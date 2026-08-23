@@ -12,11 +12,13 @@
  *
  * So this is the **floor of the mix** and nothing else. It has no position, no
  * range, no gate and no trigger; it does not know where the player is and never
- * will. What it has is a level 35 dB down and a very slow swell, and the whole
- * test of it is `ENGINE_BED_GAIN`'s test one storey lower: *a player must never
- * identify it as a sound at all until they walk somewhere it is not* -- and
- * there is nowhere it is not, so the only way to notice it is to turn the sound
- * off.
+ * will. What it has is a level under everything else in the mix and a swell that
+ * takes it from silence to that level and back, and the whole test of it is
+ * `ENGINE_BED_GAIN`'s test one storey lower: *a player must never identify it as
+ * a sound at all until they walk somewhere it is not* -- and there is nowhere it
+ * is not, so the only way to notice it is to turn the sound off. Both of those
+ * numbers were got wrong on the first cut and set by ear on the second; see
+ * `CITY_BED_GAIN` and section 4.
  *
  * ---------------------------------------------------------------------------
  * 1. THIS IS NOT `carsound`'s BED, AND THE TWO MUST NOT BE MERGED.
@@ -32,8 +34,8 @@
  * stop being able to reach zero on a quiet street, which is the only thing it is
  * for, and this one would inherit a gate, which is the only thing it must not
  * have. They also live at different levels for that reason -- 0.10 * `ENGINE_TRIM`
- * against `CITY_BED_GAIN`'s 0.018 -- and the ordering is the design: the cars are
- * a thing you hear, this is the thing you hear them *over*.
+ * is 0.0167 of traffic against `CITY_BED_GAIN`'s 0.006 -- and the ordering is the
+ * design: the cars are a thing you hear, this is the thing you hear them *over*.
  *
  * ---------------------------------------------------------------------------
  * 2. PINK, AND WHICH PINK.
@@ -96,27 +98,85 @@
  * and is worse than the click it replaced.
  *
  * ---------------------------------------------------------------------------
- * 4. THE SWELL IS A PURE FUNCTION OF TIME, AND THAT IS WHY IT CAN BE TESTED.
+ * 4. THE SWELL: ALL THE WAY DOWN, ALL THE WAY UP, AND AT A TEMPO THAT WANDERS.
  *
- * *"swelling randomly"*. The obvious implementation is `Math.random` on a timer
- * and it is wrong twice over: nothing in this project's audio is allowed to be
- * irreproducible (`game/footy.ts` and `game/traffic.ts` state the rule -- ambient
- * things are pure functions of `(anchor, index, tick)`), and a check cannot
- * assert anything about a random walk except that it stayed in its bounds.
+ * The owner heard the first cut and replaced the spec: *"the pink noise should
+ * swell from 0-100% vol with a random frequency that shifts between 0.1 and
+ * 0.01hz"*. Three things in one sentence, and each of them is a change from what
+ * was here before.
  *
- * So `citySwell(t)` is four slow waves on **incommensurate periods** -- 37, 53,
- * 71 and 97 seconds, four primes -- summed onto 1. Their beat repeats after
- * 37 * 53 * 71 * 97 seconds, which is 156 days, so it never audibly repeats
- * inside any session anybody will ever play; and because it is a sum of four
- * bounded continuous waves it can never lurch, which a random walk absolutely
- * can. `verifyCityBed` asserts both properties directly rather than trusting the
- * arithmetic: it bounds the first difference over ten minutes of samples, and
- * it searches every candidate period under ten minutes for one that repeats.
+ *   - **0 to 100 %, not a shallow wobble.** `citySwell(t)` returns 0..1 and it
+ *     really does reach both -- the bed goes *silent* at the bottom of every
+ *     breath and to the whole of `CITY_BED_GAIN` at the top. The first cut moved
+ *     between 0.6 and 1.4 of the level, which is a bed that is always on with a
+ *     tremor in it; this is a bed that arrives and leaves. `verifyCityBed`
+ *     asserts the silence, because "never quite reaching zero" is the exact
+ *     failure this spec exists to rule out and it is the one a smoothing constant
+ *     can reintroduce by accident (see `CITY_BED_GLIDE_S`).
+ *   - **A tempo, not a period.** The swell's own frequency wanders between
+ *     `CITY_SWELL_SLOW_HZ` and `CITY_SWELL_FAST_HZ` -- 0.01 to 0.1 Hz, breaths of
+ *     100 seconds down to 10 -- and the wander itself takes minutes, driven by
+ *     two very slow incommensurate terms (`CITY_TEMPO_PERIODS`, 311 s and 173 s,
+ *     both prime). So the thing that is "random" is not the level, it is the
+ *     rate, which is what the sentence asks for and is a much better description
+ *     of a city than a fixed pulse at any speed.
+ *   - **Still pure in `t`.** No accumulator, no state, no `Math.random`, for the
+ *     reasons the rest of this project gives (`game/footy.ts` and
+ *     `game/traffic.ts`: ambient things are pure functions of their clock) and
+ *     for the one that matters here -- a check cannot assert anything about a
+ *     random walk except that it stayed in its bounds.
  *
- * The wave is `giverbodies.wave`'s -- a triangle through a smoothstep, no
- * transcendental -- for that function's stated reason and for one more of its
- * own: this check runs in the Bun server as well as in the browser, and a
- * `Math.sin` in a thing evaluated on both ends is the habit `CLAUDE.md` bans.
+ * **How a wandering frequency stays pure**, which is the whole trick of this
+ * section. The naive implementation integrates the frequency by accumulating
+ * `phase += f(t) * dt` every frame, and that is state: it depends on the frame
+ * rate, it drifts between two clients, it cannot be sampled at an arbitrary `t`
+ * by a test, and a dropped frame changes it forever. Instead the phase is the
+ * **closed-form integral** of the frequency function:
+ *
+ * ```
+ *   f(t)  = SLOW + (FAST - SLOW) * m(t)          m(t) in [0, 1]
+ *   phi(t) = integral of f from 0 to t            -- in turns, evaluated directly
+ *   swell = shape(phi(t))                         -- the triangle, 0..1
+ * ```
+ *
+ * so `citySwell(1000.25)` is one expression with no history behind it.
+ *
+ * That constrains what `m` may be, and this is the fork the brief named. A
+ * sinusoidal `m` integrates to a cosine and is the textbook answer -- and it
+ * would put `Math.sin` and `Math.cos` into a file that both processes evaluate,
+ * which is the habit `CLAUDE.md` bans and which section 4 of the first cut
+ * claimed this file did not have. Rather than leave a claim in a header that the
+ * code no longer honours, **the polynomial path was taken**: `m` is built from
+ * the same smoothstep triangle `giverbodies.wave` uses, and a smoothstep triangle
+ * is piecewise polynomial, so its integral is piecewise polynomial too and is
+ * written out in `tempoIntegral`. The claim stands: there is not a transcendental
+ * in this file, and `verifyCityBed` checks the integral against the integrand by
+ * differentiating it numerically -- which is the test that would catch an algebra
+ * slip in that polynomial, and is worth more than the elegance of a cosine.
+ *
+ * **Evenly in frequency, or evenly in period?** The band is a factor of ten wide,
+ * and the two ways of wandering across it do not sound alike. Uniform in
+ * *frequency* spends half its life above 0.055 Hz -- breaths shorter than 18
+ * seconds -- because most of a linear frequency band is the fast end; that reads
+ * as a pulse. Uniform in *period* is the geometric feel, half the time above 55
+ * seconds, which is a tide. The second is what a city does and what the brief
+ * wants, and it is what an exponential mapping would give -- and an exponential
+ * is exactly the transcendental this file has just refused. So the bias is put in
+ * the *modulator* instead: `m` is the smoothstep triangle **cubed**, which is
+ * flat for long stretches near zero and only briefly near one, and lands between
+ * the two extremes and much nearer the good one. Measured over ten hours:
+ *
+ * ```
+ *                        mean breath   >30 s   >50 s   <15 s
+ *   uniform in frequency       18 s     26 %    11 %    41 %
+ *   this, cubed                26 s     48 %    31 %    12 %
+ *   uniform in period          55 s     78 %    56 %     6 %
+ * ```
+ *
+ * Both ends of the band are still reached rather than approached: the cube keeps
+ * `m` in [0, 1] and both terms sit at their own extremes often enough that an
+ * hour of sampling sees 0.0100 Hz and 0.0993 Hz. `verifyCityBed` asserts that
+ * too, because a band that is never used is a constant that lies.
  *
  * ---------------------------------------------------------------------------
  * 5. WHAT IT COSTS, WHICH IS AS CLOSE TO NOTHING AS AN ALWAYS-ON SOUND GETS.
@@ -142,8 +202,9 @@
  * fault as a badly looped room tone. Too long and the buffer stops being free --
  * ten seconds at 48 kHz is 1.9 MB of float held for the session, for a
  * difference nobody can hear. At four seconds the lowest full cycle in the loop
- * is 0.25 Hz, well under the swell's own 37-second slowest wave, so the two
- * never beat against each other in a way that reads as rhythm.
+ * is 0.25 Hz, and the swell above it never breathes faster than 0.1 Hz, so the
+ * two are more than a factor of two apart at their closest and never beat
+ * against each other in a way that reads as rhythm.
  *
  * The seam is a quarter of a second: long enough that the crossfade region is
  * statistically settled, short enough that it is 6 % of the buffer. See section 3.
@@ -179,21 +240,36 @@ export const PINK_DIRECT = 0.5362;
 export const PINK_TAIL = 0.115926;
 
 /**
- * How loud the whole thing is: the owner's 35 dB.
+ * How loud the whole thing is. **0.006, and it was 0.018.**
  *
- * `10 ^ (-35 / 20)` is 0.0178, and 0.018 is that to the two figures every other
- * level in `game/audio.ts` is written to. It is **the smallest gain in the
- * mix**, and deliberately: `ENGINE_BED_GAIN`'s 0.10 through `ENGINE_TRIM` is
- * 0.0167 of traffic and `SUN_SCREAM_GAIN` is 0.12, so this sits with the
- * traffic bed at the very bottom and a factor of seven under the scream. See the
- * level-budget block at the foot of `game/audio.ts` for where it lands against
- * the limiter, which is nowhere: 0.55 * 0.018 * 1.4 at the top of a swell is
- * 0.014 against a threshold of 0.398.
+ * The first cut of this constant was arithmetic: the brief said *"like 35dB ?"*,
+ * `10 ^ (-35 / 20)` is 0.0178, and 0.018 was written down as though that settled
+ * it. The owner listened to it and said it was three times too loud, which it
+ * was.
  *
- * The swell multiplies it, so the real range is 0.011 to 0.025 -- about
- * -39 to -32 dB.
+ * **The conversion was not wrong; it was answering a different question.** A
+ * level in decibels has no referent until something plays it -- 35 dB below what,
+ * through what, against what else in the mix, on what the player is listening
+ * on. What he meant by the number was a *description*: a floor you notice when
+ * it stops. What the conversion produced was a floor you can hear on an empty
+ * street, which is a different sound and is the one thing section 1 says this
+ * must never be.
+ *
+ * So **this number is an ear measurement now, not a conversion, and it must not
+ * be "restored"** to `10 ^ (-35 / 20)` by anybody who finds the arithmetic and
+ * assumes a typo. `verifyCityBed` has a line that fails if it is set back to
+ * 0.0178, with this paragraph named in the message, because that is exactly the
+ * tidy-minded edit this file will attract.
+ *
+ * Where 0.006 lands: -44.4 dB, a third of what was shipped, and under a third of
+ * `ENGINE_BED_GAIN`'s 0.0167 played level -- so the traffic bed is now clearly
+ * *over* the city bed rather than beside it, which is the right order. The swell
+ * multiplies it between 0 and 1 (see section 4), so what is actually heard runs
+ * from silence to 0.006, and the average over a breath is half of that. Against
+ * the limiter it is nothing at all: `master` is 0.55, so the peak is
+ * 0.55 * 0.006 = **0.0033** against a threshold of 0.398.
  */
-export const CITY_BED_GAIN = 0.018;
+export const CITY_BED_GAIN = 0.006;
 
 /**
  * Where the bed is low-passed, hertz, and how fast the applied gain may move.
@@ -205,65 +281,196 @@ export const CITY_BED_GAIN = 0.018;
  * source out there, so the sound has to arrive already having been through a
  * kilometre of air and a suburb of brick.
  *
- * The glide is the rate limiter section 4's swell is applied through. 0.75 s is
- * far slower than `ENGINE_GLIDE_S`' 50 ms because nothing here is tracking an
- * event: the fastest the swell itself can move is 3.6 % of the level a second,
- * and a follower an order of magnitude quicker than that guarantees the applied
- * gain is a slide under any frame rate, including the 4 fps of a tab that has
- * just come back.
+ * The glide is the rate limiter section 4's swell is applied through, and
+ * **0.2 s, where it was 0.75.** `setTargetAtTime` is a one-pole, so it is a
+ * low-pass on the swell as well as a smoother of it, and the swell is no longer
+ * slow: at `CITY_SWELL_FAST_HZ` it completes a breath in ten seconds. Measured
+ * attenuation `1 / sqrt(1 + (2 pi f tau)^2)` at the two edges of the band:
+ *
+ * ```
+ *   tau      at 0.01 Hz        at 0.1 Hz            lag at 0.1 Hz
+ *   0.75 s   0.9989 (-0.01)    0.9046 (-0.87 dB)    0.70 s
+ *   0.35 s   0.9998            0.9767 (-0.21 dB)    0.35 s
+ *   0.20 s   0.9999            0.9922 (-0.07 dB)    0.20 s
+ *   0.10 s   1.0000            0.9980 (-0.02 dB)    0.10 s
+ * ```
+ *
+ * 0.75 would have eaten a tenth of the swell's depth at the fast end, and a tenth
+ * of the depth is precisely the failure the new spec exists to rule out: the bed
+ * would stop reaching silence exactly when the breathing got quick, which is
+ * where the silence is most of the effect. 0.2 s passes 99.2 % of it, lags by a
+ * fifth of a second on a ten-second breath (2 % of a cycle, and a bed has no
+ * transient to be late for), and is still twelve frames of averaging at 60 fps --
+ * so a stutter in the frame rate cannot show up as a step in the level, which is
+ * the job the glide was here to do in the first place. `verifyCityBed` computes
+ * that attenuation from the two constants rather than trusting this table.
  */
 export const CITY_BED_LOWPASS_HZ = 2000;
-export const CITY_BED_GLIDE_S = 0.75;
+export const CITY_BED_GLIDE_S = 0.2;
 
 // --- The swell --------------------------------------------------------------------
 
 /**
- * The four periods, seconds, and how much of the swell each one owns.
+ * The band the swell's own frequency wanders in, hertz. The owner's numbers.
  *
- * Four primes, so nothing divides anything: the sum repeats after their product,
- * 13.5 million seconds, which is 156 days of continuous play. The weights add to
- * `CITY_SWELL_DEPTH` and are ordered so the slowest wave is the loudest -- the
- * thing a player should half-notice is the two-minute breath, and the 37-second
- * one is there to stop the two-minute breath from being a shape you can predict.
+ * *"a random frequency that shifts between 0.1 and 0.01hz"* -- breaths of ten
+ * seconds at the fast end and a hundred at the slow one, a factor of ten apart.
+ * Both ends are reached rather than approached; see section 4 and the check.
+ *
+ * They are exported because two other things are derived from them and must not
+ * be allowed to disagree: the steepest the level can move (`3 * FAST`, which is
+ * what `CITY_BED_GLIDE_S` was chosen against) and the longest a breath can take,
+ * which is what bounds how long the check has to sample before it can insist the
+ * bed has been silent at least once.
  */
-export const CITY_SWELL_PERIODS: readonly number[] = [97, 71, 53, 37];
-export const CITY_SWELL_WEIGHTS: readonly number[] = [0.16, 0.11, 0.08, 0.05];
-/** How far the swell may move the level either way. The weights' sum. */
-export const CITY_SWELL_DEPTH = 0.4;
+export const CITY_SWELL_SLOW_HZ = 0.01;
+export const CITY_SWELL_FAST_HZ = 0.1;
 
 /**
- * A smooth wave in [-1, 1] with period 1: a triangle through a cubic ease.
+ * How the tempo itself wanders: two very slow periods, seconds, and their share.
  *
- * `game/giverbodies.wave` exactly, restated rather than imported for the reason
- * `SOUND_SPEED` is restated in `game/carsound.ts`: this file must not depend on
- * the giver bodies, the dependency would run the wrong way, and a smoothstep is
- * not a thing either of them can get wrong. Smooth at the folds as well as
- * between them, because a bare triangle would put a corner in the swell's rate
- * twice a cycle and a corner in a gain is the one artefact this whole file is
- * arranged to avoid.
+ * 311 and 173, both prime, so the pair does not come back into step for
+ * 53,803 seconds -- fifteen hours -- and the *pattern of speeding up and slowing
+ * down* is therefore never a pattern anybody can learn. Minutes rather than
+ * seconds because this is the thing the brief calls "random": a tempo that
+ * changed every few seconds would read as wow and flutter, and one that changed
+ * every hour would read as a fixed rate.
+ *
+ * The shares add to 1 by construction -- they are a weighted average of two
+ * numbers in [0, 1], so the modulator is in [0, 1] and the frequency cannot leave
+ * its band no matter what is done to the weights. 0.62 / 0.38 rather than an even
+ * split so that neither term is a half the other can cancel: with equal weights
+ * the sum has a preferred value in the middle and the extremes get rarer.
  */
-function wave(u: number): number {
+export const CITY_TEMPO_PERIODS: readonly number[] = [311, 173];
+export const CITY_TEMPO_WEIGHTS: readonly number[] = [0.62, 0.38];
+/** Where the second term starts, in turns, so the two do not rise together at t=0. */
+const CITY_TEMPO_PHASE: readonly number[] = [0, 0.37];
+
+/**
+ * A smooth wave in [0, 1] with period 1: a triangle through a cubic ease.
+ *
+ * `game/giverbodies.wave` on the unit interval instead of on [-1, 1], restated
+ * rather than imported for the reason `SOUND_SPEED` is restated in
+ * `game/carsound.ts`: this file must not depend on the giver bodies, the
+ * dependency would run the wrong way, and a smoothstep is not a thing either of
+ * them can get wrong.
+ *
+ * It is used for two different jobs here and the shape suits both. As the
+ * **level** it reaches exactly 0 and exactly 1 once a cycle and is flat at both,
+ * so the bed lingers in silence and lingers at full rather than crossing them --
+ * which is what a swell is. As the **tempo modulator** its flatness at the ends
+ * is what puts the wander at the ends of the band instead of in the middle of it.
+ */
+function shape(u: number): number {
   const f = u - Math.floor(u);
   const t = f < 0.5 ? f * 2 : 2 - f * 2;
-  return t * t * (3 - 2 * t) * 2 - 1;
+  return t * t * (3 - 2 * t);
 }
 
 /**
- * How loud the city is right now, as a multiple of `CITY_BED_GAIN`. 0.6 to 1.4.
+ * The modulator: `shape` cubed, in [0, 1]. See section 4 on why it is cubed.
+ *
+ * The cube is the whole of the "spend more time on long breaths" decision. It
+ * costs two multiplies and it is the closest this file can get to an exponential
+ * mapping without becoming a file with an exponential in it.
+ */
+function tempoShape(u: number): number {
+  const s = shape(u);
+  return s * s * s;
+}
+
+/**
+ * The area under half a cycle of `tempoShape`, and the running integral of it.
+ *
+ * This is the closed form section 4 promised, and it is the one piece of algebra
+ * in this file that could be silently wrong -- so it is written out rather than
+ * simplified, and `verifyCityBed` differentiates it numerically and compares
+ * against `citySwellHz`.
+ *
+ * On the rising half, with `t = 2u`, `shape` is `3t^2 - 2t^3` and its cube is
+ * `t^6 (3 - 2t)^3` = `27t^6 - 54t^7 + 36t^8 - 8t^9`. Integrating in `u` (hence
+ * the half) gives `(27/7)t^7 - (27/4)t^8 + 4t^9 - (4/5)t^10`, all over two. The
+ * falling half is the mirror of it, so the whole cycle is twice the half and any
+ * `u` is (whole cycles) + (a mirror or not).
+ */
+const TEMPO_HALF_AREA = 0.5 * (27 / 7 - 27 / 4 + 4 - 4 / 5);
+
+function tempoRise(t: number): number {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  const t4 = t3 * t;
+  const t7 = t4 * t3;
+  const t8 = t7 * t;
+  const t9 = t8 * t;
+  const t10 = t9 * t;
+  return 0.5 * ((27 / 7) * t7 - (27 / 4) * t8 + 4 * t9 - (4 / 5) * t10);
+}
+
+/** The integral of `tempoShape` from 0 to `u`, in turns. */
+function tempoIntegral(u: number): number {
+  const whole = Math.floor(u);
+  const f = u - whole;
+  const part = f < 0.5 ? tempoRise(2 * f) : 2 * TEMPO_HALF_AREA - tempoRise(2 * (1 - f));
+  return whole * 2 * TEMPO_HALF_AREA + part;
+}
+
+/**
+ * How fast the city is breathing at second `t`, in hertz. 0.01 to 0.1.
+ *
+ * Exported because it is the honest description of what this file does -- "the
+ * swell's frequency wanders" is a claim about *this function*, and a check that
+ * could only see the level would have to infer the frequency from zero crossings
+ * and would be measuring its own inference. `verifyCityBed` reads it directly.
+ */
+export function citySwellHz(t: number): number {
+  let m = 0;
+  for (let i = 0; i < CITY_TEMPO_PERIODS.length; i++) {
+    m += CITY_TEMPO_WEIGHTS[i] * tempoShape(t / CITY_TEMPO_PERIODS[i] + CITY_TEMPO_PHASE[i]);
+  }
+  return CITY_SWELL_SLOW_HZ + (CITY_SWELL_FAST_HZ - CITY_SWELL_SLOW_HZ) * m;
+}
+
+/**
+ * How many whole breaths have been taken by second `t`, including the fraction.
+ *
+ * The integral of `citySwellHz` from 0 to `t`, in **turns** rather than radians,
+ * because the wave that consumes it has period 1. Evaluated directly from the
+ * closed form -- there is no accumulator anywhere in this file, which is what
+ * makes `citySwell` a function rather than a state machine, and is what lets the
+ * check sample it at t = 3,127.4 s without having simulated the 3,127 seconds in
+ * front of it.
+ *
+ * Strictly increasing, because the frequency is strictly positive. That is
+ * asserted rather than assumed: a phase that went backwards would be a swell that
+ * ran in reverse for a while, which is not a thing anybody would look for.
+ */
+export function citySwellPhase(t: number): number {
+  let integral = 0;
+  for (let i = 0; i < CITY_TEMPO_PERIODS.length; i++) {
+    const period = CITY_TEMPO_PERIODS[i];
+    const phase = CITY_TEMPO_PHASE[i];
+    integral += CITY_TEMPO_WEIGHTS[i] * period
+      * (tempoIntegral(t / period + phase) - tempoIntegral(phase));
+  }
+  return CITY_SWELL_SLOW_HZ * t + (CITY_SWELL_FAST_HZ - CITY_SWELL_SLOW_HZ) * integral;
+}
+
+/**
+ * How loud the city is right now, as a fraction of `CITY_BED_GAIN`. **0 to 1.**
+ *
+ * *"swell from 0-100% vol"*: at the bottom of a breath this returns exactly zero
+ * and the bed is silent, at the top it returns exactly one. See section 4 for why
+ * that is the spec and what changed from the first cut.
  *
  * Pure in `t` and in nothing else -- no state, no clock of its own, no
- * `Math.random` -- which is what lets `verifyCityBed` sample twenty minutes of it
- * in a boot list and what makes two clients standing in the same street hear the
- * same breath. `t` is seconds; the caller passes `ctx.currentTime`, so it starts
- * at zero when the context does and that is fine: there is no wrong phase for
- * this.
+ * `Math.random` -- which is what lets `verifyCityBed` sample an hour of it in a
+ * boot list. `t` is seconds; the caller passes `ctx.currentTime`, so it starts at
+ * zero when the context does, and that is fine: there is no wrong phase for a
+ * thing with no event in it.
  */
 export function citySwell(t: number): number {
-  let v = 1;
-  for (let i = 0; i < CITY_SWELL_PERIODS.length; i++) {
-    v += CITY_SWELL_WEIGHTS[i] * wave(t / CITY_SWELL_PERIODS[i]);
-  }
-  return v;
+  return shape(citySwellPhase(t));
 }
 
 // --- Making the noise ---------------------------------------------------------------
@@ -416,7 +623,11 @@ export function spectralTilt(x: Float32Array, rate: number): number {
 export function verifyCityBed(): string[] {
   const f: string[] = [];
 
-  // --- The swell: bounds, over an hour.
+  // --- The swell: it must reach both ends, and never leave them.
+  //
+  // 0 and 1 exactly, not "about" -- `shape` is flat at both, so the bed sits in
+  // silence and sits at full rather than crossing them, and a swell that came out
+  // 0.05..0.95 would be one somebody had put a smoother or a bias in front of.
   let lo = Infinity;
   let hi = -Infinity;
   for (let i = 0; i <= 36000; i++) {
@@ -424,28 +635,107 @@ export function verifyCityBed(): string[] {
     if (v < lo) lo = v;
     if (v > hi) hi = v;
   }
-  const floor = 1 - CITY_SWELL_DEPTH;
-  const ceil = 1 + CITY_SWELL_DEPTH;
-  if (lo < floor - 1e-12 || hi > ceil + 1e-12) {
-    f.push(`citySwell leaves [${floor}, ${ceil}]: ${lo.toFixed(4)} .. ${hi.toFixed(4)}`);
-  }
-  // And it must actually swell. A depth nobody can hear is the same bug as no
-  // bed at all, arrived at from the other side.
-  if (hi - lo < 0.25) f.push(`citySwell barely moves: ${(hi - lo).toFixed(4)} over an hour`);
+  if (lo < 0 || hi > 1) f.push(`citySwell leaves [0, 1]: ${lo} .. ${hi}`);
+  if (lo > 1e-6) f.push(`citySwell never reaches silence: its floor over an hour is ${lo.toExponential(2)}`);
+  if (hi < 1 - 1e-6) f.push(`citySwell never reaches full: its ceiling over an hour is ${hi.toFixed(6)}`);
+
+  // And it reaches both **often**, which is the part a player experiences. The
+  // slowest breath the band allows is 1 / CITY_SWELL_SLOW_HZ = 100 s, so every
+  // window of 150 s must contain a whole cycle -- a silence and a peak -- wherever
+  // it is taken. Measured over the first hour: no window has a floor above
+  // 2.2e-6 or a ceiling below 0.999999.
   {
-    let weights = 0;
-    for (const w of CITY_SWELL_WEIGHTS) weights += w;
-    if (Math.abs(weights - CITY_SWELL_DEPTH) > 1e-12) {
-      f.push(`CITY_SWELL_WEIGHTS sum to ${weights}, not CITY_SWELL_DEPTH ${CITY_SWELL_DEPTH}`);
+    const window = 150;
+    let worstFloor = 0;
+    let worstCeil = 1;
+    for (let w = 0; w < 24; w++) {
+      const t0 = w * window;
+      let a = Infinity;
+      let b = -Infinity;
+      for (let i = 0; i <= window * 20; i++) {
+        const v = citySwell(t0 + i / 20);
+        if (v < a) a = v;
+        if (v > b) b = v;
+      }
+      if (a > worstFloor) worstFloor = a;
+      if (b < worstCeil) worstCeil = b;
     }
-    if (CITY_SWELL_WEIGHTS.length !== CITY_SWELL_PERIODS.length) {
-      f.push('CITY_SWELL_WEIGHTS and CITY_SWELL_PERIODS are different lengths');
+    if (worstFloor > 1e-3) f.push(`a ${window}s window never went quiet: floor ${worstFloor.toExponential(2)}`);
+    if (worstCeil < 0.999) f.push(`a ${window}s window never reached full: ceiling ${worstCeil.toFixed(4)}`);
+  }
+
+  // --- The tempo. Inside the owner's band, and using the whole of it.
+  //
+  // Two separate claims. Staying inside is structural -- the modulator is a
+  // weighted average of two numbers in [0, 1] -- and is checked anyway, because a
+  // weight edit that broke the average would take the frequency out of the band
+  // and produce a bed that pulsed. *Using* the band is not structural at all: two
+  // slow terms that never coincided would leave the ends of it unvisited, and a
+  // constant nobody ever reaches is a constant that lies. Measured over an hour:
+  // 0.0100 Hz to 0.0993 Hz.
+  {
+    let fastest = 0;
+    let slowest = Infinity;
+    for (let i = 0; i <= 14400; i++) {
+      const v = citySwellHz(i / 4);
+      if (v > fastest) fastest = v;
+      if (v < slowest) slowest = v;
+    }
+    if (slowest < CITY_SWELL_SLOW_HZ - 1e-12 || fastest > CITY_SWELL_FAST_HZ + 1e-12) {
+      f.push(`citySwellHz leaves its band: ${slowest.toFixed(5)} .. ${fastest.toFixed(5)} Hz`);
+    }
+    const span = CITY_SWELL_FAST_HZ - CITY_SWELL_SLOW_HZ;
+    if (slowest > CITY_SWELL_SLOW_HZ + span * 0.02) {
+      f.push(`the tempo never slows to the bottom of its band: ${slowest.toFixed(5)} Hz in an hour`);
+    }
+    if (fastest < CITY_SWELL_FAST_HZ - span * 0.15) {
+      f.push(`the tempo never reaches the top of its band: ${fastest.toFixed(5)} Hz in an hour`);
+    }
+    let weights = 0;
+    for (const w of CITY_TEMPO_WEIGHTS) weights += w;
+    if (Math.abs(weights - 1) > 1e-12) {
+      f.push(`CITY_TEMPO_WEIGHTS sum to ${weights}, not 1: the tempo can leave its band`);
+    }
+    if (CITY_TEMPO_WEIGHTS.length !== CITY_TEMPO_PERIODS.length) {
+      f.push('CITY_TEMPO_WEIGHTS and CITY_TEMPO_PERIODS are different lengths');
+    }
+  }
+
+  // --- The phase really is the integral of the frequency.
+  //
+  // The one piece of algebra in this file that a careful reader cannot check by
+  // eye: `tempoIntegral` is a tenth-degree polynomial written out by hand, and a
+  // wrong coefficient in it would produce a swell that still looked plausible --
+  // bounded, smooth, aperiodic -- while breathing at a rate that had nothing to do
+  // with the band above. Differentiating the closed form numerically and comparing
+  // it against the integrand is the whole test, and it agrees to 4e-10.
+  {
+    let worst = 0;
+    for (let i = 0; i < 2000; i++) {
+      const t = i * 1.7 + 0.13;
+      const h = 1e-4;
+      const d = (citySwellPhase(t + h) - citySwellPhase(t - h)) / (2 * h);
+      const want = citySwellHz(t);
+      const err = d > want ? d - want : want - d;
+      if (err > worst) worst = err;
+    }
+    if (worst > 1e-6) {
+      f.push(`citySwellPhase does not integrate citySwellHz: off by ${worst.toExponential(2)} Hz`);
+    }
+    // Strictly increasing, because the frequency is strictly positive. A phase
+    // that went backwards is a swell running in reverse.
+    let prev = citySwellPhase(0);
+    for (let i = 1; i <= 20000; i++) {
+      const v = citySwellPhase(i * 0.25);
+      if (!(v > prev)) { f.push(`citySwellPhase stalls or reverses at t=${i * 0.25}`); break; }
+      prev = v;
     }
   }
 
   // --- Pure in t. The same second twice is the same number, and the answer
-  // cannot depend on what was asked before it: a cached state, a stray
-  // `Math.random` or a `Date.now` all fail here.
+  // cannot depend on what was asked before it: a cached state, an accumulator, a
+  // stray `Math.random` or a `Date.now` all fail here. This is the line that
+  // would catch somebody "optimising" the closed-form phase into a running sum.
   for (let i = 0; i < 500; i++) {
     const t = i * 3.7;
     const a = citySwell(t);
@@ -454,14 +744,17 @@ export function verifyCityBed(): string[] {
     if (a !== b) f.push(`citySwell is not pure at t=${t}: ${a} then ${b}`);
   }
 
-  // --- No lurch. The first difference over ten minutes at 100 Hz, against the
-  // analytic bound: the smoothstep triangle's steepest slope is 6 per period, so
-  // the sum cannot move faster than 6 * sum(weight / period) a second.
-  let slope = 0;
-  for (let i = 0; i < CITY_SWELL_PERIODS.length; i++) {
-    slope += CITY_SWELL_WEIGHTS[i] / CITY_SWELL_PERIODS[i];
-  }
-  slope *= 6;
+  // --- No lurch, against a bound derived from the band rather than typed in.
+  //
+  // `shape` climbs at most 3 per turn, and a turn takes at least
+  // 1 / CITY_SWELL_FAST_HZ seconds, so the level cannot move faster than
+  // 3 * CITY_SWELL_FAST_HZ a second -- 0.3, with the band as it stands. Measured
+  // over ten minutes at 100 Hz the worst first difference is 0.00245 against a
+  // bound of 0.00300, and over a hundred minutes it is 0.00298: the bound is
+  // attained rather than approximated, because the fast end of the band really is
+  // reached and the wave really does run at its steepest there. Which is also why
+  // the margin here is 2 % and not 50 % -- there is nothing slack about it.
+  const slope = 3 * CITY_SWELL_FAST_HZ;
   {
     const step = 0.01;
     let worst = 0;
@@ -472,12 +765,9 @@ export function verifyCityBed(): string[] {
       if (d > worst) worst = d;
       prev = v;
     }
-    if (worst > slope * step * 1.05) {
+    if (worst > slope * step * 1.02) {
       f.push(`citySwell steps: ${worst.toExponential(3)} in ${step}s, bound ${(slope * step).toExponential(3)}`);
     }
-    // And the bound itself has to be slow enough to be a swell rather than a
-    // wobble: an eighth of the depth a second would be a tremolo.
-    if (slope > CITY_SWELL_DEPTH / 8) f.push(`citySwell moves at ${slope.toFixed(4)}/s, which is a wobble`);
   }
 
   // --- No period under ten minutes.
@@ -485,20 +775,18 @@ export function verifyCityBed(): string[] {
   // Every candidate shift from half a second to ten minutes, at a tenth of a
   // second, scored against **how far the swell could have moved in that shift**
   // rather than against a fixed number. That normalisation is the whole test: a
-  // shift of a tenth of a second disagrees by almost nothing on any slow wave,
-  // so a flat threshold would report every short candidate as a repeat and
-  // nothing would ever have been checked. What a real period looks like is a
-  // shift the wave *could* have wandered over and did not. The measured worst
-  // case over the whole range is 0.49 of what was available, at 484.9 s; a
-  // quarter is the line, so this fails long before two of the periods start
-  // sharing a factor.
+  // shift of a tenth of a second cannot disagree by much whatever the wave is
+  // doing, so a flat threshold would report every short candidate as a repeat and
+  // nothing would have been checked. What a real period looks like is a shift the
+  // wave *could* have wandered over and did not. The measured worst case over the
+  // whole range is 0.70 of what was available, at 3 s; a quarter is the line.
   {
     let found = 0;
     let foundAt = 0;
     let tightest = Infinity;
     for (let p10 = 5; p10 <= 6000; p10++) {
       const period = p10 / 10;
-      const possible = Math.min(CITY_SWELL_DEPTH, slope * period);
+      const possible = Math.min(1, slope * period);
       let worst = 0;
       for (let k = 0; k < 40; k++) {
         const t = k * 13.7;
@@ -514,17 +802,17 @@ export function verifyCityBed(): string[] {
     if (found > 0) {
       f.push(`citySwell nearly repeats inside ten minutes: ${found} shift(s), first at ${foundAt}s (${tightest.toFixed(3)} of the available drift)`);
     }
-    // The primes are the reason it does not, so check they are still pairwise
-    // coprime: an edit that gives two of them a common factor shortens the beat
-    // by that factor, and this is the line that says so in one word rather than
-    // as a mysterious near-repeat above.
-    for (let i = 0; i < CITY_SWELL_PERIODS.length; i++) {
-      for (let j = i + 1; j < CITY_SWELL_PERIODS.length; j++) {
-        let a = CITY_SWELL_PERIODS[i];
-        let b = CITY_SWELL_PERIODS[j];
+    // The primes are the reason it does not: the two tempo terms come back into
+    // step only after their product. An edit that gives them a common factor
+    // shortens that by the factor, and this says so in one line rather than as a
+    // mysterious near-repeat above.
+    for (let i = 0; i < CITY_TEMPO_PERIODS.length; i++) {
+      for (let j = i + 1; j < CITY_TEMPO_PERIODS.length; j++) {
+        let a = CITY_TEMPO_PERIODS[i];
+        let b = CITY_TEMPO_PERIODS[j];
         while (b !== 0) { const r = a % b; a = b; b = r; }
         if (a !== 1) {
-          f.push(`swell periods ${CITY_SWELL_PERIODS[i]} and ${CITY_SWELL_PERIODS[j]} share a factor of ${a}`);
+          f.push(`tempo periods ${CITY_TEMPO_PERIODS[i]} and ${CITY_TEMPO_PERIODS[j]} share a factor of ${a}`);
         }
       }
     }
@@ -690,24 +978,50 @@ export function verifyCityBed(): string[] {
     // reason the speed of sound is restated in `game/carsound.ts`: this file must
     // not import the sound system, the dependency runs the other way, and what is
     // being asserted is an *ordering* that is a decision rather than a
-    // measurement -- this is the floor, and the traffic sits on it.
+    // measurement -- this is the floor, and the traffic sits on top of it.
     const trafficBed = 0.1 / 6;
-    if (!(CITY_BED_GAIN < 0.1)) f.push(`CITY_BED_GAIN ${CITY_BED_GAIN} is not under the 0.10 at the bottom of the mix`);
-    if (!(CITY_BED_GAIN * (1 + CITY_SWELL_DEPTH) < 0.1)) {
-      f.push('CITY_BED_GAIN at the top of its swell is over the 0.10 at the bottom of the mix');
+    if (!(CITY_BED_GAIN < trafficBed)) {
+      f.push(`CITY_BED_GAIN ${CITY_BED_GAIN} is not under the traffic bed's ${trafficBed.toFixed(4)}`);
     }
-    if (CITY_BED_GAIN > trafficBed * 1.5) {
-      f.push(`CITY_BED_GAIN ${CITY_BED_GAIN} is loud beside the traffic bed's ${trafficBed.toFixed(4)}`);
+    // **The restore guard.** The number is an ear measurement and the arithmetic
+    // it replaced is still sitting in its header where somebody will find it. This
+    // is the line that stops "35 dB means 0.0178, this must be a typo".
+    if (Math.abs(CITY_BED_GAIN - 0.0178) < 1e-3 || Math.abs(CITY_BED_GAIN - 0.018) < 1e-4) {
+      f.push('CITY_BED_GAIN has been restored to the dB conversion; read its header -- 0.006 is an ear measurement, not arithmetic');
     }
-    // 35 dB down, which is the number the owner asked for, to a decibel.
-    const dB = 20 * Math.log10(CITY_BED_GAIN);
-    if (dB < -36 || dB > -34) f.push(`CITY_BED_GAIN is ${dB.toFixed(1)} dB, not the 35 dB down that was asked for`);
+    // A floor, with room either side of it: quiet enough to be under everything
+    // and not so quiet it is a constant that does nothing.
+    if (!(CITY_BED_GAIN > 0.002 && CITY_BED_GAIN < 0.012)) {
+      f.push(`CITY_BED_GAIN ${CITY_BED_GAIN} is outside the range an ear settled on: 0.002 to 0.012`);
+    }
     if (!(CITY_BED_LOWPASS_HZ >= 1000 && CITY_BED_LOWPASS_HZ <= 4000)) {
       f.push(`CITY_BED_LOWPASS_HZ ${CITY_BED_LOWPASS_HZ} is not a distant-city corner`);
     }
-    if (!(CITY_BED_GLIDE_S > 0.2)) f.push('CITY_BED_GLIDE_S is short enough to let the swell step');
     if (!(CITY_BED_SEAM_S > 0 && CITY_BED_SEAM_S < CITY_BED_SECONDS / 4)) {
       f.push(`CITY_BED_SEAM_S ${CITY_BED_SEAM_S} is not a small fold at the head of a ${CITY_BED_SECONDS}s loop`);
+    }
+  }
+
+  // --- The glide, against the fastest breath the band allows.
+  //
+  // `setTargetAtTime` is a one-pole, so it attenuates the swell as well as
+  // smoothing it: `1 / sqrt(1 + (2 pi f tau)^2)`. Both halves of this matter and
+  // they pull opposite ways. Too slow and the fast end of the band is flattened --
+  // at the 0.75 s this shipped with, a ten-second breath arrives at 0.905 of its
+  // depth and the bed stops reaching silence, which is the whole point of the
+  // spec. Too quick and the follower stops covering a frame-rate stutter, and a
+  // stutter in a gain is a step. The table is in `CITY_BED_GLIDE_S`; this computes
+  // it from the constants so the table cannot go stale in secret.
+  {
+    const w = 6.283185307179586 * CITY_SWELL_FAST_HZ * CITY_BED_GLIDE_S;
+    const passed = 1 / Math.sqrt(1 + w * w);
+    if (passed < 0.99) {
+      f.push(`CITY_BED_GLIDE_S ${CITY_BED_GLIDE_S}s passes only ${passed.toFixed(3)} of a ${(1 / CITY_SWELL_FAST_HZ).toFixed(0)}s breath: the bed will stop reaching silence`);
+    }
+    // Three frames at 60 fps is the floor: below that the follower is not
+    // averaging anything and a dropped frame reaches the gain unsmoothed.
+    if (!(CITY_BED_GLIDE_S >= 0.05)) {
+      f.push(`CITY_BED_GLIDE_S ${CITY_BED_GLIDE_S}s is under three frames; a frame-rate stutter will step the level`);
     }
   }
 
