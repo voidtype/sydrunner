@@ -352,6 +352,7 @@ export function verifyWaypoint(): string[] {
       needFlags: [],
       denyFlags: [],
       repeatable: false,
+    anyRung: false,
       grantsBike: false,
       steps,
       reward: { cash: 0, xp: 0, unlock: [] },

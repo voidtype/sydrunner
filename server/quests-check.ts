@@ -909,6 +909,18 @@ async function main(): Promise<void> {
       pool.every((q) => !q.repeatable),
       'the pool is story work, done once',
     );
+    // `Quest.anyRung` is the register's one exemption and it belongs to the
+    // jobs that teach the game. A pool quest wearing it would be a hundred
+    // markers on every rung, which is the register turned back into a pile.
+    const exempt = shipped.bundle.quests.filter((q) => q.anyRung);
+    check(
+      pool.every((q) => !q.anyRung),
+      `no Act 2 job is exempt from the rung (${exempt.filter((q) => q.act === 2).length} would be)`,
+    );
+    check(
+      exempt.length <= 2,
+      `and the exemption stays rare: ${exempt.length} job(s) carry it (${exempt.map((q) => q.id).join(', ') || 'none'})`,
+    );
     const act1 = shipped.bundle.quests.filter((q) => q.act === 1);
     check(act1.length > 0 && act1.every((q) => q.level === last?.level), 'the faction work stands on the rung its door opens onto');
     check(act1.every((q) => q.repeatable), 'and both faction jobs are repeatable, so they come round with the week');

@@ -363,6 +363,25 @@ export interface Quest {
   /** Weekly rather than once. A repeatable never writes its `q:` mark. */
   repeatable: boolean;
   /**
+   * Exempt from the rung, and the only exemption the register allows.
+   *
+   * The register is exact on purpose -- a job belongs to one rung and a player
+   * past it is told "level 3 only" -- and that rule is what makes the ladder
+   * mean something. It has exactly one bad case: **a job whose whole purpose is
+   * to be seen by somebody who has not been shown anything yet.** The tutorial
+   * stands 45 m from the spawn with a mark over his head, and on the day it
+   * shipped a level-2 player standing in Sydney Park could not see him at all,
+   * because the register had correctly refused a rung-1 job to a rung-2 player.
+   * A signpost that disappears once you are lost is not a signpost.
+   *
+   * So a quest may opt out, and `quest.level` then means *where it sits in the
+   * register's listing* rather than *who may take it*. Content sets this; the
+   * pool never does, and `server/quests-check.ts` asserts that Act 2 does not.
+   * It is not a way to widen a job's audience -- it is for the handful of jobs
+   * that teach the game, and `scripts/content/content-check.ts` counts them.
+   */
+  anyRung: boolean;
+  /**
    * Hand the player a lime bike when they accept. `"bike": true`.
    *
    * A **loan**, not a reward, and the distinction is the whole reason this is a
@@ -760,6 +779,7 @@ export function parseQuestPack(raw: unknown, name: string): ParseResult<QuestPac
       needFlags: strList(q.needFlags, 8, MAX_FLAG_CHARS),
       denyFlags: strList(q.denyFlags, 8, MAX_FLAG_CHARS),
       repeatable: q.repeatable === true,
+      anyRung: q.anyRung === true,
       grantsBike: q.bike === true,
       steps,
       reward: { cash, xp, unlock },
@@ -1261,8 +1281,10 @@ export function questRefusal(quest: Quest, facts: PlayerFacts, cursors: QuestCur
   // wrong in -- and the whole point of a register is that a player can tell
   // which rung a job belongs to. See the header.
   const rung = rungOf(facts.level);
-  if (rung < quest.level) return `level ${quest.level} first`;
-  if (rung > quest.level) return `level ${quest.level} only`;
+  if (!quest.anyRung) {
+    if (rung < quest.level) return `level ${quest.level} first`;
+    if (rung > quest.level) return `level ${quest.level} only`;
+  }
   if (quest.faction !== '' && facts.faction !== quest.faction) return `that is ${quest.faction} work`;
   for (const need of quest.requires) {
     if (!facts.story.has(completionFlag(need))) return 'not yet';
@@ -1965,6 +1987,26 @@ export function verifyQuests(): string[] {
       }
       if (questRefusal(three, facts(4), {}) !== 'level 3 only') {
         failures.push(`Above the rung the refusal reads ${JSON.stringify(questRefusal(three, facts(4), {}))}.`);
+      }
+      // The one exemption, and it is exactly one. A signpost that vanishes once
+      // you are lost is not a signpost -- see `Quest.anyRung` -- so a quest that
+      // opts out is offered on every rung, and one that does not still is not.
+      const signpost = parseQuestPack(
+        { quests: [{ id: 'signpost', giver: 'clerk', level: 1, anyRung: true, steps: [{ kind: 'earn', dollars: 5 }] }] },
+        'fixture',
+      ).value.quests[0];
+      if (!signpost?.anyRung) {
+        failures.push('anyRung did not survive the parse.');
+      } else {
+        for (const level of [1, 2, 5, REGISTER_LEVELS, REGISTER_LEVELS + 3]) {
+          if (questRefusal(signpost, facts(level), {}) !== '') {
+            failures.push(`The signpost was refused at level ${level}: ${questRefusal(signpost, facts(level), {})}.`);
+          }
+        }
+        // It is an exemption from the rung and from nothing else: done is done.
+        if (questRefusal(signpost, facts(2, [completionFlag('signpost')]), {}) === '') {
+          failures.push('The signpost was offered again after it was finished.');
+        }
       }
     }
     // The top rung is a landing: a quest authored past the register is clamped

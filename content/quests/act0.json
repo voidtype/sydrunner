@@ -48,6 +48,7 @@
       "blurb": "Some bloke in the park reckons Cenno owes you money and has a bike you can borrow. He may be right about one of those.",
       "giver": "ladmaster",
       "level": 1,
+      "anyRung": true,
       "bike": true,
       "steps": [
         {
