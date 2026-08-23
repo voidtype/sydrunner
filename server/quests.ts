@@ -608,10 +608,13 @@ export const MAX_PACK_BYTES = 512 * 1024;
  * working as designed, and is also the whole reason the probe exists. Every
  * dialog node had been serving its authored line for as long as that was true,
  * and nothing else in the game could have told you. The successor here is the
- * closest listed relative; the env var on the box is the real setting and this
+ * cheapest model the provider lists that can hold a persona for two sentences
+ * -- $0.04 in and $0.07 out per million tokens, against the flash model's
+ * several times that -- because an improv line is forty tokens of small talk
+ * and the budget is capped. The env var on the box is the real setting and this
  * is only what a machine with no `/etc/sydney/secrets.env` falls back to.
  */
-export const DEFAULT_DIALOG_MODEL = 'glm-5-2';
+export const DEFAULT_DIALOG_MODEL = 'qwen3-5-4b';
 
 interface CacheEntry {
   /** The clamped line, or `''` while a fill is in flight or has failed. */
