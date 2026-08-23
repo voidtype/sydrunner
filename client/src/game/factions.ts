@@ -665,7 +665,18 @@ export const NPC_STATE = {
   WALK: 1,
   /** Running at the suspect. */
   CHASE: 2,
-  /** Stopped, weapon up, inside `AIM_TICKS` of firing. */
+  /**
+   * Stopped and squared up on whoever this actor is engaged with.
+   *
+   * **Not a promise of a round.** It used to be -- "inside `AIM_TICKS` of
+   * firing" -- and two things have made that untrue in both directions: an
+   * officer arresting a drunk holds `AIM` with a baton and never fires (see
+   * `POLICE.think`'s stand-down branch, which says so), and since
+   * `POLICE_ARMED_STARS` an officer on a one-star suspect holds it with nothing
+   * at all. What it does mean at both ends is *engaged and stationary*, which
+   * is what the shout is drawn off -- `FactionField.bark` offline and the rising
+   * edge of this byte online.
+   */
   AIM: 3,
   /**
    * A shot has just left the barrel. Held for `FIRE_STATE_TICKS`.
@@ -1124,12 +1135,99 @@ export function onCrime(fn: (playerId: number, reason: number, witness: number, 
  */
 let heatReader: ((playerId: number) => number) | null = null;
 
-export function setHeatReader(fn: ((playerId: number) => number) | null): void {
+/**
+ * Install the reader, and hand back the one that was there.
+ *
+ * The return value is `heat.installHeat`'s, for `heat.installHeat`'s reason: a
+ * self-check that needs a ladder of its own has to be able to put the real one
+ * back, and a checker that clobbered the process's reader on its way past would
+ * leave every officer in the room reading zero stars for the rest of the boot.
+ * `verifyPolice` at the bottom of this file is the caller that needs it.
+ */
+export function setHeatReader(fn: ((playerId: number) => number) | null): ((playerId: number) => number) | null {
+  const was = heatReader;
   heatReader = fn;
+  return was;
 }
 
 export function heatOf(playerId: number): number {
   return heatReader === null ? 0 : heatReader(playerId);
+}
+
+/**
+ * The rung at which the police are **armed**. Two stars.
+ *
+ * ---------------------------------------------------------------------------
+ * THE DESIGN, in the owner's words: *"make police only attack u from 2 star up"*.
+ *
+ * The ladder in `game/heat.ts` already says what the two bottom rungs mean, and
+ * has said so in its header since the day it was written -- *"1 star: officers
+ * shout, walk at you, no shooting"*, *"2 stars: today's pursuit -- they run and
+ * they shoot"*. Only the second half of that was ever true. A one-star
+ * investigation dispatched constables who closed to `ENGAGE_RANGE` and opened
+ * fire, so the smallest offence in the game -- a bump, a scuffle, a tuned e-bike
+ * ridden past a patrol -- cost a player the same three pips as knocking out an
+ * officer. A ladder whose bottom two rungs feel identical is a ladder with four
+ * rungs and a decoration.
+ *
+ * So: **below two stars the police do no damage.** They still dispatch, still
+ * close, still follow, still fill the banner and still run the 45 s countdown
+ * out. They simply have nothing that costs you anything. At two stars and above
+ * not one number moves: `policeShotLands`, `POLICE_LAND_SCALE` and the 1-in-10
+ * at 15 m are exactly what they were.
+ *
+ * ---------------------------------------------------------------------------
+ * **DOES A ONE-STAR OFFICER FIRE AND MISS, OR NOT FIRE AT ALL?** Not at all.
+ *
+ * The alternative -- let the round leave the barrel and never let it land -- was
+ * considered and rejected, and the reason is that this build's shot is *honest*
+ * in a way that would make the lie visible. `NPC_STATE.FIRE` is held for one
+ * snapshot period precisely so a client can draw a muzzle flash, a tracer and a
+ * crack off the state byte with no message behind it (see `FIRE_STATE_TICKS`),
+ * and the `shot` event carries a real aim point that misses high when the round
+ * misses. A player standing in a hail of tracers on full health for forty-five
+ * seconds would learn, correctly, that police fire is theatre -- which is a
+ * worse thing to teach than that a constable at one star is a man telling you to
+ * move along.
+ *
+ * Nothing else is load-bearing on the shot at this rung. What a player hears at
+ * one star is the **shout**, and the shout hangs off `NPC_STATE.AIM` rather than
+ * off the round -- offline through `FactionField.bark`, online through the state
+ * byte, which `main.ts` reads on the rising edge with the comment *"an officer
+ * who has just entered NPC_STATE.AIM is an officer who has just shouted at
+ * you"*. So the gate is placed **after** the aim transition and before the shot:
+ * the officer arrives, stops, turns to face you and shouts, and then simply
+ * stands there. `field.shots` does not move, `actor.shotsFired` does not move,
+ * no `shot` event is emitted, and there is no tracer and no crack because there
+ * is nothing for either to be drawn off.
+ *
+ * ---------------------------------------------------------------------------
+ * **ONE TEST, NOT A SCATTERED CONSTANT.** `policeMayHarm` below is the only
+ * place this number is compared against anything, and every path in this build
+ * that can take a pip off a player and call itself police goes through it:
+ * `POLICE.think`'s round here, and `heat.ts`' Polair marksman, highway-patrol
+ * contact and RBT -- both of the last three arrive at rungs well above this one
+ * and the gate is a no-op for them today, which is exactly why it is written
+ * down rather than left to be true by accident. A fifth path added later that
+ * forgets to ask is the failure this constant exists to make findable.
+ */
+export const POLICE_ARMED_STARS = 2;
+
+/**
+ * May the police do damage to this player? The one test.
+ *
+ * A predicate rather than an exported comparison, so that the four call sites
+ * read as a sentence and so that a fifth cannot get the inequality backwards.
+ *
+ * **A process with no ladder installed answers no**, which falls out of
+ * `heatOf` returning 0 and is the safe direction: a build that lost its heat
+ * field would have police who follow you and never shoot, not police who shoot
+ * an innocent. Anything driving `POLICE.think` in a bare field -- a self-check,
+ * a harness -- has to install a reader through `setHeatReader` to see a round,
+ * and `verifyPolice` does exactly that.
+ */
+export function policeMayHarm(playerId: number): boolean {
+  return heatOf(playerId) >= POLICE_ARMED_STARS;
 }
 
 /**
@@ -3279,6 +3377,29 @@ export const POLICE = registerNpcKind({
       }
       return;
     }
+    // --- **Below two stars, nothing leaves the barrel.** See
+    //     `POLICE_ARMED_STARS`, which argues the whole of this.
+    //
+    // Placed exactly here, and both neighbours matter. **After** the aim
+    // transition above, so a one-star officer still arrives, stops, turns to
+    // face the suspect and shouts -- the bark is the rising edge of
+    // `NPC_STATE.AIM` at both ends, and it is the entire 1-star response. And
+    // **after** the fire-state hold, so an officer already mid-`FIRE` on the
+    // tick a suspect sheds back to one star still brings the weapon down to
+    // `AIM` on schedule instead of freezing with a muzzle flash on it.
+    //
+    // What is skipped is the shot and every trace of it: `state` never reaches
+    // `FIRE`, so there is no muzzle, no tracer and no crack; `shotsFired` and
+    // `field.shots` do not move, so no counter claims a round that was not
+    // fired; and no `shot` event is emitted, so nothing downstream has to
+    // decide what a harmless round looks like.
+    //
+    // Read off the **suspect** rather than off the officer, because the ladder
+    // is a property of the person being chased. The test is exact on the tick:
+    // an officer who has been standing in `AIM` through a one-star
+    // investigation has already run its `AIM_TICKS` out and is holding a zero
+    // cooldown, so the tick the second star lands is the tick it fires.
+    if (!policeMayHarm(suspect.id)) return;
     // The first shot waits out the aim; every one after it waits out the
     // cooldown, which the aim has usually already covered. Both are simulation
     // ticks.
@@ -3719,8 +3840,257 @@ export function verifyPolice(kitTriangles?: number, snapshotInterval?: number): 
   // blocked by a building it passes over, and clear when it should not be.
   failures.push(...verifyLineOfSight());
 
+  // --- The two-star gate, over the real `POLICE.think`.
+  failures.push(...verifyArmedAtTwoStars());
+
   return failures;
 }
+
+/**
+ * **The two-star gate**, driven through `POLICE.think` rather than argued about.
+ *
+ * The constant and the predicate are three lines and neither can be wrong on its
+ * own; what can be wrong is *where they were spent*, and every way of getting
+ * that wrong renders a plausible game:
+ *
+ *   - **Gated too early -- above the aim transition.** The officer never reaches
+ *     `NPC_STATE.AIM`, so it never shouts and never squares up: it walks to 35 m
+ *     and stands facing wherever it was last heading. Nothing errors, and the
+ *     1-star response silently becomes no response at all.
+ *   - **Gated too late -- below the shot.** `shotsFired` and `field.shots` count
+ *     a round nobody fired, `state` reaches `FIRE`, and every client draws a
+ *     muzzle flash and a tracer and plays a crack for a bullet that does not
+ *     exist. That is the fire-and-miss design this file rejected, arrived at by
+ *     accident. It is the one an eye would *not* catch, because it looks exactly
+ *     like being shot at and missed.
+ *   - **Gated on the officer instead of the suspect.** `heatOf(actor.id)` type-
+ *     checks perfectly and asks how wanted an actor id is, which is always zero:
+ *     the police stop shooting at every rung and the pursuit becomes scenery.
+ *   - **The inequality backwards**, which is police who shoot you at one star
+ *     and stop at two -- the exact opposite of the brief, and indistinguishable
+ *     from the old behaviour for the first forty-five seconds of play.
+ *   - **The shot model moved on the way past.** The gate must be transparent at
+ *     two stars: the same one round in ten at 15 m, from the same hash, through
+ *     the same door. Measured here end-to-end rather than trusted, because
+ *     `policeShotLands` being right in isolation is what the section above
+ *     already proves and is not the same claim.
+ *
+ * ---------------------------------------------------------------------------
+ * HOW IT IS DRIVEN. One officer, one suspect, 15 m apart -- `POLICE_TUNED_RANGE`,
+ * so the rate this measures is the number the model is tuned at and the number
+ * `server/cardamage-check.ts` prints. `think` is called directly with
+ * `stateTicks` advanced exactly as `FactionField.step` advances it, rather than
+ * through `step`, because `step` also recruits: a station reinforcement wandering
+ * in every two seconds would add rounds from unknown ranges and turn an exact
+ * rate into an average over a distribution.
+ *
+ * The ladder is a **stub reader** installed through `setHeatReader` and put back
+ * afterwards. `game/heat.ts` cannot be imported here -- it imports this file --
+ * and reaching for the process's live field would make this check depend on
+ * whether anybody had installed one, which in a second module instance (the one
+ * `server/integration-check.ts` makes) is nobody. The seam that exists for
+ * exactly this is the reader, so the check turns the stars with a variable and
+ * the gate cannot tell the difference.
+ */
+/**
+ * The player id this check's suspect carries.
+ *
+ * A named constant rather than a literal because the stub heat reader, the
+ * investigation and the combatant all have to agree on it, and a check whose
+ * three halves disagreed would answer "nobody is wanted" and pass every
+ * assertion about a one-star player for entirely the wrong reason.
+ */
+const SUSPECT_ID = 424242;
+
+function verifyArmedAtTwoStars(): string[] {
+  const failures: string[] = [];
+  const def = npcKind(NPC_KIND.POLICE);
+  if (def === undefined) return ['verifyPolice could not find the police kind; the two-star gate is unproven.'];
+
+  /** The ladder, for this check only. Turned by hand, tick by tick. */
+  let stars = 1;
+  const wasReader = setHeatReader((id) => (id === SUSPECT_ID ? stars : 0));
+  try {
+    const field = new FactionField();
+    const suspect = {
+      id: SUSPECT_ID,
+      body: { position: { x: 0, y: 0, z: 0 }, velocity: { x: 0, y: 0, z: 0 }, yaw: 0, pitch: 0, onGround: true },
+      health: MAX_HEALTH,
+      phase: 'idle',
+    } as unknown as CombatantState;
+
+    let damage = 0;
+    let shotEvents = 0;
+    const ctx: FactionCtx = {
+      tick: 1000,
+      dt: 1 / 60,
+      collision: null,
+      groundHeight: () => 0,
+      peds: null,
+      combatants: [suspect],
+      field,
+      // Hand-made rather than `field.accuse`'d, and the reason is a side effect:
+      // `accuse` runs the crime listeners, and in a process where `game/heat.ts`
+      // has installed a live ladder that would bank real points onto whichever
+      // player happens to hold this id. A self-check must not be able to make
+      // somebody wanted. `POLICE.think` reads exactly one field off this record.
+      investigationOf: (id) => (id === SUSPECT_ID ? { playerId: SUSPECT_ID, reason: REASON.ASSAULT, ticks: COUNTDOWN_TICKS, since: 0 } : undefined),
+      damagePlayer: (_id, pips) => {
+        damage += pips;
+      },
+      emit: (e) => {
+        if (e.kind === 'shot') shotEvents++;
+      },
+    };
+
+    const officer = field.promote(NPC_KIND.POLICE, POLICE_TUNED_RANGE, 0, 0, -1, 0, SUSPECT_ID);
+    if (officer === null) return ['verifyPolice could not promote an officer; the two-star gate is unproven.'];
+
+    /** `FactionField.step`'s inner loop for one actor, and nothing else it does. */
+    const run = (ticks: number): void => {
+      for (let i = 0; i < ticks; i++) {
+        ctx.tick++;
+        officer.stateTicks++;
+        def.think(officer, ctx);
+      }
+    };
+
+    // --- 1. One star: sixty seconds, and nothing leaves the barrel.
+    //
+    // Sixty seconds is `COUNTDOWN_TICKS` and a third -- longer than an
+    // investigation is allowed to last, so this is the whole of a one-star
+    // encounter and then some. At `FIRE_INTERVAL_TICKS` it is room for 66 rounds.
+    const opportunities = Math.floor((60 * 60 - AIM_TICKS) / FIRE_INTERVAL_TICKS);
+    run(60 * 60);
+    if (damage !== 0 || field.shots !== 0 || officer.shotsFired !== 0 || shotEvents !== 0) {
+      failures.push(
+        `A one-star suspect took ${damage} pip(s) from ${field.shots} round(s) over a minute at ` +
+          `${POLICE_TUNED_RANGE} m (${officer.shotsFired} on the officer's own tally, ${shotEvents} shot event(s), ` +
+          `room for ${opportunities}). Below ${POLICE_ARMED_STARS} stars the police do no damage and fire nothing ` +
+          'at all -- see POLICE_ARMED_STARS, which argues why a harmless round is worse than no round.',
+      );
+    }
+    // And the other half of the rung, which is the half a gate placed one line
+    // too high would delete: they still turn up, square up and shout.
+    if (officer.state !== NPC_STATE.AIM) {
+      failures.push(
+        `A one-star officer 15 m from its suspect is in state ${officer.state}, not AIM. The gate is above the ` +
+          'aim transition, so the officer never squares up and never shouts -- the 1-star rung is now nothing.',
+      );
+    }
+    if (!field.events.some((e) => e.kind === 'aggro' && e.actorId === officer.id) && officer.barkedAt === 0) {
+      failures.push('A one-star officer never barked. The shout is the whole of the first rung and it is gone.');
+    }
+
+    // --- 2. The boundary, exact, on the tick the star lands.
+    //
+    // The officer has been standing in `AIM` for a minute, so its aim window is
+    // long since out and its cooldown is zero: if the gate is the only thing
+    // holding the round, the very next `think` after the ladder reads two has to
+    // fire one. A gate that sampled the stars a tick late, or that reset the aim
+    // window on the way through, fails exactly here and nowhere else.
+    stars = POLICE_ARMED_STARS;
+    run(1);
+    if (field.shots !== 1 || shotEvents !== 1 || officer.state !== NPC_STATE.FIRE) {
+      failures.push(
+        `Crossing into ${POLICE_ARMED_STARS} stars produced ${field.shots} round(s) and ${shotEvents} shot ` +
+          `event(s) on the tick the star landed, in state ${officer.state}. The rung has to start the moment the ` +
+          'banner says it does; anything else is a pause a player reads as the police being broken.',
+      );
+    }
+
+    // --- 3. And shedding back stops it, just as exactly.
+    //
+    // Run long enough for the fire state to fall back to `AIM` and for a dozen
+    // more cooldowns to come round. Nothing may leave the barrel, and the
+    // officer must not be *stuck* in `FIRE` either -- an actor frozen mid-shot
+    // is a muzzle flash a client draws forever.
+    stars = 1;
+    const atShed = field.shots;
+    run(FIRE_INTERVAL_TICKS * 12);
+    if (field.shots !== atShed) {
+      failures.push(
+        `${field.shots - atShed} round(s) were fired after the suspect shed back to one star. The gate is read ` +
+          'once at the start of a pursuit rather than every tick.',
+      );
+    }
+    if (officer.state === NPC_STATE.FIRE) {
+      failures.push(
+        'An officer whose suspect shed back to one star is stuck in NPC_STATE.FIRE. The gate is above the ' +
+          'fire-state hold, so the weapon never comes back down and every client draws a permanent muzzle flash.',
+      );
+    }
+
+    // --- 4. Two stars: the shot model, unchanged, end to end.
+    //
+    // A thousand rounds at the tuned range through the real `think`, against the
+    // 1-in-10 the owner asked for. The band is 7% to 13.5%, which is about three
+    // standard errors either side of 10% on a thousand samples -- wide enough
+    // never to flake and far too tight to survive `POLICE_LAND_SCALE` being
+    // dropped (55%) or the gate scaling the damage on its way past.
+    stars = POLICE_ARMED_STARS;
+    const ROUNDS = 1000;
+    const before = field.shots;
+    const damageBefore = damage;
+    run(FIRE_INTERVAL_TICKS * ROUNDS);
+    const fired = field.shots - before;
+    const landed = (damage - damageBefore) / SHOT_DAMAGE;
+    if (fired < ROUNDS - 2) {
+      failures.push(
+        `${fired} rounds were fired where ${ROUNDS} cooldowns came round. The cadence has changed, and the rate ` +
+          'below is being measured over the wrong denominator.',
+      );
+    } else if (!(landed / fired > 0.07 && landed / fired < 0.135)) {
+      failures.push(
+        `At two stars ${landed} of ${fired} rounds landed at ${POLICE_TUNED_RANGE} m, a ` +
+          `${((landed / fired) * 100).toFixed(1)}% rate against the ${(POLICE_LAND_TUNED * 100).toFixed(0)}% ` +
+          'the model is tuned at. The two-star gate is not transparent: it has moved the shot model rather ' +
+          'than merely deciding when it applies.',
+      );
+    }
+    // Whole half-pips, and never more damage than rounds. The gate must not have
+    // become a *scale* on the way past.
+    if (landed !== Math.round(landed) || landed > fired) {
+      failures.push(
+        `${damage - damageBefore} pips came off ${fired} rounds, which is not a whole number of ` +
+          `${SHOT_DAMAGE}-pip hits. Something between the roll and the door is scaling the damage.`,
+      );
+    }
+
+    // --- 5. Determinism. The same drive, twice, to the round.
+    //
+    // `policeShotLands` is proved a pure function above; what this adds is that
+    // the *gate* did not put a clock in the path. Two officers with the same id
+    // over the same ticks against the same suspect at the same stars have to
+    // land the same rounds, or the browser's offline prediction and the server's
+    // authority disagree for the whole of a pursuit.
+    const replay = (): number => {
+      const f2 = new FactionField();
+      let pips = 0;
+      const c2: FactionCtx = { ...ctx, tick: 1000, field: f2, damagePlayer: (_id, p) => { pips += p; }, emit: () => {} };
+      const a2 = f2.promote(NPC_KIND.POLICE, POLICE_TUNED_RANGE, 0, 0, -1, 0, SUSPECT_ID);
+      if (a2 === null) return -1;
+      // The officer id is one of the four hash inputs, so it is pinned rather
+      // than taken: `FactionField.nextId` is per-field and would hand both
+      // replays the same number today, which is exactly the kind of accident
+      // that makes a determinism check pass without testing anything.
+      a2.id = officer.id;
+      for (let i = 0; i < FIRE_INTERVAL_TICKS * 40; i++) {
+        c2.tick++;
+        a2.stateTicks++;
+        def.think(a2, c2);
+      }
+      return pips;
+    };
+    if (replay() !== replay()) {
+      failures.push('Two identical two-star pursuits landed different rounds. Something in the shot path reads a clock.');
+    }
+  } finally {
+    setHeatReader(wasReader);
+  }
+  return failures;
+}
+
 
 /**
  * The LOS ray, against a hand-built prism. Split out so `checkPolice` can run it

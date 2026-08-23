@@ -140,6 +140,17 @@
  *            the airframe, the light and the puffs of grit are
  *            `world/highway-patrol.ts`. Nothing about any of it is on the wire.
  *
+ * The gap between the first two rungs is the whole shape of the bottom of this
+ * ladder, and for a long time it was only written down here: *"1 star: no
+ * shooting"* was a sentence in this comment and nothing in the build enforced
+ * it, so a one-star investigation dispatched constables who closed and opened
+ * fire and the smallest offence in the game cost the same three pips as the
+ * largest. The rule lives in `factions.POLICE_ARMED_STARS` now -- two stars, one
+ * predicate, and every police damage path in this build asks it, including the
+ * three below that could never have failed it. Read that header before moving
+ * any rung: the boundary between "they have noticed you" and "they are
+ * shooting" is the one this table is built around.
+ *
  * ---------------------------------------------------------------------------
  * 5. WHAT IS IN THIS FILE AND WHAT IS NOT.
  *
@@ -191,6 +202,12 @@ import {
   createWitness,
   npcKind,
   onCrime,
+  // The two-star gate, and the one test every police damage path in this build
+  // asks. Three of the four live in this file -- the marksman, the patrol car's
+  // bumper and the RBT -- and all three sit at rungs above it already, which is
+  // the reason to ask rather than to assume: the rungs are tuning and the gate
+  // is the rule. See `factions.POLICE_ARMED_STARS`.
+  policeMayHarm,
   policeWitness,
   registerNpcKind,
   setHeatReader,
@@ -1205,6 +1222,14 @@ export class HeatField {
     }
     trail.push(ctx.tick, sx, sy, sz);
     if (suspect.phase === 'ko' || suspect.health <= 0) return;
+    // The two-star gate, asked here rather than assumed from the rung. This
+    // method is only reached at five stars, so it is a no-op today and is
+    // written down anyway: `factions.POLICE_ARMED_STARS` is the one place this
+    // build says when the police are armed, and a marksman who answered the
+    // question with `>= 5` in a different file would be a second answer nobody
+    // would think to change. *After* the trail push on purpose -- the orbit is
+    // the helicopter being **there**, which is not damage and is not gated.
+    if (!policeMayHarm(h.playerId)) return;
     if (!polairShotFired(h.playerId, ctx.tick)) return;
 
     polairPose(h.playerId, ctx.tick, sx, sy, sz, trail, this.polair);
@@ -1633,7 +1658,18 @@ export class HeatField {
 
       // --- Contact. The same knockdown a Camry gives, through the authority's
       // own damage door so the KO, the feed and the respawn are one machine.
-      if (d2 <= PATROL_HIT_M * PATROL_HIT_M && suspect.phase !== 'ko' && suspect.health > 0) {
+      //
+      // `policeMayHarm` here for the marksman's reason one method up: patrol
+      // cars arrive at three stars and the loop above already retires one whose
+      // suspect has fallen below that, so this cannot be false today. It is
+      // asked anyway because the bumper is police damage and every piece of
+      // police damage in this build asks the same question in the same words.
+      if (
+        d2 <= PATROL_HIT_M * PATROL_HIT_M &&
+        suspect.phase !== 'ko' &&
+        suspect.health > 0 &&
+        policeMayHarm(suspect.id)
+      ) {
         // --- WORKSTREAM W: `Right of Way` / `Sirens Are Music`: highway patrol
         // cannot ram you. The pip still lands -- being clipped by a Camry at
         // 25 m/s is not nothing -- and what the talent removes is the
@@ -1692,6 +1728,19 @@ export class HeatField {
       // The two constables, held on their posts until the suspect arrives.
       this.pinRbtOfficers(h, ctx, d2 > RBT_STAND_M * RBT_STAND_M);
       if (d2 > RBT_STAND_M * RBT_STAND_M) {
+        h.rbtStandTicks = 0;
+        continue;
+      }
+      // --- The two-star gate, once, covering **both** of this block's
+      //     outcomes: the pip for driving through and the arrest for standing
+      //     still. `factions.POLICE_ARMED_STARS` again, and unreachable again --
+      //     an RBT belongs to a four-star pursuit and the clause above tears one
+      //     down the moment its suspect drops below that.
+      //
+      // Below the officer pin rather than above it, and the line is the same one
+      // the patrol car draws: a roadblock **standing** in the road with two
+      // constables on their posts is not damage, and is not what this gates.
+      if (!policeMayHarm(h.playerId)) {
         h.rbtStandTicks = 0;
         continue;
       }

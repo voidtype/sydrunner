@@ -182,6 +182,11 @@ import {
   type PedBand,
 } from '../client/src/game/pedestrians.ts';
 import { ENGAGE_RANGE } from '../client/src/game/factions.ts';
+// `checkPolice`'s fixture has to reach the rung the police are armed from, and
+// the honest way to get there is the ladder's own front door with the ladder's
+// own witness byte. See `holdScenario`, which argues why the fixture was raised
+// rather than the threshold lowered.
+import { WITNESS_KIND as HEAT_WITNESS } from '../client/src/game/heat.ts';
 import { trafficTick } from '../client/src/game/traffic.ts';
 // The moving fleet, for `checkPolice`'s marked-car presence test. A liveried car
 // is drawn by `world/cars.ts`, which imports three and cannot be loaded here --
@@ -6375,13 +6380,55 @@ async function checkPolice(): Promise<void> {
    * probe is held on its feet and wanted for exactly as long as it takes to
    * measure those. Section 7 lets go the instant it starts counting damage --
    * see there.
+   *
+   * ---------------------------------------------------------------------------
+   * **AND WANTED AT TWO STARS, WHICH IS THE THIRD FACT AND THE NEWEST.**
+   *
+   * `factions.POLICE_ARMED_STARS` is 2: below it the police dispatch, close,
+   * follow and shout, and do no damage at all. The one crime section 5 stages is
+   * a bystander assault, which is 130 points and **one** star -- so from that
+   * change onward this fixture staged a pursuit that was working exactly as
+   * designed and in which nothing would ever be fired, and section 7 sat out its
+   * whole 45 s countdown waiting for a round that was correctly never coming.
+   *
+   * The fixture is raised rather than the threshold lowered, and it is worth
+   * being explicit about why, because the other repair is one character and
+   * looks equivalent: section 7's subject is *"exactly half a pip, and a client
+   * cannot dodge it"* -- the size and the authority of a police round -- and that
+   * claim is only ever true at two stars and up. A check that reached for a
+   * one-star pursuit to make it would be asking the question at a rung where the
+   * feature promises no answer.
+   *
+   * Two bystander assaults is 260 points and two stars, which is the ladder's
+   * own arithmetic (`heat.ts`' header states it in so many words) rather than a
+   * debug hook, so what the fixture stages is still a thing a player can do.
+   * Restated every tick like the other two facts, because points shed while
+   * nobody has line of sight and 260 is only ten above the threshold -- a
+   * fixture that banked the second crime once and walked away would slide back
+   * to one star mid-measurement and fail intermittently, which is the worst
+   * available outcome.
    */
   const holdScenario = (): void => {
     if (suspect.combat.health < MAX_HEALTH) suspect.combat.health = MAX_HEALTH;
     if (!sim.factions.investigationOf(suspect.id)) {
       sim.factions.accuse(suspect.id, one.REASON.ASSAULT, trafficTick(Date.now()));
     }
+    if (sim.heat.starsOf(suspect.id) < one.POLICE_ARMED_STARS) {
+      sim.heat.report(suspect.id, one.REASON.ASSAULT, HEAT_WITNESS.POLICE);
+    }
   };
+  // The heat ladder agrees the fixture is armed before either section measures
+  // anything. `report` banks points that `HeatField.step` reads off on its next
+  // tick, so the stars arrive one step behind the crime -- see `heat.ts`.
+  holdScenario();
+  sim.step(out);
+  holdScenario();
+  sim.step(out);
+  check(
+    sim.heat.starsOf(suspect.id) >= one.POLICE_ARMED_STARS,
+    `the fixture is at ${sim.heat.starsOf(suspect.id)} stars, at or above the ${one.POLICE_ARMED_STARS} the ` +
+      'police are armed from (two bystander assaults, which is the ladder\'s own arithmetic)',
+  );
 
   // --- 6. Officers are promoted onto the suspect, and they come from the beat.
   {
