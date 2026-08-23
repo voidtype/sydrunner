@@ -1052,16 +1052,28 @@ export class TileStreamer implements LampSource {
   /** Two pole geometries, the timber material and the unlit wire material. */
   private readonly powerAssets = new PowerAssets();
   /**
-   * One geometry and one material for every street lamp in the city.
+   * One geometry and one material for every street lamp in the city -- and one
+   * more pair for the columns that stand where there is no pole to hang one on.
    *
    * Owned here rather than by `world/nightlights.ts`'s `NightLights`, because a
    * luminaire's lifecycle is a *tile's* -- it is built off the same `power.bin`
    * sidecar as the pole it hangs on, it is hidden and shadowed with the tile,
    * and its instance buffers go when the tile does. Exactly the arrangement
-   * `powerAssets` above has, for exactly the same reasons, and it is what puts
-   * the lamp material in `warmupParts` where it belongs.
+   * `powerAssets` above has, for exactly the same reasons.
+   *
+   * **Public**, and it stopped being private for exactly one caller.
+   * `world/giverlamp.ts` stands a column over a hero quest giver -- there are no
+   * street lights in Sydney Park, measured, and the Ladmaster is meant to be
+   * standing under one -- and the whole argument for that feature costing
+   * nothing is that it draws with *these*: the same geometry, the same
+   * material, therefore the same pipeline. A second `StreetLampAssets` would be
+   * a second material, a second compile, and a lamp in a park that is a
+   * different night from the lamp on the street beside it.
+   *
+   * Read-only from outside for the other half of that: it is the city's, and
+   * `dispose`-ing it from a caller would put out every light in Sydney.
    */
-  private readonly streetLamps = new StreetLampAssets();
+  readonly streetLamps = new StreetLampAssets();
   /**
    * Whether the night geometry in the resident tiles is being drawn.
    *

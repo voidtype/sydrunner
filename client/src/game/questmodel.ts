@@ -187,6 +187,20 @@ export const MAX_CHOICE_CHARS = 90;
 export const MAX_FLAG_CHARS = 48;
 
 /**
+ * How long a step's **banner** line may be. Much shorter than a label, and the
+ * shortness is the whole point.
+ *
+ * `label` is a tracker row in a panel the player has chosen to open, so it can
+ * afford sixty characters of "get to the Redfern service centre". The objective
+ * is drawn over the top of Sydney in capitals while the player is running, and
+ * a banner nobody can read at a glance is a banner that has to be read twice --
+ * which is exactly the moment of confusion the waypoint exists to remove.
+ * Twenty-four characters is "GET TO REDFERN" with room to spare and is short of
+ * anything that would wrap on a phone-width viewport.
+ */
+export const MAX_OBJECTIVE_CHARS = 24;
+
+/**
  * How far a `goto` may ask a player to stand from a point, and how close.
  *
  * A floor because a radius of zero is a step nobody can ever satisfy -- the
@@ -248,6 +262,20 @@ export interface QuestStep {
   kind: StepKind;
   /** A short line for the tracker: "get to the Marrickville office". Always set. */
   label: string;
+  /**
+   * The **banner** line, in `client/src/waypoint.ts`, or `''` to use the label.
+   *
+   * A second string for the same step, and the reason there are two rather than
+   * one is that they are read in two different postures. The label is a row in
+   * a panel somebody opened; the objective is four words over the top of the
+   * city while they are running toward it. `game/waypoint.waypointBanner` falls
+   * back to the label when this is empty -- which is what makes it optional
+   * rather than a field every step in a hundred quests has to grow -- and clips
+   * either of them to `MAX_OBJECTIVE_CHARS`.
+   *
+   * Only a step that has a **position** ever shows one; see `waypoint.ts`.
+   */
+  objective: string;
   /** How many times. 1 for everything except `ko`, `buy` and `earn`. */
   count: number;
   /** GOTO / PHOTO: where, in world metres. */
@@ -283,6 +311,7 @@ function blankStep(): QuestStep {
   return {
     kind: STEP_KIND.GOTO,
     label: '',
+    objective: '',
     count: 1,
     x: 0,
     z: 0,
@@ -333,6 +362,23 @@ export interface Quest {
   denyFlags: string[];
   /** Weekly rather than once. A repeatable never writes its `q:` mark. */
   repeatable: boolean;
+  /**
+   * Hand the player a lime bike when they accept. `"bike": true`.
+   *
+   * A **loan**, not a reward, and the distinction is the whole reason this is a
+   * flag on the quest rather than a field of `QuestReward`: it is not paid, it
+   * is not banked, and a content file cannot mint one per player per quest. The
+   * id is `game/bikes.loanBikeId(playerId)` -- one per player, forever -- so a
+   * pack with a bike on all hundred jobs still produces exactly one loan bike
+   * per player, moved to their feet each time. See `game/bikes.placeLoanBike`
+   * for the placement and `server/quests.QuestWorld.loanBike` for the seam.
+   *
+   * It is here rather than in `reward` because a reward is what a turn-in pays
+   * and this is what an **accept** grants -- the Ladmaster's whole point is that
+   * you ride away on it, and a bike handed over at the far end of the errand
+   * would be a joke rather than a tutorial.
+   */
+  grantsBike: boolean;
   steps: QuestStep[];
   reward: QuestReward;
 }
@@ -401,7 +447,38 @@ export interface DialogNpc {
   radius: number;
   /** The node the conversation starts at. */
   root: string;
+  /**
+   * How loud the mark over this giver's head is. `''` or `'hero'`.
+   *
+   * **Content-driven, so a future hero quest gets one without a code change**,
+   * which was the whole instruction. `world/questmarkers.ts` draws a `'hero'`
+   * mark at `HERO_SCALE` and sees it from `HERO_RANGE_M` instead of
+   * `MARKER_RANGE_M`, and the cap will drop an ordinary mark before it drops
+   * this one -- because the reason a hero mark exists at all is that the player
+   * has not been told anything yet, and a mark that loses a coin toss with a
+   * pool giver is a tutorial that sometimes does not happen.
+   *
+   * On the **npc** rather than on the quest, and that is not arbitrary: the mark
+   * hangs over a body, `markerFor` is already handed the npc, and a giver with
+   * three jobs would otherwise have three votes about how big their own `!` is.
+   *
+   * An unrecognised value folds to `''` rather than refusing the pack, on
+   * `parseStep`'s standing radius argument -- it is a cosmetic field, and the
+   * cost of a typo is one ordinary marker rather than a hundred quests offline.
+   */
+  marker: string;
   nodes: DialogNode[];
+}
+
+/** The marker loudnesses a content file may ask for. `''` is the ordinary one. */
+export const NPC_MARKER = { NONE: '', HERO: 'hero' } as const;
+
+const NPC_MARKERS: readonly string[] = Object.values(NPC_MARKER);
+
+/** A `marker` field as a content file may spell it, folded to one of `NPC_MARKER`. */
+export function npcMarker(raw: unknown): string {
+  const text = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+  return NPC_MARKERS.includes(text) ? text : NPC_MARKER.NONE;
 }
 
 export interface DialogPack {
@@ -508,6 +585,9 @@ function parseStep(raw: unknown, where: string, errors: string[]): QuestStep | n
   const step = blankStep();
   step.kind = kind as StepKind;
   step.label = str(row.label, MAX_TITLE_CHARS);
+  // Clipped rather than refused, on the radius rule below: an author who writes
+  // a thirty-character banner should lose six characters, not the pack.
+  step.objective = str(row.objective, MAX_OBJECTIVE_CHARS);
   step.count = clampInt(num(row.count, 1), 1, MAX_STEP_COUNT);
 
   if (kind === STEP_KIND.GOTO || kind === STEP_KIND.PHOTO) {
@@ -680,6 +760,7 @@ export function parseQuestPack(raw: unknown, name: string): ParseResult<QuestPac
       needFlags: strList(q.needFlags, 8, MAX_FLAG_CHARS),
       denyFlags: strList(q.denyFlags, 8, MAX_FLAG_CHARS),
       repeatable: q.repeatable === true,
+      grantsBike: q.bike === true,
       steps,
       reward: { cash, xp, unlock },
     });
@@ -862,6 +943,7 @@ export function parseDialogPack(raw: unknown, name: string): ParseResult<DialogP
       z,
       radius: Math.max(MIN_GOTO_RADIUS_M, Math.min(MAX_GOTO_RADIUS_M, num(n.radius, 4))),
       root,
+      marker: npcMarker(n.marker),
       nodes,
     });
   }
@@ -1530,6 +1612,88 @@ export function verifyQuests(): string[] {
       'fixture',
     );
     if (flags.value.quests.length !== 0) failures.push(`A quest setting six story flags was accepted, over the ${MAX_UNLOCKS} cap.`);
+  }
+
+  /*
+   * --- The three fields the tutorial added, and all three fail *quietly*.
+   *
+   *   - A dropped `objective` is a waypoint banner that falls back to a
+   *     sixty-character tracker line and wraps across the top of Sydney.
+   *   - A `bike` flag that does not survive the parse is a Ladmaster who tells
+   *     you to grab the lime bike and hands you nothing, which reads as the
+   *     game being broken on the first thirty seconds a player ever plays.
+   *   - A `marker` that folds the wrong way is either no hero mark at all (the
+   *     tutorial nobody finds) or every giver in Sydney shouting.
+   */
+  {
+    const { value, errors } = parseQuestPack(
+      {
+        quests: [
+          {
+            id: 'tut',
+            giver: 'lad',
+            bike: true,
+            steps: [
+              { kind: 'goto', x: 10, z: 20, label: 'get to the Redfern service centre', objective: 'GET TO REDFERN' },
+              { kind: 'goto', x: 30, z: 40, label: 'plain' },
+            ],
+          },
+        ],
+      },
+      'fixture',
+    );
+    if (errors.length > 0) failures.push(`A quest with a bike and an objective produced errors: ${errors.join('; ')}`);
+    const q = value.quests[0];
+    if (!q) {
+      failures.push('The tutorial-fields fixture produced no quest.');
+    } else {
+      if (!q.grantsBike) failures.push('A quest with "bike": true came back without its loan.');
+      if (q.steps[0]?.objective !== 'GET TO REDFERN') {
+        failures.push(`A step's objective came back as ${JSON.stringify(q.steps[0]?.objective)}.`);
+      }
+      if (q.steps[1]?.objective !== '') failures.push('A step with no objective invented one.');
+    }
+    const plain = parseQuestPack(
+      { quests: [{ id: 'plain', giver: 'lad', steps: [{ kind: 'earn', dollars: 5 }] }] },
+      'fixture',
+    ).value.quests[0];
+    if (plain?.grantsBike !== false) failures.push('A quest with no "bike" field came back granting one.');
+    // Clipped rather than refused: a long banner loses characters, not the pack.
+    const long = parseQuestPack(
+      {
+        quests: [
+          { id: 'long', giver: 'lad', steps: [{ kind: 'goto', x: 0, z: 0, objective: 'x'.repeat(200) }] },
+        ],
+      },
+      'fixture',
+    ).value.quests[0];
+    if (!long) failures.push('A quest with an over-long objective was refused rather than clipped.');
+    else if ([...long.steps[0].objective].length !== MAX_OBJECTIVE_CHARS) {
+      failures.push(
+        `A ${200}-character objective came back ${[...long.steps[0].objective].length} long, not ${MAX_OBJECTIVE_CHARS}.`,
+      );
+    }
+  }
+
+  // --- The hero mark, which is a field on the npc rather than on the quest.
+  {
+    const npcOf = (marker: unknown): DialogNpc | undefined =>
+      parseDialogPack(
+        {
+          npcs: [{ id: 'lad', x: 0, z: 0, marker, nodes: [{ id: 'hello', line: 'oi' }] }],
+        },
+        'fixture',
+      ).value.npcs[0];
+    if (npcOf('hero')?.marker !== NPC_MARKER.HERO) failures.push('An npc marked "hero" did not come back a hero.');
+    if (npcOf('  HERO ')?.marker !== NPC_MARKER.HERO) failures.push('A hero marker was not folded and trimmed.');
+    if (npcOf(undefined)?.marker !== NPC_MARKER.NONE) failures.push('An npc with no marker field came back with one.');
+    for (const junk of ['banana', 42, null, 'heroic']) {
+      const got = npcOf(junk);
+      if (got === undefined) failures.push(`An npc with marker ${JSON.stringify(junk)} was refused rather than folded.`);
+      else if (got.marker !== NPC_MARKER.NONE) {
+        failures.push(`An npc with marker ${JSON.stringify(junk)} came back as ${JSON.stringify(got.marker)}.`);
+      }
+    }
   }
 
   // --- The two spellings, which render perfectly when they are wrong.

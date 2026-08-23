@@ -135,11 +135,15 @@ import {
 // is what makes a claim mean the same thing on both ends. See `game/bikes.ts`.
 import {
   BikeField,
+  LOAN_BIKE_GAP_M,
   inTuningZone,
+  loanBikeId,
+  placeLoanBike,
   type Bike,
+  type LoanGround,
   type RiderView,
 } from '../client/src/game/bikes.ts';
-import { EYE_HEIGHT } from '../client/src/player/controller.ts';
+import { EYE_HEIGHT, PLAYER_RADIUS } from '../client/src/player/controller.ts';
 import { COLOURWAYS } from '../client/src/player/character.ts';
 import {
   ANIM,
@@ -500,6 +504,20 @@ const EMPTY_CARS: readonly CarRecord[] = [];
 function inGameDay(nowMs: number): number {
   return Math.floor((nowMs - CYCLE_EPOCH_MS) / CYCLE_MS);
 }
+
+/**
+ * The capsule a loan bike's clearance is probed with, and the height it ignores
+ * obstacles below. Workstream AP.
+ *
+ * `world.layOutBikes`' `PLACE_RADIUS` / `PLACE_STEP`, restated here rather than
+ * exported from that file because they are its private numbers and this is a
+ * second caller with the same question: is a bike-sized circle at this point
+ * clear of every prism, treating anything a player could step onto as not an
+ * obstruction. Both are copies of `player/controller.ts`'s, which is the
+ * duplication `game/spawn.SPAWN_PROBE_RADIUS` already carries and argues for.
+ */
+const LOAN_PLACE_RADIUS = PLAYER_RADIUS;
+const LOAN_PLACE_STEP = 0.42;
 
 const JOIN_RING = 9;
 const JOIN_PER_RING = 8;
@@ -1130,6 +1148,20 @@ export class Simulation {
 
   /** Bikes whose rider or position changed this tick, for the transport to send. */
   private readonly bikeChanges: Bike[] = [];
+  /**
+   * Loan bikes adopted since the last tick, waiting to go out. See `loanBike`.
+   *
+   * A second array rather than pushing straight onto `bikeChanges`, and the
+   * reason is the ordering of a tick: `step` clears `bikeChanges` at the top and
+   * `Room.sendBikes` reads it at the bottom, but a quest is accepted from the
+   * **socket pump**, which runs between ticks. A loan pushed there would be
+   * cleared by the next `step` before anybody was told about it -- a bike the
+   * server thinks exists and no client has ever heard of, which is the exact
+   * failure `protocol.encodeBikes` puts the positions on the wire to prevent.
+   * Draining here, just after the clear, costs at most one tick of delay (17 ms)
+   * and cannot be got wrong by a caller.
+   */
+  private readonly bikeLoans: Bike[] = [];
   /** Reused by `follow`, so a tick with nobody riding allocates nothing. */
   private readonly bikeSweep: Bike[] = [];
   private readonly riderViews: RiderView[] = [];
@@ -1433,6 +1465,103 @@ export class Simulation {
    */
   bikeDelta(): readonly Bike[] {
     return this.bikeChanges;
+  }
+
+  /**
+   * Hand this player a lime bike, on clear ground beside them. Workstream AP.
+   *
+   * The quest engine's one physical effect on the world, and the whole of the
+   * seam. `game/bikes.placeLoanBike` decides *where* -- pure, deterministic over
+   * `(x, z, seed)`, and checked by `verifyBikes` -- and this decides nothing at
+   * all except which world it is asked about and how the answer reaches the
+   * clients. Returns the spot, or null when there is nowhere for a bicycle to be
+   * (a player who accepted the job wedged in a stairwell), which the caller turns
+   * into a sentence rather than into a bike in a wall.
+   *
+   * **The id is the player's**, through `loanBikeId`, and that is what keeps the
+   * feature from being a leak: `MSG.BIKES` has no delete and the set of bikes is
+   * fixed for the life of a build, so a fresh id per accept would litter Sydney
+   * with one bicycle per quest per player until the process restarted. One id
+   * per player means accepting twice *moves* the bike to your feet -- `adopt`
+   * takes both branches -- which is also the behaviour a player expects when
+   * they walk back and ask again.
+   *
+   * The seed is the caller's rather than the tick's own, because the honest
+   * property is "the same accept always places the same bike" and the thing that
+   * makes an accept the same is the tick it happened on. `QuestEngine` passes
+   * this simulation's tick.
+   */
+  loanBike(playerId: number, seed: number): { x: number; y: number; z: number } | null {
+    const p = this.participants.get(playerId);
+    if (!p) return null;
+    const c = p.combat;
+    const x = c.body.position.x;
+    const z = c.body.position.z;
+    const id = loanBikeId(playerId);
+    const rail = this.world.rail ?? null;
+    const ground: LoanGround = {
+      // `layOutBikes`' three, verbatim in intent: the participant's own world
+      // carries the `lastGround` that makes a query beside a body cheap, and the
+      // prism test is the same null move `placeClear` and `pickRespawn` make.
+      groundHeight: (qx, qz, feetY) => p.world.groundHeight(qx, qz, feetY),
+      clear: (qx, qz, y) => !this.world.collision.resolve(qx, qz, qx, qz, LOAN_PLACE_RADIUS, y + LOAN_PLACE_STEP).hit,
+      waterSurface: (qx, qz) => this.world.water.surfaceAt(qx, qz),
+      /*
+       * **Not on the tracks**, which the 6,017 planned bikes have never been
+       * asked about and this one is -- because this one is put down at a
+       * player's feet by a quest that told them to get on it, and a bicycle in
+       * the four-foot at Redfern is a bicycle somebody will ride into a train.
+       *
+       * A linear walk of the rail bake's vertices, which is 29,000 iterations
+       * and about a tenth of a millisecond. That is unarguable per tick and
+       * completely fine **once per accept**, which is what this is: the whole
+       * placement runs at most 24 times, off the socket pump, on a click a
+       * person made. The 200 m segment reject is `content-check.trackDist`'s and
+       * is what stops a stitch between two distant vertices reading as a rail
+       * across the middle of Sydney.
+       */
+      railGap:
+        rail === null
+          ? undefined
+          : (qx, qz) => {
+              const V = rail.vertices;
+              let best = Infinity;
+              for (let i = 0; i + 5 < V.length; i += 3) {
+                const ax = V[i];
+                const az = V[i + 2];
+                const dx = V[i + 3] - ax;
+                const dz = V[i + 5] - az;
+                const l2 = dx * dx + dz * dz;
+                if (l2 > 200 * 200 || l2 === 0) continue;
+                let t = ((qx - ax) * dx + (qz - az) * dz) / l2;
+                t = t < 0 ? 0 : t > 1 ? 1 : t;
+                const d = (ax + t * dx - qx) ** 2 + (az + t * dz - qz) ** 2;
+                if (d < best) best = d;
+              }
+              return Math.sqrt(best);
+            },
+      // And not inside another bike. The loan's own record is skipped, or a
+      // second accept would refuse every candidate near where the first one
+      // parked and push the bike to the far edge of the annulus for no reason.
+      bikeNear: (qx, qz) => {
+        for (const bike of this.bikes.all()) {
+          if (bike.id === id) continue;
+          const dx = bike.x - qx;
+          const dz = bike.z - qz;
+          if (dx * dx + dz * dz < LOAN_BIKE_GAP_M * LOAN_BIKE_GAP_M) return true;
+        }
+        return false;
+      },
+    };
+    const spot = placeLoanBike(x, z, seed, ground);
+    if (spot === null) return null;
+    const bike = this.bikes.adopt(id, spot);
+    // If the player was somehow already on their own loan bike, moving it under
+    // them would be a teleport. `adopt` does not clear the rider and neither
+    // does this; the sweep in `stepBikes` carries a ridden bike to its rider on
+    // the very next tick, so the position below is a frame of nothing.
+    this.bikeLoans.push(bike);
+    return { x: spot.x, y: spot.y, z: spot.z };
   }
 
   /** Every driven car, as the wire wants them. The full set, for a joiner. */
@@ -2662,6 +2791,11 @@ export class Simulation {
     fxSetNow(Date.now());
     this.events.length = 0;
     this.bikeChanges.length = 0;
+    // **After** the clear, never before. See `bikeLoans`.
+    if (this.bikeLoans.length > 0) {
+      for (const bike of this.bikeLoans) this.bikeChanges.push(bike);
+      this.bikeLoans.length = 0;
+    }
     this.carChanges.length = 0;
     this.carRemovals.length = 0;
     // WORKSTREAM Y: the third outbox, on the same line as the other two so

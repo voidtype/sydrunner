@@ -359,6 +359,92 @@ export function hashHeading(id: string): number {
   return wrapPi(((mix32(giverHash(id)) >>> 19) % 16) * ((Math.PI * 2) / 16));
 }
 
+// --- The one light a content file may ask for --------------------------------------
+
+/**
+ * How far the Ladmaster's lamp post stands from the Ladmaster, metres.
+ *
+ * Far enough that a 0.115 m column is not growing out of his shoulder and near
+ * enough that `LAMP_OUTREACH`'s 0.9 m arm, aimed back at him, puts the luminaire
+ * over his head rather than over the grass. 2.4 m is also outside the dialog
+ * radius nothing uses and inside the 3 m a player stands at to talk, so the post
+ * never gets between the two of them.
+ */
+export const GIVER_LAMP_OFFSET_M = 2.4;
+
+/**
+ * How many content-driven lamps the client will build. See `world/giverlamp.ts`.
+ *
+ * Four, and it is a **cap on the content** rather than a budget on the frame:
+ * there is exactly one hero in `content/` and there is meant to be. If a pack
+ * ever ships five, the fifth stands in the dark and nothing else about the
+ * session changes -- which is the correct failure for a cosmetic that a JSON
+ * file on github.com can conjure.
+ */
+export const MAX_GIVER_LAMPS = 4;
+
+/** Where a giver's own lamp stands, and which way its arm reaches. */
+export interface GiverLamp {
+  /** The foot of the column, world metres. */
+  x: number;
+  y: number;
+  z: number;
+  /** Rotation about Y that sends the geometry's +X -- the arm -- over the giver. */
+  yaw: number;
+}
+
+/**
+ * The lamp for one giver: a post beside them with the arm over their head.
+ *
+ * **The bearing is the id's**, through `hashHeading`, and that is the whole of
+ * why this is a two-line function rather than a search. The alternatives were
+ * the footpath bands (`bandHeading`) and the giver's own resolved heading, and
+ * both are *late*: a band arrives when a lane sidecar streams and a resting
+ * heading is resolved the first time a body is assigned, so a lamp built off
+ * either would stand somewhere on the first frame and somewhere else a second
+ * later. A street light that walks around a person as you approach is worse than
+ * no street light. The hash is not a good bearing; it is a **stable** one, which
+ * is rule 3 of this file's heading and is the property that matters when the
+ * thing being placed is a nine-metre pole.
+ *
+ * The yaw points the arm back at whoever the lamp is for, so the luminaire, its
+ * glow blob and the `PointLight` that follows it all end up over the giver
+ * rather than 0.9 m the other way. It is **not** `yawToward`, and that is the
+ * one trap in this function: `ColumnSite.yaw` feeds `Matrix4.makeRotationY`,
+ * which sends the geometry's `+X` -- the arm -- to `(cos t, -sin t)` in world
+ * `(x, z)`. This project's own yaw is `yawOf`'s `atan2(-dx, -dz)`, a different
+ * function of the same pair, and using it here puts the arm a quarter-turn out:
+ * a lamp beside a person either way, in a screenshot, with the light on the
+ * grass. `armYaw` below is the inverse of the rotation that is actually applied,
+ * and `verifyGiverBodies` walks the arm back to the giver's feet to prove it.
+ *
+ * Pure over `(id, x, z, groundY)`, three-free, and therefore checkable in
+ * `verifyGiverBodies` on a server with no screen.
+ */
+export function giverLampSpot(id: string, x: number, z: number, groundY: number): GiverLamp {
+  const bearing = hashHeading(id);
+  // `-sin, -cos` rather than `cos, sin`: this project's yaw is `yawOf`'s, north
+  // is 0 and `+x` is `-pi/2`, so a unit step along a yaw is this pair. Getting
+  // it the other way round puts the lamp a quarter-turn from where the giver
+  // thinks it is, which looks like a lamp beside a person either way.
+  const lx = x - Math.sin(bearing) * GIVER_LAMP_OFFSET_M;
+  const lz = z - Math.cos(bearing) * GIVER_LAMP_OFFSET_M;
+  return { x: lx, y: groundY, z: lz, yaw: armYaw(lx, lz, x, z) };
+}
+
+/**
+ * The `ColumnSite.yaw` that sends a lamp's arm from `(x, z)` to `(tx, tz)`.
+ *
+ * The inverse of `Matrix4.makeRotationY`'s effect on `+X`; see `giverLampSpot`.
+ * Exported so the check can state the rule rather than restate the arithmetic.
+ */
+export function armYaw(x: number, z: number, tx: number, tz: number): number {
+  const dx = tx - x;
+  const dz = tz - z;
+  if (dx * dx + dz * dz < 1e-12) return 0;
+  return Math.atan2(-dz, dx);
+}
+
 // --- Angles ------------------------------------------------------------------------
 
 /** An angle folded into [-pi, pi). */
@@ -914,6 +1000,61 @@ export function verifyGiverBodies(): string[] {
     if (fromHead - (g + FIGURE_HEIGHT) < 0.2) failures.push('The mark is less than 20 cm over the crown; it is in her hair.');
     // A head bone lowered -- crouched, or lying down -- takes the mark with it.
     if (markYFromHeadBone(g + 0.4) >= fromHead) failures.push('The mark does not follow the head bone down.');
+  }
+
+  /*
+   * --- The one content-driven lamp, and the two things about it that are
+   * invisible when they are wrong.
+   *
+   * A lamp at the wrong **distance** is a pole growing out of a person's
+   * shoulder or one standing in the next field; a lamp with the wrong **yaw**
+   * has its 0.9 m arm, its glow blob and the real `PointLight` that follows it
+   * all pointing away from the only person it exists to light -- which on a
+   * screenshot at noon is a perfectly ordinary street light. And a lamp whose
+   * position is not stable per id walks around the giver as the world streams
+   * in, which is the failure `hashHeading` exists to prevent for the body and
+   * matters more for a nine-metre pole.
+   */
+  {
+    const spot = giverLampSpot('ladmaster', -2210.8, 4506.3, -57.48);
+    const d = Math.hypot(spot.x + 2210.8, spot.z - 4506.3);
+    if (Math.abs(d - GIVER_LAMP_OFFSET_M) > 1e-9) {
+      failures.push(`A giver's lamp stands ${d.toFixed(2)} m away, not ${GIVER_LAMP_OFFSET_M}.`);
+    }
+    if (spot.y !== -57.48) failures.push(`A lamp's foot sits at ${spot.y}, not on the ground it was handed.`);
+    /*
+     * **The arm reaches the giver.** Walked rather than compared: the yaw feeds
+     * `makeRotationY`, which sends the geometry's `+X` to `(cos t, -sin t)`, so
+     * stepping the offset from the lamp's foot along *that* pair has to land on
+     * the giver's feet. Asserting `spot.yaw === someFunction(...)` would only
+     * prove this file agrees with itself; this proves it agrees with three.
+     */
+    const armX = spot.x + Math.cos(spot.yaw) * GIVER_LAMP_OFFSET_M;
+    const armZ = spot.z - Math.sin(spot.yaw) * GIVER_LAMP_OFFSET_M;
+    if (Math.hypot(armX + 2210.8, armZ - 4506.3) > 1e-6) {
+      failures.push(
+        `Stepping ${GIVER_LAMP_OFFSET_M} m along the lamp's arm reaches ` +
+          `(${armX.toFixed(2)}, ${armZ.toFixed(2)}), which is ` +
+          `${Math.hypot(armX + 2210.8, armZ - 4506.3).toFixed(2)} m from the giver it is meant to light.`,
+      );
+    }
+    // The four compass points on `armYaw` itself, because the walk above would
+    // pass for a pair of errors that cancel.
+    for (const [dx, dz, want] of [[1, 0, 0], [0, -1, Math.PI / 2], [-1, 0, Math.PI], [0, 1, -Math.PI / 2]] as Array<
+      [number, number, number]
+    >) {
+      const got = armYaw(0, 0, dx, dz);
+      if (Math.abs(wrapPi(got - want)) > 1e-9 && Math.abs(Math.abs(got) - Math.PI) > 1e-9) {
+        failures.push(`An arm reaching (${dx}, ${dz}) yaws to ${got.toFixed(3)}, not ${want.toFixed(3)}.`);
+      }
+    }
+    // Stable per id and different between ids, so a street of heroes is not a
+    // row of poles in one line.
+    const again = giverLampSpot('ladmaster', -2210.8, 4506.3, -57.48);
+    if (again.x !== spot.x || again.z !== spot.z) failures.push('A giver’s lamp is not stable for one id.');
+    const other = giverLampSpot('rabbitohs-ray', -2210.8, 4506.3, -57.48);
+    if (other.x === spot.x && other.z === spot.z) failures.push('Two givers’ lamps stand in exactly the same place.');
+    if (MAX_GIVER_LAMPS < 1) failures.push('The lamp cap is zero; no hero would ever be lit.');
   }
 
   return failures;

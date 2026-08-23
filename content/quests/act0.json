@@ -19,6 +19,19 @@
     "between them and a level is 1000, so nothing here can level you off its own",
     "rung before you have finished it. Whoever edits these numbers owns that sum.",
     "",
+    "THE TUTORIAL IS ON RUNG 1 TOO AND IS NOT ONE OF THE FIVE OBLIGATIONS.",
+    "`act0-ladmaster` is the first thing in the game: no requires, no needFlags,",
+    "nothing gates it. It pays 2 xp, which is deliberately nothing -- it is a",
+    "handshake, not a job -- so the rung-1 sum below is 702 against the 1000",
+    "that would level you off the rung. Whoever edits these numbers owns that",
+    "sum; server/quests-check.ts asserts it and names the five obligations by",
+    "id so a sixth job on rung 1 cannot quietly join them.",
+    "",
+    "It carries `\"bike\": true`, which is the only quest in content/ that does:",
+    "accepting it puts a lime bike on clear ground within five metres of you.",
+    "See client/src/game/bikes.ts (placeLoanBike) -- the id is outside the",
+    "planned range, so it is a loan rather than one of the city's own.",
+    "",
     "The last 300 xp are knockouts, which is the point: Denise cannot sign you",
     "off for a participation review until you have participated in something.",
     "The review is the rung-2 door and its final conversation is where a handler",
@@ -28,6 +41,26 @@
     "Centrelink is the real Redfern office out of game/centrelink-data.ts."
   ],
   "quests": [
+    {
+      "id": "act0-ladmaster",
+      "act": 0,
+      "title": "Down to the Fern",
+      "blurb": "Some bloke in the park reckons Cenno owes you money and has a bike you can borrow. He may be right about one of those.",
+      "giver": "ladmaster",
+      "level": 1,
+      "bike": true,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -938.3,
+          "z": 2669.9,
+          "radius": 30,
+          "label": "ride down to Redfern and find Ray",
+          "objective": "GET TO REDFERN"
+        }
+      ],
+      "reward": { "cash": 10, "xp": 2, "unlock": ["act0:shown"] }
+    },
     {
       "id": "act0-report",
       "act": 0,
