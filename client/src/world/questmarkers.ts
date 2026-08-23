@@ -113,6 +113,37 @@
  * bind pose so a body appearing under a mark does not move it. The clearance
  * itself now lives in `game/giverbodies.MARK_CLEARANCE_M`, which is the one
  * place both halves can read it.
+ *
+ * ---------------------------------------------------------------------------
+ * ONE MARK IS ALLOWED TO SHOUT, AND THE CONTENT FILE DECIDES WHICH
+ *
+ * `DESIGN.md` rule 6 is that the city does not shout, and everything above is
+ * that rule: one gold, two glyphs, 150 m, and a marker that means "that one,
+ * over there" rather than "look at me". The one case it cannot serve is the
+ * **first** one -- a player at level 1 standing in Sydney Park who has never
+ * seen a `!` and does not know there is anything to walk toward. Ten givers on
+ * a rung at 150 m each is 0.016% of this city; the ordinary rule is a reward for
+ * already being in the right place, and there is no right place yet.
+ *
+ * So a `DialogNpc` may carry `"marker": "hero"` (`questmodel.NPC_MARKER`) and
+ * one does: the Ladmaster, in the park, in sight of the spawn. It changes three
+ * numbers and **no geometry** -- same two quads, same halo, same buffers, same
+ * single draw call, so a hero costs exactly what an ordinary mark costs:
+ *
+ *   - `HERO_RANGE_M` / `HERO_FADE_FULL_M` instead of the ordinary pair, so it is
+ *     seen from four hundred metres rather than a hundred and fifty;
+ *   - `HERO_SCALE` on the whole apparent-size curve, so it is two and a half
+ *     times the glyph at every distance and still shrinks with range;
+ *   - **the cap prefers it.** `MAX_MARKERS` is twelve and a hero displaces an
+ *     ordinary mark rather than being dropped by one, because the whole reason
+ *     a hero exists is that the player has not been told anything yet.
+ *
+ * It is content-driven rather than a special case for this npc id, which is the
+ * only part of it worth defending: the next hero quest -- the act 3 door, the
+ * first faction handler somebody has to find -- gets one by editing a JSON file
+ * on github.com, which is what `server/quests.ts`'s whole publish path is for.
+ * What it must **not** become is a field a hundred pool givers set. There is
+ * exactly one in `content/` today.
  */
 
 import {
@@ -134,6 +165,7 @@ import {
   markYFromHeadBone,
 } from '../game/giverbodies.ts';
 import {
+  NPC_MARKER,
   markerFor,
   parseDialogPack,
   parseQuestPack,
@@ -159,6 +191,40 @@ export const MARKER_RANGE_M = 150;
 
 /** Full strength to here, then a smooth ramp to nothing at `MARKER_RANGE_M`. */
 export const FADE_FULL_M = 110;
+
+/**
+ * And the hero's own two, which are the answer to an arithmetic problem rather
+ * than a taste one.
+ *
+ * A player spawns in Sydney Park at level 1 with nothing in the world to walk
+ * toward. Ten givers on a rung, each visible inside 150 m, is about 0.7 km^2 of
+ * a 4,528 km^2 city -- 0.016% -- so the ordinary marker is a *reward for already
+ * being in the right place*, which is exactly the right rule for the ninety-nine
+ * quests a player finds after they know what a quest is, and no use at all for
+ * the one that tells them.
+ *
+ * A `'hero'` npc (`questmodel.NPC_MARKER`) is seen from 400 m and drawn at
+ * `HERO_SCALE`. Four hundred metres is chosen against the spawn: the dither disc
+ * is 100 m (`game/spawn.SPAWN_DITHER_RADIUS`) and the Ladmaster stands 45 m from
+ * its centre, so the worst case a player can be handed is 145 m and the mark is
+ * comfortably in frame from anywhere in the disc with room for somebody who
+ * wandered. It is not larger because the mark is **depth tested** like every
+ * other one -- see the header -- so a hero across the city is behind a building,
+ * and a range that reached further would only add marks nobody can see.
+ */
+export const HERO_RANGE_M = 400;
+export const HERO_FADE_FULL_M = 340;
+
+/**
+ * How much bigger a hero's `!` is. Deliberately unmissable.
+ *
+ * 2.6 rather than 2 because the apparent-size clamp is already shrinking a
+ * distant mark sub-linearly (`markerScale`), so a hero at 145 m has to beat both
+ * the distance and the ordinary marks beside it. At arm's length it is a 2.2 m
+ * glyph, which is absurd and correct: this is the one marker in the game whose
+ * job is to be seen by somebody who does not yet know that markers exist.
+ */
+export const HERO_SCALE = 2.6;
 
 /**
  * The em box, in metres, before the distance scale.
@@ -312,18 +378,39 @@ const INDICES_PER_QUAD = 6;
 
 // --- Pure maths, so the check can reach it ---------------------------------------
 
+/**
+ * How far a mark of this loudness is worth drawing, and where its fade starts.
+ *
+ * One function rather than two constants read at four call sites, because the
+ * range test in `rescan` and the fade in `write` have to agree about the same
+ * pair or a hero mark is either culled while still solid or drawn at zero alpha
+ * for 250 m of nothing.
+ */
+export function markerReach(hero: boolean): { full: number; range: number } {
+  return hero ? { full: HERO_FADE_FULL_M, range: HERO_RANGE_M } : { full: FADE_FULL_M, range: MARKER_RANGE_M };
+}
+
 /** Marker opacity at a distance. 1 near, 0 past the range, smooth between. */
-export function markerAlpha(distance: number): number {
-  if (distance <= FADE_FULL_M) return 1;
-  if (distance >= MARKER_RANGE_M) return 0;
-  const t = (distance - FADE_FULL_M) / (MARKER_RANGE_M - FADE_FULL_M);
+export function markerAlpha(distance: number, hero = false): number {
+  const { full, range } = markerReach(hero);
+  if (distance <= full) return 1;
+  if (distance >= range) return 0;
+  const t = (distance - full) / (range - full);
   return 1 - t * t * (3 - 2 * t);
 }
 
-/** World-space scale multiplier at a distance. See `SCALE_FROM`. */
-export function markerScale(distance: number): number {
-  if (distance <= SCALE_FROM) return 1;
-  return Math.min(SCALE_MAX, Math.pow(distance / SCALE_FROM, SCALE_POWER));
+/**
+ * World-space scale multiplier at a distance. See `SCALE_FROM`.
+ *
+ * `hero` multiplies the whole curve rather than raising the floor, which is the
+ * difference between "a big marker" and "a marker that is big at every
+ * distance": the sub-linear growth is the depth cue, and a hero that flattened
+ * it would read as a HUD element pasted over Sydney -- which is the one thing
+ * `verifyQuestMarkers` has always refused, and now refuses for both sizes.
+ */
+export function markerScale(distance: number, hero = false): number {
+  const grown = distance <= SCALE_FROM ? 1 : Math.min(SCALE_MAX, Math.pow(distance / SCALE_FROM, SCALE_POWER));
+  return hero ? grown * HERO_SCALE : grown;
 }
 
 /**
@@ -381,6 +468,8 @@ interface LiveMarker {
   y: number;
   z: number;
   phase: number;
+  /** `DialogNpc.marker === 'hero'`. Decides the reach, the size and the cap. */
+  hero: boolean;
 }
 
 export class QuestMarkerField {
@@ -527,15 +616,36 @@ export class QuestMarkerField {
     const view = source.view();
     const facts = source.facts();
     const range2 = MARKER_RANGE_M * MARKER_RANGE_M;
+    const heroRange2 = HERO_RANGE_M * HERO_RANGE_M;
     for (const npc of npcs) {
+      const hero = npc.marker === NPC_MARKER.HERO;
       const dx = npc.x - this.camPos.x;
       const dz = npc.z - this.camPos.z;
-      if (dx * dx + dz * dz > range2) continue;
+      // The cheap test first, as it always was, but with the hero's own reach.
+      // A string compare per giver is one more comparison in front of a
+      // multiply; `markerFor` behind it is a walk of a dialog tree.
+      if (dx * dx + dz * dz > (hero ? heroRange2 : range2)) continue;
       const kind = markerFor(npc, facts, view);
       if (kind === 'none') continue;
       if (this.markers.length >= MAX_MARKERS) {
+        /*
+         * **A hero mark is never the one the cap drops.**
+         *
+         * Twelve is sized against a content pool nobody had written when it was
+         * chosen, and a hero exists precisely because the player has not been
+         * told anything yet -- so a tutorial that loses a coin toss with the
+         * eleventh pool giver on a CBD block is a tutorial that sometimes does
+         * not happen, on a machine where nothing looks wrong. The eviction is a
+         * linear scan of at most twelve, on a 4 Hz beat, in the branch that only
+         * runs when the cap is already reached.
+         */
+        const victim = hero ? this.markers.findIndex((m) => !m.hero) : -1;
+        if (victim < 0) {
+          this.dropped++;
+          continue;
+        }
+        this.markers.splice(victim, 1);
         this.dropped++;
-        continue;
       }
       // **Off the head when there is a head.** See the header's last section:
       // `headY` answers for a giver `world/giverbodies.ts` is drawing, and the
@@ -550,6 +660,7 @@ export class QuestMarkerField {
         y: head === null ? markYFromGround(source.groundAt(npc.x, npc.z)) : markYFromHeadBone(head),
         z: npc.z,
         phase: bobPhase(npc.id),
+        hero,
       });
     }
   }
@@ -563,10 +674,10 @@ export class QuestMarkerField {
       const dy = marker.y - this.camPos.y;
       const dz = marker.z - this.camPos.z;
       const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      const alpha = markerAlpha(distance);
+      const alpha = markerAlpha(distance, marker.hero);
       if (alpha <= 0) continue;
       const glyph = marker.kind === 'turnin' ? QUERY : BANG;
-      const scale = markerScale(distance) * GLYPH_EM_M;
+      const scale = markerScale(distance, marker.hero) * GLYPH_EM_M;
       const bob = Math.sin(this.clock * BOB_HZ * Math.PI * 2 + marker.phase) * BOB_M;
       const y = marker.y + bob;
       // The halo first and the face over it. No depth write, so painter's order
@@ -618,6 +729,19 @@ export class QuestMarkerField {
   markerHeight(index: number): number | null {
     const marker = this.markers[index];
     return marker === undefined ? null : marker.y;
+  }
+
+  /**
+   * Is the nth live mark a hero's? For the check, and for a console poke.
+   *
+   * The cap's preference is the one thing about this feature that is invisible
+   * in every screenshot that is not the exact screenshot where it went wrong --
+   * a hero dropped by a crowd looks like a hero who has nothing to give -- so
+   * the answer is worth being able to read.
+   */
+  markerIsHero(index: number): boolean | null {
+    const marker = this.markers[index];
+    return marker === undefined ? null : marker.hero;
   }
 
   /** Give the buffers back. Nothing else here allocates GPU memory. */
@@ -716,6 +840,99 @@ export function verifyQuestMarkers(): string[] {
   }
   if (bobPhase('a') === bobPhase('b')) failures.push('Two givers bob in unison; the phase is not derived from the id.');
   if (bobPhase('centrelink-clerk') !== bobPhase('centrelink-clerk')) failures.push('The bob phase is not stable per id.');
+
+  // --- The hero mark: the reach, the size, and the cap that must prefer it.
+  //
+  // Every one of these is silent. A hero that reaches no further than an
+  // ordinary mark is a tutorial nobody finds; a hero at the ordinary size is a
+  // marker in a park with nothing to distinguish it; a hero that grew to a
+  // *constant* apparent size is a HUD element pasted over Sydney, which is the
+  // failure `markerScale` has always been written against; and a hero the cap
+  // drops is the first thirty seconds of the game not happening, on a CBD block,
+  // sometimes.
+  if (markerAlpha(MARKER_RANGE_M + 10, true) <= 0) failures.push('A hero mark is invisible past the ordinary range.');
+  if (markerAlpha(HERO_FADE_FULL_M, true) !== 1) failures.push('A hero mark is not solid inside its own fade.');
+  if (markerAlpha(HERO_RANGE_M, true) !== 0 || markerAlpha(HERO_RANGE_M + 50, true) !== 0) {
+    failures.push(`A hero mark is still drawn past ${HERO_RANGE_M} m.`);
+  }
+  if (markerAlpha(HERO_RANGE_M - 20, true) <= 0 || markerAlpha(HERO_RANGE_M - 20, true) >= 1) {
+    failures.push('The hero fade between its two distances is not a ramp.');
+  }
+  if (markerScale(5, true) <= markerScale(5)) failures.push('A hero mark at arm’s length is no bigger than an ordinary one.');
+  if (Math.abs(markerScale(5, true) - HERO_SCALE) > 1e-9) {
+    failures.push(`A hero mark inside the scale floor is ${markerScale(5, true)}x, not ${HERO_SCALE}x.`);
+  }
+  // Bigger in world space and still smaller on screen with distance: the depth
+  // cue has to survive the multiplier or the hero reads as an overlay.
+  if (markerScale(HERO_RANGE_M, true) / HERO_RANGE_M >= markerScale(SCALE_FROM, true) / SCALE_FROM) {
+    failures.push('A distant hero mark is not smaller on screen than a near one; it would read as a HUD element.');
+  }
+  if (markerReach(true).range <= markerReach(false).range) failures.push('The hero reach is not longer than the ordinary one.');
+
+  {
+    const field = new QuestMarkerField();
+    const npcOf = (id: string, x: number, z: number, hero: boolean): DialogNpc =>
+      parseDialogPack(
+        {
+          npcs: [
+            {
+              id,
+              x,
+              z,
+              radius: 5,
+              marker: hero ? 'hero' : '',
+              nodes: [{ id: 'hello', line: 'gday', choices: [{ text: 'the job', accept: 'j' }] }],
+            },
+          ],
+        },
+        'fixture',
+      ).value.npcs[0];
+    const quests = parseQuestPack(
+      { quests: [{ id: 'j', giver: 'a', level: 1, steps: [{ kind: 'ko', count: 1 }] }] },
+      'fixture',
+    ).value.quests;
+    const facts: PlayerFacts = { level: 1, faction: '', story: new Set(), cash: 0 };
+    const source = (npcs: DialogNpc[]): QuestMarkerSource => ({
+      npcs: () => npcs,
+      view: () => questView(quests, {}),
+      facts: () => facts,
+      groundAt: () => 0,
+    });
+    const camera = { matrixWorld: new Matrix4() };
+
+    // A hero two hundred metres out is drawn where an ordinary giver is gone.
+    field.update(1, camera, source([npcOf('ordinary', 200, 0, false)]));
+    if (field.live !== 0) failures.push('An ordinary giver 200 m away drew a mark.');
+    field.update(1, camera, source([npcOf('lad', 200, 0, true)]));
+    if (field.live !== 1) failures.push(`A hero 200 m away drew ${field.live} marks.`);
+    if (field.markerIsHero(0) !== true) failures.push('The field did not record the mark as a hero’s.');
+    // And a hero past its own reach is gone entirely rather than drawn at nothing.
+    field.update(1, camera, source([npcOf('lad', HERO_RANGE_M + 40, 0, true)]));
+    if (field.live !== 0) failures.push(`A hero ${HERO_RANGE_M + 40} m away still drew a mark.`);
+
+    // The same two quads and the same halo. A hero that grew the glyph would
+    // silently need bigger buffers, which in a typed array is a corrupt frame.
+    field.update(1, camera, source([npcOf('lad', 10, 0, true)]));
+    if (field.mesh.geometry.drawRange.count !== BANG.length * INDICES_PER_QUAD * 2) {
+      failures.push(`A hero "!" drew ${field.mesh.geometry.drawRange.count} indices; it is the same two quads and a halo.`);
+    }
+
+    /*
+     * **The cap prefers the hero**, which is the assertion the whole feature
+     * rests on and the one nothing else would catch. Twelve ordinary givers are
+     * offered first, so the naive loop is already full by the time the hero is
+     * reached and would drop him.
+     */
+    const crowd: DialogNpc[] = [];
+    for (let i = 0; i < MAX_MARKERS + 4; i++) crowd.push(npcOf(`n${i}`, i * 2 + 4, 0, false));
+    crowd.push(npcOf('lad', 60, 0, true));
+    field.update(1, camera, source(crowd));
+    if (field.live > MAX_MARKERS) failures.push(`${field.live} markers were written into buffers sized for ${MAX_MARKERS}.`);
+    let heroes = 0;
+    for (let i = 0; i < MAX_MARKERS; i++) if (field.markerIsHero(i) === true) heroes++;
+    if (heroes !== 1) failures.push(`A hero behind ${MAX_MARKERS + 4} ordinary givers was dropped by the cap.`);
+    field.dispose();
+  }
 
   // --- The field itself, driven with a bare matrix and no renderer.
   {

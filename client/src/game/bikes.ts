@@ -618,6 +618,187 @@ export function placeBike(plan: BikePlanEntry, world: BikeGround): BikeSpot | nu
   return null;
 }
 
+
+// --- The loan bike ---------------------------------------------------------------
+
+/**
+ * Where the ids of quest-granted bikes start, and why they are a band rather
+ * than the next number after the plan.
+ *
+ * `bikePlan` hands out 1..n in the index's own tile order, and *both ends derive
+ * that from the same `index.json`*, which is the whole reason a `u16` on the
+ * wire means the same bike in every process. A loan bike is not in the plan --
+ * it did not come out of a tile hash and no client can derive it -- so putting
+ * one at `n + 1` would make the id depend on how many tiles the build happens
+ * to have, and a retile that added one tile would silently renumber every loan
+ * bike in flight into somebody else's bicycle.
+ *
+ * A high fixed band cannot do that. 0xF000 is 61,440; the shipped `middle`
+ * index plans **6,017** bikes, so the two ranges are an order of magnitude
+ * apart and `verifyBikes` asserts the gap against the real arithmetic rather
+ * than trusting this paragraph.
+ *
+ * **Nothing on the wire changed to carry this**, which is the honest part of
+ * the seam and is worth stating plainly: `protocol.encodeBikes` is already a
+ * `u16` id with **upsert** semantics -- "the receiver merges by id and leaves
+ * everything it is not told about alone" -- so a loan bike is one ordinary
+ * 18-byte record on the message that already exists, and a client mirrors it
+ * with the same line that mirrors bike 4,211 being mounted. The two ends cannot
+ * disagree about which bikes exist, because the server is still the only thing
+ * that says so and it says it the same way.
+ */
+export const BIKE_LOAN_ID_BASE = 0xf000;
+
+/**
+ * How many distinct players the loan band can hold. The low twelve bits.
+ *
+ * `Simulation.nextId` runs 1..65535 and wraps, so a raw `BASE + playerId` would
+ * run off the end of a `u16`. Masking to twelve bits keeps every loan inside the
+ * band and costs a collision only between two players whose ids are 4,096
+ * apart -- which on a sixteen-player box means two people who joined 4,096
+ * joins apart, i.e. never at once. What it buys is worth more than that risk:
+ * a **stable id per player**, so accepting a bike-granting quest twice moves the
+ * one loan bike to your feet instead of littering Sydney with a bicycle per
+ * quest per player forever. The set of bikes is fixed for the life of a build
+ * (`MSG.BIKES` has no delete) and this is what keeps that true.
+ */
+export const BIKE_LOAN_SLOTS = 0x1000;
+
+/** The one loan bike this player may have out. Stable for the session and beyond. */
+export function loanBikeId(playerId: number): number {
+  return BIKE_LOAN_ID_BASE + (Math.trunc(playerId) & (BIKE_LOAN_SLOTS - 1));
+}
+
+/** Is this a loan rather than one of the city's own? For the checks and a log line. */
+export function isLoanBike(id: number): boolean {
+  return id >= BIKE_LOAN_ID_BASE && id < BIKE_LOAN_ID_BASE + BIKE_LOAN_SLOTS;
+}
+
+/**
+ * The near and far edge of "grab this lime bike", metres.
+ *
+ * The near edge exists because a bicycle that materialises *inside* the player
+ * is a bicycle they are standing in the middle of, and `MOUNT_RADIUS` is 2.2 --
+ * so a bike at 0.5 m is mountable, invisible behind the camera in first person,
+ * and reads as nothing having happened. One metre is far enough to be a thing
+ * beside you and near enough that it is unmistakably yours.
+ *
+ * The far edge is `MOUNT_RADIUS` doubled and a bit: at 5 m the bike is in frame
+ * at any sensible field of view, and the two steps it takes to reach it are the
+ * beat that makes it read as *arriving* rather than as having always been there.
+ * Past that and a player in a park is looking for it.
+ */
+export const LOAN_MIN_M = 1;
+export const LOAN_MAX_M = 5;
+
+/**
+ * How far a loan bike must stay from the rails. `content-check.ts`'s own number.
+ *
+ * Six metres is what that gate calls "on the tracks" for a quest giver, and a
+ * bicycle parked in the four-foot is worse than a person standing there: the
+ * player will get on it. The test is **optional** on the world -- see
+ * `LoanGround.railGap` -- because the 6,017 bikes `placeBike` puts out have
+ * never had one either, and a rule that applied to the single bike handed to a
+ * player and to none of the others would be a stricter standard for the one
+ * placement anybody is watching.
+ */
+export const LOAN_RAIL_CLEARANCE_M = 6;
+
+/** How far apart two bikes have to be before one is not inside the other. */
+export const LOAN_BIKE_GAP_M = 1.5;
+
+/** How many hashed candidates a loan gets. See `placeLoanBike`. */
+const LOAN_TRIES = 24;
+
+/**
+ * What `placeLoanBike` needs beyond what `placeBike` already asks for.
+ *
+ * Both extras are optional and absent is a working configuration rather than a
+ * broken one, which is `BikeGround.waterSurface`'s own contract: a world with no
+ * rail bake (every world the checks build by hand, and any deployment whose
+ * pipeline predates the rail round) simply cannot answer the track question, and
+ * refusing to lend a bike because of that would be a tutorial that does not
+ * happen on a machine where everything else works.
+ */
+export interface LoanGround extends BikeGround {
+  /** Metres to the nearest running rail, or a non-finite value where unknown. */
+  railGap?(x: number, z: number): number;
+  /** Is there already a bike within `LOAN_BIKE_GAP_M` of this point? */
+  bikeNear?(x: number, z: number): boolean;
+}
+
+/**
+ * Put a loaned bike on clear ground beside a player, or return null.
+ *
+ * `placeBike`'s spiral turned inside out, and the differences are the whole
+ * point of it being a second function rather than a flag on the first:
+ *
+ *   - The **annulus**, not the point. `placeBike` starts on its planned point
+ *     and walks outward until something works; this must never land on the
+ *     planned point, because the planned point is a person. Every candidate is
+ *     between `LOAN_MIN_M` and `LOAN_MAX_M`.
+ *   - The **golden angle**, not a widening ring. Sixteen candidates around one
+ *     circle would be sixteen samples of one radius; stepping the angle by
+ *     2.39996 rad and the radius by an equal share of the annulus lays the
+ *     tries out as a sunflower, so the twenty-four of them cover the ring at
+ *     every distance rather than the ring at one.
+ *   - It is **seeded**, not hashed off a tile key. There is no tile key: the
+ *     input is a player standing somewhere. `seed` is the caller's -- the
+ *     server passes the tick -- and the whole function is a pure deterministic
+ *     function of `(x, z, seed)`, which is what lets `verifyBikes` assert that
+ *     the same three numbers place the bike in the same centimetre twice.
+ *
+ * Returning null is a real outcome, exactly as it is for `placeBike`: a player
+ * who accepts the job wedged in a stairwell has nowhere for a bicycle to be, and
+ * a bike forced into a wall is worse than the sentence "no room for the bike
+ * here" -- which is what the caller says. See `server/quests.QuestEngine.accept`.
+ */
+export function placeLoanBike(x: number, z: number, seed: number, world: LoanGround): BikeSpot | null {
+  // The angle is offset by the seed so two players who accept on the same tick
+  // in the same doorway do not both try the same first candidate and both fail
+  // over the same lamp post.
+  const base = hashFraction(`loan:${seed}`, BIKE_STAMP + 32) * Math.PI * 2;
+  for (let attempt = 0; attempt < LOAN_TRIES; attempt++) {
+    const angle = base + attempt * 2.399963;
+    // Ramped across the annulus rather than random in it: the first candidates
+    // are near, so a bike in an open street lands at `LOAN_MIN_M` and reads as
+    // being handed to you, and only a crowded spot pushes it out to five.
+    const radius = LOAN_MIN_M + ((LOAN_MAX_M - LOAN_MIN_M) * attempt) / (LOAN_TRIES - 1);
+    const cx = x + Math.cos(angle) * radius;
+    const cz = z + Math.sin(angle) * radius;
+    // `-Infinity` for the feet, as `placeBike` does and for its reason: the
+    // question is where the street is, not which roof the query is standing on.
+    const y = world.groundHeight(cx, cz, -Infinity);
+    if (!Number.isFinite(y)) continue;
+    if (!world.clear(cx, cz, y)) continue;
+    const surface = world.waterSurface?.(cx, cz) ?? Number.NaN;
+    // `NaN` compares false, which is the dry case.
+    if (Number.isFinite(surface) && surface > y + 0.15) continue;
+    const rail = world.railGap?.(cx, cz) ?? Number.NaN;
+    if (Number.isFinite(rail) && rail < LOAN_RAIL_CLEARANCE_M) continue;
+    if (world.bikeNear?.(cx, cz) === true) continue;
+    // Parked facing the way it was handed over, which is away from the player:
+    // a rider who gets on is already pointed at open ground rather than at the
+    // person who gave it to them.
+    return { x: cx, y, z: cz, yaw: yawOfLoan(cx - x, cz - z) };
+  }
+  return null;
+}
+
+/**
+ * The yaw of the direction the bike was set down in.
+ *
+ * `game/giverbodies.yawOf` inlined rather than imported, on this file's standing
+ * rule: `bikes.ts` is what the **server** runs and it imports one thing
+ * (`game/powerups.ts`) on purpose. Two lines is cheaper than a dependency, and
+ * `verifyBikes` pins it against the four compass points so the two copies cannot
+ * quietly part company.
+ */
+function yawOfLoan(dx: number, dz: number): number {
+  if (dx * dx + dz * dz < 1e-12) return 0;
+  return Math.atan2(-dx, -dz);
+}
+
 // --- The world's bikes, and who is on them ------------------------------------
 
 /** One bike, as both ends hold it. */
@@ -1109,6 +1290,121 @@ export function verifyBikes(): string[] {
     // And the harbour is not a car park.
     const wet: BikeGround = { groundHeight: () => -3, clear: () => true, waterSurface: () => 0 };
     if (placeBike(plan, wet) !== null) failures.push('A bike was parked under three metres of water.');
+  }
+
+  // --- The loan bike: the band, the annulus, and the ground under it.
+  //
+  // Four things, and three of them are silent. An id that fell inside the plan
+  // is a loan bike that **is** somebody's city bike -- two records, one number,
+  // and the last write wins on both ends. A placement inside the player is a
+  // bike nobody can see. A placement past five metres is a tutorial that says
+  // "grab this lime bike" beside an empty footpath. And a placement that is not
+  // deterministic is a bike that lands somewhere else every time the same
+  // accept is replayed, which is exactly the class of thing a reconnect does.
+  {
+    if (!isLoanBike(loanBikeId(1))) failures.push('A loan id is not in the loan band.');
+    if (loanBikeId(7) !== loanBikeId(7)) failures.push('A loan id is not stable for one player.');
+    if (loanBikeId(7) === loanBikeId(8)) failures.push('Two players were given the same loan id.');
+    if (loanBikeId(0) <= 0 || loanBikeId(BIKE_LOAN_SLOTS * 3 + 5) > 0xffff) {
+      failures.push('A loan id fell outside what a u16 on the wire can carry.');
+    }
+    if (isLoanBike(1) || isLoanBike(BIKE_LOAN_ID_BASE - 1)) failures.push('A planned bike id was read as a loan.');
+    // The gap against the real arithmetic rather than against the paragraph: a
+    // 60 km square of 500 m tiles is 14,400 tiles, a third of them get a bike,
+    // and the loan band must still be clear of the top of that by a mile.
+    {
+      const tiles: BikeTile[] = [];
+      for (let tx = -60; tx < 60; tx++) {
+        for (let tz = -60; tz < 60; tz++) {
+          tiles.push({ key: `${tx}_${tz}`, bounds: [tx * 500, tz * 500, tx * 500 + 500, tz * 500 + 500] });
+        }
+      }
+      const planned = bikePlan(tiles);
+      if (planned.length === 0) failures.push('A 14,400-tile world planned no bikes.');
+      const top = planned[planned.length - 1]?.id ?? 0;
+      if (top >= BIKE_LOAN_ID_BASE) {
+        failures.push(`A 120x120-tile world plans up to bike ${top}, which is inside the loan band at ${BIKE_LOAN_ID_BASE}.`);
+      }
+    }
+
+    const flat: LoanGround = { groundHeight: () => 4, clear: () => true };
+    const spot = placeLoanBike(100, -200, 1234, flat);
+    if (spot === null) {
+      failures.push('A loan bike found nowhere to stand on open flat ground.');
+    } else {
+      const d = Math.hypot(spot.x - 100, spot.z + 200);
+      if (d < LOAN_MIN_M - 1e-9) failures.push(`A loan bike landed ${d.toFixed(2)} m from the player, inside the ${LOAN_MIN_M} m floor.`);
+      if (d > LOAN_MAX_M + 1e-9) failures.push(`A loan bike landed ${d.toFixed(2)} m away, past the ${LOAN_MAX_M} m ceiling.`);
+      if (spot.y !== 4) failures.push(`A loan bike sits at y=${spot.y}, not on the ground at 4.`);
+      // Deterministic given the same three numbers, and different given a
+      // different seed -- so a replayed accept is idempotent and two accepts on
+      // two ticks do not stack two bikes on one square metre.
+      const again = placeLoanBike(100, -200, 1234, flat);
+      if (again === null || Math.abs(again.x - spot.x) > 1e-12 || Math.abs(again.z - spot.z) > 1e-12) {
+        failures.push('placeLoanBike is not deterministic over the same (x, z, seed).');
+      }
+      const other = placeLoanBike(100, -200, 1235, flat);
+      if (other !== null && Math.abs(other.x - spot.x) < 1e-12 && Math.abs(other.z - spot.z) < 1e-12) {
+        failures.push('Two different seeds placed the loan bike in exactly the same spot.');
+      }
+    }
+
+    // Every candidate, not just the one that was taken: a floor that only holds
+    // for the first try is a floor that fails the day a lamp post moves.
+    for (let seed = 0; seed < 40; seed++) {
+      const s = placeLoanBike(0, 0, seed, flat);
+      if (s === null) {
+        failures.push(`Seed ${seed} found nowhere on open ground.`);
+        continue;
+      }
+      const d = Math.hypot(s.x, s.z);
+      if (d < LOAN_MIN_M - 1e-9 || d > LOAN_MAX_M + 1e-9) {
+        failures.push(`Seed ${seed} placed a loan bike ${d.toFixed(2)} m away, outside ${LOAN_MIN_M}..${LOAN_MAX_M}.`);
+      }
+    }
+
+    // A player wedged in a stairwell gets a sentence, not a bike in the wall.
+    const walled: LoanGround = { groundHeight: () => 0, clear: () => false };
+    if (placeLoanBike(0, 0, 1, walled) !== null) failures.push('A loan bike was placed inside a building.');
+    // Nor in the harbour.
+    const wet: LoanGround = { groundHeight: () => -3, clear: () => true, waterSurface: () => 0 };
+    if (placeLoanBike(0, 0, 1, wet) !== null) failures.push('A loan bike was parked under three metres of water.');
+    // Nor over a tile that has not decoded.
+    const hole: LoanGround = { groundHeight: () => Number.NaN, clear: () => true };
+    if (placeLoanBike(0, 0, 1, hole) !== null) failures.push('A loan bike was placed over a hole in the world.');
+    // Nor in the four-foot. The whole annulus is inside the clearance here, so
+    // the only correct answer is none.
+    const trackside: LoanGround = { groundHeight: () => 0, clear: () => true, railGap: () => 0.5 };
+    if (placeLoanBike(0, 0, 1, trackside) !== null) failures.push('A loan bike was parked on the tracks.');
+    // But a world that cannot answer the track question still lends a bike.
+    const noRail: LoanGround = { groundHeight: () => 0, clear: () => true, railGap: () => Number.NaN };
+    if (placeLoanBike(0, 0, 1, noRail) === null) failures.push('A world with no rail bake refused to lend a bike.');
+    // And a rail on one side pushes the bike to the other rather than refusing.
+    const oneSide: LoanGround = {
+      groundHeight: () => 0,
+      clear: () => true,
+      railGap: (bx) => (bx > 0 ? 0.5 : 50),
+    };
+    const away = placeLoanBike(0, 0, 3, oneSide);
+    if (away === null) failures.push('A rail down one side of the street left nowhere to park.');
+    else if (away.x > 0) failures.push('A loan bike was parked on the side of the street the rails are on.');
+    // Nor inside another bike.
+    const crowded: LoanGround = {
+      groundHeight: () => 0,
+      clear: () => true,
+      bikeNear: (bx, bz) => Math.hypot(bx, bz) < 3,
+    };
+    const beyond = placeLoanBike(0, 0, 5, crowded);
+    if (beyond === null) failures.push('A bike three metres away left nowhere to put a second one.');
+    else if (Math.hypot(beyond.x, beyond.z) < 3) failures.push('A loan bike was placed inside another bike.');
+
+    // The yaw is the direction it was set down in, and it is this project's yaw
+    // -- north is 0 -- rather than a second convention living in this file.
+    const north: LoanGround = { groundHeight: () => 0, clear: (bx, bz) => bz < -0.9 && Math.abs(bx) < 0.9 };
+    const facing = placeLoanBike(0, 0, 11, north);
+    if (facing !== null && Math.abs(facing.yaw) > 0.5) {
+      failures.push(`A bike set down due north faces ${facing.yaw.toFixed(2)} rad, not 0.`);
+    }
   }
 
   // --- One bike, two claimants, one rider.

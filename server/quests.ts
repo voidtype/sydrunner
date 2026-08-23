@@ -883,6 +883,21 @@ export interface QuestWorld {
   levelled?(playerId: number, level: number): void;
   /** Which station this player's train is standing at, or null. */
   rideStation(playerId: number): { line: number; station: string } | null;
+  /**
+   * Put a lime bike on clear ground beside this player, or answer null.
+   * Workstream AP.
+   *
+   * Optional, and absent is a working configuration rather than a broken one --
+   * `levelled`'s contract, for its reason: a check that only wants to walk a
+   * conversation should not have to build a `Simulation` to do it, and a quest
+   * with `"bike": true` on a host that cannot lend one simply does not lend one.
+   * The player is told either way; see `accept`.
+   *
+   * `seed` makes the placement reproducible over `(x, z, seed)`. The engine
+   * passes its own sweep counter rather than `Date.now()`, so a replayed accept
+   * in a check puts the bike in the same centimetre twice.
+   */
+  loanBike?(playerId: number, seed: number): { x: number; y: number; z: number } | null;
   /** Put a frame on this player's socket. A no-op for anyone who has left. */
   send(playerId: number, frame: ArrayBuffer): void;
 }
@@ -927,6 +942,8 @@ export class QuestEngine implements QuestSink {
 
   /** Guests, by player id. Dropped on `forget`. */
   private readonly guests = new Map<number, GuestState>();
+  /** How many sweeps have run. The loan bike's placement seed; see `tick`. */
+  private sweeps = 0;
   /** Per-socket budget, so a hammered panel cannot spend the box. */
   private readonly guards = new Map<number, FloodGuard>();
   /** Whose state frame is owed on the next flush. */
@@ -1131,6 +1148,27 @@ export class QuestEngine implements QuestSink {
     this.sweepOne(playerId);
     this.save(playerId);
     this.say(playerId, quest.title.toLowerCase().slice(0, 40));
+    /*
+     * --- WORKSTREAM AP: the loan bike, **after** the cursor and the save.
+     *
+     * The ordering is the same argument `turnin` makes about paying last: a
+     * crash between the cursor and the bike is a player on the job with no
+     * bicycle, which they can fix by walking; a crash between the bike and the
+     * cursor would be a bicycle handed out for a job nobody is on, forever,
+     * because `MSG.BIKES` has no delete. The survivable failure is the one this
+     * order picks.
+     *
+     * A host that cannot lend -- no `loanBike`, or nowhere within five metres of
+     * a player standing in a stairwell -- says so in the pill rather than failing
+     * the accept. The quest is still taken; the Ladmaster's line still says to
+     * grab the bike; and "no room for the bike here" is a sentence a player can
+     * act on by stepping into the street, which is the whole of what the
+     * degraded case needs to be.
+     */
+    if (quest.grantsBike && this.world.loanBike) {
+      const spot = this.world.loanBike(playerId, this.sweeps);
+      this.say(playerId, spot === null ? 'no room for the bike here' : 'a lime bike, for you');
+    }
   }
 
   /** Is there a dialog choice anywhere on the giver's tree that accepts this? */
@@ -1362,6 +1400,12 @@ export class QuestEngine implements QuestSink {
     this.sinceSweep += dt;
     if (this.sinceSweep < 1 / SWEEP_HZ) return;
     this.sinceSweep = 0;
+    // WORKSTREAM AP: the seed a loan bike's placement is deterministic over.
+    // A counter rather than `Date.now()` for the reason `game/footy.ts` gives
+    // about ambient things: a wall clock is a number no check can reproduce, and
+    // "the same accept always parks the bike in the same place" is only a true
+    // sentence if the input is something a check can set.
+    this.sweeps++;
     this.world.eachPlayer((playerId) => {
       const account = this.world.accountOf(playerId);
       const cursors = account !== null ? account.quests : this.guests.get(playerId)?.cursors;

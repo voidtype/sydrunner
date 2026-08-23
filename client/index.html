@@ -412,6 +412,57 @@
         pointer-events: none;
       }
 
+      /* THE WAYPOINT, under the clock.
+
+         Hidden until `WaypointBanner` adds `shown`, and hidden by *opacity and
+         a transform* rather than by `display`, so it fades in when a job is
+         accepted and out when a step completes instead of appearing as a jump.
+         `visibility` rides with the opacity so a hidden banner is not a
+         click target -- it is `pointer-events: none` anyway, on every other
+         over-the-world element's rule, but a screen reader should not read out
+         an objective nobody has.
+
+         The gold is `world/questmarkers.FACE_COLOUR` to two decimal places, on
+         purpose: the `!` over the giver's head, the needle that points at the
+         job he gave you and the text under it are one idea, and a second yellow
+         would be a second thing to learn. */
+      #waypoint {
+        position: fixed; top: 52px; left: 50%;
+        transform: translate(-50%, -6px);
+        display: flex; align-items: center; gap: 9px;
+        padding: 5px 14px 5px 11px;
+        background: rgba(10,14,20,.55);
+        -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+        border: 1px solid rgba(207,226,242,.28);
+        border-radius: 999px;
+        pointer-events: none; z-index: 2;
+        opacity: 0; visibility: hidden;
+        transition: opacity .22s ease, transform .22s ease, visibility 0s linear .22s;
+      }
+      #waypoint.shown {
+        opacity: 1; visibility: visible;
+        transform: translate(-50%, 0);
+        transition: opacity .22s ease, transform .22s ease, visibility 0s;
+      }
+      /* The needle. `transform` is written every frame by `WaypointBanner`, so
+         there is deliberately **no transition on it** -- a quarter-second ease
+         on a needle that follows the mouse is a needle that is always wrong. */
+      #waypoint-needle {
+        width: 19px; height: 19px; flex: 0 0 auto;
+        fill: #ffd129;
+        filter: drop-shadow(0 0 1.5px rgba(6,10,16,.95)) drop-shadow(0 1px 2px rgba(0,0,0,.8));
+      }
+      #waypoint-body { display: flex; flex-direction: column; line-height: 1.15; }
+      #waypoint-text {
+        font-size: 11px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase;
+        color: #ffd129; text-shadow: 0 1px 3px rgba(0,0,0,.9);
+      }
+      #waypoint-range {
+        font-size: 10px; letter-spacing: .06em;
+        color: #cfe2f2; opacity: .78; text-shadow: 0 1px 3px rgba(0,0,0,.9);
+      }
+      #waypoint-range:empty { display: none; }
+
       /* The day/night clock, top centre. See `client/src/sky/clock.ts`, which
          owns the SVG inside it and the arithmetic that places the marker; this
          is the position, the panel, the type and the palette.
@@ -564,9 +615,16 @@
          feature nobody knows exists. */
       @media (max-height: 620px), (max-width: 960px) {
         #clock { transform: translateX(-50%) scale(.78); transform-origin: top center; }
+        /* And the waypoint comes up under it, because the clock got shorter.
+           Written out rather than derived: the banner is fading its own
+           `transform` and a media query that only moved `top` is the one thing
+           that can be changed here without breaking that. */
+        #waypoint { top: 45px; }
+        #waypoint.shown { top: 45px; }
       }
       @media (max-width: 640px) {
         #clock { transform: translateX(-50%) scale(.6); transform-origin: top center; }
+        #waypoint, #waypoint.shown { top: 39px; }
       }
 
       /* Taking a hit. A DOM overlay rather than a post-process pass: it is one
@@ -2064,6 +2122,23 @@
          splitting the two would put the shape a file away from the arithmetic
          that places the marker on it. -->
     <div id="clock"></div>
+    <!-- The waypoint: which way the active objective is, and what it is called.
+         Under the clock, which is the one strip of frame above the reticle that
+         nothing else claims; `client/src/waypoint.ts` argues the placement and
+         `client/src/game/waypoint.ts` decides everything it says. The needle is
+         an inline SVG rather than a CSS triangle because a triangle made of
+         borders cannot carry the dark halo every other over-the-world glyph in
+         this interface has, and gold on a noon sky needs one. Empty of state:
+         the class `shown` is the whole of whether it is up. -->
+    <div id="waypoint">
+      <svg id="waypoint-needle" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 2 L20 21 L12 16.4 L4 21 Z" />
+      </svg>
+      <div id="waypoint-body">
+        <div id="waypoint-text"></div>
+        <div id="waypoint-range"></div>
+      </div>
+    </div>
     <!-- The heat ladder's stars, above the banner. `#investigation` says why
          the police are interested and this says how much; see `hud.heat` and
          `game/heat.ts` for the ladder itself. -->

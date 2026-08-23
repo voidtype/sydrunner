@@ -262,6 +262,7 @@ import { verifyDialog, verifyQuests } from '../client/src/game/questmodel.ts';
 // these rules are read off, so it should refuse to start over a rule that is
 // broken. Nothing here runs in the simulation -- a giver is not an actor.
 import { verifyGiverBodies } from '../client/src/game/giverbodies.ts';
+import { verifyWaypoint } from '../client/src/game/waypoint.ts';
 import { decodeQuest, verifyQuestWire } from '../client/src/net/quests.ts';
 import { ContentStore, ImprovCache, QuestEngine, contentResponse, type QuestWorld } from './quests.ts';
 import { TEAM } from '../client/src/game/teams.ts';
@@ -703,6 +704,22 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // Sydney stepping half a metre on the beat a body appears under it. None of
     // those throws, and the browser is the only place that would have looked.
     ['verifyGiverBodies', verifyGiverBodies()],
+    /*
+     * --- WORKSTREAM AP: the waypoint, whose arrow this process never draws.
+     *
+     * Here for the same reason `verifyGiverBodies` is, and one more that is
+     * specific to it: **this process owns the cursors the arrow reads.** The
+     * whole safety property of the feature is that a waypoint comes off a
+     * cursor rather than off an offer -- so it can never point at a step the
+     * register would refuse -- and the cursors are `AccountRecord.quests`,
+     * which is this file's. A `game/waypoint.activeWaypoint` that started
+     * reading the bundle instead would be a client pointing at jobs the server
+     * will not give it, and the server should refuse to start over it.
+     *
+     * The bearing maths is the other half: a sign error is a needle pointing at
+     * the opposite side of Sydney, which looks exactly like a needle.
+     */
+    ['verifyWaypoint', verifyWaypoint()],
     // WORKSTREAM N (carry): the sentence a restored session is visible as. Run
     // here as well as in the browser for `verifyLevelHud`'s reason one line up
     // -- this process decides *whether* a join was a restore and puts the bit on
@@ -1065,6 +1082,17 @@ const questWorld: QuestWorld = {
     found.room.sim.rosterVersion++;
   },
   rideStation: (playerId) => findPlayer(playerId)?.room.sim.rideStation(playerId) ?? null,
+  /**
+   * WORKSTREAM AP. The Ladmaster's lime bike, into the room the player is in.
+   *
+   * One line, and it is one line because every decision is somewhere else:
+   * `game/bikes.placeLoanBike` chooses the spot, `Simulation.loanBike` asks this
+   * room's own prisms and terrain and queues the record for the next
+   * `Room.sendBikes`, and `QuestEngine.accept` decides whether a quest asked for
+   * one at all. This is the lookup, which is the only thing the host knows that
+   * neither of the other two does.
+   */
+  loanBike: (playerId, seed) => findPlayer(playerId)?.room.sim.loanBike(playerId, seed) ?? null,
   /**
    * Put a frame on one player's socket.
    *

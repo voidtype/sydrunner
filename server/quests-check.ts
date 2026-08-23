@@ -771,12 +771,73 @@ async function main(): Promise<void> {
     const shipped = new ContentStore({ dir: new URL('../content', import.meta.url).pathname, ledgerPath: `${scratch}/ledger3.json`, timers: false });
     const errs = await shipped.load();
     check(errs.length === 0, 'content/ validates', errs.slice(0, 3).join('; '));
+    /*
+     * --- WORKSTREAM AP: act 0 is the obligations **and the tutorial**, and this
+     * block used to be able to say "act 0" and mean "Denise's".
+     *
+     * `act0-ladmaster` is act 0 too -- it is the first thing that happens in
+     * this game and it belongs to the same story -- and it is given by the
+     * Ladmaster in Sydney Park rather than by the clerk in Redfern. So the two
+     * assertions that used to read `q.act === 0` are split: the obligations are
+     * named **by id**, because that is what they actually are and a count is
+     * exactly the thing that stopped being true when a sixth act-0 job arrived,
+     * and the tutorial is asserted separately with the two properties that make
+     * it the tutorial -- nothing gates it, and it hands over a bike.
+     */
+    const OBLIGATIONS = ['act0-report', 'act0-jobsearch', 'act0-evidence', 'act0-travel', 'act0-training'] as const;
     const act0 = shipped.bundle.quests.filter((q) => q.act === 0);
-    check(act0.length >= 5, 'Act 0 is five or six jobs', `${act0.length}`);
-    check(
-      act0.every((q) => q.giver === 'centrelink-clerk'),
-      'and all of them come from the one clerk',
+    check(act0.length === OBLIGATIONS.length + 2, 'Act 0 is the tutorial, five obligations and the review', `${act0.length}`);
+    const obligations = OBLIGATIONS.map((id) => shipped.bundle.quests.find((q) => q.id === id)).filter(
+      (q): q is NonNullable<typeof q> => q !== undefined,
     );
+    check(obligations.length === OBLIGATIONS.length, 'the five obligations are all there, by id', obligations.map((q) => q.id).join(', '));
+    check(
+      obligations.every((q) => q.giver === 'centrelink-clerk'),
+      'and all five come from the one clerk',
+    );
+
+    /*
+     * --- The tutorial itself: the first thing in the game, and nothing gates it.
+     *
+     * Every clause here is a way the onboarding silently does not happen. A rung
+     * other than 1 and a fresh account never sees it. A `requires` or a
+     * `needFlags` and it waits for a flag a new player cannot have. A giver who
+     * is not the hero and there is no giant `!` to find. No `bike` and the line
+     * says grab the lime bike beside an empty footpath. No `goto` and the
+     * waypoint has nothing to point at, which is the whole discoverability
+     * answer gone. And an `unlock` that nothing writes is a "you have been shown
+     * the ropes" check that can never be true.
+     */
+    const tutorial = shipped.bundle.quests.find((q) => q.id === 'act0-ladmaster');
+    if (!tutorial) {
+      check(false, 'the tutorial is in the shipped content');
+    } else {
+      check(tutorial.act === 0, 'the tutorial is act 0', `act ${tutorial.act}`);
+      check(tutorial.level === 1, 'the tutorial stands on rung 1', `level ${tutorial.level}`);
+      check(
+        tutorial.requires.length === 0 && tutorial.needFlags.length === 0 && tutorial.denyFlags.length === 0,
+        'and nothing gates it: it is the first thing in the game',
+        `${tutorial.requires.length} requires, ${tutorial.needFlags.length} needFlags`,
+      );
+      check(tutorial.faction === '', 'nor does it belong to a side');
+      check(!tutorial.repeatable, 'and it is done once, so its mark survives Monday');
+      check(tutorial.grantsBike, 'accepting it lends a lime bike');
+      check(tutorial.reward.unlock.includes('act0:shown'), 'and finishing it sets act0:shown', tutorial.reward.unlock.join(', '));
+      check(tutorial.reward.cash === 10 && tutorial.reward.xp === 2, 'it pays $10 and 2 xp', `$${tutorial.reward.cash}, ${tutorial.reward.xp} xp`);
+      const first = tutorial.steps[0];
+      check(tutorial.steps.length === 1 && first?.kind === 'goto', 'it is one goto and nothing else', `${tutorial.steps.length} step(s)`);
+      check((first?.objective ?? '') === 'GET TO REDFERN', 'whose banner reads GET TO REDFERN', JSON.stringify(first?.objective));
+      // The step points at Ray rather than at Denise: he is the one who takes it
+      // back, and a waypoint that landed the player at a counter with nothing to
+      // hand over is the tutorial's one unrecoverable moment.
+      const ray = shipped.bundle.npcs.find((n) => n.id === 'rabbitohs-ray');
+      const gap = ray && first ? Math.hypot(first.x - ray.x, first.z - ray.z) : Infinity;
+      check(gap <= (first?.radius ?? 0), 'and lands the player on Ray, who takes it back', `${gap.toFixed(1)} m`);
+      // Exactly one hero in the whole of `content/`. Two would be two tutorials.
+      const heroes = shipped.bundle.npcs.filter((n) => n.marker === 'hero');
+      check(heroes.length === 1 && heroes[0].id === 'ladmaster', 'exactly one giver in Sydney wears the hero mark', heroes.map((n) => n.id).join(', '));
+      check(tutorial.giver === 'ladmaster', 'and he is the one who gives the tutorial', tutorial.giver);
+    }
     // The arc has a spine: every job but the first requires the one before it,
     // and the last is gated at the level the faction choice happens.
     const last = shipped.bundle.quests.find((q) => q.id === 'act0-review');
@@ -801,12 +862,32 @@ async function main(): Promise<void> {
       `every shipped job sits on a rung of the register (1-${REGISTER_LEVELS})`,
       rungs.join(', '),
     );
+    /*
+     * The sum that a content author owns, re-run now that the tutorial stands
+     * on the same rung. It pays **2 xp**, which is deliberately nothing -- it is
+     * a handshake rather than a job -- so rung 1's act-0 total went from 700 to
+     * **702** against the 1,000 that would level a player off it. There is 298
+     * xp of headroom, which is a knockout and a bit; the day somebody wants to
+     * pay the tutorial properly, this is the line that says what it costs.
+     */
     const rung1 = shipped.bundle.quests.filter((q) => q.level === 1 && q.act === 0);
-    check(rung1.length === 5, 'Act 0 puts five obligations on rung 1', `${rung1.length}`);
+    check(
+      rung1.length === OBLIGATIONS.length + 1,
+      'rung 1 of Act 0 is the five obligations and the tutorial',
+      rung1.map((q) => q.id).join(', '),
+    );
+    check(
+      OBLIGATIONS.every((id) => rung1.some((q) => q.id === id)),
+      'and the five obligations are on it by id, not by count',
+    );
     const rung1Xp = rung1.reduce((sum, q) => sum + q.reward.xp, 0);
     check(
+      rung1Xp === 702,
+      `rung 1 pays ${rung1Xp} xp between the tutorial and its five obligations, which is the 702 the pack's comment claims`,
+    );
+    check(
       rung1Xp < XP_PER_LEVEL,
-      `rung 1 pays ${rung1Xp} xp between its five obligations, under the ${XP_PER_LEVEL} that would level a player off it`,
+      `and ${rung1Xp} is under the ${XP_PER_LEVEL} that would level a player off the rung before the last of them is taken`,
     );
     // Act 2 is the city's own work: the hundred-quest pool, ten to a rung. A
     // rung may hold more than a player can finish -- that is a menu, not a

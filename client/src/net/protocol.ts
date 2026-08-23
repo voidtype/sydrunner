@@ -5131,6 +5131,45 @@ export function verifyNet(): string[] {
     if (partial === null || partial.length !== 1) {
       failures.push(`A BIKES message truncated mid-record decoded ${partial?.length ?? 'null'} bikes, not 1.`);
     }
+
+    /*
+     * --- WORKSTREAM AP: the loan band, which is why this message did **not**
+     * have to change to carry a quest-granted bike.
+     *
+     * `game/bikes.BIKE_LOAN_ID_BASE` is 0xF000 and the planned set is 1..n --
+     * 6,017 on the shipped `middle` index -- so a loan bike is one ordinary
+     * record with a high id, and the upsert semantics this message already has
+     * are the whole of how a client learns about one mid-session. The number is
+     * written out rather than imported because this file imports nothing, by
+     * design; `verifyBikes` owns the constant and asserts the planned set can
+     * never reach it, and this asserts the wire can carry it.
+     *
+     * What would break silently without this: an id band that ran past 0xFFFF,
+     * or a future narrowing of the id field back to a byte. Both would land a
+     * loan bike on top of a real one -- two records, one number, last write wins
+     * on both ends -- which is a bicycle that teleports across Sydney when
+     * somebody in Parramatta mounts theirs.
+     */
+    const loans: BikeRecord[] = [
+      { id: 0xf000, rider: 0, x: -2210.8, y: -57.48, z: 4506.3, yaw: 1.25 },
+      { id: 0xffff, rider: 4095, x: 0, y: 0, z: 0, yaw: 0 },
+    ];
+    const lent = decodeBikes(encodeBikes(loans));
+    if (!lent || lent.length !== 2) {
+      failures.push(`Two loan-band bikes decoded to ${lent?.length ?? 'null'} records.`);
+    } else {
+      for (let i = 0; i < 2; i++) {
+        if (lent[i].id !== loans[i].id) {
+          failures.push(`A loan bike with id ${loans[i].id} came back as ${lent[i].id}; the band does not fit the wire.`);
+        }
+        if (lent[i].rider !== loans[i].rider) {
+          failures.push(`A loan bike's rider ${loans[i].rider} came back as ${lent[i].rider}.`);
+        }
+      }
+      if (Math.abs(lent[0].x - loans[0].x) > 0.01 || Math.abs(lent[0].z - loans[0].z) > 0.01) {
+        failures.push('A loan bike parked in Sydney Park did not survive the round trip.');
+      }
+    }
   }
 
   /* --- The screaming sun's two instants.

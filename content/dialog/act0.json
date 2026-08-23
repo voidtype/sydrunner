@@ -13,9 +13,174 @@
     "caches the answer. With no key -- which is the ordinary configuration -- the",
     "authored `line` below serves and nothing anywhere is different. An improv",
     "node may not accept, turn in or charge for anything: the schema forbids it",
-    "and verifyDialog refuses a pack that tries. The AI paints; the data decides."
+    "and verifyDialog refuses a pack that tries. The AI paints; the data decides.",
+    "",
+    "THE LADMASTER AND RABBITOHS RAY ARE THE FIRST THING IN THE GAME.",
+    "",
+    "He stands in Sydney Park 45 m from the spawn pin, on the bearing to Redfern,",
+    "and he is the only giver in content/ with \"marker\": \"hero\" -- a giant `!`",
+    "seen from 400 m instead of 150 (world/questmarkers.ts) and a street light of",
+    "his own (world/giverlamp.ts), because Sydney Park has no lamps in it: the",
+    "nearest is 256 m away, measured off the bake. His quest carries",
+    "\"bike\": true, so accepting it puts a lime bike within five metres.",
+    "",
+    "Ray is on the footpath out the front of the Centrelink, 28 m from Denise --",
+    "far enough to clear content-check\u0027s 25 m rule between givers, near enough",
+    "to read as \u0022out the front\u0022. He gives nothing; he only takes the tutorial",
+    "back, which is why the quest\u0027s giver is the Ladmaster and its turn-in is",
+    "on Ray\u0027s tree. His numbers about the claim are game/cash.ts\u0027s real ones",
+    "($100, seven in-game days, per office, six metres from the door) and his",
+    "complaint is DeFAULT\u0027s Click \u0026 Collect, teams.ts id 31."
   ],
   "npcs": [
+    {
+      "id": "ladmaster",
+      "name": "The Ladmaster",
+      "x": -2210.8,
+      "z": 4506.3,
+      "radius": 5,
+      "marker": "hero",
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Oi. Oi bruv. Yeah you, the one standin in the park doin nothin. Come here a sec, I've got somethin for ya.",
+          "choices": [
+            { "text": "What?", "goto": "job" },
+            { "text": "Who are you?", "goto": "who" },
+            { "text": "Which way was it again?", "goto": "nudge" },
+            { "text": "I found Ray.", "goto": "done", "needFlag": "act0:shown" },
+            { "text": "Nah, you're right.", "goto": "nah" }
+          ]
+        },
+        {
+          "id": "job",
+          "line": "Adlay, you need some more ascay! Get down to Cenno and tell em you did 5 job interviews this week, eshay bruv! Grab this lime bike and ride down to the fern cuz, its just straight down here then right!",
+          "choices": [
+            { "text": "Righto. Where's the bike?", "accept": "act0-ladmaster", "denyFlag": "act0:shown" },
+            { "text": "Adlay?", "goto": "adlay" },
+            { "text": "Five interviews?", "goto": "interviews" },
+            { "text": "Nah, you're right.", "goto": "nah" }
+          ]
+        },
+        {
+          "id": "adlay",
+          "line": "Adlay. Lad. Ascay, cash. Cenno's just Cenno, everyone knows that one. Ya either keep up or ya don't, and if ya don't thats fine, plenty do not.",
+          "choices": [{ "text": "Right.", "goto": "job" }]
+        },
+        {
+          "id": "interviews",
+          "line": "Five. Dont say six, six is greedy and they check six. Five is the number where the lady goes mm and ticks the box and nobody has to have a day about it.",
+          "choices": [{ "text": "Five it is.", "goto": "job" }]
+        },
+        {
+          "id": "who",
+          "line": "Nobody's ever asked me that bruv. I'm the Ladmaster. I stand under this light and I tell blokes where the money is. Been doin it since before they done up the kilns.",
+          "choices": [{ "text": "Fair enough.", "goto": "hello" }]
+        },
+        {
+          "id": "nudge",
+          "line": "The fern cuz. Straight down here, then right. Big square, glass front, blokes on the bench out the front. If ya lost the bike thats on you, I only had the one.",
+          "choices": [{ "text": "Got it.", "goto": "" }]
+        },
+        {
+          "id": "nah",
+          "line": "Suit yaself ay. Bike stays here then. Its not even my bike.",
+          "choices": [{ "text": "See ya.", "goto": "" }]
+        },
+        {
+          "id": "done",
+          "line": "See? Told ya bruv. Rays alright, but dont let him start on the footy, youll be there til Tuesday.",
+          "choices": [{ "text": "Too late.", "goto": "hello" }]
+        }
+      ]
+    },
+    {
+      "id": "rabbitohs-ray",
+      "name": "Rabbitohs Ray",
+      "x": -938.3,
+      "z": 2669.9,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Gday champ. Nah I'm not in the queue, I was done by half nine. I just like the bench. Sun hits it about now and nobody bothers ya.",
+          "choices": [
+            { "text": "Bloke in the park sent me.", "turnin": "act0-ladmaster", "goto": "paid" },
+            { "text": "Where's the Centrelink?", "goto": "where" },
+            { "text": "How's a claim work?", "goto": "claim" },
+            { "text": "Does everyone get the same?", "goto": "collect" },
+            { "text": "Go the Bunnies.", "goto": "footy" },
+            { "text": "See ya, Ray.", "goto": "" }
+          ]
+        },
+        {
+          "id": "paid",
+          "line": "Him. Course it was him. Here, tenner, dont spend it in there. And now ya know where the door is, which is the actual thing he sent ya for, whatever he told ya.",
+          "choices": [
+            { "text": "So how's it work?", "goto": "claim" },
+            { "text": "Ta, Ray.", "goto": "hello" }
+          ]
+        },
+        {
+          "id": "where",
+          "line": "Right there champ. Glass front, other side of the square, Denise is on the counter and she has heard it. Six metres from that door is close enough. Any closer and it doesnt love ya more, I have tested it.",
+          "choices": [{ "text": "Ta.", "goto": "hello" }]
+        },
+        {
+          "id": "claim",
+          "line": "Hundred bucks. Once every seven days, and a day here is that sun goin round once, not a Monday to a Monday. Per office, mind. Thats the bit nobody reads.",
+          "choices": [
+            { "text": "Per office?", "goto": "circuit" },
+            { "text": "Righto.", "goto": "hello" }
+          ]
+        },
+        {
+          "id": "circuit",
+          "line": "Thirty one doors in this town and the clock is per door. Marrickville, Campsie, Bankstown, Hurstville. Get a car and thats four hundred before lunch. Thats not rortin it champ, thats it workin as designed.",
+          "choices": [{ "text": "Noted.", "goto": "hello" }]
+        },
+        {
+          "id": "collect",
+          "line": "No. No we do not. Some of these DeFAULT fellas have got a knack on em -- Click and Collect, they call it, like its a Woolies order. Five days instead of seven. FIVE.",
+          "choices": [
+            { "text": "That's the whole of it?", "goto": "collect2" },
+            { "text": "Unbelievable.", "goto": "hello" }
+          ]
+        },
+        {
+          "id": "collect2",
+          "line": "Thats not the whole of it. Anyone from DeFAULT claims within two hundred metres of one of em and the fella just standin there gets twenty bucks. For standin there. Champ. I stand here all day.",
+          "choices": [
+            { "text": "Ever thought about signing up?", "goto": "collect3" },
+            { "text": "Rough.", "goto": "hello" }
+          ]
+        },
+        {
+          "id": "collect3",
+          "line": "Mate. They took my club out of the competition in 2000 and I came back in 2002 and I have not missed a home game since. I am not changin sides for twenty dollars and a shorter week.",
+          "choices": [{ "text": "Fair enough, Ray.", "goto": "hello" }]
+        },
+        {
+          "id": "footy",
+          "line": "Go the Bunnies. See, thats the right answer and ya didnt even have to think about it. Sit down, theres room.",
+          "improv": {
+            "persona": "Rabbitohs Ray, on the bench outside the Redfern service centre. South Sydney supporter since 1988, sixties, warm, aggrieved about everything except the football, which he is aggrieved about differently. Broad Australian, no swearing, no exclamation marks.",
+            "context": "A stranger has just said go the Bunnies to him unprompted, outside Centrelink in Redfern, which is the correct thing to have said. He is pleased and is not going to make a fuss about being pleased."
+          },
+          "choices": [
+            { "text": "Actually I'm a Roosters man.", "goto": "roosters" },
+            { "text": "Go the Bunnies.", "goto": "hello" }
+          ]
+        },
+        {
+          "id": "roosters",
+          "line": "Get off my bench.",
+          "choices": [{ "text": "...", "goto": "hello" }]
+        }
+      ]
+    },
     {
       "id": "centrelink-clerk",
       "name": "Denise, Services Australia",

@@ -264,6 +264,12 @@ import { QuestMarkerField, verifyQuestMarkers, type QuestMarkerSource } from './
 // WORKSTREAM AO: and the givers standing under them. Same block, same beat.
 import { verifyGiverBodies } from './game/giverbodies.ts';
 import { GiverBodyField, verifyGiverBodyField, type GiverBodySource } from './world/giverbodies.ts';
+// WORKSTREAM AP: the arrow that says which way the job is, and the one street
+// light in this game that a content file asks for. See `game/waypoint.ts` and
+// `world/giverlamp.ts` -- both are argued at length in their own headers.
+import { verifyWaypoint } from './game/waypoint.ts';
+import { WaypointBanner, type WaypointSource } from './waypoint.ts';
+import { GiverLampField, lampsOver, verifyGiverLamps } from './world/giverlamp.ts';
 import { BuildSheet, verifyBuildSheet } from './buildsheet.ts';
 import { ChangelogFeed, verifyChangelog, verifyChangeFeed } from './changelog.ts';
 import { BugReportForm, FrameGrabber, verifyBugReport } from './bugreport.ts';
@@ -4571,6 +4577,11 @@ async function main(): Promise<void> {
     // `CharacterAssets` and so can only run here, beside the marks it feeds.
     ...verifyGiverBodies(),
     ...verifyGiverBodyField(characters),
+    // WORKSTREAM AP. The waypoint's pure half runs on the server too -- see
+    // `server/index.ts`, which owns the cursors it reads -- and the lamp's can
+    // only run here, because it needs the city's own street-lamp assets.
+    ...verifyWaypoint(),
+    ...verifyGiverLamps(streamer.streetLamps),
   ];
   if (dialogFailures.length > 0) {
     hud.fatal('Quest content self-checks failed:\n' + dialogFailures.map((f) => '  - ' + f).join('\n'));
@@ -4707,6 +4718,31 @@ async function main(): Promise<void> {
     // the rig's head when there is a rig, and off the ground when there is not.
     headY: (id) => giverBodies.headY(id),
   };
+  /*
+   * --- WORKSTREAM AP: the street light over the hero, and the arrow to the job.
+   *
+   * Two more readers of the *same* three closures, which is the point of them
+   * being hoisted: the mark over the Ladmaster's head, the light he is standing
+   * under and the needle pointing at where he sent you are one feature seen from
+   * three places, and any two of them disagreeing would be two copies of the
+   * register.
+   *
+   * The lamp draws with `streamer.streetLamps` -- the city's own column geometry
+   * and material -- so it adds no pipeline and nothing to `world/warmup.ts`. Its
+   * lamp record is merged into the source `NightLights` already reads, so the
+   * two real `PointLight`s that exist walk over and light him after dark rather
+   * than an eighth one being built. `world/giverlamp.ts` carries that argument
+   * in full; it is the reason this is three lines here rather than a light.
+   */
+  const giverLamps = new GiverLampField(streamer.streetLamps);
+  /** The `LampSource` the night rig reads: the resident tiles, plus these. */
+  const lampSource = lampsOver(streamer, () => giverLamps.lampRecords());
+  const waypointSource: WaypointSource = {
+    quests: () => questBundle.quests,
+    cursors: () => cursorsFrom(questFrame()),
+    pose: () => ({ x: player.position.x, z: player.position.z, yaw: player.yaw }),
+  };
+  const waypoint = new WaypointBanner(waypointSource);
   /** One line in the render loop, beside the plates. See `nameplates.end()`. */
   const updateQuestMarkers = (dt: number): void => {
     questMarkers.update(dt, camera, questMarkerSource);
@@ -4714,6 +4750,15 @@ async function main(): Promise<void> {
     // taken rather than the previous one. See `GiverBodyField`'s header on the
     // one beat of settle that costs.
     giverBodies.update(dt, questMarkers.beats, player.position.x, player.position.z, giverBodySource);
+    // The lamps rebuild only when `/content` changes revision, which is once a
+    // session in practice; the guard is inside `rebuild`, and it answers whether
+    // it did anything. The object count is **not** the test -- one hero replaced
+    // by another leaves it at two -- so the boolean is what parents the meshes.
+    // `wildGround` rather than `groundHeightAt` for the reason the marks give.
+    if (giverLamps.rebuild(questBundle.revision, questBundle.npcs, (x, z) => wildGround(x, z))) {
+      for (const o of giverLamps.objects) scene.add(o);
+    }
+    waypoint.update(dt);
   };
   window.addEventListener(
     'keydown',
@@ -10291,7 +10336,12 @@ async function main(): Promise<void> {
       camera,
       alt,
       Math.hypot(player.velocity.x, player.velocity.z),
-      streamer,
+      // WORKSTREAM AP: the streamer's lamps **and** the hero giver's, through
+      // `world/giverlamp.lampsOver`. Sydney Park has no lights in it -- measured,
+      // the nearest is 256 m away -- so without this the Ladmaster stands under
+      // a pole that never comes on. No light was added to the scene to do it;
+      // see that file's header on why an eighth `PointLight` was refused.
+      lampSource,
       torchMountNow,
       // WORKSTREAM fire-look: which cars are alight, for the two real lights a
       // burning car gets after dark. `CarSmoke` is the one thing in the client
@@ -10306,7 +10356,11 @@ async function main(): Promise<void> {
     // otherwise cost. One comparison on every frame but the two a day where the
     // answer changes; see `TileStreamer.setNightLightsVisible` for why this is
     // a mesh flag and must never become a light one.
-    streamer.setNightLightsVisible(nightLights.level > NIGHT_VISIBLE_LEVEL);
+    const lampsLit = nightLights.level > NIGHT_VISIBLE_LEVEL;
+    streamer.setNightLightsVisible(lampsLit);
+    // The hero's own luminaire, on the same boolean. A **mesh** flag and never a
+    // light one -- `TileStreamer.setNightLightsVisible`'s note is the reason.
+    giverLamps.setNightVisible(lampsLit);
 
     frameProfile.at(FSEC.traffic);
     // The traffic, after the streamer so a tile that arrived this frame already
