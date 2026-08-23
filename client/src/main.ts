@@ -419,6 +419,9 @@ import {
   createCarSoundMix,
   verifyCarSound,
 } from './game/carsound.ts';
+// And the floor underneath the traffic: pink noise on a slow swell, always on,
+// three-free so the server checks it too. See `game/citybed.ts`.
+import { verifyCityBed } from './game/citybed.ts';
 // The camera distance, which is a *scalar* and not a mode -- see `game/camera.ts`
 // for why the boolean this replaced was the reported bug rather than a feature.
 import {
@@ -1019,6 +1022,12 @@ async function main(): Promise<void> {
   // sound itself is ears-only and is the one thing this cannot judge. See
   // `game/carsound.ts`.
   const carSoundFailures = timed('car sound', verifyCarSound);
+  // And the city under it, whose every failure is silent in the strongest sense
+  // this list has: the whole design of a bed is that nobody consciously hears
+  // it, so a swell that steps, a loop that clicks every four seconds or a buffer
+  // that came out white instead of pink are all things a player reports as "the
+  // audio feels wrong" and nobody can screenshot. See `game/citybed.ts`.
+  const cityBedFailures = timed('city bed', verifyCityBed);
   // And the plume off a broken bonnet, which fails in the way every closed-form
   // effect in this renderer fails: a perfectly good frame with nothing in it.
   // A count left at zero is no smoke at all, a count left high is twelve stale
@@ -1435,6 +1444,7 @@ async function main(): Promise<void> {
     staticCarFailures.length ||
     drivenCarFailures.length ||
     carSoundFailures.length ||
+    cityBedFailures.length ||
     carSmokeFailures.length ||
     carFireFailures.length ||
     damageGradeFailures.length ||
@@ -1521,6 +1531,7 @@ async function main(): Promise<void> {
           ...staticCarFailures,
           ...drivenCarFailures,
           ...carSoundFailures,
+          ...cityBedFailures,
           ...carSmokeFailures,
           ...carFireFailures,
           ...damageGradeFailures,
@@ -10930,6 +10941,11 @@ async function main(): Promise<void> {
     carListener.ownSteer = driveSteering.right;
     carSound.end(carListener, carSoundMix);
     audio.engineUpdate(carSoundMix);
+    // And the city under the traffic. No arguments, because it depends on
+    // nothing: no listener, no distance, no mix -- see `game/citybed.ts`. It is
+    // here rather than anywhere else only because this is where the sound system
+    // is already being spoken to, and it is free when the audio is off.
+    audio.cityBedUpdate();
 
     frameProfile.at(FSEC.actors);
     // Every actor -- three dummies and the player's own body -- on the frame

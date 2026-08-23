@@ -437,17 +437,36 @@ export function createRailAnnounceMix(): RailAnnounceMix {
  * station every two minutes, all day, on ten lines -- at rave range a walk
  * through Newtown would be narrated.
  *
- * 110 m is a platform and the street it opens onto. Measured from the carriage
- * rather than from the station, so what it buys is exactly: the whole platform
- * hears the train it is standing beside, the concourse does not, and the next
- * street does not know the railway is there.
+ * **90 m, and it was 110.** The owner: *"make the sound of cars and trains decay
+ * faster"*. The PA is the only train voice in this build -- there is no
+ * rolling-stock sound at all, so "trains" is this -- and the same reduction the
+ * engines got applies here for a sharper version of the reason: an announcement
+ * is *speech*, and speech carries a long way past the point where it is
+ * intelligible. Being able to hear that an announcement is happening two streets
+ * away, without being able to make out a word of it, is worse than not hearing
+ * it: it is the sound of a public address system somewhere else, which is a
+ * thing nobody has ever wanted in a game.
  *
- * `ANNOUNCE_RANGE / ANNOUNCE_HALF_DISTANCE` is 4.78, which is the rave model's
- * 4.73 to two figures and is deliberate -- it puts the level at the gate at
- * 0.17 of the level at the source, the same near-inaudible point the music is
- * switched off at, so nothing pops when you walk away.
+ * 90 m is a platform and the doors it opens onto, measured from the carriage
+ * rather than from the station, so what it buys is exactly: the whole platform
+ * hears the train it is standing beside, the concourse hears the end of it, and
+ * the next street does not know the railway is there. **The platform is the
+ * constraint that was checked rather than assumed.** A Sydney platform is about
+ * 160 m and a consist is `CONSIST_M`'s 170, so a train that has stopped is
+ * alongside every metre of it -- with the distance taken to the nearest carriage,
+ * nobody standing on the platform is more than about 25 m from the source, where
+ * the level is 0.128 of full scale against a mix floor of 0.018. The far end of a
+ * platform is not close to the gate and was never in danger from this change;
+ * what is now outside 90 m is the concourse stairs, the street, and the next
+ * platform but two.
+ *
+ * `ANNOUNCE_RANGE / ANNOUNCE_HALF_DISTANCE` is 6.0, against the 4.78 it was --
+ * so the level at the gate is 0.143 of the level at the carriage side rather
+ * than 0.173. Both are inside the band this project has decided is inaudible
+ * (`RAVE_AUDIBLE_RANGE` cuts at 0.108 and `ENGINE_RANGE` at 0.125), so nothing
+ * pops when you walk away; it is simply reached sooner.
  */
-export const ANNOUNCE_RANGE = 110;
+export const ANNOUNCE_RANGE = 90;
 
 /**
  * How close before a byte is fetched, metres.

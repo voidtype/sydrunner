@@ -218,6 +218,11 @@ import { verifyDrivingContract } from '../client/src/game/driving-contract.ts';
 // terms, so the whole schedule -- which cars are audible, how loud, at what pitch
 // -- re-derives here with no `AudioContext` within a mile of it.
 import { verifyCarSound } from '../client/src/game/carsound.ts';
+// And the floor underneath it. `game/citybed.ts` is three-free for the same
+// reason and checks the same way: the swell is a pure function of seconds and
+// the pink buffer is a Float32Array, so the colour, the loop seam and the level
+// all re-derive here with no `AudioContext` in the process.
+import { verifyCityBed } from '../client/src/game/citybed.ts';
 import { verifyFares } from './fares.ts';
 import { WalletStore, defaultWalletPath, verifyWallets } from './wallets.ts';
 // --- Accounts, unique handles and the level ladder. Workstream G.
@@ -634,6 +639,13 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // because there is no audio in the file -- only the arithmetic that decides
     // what the audio should be.
     ['verifyCarSound', verifyCarSound()],
+    // The city bed, on the same terms. Every failure in it is silent even by the
+    // standards of this list -- a bed is by construction the sound nobody
+    // notices, so a swell that steps, a loop that clicks once every four seconds
+    // or a buffer that came out white are all "the audio feels off" with no
+    // repro. It runs here because it *can*: there is no audio in the file, only
+    // the sample data and the arithmetic that decides what the graph does.
+    ['verifyCityBed', verifyCityBed()],
     // The phone's model. Run **here** despite the server having no opinion
     // about which hand a bat is in, because the interesting half of that file
     // is the photo album and every one of its failures is silent: an album that

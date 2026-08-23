@@ -63,6 +63,18 @@
 import type { RailAnnounceMix, RailVoice } from './rail-audio.ts';
 import type { CarSoundMix, EngineVoice } from './carsound.ts';
 import { screamGap } from './sunbutton.ts';
+// The floor of the mix: pink noise and a very slow swell, decided three-free
+// next door and made into three nodes here. `game/carsound.ts`' split exactly --
+// that file has the argument for the colour, the level and the loop, and this
+// one has the graph. See `cityBedUpdate`.
+import {
+  CITY_BED_GAIN,
+  CITY_BED_GLIDE_S,
+  CITY_BED_LOWPASS_HZ,
+  CITY_BED_SECONDS,
+  citySwell,
+  fillCityBed,
+} from './citybed.ts';
 
 /**
  * How hard a crash has to be before glass breaks. `CombatAudio.carCrunch`'s
@@ -122,6 +134,8 @@ export class CombatAudio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private noise: AudioBuffer | null = null;
+  /** The city underneath everything. Built once, never torn down. See `cityBedUpdate`. */
+  private city: CityBedChain | null = null;
 
   /**
    * Decoded voice clips, by URL. See `loadClip`.
@@ -3116,7 +3130,9 @@ export class CombatAudio {
   // -- around 10 m, so 0.14 of full each -- sum incoherently to about **0.21**.
   // Together with the bed that is 0.33, still under the threshold, which is what
   // leaves the limiter for the thing it is for: a crash or a gunshot landing on
-  // top of all of it. Checked this way rather than by ear because the failure --
+  // top of all of it. The city bed under all of that adds 0.014 -- see
+  // `CityBedChain` for where that number comes from -- and 0.344 is still under
+  // 0.398. Checked this way rather than by ear because the failure --
   // a mix that pumps every time a bat connects -- sounds like a mastering problem
   // rather than like a bug.
   //
@@ -3411,6 +3427,103 @@ export class CombatAudio {
       }
     }, 300);
   }
+
+  // ---------------------------------------------------------------------------
+  // THE CITY, WHICH IS THE ONLY THING IN THIS FILE THAT NEVER STOPS.
+  //
+  // Every other voice here is a *cue*: it starts because something happened, it
+  // is placed where the thing is, and it goes away again. This one is the
+  // opposite of all three -- it has no trigger, no position and no end -- and it
+  // is the last thing in the mix rather than the first because that is exactly
+  // its job: `game/citybed.ts` has the argument, and the short version is that a
+  // street with nothing on it should not be silent, and the sound that fixes
+  // that must be one a player can never point at.
+  //
+  // Three nodes and one parameter move a frame, forever. There is no rig, no
+  // idle timer and no teardown, because there is no state to be in: unlike
+  // `engineSilence`, which drops ninety nodes for a player who parks in a
+  // paddock, this is a source, a filter and a gain and holding them open costs
+  // less than the branch that would decide whether to.
+
+  /**
+   * Bring the bed up for this frame. Called once a frame from the animation loop
+   * with nothing at all, because it depends on nothing at all.
+   *
+   * Free when there is no sound: the context is null until `enable()` and
+   * suspended whenever the tab is in the background, and both return before the
+   * clock is read. The buffer is generated on the first frame after the context
+   * opens -- about 25 ms of arithmetic for four seconds of noise, once, on a
+   * frame the player has just clicked into the game on and where a hitch is
+   * covered by the pointer lock.
+   */
+  cityBedUpdate(): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    if (!ctx || !master || ctx.state !== 'running') return;
+    const chain = this.city ?? this.cityBedBuild(ctx, master);
+    if (!chain) return;
+    this.city = chain;
+    const t = ctx.currentTime;
+    // The swell is a pure function of the audio clock and of nothing else -- see
+    // `citySwell`. The clock starts when the context does, so two players are at
+    // different phases of it, and that is fine: there is no correct phase for a
+    // thing with no event in it, which is exactly why this one is allowed to be
+    // per-client where `RaveMix.offset` is not.
+    //
+    // `setTargetAtTime` at `CITY_BED_GLIDE_S` is the rate limit rather than a
+    // smoothing nicety. The swell cannot move faster than 3.6 % of the level a
+    // second and its quickest wave takes 37 s, against a follower that settles in
+    // about two, so what reaches the gain is a slide at any frame rate -- including
+    // the four a second a background tab is throttled to, where a directly
+    // assigned `.value` would step.
+    chain.gain.gain.setTargetAtTime(CITY_BED_GAIN * citySwell(t), t, CITY_BED_GLIDE_S);
+  }
+
+  /**
+   * Generate the loop and wire the three nodes. Once per context.
+   *
+   * The buffer is its own rather than the shared half-second of white at the top
+   * of `enable()`, and it has to be: that one is white, it is half a second long,
+   * and every other user of it re-triggers it as a one-shot. This one is pink,
+   * four seconds, and loops for the session -- the two have nothing in common but
+   * the word noise.
+   */
+  private cityBedBuild(ctx: AudioContext, master: GainNode): CityBedChain | null {
+    try {
+      const frames = Math.floor(ctx.sampleRate * CITY_BED_SECONDS);
+      const buffer = ctx.createBuffer(1, frames, ctx.sampleRate);
+      fillCityBed(buffer.getChannelData(0), ctx.sampleRate);
+
+      const gain = ctx.createGain();
+      // Opened by the first `setTargetAtTime` rather than started at level: a bed
+      // that arrives at full gain on the frame the context opens is the one thing
+      // a player *would* notice about it.
+      gain.gain.value = 0.0001;
+      gain.connect(master);
+
+      const lowpass = ctx.createBiquadFilter();
+      lowpass.type = 'lowpass';
+      lowpass.frequency.value = CITY_BED_LOWPASS_HZ;
+      // Butterworth, `raveBuild`'s and `announceBuild`'s reason: the default Q of
+      // 1 puts a 1.2 dB bump on the corner, and a bump at 2 kHz in a sound that is
+      // never anything but a wash is the one frequency that would make it
+      // identifiable as a filter.
+      lowpass.Q.value = 0.707;
+      lowpass.connect(gain);
+
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.loop = true;
+      source.connect(lowpass);
+      source.start();
+      return { source, lowpass, gain };
+    } catch {
+      // A context that refuses a four-second buffer is one with no memory left,
+      // and a game with no ambience is better than a game with no audio. Every
+      // other voice in this file survives it.
+      return null;
+    }
+  }
 }
 
 // --- The sound system's own types and numbers ---------------------------------------
@@ -3596,21 +3709,44 @@ const ANNOUNCE_SHELL = 0.55;
 /**
  * Where the level has halved, metres.
  *
- * 23, against `RAVE_HALF_DISTANCE`'s 37 and `bark`'s 22. Almost exactly a bark's
- * and for almost the opposite reason: a police officer's shout is gentle because
- * a warning you cannot hear is not a warning, and this is steep because there is
- * an announcement at every station every two minutes and a cue that is always on
- * is not a cue. The two arrive at the same number from opposite ends, which is a
- * coincidence worth writing down rather than one worth hiding.
+ * **15, and it was 23.** The owner asked for the trains to decay faster along
+ * with the cars, and this is the whole of what a train says: `ANNOUNCE_RANGE`
+ * has the argument about speech carrying past the point of intelligibility, and
+ * this is the curve that makes it true inside the range as well as at the edge
+ * of it. Now steeper than `bark`'s 22 rather than level with it, and steeper
+ * than everything else in the file, which is right -- there is an announcement at
+ * every station every two minutes, and the cue that repeats most often should be
+ * the one with the smallest footprint.
  *
- * It holds `ANNOUNCE_RANGE / this` at 4.78, matching the rave model's 4.73, so
- * the level at the gate is `1 / (1 + 4.78)` = 0.173 of what the same curve gives
- * at the carriage side -- the identical near-inaudible fraction the music is cut
- * at, and the reason nothing pops off when you walk away from a platform.
- * Against the level *inside* the carriage it is 0.095, because the shell is
- * between you and it either way.
+ * ```
+ *                  gain at   0 m    25 m    50 m    90 m   at the gate
+ *   before, 23               0.341   0.163   0.107   0.070   0.059 (110 m)
+ *   after,  15               0.341   0.128   0.079   0.049   0.049 (90 m)
+ * ```
+ *
+ * What a player hears differently: standing at the doors, nothing -- the level at
+ * the carriage side is untouched, exactly as `RAVE_CUTOFF_AT` kept the sound
+ * *at* a rave bit-identical. Standing on the concourse, an announcement that used
+ * to follow them up the stairs now stops at the top of them.
+ *
+ * **The platform was measured rather than assumed**, because an announcement
+ * that cannot be understood at the far end of the platform it is made on is a
+ * broken PA rather than a tighter mix. A platform is about 160 m, a consist is
+ * 170, and the distance is taken to the nearest carriage -- so the worst case on
+ * a platform is about 25 m, where this curve gives 0.128, seven times the mix
+ * floor (`citybed.CITY_BED_GAIN`'s 0.018 and the traffic bed's 0.017). Even at
+ * the 90 m gate it is 0.049, still nearly three times that floor, which is why
+ * 15 could be taken rather than the 18 or 19 that would have been the compromise
+ * if the platform had come out marginal. It did not: the gate is what shortens
+ * the reach here, and the platform is nowhere near it.
+ *
+ * It holds `ANNOUNCE_RANGE / this` at 6.0, against the rave model's 4.73, so the
+ * level at the gate is `1 / (1 + 6)` = 0.143 of what the same curve gives at the
+ * carriage side -- between the music's 0.108 and the engines' 0.125, so the same
+ * near-inaudible switch-off, reached sooner. Against the level *inside* the
+ * carriage it is 0.079, because the shell is between you and it either way.
  */
-const ANNOUNCE_HALF_DISTANCE = 23;
+const ANNOUNCE_HALF_DISTANCE = 15;
 
 /**
  * Inside this the shell filter is flat, metres, and the corner frequency there.
@@ -4008,6 +4144,14 @@ const ENGINE_SKID_Q = 2.2;
  * a hum, and the whole point of it is that a player never identifies it as a
  * sound at all until they walk somewhere it is not.
  *
+ * **`citybed.CITY_BED_GAIN` is now written lower than this, at 0.018, and that
+ * does not take the claim away.** 0.10 is what this constant is written at and
+ * 0.0167 is what it plays at once `ENGINE_TRIM` is applied, so the two beds sit
+ * on the same storey -- see the block above `ENGINE_DUCK`. The difference between
+ * them is not level, it is that this one can reach zero and that one cannot: a
+ * street with no moving cars on it has no traffic bed at all, and the city is
+ * still there underneath it.
+ *
  * 190 Hz is what a few streets of traffic leaves after the buildings between you
  * and it have taken the rest, which is `RAVE_CUTOFF_AT`'s observation about a
  * kick drum in a different key. Low-passed noise on its own reads as wind, so a
@@ -4018,6 +4162,57 @@ const ENGINE_BED_GAIN = 0.10;
 const ENGINE_BED_HZ = 190;
 const ENGINE_BED_BAND_HZ = 420;
 const ENGINE_BED_BAND = 0.25;
+
+// --- The city's own numbers, which are one gain and one corner --------------------
+
+/**
+ * The three nodes the bed runs on, held for the session. See `cityBedUpdate`.
+ *
+ * There is no `sources` array and no teardown, unlike every other chain in this
+ * file: the bed is never silenced, so the one `AudioBufferSourceNode` in it is
+ * started once and stopped when the context dies with it.
+ */
+interface CityBedChain {
+  source: AudioBufferSourceNode;
+  lowpass: BiquadFilterNode;
+  gain: GainNode;
+}
+
+// Where `citybed.CITY_BED_GAIN` sits in this file's level budget, which is the
+// only part of it that belongs here.
+//
+// The number is 0.018 and it is chosen in `game/citybed.ts` -- the owner's
+// *"like 35dB ?"*, which is `10 ^ (-35 / 20)` = 0.0178. What has to be settled
+// *here* is where that lands among the levels this file already argues about,
+// and the answer is: **underneath all of them**.
+//
+// ```
+//   SIREN_GAIN            0.30    an event, and the loudest continuous thing
+//   ENGINE_OWN_GAIN       0.30    before ENGINE_TRIM: the car you are sitting in
+//   ROTOR_GAIN            0.22    a presence
+//   SUN_SCREAM_GAIN       0.12    audible over street ambience, not painful
+//   ENGINE_BED_GAIN       0.10    "deliberately at the bottom of everything"
+//     ... times ENGINE_TRIM       0.0167, which is what it actually plays at
+//   CITY_BED_GAIN         0.018   the floor: 0.011 to 0.025 across the swell
+// ```
+//
+// The line that matters is `ENGINE_BED_GAIN`'s claim to be at the bottom, and
+// this does not break it: 0.10 is that constant's *written* level and 0.0167 is
+// the level it plays at once `ENGINE_TRIM` is applied, so the city bed sits
+// beside the traffic bed rather than under a tenth of it. That is the intended
+// reading -- the two are the same storey of the mix, one of them measured from
+// the cars and the other one always there -- and it is why the traffic bed can
+// still reach zero on a quiet street without the street going silent.
+//
+// Against the limiter it is nothing at all: `master` is 0.55 and the compressor's
+// -8 dB threshold is 0.398 linear, so the bed at the top of its swell is
+// 0.55 * 0.018 * 1.4 = **0.014**, which is 3.5 % of the threshold and 12 % of the
+// local car flat out. It does not move the arithmetic in the engine section's
+// "against the limiter" block by anything that rounds.
+//
+// The corner and the swell live in `game/citybed.ts` with the reasons; the only
+// thing this file decides about them is that the biquad is a Butterworth, which
+// is `cityBedBuild`'s line.
 
 /**
  * How far the crash ducks the local engine, and how long it takes to come back.

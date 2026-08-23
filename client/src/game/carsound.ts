@@ -69,7 +69,7 @@
  * 3. THE POOL, AND WHY A VOICE IS A SLOT RATHER THAN A CAR.
  *
  * `ENGINE_VOICES` chains are built once and run for the session. They are not
- * created per car and never could be: a car crosses the audible range in four
+ * created per car and never could be: a car crosses the audible range in three
  * seconds at 44 m/s, so a voice-per-car policy is an `OscillatorNode` allocation
  * every few hundred milliseconds, forever, and a garbage collector pause in a
  * 16.7 ms frame is a stutter you can see.
@@ -157,12 +157,17 @@ import { DRIVE_ACCELERATION, DRIVE_TOP_SPEED } from './driving.ts';
  * How many pooled voices the ambient fleet gets. **Seven.**
  *
  * The brief asked for six to eight and the argument for the middle of it is what
- * a street actually holds. Standing on a two-lane arterial in Marrickville, the
- * cars inside `ENGINE_RANGE` that are moving number about five; on Parramatta
- * Road at a green light it is nearer thirty. Seven covers the first case
- * completely -- every car you can see has its own voice -- and in the second it
- * covers the ones close enough to pick out, with the other twenty-three going
- * into the bed where they belong.
+ * a street actually holds. Counted off the shipped lanes at 17:30, the moving
+ * cars inside `ENGINE_RANGE` are 1.3 on a quiet inner-west street, 4.5 on George
+ * Street and 7.8 at the busiest corner in the CBD. Seven covers the first two
+ * completely -- every car you can see has its own voice -- and at the third it
+ * covers all but one, which goes into the bed where it belongs.
+ *
+ * Those counts are the *new* range's, and they are about half what they were:
+ * pulling `ENGINE_RANGE` from 95 to 70 took George Street from 8.0 cars to 4.5.
+ * Seven survived the change without an argument because it was never sized by
+ * the count -- it is sized by how many separate engines a listener can actually
+ * tell apart, which is a property of ears rather than of Sydney.
  *
  * The cost is stated where it is paid: about ten `AudioNode`s a voice, so seventy
  * for the pool. See `CombatAudio.engineBuild`.
@@ -172,37 +177,71 @@ export const ENGINE_VOICES = 7;
 /**
  * How far one car's engine carries, metres, and where it is half as loud.
  *
- * 95 m is a block and a half, and it is chosen against the two neighbours in this
- * project rather than against a physical measurement: `SIREN_RANGE` is 300
+ * **70 and 10, and they were 95 and 19.** The owner, listening to the first
+ * cut: *"make the sound of cars and trains decay faster ... i mean decay as u
+ * get further from it"*. What he is describing is the same complaint
+ * `RAVE_AUDIBLE_RANGE` had at 520 m and answered by dividing its whole model by
+ * three: a hyperbola with a generous half-distance is *flat* over the range a
+ * player actually walks, so a car four doors down and a car at the end of the
+ * street arrive at nearly the same level and neither of them reads as being
+ * anywhere in particular. The old curve gave a car at 40 m a third of the level
+ * of a car in front of you, which is not what a street sounds like.
+ *
+ * ```
+ *              gain at   0 m    10 m    20 m    40 m    70 m   at the gate
+ *   before               1.00    0.66    0.49    0.32    0.21    0.169 (95 m)
+ *   after                1.00    0.50    0.33    0.20    0       0.125 (70 m)
+ * ```
+ *
+ * What a player hears differently is **position**. The car beside you is exactly
+ * as loud as it was -- nothing at the ear moved -- and everything behind it drops
+ * away twice as fast, so an engine getting louder now means a car actually
+ * arriving rather than a car existing somewhere. The cost is honest and is worth
+ * stating: the far half of the street is quieter than it was, and what fills that
+ * space is the bed below and `game/citybed.ts` under it.
+ *
+ * The range moved with the half-distance and had to, on `RAVE_HALF_DISTANCE`'s
+ * argument: cutting one without the other changes the level at the gate, and a
+ * voice switched off while it is still clearly audible is a click every time a
+ * car crosses out. At 70 and 10 the gate cuts at 0.125 of the level at the ear,
+ * between the rave's 0.108 and the announcement's 0.143, which is the band this
+ * project has decided is inaudible.
+ *
+ * The neighbours are unchanged and still order the mix: `SIREN_RANGE` is 300
  * because a siren's whole job is to be heard before it is seen, and
- * `ANNOUNCE_RANGE` is 110 because a platform announcement should not narrate the
+ * `ANNOUNCE_RANGE` is 90 because a platform announcement should not narrate the
  * next street. An engine is the quietest of the three and the most numerous, and
  * the failure mode of a generous range here is not "too loud" -- it is that the
- * nearest seven cars are all 80 m away and the street immediately around you is
+ * nearest seven cars are all 60 m away and the street immediately around you is
  * represented by whichever of them happened to win a slot.
- *
- * The half-distance is `bark`'s 22 pulled in slightly, which puts the level at
- * the gate at 0.17 of the level at the source -- the same near-inaudible point
- * `RAVE_AUDIBLE_RANGE` and `ANNOUNCE_RANGE` both cut at, so nothing pops when a
- * car crosses out.
  */
-export const ENGINE_RANGE = 95;
-export const ENGINE_HALF_DISTANCE = 19;
+export const ENGINE_RANGE = 70;
+export const ENGINE_HALF_DISTANCE = 10;
 
 /**
  * How far the bed hears, metres.
  *
- * Nearly twice the engine range, because the bed is the *sum* of things you
- * cannot individually hear and a sum reaches further than its terms. 170 m is
- * about four city blocks, which is the distance at which a busy road stops
- * contributing to the noise floor of the street you are standing in.
+ * **120, and it was 170.** Still nearly twice the engine range, because the bed
+ * is the *sum* of things you cannot individually hear and a sum reaches further
+ * than its terms -- but 170 m was four city blocks, and four blocks away is a
+ * district rather than a street. It moved with `ENGINE_RANGE` for the owner's
+ * "decay faster", and the effect is the one the pool got: the bed now reports
+ * *the road you are on* instead of the neighbourhood you are in, so walking off
+ * an arterial into a side street is audible where before it took two more
+ * corners.
+ *
+ * Shortening it alone would have taken the level down everywhere, because the
+ * count is what drives `bedLevel` and the count halves. It did not, because
+ * `BED_HALF` was re-tuned against the same measurement in the same change --
+ * see that constant for the counts and the numbers either side.
  *
  * It is also the outer gate on the whole file: a car further than this is
  * rejected by one squared comparison and costs nothing else. `TRAFFIC_DRAW_RADIUS`
- * is 420, so about five sixths of the cars the draw loop offers are dismissed on
- * that line.
+ * is 420, so about eleven twelfths of the cars the draw loop offers are now
+ * dismissed on that line, against five sixths before -- the change pays for
+ * itself twice.
  */
-export const BED_RANGE = 170;
+export const BED_RANGE = 120;
 
 /**
  * Below this, a car is not making engine noise worth a voice, m/s.
@@ -223,13 +262,39 @@ export const BED_MOVING = 1.5;
 /**
  * How many moving cars the bed needs before it is half as loud as it can get.
  *
- * Twelve. `bedLevel` is `n / (n + BED_HALF)`, so four cars is a quarter of the
- * level, twelve is a half, thirty-six is three quarters and it never reaches one
- * -- which is the right shape for a count, because the difference between forty
- * cars and eighty cars in earshot is nothing you can hear and the difference
- * between two and six is the difference between a lane and a road.
+ * **Seven, and it was twelve.** `bedLevel` is `n / (n + BED_HALF)`, so two cars
+ * is a fifth of the level, seven is a half, twenty-one is three quarters and it
+ * never reaches one -- which is the right shape for a count, because the
+ * difference between forty cars and eighty cars in earshot is nothing you can
+ * hear and the difference between two and six is the difference between a lane
+ * and a road.
+ *
+ * It moved because `BED_RANGE` did, and the number is a measurement rather than
+ * a guess. Counting moving cars off the shipped `.lanes.bin` at 17:30 at eight
+ * probes around the inner city, the count inside 120 m is between a third and
+ * two thirds of the count inside 170 m -- the road network is not uniform, so it
+ * is not exactly the 0.50 the areas would predict. Against the level the bed
+ * used to reach:
+ *
+ * ```
+ *   probe                     n was  n now   before   at 12   at 7
+ *   George St, CBD             12.1    5.9    0.503   0.329   0.456
+ *   the busiest corner found   27.4   10.7    0.695   0.473   0.606
+ *   Broadway                   27.6   17.3    0.697   0.590   0.711
+ *   a quiet street              7.5    2.7    0.385   0.186   0.282
+ *   Hyde Park                  21.7    4.4    0.644   0.267   0.385
+ * ```
+ *
+ * Seven is the constant that puts a busy road back where it was -- within a
+ * decibel of the three probes that are actually roads -- while the park and the
+ * quiet street, whose old level came almost entirely from traffic between 120
+ * and 170 m away, drop by 3 to 4 dB. That is precisely the change that was asked
+ * for: the near level held, the far level gone. Six would have been the number
+ * that preserves the level exactly if the count halved exactly, and it puts
+ * Broadway slightly *above* where it was, which is the wrong direction in a
+ * change whose brief was "quieter with distance".
  */
-export const BED_HALF = 12;
+export const BED_HALF = 7;
 
 /**
  * How long a slot takes to hand its chain from one car to the next, seconds.
@@ -1099,6 +1164,36 @@ export function verifyCarSound(): string[] {
   if (engineGain(ENGINE_RANGE) !== 0) f.push('engineGain does not cut at ENGINE_RANGE');
   if (engineGain(ENGINE_RANGE - 0.01) > 0.2) f.push('engineGain is still loud at the gate; it will pop');
 
+  // --- The falloff the owner asked for, pinned at the five distances the
+  // constant's own table is written at.
+  //
+  // Written as an explicit table rather than as a re-derivation of the formula,
+  // because a check that recomputes `1 / (1 + d / HALF)` cannot fail: it would
+  // agree with any half-distance anybody ever typed, including the 19 this was
+  // changed *from*. What is being defended here is the **taste decision** --
+  // half the level at 10 m, a third at 20, a fifth at 40 and nothing at 70 --
+  // and a table is the only shape of test that can defend one of those.
+  {
+    const want: [number, number][] = [[0, 1], [10, 0.5], [20, 1 / 3], [40, 0.2], [70, 0]];
+    for (const [d, level] of want) {
+      const got = engineGain(d);
+      if (Math.abs(got - level) > 0.005) {
+        f.push(`engineGain(${d}) is ${got.toFixed(3)}, want ${level.toFixed(3)}: the falloff has been retuned`);
+      }
+    }
+    // Twice as steep as it was, stated as the thing a player notices: a car at
+    // 40 m must now be under a quarter of the one beside them.
+    if (!(engineGain(40) < 0.25)) f.push('a car at 40 m is not yet in the background');
+    // And past the gate there is nothing at all, at any distance, forever.
+    for (const d of [ENGINE_RANGE, ENGINE_RANGE + 1, 200, 5000]) {
+      if (engineGain(d) !== 0) f.push(`engineGain is not silent at ${d} m`);
+    }
+    // The ratio the gate cuts at, which is the number that says nothing pops.
+    // 0.125 here, against the rave's 0.108 and the announcement's 0.143.
+    const atGate = 1 / (1 + ENGINE_RANGE / ENGINE_HALF_DISTANCE);
+    if (atGate > 0.18) f.push(`the engine is cut at ${atGate.toFixed(3)} of its level, which is audible`);
+  }
+
   for (let i = 0; i <= 40; i++) {
     const s = (i / 40) * DRIVE_TOP_SPEED;
     let last = -Infinity;
@@ -1142,6 +1237,28 @@ export function verifyCarSound(): string[] {
   }
   if (bedLevel(0) !== 0) f.push('bedLevel(0) is not silence');
   if (Math.abs(bedLevel(BED_HALF) - 0.5) > 1e-12) f.push('bedLevel is not half at BED_HALF');
+
+  // --- The bed at the densities `BED_HALF` was re-tuned against.
+  //
+  // The counts are measured -- moving cars inside the *new* `BED_RANGE`, less
+  // the ones holding a voice, off the shipped `.lanes.bin` at eight probes; see
+  // that constant for the table and for the old numbers beside them. What this
+  // asserts is the shape of the answer rather than the arithmetic: a busy road
+  // must still be most of the way up the curve, a quiet street must be clearly
+  // under it, and the gap between them has to be big enough to hear, because
+  // "loud where Sydney is busy" is `DESIGN.md` rule 1 and the bed is the only
+  // thing in the mix that implements it.
+  {
+    const busy = bedLevel(17.3);   // Broadway
+    const city = bedLevel(5.9);    // George St
+    const quiet = bedLevel(2.7);   // a quiet inner-west street
+    const park = bedLevel(4.4);    // Hyde Park, mostly hearing the roads around it
+    if (!(busy > 0.65)) f.push(`the busiest road measures ${busy.toFixed(3)}; the bed has gone quiet`);
+    if (!(city > 0.4 && city < 0.6)) f.push(`George St measures ${city.toFixed(3)}, which is not half a bed`);
+    if (!(quiet < 0.35)) f.push(`a quiet street measures ${quiet.toFixed(3)}; the bed never goes away`);
+    if (!(busy / quiet > 2)) f.push(`busy and quiet are ${(busy / quiet).toFixed(2)} apart; the city has one level`);
+    if (!(park < city)) f.push('the park is louder than the street beside it');
+  }
 
   if (skidLevel(40, 0.2) !== 0) f.push('skidLevel squeals on ordinary cornering');
   if (skidLevel(3, 1) !== 0) f.push('skidLevel squeals at walking pace');
