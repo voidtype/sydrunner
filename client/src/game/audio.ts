@@ -3130,9 +3130,9 @@ export class CombatAudio {
   // -- around 10 m, so 0.14 of full each -- sum incoherently to about **0.21**.
   // Together with the bed that is 0.33, still under the threshold, which is what
   // leaves the limiter for the thing it is for: a crash or a gunshot landing on
-  // top of all of it. The city bed under all of that adds 0.014 -- see
-  // `CityBedChain` for where that number comes from -- and 0.344 is still under
-  // 0.398. Checked this way rather than by ear because the failure --
+  // top of all of it. The city bed under all of that adds 0.0033 at the top of a
+  // swell -- see `CityBedChain` for where that number comes from -- and 0.333 is
+  // still under 0.398. Checked this way rather than by ear because the failure --
   // a mix that pumps every time a bat connects -- sounds like a mastering problem
   // rather than like a bug.
   //
@@ -3470,12 +3470,14 @@ export class CombatAudio {
     // thing with no event in it, which is exactly why this one is allowed to be
     // per-client where `RaveMix.offset` is not.
     //
-    // `setTargetAtTime` at `CITY_BED_GLIDE_S` is the rate limit rather than a
-    // smoothing nicety. The swell cannot move faster than 3.6 % of the level a
-    // second and its quickest wave takes 37 s, against a follower that settles in
-    // about two, so what reaches the gain is a slide at any frame rate -- including
-    // the four a second a background tab is throttled to, where a directly
-    // assigned `.value` would step.
+    // `setTargetAtTime` at `CITY_BED_GLIDE_S` is doing two jobs and the constant is
+    // chosen against both: it smooths the per-frame target so a frame-rate stutter
+    // cannot step the gain, and -- because a one-pole is also a filter -- it must
+    // not flatten the swell itself, which now runs from silence to full in as
+    // little as ten seconds. 0.2 s passes 99.2 % of the fastest breath the band
+    // allows and is still twelve frames of averaging at 60 fps. The arithmetic and
+    // the table it came from are in `CITY_BED_GLIDE_S`, and `verifyCityBed`
+    // recomputes it rather than trusting either.
     chain.gain.gain.setTargetAtTime(CITY_BED_GAIN * citySwell(t), t, CITY_BED_GLIDE_S);
   }
 
@@ -3733,11 +3735,12 @@ const ANNOUNCE_SHELL = 0.55;
  * that cannot be understood at the far end of the platform it is made on is a
  * broken PA rather than a tighter mix. A platform is about 160 m, a consist is
  * 170, and the distance is taken to the nearest carriage -- so the worst case on
- * a platform is about 25 m, where this curve gives 0.128, seven times the mix
- * floor (`citybed.CITY_BED_GAIN`'s 0.018 and the traffic bed's 0.017). Even at
- * the 90 m gate it is 0.049, still nearly three times that floor, which is why
- * 15 could be taken rather than the 18 or 19 that would have been the compromise
- * if the platform had come out marginal. It did not: the gate is what shortens
+ * a platform is about 25 m, where this curve gives 0.128, nearly eight times the
+ * loudest thing under it (the traffic bed's 0.017; `citybed.CITY_BED_GAIN` is
+ * 0.006 and swells down to silence). Even at the 90 m gate it is 0.049, still
+ * three times the traffic bed, which is why 15 could be taken rather than the 18
+ * or 19 that would have been the compromise if the platform had come out
+ * marginal. It did not: the gate is what shortens
  * the reach here, and the platform is nowhere near it.
  *
  * It holds `ANNOUNCE_RANGE / this` at 6.0, against the rave model's 4.73, so the
@@ -4144,13 +4147,13 @@ const ENGINE_SKID_Q = 2.2;
  * a hum, and the whole point of it is that a player never identifies it as a
  * sound at all until they walk somewhere it is not.
  *
- * **`citybed.CITY_BED_GAIN` is now written lower than this, at 0.018, and that
- * does not take the claim away.** 0.10 is what this constant is written at and
- * 0.0167 is what it plays at once `ENGINE_TRIM` is applied, so the two beds sit
- * on the same storey -- see the block above `ENGINE_DUCK`. The difference between
- * them is not level, it is that this one can reach zero and that one cannot: a
- * street with no moving cars on it has no traffic bed at all, and the city is
- * still there underneath it.
+ * **`citybed.CITY_BED_GAIN` is lower than this, at 0.006, and that does not take
+ * the claim away.** 0.10 is what this constant is written at and 0.0167 is what
+ * it plays at once `ENGINE_TRIM` is applied -- still nearly three times the city
+ * bed under it; see the block above `ENGINE_DUCK`. The two are different jobs at
+ * different levels: this one is a measurement of the traffic and reaches zero on
+ * a street with nothing moving on it, and the other one is the floor that is
+ * still there when it does.
  *
  * 190 Hz is what a few streets of traffic leaves after the buildings between you
  * and it have taken the rest, which is `RAVE_CUTOFF_AT`'s observation about a
@@ -4181,10 +4184,13 @@ interface CityBedChain {
 // Where `citybed.CITY_BED_GAIN` sits in this file's level budget, which is the
 // only part of it that belongs here.
 //
-// The number is 0.018 and it is chosen in `game/citybed.ts` -- the owner's
-// *"like 35dB ?"*, which is `10 ^ (-35 / 20)` = 0.0178. What has to be settled
-// *here* is where that lands among the levels this file already argues about,
-// and the answer is: **underneath all of them**.
+// The number is **0.006**, it is chosen in `game/citybed.ts`, and it is an *ear*
+// measurement rather than a conversion -- it shipped at 0.018 on the arithmetic
+// of the owner's *"like 35dB ?"* and he said it was three times too loud. That
+// file's header has the argument for why a level in dB has no referent until
+// something plays it; what has to be settled *here* is where 0.006 lands among
+// the levels this file already argues about, and the answer is: **underneath all
+// of them, by a clear margin rather than by a hair**.
 //
 // ```
 //   SIREN_GAIN            0.30    an event, and the loudest continuous thing
@@ -4193,22 +4199,26 @@ interface CityBedChain {
 //   SUN_SCREAM_GAIN       0.12    audible over street ambience, not painful
 //   ENGINE_BED_GAIN       0.10    "deliberately at the bottom of everything"
 //     ... times ENGINE_TRIM       0.0167, which is what it actually plays at
-//   CITY_BED_GAIN         0.018   the floor: 0.011 to 0.025 across the swell
+//   CITY_BED_GAIN         0.006   the floor: 0 to 0.006 across the swell
 // ```
 //
 // The line that matters is `ENGINE_BED_GAIN`'s claim to be at the bottom, and
-// this does not break it: 0.10 is that constant's *written* level and 0.0167 is
-// the level it plays at once `ENGINE_TRIM` is applied, so the city bed sits
-// beside the traffic bed rather than under a tenth of it. That is the intended
-// reading -- the two are the same storey of the mix, one of them measured from
-// the cars and the other one always there -- and it is why the traffic bed can
-// still reach zero on a quiet street without the street going silent.
+// this does not break it: 0.10 is that constant's *written* level, 0.0167 is what
+// it plays at once `ENGINE_TRIM` is applied, and the city bed is under **that**
+// by a factor of nearly three. The two are not the same storey any more -- the
+// traffic is a floor you can hear on a busy road and this is the floor under an
+// empty one, which is why the traffic bed can still reach zero on a quiet street
+// without the street going silent.
+//
+// And it is now a swell from *silence*, not a tremor: `citySwell` runs 0..1 (the
+// owner's second correction), so the average over a breath is half the number
+// above and the bed genuinely goes away and comes back every 10 to 100 seconds.
 //
 // Against the limiter it is nothing at all: `master` is 0.55 and the compressor's
-// -8 dB threshold is 0.398 linear, so the bed at the top of its swell is
-// 0.55 * 0.018 * 1.4 = **0.014**, which is 3.5 % of the threshold and 12 % of the
-// local car flat out. It does not move the arithmetic in the engine section's
-// "against the limiter" block by anything that rounds.
+// -8 dB threshold is 0.398 linear, so the bed at the very top of a swell is
+// 0.55 * 0.006 = **0.0033**, which is 0.8 % of the threshold and 3 % of the local
+// car flat out. It does not move the arithmetic in the engine section's "against
+// the limiter" block by anything that rounds.
 //
 // The corner and the swell live in `game/citybed.ts` with the reasons; the only
 // thing this file decides about them is that the biquad is a Butterworth, which

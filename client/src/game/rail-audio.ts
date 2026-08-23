@@ -455,7 +455,8 @@ export function createRailAnnounceMix(): RailAnnounceMix {
  * 160 m and a consist is `CONSIST_M`'s 170, so a train that has stopped is
  * alongside every metre of it -- with the distance taken to the nearest carriage,
  * nobody standing on the platform is more than about 25 m from the source, where
- * the level is 0.128 of full scale against a mix floor of 0.018. The far end of a
+ * the level is 0.128 of full scale against a traffic bed of 0.017 and a city bed
+ * of 0.006 under that. The far end of a
  * platform is not close to the gate and was never in danger from this change;
  * what is now outside 90 m is the concourse stairs, the street, and the next
  * platform but two.
