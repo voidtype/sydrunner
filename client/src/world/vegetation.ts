@@ -13,6 +13,39 @@
  *   3 paperbark         narrow, upright, near-white trunk showing its full height
  *   4 brush box         dense vertical oval. The default inner-suburb street tree
  *   5 eucalypt          a lean trunk you can see through two or three sparse lobes
+ *   6 shrub             no trunk at all. Three low lumps. The heath layer
+ *   7 bush tree         a stick and a lump. Nine trees in ten in a forest
+ *
+ * The seventh arrived with the bushland round and is the only one that is not a
+ * tree. `pipeline/sydney/vegetation.py`'s header holds the argument at length;
+ * the short of it is that heath and scrub are 33 km2 of the world, they are
+ * what the Royal and the coastal clifftops actually are, and the two ways of
+ * telling them without a shrub are both worse than the bare ground they
+ * replace -- a 15 m eucalypt on a coastal heath is a lie about the landscape,
+ * and a eucalypt scaled to 1.5 m is a doll's-house gum tree, which is the exact
+ * distortion `vegetation-audit` exists to convict.
+ *
+ * It is also nearly the cheapest thing in the world file, at **24 triangles**
+ * against the eucalypt's 100 and the fig's 162, and that is load-bearing rather
+ * than incidental: the pipeline's per-tile bushland budget is spent in
+ * triangles, and a heath is only affordable at 65 stems a hectare because each
+ * of them is a quarter of a tree.
+ *
+ * The eighth is cheaper still, and it is the one that makes a forest possible at
+ * all. `pipeline/sydney/vegetation.py`'s budget essay has the arithmetic and it
+ * is one line long: a hundred canopy stems a hectare over a 25 ha tile is 2,500
+ * stems, and 40,000 triangles over 2,500 stems is **16 triangles each**. Nothing
+ * in the six above is within a factor of four of that, and no budget this frame
+ * can carry makes them so. `BUSH_TREE` is 14 -- a three-sided trunk cone and one
+ * octahedral crown -- and **nine stems in ten** in every bushland stand is drawn
+ * with it, the tenth carrying whichever full silhouette the mix picked.
+ *
+ * That is a stochastic level of detail wearing a species slot, and it is not
+ * pretending otherwise: the same stem draws cheap at four metres and at four
+ * hundred, because the pipeline does not know where the camera will be and this
+ * file has no distance tier. The impostor pass is what replaces it, behind the
+ * seam named below, and when it lands `FOREST_MIX` collapses back to the four
+ * real species.
  *
  * The jacaranda is **not flowering**. The world is set at 3 pm on 15 February and
  * jacarandas bloom in Sydney in late October and November; a purple one in
@@ -114,6 +147,8 @@ const JACARANDA = 2;
 const PAPERBARK = 3;
 const BRUSH_BOX = 4;
 const EUCALYPT = 5;
+const SHRUB = 6;
+const BUSH_TREE = 7;
 
 // --- The palette --------------------------------------------------------------
 
@@ -154,6 +189,19 @@ const FOLIAGE: Record<number, Rgb> = {
   // rho 0.079.
   //            N.L 1.0 rgb(126, 138, 113)   0.8 rgb(112, 123, 101)   0.55 rgb( 91, 101, 80)
   [EUCALYPT]: [0.072, 0.082, 0.055],
+  // Sydney's sandstone shrub layer -- banksia, hakea, tea-tree, the pea
+  // flowers -- is darker, harder and greyer than any canopy above it, because
+  // it is small hard leaves held edge-on to a lot of sun. Darkest of the seven
+  // on purpose: a heath seen across a headland reads as a dark olive mat with
+  // the pale rock showing through it, and anything lighter turns the Royal into
+  // a lawn. rho 0.058.
+  //            N.L 1.0 rgb( 97, 111,  86)   0.8 rgb( 85,  99,  75)   0.55 rgb( 68,  80, 58)
+  [SHRUB]: [0.048, 0.058, 0.036],
+  // The same albedo as `EUCALYPT`, and it has to be: `BUSH_TREE` is a eucalypt
+  // drawn cheap, standing in the same stand as the full-detail ones, and a
+  // forest where nine trees in ten are a different green is a forest with a
+  // level-of-detail seam painted across it.
+  [BUSH_TREE]: [0.072, 0.082, 0.055],
 };
 
 /**
@@ -180,6 +228,13 @@ const BARK: Record<number, Rgb> = {
   // a paperbark's and is meant to read *through* the sparse canopy above it.
   //                                                  -> rgb(196, 195, 184)
   [EUCALYPT]: [0.3, 0.29, 0.26],
+  // A shrub has no trunk in this geometry, so this is read only by the tone
+  // jitter and never by a face. Kept at the foliage value rather than left
+  // undefined, because `BARK[species]` is indexed unconditionally in
+  // `buildSpecies` and an undefined here is three NaN colours and a black mesh.
+  [SHRUB]: [0.048, 0.058, 0.036],
+  // Pale grey gum bark, `EUCALYPT`'s exactly -- see the foliage note.
+  [BUSH_TREE]: [0.3, 0.29, 0.26],
 };
 
 /**
@@ -200,6 +255,54 @@ const BARK: Record<number, Rgb> = {
 const GRASS_STRAW = /*#__PURE__*/ vec3(0.145, 0.14, 0.07);
 //                                                     -> sun rgb(137, 151,  97)
 const GRASS_GREEN = /*#__PURE__*/ vec3(0.098, 0.112, 0.048);
+
+/**
+ * Bushland floor, sunlit and horizontal. The `bush_floor` slot.
+ *
+ * The brief for `park_grass` above was *clearly greener than the dirt, nowhere
+ * near a golf course*. This one is narrower and points the other way: **darker
+ * than both the dirt and the grass, and greyer than either.** A Sydney
+ * sandstone bushland floor is bark litter, dead sticks, coarse orange-grey
+ * sandstone grit and a broken layer of hard low sedge, and half of it is in the
+ * shade of whatever is standing on it. It is the darkest ground surface in the
+ * world file and it should be -- it is what makes a stand of forest read as a
+ * mass rather than as trees standing on a lawn.
+ *
+ * Two tones on the same argument every other ground surface in this project
+ * makes, and the same measured relation to their neighbours. `ground.ts`'s dirt
+ * renders at rgb(194, 176, 144) and rgb(172, 155, 109); the grass above at
+ * rgb(168, 169, 121) and rgb(137, 151, 97). Both of these sit **under** all
+ * four, and the pair straddles the hue line rather than sitting on one side of
+ * it -- litter is red over green like the dirt, understorey is green over red
+ * like the grass -- so a bush floor is not a darker version of either but its
+ * own thing between them.
+ */
+//                                                     -> sun rgb(142, 138, 116)
+const BUSH_LITTER = /*#__PURE__*/ vec3(0.106, 0.1, 0.072);
+//                                                     -> sun rgb(112, 120,  92)
+const BUSH_UNDER = /*#__PURE__*/ vec3(0.067, 0.077, 0.042);
+
+/**
+ * Estuarine mud and saltmarsh, sunlit and horizontal. The `wetland_mud` slot.
+ *
+ * The one green polygon in Sydney that is not a vegetation colour. Badu at
+ * Homebush, the Lane Cove and Georges River reaches, Bicentennial Park: grey
+ * mangrove standing in grey-brown tidal mud, with saltmarsh and samphire on the
+ * landward side of it in a slightly paler olive. Painted as bush floor it would
+ * be dry leaf litter on a tidal flat, which is a worse answer than the bare
+ * dirt this round is replacing, and that is the whole reason it is a second
+ * slot instead of a third tone on the first.
+ *
+ * Where the tide is actually over the mud nothing here is seen at all: the
+ * water sheet sits at its own surface height and wins the depth test, exactly
+ * the way the carriageway wins over the grass. So this is the low-tide flat and
+ * the bank above it, which is what it is most of the time and all of the time
+ * in a world fixed at 3 pm.
+ */
+//                                                     -> sun rgb(118, 110,  98)
+const MUD_WET = /*#__PURE__*/ vec3(0.075, 0.065, 0.049);
+//                                                     -> sun rgb(132, 134, 112)
+const MUD_MARSH = /*#__PURE__*/ vec3(0.093, 0.095, 0.067);
 
 // --- Geometry -----------------------------------------------------------------
 
@@ -437,6 +540,55 @@ function lobe(
   for (const [a, b, c] of ICO_FACES) m.face(base + a, base + b, base + c);
 }
 
+/**
+ * The cheap lobe: an octahedron, 8 faces and 6 vertices against `lobe`'s 20 and
+ * 12.
+ *
+ * Only the shrub uses it, and the reason it is worth a second primitive rather
+ * than a smaller `lobe` is arithmetic. A shrub built from three icosahedral
+ * lobes is 60 triangles; from three of these it is 24, and the pipeline's
+ * bushland budget is spent in triangles, so that ratio is directly the stem
+ * count a heath tile gets. 2.5x the heath for a polyhedron with six fewer
+ * vertices in it.
+ *
+ * At 1.5 m across and under `flatShading` the difference between the two is
+ * not a shape anybody can name: the same +/-14% per-vertex displacement is
+ * applied, so this is a lumpy irregular blob rather than a diamond, and a heath
+ * is a field of lumpy irregular blobs.
+ */
+const OCT_VERTS: Array<[number, number, number]> = [
+  [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1],
+];
+const OCT_FACES: Array<[number, number, number]> = [
+  [0, 2, 4], [2, 1, 4], [1, 3, 4], [3, 0, 4],
+  [2, 0, 5], [1, 2, 5], [3, 1, 5], [0, 3, 5],
+];
+
+function blob(
+  m: MeshBuilder,
+  centre: [number, number, number],
+  radii: [number, number, number],
+  colour: Rgb,
+  seed: number,
+): void {
+  const points: Array<[number, number, number]> = [];
+  const normals: Array<[number, number, number]> = [];
+  const colours: Rgb[] = [];
+  for (let i = 0; i < OCT_VERTS.length; i++) {
+    const [ux, uy, uz] = OCT_VERTS[i];
+    const d = 0.86 + 0.28 * hash(seed, i);
+    points.push([
+      centre[0] + ux * radii[0] * d,
+      centre[1] + uy * radii[1] * d,
+      centre[2] + uz * radii[2] * d,
+    ]);
+    normals.push([ux, uy, uz]);
+    colours.push(tint(colour, 0.9 + 0.2 * hash(seed, i, 7)));
+  }
+  const base = m.vertices(points, normals, colours);
+  for (const [a, b, c] of OCT_FACES) m.face(base + a, base + b, base + c);
+}
+
 /** Build the shared geometry for one species, at its nominal size. */
 function buildSpecies(species: number): BufferGeometry {
   const m = new MeshBuilder();
@@ -511,6 +663,47 @@ function buildSpecies(species: number): BufferGeometry {
       lobe(m, [0, 8.4, 0], [3.6, 4.0, 3.6], leaf, 82);
       lobe(m, [0.9, 6.5, 0.5], [2.6, 2.2, 2.6], leaf, 83);
       lobe(m, [-0.6, 10.7, -0.5], [2.4, 2.0, 2.4], leaf, 84);
+      break;
+    }
+    case BUSH_TREE: {
+      // Authored at the midpoint of `SPECIES_SIZE[BUSH_TREE]`, which is
+      // `EUCALYPT`'s: 16 m tall, 11 m across, nominal radius 5.5. The instance
+      // scales therefore land near 1.0 on the same curve the full-detail gums
+      // draw from, which is what lets the two stand in one stand without a
+      // visible size step between them.
+      //
+      // **Fourteen triangles**: a three-sided trunk and one octahedral crown.
+      // Three sides is the fewest a cone can have, and on a 0.4 m trunk seen
+      // from thirty metres it is a stick -- which is what a gum trunk is at
+      // thirty metres, and the species' own note above says the trunk is half of
+      // what makes it a gum. The crown is one blob rather than the eucalypt's
+      // three, so the sky-through-the-canopy read is lost; that is the thing
+      // being traded, it is bought back by the one stem in ten that is not this,
+      // and it is why this is a stand-in for a distance tier rather than a
+      // species anybody chose.
+      cone(m, [0, 0, 0], [0.4, 9.2, 0.15], 0.42, 0.26, 3, bark, 111);
+      blob(m, [0.5, 13.0, 0.2], [5.5, 3.4, 5.5], leaf, 112);
+      break;
+    }
+    case SHRUB: {
+      // Authored at the midpoint of `SPECIES_SIZE[SHRUB]` like every other
+      // species: 1.85 m tall, 2.15 m across, so the nominal radius is 1.075 and
+      // the instance scales land near 1.0.
+      //
+      // Three lumps and no trunk, sitting on the ground rather than over it.
+      // The lowest is the widest, which is what a wind-pruned sandstone shrub
+      // does -- it splays at the base and thins upward -- and the two above it
+      // are offset so the silhouette is asymmetric from every bearing. Nothing
+      // here is trying to be a species; it is trying to be *a shrub*, seen a
+      // thousand at a time across a headland.
+      // Authored at the midpoint of `SPECIES_SIZE[SHRUB]`: 1.8 m tall, 2.2 m
+      // across, nominal radius 1.1. That row is deliberately *proportional*
+      // (0.9:2.7 and 1.1:3.3 are both 1:3) so the two instance scale factors
+      // come out equal at every point of the size curve -- see the pipeline's
+      // note on it, and on why a shrub needs that where a tree does not.
+      blob(m, [0, 0.54, 0], [1.04, 0.58, 1.04], leaf, 101);
+      blob(m, [0.35, 1.12, -0.22], [0.73, 0.54, 0.73], leaf, 102);
+      blob(m, [-0.31, 1.38, 0.27], [0.61, 0.44, 0.61], leaf, 103);
       break;
     }
     default: {
@@ -708,6 +901,53 @@ export class VegetationAssets {
   }
 }
 
+/**
+ * What the pipeline believes each species costs to draw, and it is the only
+ * copy of this table that is not derived from the geometry.
+ *
+ * `pipeline/sydney/vegetation.SPECIES_TRIANGLES` holds the same seven numbers,
+ * and it holds them because the bushland scatter's per-tile cap is spent in
+ * triangles rather than in instances -- a heath is a thousand 24-triangle
+ * shrubs and a forest is three hundred 100-triangle gums, and a count cap
+ * prices those the same and is wrong about one of them by a factor of four.
+ * The pipeline cannot measure the geometry: it runs in Python and the geometry
+ * is authored in `buildSpecies` above.
+ *
+ * So it asserts, and this is where the assertion is checked. `VegetationAssets`
+ * already counts the built indices, so the comparison is free and the failure
+ * it catches is otherwise invisible: add one lobe to the eucalypt's crown and
+ * every forest tile in the world is over its draw budget by 20%, with nothing
+ * in any output saying so.
+ */
+export const PIPELINE_TRIANGLES = [162, 72, 88, 64, 72, 100, 24, 14] as const;
+
+/** The client half of `verifyCanopy`. Needs `three`, so it cannot live in `cover.ts`. */
+export function verifyVegetationCost(assets: VegetationAssets): string[] {
+  const out: string[] = [];
+  if (assets.triangles.length !== SPECIES_COUNT) {
+    out.push(
+      `VegetationAssets built ${assets.triangles.length} geometries against ` +
+        `SPECIES_COUNT ${SPECIES_COUNT}`,
+    );
+  }
+  if (PIPELINE_TRIANGLES.length !== SPECIES_COUNT) {
+    out.push(
+      `PIPELINE_TRIANGLES has ${PIPELINE_TRIANGLES.length} rows against ` +
+        `SPECIES_COUNT ${SPECIES_COUNT}`,
+    );
+  }
+  const n = Math.min(assets.triangles.length, PIPELINE_TRIANGLES.length);
+  for (let s = 0; s < n; s++) {
+    if (assets.triangles[s] !== PIPELINE_TRIANGLES[s]) {
+      out.push(
+        `species ${s} is ${assets.triangles[s]} triangles, and the pipeline budgets it at ` +
+          `${PIPELINE_TRIANGLES[s]} -- update SPECIES_TRIANGLES in pipeline/sydney/vegetation.py`,
+      );
+    }
+  }
+  return out;
+}
+
 // --- Instancing ---------------------------------------------------------------
 
 const _matrix = /*#__PURE__*/ new Matrix4();
@@ -875,4 +1115,94 @@ export function createParkGrassMaterial(): MeshStandardNodeMaterial {
   material.roughnessNode = float(0.95);
   material.metalnessNode = float(0.0);
   return material;
+}
+
+// --- Bushland ground ----------------------------------------------------------
+
+/**
+ * The shared skeleton of the two bushland slots and of `park_grass`.
+ *
+ * All three are the same shader with three numbers changed -- two tones, two
+ * octave scales and a threshold -- and writing it three times would have made
+ * the third one drift from the first two the way this project's material tables
+ * historically do. `createParkGrassMaterial` is deliberately *not* folded into
+ * it: it carries a paragraph of its own about mown stripes and about why its
+ * wear octave is at nine metres, and that argument is about parks rather than
+ * about ground.
+ */
+function createCoverMaterial(
+  name: string,
+  // `any`, as everywhere else this file touches a TSL value: `vec3()` returns a
+  // different node class for a constant than for a join and the two do not
+  // unify, which is a fact about three's generics rather than about the colours.
+  low: any,
+  high: any,
+  patchM: number,
+  grainM: number,
+  roughness: number,
+): MeshStandardNodeMaterial {
+  const material = new MeshStandardNodeMaterial();
+  material.name = name;
+  // The same one-unit bias `park_grass` takes, for the same reason and against
+  // the same neighbours: these sit at y = 0.01 over a terrain mesh at 0, the
+  // paving sits above them at 0.02 and 0.15, and the three green slots are cut
+  // disjoint from each other in the pipeline so they never meet.
+  material.polygonOffset = true;
+  material.polygonOffsetUnits = -1;
+  material.polygonOffsetFactor = 0;
+  material.colorNode = Fn(() => {
+    const p: any = uv();
+    const patch = octave(p, patchM, 0.37);
+    const grain = octave(p, grainM, 1.93);
+    // The grain goes into the threshold rather than being mixed after it, which
+    // is what keeps the patch edges ragged at sub-metre scale without a third
+    // octave. `ground.ts` explains why a patch boundary drawn from one smooth
+    // octave reads as an airbrush.
+    const t = smoothstep(float(0.34), float(0.68), patch.add(grain.sub(0.5).mul(0.4)));
+    const colour = mix(low, high, t);
+    const tone = float(1.0).add(grain.sub(0.5).mul(0.18)).add(patch.sub(0.5).mul(0.12));
+    return colour.mul(tone);
+  })();
+  material.roughnessNode = float(roughness);
+  material.metalnessNode = float(0.0);
+  return material;
+}
+
+/**
+ * The `bush_floor` slot: forest, scrub, heath and golf-course rough.
+ *
+ * Four cover classes share it, and `pipeline/sydney/vegetation.py`'s header
+ * argues that at length: underfoot those four *are* the same thing, and the
+ * difference between them is vertical -- it is the height and the density of
+ * what is standing on the ground, which is the instances' job and not this
+ * one's.
+ *
+ * The patch octave is at 4.5 m rather than the park's 9 m because that is the
+ * scale bushland ground actually varies at: it is the size of a shrub's own
+ * litter shadow and of the gaps between clumps, not the reach of a sprinkler.
+ * There is no wear pattern of any kind and there should not be -- nothing walks
+ * here in enough numbers to make one, and a worn track through Ku-ring-gai is a
+ * fire trail, which is a road and is drawn as one.
+ */
+export function createBushFloorMaterial(): MeshStandardNodeMaterial {
+  return createCoverMaterial('bush_floor', BUSH_UNDER, BUSH_LITTER, 4.5, 0.55, 0.95);
+}
+
+/**
+ * The `wetland_mud` slot: mangrove flats and saltmarsh.
+ *
+ * The patch octave is much wider than the others at 14 m, which is the scale a
+ * tidal flat's channels and pans run at, and the grain a little coarser so the
+ * surface is not glassy up close.
+ *
+ * Roughness 0.72 against every other ground surface's 0.95, and it is the one
+ * place in this file a sheen is wanted rather than suppressed. Wet mud is wet:
+ * a low broad specular lobe across a flat at 3 pm is the thing that says the
+ * tide was here this morning, and the argument the grass makes against sheen --
+ * that a park fills enough of the frame to become a sheet of highlight -- does
+ * not apply to a surface that is never more than a few hundred metres of
+ * shoreline at a time.
+ */
+export function createWetlandMudMaterial(): MeshStandardNodeMaterial {
+  return createCoverMaterial('wetland_mud', MUD_WET, MUD_MARSH, 14.0, 0.9, 0.72);
 }

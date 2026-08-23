@@ -5560,6 +5560,348 @@ def cmd_rail_veg_audit(args: argparse.Namespace) -> int:
 FENCE_SLOTS = (fences.SLOT_MASONRY, fences.SLOT_IRON, fences.SLOT_TIMBER)
 
 
+#: Stems a hectare each cover class may come out at, over the emitted tiles.
+#:
+#: **Ceilings, not targets, and every one of them is about twice its own design
+#: density** -- `vegetation.BUSH_DENSITY` is what the scatter aims for and this
+#: is the number that says the aim went wrong. The factor of two is not slack for
+#: its own sake: a class' measured density is legitimately over its design in two
+#: ways that are not defects. Surveyed `natural=tree` nodes and procedural street
+#: trees land inside these polygons and are counted here -- the Botanic Gardens
+#: is mown ground mapped tree by tree -- and a tile that is 10% forest gets the
+#: whole polygon's stems over a tenth of the ground, which is the right picture
+#: and a high per-hectare figure.
+#:
+#: `mown` is the loose one and it is loose for the first of those reasons alone:
+#: Hyde Park, the Domain and the Botanic Gardens are surveyed individually and
+#: run past 100 stems a hectare in the real world, which is a fact about Sydney
+#: rather than about this pipeline.
+#: The floor, as a fraction of a class' own design density. See the docstring:
+#: a ceiling alone is blind to the one defect this round exists to fix.
+#:
+#: 0.4 rather than something tight, because two things legitimately pull a
+#: measured figure under its design and neither is a fault. A class' budget is
+#: spent by the surveyed and street trees standing in it before the scatter gets
+#: any (Hyde Park is mapped tree by tree and comes out at 18 against a design of
+#: 24), and a tile that is 10% one class carries that class' stems over a tenth
+#: of the ground the audit divides by.
+CANOPY_FLOOR = 0.4
+
+CANOPY_CEILING: dict[str, float] = {
+    "mown": 120.0,
+    "rough": 20.0,
+    "forest": 150.0,
+    "scrub": 140.0,
+    "heath": 140.0,
+    "wetland": 140.0,
+}
+
+
+def _canopy_classes(greens: list) -> tuple:
+    """`(STRtree, ranks, covers)` over the green polygons, for the audit's own use."""
+    from shapely.strtree import STRtree
+
+    polys = [g.polygon for g in greens]
+    return (
+        STRtree(polys) if polys else None,
+        np.asarray([g.rank for g in greens], dtype=np.int32),
+        [g.cover for g in greens],
+    )
+
+
+@_audit
+def cmd_canopy_audit(args: argparse.Namespace) -> int:
+    """RULE 5. Every cover class is scattered at its own density and no other's.
+
+    The bushland round's gate. `vegetation.py` gives a national park, a golf
+    course, a mangrove reach, a heath and a scrubby road reserve five different
+    stem densities and five different species mixes, and the failure mode of all
+    of it is silent: a class wired to the wrong row of `BUSH_DENSITY` renders a
+    perfectly good frame with a forest on a heath in it, and no existing audit
+    asks a question that would notice.
+
+    So this reports **stems a hectare, by cover class, over the emitted tiles**,
+    against a per-class ceiling. Numbers first and a verdict after them, because
+    the numbers are the thing worth reading -- the design densities are an eighth
+    of the ecology (see `vegetation.py`'s header for the triangle arithmetic that
+    made them that) and the interesting question is usually not pass/fail but
+    *how far short*.
+
+    ---------------------------------------------------------------------------
+    WHAT IT READS, AND WHY IT IS NOT A RESTATEMENT OF THE EMIT.
+
+    Two sources and neither is the emitter. The instances come out of the shipped
+    `.veg.bin` sidecars -- the same read `vegetation-audit` and `rail-veg-audit`
+    make, which is what the client will actually instance. The class map is
+    rebuilt from `sources.osm.read_green` and the rank rule, **without** the
+    street network, the building subtraction or the terrain: so the areas here
+    are the polygons as OSM drew them rather than as the emit clipped them, and
+    the two agreeing is a fact rather than a tautology. Where they disagree it is
+    by the few per cent a tile's buildings and carriageway take out, which is
+    reported as `gross` so it can never be mistaken for exact.
+
+    ---------------------------------------------------------------------------
+    TWO CONTROLS, and between them they are what makes the rest of the output
+    mean anything.
+
+    **The planted forest.** The audit scatters `--control-per-ha` stems over a
+    real forest polygon in scope, in ENU, and pushes every one of them through
+    the identical classifier the measured instances go through. What it asserts
+    is **recognition**: at least 99% of them must come back classified as
+    standing on *some* green polygon.
+
+    That took two goes to get right and both wrong versions are worth recording,
+    because each was the control convicting itself rather than the pipeline.
+
+    The first compared the measured density against the *nominal* one and failed
+    at 13% off. A regular lattice laid over an irregular polygon's bounding box
+    keeps only the cells whose centre lands inside, and on a 9 ha stand of wood
+    that is 6% fewer stems than `area x density` predicts -- a fact about
+    lattices, not about this pipeline. Both numbers are still printed so the gap
+    stays visible.
+
+    The second asserted that a stem planted in a wood classifies as **forest**,
+    and failed at 92.7%. The 7% were the **rank rule working**: Lane Cove
+    National Park has mown picnic lawns drawn inside its `natural=wood`, a lawn
+    outranks a wood, and a stem standing on one is mown. Demanding "forest"
+    there would have been demanding that the round's central rule be broken. So
+    the assertion is "classified as *something*", which is the frame test with
+    the cover rule taken out of it, and the breakdown of what the others became
+    is printed -- it is the rank rule's own receipt.
+
+    What recognition catches is the failure that matters and it catches it
+    absolutely: an ENU/world sign error puts every tree in Sydney's mirror
+    image, where it lands in no polygon at all -- every class reads zero stems a
+    hectare, every ceiling passes, and the audit says the world is fine. The
+    control lands in the mirror image too, recognises nothing, and convicts.
+    This is `rail-veg-audit`'s trunk-on-the-railhead, in the frame this audit
+    works in.
+
+    **The density floor.** A ceiling alone only catches a class scattered too
+    thickly. A class wired to the wrong `BUSH_DENSITY` row, or one whose scatter
+    stopped running, comes out *thin* -- and a thin class is exactly the defect
+    this whole round exists to fix, so it cannot be the one the audit is blind
+    to. Every class with real ground in scope must therefore measure at least
+    `CANOPY_FLOOR` of its own design density. The band is wide on purpose: a
+    class' measured figure legitimately runs under its design where surveyed
+    trees have eaten the budget (`mown` in the Botanic Gardens) and over it
+    where street trees stand inside the polygon (`rough` on a golf course).
+    """
+    from shapely.geometry import Point, box as _box
+    from shapely.ops import unary_union
+
+    keys = _emitted_tile_keys()
+    only = _only_keys(args.only)
+    if only:
+        keys = [k for k in keys if k in only]
+        missing = only - set(keys)
+        print(f"  --only: {len(keys):,} tiles in scope"
+              + (f" ({len(missing):,} named but not emitted)" if missing else ""))
+    if not keys:
+        raise AuditUnresolved("no emitted tiles in scope")
+
+    # The tiles' own ENU box, plus a tile of margin, so a polygon that only
+    # grazes the scope is still read. The radius is the extract's, not the
+    # scope's: `read_green` filters by centroid, and a national park whose
+    # centroid is 50 km out still covers tiles at 5 km.
+    index = json.loads(config.INDEX_PATH.read_text())
+    radius = float(index.get("radius_m") or 60_000)
+    print(f"stage '{index['stage']}', {len(keys):,} tiles in scope, reading green polygons...")
+    greens = osm.read_green(radius)
+    tree, ranks, covers = _canopy_classes(greens)
+    if tree is None:
+        raise AuditUnresolved("read no green polygons at all")
+    print(f"  {len(greens):,} green polygons, "
+          + ", ".join(f"{c} {sum(1 for g in greens if g.cover == c):,}"
+                      for c in osm.COVER_CLASSES))
+
+    def classify(east: float, north: float) -> str | None:
+        """The winning cover at a point -- `vegetation.surfaces`' rule, restated."""
+        p = Point(east, north)
+        best_rank, best = 1 << 30, None
+        for j in tree.query(p):
+            j = int(j)
+            if ranks[j] < best_rank and greens[j].polygon.contains(p):
+                best_rank, best = int(ranks[j]), covers[j]
+        return best
+
+    area_ha: dict[str, float] = defaultdict(float)
+    stems: dict[str, int] = defaultdict(int)
+    by_species: dict[str, Counter] = defaultdict(Counter)
+    unclassed = 0
+    tri_worst: tuple[int, str] = (0, "")
+    s = config.TILE_SIZE
+    for key in keys:
+        tx, tz = (int(v) for v in key.split("_"))
+        oe, on = tx * s, tz * s
+        tile = _box(oe, on, oe + s, on + s)
+
+        # Per-class ground in this tile, rank-resolved so the classes are
+        # disjoint exactly as the emitted surfaces are. `gross`: no buildings and
+        # no carriageway are taken out -- see the docstring.
+        by_rank: dict[int, list] = defaultdict(list)
+        for j in tree.query(tile):
+            j = int(j)
+            by_rank[int(ranks[j])].append(greens[j])
+        taken = None
+        for rank in sorted(by_rank):
+            layer = unary_union([g.polygon for g in by_rank[rank]]).intersection(tile)
+            if taken is not None and not layer.is_empty:
+                layer = layer.difference(taken)
+            taken = layer if taken is None else unary_union([taken, layer])
+            if layer.is_empty:
+                continue
+            area_ha[by_rank[rank][0].cover] += layer.area / 10_000.0
+
+        tri = 0
+        for x, z, _h, _r, sp in _veg_instances(key):
+            tri += vegetation.SPECIES_TRIANGLES.get(int(sp), 0)
+            cover = classify(oe + x, on - z)
+            if cover is None:
+                unclassed += 1
+                continue
+            stems[cover] += 1
+            by_species[cover][int(sp)] += 1
+        if tri > tri_worst[0]:
+            tri_worst = (tri, key)
+
+    print(f"\n  {'class':<10}{'gross ha':>12}{'stems':>11}{'stems/ha':>11}{'ceiling':>10}"
+          f"   design    dominant species")
+    bad: list[str] = []
+    for cover in osm.COVER_CLASSES:
+        ha = area_ha.get(cover, 0.0)
+        n = stems.get(cover, 0)
+        per = n / ha if ha > 0 else 0.0
+        ceiling = CANOPY_CEILING.get(cover, 0.0)
+        design = _canopy_design(cover)
+        top = by_species[cover].most_common(2)
+        names = " ".join(
+            f"{vegetation.SPECIES_NAME[sp]} {100.0 * c / max(n, 1):.0f}%" for sp, c in top
+        )
+        flag = "  OVER" if ha > 0 and per > ceiling else ""
+        print(f"  {cover:<10}{ha:>12,.1f}{n:>11,}{per:>11.1f}{ceiling:>10.0f}"
+              f"{design:>9.1f}    {names}{flag}")
+        if ha > 0 and per > ceiling:
+            bad.append(f"{cover} at {per:.1f} stems/ha over a ceiling of {ceiling:.0f}")
+
+    total = sum(stems.values()) + unclassed
+    print(f"\n  {total:,} instances over the scope, {unclassed:,} standing on no green polygon "
+          f"({100.0 * unclassed / max(total, 1):.1f}% -- street trees and surveyed nodes)")
+    print(f"  worst tile by draw cost: {tri_worst[1]} at {tri_worst[0]:,} triangles, "
+          f"against a bushland budget of {vegetation.BUSH_TRIANGLE_BUDGET:,}")
+
+    # --- The controls --------------------------------------------------------
+    c = _canopy_control(greens, keys, classify, args.control_per_ha)
+    if c is None:
+        raise AuditUnresolved("no forest polygon inside the scope to plant a control in")
+    lost = c["seen"].get("(nothing)", 0)
+    recognised = 1.0 - lost / c["planted"]
+    print(f"\n  CONTROL: {c['nominal']:.0f} stems/ha asked for over {c['where']} "
+          f"({c['ha']:.1f} ha)")
+    print(f"      {c['planted']:,} planted ({c['planted'] / c['ha']:.1f}/ha -- a lattice keeps"
+          f" fewer than area x density on an irregular polygon, which is expected)")
+    print("      classified: "
+          + ", ".join(f"{k} {v:,}" for k, v in c["seen"].most_common()))
+    print(f"      recognition {100.0 * recognised:.1f}% -- every stem the classifier can see")
+
+    ok = True
+    if recognised < 0.99:
+        print(f"\n  FAIL: {lost:,} of {c['planted']:,} stems planted inside a mapped green "
+              "polygon classify as standing on nothing. The frame is wrong and every number "
+              "above means nothing")
+        ok = False
+    thin = [
+        f"{cover} at {stems[cover] / area_ha[cover]:.1f} stems/ha against a design of "
+        f"{_canopy_design(cover):.1f}"
+        for cover in osm.COVER_CLASSES
+        if area_ha.get(cover, 0.0) >= 1.0
+        and _canopy_design(cover) > 0
+        and stems.get(cover, 0) / area_ha[cover] < CANOPY_FLOOR * _canopy_design(cover)
+    ]
+    if thin:
+        print(f"\n  FAIL: scattered under {CANOPY_FLOOR:.0%} of design -- " + "; ".join(thin))
+        ok = False
+    if tri_worst[0] > args.max_triangles:
+        print(f"\n  FAIL: tile {tri_worst[1]} draws {tri_worst[0]:,} triangles of vegetation, "
+              f"over a ceiling of {args.max_triangles:,}")
+        ok = False
+    if bad:
+        print("\n  FAIL: " + "; ".join(bad))
+        ok = False
+    if ok:
+        print("\n  PASS: every cover class is scattered inside its own band, no tile is over "
+              "its draw budget, and a forest planted where the classifier can see it is seen")
+    return EXIT_PASS if ok else EXIT_FAIL
+
+
+def _canopy_design(cover: str) -> float:
+    """The stems a hectare `vegetation.BUSH_DENSITY` aims that class at."""
+    if cover == "mown":
+        return 10_000.0 / vegetation.PARK_TREE_AREA
+    shrub, tree, _mix = vegetation.BUSH_DENSITY.get(cover, (None, None, ()))
+    return sum(10_000.0 / a for a in (shrub, tree) if a)
+
+
+def _canopy_control(greens: list, keys: list[str], classify, per_ha: float):
+    """Plant a forest at a known density and measure it back through `classify`.
+
+    Over **one real tile of one real forest polygon**, and both halves of that
+    are deliberate. A real polygon rather than a synthetic one, so the control
+    exercises the same STRtree, the same rank comparison and the same `contains`
+    the measurement does. One tile rather than the whole polygon, so the control
+    costs a thousand points whether it is run over a twelve-tile sample or over
+    the whole world -- the largest `natural=wood` part in the extract is 550 km2,
+    and planting it at 40 stems a hectare is two million points to prove
+    something a hectare proves.
+    """
+    from shapely.geometry import Point, box as _box
+
+    s = config.TILE_SIZE
+    scope = set(keys)
+    best = None
+    for g in greens:
+        if g.cover != "forest":
+            continue
+        rp = g.polygon.representative_point()
+        key = f"{math.floor(rp.x / s)}_{math.floor(rp.y / s)}"
+        if key not in scope:
+            continue
+        if best is None or g.polygon.area > best[0].polygon.area:
+            best = (g, key)
+    if best is None:
+        return None
+    g, key = best
+    tx, tz = (int(v) for v in key.split("_"))
+    part = g.polygon.intersection(_box(tx * s, tz * s, tx * s + s, tz * s + s))
+    if part.is_empty or part.area < 10_000.0:
+        return None
+
+    # A jittered-free lattice at the density asked for, over the clipped
+    # polygon's own bounds, kept where it lands inside. Deliberately **not**
+    # `vegetation._bush_layer`: a control that reuses the code it is controlling
+    # proves nothing.
+    cell = math.sqrt(10_000.0 / per_ha)
+    e0, n0, e1, n1 = part.bounds
+    planted = 0
+    seen: Counter[str] = Counter()
+    for gx in range(int(math.floor(e0 / cell)), int(math.floor(e1 / cell)) + 1):
+        for gz in range(int(math.floor(n0 / cell)), int(math.floor(n1 / cell)) + 1):
+            east, north = (gx + 0.5) * cell, (gz + 0.5) * cell
+            if not part.contains(Point(east, north)):
+                continue
+            planted += 1
+            seen[classify(east, north) or "(nothing)"] += 1
+    if planted == 0:
+        return None
+    return {
+        "nominal": per_ha,
+        "planted": planted,
+        "seen": seen,
+        "ha": part.area / 10_000.0,
+        "where": f"{g.kind} {g.osm_id} in tile {key}",
+    }
+
+
 @_audit
 def cmd_fence_road_audit(args: argparse.Namespace) -> int:
     """RULE 4. No front fence stands in a carriageway.
@@ -5674,6 +6016,64 @@ def cmd_fence_road_audit(args: argparse.Namespace) -> int:
     if ok:
         print("\n  PASS: no front fence stands in the part of the road a car drives down")
     return EXIT_PASS if ok else EXIT_FAIL
+
+
+def cmd_far_cover(args: argparse.Namespace) -> int:
+    """Build `far-cover.bin`: what grows on each far-terrain post.
+
+        cd pipeline && uv run python -m sydney far-cover
+
+    One byte per post of `far-terrain.bin` -- a cover class in the top three bits
+    and how much of that 500 m cell it covers in the bottom five. 59 kB for the
+    whole 60 km world, and it is what stops the horizon being brown.
+
+    ---------------------------------------------------------------------------
+    A COMMAND OF ITS OWN RATHER THAN A LINE IN `build`, and the reason is the
+    reason it exists at all. This is a **whole-world artefact**, like
+    `far-terrain.bin` and `far.bin` beside it: it cannot be produced for a
+    handful of tiles, and it does not depend on any of them -- it is a function
+    of the green polygons and the far grid's geometry and nothing else. So a
+    scoped re-emit cannot update it and should not have to, and a round that
+    changes the cover classes can rebuild it in a minute without a retile.
+
+    `--out` defaults to the world directory. Point it somewhere else to measure
+    one without publishing it, which is what the bushland round's sample did:
+    the client reads this file only when `index.json`'s `far.terrain.cover`
+    block says it exists, so producing it and *not* naming it in the index is a
+    complete, reversible no-op on the shipped world.
+    """
+    index = json.loads(config.INDEX_PATH.read_text())
+    far = index.get("far")
+    if not far or "terrain" not in far:
+        raise SystemExit("index.json has no far.terrain block; run a build first")
+    posts = int(far["terrain"]["posts"])
+    post_m = float(far["terrain"]["post_m"])
+    half = float(far["terrain"]["half_extent_m"])
+    radius = float(index.get("radius_m") or 60_000)
+
+    print(f"far cover: {posts} x {posts} posts at {post_m:.0f} m, half extent {half:,.0f} m")
+    greens = osm.read_green(radius)
+    print(f"  {len(greens):,} green polygons")
+    t0 = time.time()
+    grid = tiles.build_far_cover(greens, posts, post_m, half)
+    out = Path(args.out) if args.out else config.OUT_ROOT
+    written = tiles.write_far_cover(out / "far-cover.bin", grid)
+    print(f"  built in {time.time() - t0:.1f} s, {written:,} bytes -> {out / 'far-cover.bin'}")
+
+    counts = Counter()
+    for value in grid.ravel().tolist():
+        counts[(value >> 5) & 0x07] += 1
+    code_name = {v: k for k, v in vegetation.COVER_CODE.items()}
+    cell_km2 = (post_m / 1000.0) ** 2
+    print(f"  {'class':<10}{'posts':>10}{'km2':>12}{'share':>9}")
+    total = posts * posts
+    for code in sorted(counts):
+        name = "none" if code == 0 else code_name.get(code, f"?{code}")
+        n = counts[code]
+        print(f"  {name:<10}{n:>10,}{n * cell_km2:>12,.0f}{100.0 * n / total:>8.1f}%")
+    print("\n  index.json needs this block under far.terrain for the client to read it:")
+    print(f'      "cover": {{"bytes": {written}, "classes": {len(vegetation.COVER_CODE) + 1}}}')
+    return EXIT_PASS
 
 
 def cmd_reset(args: argparse.Namespace) -> int:
@@ -6106,6 +6506,41 @@ def main(argv: list[str] | None = None) -> int:
         _p.add_argument("--no-terrain", action="store_true",
                         help="skip the DEM; heights come out relative to the datum")
         _p.set_defaults(func=_rail_entry(_fn))
+
+    # `cy` rather than `ca`: `clearance-audit` above already took `ca`, and two
+    # parsers on one name in one function is a trap even where the ordering
+    # happens to make it work.
+    cy = sub.add_parser(
+        "canopy-audit",
+        help="every cover class is scattered at its own density and no other's",
+        description=cmd_canopy_audit.__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    cy.add_argument("--only", default="",
+                    help="comma-separated tile keys, or @FILE for one key a line,"
+                    " for checking a partial re-emit without reading the whole world")
+    cy.add_argument("--max-triangles", type=int, default=68_000,
+                    help="vegetation triangles one tile may draw. Above"
+                    " `vegetation.BUSH_TRIANGLE_BUDGET`'s 40,000 because the two budgets"
+                    " do not add: the bushland scatter is capped at 40,000 *minus* what"
+                    " the other three sources spent, and those three have their own cap"
+                    " of 400 instances -- except that **surveyed trees are never dropped**,"
+                    " so a tile mapped tree by tree runs past it: 9_39 off Kurnell carries"
+                    " 813 instances and 61,312 triangles, and has since long before this"
+                    " round. Set above the worst tile the shipped world actually holds")
+    cy.add_argument("--control-per-ha", type=float, default=40.0,
+                    help="stems a hectare the control plants and must measure back at")
+    cy.set_defaults(func=cmd_canopy_audit)
+
+    fc = sub.add_parser(
+        "far-cover",
+        help="build far-cover.bin: what grows on each far-terrain post",
+        description=cmd_far_cover.__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    fc.add_argument("--out", default=None,
+                    help="directory to write into; defaults to the world directory")
+    fc.set_defaults(func=cmd_far_cover)
 
     r = sub.add_parser("reset", help="mark a stage's units pending again")
     r.add_argument("--kind", required=True)

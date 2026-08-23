@@ -90,6 +90,8 @@ export const MATERIALS = [
   'fence_masonry',
   'fence_iron',
   'fence_timber',
+  'bush_floor',
+  'wetland_mud',
 ] as const;
 export type MaterialName = (typeof MATERIALS)[number];
 
@@ -113,6 +115,12 @@ export const SURFACE_MATERIALS = [
   'footpath_concrete',
   'kerb_sandstone',
   'park_grass',
+  // The two bushland ground slots, on exactly `park_grass`' terms: flat,
+  // world-metre UVs, no parameter fetch, no `_BLDIDX`, and never a shadow
+  // caster. `vegetation.ts` owns all three because their colours are calibrated
+  // against the foliage standing on them rather than against the paving.
+  'bush_floor',
+  'wetland_mud',
   'contact_ao',
 ] as const;
 export type SurfaceMaterialName = (typeof SURFACE_MATERIALS)[number];

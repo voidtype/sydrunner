@@ -2772,6 +2772,117 @@ def write_far_terrain(path: Path, grid: np.ndarray) -> int:
     return arr.nbytes
 
 
+#: How many points each far-cover cell is sampled at, per side.
+#:
+#: **Six, because the field it writes into has 31 steps in it.** Four would be
+#: 16 samples and a 6.25% quantisation of the coverage fraction, against the
+#: byte's own 3.2% -- the sampler would be the coarser of the two and the five
+#: bits `cover.ts` spends on the fraction would be buying nothing. 36 samples is
+#: 2.8%, just under the byte, which is where a sampler should sit.
+#:
+#: The cost of being right about it is nothing: 243 x 243 posts x 36 is 2.1
+#: million point-in-polygon queries, done as 243 bulk STRtree calls, and the
+#: whole 60 km world comes out in about fifteen seconds. An exact polygon clip
+#: per cell would be minutes for an answer nobody can see the difference in at
+#: two kilometres.
+#:
+#: What it does **not** buy is small features: a mangrove reach of a hectare and
+#: a half inside a 25 ha cell is under one sample either way, and the Badu
+#: mangroves at Homebush read as bare on this grid. That is correct rather than
+#: a defect -- at 2 km a hectare and a half subtends about two pixels -- and the
+#: near field draws them properly from 1.8 km in.
+FAR_COVER_SAMPLES = 6
+
+
+def build_far_cover(greens: list, posts: int, post_m: float, half: float) -> np.ndarray:
+    """What grows on each far-terrain post, as one byte.
+
+        bits 7..5   the cover class, `vegetation.COVER_CODE`, 0 for nothing
+        bits 4..0   how much of the cell that class covers, 0..31
+
+    Row 0 is the northern edge and the layout is `far-terrain.bin`'s exactly, so
+    the client reads the two with one index. See `client/src/world/cover.ts` for
+    the whole argument; the short of it is that the horizon is this heightfield
+    wearing `ground.ts`'s dirt material, that material has never known what grows
+    on the ground it paints, and past the streaming radius that is the entire
+    reason a national park reads brown.
+
+    **The dominant class rather than the best-ranked one**, and that is the one
+    place this disagrees with `vegetation.surfaces`. On the ground the rank
+    settles an overlap because two materials cannot occupy the same square metre;
+    over a 500 m cell there is no overlap to settle -- there is a mixture, and
+    the honest answer to "what colour is this quarter square kilometre" is
+    whichever class holds most of it. A national park with a golf course in one
+    corner is forest at this resolution, and the rank would have said golf.
+    """
+    from shapely import STRtree
+    from shapely.geometry import Point
+
+    from . import vegetation
+
+    grid = np.zeros((posts, posts), dtype=np.uint8)
+    if not greens:
+        return grid
+
+    tree = STRtree([g.polygon for g in greens])
+    codes = np.asarray(
+        [vegetation.COVER_CODE.get(g.cover, 0) for g in greens], dtype=np.uint8
+    )
+
+    k = FAR_COVER_SAMPLES
+    step = post_m / k
+    # Row by row: 243 rows of 243 posts x 16 samples is 3,888 points a row, which
+    # is one bulk query and a few megabytes, against 945,000 points and several
+    # hundred megabytes of index pairs in one go.
+    for r in range(posts):
+        north = half - r * post_m
+        pts = []
+        for c in range(posts):
+            east = -half + c * post_m
+            for sy in range(k):
+                for sx in range(k):
+                    pts.append(
+                        Point(
+                            east + (sx + 0.5 - k / 2.0) * step,
+                            north + (sy + 0.5 - k / 2.0) * step,
+                        )
+                    )
+        pairs = tree.query(np.asarray(pts, dtype=object), predicate="within")
+        if pairs.size == 0:
+            continue
+        # One count per (post, class). `pairs` is (2, n) -- point index, polygon
+        # index -- so a point inside three overlapping polygons contributes to
+        # three classes, which is what a mixture is and is why the winner is
+        # taken by count rather than by rank.
+        hits = np.zeros((posts, 8), dtype=np.int32)
+        post_of = pairs[0] // (k * k)
+        np.add.at(hits, (post_of, codes[pairs[1]]), 1)
+        hits[:, 0] = 0
+        best = hits.argmax(axis=1)
+        count = hits.max(axis=1)
+        # A class that covers every sample is 31/31; the fraction is clamped to at
+        # least 1 wherever anything was found at all, so a cell with one sample in
+        # a reserve is faintly green rather than silently bare.
+        steps = np.clip(np.rint(count / (k * k) * vegetation.COVER_STEPS), 0, 31).astype(np.uint8)
+        steps[(count > 0) & (steps == 0)] = 1
+        grid[r] = np.where(count > 0, (best.astype(np.uint8) << 5) | steps, 0)
+    return grid
+
+
+def write_far_cover(path: Path, grid: np.ndarray) -> int:
+    """The far cover channel, one u8 per post, no header.
+
+    Same no-header argument as `write_far_terrain`: the length is fixed by the
+    post count in `index.json`, so a stale or truncated file is caught by a byte
+    check with nothing to disagree about -- and the client does exactly that
+    check before it builds the attribute.
+    """
+    arr = np.ascontiguousarray(grid, dtype=np.uint8)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(arr.tobytes())
+    return arr.nbytes
+
+
 def write_far(path: Path, buildings: list[Building], terrain, floor) -> dict:
     """Every significant building in the extent as one convex prism.
 

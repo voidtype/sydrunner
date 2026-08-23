@@ -87,7 +87,9 @@ import {
 } from 'three/webgpu';
 
 import { fetchWorldAsset } from './cdn.ts';
+import { expandCover } from './cover.ts';
 import { MATERIALS } from './facade.ts';
+import { createGroundMaterial } from './ground.ts';
 
 /**
  * `far.bin`'s magic and the format this file can read. Both from
@@ -150,6 +152,18 @@ export interface FarContract {
      */
     sink_m: number;
     bytes: number;
+    /**
+     * `far-cover.bin`: one byte per post naming what grows on it. See
+     * `world/cover.ts` for the packing and for why the horizon needs it at all.
+     *
+     * Optional, and the whole feature is optional with it: a world built before
+     * the bushland round has no cover file, `buildFarGround` is handed no
+     * attribute, and `createGroundMaterial` is built without the branch that
+     * reads one. That is the same shape `FarContract` itself takes against an
+     * older index, and for the same reason -- there is nothing sensible to
+     * stand in for a map of what grows where.
+     */
+    cover?: { bytes: number; classes: number };
   };
 }
 
@@ -214,6 +228,8 @@ const FAR_TINT: readonly Rgb[] = [
   [0.5210, 0.5109, 0.4965], // fence_masonry    -- never a wall; concrete stands in
   [0.5210, 0.5109, 0.4965], // fence_iron
   [0.5210, 0.5109, 0.4965], // fence_timber
+  [0.5210, 0.5109, 0.4965], // bush_floor       -- never a wall; concrete stands in
+  [0.5210, 0.5109, 0.4965], // wetland_mud
 ];
 
 /**
@@ -861,6 +877,11 @@ export function buildFarGround(
   far: FarContract,
   seaLevelY: number,
   material: MeshStandardNodeMaterial,
+  /**
+   * `far-cover.bin`, one byte per post, or null on a world that has none. See
+   * `world/cover.ts`.
+   */
+  cover: Uint8Array | null = null,
 ): Mesh {
   const inner = far.terrain.posts;
   const half = far.terrain.half_extent_m;
@@ -931,6 +952,12 @@ export function buildFarGround(
   geometry.setAttribute('position', new BufferAttribute(position, 3));
   geometry.setAttribute('normal', new BufferAttribute(normal, 3));
   geometry.setAttribute('uv', new BufferAttribute(uv, 2));
+  // What grows on each post, as `(r, g, b, amount)` unsigned bytes -- 240 kB at
+  // 60 km against the 960 kB a float32 vec4 would cost to carry a colour with
+  // 31 distinct values in it. Normalized, so the shader reads 0..1.
+  if (cover && cover.length === inner * inner) {
+    geometry.setAttribute('cover', new BufferAttribute(expandCover(cover, inner), 4, true));
+  }
   geometry.setIndex(index);
 
   const mesh = new Mesh(geometry, material);
@@ -1177,13 +1204,21 @@ export async function loadFarLayer(
 ): Promise<FarLayer> {
   if (!far) return EMPTY;
   try {
-    const [slabBuf, terrBuf] = await Promise.all([
+    const [slabBuf, terrBuf, coverBuf] = await Promise.all([
       hexes
         ? Promise.resolve(null)
         : fetchWorldAsset(baseUrl, 'far.bin', version).then((r) => (r.ok ? r.arrayBuffer() : null)),
       fetchWorldAsset(baseUrl, 'far-terrain.bin', version).then((r) =>
         r.ok ? r.arrayBuffer() : null,
       ),
+      // Whole-world like the terrain it rides on, for the same reason: 59 kB
+      // for the entire 60 km extent, and it is the surface every slab stands
+      // on. Only asked for when the index says the build produced one.
+      far.terrain.cover
+        ? fetchWorldAsset(baseUrl, 'far-cover.bin', version).then((r) =>
+            r.ok ? r.arrayBuffer() : null,
+          )
+        : Promise.resolve(null),
     ]);
 
     const tower = archetypes.indexOf('tower');
@@ -1210,7 +1245,27 @@ export async function loadFarLayer(
     let ground: Mesh | null = null;
     const posts = far.terrain.posts;
     if (terrBuf && terrBuf.byteLength === posts * posts * 4) {
-      ground = buildFarGround(new Float32Array(terrBuf), far, seaLevelY, groundMaterial);
+      // Length-checked rather than trusted, exactly as the heightfield above
+      // is: a truncated cover file would paint the northern strip of the world
+      // and leave the rest brown, which reads as a rendering bug rather than as
+      // a bad download.
+      const cover =
+        coverBuf && coverBuf.byteLength === posts * posts ? new Uint8Array(coverBuf) : null;
+      // A second ground material, built here and only when there is a cover file
+      // to feed it, rather than a flag on the streamer's own. Two reasons and
+      // both are about not touching what already works: `createGroundMaterial`'s
+      // cover branch reads a vertex attribute, and handing that shader to the
+      // tile terrain meshes -- which is what `streamer.groundMaterial` is --
+      // would have them sampling an attribute they do not carry; and a world
+      // built before this round has no cover file, gets the material it always
+      // had, and is byte-for-byte the frame it was.
+      //
+      // The extra pipeline costs one compile, and it is paid inside
+      // `warmup.ts`'s `compileAsync(scene, camera)` -- the far ground is added
+      // to the scene before that pass runs -- rather than on the first frame
+      // that draws the horizon.
+      const material = cover ? createGroundMaterial({ cover: true }) : groundMaterial;
+      ground = buildFarGround(new Float32Array(terrBuf), far, seaLevelY, material, cover);
     }
 
     return { slabs, ground, count: slabs?.count ?? 0, hexes: farHexes };
