@@ -188,7 +188,7 @@
  *
  * What it cannot reach is listed by name in the output rather than skipped
  * silently: a coverage audit that quietly omits half the world is worse than
- * none. Today that is the streamer's twenty slot materials, the terrain, the
+ * none. Today that is the streamer's twenty-two slot materials, the terrain, the
  * water, the power wires and the far city (all need `fetch` and a decode
  * worker), the nameplates and the sun button (both build a `CanvasTexture` off
  * `document`), and the two hero trains (10.5 MB of glTF, and covered by
@@ -213,6 +213,7 @@ import {
 } from 'three/webgpu';
 
 import { FRAME_SECTION_NAMES, FSEC, FrameProfile } from './frameprofile.ts';
+import { MATERIALS } from './world/facade.ts';
 import { CharacterActor, CharacterAssets } from './player/character.ts';
 import { ActorDriver } from './game/dummies.ts';
 import { createCombatant, type CombatantState } from './game/combat.ts';
@@ -1241,7 +1242,14 @@ async function warmGroups(): Promise<{ groups: WarmGroup[]; rail: RailRide | nul
 
 /** Renderers this harness cannot build, and why. Printed, never skipped silently. */
 const UNAUDITED: ReadonlyArray<readonly [string, string]> = [
-  ['streamer (20 slot materials)', 'needs a TileStreamer, which spawns decode workers and fetches tiles'],
+  // Counted off `MATERIALS` rather than written down: the number went 20 -> 22
+  // in the bushland round, and a printed figure that is quietly wrong about how
+  // much of the world is *not* audited is the one line in this output that must
+  // never drift.
+  [
+    `streamer (${MATERIALS.length} slot materials)`,
+    'needs a TileStreamer, which spawns decode workers and fetches tiles',
+  ],
   ['terrain / water / contact skirt', 'built from a tile\'s .terr.bin inside the streamer'],
   ['power wires (world/power.ts)', 'merged per tile by the streamer'],
   ['street-name blades', 'a CanvasTexture per legend, off document'],

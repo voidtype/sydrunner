@@ -45,6 +45,8 @@ import { createFacadeGlobals } from './world/facade.ts';
 import { loadFarLayer } from './world/far.ts';
 import { loadLandmarks, verifyLandmarks } from './world/landmarks.ts';
 import { createFarGround } from './world/ground.ts';
+import { verifyCanopy } from './world/cover.ts';
+import { VegetationAssets, verifyVegetationCost } from './world/vegetation.ts';
 import { CUT_SUBDIVISION, NO_GROUND } from './world/terrain.ts';
 import { WaterLevels, verifyWading } from './world/wading.ts';
 import { loadFarWater, verifyWater } from './world/water.ts';
@@ -1306,6 +1308,22 @@ async function main(): Promise<void> {
   // screen back, and only on the machines slow enough to reach the deadline,
   // which are the machines nobody develops on. See `world/ground-first.ts`.
   const groundFirstFailures = timed('ground-first', () => verifyGroundFirst());
+  // The bushland round. Two halves, and the split is the usual one: the pure
+  // table runs on the server too (`verifyCanopy` in `world/cover.ts` -- the
+  // `far-cover.bin` packing and the seven horizon colours), and the half that
+  // needs real geometry can only run here.
+  //
+  // That second half is the one worth naming. The pipeline spends a tile's
+  // bushland budget in **triangles**, off a table of per-species triangle counts
+  // in `pipeline/sydney/vegetation.py` that it cannot measure and can only
+  // assert. `VegetationAssets` computes the true counts from the built
+  // geometry, so this is the one place the two can be compared -- and if a lobe
+  // is ever added to a crown, the pipeline silently over-plants every forest
+  // tile in the world by the ratio and nothing else says a word.
+  const canopyFailures = timed('canopy', () => [
+    ...verifyCanopy(),
+    ...verifyVegetationCost(new VegetationAssets()),
+  ]);
   // And the night rig, which earns its place on this list twice over.
   //
   // Every other check here guards something that *renders wrongly*. This one
@@ -1480,6 +1498,7 @@ async function main(): Promise<void> {
     ghostFailures.length ||
     lifecycleFailures.length ||
     groundFirstFailures.length ||
+    canopyFailures.length ||
     nightFailures.length ||
     trainLightFailures.length ||
     raveFailures.length ||
@@ -1566,6 +1585,7 @@ async function main(): Promise<void> {
           ...ghostFailures,
           ...lifecycleFailures,
           ...groundFirstFailures,
+          ...canopyFailures,
           ...nightFailures,
           ...trainLightFailures,
           ...raveFailures,

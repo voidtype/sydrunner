@@ -111,6 +111,7 @@
 
 import {
   Fn,
+  attribute,
   cameraPosition,
   dot,
   float,
@@ -124,6 +125,8 @@ import {
   vec3,
 } from 'three/tsl';
 import { Mesh, MeshStandardNodeMaterial, PlaneGeometry } from 'three/webgpu';
+
+import { COVER_TINT_SCALE } from './cover.ts';
 
 /**
  * Extent, metres. Unchanged: it has to outrun the 1.8 km streaming radius by
@@ -276,9 +279,11 @@ function octave(p: any, metres: number, angle: number): any {
  * pipeline. Nothing in it varies per tile -- it is a function of world position
  * and nothing else.
  */
-export function createGroundMaterial(): MeshStandardNodeMaterial {
+export function createGroundMaterial(
+  options: { cover?: boolean } = {},
+): MeshStandardNodeMaterial {
   const material = new MeshStandardNodeMaterial();
-  material.name = 'ground';
+  material.name = options.cover ? 'far-ground' : 'ground';
 
   material.colorNode = Fn(() => {
     // World metres, east and south, taken from the interpolated world position
@@ -361,7 +366,28 @@ export function createGroundMaterial(): MeshStandardNodeMaterial {
       .add(q.mul(0.14))
       .add(g.mul(0.22));
 
-    return colour.mul(tone);
+    const dirt: any = colour.mul(tone);
+    if (!options.cover) return dirt;
+
+    // --- The cover channel, and it is one `mix` ------------------------------
+    //
+    // `world/cover.ts` holds the whole argument; the short of it is that this
+    // material is what the horizon wears, it has never known what grows on the
+    // ground it is painting, and past the streaming radius that is the entire
+    // reason Ku-ring-gai reads brown. `far-cover.bin` gives one byte per 500 m
+    // post -- a class and how much of the cell it covers -- and `far.ts` expands
+    // it into this attribute before the mesh is built.
+    //
+    // Mixed toward the canopy tint rather than multiplied by it, because the two
+    // are different colours and not a tint of one another: forest is grey-olive
+    // where the dirt is warm buff, and a multiply can only ever darken the dirt
+    // toward a browner brown. The dirt's own `tone` rides along on the mixed
+    // result -- one multiply after the mix rather than inside it -- so a
+    // forested slope still carries the 118 m drift that keeps the far field from
+    // going flat, at the reduced contrast a canopy actually has.
+    const cover: any = attribute('cover', 'vec4');
+    const canopy: any = cover.xyz.mul(float(COVER_TINT_SCALE)).mul(tone);
+    return mix(dirt, canopy, cover.w);
   })();
 
   // Dry soil and dead grass have no specular character worth the name, and this

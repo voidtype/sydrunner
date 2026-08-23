@@ -630,37 +630,202 @@ def read_places(radius_m: float, path: Path = PBF_PATH) -> list[OsmPlace]:
 
 # --- Green space --------------------------------------------------------------
 
-# Polygons that become mown or grassed ground rather than the default dry dirt.
+# Every polygon that is vegetation of some kind, and **what kind**, because they
+# are not one thing and the whole defect this table was rewritten to fix was
+# treating the four that were read as one and the nine that were not as nothing.
 #
-# Split across three OSM keys because the tagging genuinely is: a Sydney park is
-# `leisure=park`, the oval inside it is `leisure=pitch`, the strip of council
-# grass between two blocks is `landuse=grass`, and Camperdown Cemetery -- which
-# is a park in every way that matters to a player -- is `landuse=cemetery`.
+# The old comment here said `natural=wood` and `natural=scrub` "want their own
+# surface and their own dense tree scatter, which is a project of its own". This
+# is that project. Counted over the 60 km extract, clipped to the emitted world
+# box, the tags that were never read carry **2,917 km2 of ground** against the
+# 272 km2 that were -- Lane Cove National Park, Ku-ring-gai Chase, the Royal, the
+# Georges River mangroves and every coastal heath in the map, all of it drawn as
+# the same bare dry dirt as a car park:
 #
-# What is deliberately *not* here: `natural=scrub` and `natural=wood` (596 and
-# 330 polygons in the inner ring). Both are bushland with a closed canopy, and
-# painting them as mown grass would be worse than leaving them as ground; they
-# want their own surface and their own dense tree scatter, which is a project of
-# its own. `leisure=swimming_pool` is excluded for the obvious reason and is the
-# single most common `leisure` value in the extent, at 1,577.
-GREEN_LEISURE = {"park", "garden", "pitch", "playground"}
-GREEN_LANDUSE = {"grass", "recreation_ground", "village_green", "cemetery"}
-GREEN_NATURAL = {"grassland"}
+#     natural=wood            7,393 polys   2,233 km2
+#     landcover=trees           199         1,643
+#     boundary=protected_area   127         1,587
+#     leisure=nature_reserve    361         1,037
+#     natural=grassland         811            53   (read today, as mown)
+#     landuse=meadow            566            52
+#     natural=wetland         1,027            43
+#     leisure=golf_course       113            40
+#     landuse=forest            161            37
+#     natural=scrub           2,752            28
+#     natural=heath             270             6
+#
+# ---------------------------------------------------------------------------
+# THE COVER CLASS, and why it is not a boolean.
+#
+# A national park, a golf course, a mangrove reach, a sandstone heath and a
+# scrubby road reserve are five different surfaces carrying five different
+# scatters, and the one thing they share is that none of them is a lawn. So a
+# polygon carries a **cover class** rather than a `plantable` flag, and
+# `vegetation.py` reads the class for its surface slot, its stem density, its
+# species mix and whether the instances are trees at all.
+#
+#   mown     someone mows or grazes it: parks, gardens, ovals, playgrounds,
+#            council grass, cemeteries, grassland. Today's read, unchanged.
+#   rough    unmown grass with trees standing in it: golf, meadow, orchard,
+#            nursery. Open, and open on purpose.
+#   forest   a closed-ish eucalypt canopy: wood, forest, landcover=trees, and
+#            the two administrative tags below.
+#   scrub    shrub-dominated regrowth with the odd mallee gum over it.
+#   heath    the sandstone plateau and the clifftops: a continuous 0.3-1.5 m
+#            shrub layer and **no trees at all**.
+#   wetland  estuarine mud, saltmarsh and mangrove. Not grass, not bush floor,
+#            and the one green polygon in Sydney that is not green.
+#
+# ---------------------------------------------------------------------------
+# THE RANK, which is how an overlap is settled, and it is settled by
+# SPECIFICITY rather than by area, by iteration order or by which tag GDAL
+# happens to promote to a column.
+#
+# The overlaps are not rare and they are not accidental. Lane Cove National Park
+# is `boundary=protected_area` **and** `leisure=nature_reserve` **and**
+# `natural=wood`, and inside those three there are mown picnic lawns, a mangrove
+# reach on the river and heath on the ridges. An administrative boundary is a
+# statement about who owns the ground, not about what grows on it, so it must be
+# the **weakest** claim in the table; a mower is the strongest, because somebody
+# went out there with one. Between them the order runs from the most specific
+# botanical claim to the least:
+#
+#     0  pitch, playground     a playing surface. Beats the park it sits in.
+#     1  mown                  a lawn. Beats everything below it.
+#     2  wetland               a hydrological claim; nothing else can be true
+#                              of tidal mud.
+#     3  heath                 the mapper said explicitly: not wood, not scrub.
+#     4  scrub
+#     5  rough                 a golf course inside a reserve is a golf course;
+#                              a meadow inside a wood is a clearing.
+#     6  forest, tagged        `natural=wood` is a claim about the trees.
+#     7  forest, administrative  `protected_area` is a claim about the fence.
+#
+# Two places read this. `read_green` settles it **per polygon**, because one way
+# routinely carries three of these keys at once. `vegetation.py` settles it
+# **between polygons** -- the surface by subtracting every higher-ranked class
+# out of each lower one, so no two slots draw over the same ground, and the
+# scatter by refusing a stem that lands inside a better-ranked polygon.
+#
+# `leisure=swimming_pool` is still excluded for the obvious reason and is still
+# the single most common `leisure` value in the extent, at 6,622.
+
+COVER_MOWN = "mown"
+COVER_ROUGH = "rough"
+COVER_FOREST = "forest"
+COVER_SCRUB = "scrub"
+COVER_HEATH = "heath"
+COVER_WETLAND = "wetland"
+
+#: Every cover class, weakest rank last. The order is the tie-break order and
+#: `vegetation.py` walks it directly, so it is data rather than documentation.
+COVER_CLASSES = (
+    COVER_MOWN,
+    COVER_WETLAND,
+    COVER_HEATH,
+    COVER_SCRUB,
+    COVER_ROUGH,
+    COVER_FOREST,
+)
+
+#: `(key, value) -> (cover, rank)`. Lower rank wins. See the essay above.
+GREEN_COVER: dict[tuple[str, str], tuple[str, int]] = {
+    # Rank 0 -- a playing surface, which beats the park it stands in.
+    ("leisure", "pitch"): (COVER_MOWN, 0),
+    ("leisure", "playground"): (COVER_MOWN, 0),
+    # Rank 1 -- mown or grazed. Exactly the set that was read before this
+    # rewrite, so every tile in the shipped world that had grass still has the
+    # same grass in the same place.
+    ("leisure", "park"): (COVER_MOWN, 1),
+    ("leisure", "garden"): (COVER_MOWN, 1),
+    ("landuse", "grass"): (COVER_MOWN, 1),
+    ("landuse", "recreation_ground"): (COVER_MOWN, 1),
+    ("landuse", "village_green"): (COVER_MOWN, 1),
+    ("landuse", "cemetery"): (COVER_MOWN, 1),
+    ("natural", "grassland"): (COVER_MOWN, 1),
+    # New at rank 1 and small: 12 commons and 130 `landcover=grass` scraps,
+    # which are the same thing under a key the read never looked at.
+    ("leisure", "common"): (COVER_MOWN, 1),
+    ("landcover", "grass"): (COVER_MOWN, 1),
+    # Rank 2 -- water in the ground.
+    ("natural", "wetland"): (COVER_WETLAND, 2),
+    # Rank 3, 4 -- the shrub layers, heath first because a mapper who wrote
+    # `heath` over ground someone else called `wood` is correcting them.
+    ("natural", "heath"): (COVER_HEATH, 3),
+    ("natural", "scrub"): (COVER_SCRUB, 4),
+    ("natural", "shrubbery"): (COVER_SCRUB, 4),
+    # Rank 5 -- managed open ground with trees standing in it.
+    ("leisure", "golf_course"): (COVER_ROUGH, 5),
+    ("landuse", "meadow"): (COVER_ROUGH, 5),
+    ("landuse", "orchard"): (COVER_ROUGH, 5),
+    ("landuse", "plant_nursery"): (COVER_ROUGH, 5),
+    # Rank 6 -- somebody looked at the trees.
+    ("natural", "wood"): (COVER_FOREST, 6),
+    ("landuse", "forest"): (COVER_FOREST, 6),
+    ("landcover", "trees"): (COVER_FOREST, 6),
+    # Rank 7 -- somebody drew a fence. `landuse=conservation` is one polygon in
+    # the extent and belongs with these two rather than with the wood: it is a
+    # zoning tag.
+    ("leisure", "nature_reserve"): (COVER_FOREST, 7),
+    ("boundary", "protected_area"): (COVER_FOREST, 7),
+    ("landuse", "conservation"): (COVER_FOREST, 7),
+}
+
+#: The keys `read_green` looks at, derived so a key added above cannot be
+#: forgotten here.
+GREEN_KEYS = tuple(dict.fromkeys(k for k, _ in GREEN_COVER))
+
+# A rank names exactly one cover class, and two things downstream depend on it:
+# `vegetation.surfaces` groups a tile's green by rank and reads the class off the
+# group, and `canopy-audit` does the same independently. Both would silently
+# paint one class in another's material the day two classes shared a rank, so the
+# table says so at import instead. Costs a dict comprehension once.
+_RANK_COVER: dict[int, str] = {}
+for _tag, (_cover, _rank) in GREEN_COVER.items():
+    if _RANK_COVER.setdefault(_rank, _cover) != _cover:
+        raise AssertionError(
+            f"rank {_rank} names both {_RANK_COVER[_rank]!r} and {_cover!r} in GREEN_COVER;"
+            " a rank must name exactly one cover class -- see vegetation.surfaces"
+        )
+del _tag, _cover, _rank
+
+# Kept for the two callers outside this module that name them, and derived from
+# the table rather than repeated, so the two cannot drift.
+GREEN_LEISURE = {v for (k, v) in GREEN_COVER if k == "leisure"}
+GREEN_LANDUSE = {v for (k, v) in GREEN_COVER if k == "landuse"}
+GREEN_NATURAL = {v for (k, v) in GREEN_COVER if k == "natural"}
 
 # Below this a polygon is a planter box or a traffic island, and the vertices it
 # costs are worth more than the two square metres of green it draws.
+#
+# Applied to `mown` only. A 40 m2 floor over bushland would drop 40% of the
+# `natural=scrub` polygons in the extent -- they are road-reserve regrowth and
+# gully slivers, they are genuinely that small, and dropping them puts bare dirt
+# stripes through otherwise continuous bush. Bushland's floor is `MIN_BUSH_AREA`,
+# low enough to keep those and high enough to refuse a digitising artefact.
 MIN_GREEN_AREA = 40.0
+MIN_BUSH_AREA = 8.0
+
+#: A cover class that is a `boundary=` tag has no `landuse` or `natural` of its
+#: own to be caught by the roof-garden test, and does not need one.
+_ROOF_KEYS = ("leisure", "landuse", "natural", "landcover")
 
 
 @dataclass
 class OsmGreen:
     osm_id: str
     polygon: BaseGeometry  # shapely Polygon in ENU metres
-    kind: str  # the tag value that selected it, e.g. 'park', 'grass'
+    kind: str  # the tag value that selected it, e.g. 'park', 'wood'
     # A park proper takes specimen trees; a sports pitch and a playground must
     # stay clear, and the scatter reads that off this rather than off `kind` so
     # the rule is stated once.
     plantable: bool
+    # What grows here, and how strong the claim is. See `GREEN_COVER`. Both are
+    # decided per polygon at the read; the *spatial* half of the same rule --
+    # which class wins where two polygons overlap on the ground -- is
+    # `vegetation.py`'s, because it needs the geometry of every neighbour.
+    cover: str = COVER_MOWN
+    rank: int = 1
 
 
 # A pitch is a playing surface and a playground is soft-fall and equipment.
@@ -668,42 +833,61 @@ class OsmGreen:
 _UNPLANTABLE = {"pitch", "playground"}
 
 
+def classify_green(a: dict[str, Any]) -> tuple[str, str, int] | None:
+    """`(kind, cover, rank)` for one tag dict, or `None` if it is not green.
+
+    The lowest rank any of its tags carries wins -- so a way tagged
+    `boundary=protected_area` + `natural=wood` is forest by the wood (rank 6)
+    rather than by the boundary (rank 7), and one that adds `leisure=park` over
+    the top of both is mown (rank 1). Pure, and exported, because
+    `canopy-audit` has to be able to ask the same question of the same tags
+    without re-reading the file.
+    """
+    best: tuple[str, str, int] | None = None
+    for key in GREEN_KEYS:
+        value = a.get(key)
+        if not value:
+            continue
+        hit = GREEN_COVER.get((key, str(value)))
+        if hit is None:
+            continue
+        cover, rank = hit
+        if best is None or rank < best[2]:
+            best = (str(value), cover, rank)
+    return best
+
+
 def read_green(radius_m: float, path: Path = PBF_PATH) -> list[OsmGreen]:
-    """Park, garden and grass polygons inside the radius, in ENU metres.
+    """Every vegetated polygon inside the radius, classified, in ENU metres.
 
     Multipolygons are kept part by part rather than reduced to their largest
     ring the way a building is: a park with an island in the middle of a pond is
     one relation with several outer rings, and taking only the biggest would drop
-    most of the Botanic Gardens.
+    most of the Botanic Gardens. It matters far more now than it did: a national
+    park is one relation with dozens of outer rings and the largest of them is
+    not the park.
     """
     bbox = geo.bbox_geodetic_for_radius(radius_m)
     geoms, attrs = _read_layer(path, "multipolygons", bbox)
 
     out: list[OsmGreen] = []
     for geom, a in zip(geoms, attrs):
-        leisure, landuse, natural = a.get("leisure"), a.get("landuse"), a.get("natural")
-        kind = (
-            leisure
-            if leisure in GREEN_LEISURE
-            else landuse
-            if landuse in GREEN_LANDUSE
-            else natural
-            if natural in GREEN_NATURAL
-            else None
-        )
-        if kind is None:
+        hit = classify_green(a)
+        if hit is None:
             continue
+        kind, cover, rank = hit
         # A roof garden is tagged on the building outline. Painting grass at
         # ground level under the whole footprint is the one way this read can
         # produce a lawn inside a tower.
         if a.get("building"):
             continue
 
+        floor = MIN_GREEN_AREA if cover == COVER_MOWN else MIN_BUSH_AREA
         proj = _project(geom)
         if proj.is_empty:
             continue
         for poly in proj.geoms if proj.geom_type == "MultiPolygon" else [proj]:
-            if poly.geom_type != "Polygon" or poly.area < MIN_GREEN_AREA:
+            if poly.geom_type != "Polygon" or poly.area < floor:
                 continue
             if not _within_radius(poly, radius_m):
                 continue
@@ -713,6 +897,8 @@ def read_green(radius_m: float, path: Path = PBF_PATH) -> list[OsmGreen]:
                     polygon=poly,
                     kind=kind,
                     plantable=kind not in _UNPLANTABLE,
+                    cover=cover,
+                    rank=rank,
                 )
             )
     return out

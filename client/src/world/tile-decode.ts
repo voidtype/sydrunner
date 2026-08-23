@@ -898,8 +898,14 @@ function deltaInPlace(values: Uint16Array, components: number): void {
  * Species the client knows how to draw. Lives here rather than in
  * `vegetation.ts` because the decode clamps against it -- see below -- and the
  * clamp has to run where the decode runs. `vegetation.ts` re-exports it.
+ *
+ * Eight since the bushland round: `SHRUB` is index 6 and `BUSH_TREE` is 7. The
+ * clamp is what makes that a safe direction to move in -- a client on the old
+ * six reading a world that ships shrubs draws them as eucalypts, which is wrong
+ * and is not a crash, and a client on eight reading an old world simply never
+ * sees a 6 or a 7.
  */
-export const SPECIES_COUNT = 6;
+export const SPECIES_COUNT = 8;
 
 const VEG_STRIDE = 20;
 

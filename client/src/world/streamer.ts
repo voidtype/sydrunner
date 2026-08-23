@@ -264,7 +264,9 @@ import { warmupGeometry, type WarmupPart } from './warmup.ts';
 import {
   VegetationAssets,
   buildTileTrees,
+  createBushFloorMaterial,
   createParkGrassMaterial,
+  createWetlandMudMaterial,
 } from './vegetation.ts';
 
 export interface TileEntry {
@@ -1366,7 +1368,16 @@ export class TileStreamer implements LampSource {
           ? createStreetMaterial(slot)
           : slot === 'park_grass'
             ? createParkGrassMaterial()
-            : slot === 'contact_ao'
+            : // The two bushland ground slots, on `park_grass`' terms exactly:
+              // flat, world-metre UVs, no atlas, no `_BLDIDX`. Which one a
+              // patch of ground landed in is which cover class won it in the
+              // pipeline, and the three are cut disjoint there so no two of
+              // them are ever over the same square metre.
+              slot === 'bush_floor'
+              ? createBushFloorMaterial()
+              : slot === 'wetland_mud'
+                ? createWetlandMudMaterial()
+                : slot === 'contact_ao'
               ? createContactMaterial()
               : // The awning fascia and soffit. A facade material by the one
                 // test that matters -- it casts a shadow, and shading the
@@ -4887,6 +4898,8 @@ function slotAttributes(slot: MaterialName): Parameters<typeof warmupGeometry>[0
   const plain =
     isStreetMaterial(slot) ||
     slot === 'park_grass' ||
+    slot === 'bush_floor' ||
+    slot === 'wetland_mud' ||
     slot === 'awning_fascia' ||
     slot === 'fence_masonry' ||
     slot === 'fence_iron' ||

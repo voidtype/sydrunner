@@ -590,6 +590,24 @@ MATERIALS = (
     "fence_masonry",
     "fence_iron",
     "fence_timber",
+    # Bushland ground -- `vegetation.py`, and the header of that file is the
+    # argument. Two slots and not one: `bush_floor` is the sandstone grit, bark
+    # litter and dry sedge under a forest, a scrub, a heath and a golf-course
+    # rough, which are the same thing underfoot because the difference between
+    # those four is vertical and is carried by what stands on them;
+    # `wetland_mud` is estuarine mud and saltmarsh, which is the one green
+    # polygon in Sydney that is not a vegetation colour and would be actively
+    # wrong painted as dry litter.
+    #
+    # Appended after `contact_ao` despite that slot's note above, and it is safe
+    # for the reason `awning_fascia` gives with the sign flipped. The note's
+    # worry is a surface having to decide where it sits against a ribbon that is
+    # already lying on the ground; these two do not have to decide, because
+    # `streets.py`'s building subtraction has already taken every footprint out
+    # of them, and a contact skirt only exists where a footprint does. They
+    # share no plan area with it at all.
+    "bush_floor",
+    "wetland_mud",
 )
 MATERIAL_INDEX = {m: i for i, m in enumerate(MATERIALS)}
 

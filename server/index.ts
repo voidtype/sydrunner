@@ -100,6 +100,7 @@ import { verifyTeamLook } from '../client/src/game/teamlook.ts';
 // WORKSTREAM AJ: the ground gate's arithmetic, three-free, so it runs in both
 // boot lists as this file's own premise requires.
 import { verifyGroundFirst } from '../client/src/world/ground-first.ts';
+import { verifyCanopy } from '../client/src/world/cover.ts';
 // WORKSTREAM N (carry): the restore sentence, and the spawn rules this process
 // has always run without checking. Both three-free, so this process runs the
 // same checks the browser does. See `client/src/game/carry.ts`.
@@ -485,6 +486,16 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // ground it has not got joins, plays and reports nothing wrong. See
     // `client/src/world/ground-first.ts`.
     ['verifyGroundFirst', verifyGroundFirst()],
+    // The bushland round's ground-cover table: the byte `far-cover.bin` packs a
+    // class and a coverage fraction into, and the seven colours the horizon
+    // wears. Here as well as in the browser on this list's own premise -- it is
+    // three-free and it is a bit shift -- and because the two failures it
+    // catches are both silent. A packing that stops round-tripping paints every
+    // national park in the world as a golf course, and a cover tint lighter
+    // than `ground.ts`'s own soil makes the hills *pale* rather than green,
+    // which is a taste failure that renders a perfectly good frame. See
+    // `client/src/world/cover.ts`.
+    ['verifyCanopy', verifyCanopy()],
     // What a knocked-over NPC is worth, how fast a player may be paid it, and
     // what the note looks like. Run **here** first and foremost because this
     // process *is* the mint: the drop table and the rate bank are enforced in
