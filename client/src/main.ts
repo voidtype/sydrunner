@@ -4590,6 +4590,13 @@ async function main(): Promise<void> {
     // the register would refuse and a rim marker on the wrong bearing, and
     // neither has a screenshot that says so. See `game/givermap.ts`.
     ...verifyGiverMap(),
+    // And the big map's own projection checks, which until now lived behind
+    // `sydney.bigmapSelfChecks()` and were therefore read by nobody: a real
+    // failure ("3 bike dot sizes against 4 zooms") sat in them for as long as
+    // the fourth zoom has existed. A check nothing runs is a comment with a
+    // return type. It needs no canvas -- see `verifyBigMap`'s own note -- so
+    // there was never a reason for it to be behind a handle.
+    ...verifyBigMap(),
   ];
   if (dialogFailures.length > 0) {
     hud.fatal('Quest content self-checks failed:\n' + dialogFailures.map((f) => '  - ' + f).join('\n'));

@@ -387,7 +387,16 @@ const QUEST_GLYPH_PX = 11;
  * -- which is genuinely useful, it is a map of where the bikes are -- while
  * leaving the powerups and the combatants unambiguously the larger marks.
  */
-const BIKE_DOT_R = [2.6, 2.2, 1.7];
+const BIKE_DOT_R = [2.6, 2.2, 1.7, 1.3];
+// The fourth number is the `region` zoom, and it was missing for as long as that
+// zoom has existed: `BIKE_DOT_R[3]` was `undefined`, the lookup fell back to the
+// last entry, and 27 km of city drew its bikes at the 9 km size. `verifyBigMap`
+// had been saying so the whole time -- "3 bike dot sizes against 4 zooms" -- to a
+// console nobody was reading, which is the argument for a check being in a boot
+// list rather than behind a handle. 1.3 px continues the taper. Whether six
+// thousand dots at 27 km is a constellation or a lime haze is a look, and if it
+// is a haze the answer is to stop drawing them at that zoom rather than to
+// shrink them further: under a pixel a dot is a colour, not a mark.
 /** How far a marker's heading tick reaches past its dot, in pixels. */
 const HEADING_TICK = 4.5;
 /**
