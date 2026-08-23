@@ -599,8 +599,19 @@ export const MAX_PACK_BYTES = 512 * 1024;
 
 // --- The AI seam ------------------------------------------------------------------
 
-/** The model, named by env so a provider's rename costs a log line. */
-export const DEFAULT_DIALOG_MODEL = 'glm-4.7-flash';
+/**
+ * The model, named by env so a provider's rename costs a log line.
+ *
+ * It cost exactly that on 2026-08-23: the provider stopped listing
+ * `glm-4.7-flash` and the boot probe said so -- *"which the provider does not
+ * list. Improv nodes will serve their authored lines"* -- which is the seam
+ * working as designed, and is also the whole reason the probe exists. Every
+ * dialog node had been serving its authored line for as long as that was true,
+ * and nothing else in the game could have told you. The successor here is the
+ * closest listed relative; the env var on the box is the real setting and this
+ * is only what a machine with no `/etc/sydney/secrets.env` falls back to.
+ */
+export const DEFAULT_DIALOG_MODEL = 'glm-5-2';
 
 interface CacheEntry {
   /** The clamped line, or `''` while a fill is in flight or has failed. */
