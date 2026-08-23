@@ -164,6 +164,7 @@ import {
   markYFromGround,
   markYFromHeadBone,
 } from '../game/giverbodies.ts';
+import { GIVER_GOLD } from '../game/givermap.ts';
 import {
   NPC_MARKER,
   markerFor,
@@ -273,8 +274,16 @@ export const RESCAN_HZ = 4;
  * the difference, not the hue, and two colours would be a second thing to learn
  * for a distinction the shape already makes at any distance the mark is legible
  * at.
+ *
+ * **The literal moved and the argument did not.** It is now
+ * `game/givermap.GIVER_GOLD`, because the compass and the big map draw the same
+ * `!` in the same gold and neither may import this module -- they are 2D canvas
+ * overlays and this file imports `three/webgpu` -- and because the check that
+ * ties the two together runs in the Bun server's boot list, where there is no
+ * renderer at all. One triple, three readers, and the reasoning stays here
+ * where it was made. See `game/givermap.ts`'s header.
  */
-const FACE_COLOUR = { r: 1, g: 0.82, b: 0.16 };
+const FACE_COLOUR = GIVER_GOLD;
 
 /**
  * And a near-black halo behind it, which is not decoration.

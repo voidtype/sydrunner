@@ -206,6 +206,73 @@
  * density -- for a picture whose content is 30 px blocks and reads perfectly
  * well re-sampled. See `game/phone.MINIMAP_RAISED` for the number and
  * `index.html` for the two rules that consume it.
+ *
+ * ---------------------------------------------------------------------------
+ * AND THEN IT CAME BACK OFF THE PHONE. THE OWNER REVERSED IT, ON 22 AUGUST
+ * 2026, AND THE SECTION ABOVE IS SUPERSEDED RATHER THAN DELETED.
+ *
+ * *"im in syd park, cant see quest giver, show a minimap as i run around and
+ * put him on the minimap with a yellow !"*.
+ *
+ * That sentence is a bug report about the rule the section above argues for.
+ * The player was carrying a bat and a football, which is the default loadout
+ * every session starts in, so there was no disc on the screen -- and the thing
+ * he was looking for was a quest giver, which is exactly what a compass is for.
+ * The loadout argument is not wrong about *loadouts*: giving up a weapon for a
+ * phone is a real trade and a legible one. It is wrong about **maps**. A map
+ * you must swap a weapon to read is a map you do not read, and the register
+ * that landed after it -- a hundred jobs on ten rungs, each given by somebody
+ * standing at a coordinate -- is unusable without one. The trade was priced
+ * before the thing being traded for existed.
+ *
+ * So the disc is on the screen while the player is alive and in the world, full
+ * stop, and the two paragraphs above are kept because the *shape* of their
+ * argument survives: there is still no key that dismisses it, and what the
+ * phone buys is still real. **The phone keeps its privilege and stops being the
+ * price of entry.** Raising it in your right hand still draws the disc at
+ * `MINIMAP_RAISED`, because you are looking *at* the map rather than past it;
+ * everything else is the corner size it has always been. `game/phone.minimapScale`
+ * is where that rule is written and checked, and it is now two states rather
+ * than three -- the 0 is gone, though `setScale(0)` still works and `.mapoff`
+ * is still in `index.html`, because a caller that wants the map off should not
+ * have to invent the mechanism.
+ *
+ * ---------------------------------------------------------------------------
+ * THE FIRST MARKER ON THIS MAP THAT IS A LETTER, AND THE FIRST THAT LIES ABOUT
+ * WHERE IT IS
+ *
+ * The other half of the same instruction -- *"show all quests within 500m on
+ * minimap"* -- breaks two of this file's standing rules on purpose, so both are
+ * argued here rather than at the branch that implements them.
+ *
+ * **It is a glyph and not a dot.** Every other marker here is a filled circle
+ * of two to four pixels, and the whole legend is carried by hue: lime is a
+ * bike, magenta is a rave, amber is an event. A quest giver is drawn as the
+ * `!` itself, in `game/givermap.GIVER_GOLD` -- the same gold, from the same
+ * constant, as the mark floating over his head in the street. That tie is the
+ * entire reason it needs no legend: the thing you are looking for out there is
+ * a yellow exclamation mark, and so is the thing on the map that says where it
+ * is. It also settles the palette problem that would otherwise have sunk this:
+ * the powerups' gold is `rgb(255,184,41)` and this is `rgb(255,209,41)`, which
+ * at 3 px would be one colour with two meanings -- but nothing else on this map
+ * is a *letterform*, so the shape carries the distinction the way it does for
+ * the hollow through-wall dots, and `verifyBigMap` asserts the deliberate ink
+ * collision rather than forbidding it.
+ *
+ * **It is clamped to the rim rather than dropped.** `mark` culls at
+ * `RADIUS_M` and always has; a giver 400 m away is off this map by a factor of
+ * two and a half. The instruction said 500 m, and the honest reading of that on
+ * a 160 m disc is not "make the disc 500 m" -- that would throw away the two-to
+ * -four-blocks-of-context reading `RADIUS_M`'s own header derives -- it is that
+ * a giver beyond the rim is drawn **on** the rim, on his true bearing, as a
+ * direction and a promise rather than a position. A rim mark is drawn smaller,
+ * seated just inside the edge (`game/givermap.RIM_SEAT`, so the glyph is not
+ * cut in half by the element's `border-radius`), and carries a small outward
+ * chevron on the rim itself -- the same wedge the `N` uses, which is already
+ * this map's vocabulary for "this way, off the edge". The chevron is what makes
+ * the lie legible: a mark with one is somewhere out there, a mark without one
+ * is where it is drawn. Nothing else on this map is ever clamped, and the
+ * kinds that may be are a closed list; see `mark`.
  */
 
 import type { CollisionWorld, Prism } from './player/collision.ts';
@@ -218,6 +285,11 @@ import {
 // written. A hex copied into this file would be a second owner of a colour that
 // is also on a body, a nameplate pill and a stylesheet variable.
 import { TEAM, TEAM_COLOUR } from './game/teams.ts';
+// The quest gold, the 500 m reach and the rim arithmetic, from the three-free
+// module that owns all three. Not from `world/questmarkers.ts`, which is where
+// the colour was *argued*: that file imports `three/webgpu` and this one is a
+// 2D canvas overlay. See `game/givermap.ts`'s header.
+import { GIVER_GOLD_CSS, GIVER_RANGE_M, RIM_SEAT, rimFraction } from './game/givermap.ts';
 
 /**
  * Whoever knows which prisms are solid-but-undrawn.
@@ -329,7 +401,46 @@ export type MarkerKind =
    * be a legend entry for a distinction the player does not have to act on.
    */
   | 'enemy-marita'
-  | 'enemy-default';
+  | 'enemy-default'
+  /**
+   * Somebody with a job for you, and somebody waiting to be paid back.
+   *
+   * The eighth and ninth kinds, and the first two on this list that are drawn
+   * as **letters** rather than as dots -- the `!` and the `?`
+   * `world/questmarkers.ts` floats over their heads, in the same gold from the
+   * same constant. See this file's header for the argument, and `markerGlyph`
+   * for the one switch both maps read them out of.
+   *
+   * Two kinds rather than one with a flag, on `fare-pickup`/`fare-dropoff`'s
+   * precedent exactly: the whole job of these two is to be told apart at a
+   * glance, `questmodel.markerFor` has already decided which is which, and a
+   * boolean threaded through `MarkerSink.mark` would be a parameter every
+   * provider in the client pays for to serve one of them.
+   *
+   * Who gets one is not decided here and must not be: `game/givermap.ts` asks
+   * `questmodel.markerFor` with the live facts, which is the same function the
+   * street mark and the dialog panel's greyed-out buttons come out of. A map
+   * that pointed at a job the register would refuse is the failure that whole
+   * arrangement exists to prevent.
+   */
+  | 'giver'
+  | 'giver-turnin'
+  /**
+   * Where the job you are **on** is asking you to go.
+   *
+   * `game/waypoint.activeWaypoint`'s answer -- literally the same `Waypoint`
+   * record the needle at the top of the frame is rotated from, read off
+   * `WaypointBanner.objective` rather than recomputed, so the arrow and the map
+   * cannot disagree about where the objective is. That is not a tidiness
+   * argument: two copies of "which step am I on" that differ by one 4 Hz beat
+   * is a needle and a dot pointing at two different streets, and the player has
+   * no way to tell which one is lying.
+   *
+   * Drawn as a hollow ring rather than a glyph, because it is the one thing in
+   * this group that is a **place** rather than a person -- there is nothing
+   * standing there to put a letter over. Same gold, because it is the same job.
+   */
+  | 'objective';
 
 /**
  * One thing on the map, in world metres.
@@ -354,6 +465,18 @@ export interface Marker {
    * "bin night" is.
    */
   label?: string;
+  /**
+   * Set by `mark` when this marker's real position was outside the disc and it
+   * has been moved onto the rim. `x` and `z` are then the **drawn** point and
+   * not the world one, which is the only place in this file that is true.
+   *
+   * Written by the compass alone. `bigmap.ts` has its own pool and never clamps
+   * -- it is a north-up city map at up to nine kilometres and has nowhere to
+   * clamp *to* -- so a giver is at his real coordinate there and at the rim
+   * here, which is the two maps agreeing about the world and differing about
+   * their own edges.
+   */
+  rim?: boolean;
 }
 
 /**
@@ -527,6 +650,40 @@ const ENEMY_DOT_R = 2.8;
 const HEADING_TICK = 5;
 
 /**
+ * The quest glyph, in pixels of em box, inside the disc and on the rim.
+ *
+ * 12 px is a `!` about nine pixels tall against a 3.5 px combatant dot, and it
+ * has to be: a letter read at a glance needs several times the area a dot
+ * needs to be seen at all, and this is the one marker here whose *identity* is
+ * its shape rather than its hue. Twelve of them on a 206 px disc is still under
+ * 4% of it inked.
+ *
+ * A rim mark is 10, which is the smaller half of the two things that separate
+ * it from a mark inside the disc. It is not smaller *because* it is far away --
+ * this map has no perspective and the marker sizes here are a ranking, not a
+ * distance cue -- it is smaller because it is a claim about a direction rather
+ * than a place, and the honest way to draw a weaker claim is more quietly.
+ */
+const GIVER_GLYPH_PX = 12;
+const GIVER_RIM_GLYPH_PX = 10;
+/** The objective's hollow ring, and the line it is stroked with. */
+const OBJECTIVE_RING_R = 4.5;
+/**
+ * The dark halo behind a glyph, and its width in pixels.
+ *
+ * `world/questmarkers.OUTLINE_COLOUR`'s argument, one dimension down: gold on a
+ * bright ground has no edge, and the ground here is a figure-ground plan whose
+ * buildings are a pale blue-white at 0.30. In the world it is a second copy of
+ * the quads; on a canvas it is a stroke under a fill, which is one extra
+ * rasteriser pass over eleven pixels of letter.
+ */
+const GLYPH_HALO = 'rgba(13,10,5,0.80)';
+const GLYPH_HALO_PX = 2.5;
+/** The rim chevron: how far it reaches and how wide it is, in pixels. */
+const RIM_CHEVRON = 5;
+const RIM_CHEVRON_HALF = 3;
+
+/**
  * What colour a marker is drawn in, for **both** maps.
  *
  * Exported and shared rather than written out twice, on `collect`'s own
@@ -538,6 +695,16 @@ const HEADING_TICK = 5;
  */
 export function markerInk(kind: MarkerKind): string {
   switch (kind) {
+    // The three quest kinds share one ink deliberately, which is the second
+    // place this file's "no two markers are the same colour" rule is broken on
+    // purpose and the first time the thing that separates them is a *shape the
+    // player already knows from the world*. `verifyBigMap` asserts the
+    // collision rather than forbidding it, exactly as it does for the two
+    // hollow enemy dots. See `MarkerKind` and `markerGlyph`.
+    case 'giver':
+    case 'giver-turnin':
+    case 'objective':
+      return GIVER_GOLD_CSS;
     case 'team-marita':
     // WORKSTREAM Z: the hollow through-wall dots take their side's own colour.
     // See `MarkerKind`'s note on why this is the one deliberate ink collision.
@@ -567,6 +734,52 @@ export function markerInk(kind: MarkerKind): string {
     default:
       return COMBATANT_DOT;
   }
+}
+
+/**
+ * The letter a marker is drawn as, or `''` for the dot kinds. **Both** maps.
+ *
+ * `markerInk`'s companion and shared for its reason: the two maps draw one
+ * marker list, and a second copy of this switch is a `!` on the compass that is
+ * a plain dot on the big map -- a legend that changes when you press `M`. A
+ * pure function of the kind, so the checks can assert the whole vocabulary
+ * without a canvas.
+ *
+ * The two glyphs are the ones `world/questmarkers.BANG` and `QUERY` build out
+ * of quads in the world. Here they are text, because a canvas already has a
+ * text rasteriser and eleven pixels of `!` is not worth a polyline.
+ */
+export function markerGlyph(kind: MarkerKind): string {
+  if (kind === 'giver') return '!';
+  if (kind === 'giver-turnin') return '?';
+  return '';
+}
+
+/**
+ * Which kinds are drawn on the rim when they are past it, and how far out that
+ * is allowed to go, in metres. `0` -- every other kind -- is dropped, as they
+ * always were.
+ *
+ * A closed list with two different answers in it, and the difference is the
+ * whole of what a rim mark promises:
+ *
+ *   - A **giver** is an invitation, and it reaches as far as the invitation
+ *     does: `game/givermap.GIVER_RANGE_M`, the owner's 500 m, which is also
+ *     what the source culls at. The bound is repeated here rather than trusted
+ *     from the source because `mark` is a public sink -- a provider that
+ *     handed it a giver in Parramatta would otherwise get a rim mark promising
+ *     something twenty kilometres away, and a promise that far out is a lie.
+ *   - The **objective** has no bound at all, and that is deliberate. The needle
+ *     at the top of the frame points at it from 2.3 km (`game/waypoint.ts`'s
+ *     own worked example is Sydney Park to Redfern), and a disc that dropped
+ *     the mark the needle is pointing at would be the two disagreeing -- which
+ *     is the one thing that feature's whole arrangement is built to prevent.
+ *     You are already on that job; the map should not be coy about it.
+ */
+function rimReachM(kind: MarkerKind): number {
+  if (kind === 'giver' || kind === 'giver-turnin') return GIVER_RANGE_M;
+  if (kind === 'objective') return Infinity;
+  return 0;
 }
 
 /**
@@ -809,12 +1022,13 @@ export class Minimap implements MarkerSink {
    * behind when the map left would sit against the top-right edge looking like a
    * label for the sky.
    *
-   * A hidden map **stops redrawing**, which is the one part of this that is not
-   * purely cosmetic: `update` returns before `draw`, so a player fighting with a
-   * bat and a football pays nothing at all for a map they are not carrying --
-   * no `prismsWithin`, no path build, no fill. That is the answer to the header's
-   * old worry about what a toggle would save. It saves 0.017 ms and the point
-   * was never the microseconds.
+   * A hidden map **stops redrawing**: `update` returns before `draw`, so a scale
+   * of 0 costs no `prismsWithin`, no path build and no fill. Nothing asks for 0
+   * any more -- the owner reversed the phone rule and the disc is on whenever
+   * the player is in the world; see the header -- but the path is kept, because
+   * `setScale` is public and a caller that wants the map gone should not have to
+   * invent the mechanism. It saved 0.017 ms and the point was never the
+   * microseconds.
    */
   setScale(scale: number): void {
     if (scale === this.scaleFactor) return;
@@ -907,11 +1121,39 @@ export class Minimap implements MarkerSink {
    * own header argues at length that it must not carry text. Accepting the
    * argument and ignoring it is what lets one provider feed both maps -- see
    * `Marker.label`.
+   *
+   * **The cull has one exception now**, and it is a closed list of three kinds
+   * rather than a policy: a quest marker past the rim is *moved onto* the rim
+   * on its true bearing instead of being dropped. See the header for why the
+   * answer to "show all quests within 500 m" on a 160 m disc is a rim mark and
+   * not a wider disc, `rimReachM` for how far each kind may be promised from,
+   * and `game/givermap.rimFraction` for the one multiply that does it -- which
+   * lives over there, pure and unit-checked, because a rim mark on a bearing
+   * five degrees out looks exactly like one that is right.
+   *
+   * The clamp is computed here rather than in the provider on purpose. The
+   * provider hands over a **world position**, which is what the big map wants
+   * and what the console reports; the rim is this element's own geometry and
+   * nothing outside it should know the radius. It also means the bearing is
+   * recomputed against the live centre on every redraw at 15 Hz, while the
+   * membership behind it is only re-decided at 4 Hz -- so a rim mark swings
+   * smoothly as you turn and walk, which is the whole of what it is for.
    */
   mark(x: number, z: number, kind: MarkerKind, yaw?: number, label?: string): void {
     const dx = x - this.centreX;
     const dz = z - this.centreZ;
-    if (dx * dx + dz * dz > this.radius2) return;
+    const d2 = dx * dx + dz * dz;
+    let rim = false;
+    if (d2 > this.radius2) {
+      const reach = rimReachM(kind);
+      if (reach <= 0 || d2 > reach * reach) return;
+      rim = true;
+      // Both axes by the same factor, so the drawn point is on the line to the
+      // real one by construction. See `game/givermap.rimFraction`.
+      const f = rimFraction(d2, RADIUS_M, RIM_SEAT);
+      x = this.centreX + dx * f;
+      z = this.centreZ + dz * f;
+    }
     let m = this.pool[this.markerCount];
     if (m === undefined) {
       m = { x: 0, z: 0, kind: 'combatant', yaw: undefined };
@@ -921,6 +1163,10 @@ export class Minimap implements MarkerSink {
     m.z = z;
     m.kind = kind;
     m.yaw = yaw;
+    // Unconditional, on `bigmap.mark`'s own argument about `label`: the pool is
+    // reused across redraws and across providers, and a marker that skipped
+    // this line would inherit the last occupant's chevron.
+    m.rim = rim;
     void label;
     this.markerCount++;
   }
@@ -973,11 +1219,11 @@ export class Minimap implements MarkerSink {
    * this is a picture of the present and there is nothing to catch up on.
    */
   update(dt: number, x: number, z: number, yaw: number): void {
-    // Not on the screen, not drawn. See `setScale`: the map is the phone's now,
-    // and a player carrying a bat and a football is carrying no map -- so this
-    // is the frame loop's cheapest possible answer rather than a redraw nobody
-    // can see. The marker sources are unaffected: `collect` is a separate path
-    // and the big map still reads them.
+    // Not on the screen, not drawn. Unreachable on the shipped rule -- the disc
+    // is always on since the owner reversed the phone gate -- and kept as the
+    // frame loop's cheapest possible answer for any caller that does turn it
+    // off. The marker sources are unaffected either way: `collect` is a separate
+    // path and the big map still reads them.
     if (this.scaleFactor <= 0) return;
     this.clock += dt;
     if (this.clock < REDRAW_DT) return;
@@ -1153,6 +1399,64 @@ export class Minimap implements MarkerSink {
         ctx.strokeStyle = ink;
       }
 
+      /*
+       * --- The quest markers: a letter, not a dot, and sometimes on the rim.
+       *
+       * First in the loop rather than folded into the radius ladder below,
+       * because none of the three is a filled circle and threading them through
+       * a `r`-and-`fill` path would have meant three special cases in four
+       * places instead of one branch in one. It is also the cold path for most
+       * of a session -- a player with no giver inside 500 m pays one string
+       * compare per marker -- so the font set, which is a canvas state change,
+       * happens only on the frames there is something to draw.
+       */
+      const glyph = markerGlyph(m.kind);
+      if (glyph !== '' || m.kind === 'objective') {
+        // `glyphPx` and not `px`: the player's own x is `px` two scopes up, and
+        // a pixel size wearing that name inside a draw loop is a bug waiting.
+        const glyphPx = m.rim === true ? GIVER_RIM_GLYPH_PX : GIVER_GLYPH_PX;
+        if (m.rim === true) {
+          // The chevron, out at the rim proper, pointing the way the mark
+          // really is. The same wedge the `N` is drawn as, which is already
+          // this map's word for "off the edge, that way" -- and the reason a
+          // rim mark cannot be mistaken for one standing in the street.
+          const ux = (sx - half) / (half * RIM_SEAT);
+          const uy = (sy - half) / (half * RIM_SEAT);
+          const tipX = half + ux * (half - 2);
+          const tipY = half + uy * (half - 2);
+          const baseX = half + ux * (half - 2 - RIM_CHEVRON);
+          const baseY = half + uy * (half - 2 - RIM_CHEVRON);
+          ctx.beginPath();
+          ctx.moveTo(tipX, tipY);
+          ctx.lineTo(baseX - uy * RIM_CHEVRON_HALF, baseY + ux * RIM_CHEVRON_HALF);
+          ctx.lineTo(baseX + uy * RIM_CHEVRON_HALF, baseY - ux * RIM_CHEVRON_HALF);
+          ctx.closePath();
+          ctx.fill();
+        }
+        if (glyph === '') {
+          // The objective: a hollow ring, because it is a place and there is
+          // nobody standing there to put a letter over.
+          ctx.beginPath();
+          ctx.arc(sx, sy, m.rim === true ? OBJECTIVE_RING_R - 1 : OBJECTIVE_RING_R, 0, TAU);
+          ctx.stroke();
+        } else {
+          ctx.font = `bold ${glyphPx}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          // Halo under fill, in one pair of calls: the stroke is the dark
+          // margin `world/questmarkers.OUTLINE_COLOUR` argues for and the fill
+          // is the gold. `lineWidth` and `strokeStyle` are put back, because
+          // the next marker's heading tick reads both.
+          ctx.lineWidth = GLYPH_HALO_PX;
+          ctx.strokeStyle = GLYPH_HALO;
+          ctx.strokeText(glyph, sx, sy);
+          ctx.fillText(glyph, sx, sy);
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = ink;
+        }
+        continue;
+      }
+
       // A teamed player is a combatant with a hue, so they take the combatant's
       // radius: the ranking this file sets out -- somebody who can hit you is the
       // biggest dot -- is about what a marker *is*, not about which side it is on.
@@ -1259,7 +1563,7 @@ export class Minimap implements MarkerSink {
    */
   stats(): {
     visible: boolean;
-    /** 0 off, 1 in the corner, `MINIMAP_RAISED` with the phone up. */
+    /** 1 in the corner, `MINIMAP_RAISED` with the phone up. 0 is off and nothing asks for it. */
     scale: number;
     mapKey: string;
     readout: string;
@@ -1292,13 +1596,14 @@ export class Minimap implements MarkerSink {
     const sorted = Array.from(this.timings.subarray(0, n)).sort((a, b) => a - b);
     const round = (v: number): number => Math.round(v * 1000) / 1000;
     return {
-      // Whether the phone is in a hand, which is the whole of what decides it
-      // now. Reported rather than assumed because a compass that is off looks
-      // exactly like a compass that is broken, and this is the one field that
-      // tells the two apart from a console. See `setScale`.
+      // Reported rather than assumed because a compass that is off looks exactly
+      // like a compass that is broken, and this is the one field that tells the
+      // two apart from a console. It should now read `true` in every session
+      // from the first frame -- see `setScale` -- so a `false` here is a bug
+      // report rather than a loadout.
       visible: this.shown,
       scale: this.scaleFactor,
-      mapKey: 'M equips the phone and opens its map; the compass follows the phone',
+      mapKey: 'M toggles the big map; the compass is always on, and larger with the phone raised',
       // The last line handed to the strip. Reported here as well as in
       // `locator.stats()` because this is the end of the pipe: a readout that
       // is right in the locator and blank on screen is a missing `#locator`

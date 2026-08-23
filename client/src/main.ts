@@ -268,6 +268,9 @@ import { GiverBodyField, verifyGiverBodyField, type GiverBodySource } from './wo
 // light in this game that a content file asks for. See `game/waypoint.ts` and
 // `world/giverlamp.ts` -- both are argued at length in their own headers.
 import { verifyWaypoint } from './game/waypoint.ts';
+// The givers on the map: pure, three-free, and in the server's boot list as
+// well as this one. See `game/givermap.ts`.
+import { GiverDots, verifyGiverMap } from './game/givermap.ts';
 import { WaypointBanner, type WaypointSource } from './waypoint.ts';
 import { GiverLampField, lampsOver, verifyGiverLamps } from './world/giverlamp.ts';
 import { BuildSheet, verifyBuildSheet } from './buildsheet.ts';
@@ -4582,6 +4585,11 @@ async function main(): Promise<void> {
     // only run here, because it needs the city's own street-lamp assets.
     ...verifyWaypoint(),
     ...verifyGiverLamps(streamer.streetLamps),
+    // And the map half of the same register. Pure, so it runs here and in
+    // `server/index.ts` -- the failures it catches are a gold `!` over a job
+    // the register would refuse and a rim marker on the wrong bearing, and
+    // neither has a screenshot that says so. See `game/givermap.ts`.
+    ...verifyGiverMap(),
   ];
   if (dialogFailures.length > 0) {
     hud.fatal('Quest content self-checks failed:\n' + dialogFailures.map((f) => '  - ' + f).join('\n'));
@@ -4743,9 +4751,29 @@ async function main(): Promise<void> {
     pose: () => ({ x: player.position.x, z: player.position.z, yaw: player.yaw }),
   };
   const waypoint = new WaypointBanner(waypointSource);
+  /**
+   * And the map half: who has a job for you, out to 500 m, on both maps.
+   *
+   * A **fourth** reader of `questMarkerSource`, which is why that object was
+   * hoisted: the mark over his head, the body under it, the lamp behind him and
+   * the dot on the map are one register seen from four places, and any two of
+   * them disagreeing would be two copies of the rule. `game/givermap.ts` asks
+   * `questmodel.markerFor` exactly as the field above does -- it has no opinion
+   * of its own about rungs, factions, flags or the `anyRung` exemption -- so the
+   * map can never point at a job that would be refused at the door.
+   *
+   * Refreshed on `questMarkers.beats`, which is literally the marks' own 4 Hz
+   * decision clock rather than a second one beside it. See its header.
+   */
+  const giverDots = new GiverDots();
   /** One line in the render loop, beside the plates. See `nameplates.end()`. */
   const updateQuestMarkers = (dt: number): void => {
     questMarkers.update(dt, camera, questMarkerSource);
+    // **After** the marks, on the beat they just took. The player's feet rather
+    // than the camera, as the bodies below use, because this is a map: the disc
+    // is centred on where the player is standing and the dots are chosen by
+    // distance from that same point.
+    giverDots.refresh(questMarkers.beats, player.position.x, player.position.z, questMarkerSource);
     // **After** the marks, so the body field sees the beat the marks have just
     // taken rather than the previous one. See `GiverBodyField`'s header on the
     // one beat of settle that costs.
@@ -6102,6 +6130,50 @@ async function main(): Promise<void> {
       const dz = r.position.z - player.position.z;
       if (dx * dx + dz * dz > range2) continue;
       sink.mark(r.position.x, r.position.z, kind);
+    }
+  });
+
+  /**
+   * The quest register, as the owner asked for it: *"show all quests within
+   * 500m on minimap"*, with a yellow `!` over each one.
+   *
+   * Three marks go on out of two sources that already exist, and the point of
+   * this being **one** registration is that all three are the same register seen
+   * from different ends:
+   *
+   *   - a `!` over every giver `game/givermap.ts` says you could take a job from
+   *     right now;
+   *   - a `?` over the ones holding a job you have finished, which
+   *     `questmodel.markerFor` decided for free on the same sweep;
+   *   - a ring where the job you are already **on** is sending you.
+   *
+   * The ring comes off `WaypointBanner.objective`, which is the *same record*
+   * the needle at the top of the frame is rotated from rather than a second
+   * `activeWaypoint` call. Two callers would agree almost always and differ for
+   * the quarter-second between two 4 Hz beats -- including the beat a step
+   * completes, which is the moment a player is looking hardest at both. See
+   * that getter's note.
+   *
+   * No range test here and no cull: `game/givermap.ts` culls at its own 500 m
+   * whatever radius it is handed -- deliberately, so the big map at nine
+   * kilometres shows the dozen givers near you rather than the content pool,
+   * which is the same refusal the events source two blocks up writes out -- and
+   * the compass's sink is what puts anything past its rim *on* the rim. The
+   * objective is exempt from the 500 m rule for the reason `minimap.rimReachM`
+   * gives: the needle points at it from 2.3 km and the map must not disagree
+   * with the needle.
+   *
+   * The **label** is only read by the big map; the compass drops it. A giver's
+   * name beside his `!` is what turns "somebody in Redfern" into "Denise".
+   */
+  minimap.addMarkerSource((sink) => {
+    for (let i = 0; i < giverDots.count; i++) {
+      const g = giverDots.at(i);
+      sink.mark(g.x, g.z, g.turnin ? 'giver-turnin' : 'giver', undefined, g.name);
+    }
+    const objective = waypoint.objective;
+    if (objective !== null && objective.x !== null && objective.z !== null) {
+      sink.mark(objective.x, objective.z, 'objective', undefined, objective.text);
     }
   });
 
@@ -12271,14 +12343,30 @@ async function main(): Promise<void> {
      * five times the footprints Alexandria does inside the same 160 m.
      *
      * `addMarkerSource(fn)` is where a remote player list goes when there is
-     * one; see `minimap.ts`. It has no `toggle`: what decides whether this disc
-     * is on the screen is **whether the phone is in one of your hands**, which
-     * is `setScale` and is pushed every frame from `money.frame`. So
-     * `stats().visible` and `stats().scale` are the two fields to read when the
-     * compass is not where it used to be -- and `sydney.money.equip(2)` is how
-     * to put it back from a console.
+     * one; see `minimap.ts`. It has no `toggle`, and since the owner reversed
+     * the phone rule it has no loadout gate either: the disc is on whenever the
+     * player is in the world, and the phone only makes it bigger. So a
+     * `stats().visible` of `false` is now a bug rather than a hand full of bat,
+     * and `stats().scale` says which of the two sizes is up.
      */
     minimap,
+
+    /**
+     * Who is on the map with a job for you. `game/givermap.ts`.
+     *
+     * `giverDots.stats()` is the field to read when a giver the player can see
+     * in the street has no `!` on the map, or the reverse. It reports `found`
+     * (givers inside 500 m that the register would let you take right now) and
+     * `shown` against the cap of twelve, so "the map is missing one" and "the
+     * map is showing all seven of them" are distinguishable without guessing --
+     * which they are not from the disc itself.
+     *
+     * A `found` of 0 with a giver visibly standing in front of you is the
+     * register refusing the job, and `sydney.quests` is where to ask why: the
+     * dot and the greyed-out button in the panel come out of one
+     * `questmodel.markerFor` call and cannot disagree.
+     */
+    giverDots,
 
     /**
      * The city map on `M`.

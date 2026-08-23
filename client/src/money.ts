@@ -16,10 +16,11 @@
  *   - the phone -- the handset in your hand, the viewmodel in front of your
  *     eye, and the overlay it opens;
   *   - **both maps**: the big one is the phone's Map app and is also `M`, which
-  *     toggles it directly, and the compass is on the screen only while the phone
-  *     is in a hand. `M` used to equip the phone; the owner reversed that -- the
-  *     map is a glance, not a loadout change. See `game/phone.ts`, which is where
-  *     those rules are written and checked;
+  *     toggles it directly, and the compass is always on the screen -- larger
+  *     while the phone is raised in your right hand. Both of those are the owner
+  *     reversing an earlier rule: `M` used to equip the phone, and the compass
+  *     used to require one in a hand. The map is a glance, not a loadout change.
+  *     See `game/phone.ts`, which is where those rules are written and checked;
  *   - **the camera**: the viewfinder, the shutter, and the album on the phone;
  *   - the cash bundles lying in the street, drawn from the wallet frame;
  *   - the Centrelink prompt and the `E` that claims;
@@ -449,15 +450,16 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
   // teleports every pile after the collected one. See `CashNotePiles`.
   const piles = new CashNotePiles(deps.scene);
 
-  // --- And the compass, put where the starting loadout says before a frame is
-  // drawn.
+  // --- And the compass, put at its corner size before a frame is drawn.
   //
   // `frame` pushes this every frame anyway, so this call is only about the gap
-  // between construction and the first one: `Minimap` starts laid out (it has to
-  // be, or its constructor measures a `display: none` element and sizes the
-  // bitmap wrong -- see the field comment on `scaleFactor`), so without this
-  // there is exactly one composited frame with a map on it that the default
-  // bat/footy loadout should not have.
+  // between construction and the first one. It used to matter a great deal --
+  // the default bat/footy loadout had no map, so without this there was exactly
+  // one composited frame showing one -- and now it agrees with where `Minimap`
+  // starts, which is laid out at scale 1. Kept because the agreement is a
+  // coincidence of two defaults rather than a contract, and because the day
+  // somebody gives the compass a third state this is the line that would have
+  // been missing.
   deps.setMinimapScale(minimapScale(hands, false));
 
   // --- The markers, on one source that both maps read. See `Minimap.collect`.
@@ -543,13 +545,14 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
     // write when there is no phone out, which is most frames of most sessions.
     if (prop !== null || raised) phoneAssets.refreshScreen();
 
-    // 3b. And the compass, which is a thing on the phone now.
+    // 3b. And the compass, which is always up and is only *sized* here.
     //
     // The same pair the viewmodel's raise is gated on -- primary and first
     // person -- so the disc grows on exactly the frames the handset comes up in
-    // front of the eye. `Minimap.setScale` is a class toggle and a boolean
-    // compare when nothing has changed, which is every frame but the two a
-    // number key produces. See `game/phone.minimapScale`.
+    // front of the eye, and sits in the corner every other frame of the session.
+    // `Minimap.setScale` is a class toggle and a boolean compare when nothing
+    // has changed, which is every frame but the two a raise produces. See
+    // `game/phone.minimapScale`.
     deps.setMinimapScale(minimapScale(hands, raised));
 
     // 4. The Centrelink prompt, and the fare line, sharing one pill.

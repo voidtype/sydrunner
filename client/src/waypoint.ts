@@ -99,6 +99,26 @@ export class WaypointBanner {
   }
 
   /**
+   * The live objective, for anything else that has to point at the same place.
+   *
+   * The **record itself** rather than a copy of its coordinates, and that is
+   * the whole point of the getter existing: `main.ts` puts a marker on both
+   * maps for the step the player is on, and the one way that marker and this
+   * needle can be guaranteed to agree is for there to be one `activeWaypoint`
+   * call in the client and one answer. Two callers of that function would agree
+   * almost always -- they would drift for the quarter-second between two 4 Hz
+   * beats, and on exactly the beat the cursor advances, which is the moment a
+   * player is looking hardest.
+   *
+   * Null is "nothing to point at", and a record whose `x` is null is a step
+   * with nowhere to point -- a `ko`, a `buy` -- which keeps the banner and
+   * loses both the needle and the dot. See `game/waypoint.activeWaypoint`.
+   */
+  get objective(): Waypoint | null {
+    return this.current;
+  }
+
+  /**
    * One frame.
    *
    * The decision on the beat, the needle always. `dt` is the frame delta and is
