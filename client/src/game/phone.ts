@@ -85,6 +85,40 @@
  * shapes are 30 px blocks.
  *
  * ---------------------------------------------------------------------------
+ * AND THE FIRST OF THOSE THREE STATES IS GONE. THE OWNER REVERSED IT, 22 AUGUST
+ * 2026, AND THE SECTION ABOVE IS SUPERSEDED RATHER THAN DELETED.
+ *
+ * *"im in syd park, cant see quest giver, show a minimap as i run around and
+ * put him on the minimap with a yellow !"*
+ *
+ * That is a bug report about the **no phone** state above. He was in the
+ * default loadout -- bat and football, which is what every session starts in
+ * and what the slots' own header calls a requirement rather than a nicety -- so
+ * there was no disc at all, and the thing he could not find was a quest giver.
+ *
+ * The trade the section above describes is real and it is legible: a phone in a
+ * hand costs you a weapon. What it got wrong is the **price**. It was set
+ * before the register existed, when a map was a convenience for finding your
+ * way to a fight; there are now a hundred jobs on ten rungs, each handed out by
+ * somebody standing at a coordinate, and the one interface that says where any
+ * of them are is the thing the loadout was switching off. A map you must swap a
+ * weapon to read is a map you do not read.
+ *
+ * So there are **two** states and `minimapScale` is both:
+ *
+ *   - **alive and in the world** -- the disc in the corner at `MINIMAP_CORNER`,
+ *     whatever is in your hands, with the locator strip under it. This is now
+ *     every frame of every session that is not the one below.
+ *   - **phone raised in your right hand** -- the disc drawn larger, unchanged,
+ *     because you are *looking at* the phone rather than glancing past it.
+ *
+ * The phone therefore keeps its privilege and stops being the price of entry,
+ * which is the smallest change that answers the report without throwing away
+ * the one part of the old rule that was earning its keep. `minimapVisible`
+ * still exists, still takes the hands, and now answers `true` -- see its own
+ * note for why it was not deleted -- and what it used to mean is `phoneInHand`.
+ *
+ * ---------------------------------------------------------------------------
  * `M` IS STILL A KEY, AND THE OWNER REVERSED WHAT IT DID
  *
  * A binding that simply stopped working would be the worst version of "maps are
@@ -182,9 +216,26 @@ export const MINIMAP_CORNER = 1;
  */
 export const MINIMAP_RAISED = 1.55;
 
-/** Is the phone in either hand? Then there is a map on the screen. */
+/**
+ * Is the compass on the screen? **Yes.**
+ *
+ * It used to read the hands, and the section above says why at length. The
+ * owner reversed it -- *"im in syd park, cant see quest giver, show a minimap
+ * as i run around"* -- and that sentence is a bug report about this function:
+ * he was in the default bat/footy loadout, which is what every session starts
+ * in, so there was no disc, and the thing he was hunting for was a quest giver.
+ * A map you have to swap a weapon to read is a map you do not read.
+ *
+ * The `hands` argument is kept rather than removed, and that is deliberate on
+ * two counts. It is the one line in this file where the reversal is legible --
+ * a reader who came looking for the loadout rule finds it answered here rather
+ * than finding the function gone -- and every caller and every case in
+ * `verifyPhoneModel` still names the four hand states, so the contract is
+ * asserted in all four rather than quietly deleted down to one.
+ */
 export function minimapVisible(hands: Hands): boolean {
-  return hands.primary === SLOT.PHONE || hands.secondary === SLOT.PHONE;
+  void hands;
+  return true;
 }
 
 /**
@@ -204,6 +255,20 @@ export function minimapVisible(hands: Hands): boolean {
 export function minimapScale(hands: Hands, raised: boolean): number {
   if (!minimapVisible(hands)) return 0;
   return raised && hands.primary === SLOT.PHONE ? MINIMAP_RAISED : MINIMAP_CORNER;
+}
+
+/**
+ * Is the phone actually in one of the two hands?
+ *
+ * What `minimapVisible` used to mean, kept under an honest name because the
+ * question is still a real one -- the handset's prop, its screen texture and
+ * its apps all turn on it -- and because a function called `minimapVisible`
+ * that answers "is the phone out" is how the next pass gets this wrong again.
+ * Nothing in the compass reads it; it is here so that the thing the reversal
+ * took away from `minimapVisible` still exists somewhere with the right name.
+ */
+export function phoneInHand(hands: Hands): boolean {
+  return hands.primary === SLOT.PHONE || hands.secondary === SLOT.PHONE;
 }
 
  // --- The `M` key ------------------------------------------------------------------
@@ -625,21 +690,43 @@ export function verifyPhoneModel(): string[] {
     if (SLOT_NAME.length !== 4) failures.push(`${SLOT_NAME.length} slot names against four slots.`);
   }
 
-  // --- The map is on the phone: three states, and the negative one first
-  // because it is the whole feature.
+  /*
+   * --- The map is always on, and the phone only makes it bigger.
+   *
+   * **All four hand states**, and the first of them is the case the owner
+   * reversed: it used to assert that a bat/footy loadout had no map, and it now
+   * asserts the opposite. Kept as a case rather than deleted, because the
+   * failure it now guards is a regression to the old rule -- somebody reading
+   * `minimapVisible` and "helpfully" restoring the hands test -- and that is a
+   * change nothing else in this repo would notice: the map simply stops being
+   * there for a player who is not carrying a phone, which is how this feature
+   * was found in the first place.
+   */
   {
-    const fighting = defaultHands();
-    if (minimapVisible(fighting)) failures.push('The compass is on the screen with a bat and a football in hand.');
-    if (minimapScale(fighting, true) !== 0) {
-      failures.push(`A bat/footy loadout asked for scale ${minimapScale(fighting, true)}; there is no phone.`);
+    const states: Array<[string, Hands]> = [
+      ['a bat and a football', defaultHands()],
+      ['empty hands', { primary: SLOT.FISTS, secondary: SLOT.FISTS }],
+      ['a phone in the off hand', { primary: SLOT.BAT, secondary: SLOT.PHONE }],
+      ['a phone in the right hand', { primary: SLOT.PHONE, secondary: SLOT.FOOTY }],
+    ];
+    for (const [what, hands] of states) {
+      if (!minimapVisible(hands)) failures.push(`The compass is off the screen with ${what}; it is on whenever the player is in the world.`);
+      if (minimapScale(hands, false) !== MINIMAP_CORNER) {
+        failures.push(`With ${what} and the phone down, the compass drew at ${minimapScale(hands, false)} rather than its corner size.`);
+      }
     }
 
+    // The raise, which is the one thing left that the hands decide. It needs
+    // the phone in the **right** hand: an off-hand phone is a thing you are
+    // holding, not a thing you are reading.
+    const fighting = defaultHands();
+    if (minimapScale(fighting, true) !== MINIMAP_CORNER) {
+      failures.push(`A bat/footy loadout drew the raised map at ${minimapScale(fighting, true)}; there is no phone in front of the eye.`);
+    }
     const offHand: Hands = { primary: SLOT.BAT, secondary: SLOT.PHONE };
-    if (!minimapVisible(offHand)) failures.push('A phone in the off hand did not put the compass on the screen.');
     if (minimapScale(offHand, false) !== MINIMAP_CORNER || minimapScale(offHand, true) !== MINIMAP_CORNER) {
       failures.push('An off-hand phone drew the compass at something other than its corner size.');
     }
-
     const raised: Hands = { primary: SLOT.PHONE, secondary: SLOT.FOOTY };
     if (minimapScale(raised, false) !== MINIMAP_CORNER) {
       failures.push('A primary phone in third person drew the raised map; there is nothing in front of the eye.');
@@ -651,6 +738,10 @@ export function verifyPhoneModel(): string[] {
     if (MINIMAP_RAISED <= MINIMAP_CORNER || MINIMAP_RAISED > 1.7) {
       failures.push(`The raised scale is ${MINIMAP_RAISED}; it must be over ${MINIMAP_CORNER} and under 1.7.`);
     }
+    // `phoneInHand` is what `minimapVisible` used to mean, and it is checked so
+    // that the meaning survives somewhere with the right name on it.
+    if (phoneInHand(defaultHands())) failures.push('A bat and a football counted as a phone in hand.');
+    if (!phoneInHand(offHand) || !phoneInHand(raised)) failures.push('A phone in a hand did not read as a phone in hand.');
   }
 
   // --- `M` is now the map itself, and it touches no hand.

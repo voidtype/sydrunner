@@ -250,19 +250,21 @@
          from under the heavier rim. Listed inner-first because the first layer
          in a `box-shadow` list is the one painted on top, so the ring stays
          crisp against the soft shadow rather than the other way round. */
-      /* THE DISC IS ON THE PHONE NOW, which is two classes and one number.
+      /* THE DISC WAS ON THE PHONE AND IS NOT ANY MORE, which leaves one class
+         doing the work and one kept for a caller that no longer exists.
 
-         `minimap.ts`'s header carries the whole argument; the short version is
-         that the compass is a map, maps live on the phone, and what decides
-         whether this element is on the screen is whether the player is carrying
-         one. `Minimap.setScale` toggles these; nothing else may.
+         `minimap.ts`'s header carries both halves of that. The short version is
+         that the compass is a map, maps went onto the phone, and then the owner
+         found he could not see a quest giver from Sydney Park with a bat in his
+         hands -- so the disc is on whenever the player is in the world and the
+         phone only makes it bigger. `Minimap.setScale` toggles these; nothing
+         else may.
 
          `.mapoff` is `display: none` rather than `visibility: hidden`, because a
-         hidden element is still laid out and still composited and this one is
-         off for whole fights at a time. The class is applied from the first
-         frame and never before -- the element is measured in `Minimap`'s
-         constructor and a `display: none` element measures zero, which would put
-         the bitmap on its 206 px fallback for the session.
+         hidden element is still laid out and still composited. Nothing asks for
+         it now -- `game/phone.minimapScale` never returns 0 -- and the rule is
+         kept because `setScale(0)` is still a working call and a stylesheet that
+         had quietly dropped the class would make it silently do nothing.
 
          `.raised` is `game/phone.MINIMAP_RAISED`, which is 1.55, and it appears
          **twice more in this file** -- here, and as the locator's compensating
@@ -2456,12 +2458,16 @@
         <div><kbd>right click</kbd>use what is in your off hand</div>
         <div><kbd>3</kbd>then <kbd>left click</kbd>opens the phone — the world keeps moving</div>
         <div>the phone has your wallet, Centrelink, SydRide, the map and a camera</div>
-        <!-- The compass moved onto the phone with everything else, and this is
-             the only place that says so. It is a loadout consequence rather than
-             a binding, which is exactly why it needs writing down: a player who
-             picks up a bat and a football and finds the map gone has no way to
-             discover that their hands did it. See `client/src/minimap.ts`. -->
-        <div>the corner map is on while the phone is in a hand — bigger when it is raised</div>
+        <!-- The compass moved onto the phone and then came back off it: the
+             owner reversed the loadout rule the day he could not find a quest
+             giver from Sydney Park with a bat in his hands. What is left worth
+             writing down is the raise, which is a consequence of holding the
+             phone in your *right* hand rather than a binding, and the givers,
+             because a gold `!` on the map that nobody told you about is a
+             feature you find by accident. See `client/src/minimap.ts` and
+             `client/src/game/givermap.ts`. -->
+        <div>the corner map is always up — bigger while the phone is raised in your right hand</div>
+        <div>gold <kbd>!</kbd>on both maps is a job going within 500 m — <kbd>?</kbd>is one to hand in</div>
         <div><kbd>m</kbd>toggles the map — without touching your hands</div>
         <div>camera: <kbd>left click</kbd>shoots · the gallery keeps 12 · save, or send one to the bug box</div>
         <div><kbd>e</kbd>claim $100 at a Centrelink, once a week per office</div>

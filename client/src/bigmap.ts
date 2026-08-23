@@ -101,8 +101,12 @@
  */
 
 import type { CollisionWorld, Prism } from './player/collision.ts';
-import { markerInk } from './minimap.ts';
+import { markerGlyph, markerInk } from './minimap.ts';
 import type { HazardSource, MarkerKind, MarkerSink } from './minimap.ts';
+// The one place the quest gold is written. See `game/givermap.ts`'s header for
+// why the literal is in a three-free module and the argument for it is in
+// `world/questmarkers.ts`.
+import { GIVER_GOLD_CSS } from './game/givermap.ts';
 import {
   HAZARD_FILL,
   HAZARD_INK,
@@ -362,6 +366,15 @@ const LABEL_PAD = 2;
 const PLAYER_R = 5.5;
 const CONE_PX = 34;
 const DOT_R = 3;
+/**
+ * The quest glyph, in pixels. See `minimap.GIVER_GLYPH_PX` for the argument.
+ *
+ * A pixel smaller than the compass's twelve, because this map draws its markers
+ * over lettered streets and suburb names -- the glyph has to clear the text it
+ * sits among rather than a wordless figure-ground plan, and it has the whole
+ * city's worth of room to be found in rather than a 206 px disc.
+ */
+const QUEST_GLYPH_PX = 11;
 /**
  * The bikes, per zoom, indexed by `ZOOMS`.
  *
@@ -1441,10 +1454,47 @@ export class BigMap implements MarkerSink {
       // dot that changes meaning when you press `M` is a legend that changes.
       const sensed = d.kind === 'enemy-marita' || d.kind === 'enemy-default';
       const r = d.kind === 'bike' ? bikeR : DOT_R;
+      /*
+       * The quest kinds are letters rather than dots, on this file's standing
+       * rule that the two maps must draw one marker list the same way -- the
+       * shape is read out of `minimap.markerGlyph`, which is the same shared
+       * switch `markerInk` is, so a `!` on the compass cannot be a plain dot
+       * here. A dot that changes meaning when you press `M` is a legend that
+       * changes; see `markerInk`'s own header.
+       *
+       * Never clamped here, and there is nowhere to clamp to: this is a
+       * north-up city map up to nine kilometres across, so a giver is at his
+       * real coordinate or out of the view box. The rim mark is the compass's
+       * answer to its own 160 m edge. See `minimap.Marker.rim`.
+       */
+      const glyph = markerGlyph(d.kind);
+      if (glyph !== '') {
+        const saveFont = ctx.font;
+        const saveAlign = ctx.textAlign;
+        const saveBaseline = ctx.textBaseline;
+        ctx.font = `bold ${QUEST_GLYPH_PX}px ${MONO}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.lineWidth = HALO_PX;
+        ctx.strokeStyle = HALO;
+        ctx.strokeText(glyph, sx, sy);
+        ctx.fillText(glyph, sx, sy);
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = markerInk(d.kind);
+        ctx.font = saveFont;
+        ctx.textAlign = saveAlign;
+        ctx.textBaseline = saveBaseline;
+      } else if (d.kind === 'objective') {
+        // A place rather than a person: a hollow ring, as on the compass.
+        ctx.beginPath();
+        ctx.arc(sx, sy, DOT_R + 1.5, 0, TAU);
+        ctx.stroke();
+      } else {
       ctx.beginPath();
       ctx.arc(sx, sy, r, 0, TAU);
       if (sensed) ctx.stroke();
       else ctx.fill();
+      }
       // The RBT's white ring. See `minimap.RBT_RING`; the stroke goes back so
       // the next marker's heading tick is drawn in its own colour.
       if (d.kind === 'rbt') {
@@ -1705,6 +1755,13 @@ export function verifyBigMap(): string[] {
       // rather than catch a bug. What they get instead is the assertion below,
       // which is the *positive* form of the same claim: they must match.
       'rbt',
+      // The three quest kinds are **not** in this list, and that is the second
+      // deliberate exception. They share one gold on purpose -- the colour
+      // answers "this is quest business" and the *glyph* answers which, which
+      // is the same split the hollow enemy dots make between hue and shape --
+      // and they share it with the mark floating over the giver's head in the
+      // street, which is the entire reason either needs a legend. The positive
+      // assertions below are the checked form of that claim.
     ];
     const seen = new Map<string, MarkerKind>();
     for (const kind of kinds) {
@@ -1720,6 +1777,32 @@ export function verifyBigMap(): string[] {
     }
     if (markerInk('enemy-default') !== markerInk('team-default')) {
       failures.push('A sensed DeFAULT is not drawn in the DeFAULT colour.');
+    }
+    /*
+     * --- The quest gold, tied to the mark over the giver's head.
+     *
+     * `game/givermap.GIVER_GOLD_CSS` is the one place the colour is written and
+     * `world/questmarkers.ts` builds its material from the same triple, so this
+     * asserts the *tie* rather than the value -- the value is
+     * `verifyGiverMap`'s, which runs on the server too. What would break here
+     * is somebody adding a branch to `markerInk` with a hex in it, at which
+     * point the dot on the map stops being the colour of the thing it points
+     * at and no screenshot says so.
+     */
+    for (const kind of ['giver', 'giver-turnin', 'objective'] as MarkerKind[]) {
+      if (markerInk(kind) !== GIVER_GOLD_CSS) {
+        failures.push(`Marker '${kind}' is drawn in ${markerInk(kind)} rather than the giver gold ${GIVER_GOLD_CSS} the mark over his head uses.`);
+      }
+    }
+    // And the glyphs, which are what the shared ink leaves to carry the
+    // distinction. The `!` and the `?` are the pair WoW taught everybody; the
+    // objective has none, because it is a place and there is nobody standing
+    // there to put a letter over.
+    if (markerGlyph('giver') !== '!') failures.push(`A quest giver is drawn as '${markerGlyph('giver')}', not the yellow ! the owner asked for.`);
+    if (markerGlyph('giver-turnin') !== '?') failures.push(`A turn-in is drawn as '${markerGlyph('giver-turnin')}', not a ?.`);
+    if (markerGlyph('objective') !== '') failures.push('The objective grew a letter; it is a ring, because it is a place.');
+    for (const kind of ['combatant', 'bike', 'rave', 'centrelink', 'rbt'] as MarkerKind[]) {
+      if (markerGlyph(kind) !== '') failures.push(`Marker '${kind}' is drawn as a letter; only the quest kinds are.`);
     }
     // And the RBT is a blue, which is what ties it to the light bar. Parsed
     // rather than string-compared, on the bike's own argument below.

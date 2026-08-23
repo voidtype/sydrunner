@@ -263,6 +263,7 @@ import { verifyDialog, verifyQuests } from '../client/src/game/questmodel.ts';
 // broken. Nothing here runs in the simulation -- a giver is not an actor.
 import { verifyGiverBodies } from '../client/src/game/giverbodies.ts';
 import { verifyWaypoint } from '../client/src/game/waypoint.ts';
+import { verifyGiverMap } from '../client/src/game/givermap.ts';
 import { decodeQuest, verifyQuestWire } from '../client/src/net/quests.ts';
 import { ContentStore, ImprovCache, QuestEngine, contentResponse, type QuestWorld } from './quests.ts';
 import { TEAM } from '../client/src/game/teams.ts';
@@ -720,6 +721,26 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
      * the opposite side of Sydney, which looks exactly like a needle.
      */
     ['verifyWaypoint', verifyWaypoint()],
+    /*
+     * --- The same register, seen from the map, and this process owns the facts
+     * it reads.
+     *
+     * `game/givermap.ts` decides which givers get a yellow `!` on the compass
+     * and the big map, and it decides it by asking `questmodel.markerFor` with
+     * the player's level, faction and story flags -- which are
+     * `AccountRecord`'s, which are this file's. So the failure it guards is the
+     * client advertising a job **this** process would refuse: a mark on the map,
+     * a walk across Redfern, and a conversation with every button greyed out.
+     * That is exactly the shape of bug the register's one-rule-three-readers
+     * arrangement exists to prevent, and the process that would say no is the
+     * right one to refuse to start over it.
+     *
+     * The rim clamp is the other half and is checked here for `verifyWaypoint`'s
+     * reason one block up: a marker pushed onto the disc's edge five degrees off
+     * its true bearing looks precisely like one that is right, and the only way
+     * to find it by eye is to walk down the wrong street.
+     */
+    ['verifyGiverMap', verifyGiverMap()],
     // WORKSTREAM N (carry): the sentence a restored session is visible as. Run
     // here as well as in the browser for `verifyLevelHud`'s reason one line up
     // -- this process decides *whether* a join was a restore and puts the bit on
