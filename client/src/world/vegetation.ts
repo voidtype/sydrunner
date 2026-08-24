@@ -323,6 +323,18 @@ const NOMINAL: Record<number, [number, number]> = {
   [PAPERBARK]: [11.0, 2.6],
   [BRUSH_BOX]: [12.5, 4.0],
   [EUCALYPT]: [16.0, 5.5],
+  // Shipped without these two on 2026-08-24 and every tile carrying either one
+  // threw `undefined is not iterable` out of the destructure below, which in a
+  // bushland world is most of them: nothing rendered. The table is the
+  // midpoint of `pipeline/sydney/vegetation.SPECIES_SIZE` -- `(h_lo + h_hi) / 2`
+  // and `(s_lo + s_hi) / 4` -- re-derived there as `nominal_size`, and the two
+  // sides had drifted because adding a species touches four tables in two
+  // languages and only three of them were checked. `verifyVegetation` now
+  // checks this one; see the case named for it.
+  [SHRUB]: [1.8, 1.1],
+  // Identical to EUCALYPT on purpose: a bush tree is a eucalypt with a tenth of
+  // the triangles, so a different nominal would scale it to a different plant.
+  [BUSH_TREE]: [16.0, 5.5],
 };
 
 /** Unit icosahedron: 12 vertices, 20 faces. One lobe, before displacement. */
@@ -924,6 +936,21 @@ export const PIPELINE_TRIANGLES = [162, 72, 88, 64, 72, 100, 24, 14] as const;
 /** The client half of `verifyCanopy`. Needs `three`, so it cannot live in `cover.ts`. */
 export function verifyVegetationCost(assets: VegetationAssets): string[] {
   const out: string[] = [];
+  // **Every species needs a row in every per-species table**, and this is the
+  // check that did not exist on 2026-08-24 when `NOMINAL` was left at six rows
+  // against a `SPECIES_COUNT` of eight. `instances` destructures `NOMINAL[s]`,
+  // so the failure was not a wrong size, it was `undefined is not iterable`
+  // thrown out of every tile build that contained a shrub or a bush tree --
+  // which, once the bushland round shipped, was most of the world. The two
+  // tables below were checked by length and this one was not, so it is the one
+  // that drifted. Checked by *reading each row*, not by counting the object's
+  // keys: `NOMINAL` is a `Record<number, …>` and a typo'd key would count.
+  for (let s = 0; s < SPECIES_COUNT; s++) {
+    const row = NOMINAL[s];
+    if (!row || row.length !== 2 || !(row[0] > 0) || !(row[1] > 0)) {
+      out.push(`NOMINAL has no usable row for species ${s}: ${JSON.stringify(row)}`);
+    }
+  }
   if (assets.triangles.length !== SPECIES_COUNT) {
     out.push(
       `VegetationAssets built ${assets.triangles.length} geometries against ` +

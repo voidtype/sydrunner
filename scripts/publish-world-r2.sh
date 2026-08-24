@@ -211,7 +211,7 @@ pivots = [p for p in ("index.json", "root.json") if (world / p).exists()]
 shared = [
     p for p in (
         "suburbs.json", "far.bin", "far-terrain.bin", "far-water.bin",
-        "landmarks.glb", "street-names.bin",
+        "far-cover.bin", "landmarks.glb", "street-names.bin",
     ) if (world / p).exists()
 ]
 
