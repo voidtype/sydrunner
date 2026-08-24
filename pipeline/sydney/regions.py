@@ -267,7 +267,7 @@ def _region_jobs(n_regions: int) -> int:
     return min(max(1, (os.cpu_count() or 2) - 1), n_regions)
 
 
-def emit(tile_keys: list[str], bounds_by_key: dict[str, list[float]]) -> dict:
+def emit(tile_keys: list[str], bounds_by_key: dict[str, list[float]], on_start=None, on_progress=None) -> dict:
     """Write every region for this build and return the index contract.
 
     The directory is wiped first. A region is named for a grid cell, not for its
@@ -294,13 +294,22 @@ def emit(tile_keys: list[str], bounds_by_key: dict[str, list[float]]) -> dict:
         for key in sorted(grouped)
     ]
 
+    if on_start is not None:
+        on_start(len(work))
     jobs = _region_jobs(len(work))
+    packed: list = []
     if jobs > 1:
         ctx = multiprocessing.get_context("fork")
         with concurrent.futures.ProcessPoolExecutor(max_workers=jobs, mp_context=ctx) as pool:
-            packed = list(pool.map(_pack_region, work))
+            for r in concurrent.futures.as_completed(pool.submit(_pack_region, w) for w in work):
+                packed.append(r.result())
+                if on_progress is not None:
+                    on_progress()
     else:
-        packed = [_pack_region(w) for w in work]
+        for w in work:
+            packed.append(_pack_region(w))
+            if on_progress is not None:
+                on_progress()
 
     summaries: list[RegionSummary] = [s for s in packed if s is not None]
     summaries.sort(key=lambda s: s.key)  # pool order is nondeterministic; the contract is not

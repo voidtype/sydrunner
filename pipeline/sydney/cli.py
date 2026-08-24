@@ -71,6 +71,7 @@ from . import (
     water,
 )
 from .sources import msbuildings, osm
+from . import progress
 from . import terraincache
 from .terrain import Terrain
 
@@ -516,6 +517,8 @@ def cmd_build(args: argparse.Namespace) -> int:
     print(f"stage {stage.index} '{stage.name}' -- {stage.description}")
     print(f"radius {stage.radius_m / 1000:.0f} km")
     t0 = time.time()
+    progress.begin(f"stage {stage.name}")
+    progress.phase("head", message="loading buildings")
 
     buildings = _load_buildings(con, stage.radius_m, args.rebuild)
 
@@ -531,6 +534,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     buildings, suppressed = landmarks.suppress(buildings, zones)
     _report_suppression(anchors, suppressed)
 
+    progress.step(0.25, "reading the terrain")
     print("  reading the terrain ...")
     terrain = terraincache.load(stage.radius_m, use_cache=not args.no_terrain_cache)
     _report_terrain(terrain)
@@ -540,6 +544,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     # `elevated`, `streets` and `decks` each used to read the extract's `lines`
     # layer for themselves, which is three full passes over 56 MB to answer
     # three questions about the same 180,000 objects.
+    progress.step(0.45, "reading the road network")
     print("  reading the road network ...")
     roads = osm.read_roads(stage.radius_m)
     print(f"    {len(roads):,} ways")
@@ -585,6 +590,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     # passes as `buildings_near`. A structure five metres up occupies no
     # footpath: left in, it cut a bridge-shaped hole in the pavement under itself
     # and made the bins on the far kerb dodge something that is over their heads.
+    progress.step(0.65, "reading the street network")
     print("  reading the street network ...")
     street_network = streets.StreetNetwork.load(
         stage.radius_m, [b for b in buildings if b.base_height <= 0.0], roads
@@ -602,6 +608,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     )
     _report_decks(deck_network)
 
+    progress.step(0.85, "reading parks and mapped trees")
     print("  reading parks and mapped trees ...")
     veg_network = vegetation.VegetationNetwork.load(stage.radius_m, street_network, rail)
     print(
@@ -774,6 +781,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     )
 
     jobs = _emit_jobs(args, len(todo))
+    progress.phase("emit", total=len(todo), message=f"emitting {len(todo):,} tiles")
     results: list[tiles.TileResult] = []
     if jobs > 1:
         print(f"  emitting on {jobs} cores")
@@ -790,6 +798,7 @@ def cmd_build(args: argparse.Namespace) -> int:
                         continue
                     _record_tile(detail, res)
                     results.append(res)
+                progress.tick()
         results.sort(key=lambda r: r.key)  # completion order is nondeterministic; reports are not
     else:
         for key in tqdm(todo, unit="tile", disable=not sys.stderr.isatty()):
@@ -800,6 +809,7 @@ def cmd_build(args: argparse.Namespace) -> int:
                     continue
                 _record_tile(detail, res)
                 results.append(res)
+            progress.tick()
 
 
     _report_parking(parking_network, results)
@@ -914,6 +924,7 @@ def cmd_build(args: argparse.Namespace) -> int:
         f"{tri / 1e6:.1f} M triangles, {total_mb:.0f} MB geometry"
     )
     print(f"index -> {config.INDEX_PATH}")
+    progress.done(f"{len(all_results):,} tiles in {time.time() - t0:.0f}s")
     return 0
 
 
@@ -1284,6 +1295,8 @@ def _emit_regions(results: list[tiles.TileResult]) -> dict:
     return regions.emit(
         [r.key for r in sorted(results, key=lambda r: r.key)],
         {r.key: list(r.bounds) for r in results},
+        on_start=lambda n: progress.phase("regions", total=n, message=f"packing {n:,} regions"),
+        on_progress=progress.tick,
     )
 
 
