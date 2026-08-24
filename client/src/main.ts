@@ -385,6 +385,7 @@ import {
 // `game/staticcars.ts` and `game/driving.ts` section 1, which this retires.
 import { StaticCarField, verifyStaticCars } from './game/staticcars.ts';
 import {
+  DRIVEN_DRAW_RADIUS,
   DrivenCarView,
   HonkWatch,
   carHealthClass,
@@ -5311,6 +5312,10 @@ async function main(): Promise<void> {
     // rather than the two or three a five-minute clock allowed -- and this loop
     // runs twice a frame. The radius is `TRAFFIC_DRAW_RADIUS` with slack, so a
     // driven car is gated on exactly the terms the ambient fleet around it is.
+    //
+    // `x, z` is **where the view is about to draw that car** and not what its
+    // record says -- the caller resolves the driver before it asks. All this
+    // end contributes is the distance from the eye.
     const dx = x - player.position.x;
     const dz = z - player.position.z;
     return dx * dx + dz * dz < DRIVEN_DRAW_RADIUS * DRIVEN_DRAW_RADIUS;
@@ -5320,15 +5325,6 @@ async function main(): Promise<void> {
   // --- Workstream H: crash damage, cars that stay, and the traffic behind them.
   // One contiguous block, on the preamble's rule; every line of logic is in
   // `game/driving.ts`, `game/traffic.ts` (the hold) and `world/carsmoke.ts`.
-  /**
-   * How far a driven car is posed from, metres.
-   *
-   * `world/cars.TRAFFIC_DRAW_RADIUS` plus a margin, because the gate is applied
-   * to the *record's* stored position and an occupied car's record is as stale
-   * as the last `MSG.CARS` -- a driver doing 22 m/s covers 22 m in the second
-   * between two broadcasts of a car nobody has touched.
-   */
-  const DRIVEN_DRAW_RADIUS = 460;
   /** The plume off every smoking bonnet in view. One draw call. */
   const carSmoke = new CarSmoke();
   scene.add(carSmoke.mesh);

@@ -85,6 +85,13 @@ import { verifyCarFire } from '../client/src/game/carfire.ts';
 // and paint counts are omitted here and passed by `main.ts`, which is the end
 // that can load the palette; see `verifyStaticCars`.
 import { verifyStaticCars } from '../client/src/game/staticcars.ts';
+// And the *drawing* of a car somebody took, which is a browser rule checked here
+// on `verifyViewLatch`'s argument two imports down: `world/drivencars.ts` owns no
+// mesh and imports three only as types, so this process can run every line of it.
+// It is in this list because of what the newest section catches -- the car you
+// are driving leaving its own draw radius 460 m after you take it, because the
+// gate was asked about the kerb rather than about you. See its `near` argument.
+import { verifyDrivenCars } from '../client/src/world/drivencars.ts';
 import { verifyTraffic } from '../client/src/game/traffic.ts';
 // --- Workstream Q. A client presentation rule, checked here anyway: see the
 // header of `game/viewlatch.ts` for why a rule about what the *browser* draws is
@@ -443,6 +450,12 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // a plausible-looking wrong position, which renders perfectly and makes `E`
     // do nothing.
     ['verifyStaticCars', verifyStaticCars()],
+    // And what the browser does with a car once somebody is in it. See the
+    // import: three-free, so this end runs it too, and the property that matters
+    // is that a driven car is drawn where its *driver* is rather than where its
+    // record was parked -- which this process is the authority on, since it is
+    // this process that decides never to re-broadcast the record.
+    ['verifyDrivenCars', verifyDrivenCars()],
     // The first-person punch's pose curve. Run **here** as well as in the
     // browser because it is three-free and because it is timed off the same
     // `animation.PUNCH_*` envelope this process adjudicates a swing with: a

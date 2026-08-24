@@ -69,7 +69,7 @@ import {
   type LaneRoute,
   type TrafficField,
 } from '../game/traffic.ts';
-import { CAR_HEALTH_MAX, DRIVE_TOP_SPEED, carIsSmoking, type CarField } from '../game/driving.ts';
+import { CAR_HEALTH_MAX, CarField, DRIVE_TOP_SPEED, carIsSmoking } from '../game/driving.ts';
 // --- WORKSTREAM Y: the fire. Three-free rules, on `game/driving.ts`' terms; what
 // this file does with them is two lines of pose and one argument to the plume.
 // See `game/carfire.ts`.
@@ -141,6 +141,24 @@ export const DRIVE_CAM_DIP = 0.03;
 const CAM_EASE = 0.14;
 
 /**
+ * How far a driven car is posed from, metres. The radius `main.ts` builds the
+ * `near` predicate out of, and the one the checks measure against.
+ *
+ * `world/cars.TRAFFIC_DRAW_RADIUS` (420) plus a margin, so a driven car is
+ * gated on the same terms as the ambient fleet standing around it. Written here
+ * as a literal rather than imported from that file for the reason every number
+ * in this module is: `world/cars.ts` imports three and this module must not, or
+ * the server cannot run `verifyDrivenCars`.
+ *
+ * It lives here rather than in `main.ts` because it stopped being a private
+ * detail of one call site the moment a check had to know it. See the `near`
+ * argument of `DrivenCarView`: what that radius is measured *from* is the whole
+ * of the vanishing-car bug, and a check that guessed 460 while the client used
+ * something else would be a check that proved nothing.
+ */
+export const DRIVEN_DRAW_RADIUS = 460;
+
+/**
  * Everything the client does about a car somebody is driving.
  *
  * One per session, constructed before the first frame and handed the *getter*
@@ -197,9 +215,9 @@ export class DrivenCarView {
      */
     private readonly localCar: () => number,
     /**
-     * Is a car standing here close enough to be worth drawing? Optional, and
-     * absent means "everything", which is what every caller written before the
-     * budget meant and is still true of `verifyDrivenCars`.
+     * Is a car about to be drawn here close enough to be worth drawing?
+     * Optional, and absent means "everything", which is what every caller
+     * written before the budget meant.
      *
      * **This exists because cars stopped despawning.** The field used to hold
      * the two or three cars a room had stolen in the last five minutes and this
@@ -208,12 +226,32 @@ export class DrivenCarView {
      * twice a frame is eight hundred `Math.sin`/`Math.cos` pairs to place cars
      * in Penrith that nobody can see.
      *
-     * The gate is on the **record's** stored position, before `drivenCarPose`
-     * runs, so a car out of range costs one subtract and one compare. And it is
-     * the *record's* position on purpose, not the driver's: a remote driver
-     * whose car is beyond the gate is beyond it either way, and reaching for
-     * their interpolated pose to decide whether to reach for their interpolated
-     * pose is a question that answers itself.
+     * The gate is asked about **where the car will be drawn**, which for an
+     * empty record is its stored position and for an occupied one is its
+     * driver -- and the difference between those two is a shipped bug, reported
+     * by the owner as *"car sometimes disappears then later reappears while
+     * driving"*.
+     *
+     * This used to ask about the record's own coordinates for every car, on the
+     * argument that a remote driver whose car is beyond the gate is beyond it
+     * either way. That argument is true of a *fresh* record and this file's own
+     * header says the record is not fresh: an occupied car's stored pose is the
+     * kerb it was taken from and stays there until something else changes the
+     * record, which for a car nobody crashes is never (`room.sendCars` only
+     * broadcasts what changed, and `CarField.follow` carries the pose on the
+     * server without marking it changed). So the car **you** were driving fell
+     * out of its own draw radius after 460 m of straight road -- twenty-one
+     * seconds at the top speed -- and came back on the tick you scraped
+     * something hard enough to put the record on the wire again. The parked box
+     * stays hidden the whole time (`carlod.drivenIdentities` is ungated, by
+     * design), so what vanishes is the car, not the ride.
+     *
+     * So: the driver is resolved *first* for a car somebody is in, and the gate
+     * is asked about that. It costs one map lookup per **occupied** record --
+     * counted in ones, bounded by the room -- and nothing at all for the four
+     * hundred parked ones in Penrith, which are still one subtract and one
+     * compare each, before `drivenCarPose` and its two transcendentals run.
+     * `verifyDrivenCars` and `server/cardraw-check.ts` hold both halves.
      */
     private readonly near: (x: number, z: number) => boolean = () => true,
   ) {
@@ -233,22 +271,23 @@ export class DrivenCarView {
   private forEach(visit: (pose: CarPose, burn: number) => void): void {
     let n = 0;
     for (const car of this.field().all()) {
+      // **Where this car is going to be drawn, before anything is decided about
+      // it.** For an empty record that is the record; for a car somebody is in
+      // it is the driver, and the record is the kerb they took it from however
+      // many kilometres ago. See the `near` constructor argument for the bug
+      // that taught this loop the difference.
+      const mine = car.id === this.localCar();
+      const d = this.driverScratch;
+      const live = (mine || car.driverId !== 0) && this.driverPose(mine ? -1 : car.driverId, d);
       // The range gate, before the pose. See the `near` constructor argument:
       // the field holds up to four hundred records spread over the whole city
       // now that cars no longer despawn, and this is what stops the draw loop
-      // paying for the ones in Penrith.
-      //
-      // **On the record's own coordinates**, which for an *occupied* car are as
-      // stale as the last `MSG.CARS` -- and that is fine at this radius: a car
-      // whose record is 400 m away and whose driver has since crossed into range
-      // is a car whose driver is doing 22 m/s and will be re-broadcast within
-      // the second. The gate is generous for exactly this reason.
-      if (!this.near(car.x, car.z)) continue;
+      // paying for the ones in Penrith -- one subtract and one compare each,
+      // before `drivenCarPose`'s two transcendentals.
+      if (!this.near(live ? d.x : car.x, live ? d.z : car.z)) continue;
       const out = this.pose;
       drivenCarPose(car, out);
-      const mine = car.id === this.localCar();
-      if ((mine || car.driverId !== 0) && this.driverPose(mine ? -1 : car.driverId, this.driverScratch)) {
-        const d = this.driverScratch;
+      if (live) {
         out.x = d.x;
         out.y = d.y;
         out.z = d.z;
@@ -606,6 +645,11 @@ export function carHealthClass(health: number, burning = false): string {
  *   - **Brake lights on a parked car.** The whole street lit up red is the most
  *     visible possible failure of the deceleration test, and it happens the
  *     moment somebody writes `if (input.forward < 0)`.
+ *   - **The car you are driving vanishing out from under you**, which is the
+ *     owner's 2026-08-24 report and the one failure in this file that a player
+ *     hits within a minute of taking a car. See the `near` argument, and
+ *     `server/cardraw-check.ts` for the same property over a real `Simulation`
+ *     and the real wire.
  */
 export function verifyDrivenCars(): string[] {
   const failures: string[] = [];
@@ -690,6 +734,77 @@ export function verifyDrivenCars(): string[] {
     if (watch.standing !== 0) failures.push(`Standing on an empty street accrued ${watch.standing} s of dwell.`);
     if (!(HONK_DWELL > 0 && HONK_DWELL < 5)) {
       failures.push(`HONK_DWELL is ${HONK_DWELL} s, which is not "somebody is standing in the road".`);
+    }
+  }
+
+  // --- The range gate, and what it is measured *from*. The owner's report:
+  //     *"car sometimes disappears then later reappears while driving"*.
+  //
+  // A car somebody is in is drawn at its **driver** and gated at its driver; a
+  // car nobody can be resolved for is drawn at its record and gated there. The
+  // whole bug was those two sentences being one sentence, and it is invisible
+  // for the first twenty seconds of every drive -- `DRIVEN_DRAW_RADIUS` is
+  // 460 m and a car does that in twenty-one seconds -- which is why it shipped.
+  //
+  // Three kilometres, one field, no renderer, three assertions.
+  {
+    const field = new CarField();
+    const kerb = { identity: 0xca4, body: 0, colour: 0, x: 0, y: 0, z: 0, yaw: 0, parked: true };
+    const mine = field.take(kerb, 7);
+    // Somebody else's, taken at the same kerb, whose driver this client cannot
+    // see: the case the gate exists for and the one that must still be gated.
+    const theirs = field.take({ ...kerb, identity: 0xca5 }, 8);
+    if (mine === null || theirs === null) {
+      failures.push('Two cars could not be taken from an empty field; the rest of this section is meaningless.');
+    } else {
+      const eye = { x: 0, z: 0 };
+      const view = new DrivenCarView(
+        () => field,
+        (driverId: number, out: DriverPose): boolean => {
+          // Only *my* driver is resolvable, which is `main.ts`'s answer for a
+          // remote outside the interest set.
+          if (driverId !== -1) return false;
+          out.x = eye.x;
+          out.y = 0;
+          out.z = eye.z;
+          out.yaw = 0;
+          return true;
+        },
+        () => mine.id,
+        (x, z) => {
+          const dx = x - eye.x;
+          const dz = z - eye.z;
+          return dx * dx + dz * dz < DRIVEN_DRAW_RADIUS * DRIVEN_DRAW_RADIUS;
+        },
+      );
+      const posed = (): Map<number, number> => {
+        const at = new Map<number, number>();
+        view.source.forEach((pose) => at.set(pose.identity, pose.z));
+        return at;
+      };
+      // At the kerb, before anything has moved: both cars, both at the kerb.
+      if (posed().size !== 2) failures.push('Two cars standing at the kerb you are on were not both drawn.');
+      // And three kilometres later. The record has not moved and never will --
+      // an occupied car costs no bandwidth, so nothing updates it.
+      eye.z = -3000;
+      const far = posed();
+      if (!far.has(mine.carId)) {
+        failures.push(
+          'The car the player is driving was not drawn 3 km from the kerb it was taken at. The range gate is being ' +
+            'asked about the record instead of about the driver; this is the owner\'s vanishing car.',
+        );
+      } else if (Math.abs((far.get(mine.carId) ?? 0) - eye.z) > 1) {
+        failures.push(`The driven car was drawn at z = ${far.get(mine.carId)}, not at its driver's ${eye.z}.`);
+      }
+      if (far.has(theirs.carId)) {
+        failures.push(
+          'A car 3 km away whose driver this client cannot see was posed anyway. The gate has been deleted rather ' +
+            'than re-centred.',
+        );
+      }
+      if (!(DRIVEN_DRAW_RADIUS > 420)) {
+        failures.push(`DRIVEN_DRAW_RADIUS is ${DRIVEN_DRAW_RADIUS} m, inside world/cars.TRAFFIC_DRAW_RADIUS's 420.`);
+      }
     }
   }
 

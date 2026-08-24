@@ -544,7 +544,12 @@ Before step 1, the merged tree must pass: `tsc --noEmit` on both ends; a local
 boot (`SYDNEY_PORT=8799 SYDNEY_STATE_DIR=/tmp/x bun run server/index.ts`) with
 every `verify*` in the self-check line; `bun run server/accounts-check.ts` (with
 `SYDNEY_CHECK_URL` pointed at that local server for phase B/C);
-`bun run server/cardamage-check.ts`; `bun run server/take-check.ts` (7 s over
+`bun run server/cardamage-check.ts`; `bun run server/cardraw-check.ts` (a few
+seconds: it drives a car three kilometres through a real `Simulation` and the
+real `encodeCars`/`decodeCars` into a real client-side mirror, and asserts the
+car the player is *in* is drawable on every tick — the owner's "car sometimes
+disappears then later reappears while driving", which is invisible for the first
+460 m of every drive); `bun run server/take-check.ts` (7 s over
 the shipped bake — it presses `E` beside real parked cars through the real
 `Simulation` and then once more over a real `Room` and a real `NetClient`, and
 it is the only thing that covers stealing a car at all — **since workstream S its
