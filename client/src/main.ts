@@ -8439,10 +8439,18 @@ async function main(): Promise<void> {
       rideNudgeT = RIDE_NUDGE_SECONDS;
       rideNudgeText = RIDE_PROMPT;
     }
-    if (armed) {
-      punchBuffer = Math.max(0, punchBuffer - dt);
-      throwBuffer = Math.max(0, throwBuffer - dt);
-    }
+    // **The buffers decay whether or not the click is armed.** `armed` says
+    // where the click is *delivered* -- a driver's click is a horn, a rider's is
+    // a nudge, and only a walker's is a swing -- and time passing is not one of
+    // those. Gating the decay on it meant a driver's click set `punchBuffer` to
+    // `PUNCH_BUFFER` and nothing ever took it down again: the swing that spends
+    // it cannot happen in a car, so the horn's own 0.34 s cooldown re-fired on
+    // it forever. One click, a horn until you got out. Reported 2026-08-24 as
+    // "it went beeping FORVER", and it is the second bug of this shape here --
+    // see `rideNudgeT` above, whose own comment is about a pill that would not
+    // go away.
+    punchBuffer = Math.max(0, punchBuffer - dt);
+    throwBuffer = Math.max(0, throwBuffer - dt);
     rideNudgeT = Math.max(0, rideNudgeT - dt);
     // The ride pill, **derived and re-derived every tick**, which is the whole
     // of the fix for "I died on bike and saw E to get off bike forever".
