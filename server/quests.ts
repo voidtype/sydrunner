@@ -122,6 +122,8 @@ import {
   STEP_KIND,
   addProgress,
   blankCursor,
+  MAX_NPCS_PER_BUNDLE,
+  MAX_QUESTS_PER_BUNDLE,
   choiceRefusal,
   clampImprov,
   doneFlag,
@@ -219,6 +221,21 @@ export function bundleFrom(files: RawFiles): { bundle: ContentBundle; errors: st
       errors.push(...parsed.errors);
       quests.push(...parsed.value.quests);
     }
+  }
+  // Every file parsed clean and the merge is still refusable: the client reads
+  // this bundle back with the *bundle* caps, and a merge past them is a merge
+  // every browser drops on the floor without saying so. Refused here instead,
+  // where a reason reaches the log and the last good pack keeps serving --
+  // which is what the pipeline promises for every other kind of bad pack.
+  if (quests.length > MAX_QUESTS_PER_BUNDLE) {
+    errors.push(
+      `the merged bundle carries ${quests.length} quests, over the ${MAX_QUESTS_PER_BUNDLE} every client parses it with.`,
+    );
+  }
+  if (npcs.length > MAX_NPCS_PER_BUNDLE) {
+    errors.push(
+      `the merged bundle carries ${npcs.length} npcs, over the ${MAX_NPCS_PER_BUNDLE} every client parses it with.`,
+    );
   }
   errors.push(...validateBundle(quests, npcs));
   errors.push(...worldRefusals(quests));

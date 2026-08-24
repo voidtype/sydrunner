@@ -253,6 +253,8 @@ import { TalentsPanel, verifyTalentsPanel } from './teams.ts';
 import { DialogPanel, cursorsFrom, verifyDialogPanel } from './dialog.ts';
 import {
   EMPTY_BUNDLE,
+  MAX_NPCS_PER_BUNDLE,
+  MAX_QUESTS_PER_BUNDLE,
   parseDialogPack,
   parseQuestPack,
   questView,
@@ -4652,8 +4654,11 @@ async function main(): Promise<void> {
       // the server -- it is the same `parseQuestPack` the server ran, so a
       // client on an older build silently drops a step kind it does not know
       // instead of drawing a tracker line it cannot describe.
-      const quests = parseQuestPack({ quests: raw.quests }, 'live').value.quests;
-      const npcs = parseDialogPack({ npcs: raw.npcs }, 'live').value.npcs;
+      // The bundle caps, not the pack caps: this is the *merge* of every
+      // content file, and the per-file ceiling refused the whole thing once
+      // the pool packs took the total past 64. See `MAX_QUESTS_PER_BUNDLE`.
+      const quests = parseQuestPack({ quests: raw.quests }, 'live', MAX_QUESTS_PER_BUNDLE).value.quests;
+      const npcs = parseDialogPack({ npcs: raw.npcs }, 'live', MAX_NPCS_PER_BUNDLE).value.npcs;
       questBundle = { quests, npcs, revision: String(raw.revision ?? '') };
     } catch {
       // No content, no quests, no prompt. See the header.

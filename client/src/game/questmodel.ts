@@ -179,6 +179,34 @@ export const MAX_NPCS_PER_PACK = 32;
 export const MAX_NODES_PER_NPC = 48;
 export const MAX_CHOICES = 6;
 
+/**
+ * THE SAME PARSER READS TWO DIFFERENT THINGS, AND THEY DO NOT HAVE THE SAME
+ * CEILING.
+ *
+ * The two caps above bound one authored *file* -- they are the guard against a
+ * content pack with a runaway loop in it, and 64 quests in one file is already
+ * far past anything a person writes by hand. But the server parses every file
+ * separately and then serves the **merge** of all of them over `/content`, and
+ * the client re-parses that merge with the same function. A pack cap applied to
+ * a bundle is the wrong question asked of the right data.
+ *
+ * It cost a production outage to learn. Twelve quest files of ten each parsed
+ * cleanly on the server, merged to 109, and every browser refused the lot:
+ * `parseQuestPack` returns an **empty pack** when the cap is blown, and
+ * `main.ts` drops a failed fetch silently on purpose, so 109 quests and 105
+ * npcs became no quests, no givers, no markers and nothing in any log. The
+ * Ladmaster stood in Sydney Park for days and no player could see him.
+ *
+ * So the bundle gets its own ceiling, an order of magnitude over what the
+ * content is: it is a backstop against a server that has gone mad, not a budget
+ * anybody is meant to design against. `server/quests.ts` refuses a merge that
+ * would exceed it, which turns "every client silently blind" into "the pack is
+ * refused, loudly, with a reason" -- the behaviour the content pipeline already
+ * promises for every other kind of bad pack.
+ */
+export const MAX_QUESTS_PER_BUNDLE = 512;
+export const MAX_NPCS_PER_BUNDLE = 256;
+
 /** Text caps. Generous for a line, tight for an id. */
 export const MAX_ID_CHARS = 48;
 export const MAX_TITLE_CHARS = 60;
@@ -684,7 +712,13 @@ export function defaultLabel(step: QuestStep): string {
  * because it is a property of the **set** of packs the server is holding and a
  * single file cannot know it.
  */
-export function parseQuestPack(raw: unknown, name: string): ParseResult<QuestPack> {
+export function parseQuestPack(
+  raw: unknown,
+  name: string,
+  /** The ceiling for *this* read. A file gets the pack cap; the merged bundle
+   *  `/content` serves gets `MAX_QUESTS_PER_BUNDLE`. See the note on those. */
+  maxQuests: number = MAX_QUESTS_PER_PACK,
+): ParseResult<QuestPack> {
   const errors: string[] = [];
   const out: QuestPack = { pack: name, quests: [] };
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
@@ -698,8 +732,8 @@ export function parseQuestPack(raw: unknown, name: string): ParseResult<QuestPac
     errors.push(`${name}: "quests" must be an array.`);
     return { value: out, errors };
   }
-  if (rows.length > MAX_QUESTS_PER_PACK) {
-    errors.push(`${name}: ${rows.length} quests, over the ${MAX_QUESTS_PER_PACK} cap.`);
+  if (rows.length > maxQuests) {
+    errors.push(`${name}: ${rows.length} quests, over the ${maxQuests} cap.`);
     return { value: out, errors };
   }
   const seen = new Set<string>();
@@ -818,7 +852,13 @@ function parseChoice(raw: unknown, where: string, errors: string[]): DialogChoic
   };
 }
 
-export function parseDialogPack(raw: unknown, name: string): ParseResult<DialogPack> {
+export function parseDialogPack(
+  raw: unknown,
+  name: string,
+  /** As `parseQuestPack`'s: the pack cap for a file, the bundle cap for the
+   *  merge `/content` serves. */
+  maxNpcs: number = MAX_NPCS_PER_PACK,
+): ParseResult<DialogPack> {
   const errors: string[] = [];
   const out: DialogPack = { pack: name, npcs: [] };
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
@@ -832,8 +872,8 @@ export function parseDialogPack(raw: unknown, name: string): ParseResult<DialogP
     errors.push(`${name}: "npcs" must be an array.`);
     return { value: out, errors };
   }
-  if (rows.length > MAX_NPCS_PER_PACK) {
-    errors.push(`${name}: ${rows.length} npcs, over the ${MAX_NPCS_PER_PACK} cap.`);
+  if (rows.length > maxNpcs) {
+    errors.push(`${name}: ${rows.length} npcs, over the ${maxNpcs} cap.`);
     return { value: out, errors };
   }
   const seenNpc = new Set<string>();
@@ -1548,6 +1588,55 @@ export function clampImprov(raw: unknown): string {
  */
 export function verifyQuests(): string[] {
   const failures: string[] = [];
+
+  // --- THE MERGE PARSES AT THE SCALE THE SERVER ACTUALLY SERVES IT.
+  //
+  // The regression this exists for shipped green: every content file was well
+  // under the pack cap, every existing case here parsed one file, and the thing
+  // that broke was the *merge* of twelve of them. So this builds a bundle the
+  // shape `/content` really carries -- more rows than one file may hold -- and
+  // asserts the bundle caps let it through while the pack cap still refuses it.
+  // A cap that cannot be seen doing both jobs is a cap nobody knows the sense of.
+  {
+    const rows = Array.from({ length: MAX_QUESTS_PER_PACK + 45 }, (_, i) => ({
+      id: `bundle-${i}`,
+      title: `Bundle quest ${i}`,
+      blurb: 'One of many, merged from many files.',
+      giver: 'someone',
+      level: 1,
+      steps: [{ kind: 'goto', x: 0, z: 0, radius: 30, label: 'go' }],
+      reward: { cash: 1, xp: 1 },
+    }));
+    const merged = parseQuestPack({ quests: rows }, 'bundle', MAX_QUESTS_PER_BUNDLE);
+    if (merged.value.quests.length !== rows.length) {
+      failures.push(
+        `A ${rows.length}-quest merge parsed to ${merged.value.quests.length} under the bundle cap of ${MAX_QUESTS_PER_BUNDLE}.`,
+      );
+    }
+    const asPack = parseQuestPack({ quests: rows }, 'bundle');
+    if (asPack.value.quests.length !== 0 || asPack.errors.length === 0) {
+      failures.push(`The pack cap of ${MAX_QUESTS_PER_PACK} did not refuse a ${rows.length}-quest file.`);
+    }
+
+    const npcRows = Array.from({ length: MAX_NPCS_PER_PACK + 73 }, (_, i) => ({
+      id: `npc-${i}`,
+      name: `Someone ${i}`,
+      x: 0,
+      z: 0,
+      root: 'hello',
+      nodes: [{ id: 'hello', line: 'Gday.', choices: [] }],
+    }));
+    const mergedNpcs = parseDialogPack({ npcs: npcRows }, 'bundle', MAX_NPCS_PER_BUNDLE);
+    if (mergedNpcs.value.npcs.length !== npcRows.length) {
+      failures.push(
+        `A ${npcRows.length}-npc merge parsed to ${mergedNpcs.value.npcs.length} under the bundle cap of ${MAX_NPCS_PER_BUNDLE}.`,
+      );
+    }
+    const npcsAsPack = parseDialogPack({ npcs: npcRows }, 'bundle');
+    if (npcsAsPack.value.npcs.length !== 0 || npcsAsPack.errors.length === 0) {
+      failures.push(`The pack cap of ${MAX_NPCS_PER_PACK} did not refuse a ${npcRows.length}-npc file.`);
+    }
+  }
 
   // --- The parser refuses the rows a hand-edited file really contains.
   {
