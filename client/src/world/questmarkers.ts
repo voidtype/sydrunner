@@ -230,10 +230,13 @@ export const HERO_SCALE = 2.6;
 /**
  * The em box, in metres, before the distance scale.
  *
- * 0.85 m is about the height of a person's head and shoulders, which is the
- * size that reads as "a sign over somebody" rather than as a prop of its own.
+ * 0.75 m is a little under the height of a person's head and shoulders, which
+ * is the size that reads as "a sign over somebody" rather than as a prop of its
+ * own. It was 0.85 and came down a notch for the reason
+ * `giverbodies.MARK_CLEARANCE_M` went up: against `HERO_SCALE`'s 2.6x the older
+ * box was wider than the giver wearing it.
  */
-export const GLYPH_EM_M = 0.85;
+export const GLYPH_EM_M = 0.75;
 
 /**
  * How far over the ground the glyph's baseline floats, when there is no body.

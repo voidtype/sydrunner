@@ -275,13 +275,19 @@ export const CROWN_OVER_HEAD_BONE = FIGURE_HEIGHT - HEAD_BONE_HEIGHT;
  * Clearance from the crown to the mark's baseline, metres.
  *
  * `questmarkers.MARKER_LIFT_M` was `FIGURE_HEIGHT + 0.62` and this is that
- * `0.62`, moved here so the two ways of computing the mark's height -- off a
+ * clearance, moved here so the two ways of computing the mark's height -- off a
  * body's head bone, and off the bare ground when there is no body -- are the
  * same number plus the same clearance and cannot drift apart. In the bind pose
  * they agree to a millimetre, which is what `verifyGiverBodies` asserts and what
  * makes a body appearing under an existing mark invisible rather than a jump.
+ *
+ * **1.8x the original 0.62 m**, because 0.62 was measured against a mark that
+ * has since grown: `questmarkers.HERO_SCALE` makes the Ladmaster's `!` two and a
+ * half times the ordinary one, and at that size a clearance chosen for the
+ * ordinary one put the glyph's dot through the top of his head. The owner saw it
+ * from three metres in Sydney Park and it read as a hat rather than a sign.
  */
-export const MARK_CLEARANCE_M = 0.62;
+export const MARK_CLEARANCE_M = 1.12;
 
 /** Where the mark floats, given the world y of a giver's head **bone**. */
 export function markYFromHeadBone(headBoneY: number): number {

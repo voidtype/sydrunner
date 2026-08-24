@@ -4842,9 +4842,12 @@ async function main(): Promise<void> {
       if (e.code !== 'KeyE' || e.repeat || dialog.visible) return;
       // `E` on a train or a bike means "get off". See the header.
       if (playerCombat.ridingBike !== 0 || isAboard(playerCombat.aboard)) return;
-      // **Not consumed**, deliberately: the mount bit still goes out on this
-      // press, on `money.keydown`'s Centrelink precedent.
-      dialog.tryOpen();
+      // **The dialog is no longer opened here**, and that is the fix for `E`
+      // meaning two things at once. It used to fire on this event *and* let the
+      // mount bit go out on the same press, so a giver standing beside a bike
+      // answered a press that also took the bike. The attempt now lives beside
+      // `pressMount` in the input step, which is the only place that knows
+      // whether the press was already spent -- see `pressMount`'s `took`.
     },
     true,
   );
@@ -6697,6 +6700,14 @@ async function main(): Promise<void> {
   let rideLean = 0;
 
   canvas.addEventListener('click', () => {
+    // **The dialog panel owns the mouse while it is up.** `DialogPanel.setOpen`
+    // drops pointer lock on open so the player can read a giver's lines and aim
+    // at a choice -- and this listener used to take it straight back on the very
+    // next click, which is every click a player makes at a conversation. The
+    // cursor vanished mid-sentence and the only way out was Escape, which also
+    // closed the conversation. So the re-lock waits for the panel to go: Escape
+    // closes it (`dialog.close`) and the click after that locks as it always did.
+    if (dialog.visible) return;
     if (!locked) void canvas.requestPointerLock();
   });
   document.addEventListener('pointerlockchange', () => {
@@ -7801,7 +7812,7 @@ async function main(): Promise<void> {
    * harness must not do. So the harness presses the same button, and it fails
    * for the same reasons -- no train, doors shut, standing too far from the door.
    */
-  const pressMount = (): void => {
+  const pressMount = (): boolean => {
     /* --- The button in Sydney Park, **ahead of everything**, and it is the one
      *     addition to this chain that does not need to be in `sim.resolveMount`.
      *
@@ -7830,10 +7841,21 @@ async function main(): Promise<void> {
         net ? () => void net.pressSun() : null,
       )
     ) {
-      return;
+      return true;
     }
 
     const field = bikeWorld();
+    /* Whether this press was **consumed**, so `E` can mean exactly one thing.
+     *
+     * Every branch below does something; only the last one can find nothing to
+     * mount, board or take, and that is the case `dialog.tryOpen` is allowed to
+     * have. `dialog.ts`'s `tryOpen` header already specified this ordering --
+     * "a quest NPC standing beside a lime bike must not make the bike
+     * unmountable, so the dialog is tried after `resolveMount` finds nothing"
+     * -- but the `E` listener called it unconditionally, so standing at the
+     * Ladmaster's own loan bike both took the bike and opened his conversation
+     * on the one press. */
+    let took = true;
     // --- The train, ahead of the bike, on one key. `sim.resolveMount` runs the
     //     identical chain in the identical order, which is what makes this a
     //     prediction rather than a second opinion: off a train, then off a
@@ -7885,9 +7907,10 @@ async function main(): Promise<void> {
         net?.predictedBikeChange();
         audio.pickupFlatWhite();
       } else {
-        predictTakeCar();
+        took = predictTakeCar();
       }
     }
+    return took;
   };
 
   /**
@@ -7904,7 +7927,7 @@ async function main(): Promise<void> {
    * Offline this **is** the authority, which is what makes `?offline` a real
    * test of the feature rather than a second implementation of it.
    */
-  const predictTakeCar = (): void => {
+  const predictTakeCar = (): boolean => {
     const cars = carWorld();
     const feet = player.position.y - EYE_HEIGHT;
     // Somebody's abandoned getaway car, or the one you parked. No crime: the
@@ -7929,7 +7952,7 @@ async function main(): Promise<void> {
       player.yaw = best.yaw;
       net?.predictedCarChange();
       audio.pickupFlatWhite();
-      return;
+      return true;
     }
     // Or one off the timetable, which is the theft. **No crime is predicted**:
     // unlike the tuned ride-by twenty screens down, whether anybody saw it
@@ -7953,7 +7976,7 @@ async function main(): Promise<void> {
         staticCars,
       )
     ) {
-      return;
+      return false;
     }
     // --- Workstream H: make room, if the room is out of records.
     //
@@ -7966,10 +7989,10 @@ async function main(): Promise<void> {
     // next snapshot, which is a car re-appearing 250 m away that nobody is
     // looking at.
     if (cars.size >= MAX_DRIVEN_CARS) {
-      if (cars.recycleFarthest([player.position.x, player.position.z]) === 0) return;
+      if (cars.recycleFarthest([player.position.x, player.position.z]) === 0) return false;
     }
     const taken = cars.take(takeScratch.take, playerCombat.id);
-    if (taken === null) return;
+    if (taken === null) return false;
     playerCombat.drivingCar = taken.id;
     playerCombat.carSpeed = 0;
     // Point the driver down the street rather than at whatever shopfront they
@@ -7978,6 +8001,7 @@ async function main(): Promise<void> {
     player.yaw = taken.yaw;
     net?.predictedCarChange();
     audio.pickupFlatWhite();
+    return true;
   };
 
   /**
@@ -8593,8 +8617,16 @@ async function main(): Promise<void> {
     // function the server calls -- so nothing about the *multiplier* is decided
     // on this side at all, and a client that edited these lines would move at
     // its own speed for exactly as long as it takes the next snapshot to arrive.
-    input.mount = keys.has('KeyE');
-    if (input.mount && !mountHeld && playerCombat.phase !== 'ko') pressMount();
+    // `&& !dialog.visible`: a conversation swallows `E` whole. Without this the
+    // mount bit still went out under an open panel, so pressing `E` to pick a
+    // line also mounted whatever was parked beside the giver.
+    input.mount = keys.has('KeyE') && !dialog.visible;
+    if (input.mount && !mountHeld && playerCombat.phase !== 'ko') {
+      // **One key, one thing.** Mount first -- `dialog.tryOpen`'s header asks
+      // for exactly this order so a giver beside a bike cannot make the bike
+      // unmountable -- and only talk when the press found nothing to take.
+      if (!pressMount()) dialog.tryOpen();
+    }
     mountHeld = input.mount;
 
     // --- WORKSTREAM W: the three talent keys, in the same place and for the

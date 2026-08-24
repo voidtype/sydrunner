@@ -253,7 +253,7 @@
  * entire reason it needs no legend: the thing you are looking for out there is
  * a yellow exclamation mark, and so is the thing on the map that says where it
  * is. It also settles the palette problem that would otherwise have sunk this:
- * the powerups' gold is `rgb(255,184,41)` and this is `rgb(255,209,41)`, which
+ * the powerups' gold is `rgb(255,184,41)` and this is `rgb(255,242,26)`, which
  * at 3 px would be one colour with two meanings -- but nothing else on this map
  * is a *letterform*, so the shape carries the distinction the way it does for
  * the hollow through-wall dots, and `verifyBigMap` asserts the deliberate ink

@@ -170,7 +170,7 @@ export const MAX_GIVER_DOTS = 12;
  * string for `markerInk`. See the header for why the literal is in this file
  * and the argument for it is in that one.
  */
-export const GIVER_GOLD = { r: 1, g: 0.82, b: 0.16 } as const;
+export const GIVER_GOLD = { r: 1, g: 0.95, b: 0.1 } as const;
 
 /** `GIVER_GOLD` as CSS, rounded the way a canvas would round it anyway. */
 export const GIVER_GOLD_CSS = `rgb(${Math.round(GIVER_GOLD.r * 255)},${Math.round(
@@ -411,8 +411,8 @@ export function verifyGiverMap(): string[] {
 
   // --- The gold, both spellings of it.
   {
-    if (GIVER_GOLD_CSS !== 'rgb(255,209,41)') {
-      failures.push(`The giver gold reads as ${GIVER_GOLD_CSS}, not the rgb(255,209,41) the glyph is drawn in.`);
+    if (GIVER_GOLD_CSS !== 'rgb(255,242,26)') {
+      failures.push(`The giver gold reads as ${GIVER_GOLD_CSS}, not the rgb(255,242,26) the glyph is drawn in.`);
     }
     const m = /rgb\((\d+),(\d+),(\d+)\)/.exec(GIVER_GOLD_CSS);
     if (m === null) {
