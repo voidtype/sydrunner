@@ -46,7 +46,7 @@ import { loadFarLayer } from './world/far.ts';
 import { loadLandmarks, verifyLandmarks } from './world/landmarks.ts';
 import { createFarGround } from './world/ground.ts';
 import { verifyCanopy } from './world/cover.ts';
-import { VegetationAssets, verifyVegetationCost } from './world/vegetation.ts';
+import { VegetationAssets, verifyStemVariety, verifyVegetationCost } from './world/vegetation.ts';
 import { CUT_SUBDIVISION, NO_GROUND } from './world/terrain.ts';
 import { WaterLevels, verifyWading } from './world/wading.ts';
 import { loadFarWater, verifyWater } from './world/water.ts';
@@ -1326,6 +1326,12 @@ async function main(): Promise<void> {
   // tile in the world by the ratio and nothing else says a word.
   const canopyFailures = timed('canopy', () => [
     ...verifyCanopy(),
+    // The per-stem variation's own half, three-free and on the server's list
+    // too: bounds on the yaw, the lean, the plan aspect and the tint, and the
+    // regression for the 256-value seed cycle that made every tenth stem in a
+    // forest its neighbour's twin. Here as well because a bound that only the
+    // server asserts is a bound the renderer can still walk out of.
+    ...verifyStemVariety(),
     ...verifyVegetationCost(new VegetationAssets()),
   ]);
   // And the night rig, which earns its place on this list twice over.

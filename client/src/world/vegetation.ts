@@ -91,6 +91,47 @@
  * the Botanic Gardens are mapped tree by tree. Nothing here is over-drawing; the
  * city is simply that leafy.
  *
+ * ---------------------------------------------------------------------------
+ * Variety, and what the fourth draw call a bushland tile now makes is for.
+ *
+ * Reported 2026-08-24 from Riverside Drive, Chatswood West: *"the new tree
+ * models are very homogenous"*, over a screenshot of a canopy of near-identical
+ * dark octahedral crowns, all about the same size, the same orientation and the
+ * same colour, on thin bare trunks. It read as one tree stamped a thousand
+ * times, which is exactly what `BUSH_TREE` was.
+ *
+ * The budget above is the constraint and none of it moved. What changed is in
+ * two places, and the split is worth knowing because only one of them needs a
+ * retile:
+ *
+ *   - `tile-decode.ts`'s `stemVariation` -- yaw off the stem's position rather
+ *     than off a 256-value seed cycle, an area-preserving plan aspect, a lean,
+ *     and a per-instance tint on a value-and-hue axis instead of three
+ *     independent channels. All four are arithmetic over bytes that already
+ *     ship, so they arrive with a bundle and change no geometry at all.
+ *   - four crown archetypes for `BUSH_TREE` instead of one, because the
+ *     proportion of trunk to crown is the one thing an instance transform
+ *     cannot vary -- it scales both together -- and it is what a low-poly stand
+ *     is read by. Same fourteen triangles for three of them and **twelve** for
+ *     the dead spar, so the per-stem cost does not rise and on average falls by
+ *     0.1 of a triangle. Also client-side; also no retile.
+ *
+ * The size *distribution* is the pipeline's half and is the one that does need
+ * one: `_size` drew a bushland stem uniformly over the top two thirds of its
+ * species' range, which is 14.8-20.0 m for a bush tree, a 1.35:1 spread and
+ * visibly one age class. It now draws a reverse-J with an emergent tail --
+ * 12.0-23.6 m, quartiles 13.3 / 16.0 / 19.4 -- which is what an uneven-aged
+ * sandstone stand is.
+ *
+ * The cost of the archetypes, stated rather than assumed: a bushland tile goes
+ * from one bush-tree `InstancedMesh` to four, so the streamer's 25 resident
+ * tiles carry +75 instanced draws. Against the measurement above -- 100
+ * instanced draws for the *CBD* view, which also carries 3,759 parked cars, a
+ * crowd, street furniture, power spans and nameplates, none of which a bushland
+ * tile has any of -- that is the cheapest frame in the world spending three more
+ * binds a tile. It is the only thing in this round that is not free and it is
+ * the only thing in it that is worth eyes.
+ *
  * What is deliberately missing is therefore the impostor. Spec 7.5 wants
  * billboards beyond 150 m and the measurement above is what now justifies them.
  * The seam is `VegetationAssets.geometry()` and `buildTileTrees`: the first is
@@ -128,7 +169,30 @@ import {
   vec3,
 } from 'three/tsl';
 
-import { SPECIES_COUNT, decodeVegetation, type TileVegetation } from './tile-decode.ts';
+import {
+  BRUSH_BOX,
+  BUSH_TREE,
+  CROWN_BROAD,
+  CROWN_COUNT,
+  CROWN_SPAR,
+  CROWN_SPREAD,
+  CROWN_UPRIGHT,
+  EUCALYPT,
+  FIG,
+  JACARANDA,
+  PAPERBARK,
+  PLANE,
+  SHRUB,
+  SPECIES_COUNT,
+  STEM_VARIETY,
+  decodeVegetation,
+  newStemVariation,
+  stemCrown,
+  stemHash as hash,
+  stemVariation,
+  verifyStemVariety,
+  type TileVegetation,
+} from './tile-decode.ts';
 
 /**
  * The sidecar half of this module lives in `world/tile-decode.ts`.
@@ -138,17 +202,26 @@ import { SPECIES_COUNT, decodeVegetation, type TileVegetation } from './tile-dec
  * the render thread. Re-exported from here so every existing caller keeps
  * naming the module that owns what a tree *is*, which is this one.
  */
-export { SPECIES_COUNT, decodeVegetation };
+export { SPECIES_COUNT, decodeVegetation, verifyStemVariety };
 export type { TileVegetation };
 
-const FIG = 0;
-const PLANE = 1;
-const JACARANDA = 2;
-const PAPERBARK = 3;
-const BRUSH_BOX = 4;
-const EUCALYPT = 5;
-const SHRUB = 6;
-const BUSH_TREE = 7;
+/**
+ * The species indices and the per-stem variation moved to the sidecar half on
+ * 2026-08-24, with the crown archetypes, for one reason: they have to be
+ * checkable without a GPU. See `verifyStemVariety` there and the case it makes.
+ */
+export {
+  BUSH_TREE,
+  CROWN_BROAD,
+  CROWN_COUNT,
+  CROWN_SPAR,
+  CROWN_SPREAD,
+  CROWN_UPRIGHT,
+  EUCALYPT,
+  FIG,
+  SHRUB,
+  STEM_VARIETY,
+};
 
 // --- The palette --------------------------------------------------------------
 
@@ -351,18 +424,12 @@ const ICO_FACES: Array<[number, number, number]> = [
   [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1],
 ];
 
-/**
- * Deterministic hash. Author-time only -- this runs once at startup over a few
- * hundred vertices, so it is written for clarity rather than for speed.
+/*
+ * `hash` is `tile-decode.ts`'s `stemHash`, imported under its old name. It was
+ * private to this file and author-time only until the per-stem variation wanted
+ * exactly the same function on the per-instance path; it is the same bits, so
+ * every geometry below is the same geometry it was.
  */
-function hash(...parts: number[]): number {
-  let h = 0x811c9dc5;
-  for (const p of parts) {
-    h ^= Math.imul(p | 0, 0x27d4eb2d) >>> 0;
-    h = Math.imul(h ^ (h >>> 15), 0x85ebca6b) >>> 0;
-  }
-  return ((h ^ (h >>> 13)) >>> 0) / 0xffffffff;
-}
 
 /**
  * Accumulates indexed triangles with a colour per vertex.
@@ -601,8 +668,21 @@ function blob(
   for (const [a, b, c] of OCT_FACES) m.face(base + a, base + b, base + c);
 }
 
-/** Build the shared geometry for one species, at its nominal size. */
-function buildSpecies(species: number): BufferGeometry {
+/**
+ * Build the shared geometry for one species and one crown archetype, at the
+ * species' nominal size.
+ *
+ * `crown` is `CROWN_BROAD` for every species but `BUSH_TREE`, and for those it
+ * means "the one silhouette authored below". The bush tree has four, and the
+ * rule that governs them is stated once here and enforced in
+ * `verifyVegetationCost`: **an archetype may be cheaper than the pipeline's
+ * budgeted cost for its species and may never be dearer.** The budget essay in
+ * `pipeline/sydney/vegetation.py` spends a tile in triangles off a table Python
+ * cannot measure, and a variant that quietly cost sixteen would over-plant
+ * every forest tile in the world by a seventh with nothing in any output saying
+ * so.
+ */
+function buildSpecies(species: number, crown: number): BufferGeometry {
   const m = new MeshBuilder();
   const leaf = FOLIAGE[species];
   const bark = BARK[species];
@@ -682,7 +762,11 @@ function buildSpecies(species: number): BufferGeometry {
       // `EUCALYPT`'s: 16 m tall, 11 m across, nominal radius 5.5. The instance
       // scales therefore land near 1.0 on the same curve the full-detail gums
       // draw from, which is what lets the two stand in one stand without a
-      // visible size step between them.
+      // visible size step between them. Every archetype below is authored to
+      // the same 16 m, and `verifyVegetationCost` measures each one's built top
+      // against `NOMINAL` to say so -- an archetype 30% shorter than its own
+      // species is a 30% shorter tree wherever the pipeline said eighteen
+      // metres, and it would read as a second stratum the ecology does not have.
       //
       // **Fourteen triangles**: a three-sided trunk and one octahedral crown.
       // Three sides is the fewest a cone can have, and on a 0.4 m trunk seen
@@ -693,8 +777,62 @@ function buildSpecies(species: number): BufferGeometry {
       // being traded, it is bought back by the one stem in ten that is not this,
       // and it is why this is a stand-in for a distance tier rather than a
       // species anybody chose.
-      cone(m, [0, 0, 0], [0.4, 9.2, 0.15], 0.42, 0.26, 3, bark, 111);
-      blob(m, [0.5, 13.0, 0.2], [5.5, 3.4, 5.5], leaf, 112);
+      //
+      // The obvious way to spend the fourteen better was asked and refused: two
+      // octahedral crowns and no trunk is sixteen and over budget, and two
+      // crowns at the *expense* of the trunk is twelve triangles of foliage
+      // floating over nothing. A gum without a visible trunk is not a gum. So
+      // the trunk keeps its six and the variation goes where it is free --
+      // which is everywhere except here.
+      //
+      // ---------------------------------------------------------------------
+      // FOUR ARCHETYPES, because one is what the report was about.
+      //
+      // Yaw, plan aspect, lean and tint are all free and all of them are now
+      // applied (see `tile-decode.ts`'s `stemVariation`), but none of them can
+      // change the one thing a low-poly stand is read by at fifty metres, which
+      // is **the proportion of trunk to crown**. An instance transform scales
+      // both together by construction. Only a second geometry can put a long
+      // clean bole under a small deep crown, and that is what these are.
+      switch (crown) {
+        case CROWN_UPRIGHT: {
+          // Suppressed: grown up inside a stand, so the bole is long and clean
+          // and the crown is small, deep and held high. The commonest thing in
+          // a gully and the thing the single archetype never was.
+          cone(m, [0, 0, 0], [-0.3, 11.0, 0.25], 0.34, 0.2, 3, bark, 113);
+          blob(m, [-0.35, 13.0, 0.3], [4.0, 3.7, 4.0], leaf, 114);
+          break;
+        }
+        case CROWN_SPREAD: {
+          // Open-grown: nothing shaded it, so it put its height into a wide flat
+          // head on a short heavy bole. The one that breaks a canopy's skyline.
+          cone(m, [0, 0, 0], [0.7, 7.4, -0.3], 0.5, 0.3, 3, bark, 115);
+          blob(m, [0.8, 12.9, -0.35], [6.9, 2.7, 6.9], leaf, 116);
+          break;
+        }
+        case CROWN_SPAR: {
+          // A dead standing stag, and it is the one archetype that **pays for
+          // itself**: two trunk segments and no crown is twelve triangles
+          // against the fourteen the pipeline budgeted, so a stand with 5% of
+          // these in it comes in under budget rather than over. Sydney dry
+          // sclerophyll is full of them -- fire, drought and dieback all leave
+          // the trunk standing for a decade -- and a bare silver spar among
+          // green crowns is the strongest single break in a canopy's repetition
+          // that fourteen triangles can buy. Taller and much thinner than the
+          // living ones, because a spar has lost its top and its bark.
+          cone(m, [0, 0, 0], [0.35, 7.5, 0.1], 0.4, 0.26, 3, bark, 117);
+          cone(m, [0.35, 7.5, 0.1], [0.9, 14.2, 0.35], 0.26, 0.09, 3, bark, 118);
+          break;
+        }
+        default: {
+          // `CROWN_BROAD`, and it is the shipped one to the vertex: a stand that
+          // changed every stem at once would be a different forest rather than
+          // a more varied one.
+          cone(m, [0, 0, 0], [0.4, 9.2, 0.15], 0.42, 0.26, 3, bark, 111);
+          blob(m, [0.5, 13.0, 0.2], [5.5, 3.4, 5.5], leaf, 112);
+          break;
+        }
+      }
       break;
     }
     case SHRUB: {
@@ -732,7 +870,7 @@ function buildSpecies(species: number): BufferGeometry {
       break;
     }
   }
-  return m.build(`tree_${species}`);
+  return m.build(`tree_${species}_${crown}`);
 }
 
 // --- Wind ---------------------------------------------------------------------
@@ -868,16 +1006,42 @@ function swayNode(): MeshStandardNodeMaterial['positionNode'] {
  * compiled per tile, and pipeline compilation blocks the main thread.
  */
 export class VegetationAssets {
-  private readonly geometries: BufferGeometry[] = [];
+  /**
+   * `SPECIES_COUNT * CROWN_COUNT` slots, `null` where a species does not draw
+   * that archetype. A flat array with holes rather than a map, because
+   * `buildTileTrees` indexes it once per stem and a forest tile has 2,500 of
+   * them; eleven of these are geometries and twenty-one are `null`.
+   */
+  private readonly geometries: Array<BufferGeometry | null> = [];
   readonly material: MeshStandardNodeMaterial;
-  /** Triangles per species. 64-162; spec 7.5's implied ceiling here is 300. */
+  /**
+   * The **worst** archetype's triangle count, per species. 12-162; spec 7.5's
+   * implied ceiling here is 300, and the pipeline's own per-species budget is
+   * the other bar -- see `PIPELINE_TRIANGLES`.
+   */
   readonly triangles: number[] = [];
+  /** Every built archetype's count, `[species][crown]`, `-1` where none is built. */
+  readonly crownTriangles: number[][] = [];
 
   constructor() {
     for (let s = 0; s < SPECIES_COUNT; s++) {
-      const g = buildSpecies(s);
-      this.geometries.push(g);
-      this.triangles.push((g.getIndex()?.count ?? 0) / 3);
+      const crowns = STEM_VARIETY[s]?.crowns ?? 1;
+      const row: number[] = [];
+      let worst = 0;
+      for (let c = 0; c < CROWN_COUNT; c++) {
+        if (c >= crowns) {
+          this.geometries.push(null);
+          row.push(-1);
+          continue;
+        }
+        const g = buildSpecies(s, c);
+        this.geometries.push(g);
+        const tris = (g.getIndex()?.count ?? 0) / 3;
+        row.push(tris);
+        worst = Math.max(worst, tris);
+      }
+      this.crownTriangles.push(row);
+      this.triangles.push(worst);
     }
 
     const material = new MeshStandardNodeMaterial();
@@ -905,11 +1069,21 @@ export class VegetationAssets {
   }
 
   /**
-   * The mesh for one species. The single point where a species becomes geometry
-   * -- an impostor LOD adds a `detail` argument here and changes nothing else.
+   * The mesh for one species and one crown archetype. The single point where a
+   * species becomes geometry -- an impostor LOD adds a `detail` argument here
+   * and changes nothing else.
+   *
+   * Falls back twice, and both falls are reachable only from bad data: an
+   * unknown archetype degrades to the species' own authored silhouette, and an
+   * unknown species to the brush box, which is what a Sydney street tree is
+   * when nothing better is known.
    */
-  geometry(species: number): BufferGeometry {
-    return this.geometries[species] ?? this.geometries[BRUSH_BOX];
+  geometry(species: number, crown: number = CROWN_BROAD): BufferGeometry {
+    return (
+      this.geometries[species * CROWN_COUNT + crown] ??
+      this.geometries[species * CROWN_COUNT] ??
+      (this.geometries[BRUSH_BOX * CROWN_COUNT] as BufferGeometry)
+    );
   }
 }
 
@@ -932,6 +1106,19 @@ export class VegetationAssets {
  * in any output saying so.
  */
 export const PIPELINE_TRIANGLES = [162, 72, 88, 64, 72, 100, 24, 14] as const;
+
+/**
+ * How far an archetype's authored top may sit from its species' `NOMINAL`
+ * height, either way.
+ *
+ * The instance scale is `height / NOMINAL[s][0]`, so a crown archetype authored
+ * short is not a shorter *crown*, it is a shorter *tree* -- everywhere the
+ * pipeline said eighteen metres. Four archetypes drifting apart on this axis
+ * would put a size step through every stand along a line the ecology does not
+ * draw, which is the exact defect `SPECIES_SIZE[BUSH_TREE]`'s comment refuses
+ * for the species as a whole. The shipped eight run 0.89 to 1.09 of nominal.
+ */
+const ARCHETYPE_HEIGHT_BAND: readonly [number, number] = [0.8, 1.15];
 
 /** The client half of `verifyCanopy`. Needs `three`, so it cannot live in `cover.ts`. */
 export function verifyVegetationCost(assets: VegetationAssets): string[] {
@@ -964,14 +1151,113 @@ export function verifyVegetationCost(assets: VegetationAssets): string[] {
     );
   }
   const n = Math.min(assets.triangles.length, PIPELINE_TRIANGLES.length);
+
+  // **The archetype rule**, and it is the one thing standing between four crown
+  // shapes and a silently over-planted world. The pipeline spends a bushland
+  // tile in triangles off `SPECIES_TRIANGLES`, a table Python cannot measure
+  // and can only assert; it prices every stem of a species at one number. So an
+  // archetype may be **cheaper** than that number -- the dead spar is twelve
+  // against fourteen and the tile comes in under budget, which is safe -- and
+  // may never be dearer, because a sixteen-triangle variant at a fifth of the
+  // stems is 5% over every forest tile in the world with nothing in any output
+  // saying a word. And the worst archetype must *equal* the budget, or the
+  // pipeline is leaving triangles unplanted for a stem it never emitted.
   for (let s = 0; s < n; s++) {
+    const crowns = STEM_VARIETY[s]?.crowns ?? 1;
+    const row = assets.crownTriangles[s] ?? [];
+    for (let c = 0; c < CROWN_COUNT; c++) {
+      const built = row[c] ?? -1;
+      if (c < crowns && built < 0) {
+        out.push(`species ${s} draws ${crowns} crown archetypes and archetype ${c} was not built`);
+      }
+      if (c >= crowns && built >= 0) {
+        out.push(`species ${s} built crown archetype ${c} and STEM_VARIETY says it draws ${crowns}`);
+      }
+      if (built > PIPELINE_TRIANGLES[s]) {
+        out.push(
+          `species ${s} crown archetype ${c} is ${built} triangles against the pipeline's ` +
+            `budget of ${PIPELINE_TRIANGLES[s]} -- an archetype may be cheaper and never dearer`,
+        );
+      }
+    }
     if (assets.triangles[s] !== PIPELINE_TRIANGLES[s]) {
       out.push(
-        `species ${s} is ${assets.triangles[s]} triangles, and the pipeline budgets it at ` +
-          `${PIPELINE_TRIANGLES[s]} -- update SPECIES_TRIANGLES in pipeline/sydney/vegetation.py`,
+        `species ${s} is ${assets.triangles[s]} triangles at its worst archetype, and the ` +
+          `pipeline budgets it at ${PIPELINE_TRIANGLES[s]} -- update SPECIES_TRIANGLES in ` +
+          'pipeline/sydney/vegetation.py',
       );
     }
   }
+
+  // Every archetype is the same plant at the same height. See
+  // `ARCHETYPE_HEIGHT_BAND`.
+  for (let s = 0; s < SPECIES_COUNT; s++) {
+    const nominal = NOMINAL[s]?.[0];
+    if (!(nominal > 0)) continue;
+    const crowns = STEM_VARIETY[s]?.crowns ?? 1;
+    for (let c = 0; c < crowns; c++) {
+      const pos = assets.geometry(s, c).getAttribute('position');
+      let top = 0;
+      for (let v = 0; v < pos.count; v++) top = Math.max(top, pos.getY(v));
+      const f = top / nominal;
+      if (f < ARCHETYPE_HEIGHT_BAND[0] || f > ARCHETYPE_HEIGHT_BAND[1]) {
+        out.push(
+          `species ${s} crown archetype ${c} tops out at ${top.toFixed(2)} m, ` +
+            `${f.toFixed(3)} of its NOMINAL ${nominal} m -- outside ` +
+            `[${ARCHETYPE_HEIGHT_BAND[0]}, ${ARCHETYPE_HEIGHT_BAND[1]}]`,
+        );
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // THE PALETTE RULE, NOW PER INSTANCE.
+  //
+  // This file's header states it once for the eight species: *green-dominant,
+  // and blue pulled a long way down under both, because it is February and this
+  // is not England*. Until the per-stem tint existed that was a property of a
+  // table and could be read off it. It is now a property of a **hash**, and a
+  // hue axis wide enough to be worth having is wide enough to walk a species
+  // out of its own palette at one end of it. So the rule is asserted over the
+  // draw rather than over the table: sweep the same hashes the renderer will,
+  // multiply the species' authored albedos by what comes out, and require that
+  // green still leads red and blue on every foliage face of every stem.
+  //
+  // The spar is exempt from the foliage half and only from that half: it has no
+  // foliage on it, it is twelve triangles of dead wood, and its tint is
+  // deliberately warm where a living crown's may not be.
+  {
+    const v = newStemVariation();
+    for (let s = 0; s < SPECIES_COUNT; s++) {
+      const leaf = FOLIAGE[s];
+      const bark = BARK[s];
+      if (!leaf || !bark) {
+        out.push(`species ${s} has no row in FOLIAGE or BARK`);
+        continue;
+      }
+      for (let a = 0; a < 12; a++) {
+        for (let b = 0; b < 12; b++) {
+          stemVariation(s, a * 21 + 3, b * 47.7 - 260.0, a * 13.9 - 90.0, v);
+          const t: [number, number, number] = [v.tintR, v.tintG, v.tintB];
+          if (v.crown !== CROWN_SPAR) {
+            const r = leaf[0] * t[0], g = leaf[1] * t[1], bl = leaf[2] * t[2];
+            if (!(g > r) || !(g > bl)) {
+              out.push(
+                `species ${s} tints a crown to linear (${r.toFixed(4)}, ${g.toFixed(4)}, ` +
+                  `${bl.toFixed(4)}) -- green no longer leads, and the stand stops being Sydney`,
+              );
+            }
+          }
+          for (let k = 0; k < 3; k++) {
+            if (!(bark[k] * t[k] <= 1) || !(leaf[k] * t[k] <= 1)) {
+              out.push(`species ${s} tints an albedo past 1.0 linear on channel ${k}`);
+            }
+          }
+        }
+      }
+    }
+  }
+
   return out;
 }
 
@@ -980,9 +1266,12 @@ export function verifyVegetationCost(assets: VegetationAssets): string[] {
 const _matrix = /*#__PURE__*/ new Matrix4();
 const _position = /*#__PURE__*/ new Vector3();
 const _quaternion = /*#__PURE__*/ new Quaternion();
+const _lean = /*#__PURE__*/ new Quaternion();
+const _leanAxis = /*#__PURE__*/ new Vector3();
 const _scale = /*#__PURE__*/ new Vector3();
 const _up = /*#__PURE__*/ new Vector3(0, 1, 0);
 const _colour = /*#__PURE__*/ new Color();
+const _stem = /*#__PURE__*/ newStemVariation();
 
 /**
  * Build one `InstancedMesh` per species present in a tile.
@@ -1002,44 +1291,77 @@ export function buildTileTrees(
   assets: VegetationAssets,
   groundAt: (x: number, z: number) => number = () => 0,
 ): InstancedMesh[] {
-  const perSpecies: number[][] = Array.from({ length: SPECIES_COUNT }, () => []);
-  for (let i = 0; i < data.count; i++) perSpecies[data.species[i]].push(i);
+  // Bucketed by species **and crown archetype**, because an archetype is a
+  // different geometry and therefore a different mesh. `stemCrown` is the
+  // cheap half of `stemVariation` and exists so this pass can be made without
+  // computing the yaw, the lean and the tint a whole tile early; the two share
+  // one hash stream, so a stem cannot bucket as one archetype here and draw as
+  // another below.
+  const perBucket: number[][] = Array.from(
+    { length: SPECIES_COUNT * CROWN_COUNT },
+    () => [],
+  );
+  for (let i = 0; i < data.count; i++) {
+    const s = data.species[i];
+    perBucket[s * CROWN_COUNT + stemCrown(s, data.seed[i], data.x[i], data.z[i])].push(i);
+  }
 
   const out: InstancedMesh[] = [];
-  for (let s = 0; s < SPECIES_COUNT; s++) {
-    const members = perSpecies[s];
+  for (let bucket = 0; bucket < perBucket.length; bucket++) {
+    const members = perBucket[bucket];
     if (members.length === 0) continue;
+    const s = (bucket / CROWN_COUNT) | 0;
+    const crown = bucket % CROWN_COUNT;
 
-    const mesh = new InstancedMesh(assets.geometry(s), assets.material, members.length);
-    mesh.name = `trees_${s}`;
+    const mesh = new InstancedMesh(assets.geometry(s, crown), assets.material, members.length);
+    mesh.name = `trees_${s}_${crown}`;
     const [nominalHeight, nominalRadius] = NOMINAL[s];
 
     for (let n = 0; n < members.length; n++) {
       const i = members[n];
-      const seed = data.seed[i];
+      stemVariation(s, data.seed[i], data.x[i], data.z[i], _stem);
       _position.set(data.x[i], groundAt(data.x[i], data.z[i]), data.z[i]);
-      // Yaw from the seed. A row of street trees all facing the same way is the
-      // single most obvious tell that they were instanced, and one rotation is
-      // the cheapest possible fix for it.
-      _quaternion.setFromAxisAngle(_up, (seed / 256) * Math.PI * 2);
+
+      // Yaw. A row of street trees all facing the same way is the single most
+      // obvious tell that they were instanced -- and this was already here, off
+      // `seed / 256`, which is 256 distinct bearings over a forest tile that
+      // holds ten times that. `stemVariation` hashes the stem's own position in
+      // with the seed, which is where the cycle goes away.
+      _quaternion.setFromAxisAngle(_up, _stem.yawTurns * Math.PI * 2);
+      if (_stem.lean > 0) {
+        // A horizontal axis square to the bearing, so the crown tips *toward*
+        // the bearing. Premultiplied rather than multiplied: the yaw is the
+        // tree's own frame and the lean is the world's, which is the order the
+        // two happen in -- a tree grows at a bearing and then leans off
+        // vertical, and composing them the other way would swing the crown
+        // around a tilted pole. The base is at the origin of the geometry
+        // either way, so a leaning stem stays in the ground.
+        const b = _stem.leanTurns * Math.PI * 2;
+        _leanAxis.set(-Math.sin(b), 0, Math.cos(b));
+        _lean.setFromAxisAngle(_leanAxis, _stem.lean);
+        _quaternion.premultiply(_lean);
+      }
+
       const sy = data.height[i] / nominalHeight;
       const sxz = data.radius[i] / nominalRadius;
-      _scale.set(sxz, sy, sxz);
+      // Area-preserving in plan: `a` across and `1 / a` along, so a crown stops
+      // being a circle seen from above without the stand gaining or losing a
+      // square metre of canopy. That last part is load-bearing -- the pipeline's
+      // cover arithmetic is `stems x pi r^2` off the radius in the sidecar, and
+      // a variation that quietly changed the mean area would make that number a
+      // fiction.
+      _scale.set(sxz * _stem.aspect, sy, sxz / _stem.aspect);
       _matrix.compose(_position, _quaternion, _scale);
       mesh.setMatrixAt(n, _matrix);
 
-      // Hue jitter, +/-8%, weighted toward blue because that is the axis dry
-      // foliage actually varies along -- a stressed tree goes grey-blue and a
-      // watered one goes deeper green, and neither changes its red much. It
-      // multiplies the trunk too, which is correct: bark varies at least as much.
-      const a = hash(seed, s, 1);
-      const b = hash(seed, s, 2);
-      const c = hash(seed, s, 3);
-      _colour.setRGB(
-        1 + (a - 0.5) * 0.11,
-        1 + (b - 0.5) * 0.09,
-        1 + (c - 0.5) * 0.16,
-      );
+      // Value and hue off one axis rather than three independent channels --
+      // `tile-decode.ts`'s `stemVariation` holds the argument, and the short of
+      // it is that three independent channels are chromatic noise and a real
+      // gum stand varies along one line from grey-blue to khaki. Free: the
+      // material has no `colorNode`, so this arrives through the built-in
+      // `instanceColor` multiply. It scales the trunk too, which is correct --
+      // bark varies at least as much as foliage does.
+      _colour.setRGB(_stem.tintR, _stem.tintG, _stem.tintB);
       mesh.setColorAt(n, _colour);
     }
     mesh.instanceMatrix.needsUpdate = true;

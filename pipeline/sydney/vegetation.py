@@ -348,6 +348,14 @@ SIZE_WOBBLE: dict[int, float] = {SHRUB: 0.4}
 # same as a 162-triangle fig, which is wrong by a factor of seven in the one
 # direction that decides whether a heath is affordable.
 #
+# **An upper bound per stem, not an exact cost**, since the tree-variety round:
+# the client draws `BUSH_TREE` as one of four crown archetypes and one of them
+# -- the dead spar, at 5% of stems -- is twelve triangles rather than fourteen.
+# So a forest tile spends about 13.9 a stem against the 14 budgeted here and
+# comes in marginally under. `world/vegetation.ts`'s `verifyVegetationCost` is
+# what holds that direction: an archetype may be cheaper than the number below
+# and may never be dearer.
+#
 # Derived rather than measured, and the derivation is the whole check on it:
 # `world/vegetation.ts`'s `buildSpecies` builds each species out of `cone` --
 # `2 * sides` triangles -- and `lobe`, an icosahedron at 20, or `blob`, an
@@ -661,9 +669,12 @@ WETLAND_MIX: tuple[tuple[int, float], ...] = ((BUSH_TREE, 0.90), (PAPERBARK, 0.1
 #: triangles after the cap.
 BUSH_DENSITY: dict[str, tuple[float | None, float | None, tuple[tuple[int, float], ...]]] = {
     # 71 canopy stems a hectare, against an ecological 100-200 for the canopy
-    # layer of Sydney coastal dry sclerophyll. At a 6 m mean crown radius that is
-    # ~80% canopy cover: a forest with sky through it, which is what an open
-    # forest is, rather than the 11 stems and 13% cover a full-mesh budget bought.
+    # layer of Sydney coastal dry sclerophyll. At a 5.7 m mean crown radius that
+    # is ~76% canopy cover: a forest with sky through it, which is what an open
+    # forest is, rather than the 11 stems and 13% cover a full-mesh budget
+    # bought. It was ~80% on a 6.0 m mean before the tree layer's size draw
+    # became a reverse-J -- see `BUSH_T_TOP`, which spends those four points on
+    # a stand that has seedlings and emergents in it instead of one age class.
     osm.COVER_FOREST: (None, 140.0, FOREST_MIX),
     # 62 shrubs and 4 gums a hectare. A real coastal scrub is nearer 800 shrubs,
     # so this is still the class the budget shortchanges hardest -- a scrub is
@@ -685,19 +696,103 @@ BUSH_DENSITY: dict[str, tuple[float | None, float | None, tuple[tuple[int, float
     osm.COVER_ROUGH: (None, 1700.0, ROUGH_MIX),
 }
 
-#: Where on its own size curve a bushland instance is drawn from. `_size` runs
+#: Where on its own size curve a bushland **shrub** is drawn from. `_size` runs
 #: `t` over the whole 0-1 range, which is right for a park specimen and wrong for
 #: a forest: a stand of gums is *mature* -- the small ones are the understorey
 #: and are not what an instance with a crown represents. Biasing `t` into the
 #: top two thirds costs nothing and takes canopy cover from ~8% to ~17% at the
 #: same stem count, which is the cheapest thing in this round.
+#:
+#: **The tree layer no longer uses this**; see `BUSH_T_TOP` below for what
+#: replaced it and why the shrub layer kept it.
 BUSH_T_FLOOR = 0.35
+
+#: The tree layer's draw, and the answer to *"the new tree models are very
+#: homogenous"* (Riverside Drive, Chatswood West, 2026-08-24).
+#:
+#: ---------------------------------------------------------------------------
+#: WHAT THE OLD DRAW ACTUALLY WAS, because it is worse than it reads.
+#:
+#: `t = BUSH_T_FLOOR + (1 - BUSH_T_FLOOR) * u` is **uniform on [0.35, 1.0]**, so
+#: a bush tree came out uniformly between 14.8 m and 20.0 m. That is a 1.35:1
+#: spread with no mode and no tail -- not a forest, a **plantation**: one age
+#: class, planted the same year, and no amount of client-side yaw or colour can
+#: make a thousand stems of one height read as a stand. Sydney sandstone dry
+#: sclerophyll is the opposite. It burns, it regenerates in cohorts, it is
+#: rock-shelf thin in one gully and deep-soil tall in the next, and its stem
+#: diameters follow the reverse-J every unmanaged forest on earth follows: many
+#: small, fewer medium, a handful of emergents over the canopy.
+#:
+#: So the draw is `t = BUSH_T_TOP * u ** BUSH_T_SKEW`. A power law is the whole
+#: of it -- one multiply and one `**` in the hottest loop in the module -- and it
+#: does three things a floor cannot:
+#:
+#:   * the mode moves to the bottom. Quartiles for a bush tree go from
+#:     15.3 / 17.4 / 19.5 m to **13.3 / 16.0 / 19.4 m**, and the p90/p10 spread
+#:     from 1.27 to 1.77. `vegetation-audit` now measures exactly that number.
+#:   * the top opens past the species' own range, the way a *measured* specimen
+#:     is already allowed to (see `MEASURED_T_MAX`, which is 1.6 and which this
+#:     stays well inside). The tallest 3% of a stand are emergents at 23 m, and
+#:     an emergent breaking a canopy's skyline is most of what says "forest"
+#:     from outside it.
+#:   * the floor drops to the species' own minimum, so seedlings and mature
+#:     trees stand together. The header's argument for the floor -- that an
+#:     instance with a crown is a canopy tree and not understorey -- survives
+#:     that: 12 m is still a canopy tree. It is a *young* one.
+#:
+#: **What it costs**, stated because the floor was bought with canopy cover and
+#: this gives some of it back. Cover is `stems x pi r^2` off the sidecar radius,
+#: and `E[r^2]` goes from 36.6 m^2 to 34.0 -- so ~82% cover becomes **~76%** at
+#: the same 71 stems a hectare and the same 40,000 triangles. Four points of
+#: cover for an uneven-aged stand is the trade, and it is the right way round:
+#: 82% cover of one repeated tree is what was reported as broken.
+#:
+#: The shrub layer is deliberately left on `BUSH_T_FLOOR`, and that is not
+#: laziness. The reverse-J is an *age structure* argument and heath is even-aged
+#: by fire; and `SPECIES_SIZE[SHRUB]` already swings +/-50% about its own
+#: midpoint where a tree swings +/-25%, so the shrub layer's relative size
+#: spread is 1.57 against the tree layer's old 1.27. It was never the flat one.
+BUSH_T_TOP = 1.45
+BUSH_T_SKEW = 1.55
+
+#: The client's instance scale a bushland draw may not push past.
+#:
+#: The emergent tail is the reason this exists: `t > 1` puts an instance past
+#: the top of its species' authored range, which is exactly what
+#: `MEASURED_T_MAX` already allows a surveyed specimen, and past far enough the
+#: geometry stops being the thing it was authored as. `vegetation-audit`'s
+#: `--max-scale` is 1.60 and this is 1.55, leaving the margin `_size`'s spread
+#: wobble wants underneath it.
+#:
+#: It binds on nothing in any bushland mix today -- every one of the five tree
+#: species could carry `t = 1.5` -- and that is the point of deriving it rather
+#: than tabling it. A species whose range is narrow against its own midpoint
+#: reaches a given scale at a much lower `t`: the shrub hits 1.55x at t = 1.05
+#: where the bush tree is still at 1.51, which is the same fact
+#: `SIZE_WOBBLE`'s comment records from the other end. Adding one to a tree mix
+#: cannot silently ship an instance past the audit.
+BUSH_SCALE_MAX = 1.55
 
 #: Trees and shrubs stand closer together in bush than specimens do in a park,
 #: and `CLEAR_IN_PARK`'s 8 m would thin a forest by two thirds before the budget
 #: ever saw it. These are minimum trunk separations, not crown separations --
 #: crowns in a forest overlap, which is what a canopy is.
-CLEAR_IN_BUSH = 3.5
+#:
+#: The tree figure was 3.5 m and is **2.0**, and the reason is spacing rather
+#: than density: `_bush_layer` confines each stem to the middle
+#: `(cell - clear) / cell` of its own cell, so the separation *is* the jitter
+#: budget. At a 11.8 m forest cell, 3.5 m let a stem move +/-4.15 m and the
+#: lattice still read as a lattice from inside the stand; 2.0 m lets it move
+#: +/-4.91 m, and two neighbours can now stand two metres apart or twenty-two.
+#: Two metres of trunk separation is not a crowded forest, it is a forest.
+#:
+#: What this does **not** buy is clumping -- one stem per cell is still one stem
+#: per cell, so the density is uniform where a real stand has thickets and rock
+#: shelves. The fix for that is a lattice at half the cell area with a Bernoulli
+#: keep, which is a genuine Poisson scatter at the same mean density and is
+#: refused here for a measured reason: it doubles the `prepared.contains` calls,
+#: which are the dominant cost of the whole source over six million cells.
+CLEAR_IN_BUSH = 2.0
 CLEAR_IN_SHRUB = 1.2
 
 #: No stem within this of the polygon edge. Smaller than a park's 3 m because a
@@ -836,7 +931,32 @@ def species_from_taxon(taxon: str) -> int | None:
     return None
 
 
-def _size(species: int, h: int, street: bool, t_floor: float = 0.0) -> tuple[float, float]:
+def _bush_t_ceiling(species: int) -> float:
+    """The highest `t` this species may be drawn at, from `BUSH_SCALE_MAX`.
+
+    Derived rather than tabled, on this module's usual rule: the client's two
+    instance scale factors are `height / nominalHeight` and
+    `radius / nominalRadius`, both of them affine in `t`, so the largest `t`
+    that keeps both under the cap is one solve per axis and the smaller of the
+    two. A table would be a fifth per-species table to forget a row of.
+    """
+    h_lo, h_hi, s_lo, s_hi = SPECIES_SIZE[species]
+    nom_h, nom_r = nominal_size(species)
+    limits = []
+    if h_hi > h_lo:
+        limits.append((BUSH_SCALE_MAX * nom_h - h_lo) / (h_hi - h_lo))
+    if s_hi > s_lo:
+        limits.append((BUSH_SCALE_MAX * nom_r * 2.0 - s_lo) / (s_hi - s_lo))
+    return min(limits) if limits else 1.0
+
+
+def _size(
+    species: int,
+    h: int,
+    street: bool,
+    t_floor: float = 0.0,
+    t_top: float = 0.0,
+) -> tuple[float, float]:
     """Draw a height and canopy radius for one instance.
 
     Height and spread come off the *same* normalised draw plus a small
@@ -852,23 +972,37 @@ def _size(species: int, h: int, street: bool, t_floor: float = 0.0) -> tuple[flo
     reaches the kerb as a surveyed node.
 
     `t_floor` is the same argument from the other end and is what the bushland
-    scatter uses. A stand of forest is *mature*: the small stems in it are the
-    understorey, and an instance with a crown does not represent one of those --
-    it represents a canopy tree. Lifting the floor of the draw to
-    `BUSH_T_FLOOR` costs nothing, keeps height and spread on the same `t` so the
-    client's two scale factors stay in step, and takes canopy cover from about
-    8% to about 17% at the same stem count. Exclusive with `street`, which is
-    the same knob pointed the other way; nothing asks for both.
+    **shrub** layer uses. A stand is *mature*: the small stems in it are the
+    understorey, and an instance with a crown does not represent one of those.
+    Lifting the floor of the draw to `BUSH_T_FLOOR` costs nothing, keeps height
+    and spread on the same `t`, and takes canopy cover from about 8% to 17% at
+    the same stem count.
+
+    `t_top` is the bushland **tree** layer's, and it replaced a floor with a
+    reverse-J: `BUSH_T_TOP * u ** BUSH_T_SKEW`, clamped per species by
+    `_bush_t_ceiling`. `BUSH_T_TOP`'s comment is the whole argument and the
+    measured before-and-after. The three knobs are mutually exclusive and
+    nothing asks for two.
+
+    The spread clamp is `max(1.0, t)` rather than `1.0`, and the change is
+    exact rather than cosmetic: for every `t <= 1` -- which is every draw this
+    module made before the emergent tail existed -- `max(1.0, t)` **is** the
+    float 1.0, so no instance in the shipped city moves by a bit. Above 1 it is
+    what keeps the emergents' spread following their height instead of pinning
+    at `s_hi` and pulling the two scale factors apart, which is the one
+    distortion `vegetation-audit` was built to convict.
     """
     h_lo, h_hi, s_lo, s_hi = SPECIES_SIZE[species]
     t = _unit(h, 1)
     if street:
         t *= 0.7
+    elif t_top > 0.0:
+        t = min(t_top, _bush_t_ceiling(species)) * t**BUSH_T_SKEW
     elif t_floor > 0.0:
         t = t_floor + (1.0 - t_floor) * t
     wobble = (_unit(h, 2) - 0.5) * 0.25 * SIZE_WOBBLE.get(species, 1.0)
     height = h_lo + (h_hi - h_lo) * t
-    spread = s_lo + (s_hi - s_lo) * min(max(t + wobble, 0.0), 1.0)
+    spread = s_lo + (s_hi - s_lo) * min(max(t + wobble, 0.0), max(1.0, t))
     return height, spread * 0.5
 
 
@@ -1896,7 +2030,14 @@ class VegetationNetwork:
                 ):
                     continue
                 species = _pick(mix, _unit(h, 8))
-                height, radius = _size(species, h, street=False, t_floor=BUSH_T_FLOOR)
+                # The two layers draw their sizes differently and the split is
+                # `BUSH_T_TOP`'s comment: a tree layer is uneven-aged and gets
+                # the reverse-J with its emergent tail, a shrub layer is
+                # even-aged by fire and keeps the floor it always had.
+                if layer == 0:
+                    height, radius = _size(species, h, street=False, t_floor=BUSH_T_FLOOR)
+                else:
+                    height, radius = _size(species, h, street=False, t_top=BUSH_T_TOP)
                 placed.append(Tree(east, north, height, radius, species, h & 0xFF, "bush"))
         return placed
 

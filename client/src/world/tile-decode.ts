@@ -955,6 +955,453 @@ export function decodeVegetation(buffer: ArrayBuffer): TileVegetation | null {
   return out;
 }
 
+// --- One stem is not the tree beside it ---------------------------------------
+
+/**
+ * The species indices, and they live here for the same reason `SPECIES_COUNT`
+ * does: the decode clamps against the count, the variation table below is keyed
+ * by the index, and both of those run where there is no `three`.
+ * `world/vegetation.ts` imports them rather than keeping a second copy, because
+ * a second copy of an APPEND-ONLY wire enumeration is exactly the thing that
+ * shipped `NOMINAL` two rows short.
+ */
+export const FIG = 0;
+export const PLANE = 1;
+export const JACARANDA = 2;
+export const PAPERBARK = 3;
+export const BRUSH_BOX = 4;
+export const EUCALYPT = 5;
+export const SHRUB = 6;
+export const BUSH_TREE = 7;
+
+/**
+ * Deterministic hash, [0, 1). Integer parts only.
+ *
+ * Was `world/vegetation.ts`'s private author-time helper and is now shared,
+ * because the per-instance path below wants exactly the same function and two
+ * copies of a hash is two different worlds the first time one of them is
+ * tuned. Still cheap enough for the per-instance path: a forest tile is ~2,500
+ * stems and eight hashes each, which is twenty thousand `Math.imul` chains
+ * against the same tile's 1.6 MB of GLB parse.
+ */
+export function stemHash(...parts: number[]): number {
+  let h = 0x811c9dc5;
+  for (const p of parts) {
+    h ^= Math.imul(p | 0, 0x27d4eb2d) >>> 0;
+    h = Math.imul(h ^ (h >>> 15), 0x85ebca6b) >>> 0;
+  }
+  return ((h ^ (h >>> 13)) >>> 0) / 0xffffffff;
+}
+
+/**
+ * Crown archetypes. A species with `crowns: 1` in `STEM_VARIETY` draws only
+ * `CROWN_BROAD`, which for it means "the one silhouette `buildSpecies`
+ * authored"; only `BUSH_TREE` has more than one, and the reason is in the
+ * paragraph on cost below.
+ */
+export const CROWN_BROAD = 0;
+export const CROWN_UPRIGHT = 1;
+export const CROWN_SPREAD = 2;
+export const CROWN_SPAR = 3;
+export const CROWN_COUNT = 4;
+
+/** How often each archetype is drawn, over the species that has all four. */
+export const CROWN_SHARE = [0.4, 0.3, 0.25, 0.05] as const;
+
+/**
+ * Per-instance variation for one vegetation stem: everything that makes two
+ * instances of one geometry read as two plants rather than as one stamped
+ * twice.
+ *
+ * Here rather than in `world/vegetation.ts` for the reason everything in this
+ * file is here -- it is arithmetic over the sidecar's own numbers, there is no
+ * `three` in it, and that is what lets `verifyStemVariety` run in the server's
+ * boot list as well as the browser's. That matters more than tidiness: the
+ * dangerous failure in a per-instance variation is not that it looks wrong, it
+ * is that it is *unbounded*, and a lean that can reach ninety degrees is a
+ * fallen tree. A bound is only a bound if something asserts it, and the only
+ * assertion that costs nothing to run is one that needs no GPU.
+ *
+ * ---------------------------------------------------------------------------
+ * WHAT VARIES, IN THE ORDER OF WHAT IT COSTS.
+ *
+ * The report was a canopy at Chatswood West: near-identical dark octahedral
+ * crowns, all about the same size, the same orientation and the same colour, on
+ * thin bare trunks. It reads as one tree stamped a thousand times, which is
+ * what it was -- nine stems in ten in a bushland stand are `BUSH_TREE`, one
+ * fourteen-triangle geometry shared by every instance in the world.
+ *
+ * The budget essay in `pipeline/sydney/vegetation.py` is not negotiable, so
+ * everything below is ordered by what it costs and the free things come first:
+ *
+ *   yaw       free, and it was **already applied** -- off `seed / 256`, which
+ *             is a 256-value cycle over a forest tile's 2,500 stems, so one
+ *             stem in ten was the same tree at the same bearing as the one you
+ *             were looking at. Hashed with the stem's own position now, which
+ *             is where the cycle goes away. An octahedral crown is also nearly
+ *             four-fold symmetric about its axis, so yaw alone was never going
+ *             to carry this: it is the cheapest variation and the weakest.
+ *   aspect    free. `sx = sxz * a` and `sz = sxz / a`, so the plan **area** is
+ *             preserved exactly and the pipeline's canopy-cover arithmetic is
+ *             untouched -- only the shape moves, and a canopy of ellipses at
+ *             random bearings stops reading as a canopy of circles.
+ *   lean      free. A tilt off vertical about a hashed bearing, squared so the
+ *             stand is mostly upright with a few leaners rather than uniformly
+ *             drunk. Applied about the trunk base, so a leaning tree stays in
+ *             the ground.
+ *   tint      free, and the largest single win available. The foliage material
+ *             already multiplies by `instanceColor` when the object has one --
+ *             `world/vegetation.ts` says so in the comment on its missing
+ *             `colorNode` -- so this is one built-in multiply, no shader graph,
+ *             no new pipeline and no new attribute buffer beyond the one that
+ *             was already being filled.
+ *   crown     **not** free, and it is the only thing here that is not: an
+ *             archetype is a second geometry and therefore a second
+ *             `InstancedMesh` on any tile that draws it. Triangles per stem do
+ *             not move -- see `CROWN_TRIANGLE_RULE` in `verifyVegetationCost` --
+ *             but a bushland tile goes from one bush-tree draw to four. Over
+ *             the streamer's 25 resident tiles that is +75 instanced draws on a
+ *             frame which, by the same header's measurement, carries none of
+ *             the CBD's 3,759 parked cars, none of its crowd and none of its
+ *             street furniture. It is the cheapest frame in the world and it
+ *             can afford three more binds a tile.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THE TINT IS TWO NUMBERS AND NOT THREE.
+ *
+ * The variation this replaced was three independent per-channel jitters, and
+ * three independent channels is *hue noise*: it moves every instance somewhere
+ * random in colour space, which at the amplitude that is visible reads as
+ * chromatic aberration rather than as a stand of plants. A real eucalypt stand
+ * varies along exactly one line -- grey-blue at one end (glaucous, wax-bloomed,
+ * a stressed or a high-country gum), khaki-olive at the other (dusty, sun-hit,
+ * end of summer) -- with brightness varying independently of it.
+ *
+ * So: a **value** term and a **hue** term. The hue term moves red up and blue a
+ * long way down toward olive, and the reverse toward blue-grey, and leaves green
+ * almost alone -- which is what keeps the whole range inside the palette rule
+ * `world/vegetation.ts`'s header states and `verifyVegetationCost` now enforces
+ * per instance rather than per species: **green over red and green over blue at
+ * both extremes**. It is February and it is still not England at either end of
+ * the axis.
+ *
+ * The same tint multiplies the trunk, which is correct and was correct before:
+ * bark varies at least as much as foliage does, and a stem whose canopy went
+ * khaki with a grey-blue trunk under it would be two plants.
+ */
+export interface StemVariation {
+  /** Yaw about the vertical, in **turns**: [0, 1). Turns, so the bound is trivial. */
+  yawTurns: number;
+  /** Tilt off vertical, radians: [0, `LEAN_MAX`]. */
+  lean: number;
+  /** The bearing the crown leans toward, in turns: [0, 1). */
+  leanTurns: number;
+  /** Plan aspect: local x is multiplied by this and local z divided by it. */
+  aspect: number;
+  /** Per-instance colour multiplier, all three in [`TINT_MIN`, `TINT_MAX`]. */
+  tintR: number;
+  tintG: number;
+  tintB: number;
+  /** Which crown archetype: 0..`CROWN_COUNT` - 1. */
+  crown: number;
+}
+
+/** How hard each variation blows on one species. */
+export interface StemVarietyRow {
+  /** Multiplier on the two tint amplitudes. 0 is one flat colour per species. */
+  tint: number;
+  /** Peak tilt off vertical, radians. */
+  lean: number;
+  /** Peak half-amplitude of the area-preserving plan aspect. */
+  aspect: number;
+  /** How many crown archetypes this species draws. 1 is the authored one. */
+  crowns: number;
+}
+
+/** The two tint amplitudes at `tint: 1.0`. Value first, then the hue axis. */
+const TINT_VALUE = 0.13;
+const TINT_HUE_R = 0.085;
+const TINT_HUE_G = 0.02;
+const TINT_HUE_B = 0.3;
+
+/** Dead wood is paler than living bark, and never blue. */
+const SPAR_PALE = 1.1;
+
+/** The bounds every row and every draw is asserted against. */
+export const LEAN_MAX = 0.16;
+export const ASPECT_MAX = 0.22;
+export const TINT_SPREAD_MAX = 1.2;
+export const TINT_MIN = 0.55;
+export const TINT_MAX = 1.55;
+
+/**
+ * Per species, and **every species needs a row** -- the register `NOMINAL` set
+ * on 2026-08-24 by shipping two rows short and taking every bushland tile in
+ * the world down with `undefined is not iterable`. `verifyStemVariety` reads
+ * each row rather than counting the object's keys, because a `Record<number, …>`
+ * with a typo'd key counts fine.
+ *
+ * The spreads are not uniform across the eight and that is the whole content of
+ * the table. A row of London planes down George Street genuinely *is* uniform:
+ * they are one nursery clone, planted in one season, pruned to a ball by one
+ * contractor, and staked straight. A stand of sandstone dry sclerophyll is the
+ * opposite of all four. So the street broadleaves keep about half the
+ * amplitude, the sclerophyll species get all of it, and the bush tree -- which
+ * is nine stems in ten of every stand and the whole subject of the report --
+ * gets all of it plus the four crown archetypes.
+ */
+export const STEM_VARIETY: Record<number, StemVarietyRow> = {
+  // Park giants, and there are never many in a frame. A fig leans a little
+  // because a fig on a harbour headland does.
+  [FIG]: { tint: 0.5, lean: 0.03, aspect: 0.1, crowns: 1 },
+  // The most uniform thing that grows in this city, and it should stay that way.
+  [PLANE]: { tint: 0.4, lean: 0.015, aspect: 0.07, crowns: 1 },
+  [JACARANDA]: { tint: 0.5, lean: 0.035, aspect: 0.12, crowns: 1 },
+  // Melaleuca is a swamp tree with a hard glaucous leaf: more colour range than
+  // a street broadleaf, and it leans out of a bank.
+  [PAPERBARK]: { tint: 0.7, lean: 0.05, aspect: 0.1, crowns: 1 },
+  [BRUSH_BOX]: { tint: 0.5, lean: 0.02, aspect: 0.09, crowns: 1 },
+  // The full amplitude. A gum stand is the thing the hue axis was drawn for.
+  [EUCALYPT]: { tint: 1.0, lean: 0.07, aspect: 0.16, crowns: 1 },
+  // A wind-pruned heath shrub is splayed, asymmetric in plan and every colour
+  // from grey to olive within one metre. The widest aspect of the eight, and
+  // the least lean -- there is not enough of it above ground to lean.
+  [SHRUB]: { tint: 1.0, lean: 0.04, aspect: 0.2, crowns: 1 },
+  // 0.10 rad is 5.7 degrees at the peak and the square makes the median under
+  // two. That is a stand with a few leaners in it, which is what a gully stand
+  // is; it is nowhere near the `LEAN_MAX` that would be a fallen tree.
+  [BUSH_TREE]: { tint: 1.0, lean: 0.1, aspect: 0.16, crowns: CROWN_COUNT },
+};
+
+/**
+ * Which crown archetype a stem draws. Split out of `stemVariation` because
+ * `buildTileTrees` needs it a whole tile ahead of the rest, to know how many
+ * `InstancedMesh`es to make and how big -- and two functions that disagree
+ * about it would bucket a stem into one mesh and transform it as another.
+ */
+export function stemCrown(species: number, seed: number, x: number, z: number): number {
+  const row = STEM_VARIETY[species];
+  if (!row || row.crowns <= 1) return CROWN_BROAD;
+  let total = 0;
+  for (let c = 0; c < row.crowns; c++) total += CROWN_SHARE[c];
+  let acc = stemHash(seed, Math.round(x * 100) | 0, Math.round(z * 100) | 0, 5) * total;
+  for (let c = 0; c < row.crowns; c++) {
+    acc -= CROWN_SHARE[c];
+    if (acc < 0) return c;
+  }
+  return row.crowns - 1;
+}
+
+/**
+ * Everything that varies for one stem, written into `out` rather than returned,
+ * because this runs 2,500 times a bushland tile and the module's other hot
+ * paths keep their scratch the same way.
+ *
+ * **Deterministic in the sidecar and in nothing else.** The seed is one byte,
+ * which is 256 distinct plants over a tile that holds ten times that, so the
+ * stem's own tile-local position joins it -- quantised to the centimetre, so
+ * the draw is a pure function of the two float32s the pipeline wrote and not of
+ * anything the renderer decided along the way. Nothing here reads the instance
+ * index, the tile key or the clock: two clients, and this process, get the same
+ * forest.
+ */
+export function stemVariation(
+  species: number,
+  seed: number,
+  x: number,
+  z: number,
+  out: StemVariation,
+): void {
+  const row = STEM_VARIETY[species] ?? STEM_VARIETY[BUSH_TREE];
+  const qx = Math.round(x * 100) | 0;
+  const qz = Math.round(z * 100) | 0;
+
+  out.yawTurns = stemHash(seed, qx, qz, 1);
+
+  // Squared, so the distribution piles up at vertical: the median lean is a
+  // quarter of the peak and three stems in four are under half of it.
+  const l = stemHash(seed, qx, qz, 2);
+  out.lean = row.lean * l * l;
+  out.leanTurns = stemHash(seed, qx, qz, 3);
+
+  out.aspect = 1.0 + (stemHash(seed, qx, qz, 4) - 0.5) * 2.0 * row.aspect;
+
+  const crown = stemCrown(species, seed, x, z);
+  out.crown = crown;
+
+  const value = 1.0 + (stemHash(seed, qx, qz, 6) - 0.5) * 2.0 * TINT_VALUE * row.tint;
+  const hueAxis = (stemHash(seed, qx, qz, 7) - 0.5) * 2.0 * row.tint;
+  // A spar carries no foliage at all, so the foliage axis is the wrong one for
+  // it: weathered gum wood is silver-grey, a touch warmer than living bark and
+  // never blue. Half the axis, folded to the warm side, and paler overall.
+  const spar = crown === CROWN_SPAR;
+  const hue = spar ? Math.abs(hueAxis) * 0.5 : hueAxis;
+  const v = spar ? value * SPAR_PALE : value;
+  out.tintR = v * (1.0 + TINT_HUE_R * hue);
+  out.tintG = v * (1.0 - TINT_HUE_G * hue);
+  out.tintB = v * (1.0 - TINT_HUE_B * hue);
+}
+
+/** A `StemVariation` with every field at its no-variation value. */
+export function newStemVariation(): StemVariation {
+  return {
+    yawTurns: 0,
+    lean: 0,
+    leanTurns: 0,
+    aspect: 1,
+    tintR: 1,
+    tintG: 1,
+    tintB: 1,
+    crown: CROWN_BROAD,
+  };
+}
+
+/**
+ * The three-free half of the tree-variety check, and it runs in **both** boot
+ * lists -- `client/src/main.ts` and `server/index.ts`. Its sibling
+ * `verifyVegetationCost` needs `three` to build a geometry and can only run in
+ * the browser, so everything that can be asserted without one is asserted here
+ * instead.
+ *
+ * Four questions, and the second is the one this exists for:
+ *
+ *   1. every species has a usable row, **read row by row**;
+ *   2. every draw is inside its bound, over a sweep -- because an unbounded
+ *      lean is a fallen tree and an unbounded aspect is a pancake, and both
+ *      would ship looking like a data problem rather than like a code one;
+ *   3. the draw is deterministic and is a function of the sidecar only;
+ *   4. the 256-value seed cycle that made a forest repeat every tenth stem is
+ *      actually gone -- which is a regression test with a screenshot behind it.
+ */
+export function verifyStemVariety(): string[] {
+  const out: string[] = [];
+
+  for (let s = 0; s < SPECIES_COUNT; s++) {
+    const row = STEM_VARIETY[s];
+    if (!row) {
+      out.push(`STEM_VARIETY has no row for species ${s}`);
+      continue;
+    }
+    if (!(row.tint >= 0) || row.tint > TINT_SPREAD_MAX) {
+      out.push(`STEM_VARIETY[${s}].tint is ${row.tint}, outside [0, ${TINT_SPREAD_MAX}]`);
+    }
+    if (!(row.lean >= 0) || row.lean > LEAN_MAX) {
+      out.push(
+        `STEM_VARIETY[${s}].lean is ${row.lean} rad, outside [0, ${LEAN_MAX}] -- ` +
+          'a stem that leans further than this is a fallen tree, not a plant',
+      );
+    }
+    if (!(row.aspect >= 0) || row.aspect > ASPECT_MAX) {
+      out.push(`STEM_VARIETY[${s}].aspect is ${row.aspect}, outside [0, ${ASPECT_MAX}]`);
+    }
+    if (!Number.isInteger(row.crowns) || row.crowns < 1 || row.crowns > CROWN_COUNT) {
+      out.push(`STEM_VARIETY[${s}].crowns is ${row.crowns}, outside 1..${CROWN_COUNT}`);
+    }
+  }
+
+  if (CROWN_SHARE.length !== CROWN_COUNT) {
+    out.push(`CROWN_SHARE has ${CROWN_SHARE.length} rows against CROWN_COUNT ${CROWN_COUNT}`);
+  }
+  const shareSum = CROWN_SHARE.reduce((a, b) => a + b, 0);
+  if (Math.abs(shareSum - 1) > 1e-9 || CROWN_SHARE.some((w) => !(w > 0))) {
+    out.push(`CROWN_SHARE sums to ${shareSum} and must sum to 1 with every share positive`);
+  }
+
+  // The sweep. 8 seeds x 8 eastings x 8 northings a species is 512 draws, and
+  // the whole thing is 4,096 -- under a millisecond, and it is the only way the
+  // bounds above become facts about the output rather than about the table.
+  const v = newStemVariation();
+  const seen: number[] = new Array(CROWN_COUNT).fill(0);
+  let bushDraws = 0;
+  for (let s = 0; s < SPECIES_COUNT; s++) {
+    const row = STEM_VARIETY[s];
+    if (!row) continue;
+    for (let a = 0; a < 8; a++) {
+      for (let b = 0; b < 8; b++) {
+        for (let c = 0; c < 8; c++) {
+          const seed = a * 31 + 7;
+          const x = b * 61.3 - 240.0;
+          const z = c * 57.9 - 210.0;
+          stemVariation(s, seed, x, z, v);
+          if (!(v.yawTurns >= 0 && v.yawTurns < 1)) {
+            out.push(`species ${s} drew a yaw of ${v.yawTurns} turns, outside [0, 1)`);
+          }
+          if (!(v.leanTurns >= 0 && v.leanTurns < 1)) {
+            out.push(`species ${s} drew a lean bearing of ${v.leanTurns} turns, outside [0, 1)`);
+          }
+          if (!(v.lean >= 0 && v.lean <= row.lean + 1e-12)) {
+            out.push(`species ${s} drew a lean of ${v.lean} rad against a row peak of ${row.lean}`);
+          }
+          if (v.lean > LEAN_MAX) {
+            out.push(`species ${s} drew a lean of ${v.lean} rad, past LEAN_MAX ${LEAN_MAX}`);
+          }
+          if (!(v.aspect >= 1 - ASPECT_MAX && v.aspect <= 1 + ASPECT_MAX) || !(v.aspect > 0)) {
+            out.push(`species ${s} drew a plan aspect of ${v.aspect}, outside the bound`);
+          }
+          for (const [name, t] of [['red', v.tintR], ['green', v.tintG], ['blue', v.tintB]] as const) {
+            if (!(t >= TINT_MIN && t <= TINT_MAX)) {
+              out.push(`species ${s} drew a ${name} tint of ${t}, outside [${TINT_MIN}, ${TINT_MAX}]`);
+            }
+          }
+          if (!Number.isInteger(v.crown) || v.crown < 0 || v.crown >= row.crowns) {
+            out.push(`species ${s} drew crown ${v.crown} against a row of ${row.crowns}`);
+          }
+          if (v.crown !== stemCrown(s, seed, x, z)) {
+            out.push(`species ${s} bucketed as crown ${stemCrown(s, seed, x, z)} and drew as ${v.crown}`);
+          }
+          if (s === BUSH_TREE) {
+            seen[v.crown]++;
+            bushDraws++;
+          }
+        }
+      }
+    }
+  }
+
+  // Every archetype authored has to be one the world actually draws, and near
+  // the share it was given -- an archetype at 0.4% is a geometry compiled, a
+  // pipeline warmed and a draw call spent on something nobody sees.
+  for (let c = 0; c < CROWN_COUNT; c++) {
+    const share = seen[c] / Math.max(bushDraws, 1);
+    if (share < CROWN_SHARE[c] * 0.5 || share > CROWN_SHARE[c] * 1.6) {
+      out.push(
+        `crown archetype ${c} came out at ${(share * 100).toFixed(1)}% of bush stems ` +
+          `against a designed ${(CROWN_SHARE[c] * 100).toFixed(0)}%`,
+      );
+    }
+  }
+
+  // Determinism, and it is worth asserting rather than assuming: the whole
+  // draw reads the sidecar and the sidecar only, so the same stem is the same
+  // plant on every client and on this process.
+  const p = newStemVariation();
+  const q = newStemVariation();
+  stemVariation(BUSH_TREE, 137, 211.37, -88.02, p);
+  stemVariation(BUSH_TREE, 137, 211.37, -88.02, q);
+  for (const k of Object.keys(p) as Array<keyof StemVariation>) {
+    if (p[k] !== q[k]) out.push(`stemVariation is not deterministic: ${k} came out ${p[k]} then ${q[k]}`);
+  }
+
+  // The regression the report was actually about. With the seed alone there
+  // were 256 distinct trees in a world of forty million, so every tenth stem
+  // on a tile was its neighbour's twin at its neighbour's bearing. Sixty-four
+  // stems of one seed along one row must now be sixty-four different plants.
+  {
+    const yaws = new Set<number>();
+    for (let i = 0; i < 64; i++) {
+      stemVariation(BUSH_TREE, 42, i * 3.5, 17.25, p);
+      yaws.add(p.yawTurns);
+    }
+    if (yaws.size < 60) {
+      out.push(
+        `64 bush stems of one seed drew only ${yaws.size} distinct yaws -- the seed cycle is back`,
+      );
+    }
+  }
+
+  return out;
+}
+
 // --- The power sidecar --------------------------------------------------------
 
 /** Pole kinds: a plain one and a transformer. `power.ts` re-exports this. */

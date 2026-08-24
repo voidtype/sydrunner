@@ -108,6 +108,7 @@ import { verifyTeamLook } from '../client/src/game/teamlook.ts';
 // boot lists as this file's own premise requires.
 import { verifyGroundFirst } from '../client/src/world/ground-first.ts';
 import { verifyCanopy } from '../client/src/world/cover.ts';
+import { verifyStemVariety } from '../client/src/world/tile-decode.ts';
 // WORKSTREAM N (carry): the restore sentence, and the spawn rules this process
 // has always run without checking. Both three-free, so this process runs the
 // same checks the browser does. See `client/src/game/carry.ts`.
@@ -510,6 +511,16 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // which is a taste failure that renders a perfectly good frame. See
     // `client/src/world/cover.ts`.
     ['verifyCanopy', verifyCanopy()],
+    // The bushland round's *other* half, added 2026-08-24 with the per-stem
+    // variation. Every bushland stem gets a yaw, a lean, a plan aspect, a crown
+    // archetype and a colour hashed out of its seed and its position, and the
+    // dangerous failure in that is not that it looks wrong -- it is that a bound
+    // slips and the lean reaches ninety degrees, which is a forest of fallen
+    // trees that no table anywhere would have shown. Three-free on purpose so
+    // it can be asserted here, where it costs nothing and runs every boot. Its
+    // sibling `verifyVegetationCost` needs `three` to build a geometry and can
+    // only run in the browser. See `client/src/world/tile-decode.ts`.
+    ['verifyStemVariety', verifyStemVariety()],
     // What a knocked-over NPC is worth, how fast a player may be paid it, and
     // what the note looks like. Run **here** first and foremost because this
     // process *is* the mint: the drop table and the rate bank are enforced in

@@ -2797,12 +2797,54 @@ def cmd_vegetation_audit(args: argparse.Namespace) -> int:
     sizes are re-derived from `vegetation.SPECIES_SIZE` rather than read from the
     client, which is the one place the two files are allowed to touch -- see
     `vegetation.nominal_size`.
+
+    ---------------------------------------------------------------------------
+    AND THE OPPOSITE QUESTION, added 2026-08-24: **is a stand all one size?**
+
+    Everything above asks whether an instance has been pushed too far from what
+    it was authored as. Nothing asked whether a thousand of them had been pushed
+    *nowhere at all*, and that is the defect the tree-variety round was reported
+    for: a canopy at Chatswood West of near-identical crowns, all about the same
+    size. The draw behind it was uniform on the top two thirds of the species'
+    range, which is a p90/p10 height spread of **1.27** -- one age class, and no
+    number in any output said so.
+
+    So the size distribution is now measured and printed for every species, and
+    `--min-spread` is a **floor** on it for the two species that only the
+    bushland scatter emits. A floor rather than a band, and only on those two,
+    because uniformity is not a defect everywhere: a row of London planes down
+    George Street is one nursery clone planted in one season and pruned by one
+    contractor, and it measures 1.22 because it *is* 1.22.
+
+    ---------------------------------------------------------------------------
+    A per-species table with a missing row is also checked here, by **reading
+    every row**. That is `NOMINAL`'s register, moved to the side of the fence it
+    can be caught on earliest: adding a species touches four tables in Python
+    and four in TypeScript, the client's own `verifyVegetationCost` covers its
+    side, and this covers the rest.
     """
     index = json.loads(config.INDEX_PATH.read_text())
     keys = [t["key"] for t in index["tiles"]]
     print(f"stage '{index['stage']}', {len(keys):,} tiles, every tree instance")
 
-    per_species: dict[int, list[tuple[float, float]]] = defaultdict(list)
+    missing: list[str] = []
+    for sp in range(vegetation.SPECIES_COUNT):
+        row = vegetation.SPECIES_SIZE.get(sp)
+        if not row or len(row) != 4 or not all(v > 0 for v in row):
+            missing.append(f"SPECIES_SIZE has no usable row for species {sp}: {row!r}")
+        elif not (row[0] <= row[1] and row[2] <= row[3]):
+            missing.append(f"SPECIES_SIZE[{sp}] has a range running backwards: {row!r}")
+        if not vegetation.SPECIES_TRIANGLES.get(sp):
+            missing.append(f"SPECIES_TRIANGLES has no row for species {sp}")
+        if not vegetation.SPECIES_NAME.get(sp):
+            missing.append(f"SPECIES_NAME has no row for species {sp}")
+    if missing:
+        for m in missing:
+            print(f"  {m}")
+        print(f"  FAIL: {len(missing):,} per-species table rows missing")
+        return 1
+
+    per_species: dict[int, list[tuple[float, float, float]]] = defaultdict(list)
     over_scale: list[tuple] = []
     over_aspect: list[tuple] = []
     total = 0
@@ -2813,15 +2855,19 @@ def cmd_vegetation_audit(args: argparse.Namespace) -> int:
             total += 1
             sxz, sy = vegetation.instance_scale(sp, height, radius)
             aspect = max(sxz / sy, sy / sxz) if sxz > 0 and sy > 0 else float("inf")
-            per_species[sp].append((max(sxz, sy), aspect))
+            per_species[sp].append((max(sxz, sy), aspect, height))
             row = (aspect, max(sxz, sy), key, oe + x, on - z, height, radius, sp)
             if max(sxz, sy) > args.max_scale:
                 over_scale.append(row)
             if aspect > args.max_aspect:
                 over_aspect.append(row)
 
-    print(f"  {'species':<18}{'instances':>11}{'worst scale':>13}{'worst aspect':>14}")
+    print(
+        f"  {'species':<18}{'instances':>11}{'worst scale':>13}{'worst aspect':>14}"
+        f"{'p10':>9}{'p50':>7}{'p90':>7}{'p90/p10':>10}"
+    )
     worst_scale = worst_aspect = 0.0
+    flat: list[str] = []
     for sp in range(vegetation.SPECIES_COUNT):
         rows = per_species.get(sp)
         if not rows:
@@ -2829,16 +2875,31 @@ def cmd_vegetation_audit(args: argparse.Namespace) -> int:
         s = max(r[0] for r in rows)
         a = max(r[1] for r in rows)
         worst_scale, worst_aspect = max(worst_scale, s), max(worst_aspect, a)
-        nom_h, nom_r = vegetation.nominal_size(sp)
+        hs = sorted(r[2] for r in rows)
+        p10 = hs[int(0.10 * (len(hs) - 1))]
+        p50 = hs[int(0.50 * (len(hs) - 1))]
+        p90 = hs[int(0.90 * (len(hs) - 1))]
+        spread = p90 / p10 if p10 > 0 else float("inf")
+        gated = sp in SPREAD_GATED_SPECIES and len(rows) >= SPREAD_SAMPLE_MIN
+        flag = "  FLAT" if gated and spread < args.min_spread else ""
         print(
             f"  {vegetation.SPECIES_NAME[sp]:<18}{len(rows):>11,}"
             f"{s:>12.2f}x{a:>13.2f}"
-            f"    nominal {nom_h:.1f} m / {nom_r:.1f} m radius"
+            f"{p10:>9.1f}{p50:>7.1f}{p90:>7.1f}{spread:>10.2f}{flag}"
         )
+        if flag:
+            flat.append(
+                f"{vegetation.SPECIES_NAME[sp]} at a p90/p10 height spread of {spread:.2f}"
+                f" over {len(rows):,} instances, under a floor of {args.min_spread:.2f}"
+            )
     print(
         f"  {'ALL':<18}{total:>11,}{worst_scale:>12.2f}x{worst_aspect:>13.2f}"
-        f"    limits {args.max_scale:.2f}x / {args.max_aspect:.2f}"
+        f"    limits {args.max_scale:.2f}x / {args.max_aspect:.2f},"
+        f" spread floor {args.min_spread:.2f} on "
+        + ", ".join(vegetation.SPECIES_NAME[sp] for sp in sorted(SPREAD_GATED_SPECIES))
     )
+    if flat:
+        print("  FAIL: a stand of one size is a plantation -- " + "; ".join(flat))
 
     bad = sorted(set(over_scale) | set(over_aspect), reverse=True)
     if bad:
@@ -2854,8 +2915,24 @@ def cmd_vegetation_audit(args: argparse.Namespace) -> int:
             f" {len(over_aspect):,} over {args.max_aspect:.2f} aspect"
         )
         return 1
-    print("  every instance is within the authored envelope of its own species")
+    if flat:
+        return 1
+    print(
+        "  every instance is within the authored envelope of its own species,"
+        " and no bushland species is all one size"
+    )
     return 0
+
+
+#: The species `--min-spread` is asserted on: the two the bushland scatter is
+#: the only emitter of. Everything else in the eight reaches a street or a park,
+#: where being all one size is a fact about the city rather than a defect --
+#: see the docstring's note on London planes.
+SPREAD_GATED_SPECIES = frozenset({vegetation.SHRUB, vegetation.BUSH_TREE})
+
+#: Below this many instances a percentile is noise, not a distribution. A single
+#: emitted tile of forest carries more than this on its own.
+SPREAD_SAMPLE_MIN = 1_000
 
 
 # How far a prism's underside has to clear the ground before the player walks
@@ -5728,6 +5805,11 @@ def cmd_canopy_audit(args: argparse.Namespace) -> int:
     area_ha: dict[str, float] = defaultdict(float)
     stems: dict[str, int] = defaultdict(int)
     by_species: dict[str, Counter] = defaultdict(Counter)
+    # Stem heights per class, as a 0.5 m histogram to 40 m rather than a list.
+    # `vegetation-audit` keeps every instance and can afford to; this one runs
+    # over the same tiles with the polygon index and the classifier already
+    # resident, and a bin is the resolution the answer is wanted at anyway.
+    heights: dict[str, list[int]] = defaultdict(lambda: [0] * (CANOPY_HEIGHT_BINS + 1))
     unclassed = 0
     tri_worst: tuple[int, str] = (0, "")
     s = config.TILE_SIZE
@@ -5762,11 +5844,12 @@ def cmd_canopy_audit(args: argparse.Namespace) -> int:
                 continue
             stems[cover] += 1
             by_species[cover][int(sp)] += 1
+            heights[cover][min(int(_h / CANOPY_HEIGHT_BIN_M), CANOPY_HEIGHT_BINS)] += 1
         if tri > tri_worst[0]:
             tri_worst = (tri, key)
 
     print(f"\n  {'class':<10}{'gross ha':>12}{'stems':>11}{'stems/ha':>11}{'ceiling':>10}"
-          f"   design    dominant species")
+          f"   design   p10   p50   p90  spread    dominant species")
     bad: list[str] = []
     for cover in osm.COVER_CLASSES:
         ha = area_ha.get(cover, 0.0)
@@ -5779,8 +5862,11 @@ def cmd_canopy_audit(args: argparse.Namespace) -> int:
             f"{vegetation.SPECIES_NAME[sp]} {100.0 * c / max(n, 1):.0f}%" for sp, c in top
         )
         flag = "  OVER" if ha > 0 and per > ceiling else ""
+        p10, p50, p90 = _height_percentiles(heights.get(cover))
+        spread = p90 / p10 if p10 > 0 else 0.0
         print(f"  {cover:<10}{ha:>12,.1f}{n:>11,}{per:>11.1f}{ceiling:>10.0f}"
-              f"{design:>9.1f}    {names}{flag}")
+              f"{design:>9.1f}{p10:>6.1f}{p50:>6.1f}{p90:>6.1f}{spread:>8.2f}"
+              f"    {names}{flag}")
         if ha > 0 and per > ceiling:
             bad.append(f"{cover} at {per:.1f} stems/ha over a ceiling of {ceiling:.0f}")
 
@@ -5789,6 +5875,17 @@ def cmd_canopy_audit(args: argparse.Namespace) -> int:
           f"({100.0 * unclassed / max(total, 1):.1f}% -- street trees and surveyed nodes)")
     print(f"  worst tile by draw cost: {tri_worst[1]} at {tri_worst[0]:,} triangles, "
           f"against a bushland budget of {vegetation.BUSH_TRIANGLE_BUDGET:,}")
+    # An upper bound, and it is worth saying so in the output rather than only
+    # in a comment: `SPECIES_TRIANGLES` prices every stem of a species at one
+    # number, and since the tree-variety round the client draws `BUSH_TREE` as
+    # one of four crown archetypes -- three at fourteen triangles and the dead
+    # spar at twelve. So a forest tile draws ~0.7% under what is printed above,
+    # never over. `world/vegetation.ts`'s `verifyVegetationCost` is what holds
+    # that direction at boot.
+    print("  (an upper bound: the client's cheap crown archetypes draw ~0.7% under it,"
+          " never over -- see verifyVegetationCost)")
+    print("  height percentiles are metres, and `spread` is p90/p10 -- the number that"
+          " tells an uneven-aged stand from a plantation. See `vegetation.BUSH_T_TOP`")
 
     # --- The controls --------------------------------------------------------
     c = _canopy_control(greens, keys, classify, args.control_per_ha)
@@ -5832,6 +5929,34 @@ def cmd_canopy_audit(args: argparse.Namespace) -> int:
         print("\n  PASS: every cover class is scattered inside its own band, no tile is over "
               "its draw budget, and a forest planted where the classifier can see it is seen")
     return EXIT_PASS if ok else EXIT_FAIL
+
+
+#: The stem-height histogram's resolution and its top bin. 0.5 m to 40 m: the
+#: tallest thing `SPECIES_SIZE` can draw is a Moreton Bay fig at an emergent
+#: `t`, which is 25 m, so the top bin is never reached and is there so a future
+#: species cannot silently fall out of the count.
+CANOPY_HEIGHT_BIN_M = 0.5
+CANOPY_HEIGHT_BINS = 80
+
+
+def _height_percentiles(hist: list[int] | None) -> tuple[float, float, float]:
+    """p10, p50 and p90 in metres out of the 0.5 m histogram, or zeroes."""
+    if not hist:
+        return 0.0, 0.0, 0.0
+    total = sum(hist)
+    if total == 0:
+        return 0.0, 0.0, 0.0
+    out = []
+    for q in (0.10, 0.50, 0.90):
+        want, seen = q * total, 0
+        for i, n in enumerate(hist):
+            seen += n
+            if seen >= want:
+                out.append((i + 0.5) * CANOPY_HEIGHT_BIN_M)
+                break
+        else:
+            out.append(float(len(hist)) * CANOPY_HEIGHT_BIN_M)
+    return out[0], out[1], out[2]
 
 
 def _canopy_design(cover: str) -> float:
@@ -6178,6 +6303,13 @@ def main(argv: list[str] | None = None) -> int:
     # comment allows itself either way.
     v.add_argument("--max-scale", type=float, default=1.60)
     v.add_argument("--max-aspect", type=float, default=1.15)
+    # The floor on a bushland species' p90/p10 height spread. 1.35 sits between
+    # the two draws it has to tell apart and is not a round number by accident:
+    # the uniform draw this replaced measures **1.27** on a bush tree and the
+    # reverse-J that replaced it measures **1.77**, so the gap is wide enough
+    # that the threshold is not the thing being tuned. It convicts the world
+    # shipped before the tree-variety round, which is the point of it.
+    v.add_argument("--min-spread", type=float, default=1.35)
     v.set_defaults(func=cmd_vegetation_audit)
 
     c = sub.add_parser(
