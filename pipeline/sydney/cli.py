@@ -24,8 +24,11 @@ run picks up where it stopped rather than starting over.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import functools
 import json
+import multiprocessing
+import os
 import math
 import struct
 import sys
@@ -68,6 +71,7 @@ from . import (
     water,
 )
 from .sources import msbuildings, osm
+from . import terraincache
 from .terrain import Terrain
 
 # How far past the stage radius the suburb label nodes are read. See
@@ -414,6 +418,96 @@ def _report_station_clear(removed: dict[str, list[float]], rail) -> None:
         print(f"      {name:28} {len(areas):5,}  {sum(areas):9,.0f} m2")
 
 
+# The tiles are independent: `build_tile` is a pure function of the shared,
+# read-only networks and terrain, and it writes only the files named for its own
+# key, so two tiles never touch the same byte. That is what lets the emit run one
+# tile per core. The one thing that is *not* parallel is the ledger -- a single
+# SQLite connection the parent owns -- so a worker returns its `TileResult` and
+# the parent records it, keeping every database write on one thread. Workers are
+# forked, not spawned, so the ~GB of networks is inherited copy-on-write rather
+# than pickled to each one; `_EMIT_CTX` is where the parent leaves them for the
+# fork to find. Output is byte-identical to the serial path by construction --
+# nothing about which process calls `build_tile` changes the bytes it writes.
+_EMIT_CTX: dict | None = None
+
+
+def _emit_one(key: str):
+    """Emit one tile from the shared context. Runs in a forked worker or inline."""
+    ctx = _EMIT_CTX
+    assert ctx is not None, "_EMIT_CTX not set before emit"
+    (
+        street_network, veg_network, parking_network, power_network,
+        furniture_network, powerup_network, awning_network, door_network,
+        fence_network, terrain, landmark_prisms, deck_network, lane_network,
+    ) = ctx["networks"]
+    return tiles.build_tile(
+        key,
+        ctx["by_tile"].get(key, []),
+        street_network,
+        veg_network,
+        parking_network,
+        power_network,
+        furniture_network,
+        powerup_network,
+        awning_network,
+        door_network,
+        fence_network,
+        terrain,
+        landmark_prisms.get(key),
+        deck_network,
+        lane_network,
+    )
+
+
+def _record_tile(detail: dict, res: "tiles.TileResult") -> None:
+    """Write a finished tile's numbers into its ledger detail. One place, so the
+    serial and parallel paths record identically."""
+    detail.update(
+        b=res.buildings,
+        t=res.triangles,
+        sz=res.glb_bytes,
+        v=res.trees,
+        c=res.cars,
+        p=res.poles,
+        w=res.spans,
+        fb=res.bins,
+        fp=res.posts,
+        fs=res.signals,
+        pw=res.powerups,
+        sn=res.street_names,
+        snb=res.names_bytes,
+        wv=res.water_verts,
+        wt=res.water_tris,
+        wb=res.water_bytes,
+        wy=round(res.water_y, 3),
+        wa=round(res.water_area, 1),
+        lw=res.lane_ways,
+        lr=res.lane_routes,
+        lc=res.lane_cars,
+        lb=res.lanes_bytes,
+        # `hmax` sizes the client's per-tile cull box; it must be recorded or the
+        # tile claims a tallest building of 0 m and its towers pop out of frame.
+        hmax=round(res.height_max, 1),
+        g=[round(res.ground_min, 2), round(res.ground_max, 2)],
+    )
+
+
+def _emit_jobs(args: argparse.Namespace, n_tiles: int) -> int:
+    """How many worker processes to emit with. `--jobs 0` (the default) picks all
+    but one core; `--jobs 1` is the serial path, which fork cannot beat on a
+    handful of tiles and which stays the reproducible reference. Never more
+    workers than tiles."""
+    requested = getattr(args, "jobs", 0)
+    if requested == 1 or n_tiles <= 1:
+        return 1
+    if requested > 1:
+        return min(requested, n_tiles)
+    if multiprocessing.get_start_method(allow_none=True) is None and not hasattr(os, "fork"):
+        return 1  # no fork available: stay serial rather than pay spawn's pickling
+    auto = max(1, (os.cpu_count() or 2) - 1)
+    return min(auto, n_tiles)
+
+
 def cmd_build(args: argparse.Namespace) -> int:
     stage = config.STAGE_BY_NAME[args.stage]
     config.ensure_dirs()
@@ -438,7 +532,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     _report_suppression(anchors, suppressed)
 
     print("  reading the terrain ...")
-    terrain = Terrain.load(stage.radius_m)
+    terrain = terraincache.load(stage.radius_m, use_cache=not args.no_terrain_cache)
     _report_terrain(terrain)
     _report_water(terrain)
 
@@ -666,63 +760,47 @@ def cmd_build(args: argparse.Namespace) -> int:
         print(f"  --only: {len(todo):,} tiles of {len(keys):,}")
     print(f"  {len(todo):,} tiles to emit ({len(keys) - len(todo):,} already done)")
 
+    # The shared, read-only inputs every tile is a pure function of. Stashed in a
+    # module global so a forked worker inherits them copy-on-write rather than
+    # having them pickled to it -- see `_emit_one` and `_emit_parallel`.
+    global _EMIT_CTX
+    _EMIT_CTX = dict(
+        by_tile=by_tile,
+        networks=(
+            street_network, veg_network, parking_network, power_network,
+            furniture_network, powerup_network, awning_network, door_network,
+            fence_network, terrain, landmark_prisms, deck_network, lane_network,
+        ),
+    )
+
+    jobs = _emit_jobs(args, len(todo))
     results: list[tiles.TileResult] = []
-    for key in tqdm(todo, unit="tile", disable=not sys.stderr.isatty()):
-        with ledger.unit(con, "tile", key) as detail:
-            res = tiles.build_tile(
-                key,
-                by_tile.get(key, []),
-                street_network,
-                veg_network,
-                parking_network,
-                power_network,
-                furniture_network,
-                powerup_network,
-                awning_network,
-                door_network,
-                fence_network,
-                terrain,
-                landmark_prisms.get(key),
-                deck_network,
-                lane_network,
-            )
-            if res is None:
-                detail["empty"] = True
-                continue
-            detail.update(
-                b=res.buildings,
-                t=res.triangles,
-                sz=res.glb_bytes,
-                v=res.trees,
-                c=res.cars,
-                p=res.poles,
-                w=res.spans,
-                fb=res.bins,
-                fp=res.posts,
-                fs=res.signals,
-                pw=res.powerups,
-                sn=res.street_names,
-                snb=res.names_bytes,
-                wv=res.water_verts,
-                wt=res.water_tris,
-                wb=res.water_bytes,
-                wy=round(res.water_y, 3),
-                wa=round(res.water_area, 1),
-                lw=res.lane_ways,
-                lr=res.lane_routes,
-                lc=res.lane_cars,
-                lb=res.lanes_bytes,
-                # `hmax` was missing from this record and defaulted to zero in
-                # `_results_from_ledger`, so every tile in the index has claimed a
-                # tallest building of 0 m since the ledger started rebuilding it.
-                # The client sizes each tile's cull box from it, which left the
-                # CBD's towers in a 25 m box: they pop out of frame the moment you
-                # stand under one and look up. Found while extending the same box
-                # downward for terrain.
-                hmax=round(res.height_max, 1),
-                g=[round(res.ground_min, 2), round(res.ground_max, 2)],
-            )
-            results.append(res)
+    if jobs > 1:
+        print(f"  emitting on {jobs} cores")
+        ctx = multiprocessing.get_context("fork")
+        with concurrent.futures.ProcessPoolExecutor(max_workers=jobs, mp_context=ctx) as pool:
+            futures = {pool.submit(_emit_one, key): key for key in todo}
+            done_iter = concurrent.futures.as_completed(futures)
+            for fut in tqdm(done_iter, total=len(futures), unit="tile", disable=not sys.stderr.isatty()):
+                key = futures[fut]
+                with ledger.unit(con, "tile", key) as detail:
+                    res = fut.result()  # a worker exception surfaces here, recorded as failed
+                    if res is None:
+                        detail["empty"] = True
+                        continue
+                    _record_tile(detail, res)
+                    results.append(res)
+        results.sort(key=lambda r: r.key)  # completion order is nondeterministic; reports are not
+    else:
+        for key in tqdm(todo, unit="tile", disable=not sys.stderr.isatty()):
+            with ledger.unit(con, "tile", key) as detail:
+                res = _emit_one(key)
+                if res is None:
+                    detail["empty"] = True
+                    continue
+                _record_tile(detail, res)
+                results.append(res)
+
 
     _report_parking(parking_network, results)
     _report_power(power_network, results)
@@ -6240,6 +6318,25 @@ def main(argv: list[str] | None = None) -> int:
         " keeps the tiles and the index entries it already has -- see"
         " `_carry_index_tiles`. For verifying a local change without a citywide"
         " rebuild.",
+    )
+    b.add_argument(
+        "--jobs",
+        type=int,
+        default=0,
+        help="worker processes for the tile emit. 0 (default) uses all but one"
+        " core; 1 forces the serial path, which is the reproducible reference and"
+        " which fork cannot beat on a `--only` handful. The tiles are"
+        " independent, so this only changes wall-clock, never a byte -- see"
+        " `_emit_one`.",
+    )
+    b.add_argument(
+        "--no-terrain-cache",
+        action="store_true",
+        help="solve the terrain lattice fresh rather than loading the cached"
+        " solve. The cache is keyed on the DEM, the OSM extract and the source"
+        " of every module that shapes the lattice, so it is only ever a hit when"
+        " all of those are unchanged; this forces a recompute when you do not"
+        " trust that -- see `terraincache`.",
     )
     b.set_defaults(func=cmd_build)
 

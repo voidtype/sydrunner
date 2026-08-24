@@ -91,6 +91,9 @@ sorted by path so a rebuild of an unchanged world produces an identical file.
 
 from __future__ import annotations
 
+import concurrent.futures
+import multiprocessing
+import os
 import shutil
 import struct
 from collections import defaultdict
@@ -226,6 +229,44 @@ def _pack(entries: list[tuple[str, Path]]) -> bytes:
     return bytes(out)
 
 
+def _pack_region(work: tuple[str, list[str], dict[str, list[float]]]) -> "RegionSummary | None":
+    """Pack one region's tiles into its bundle and return its summary. Runs in a
+    forked worker or inline; identical bytes either way -- it reads its members in
+    the same sorted order and writes only `REGION_DIR/<key>.bin`."""
+    key, tiles_sorted, bounds = work
+    members: list[tuple[str, Path]] = []
+    min_x = min_z = float("inf")
+    max_x = max_z = float("-inf")
+    for tile in tiles_sorted:
+        members.extend(_members(tile))
+        b = bounds[tile]
+        min_x, min_z = min(min_x, b[0]), min(min_z, b[1])
+        max_x, max_z = max(max_x, b[2]), max(max_z, b[3])
+    if not members:
+        return None
+    blob = _pack(members)
+    (REGION_DIR / f"{key}.bin").write_bytes(blob)
+    return RegionSummary(
+        key=key,
+        bounds=(min_x, min_z, max_x, max_z),
+        tiles=len(tiles_sorted),
+        entries=len(members),
+        size=len(blob),
+    )
+
+
+def _region_jobs(n_regions: int) -> int:
+    """Workers for the region pack. `SYDNEY_REGION_JOBS` overrides; default is all
+    but one core. Never more than there are regions, and 1 (serial) when there is
+    nothing to gain."""
+    env = os.environ.get("SYDNEY_REGION_JOBS", "")
+    if env:
+        return max(1, min(int(env), n_regions))
+    if n_regions <= 1 or not hasattr(os, "fork"):
+        return 1
+    return min(max(1, (os.cpu_count() or 2) - 1), n_regions)
+
+
 def emit(tile_keys: list[str], bounds_by_key: dict[str, list[float]]) -> dict:
     """Write every region for this build and return the index contract.
 
@@ -243,32 +284,29 @@ def emit(tile_keys: list[str], bounds_by_key: dict[str, list[float]]) -> dict:
     for key in tile_keys:
         grouped[region_key(key)].append(key)
 
-    summaries: list[RegionSummary] = []
-    oversize: list[str] = []
-    for key in sorted(grouped):
-        members: list[tuple[str, Path]] = []
-        min_x = min_z = float("inf")
-        max_x = max_z = float("-inf")
-        for tile in sorted(grouped[key]):
-            members.extend(_members(tile))
-            b = bounds_by_key[tile]
-            min_x, min_z = min(min_x, b[0]), min(min_z, b[1])
-            max_x, max_z = max(max_x, b[2]), max(max_z, b[3])
-        if not members:
-            continue
-        blob = _pack(members)
-        if len(blob) > MAX_REGION_BYTES:
-            oversize.append(f"{key} ({len(blob) / 1024**2:.1f} MB)")
-        (REGION_DIR / f"{key}.bin").write_bytes(blob)
-        summaries.append(
-            RegionSummary(
-                key=key,
-                bounds=(min_x, min_z, max_x, max_z),
-                tiles=len(grouped[key]),
-                entries=len(members),
-                size=len(blob),
-            )
-        )
+    # One work item per region: its member tile keys and their bounds. A region
+    # reads only its own tiles' files and writes only its own bundle, so packing
+    # them is independent -- the same one-per-core shape as the tile emit, and
+    # byte-identical to the serial pack for the same reason. The payload is tiny
+    # (keys and bounds), so there is nothing to share by fork; a plain pool does.
+    work = [
+        (key, sorted(grouped[key]), {t: bounds_by_key[t] for t in grouped[key]})
+        for key in sorted(grouped)
+    ]
+
+    jobs = _region_jobs(len(work))
+    if jobs > 1:
+        ctx = multiprocessing.get_context("fork")
+        with concurrent.futures.ProcessPoolExecutor(max_workers=jobs, mp_context=ctx) as pool:
+            packed = list(pool.map(_pack_region, work))
+    else:
+        packed = [_pack_region(w) for w in work]
+
+    summaries: list[RegionSummary] = [s for s in packed if s is not None]
+    summaries.sort(key=lambda s: s.key)  # pool order is nondeterministic; the contract is not
+    oversize = [
+        f"{s.key} ({s.size / 1024**2:.1f} MB)" for s in summaries if s.size > MAX_REGION_BYTES
+    ]
 
     if oversize:
         raise ValueError(

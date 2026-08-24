@@ -143,10 +143,14 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_ROOT = Path(os.environ.get("SYDNEY_DATA_ROOT", REPO_ROOT / "data"))
 CACHE_DIR = DATA_ROOT / "cache"  # downloaded source data, kept
 SCRATCH_DIR = DATA_ROOT / "scratch"  # LAZ tiles etc, deleted after extraction
-LEDGER_PATH = DATA_ROOT / "ledger.sqlite"
+LEDGER_PATH = Path(os.environ.get("SYDNEY_LEDGER", str(DATA_ROOT / "ledger.sqlite")))
 
-# Pipeline output, served statically to the client.
-OUT_ROOT = REPO_ROOT / "client" / "public" / "world"
+# Pipeline output, served statically to the client. `SYDNEY_WORLD_OUT` redirects
+# it -- for an isolated or experimental build that must not touch the world the
+# client is served from (the byte-for-byte A/B that proves a parallel emit is
+# identical to a serial one, say). Mirrors SYDNEY_DATA_ROOT above; defaults to
+# the real path so a normal build is unchanged.
+OUT_ROOT = Path(os.environ.get("SYDNEY_WORLD_OUT", str(REPO_ROOT / "client" / "public" / "world")))
 TILE_DIR = OUT_ROOT / "tiles"
 INDEX_PATH = OUT_ROOT / "index.json"
 COLLISION_DIR = OUT_ROOT / "collision"
