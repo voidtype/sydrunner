@@ -523,14 +523,14 @@ async function main(): Promise<void> {
   engine.handle(hero.id, QUEST_OP.ACCEPT, 'check-weekly', '', 0, at());
   check(record.quests['check-weekly'] === undefined, 'so it cannot be taken twice in the same week');
 
-  // --- Phase C2: the register, and a level that is exact --------------------------
+  // --- Phase C2: the register, and a level that is a floor ------------------------
   //
   // The feature workstream AN exists for, walked through the ops a client
   // really sends against a level the engine really reads. `verifyQuests` proves
   // the arithmetic in isolation; this is the only thing that can prove the
   // wiring, because `levelOf` comes off a `Participant` and a `Participant` is
   // a thing only a `Simulation` has.
-  console.log('\n--- phase C2: offered at 3, refused at 2 and at 4 ---');
+  console.log('\n--- phase C2: refused at 2, offered at 3 and still offered at 4 ---');
   {
     const clerk3 = content.bundle.npcs.find((n) => n.id === 'clerk3');
     if (!clerk3) {
@@ -557,15 +557,20 @@ async function main(): Promise<void> {
       check(markerFor(clerk3, facts(), view()) === 'none', 'and its giver draws no "!" at level 2');
 
       /*
-       * **And refused from above**, which is the assertion a minimum could
-       * never have failed and the whole of what "strict" means. A gate only
-       * ever tested from below reads as correct until somebody levels up.
+       * **And still offered from above**, which is the reversal this phase was
+       * rewritten for. It asserted the opposite once -- a rung-3 job refused at
+       * 4 -- on the argument that a register which forgets makes a level a
+       * place you were rather than a number you passed. That argument lost to a
+       * player who reached the Centrelink counter on rung 2 because he had
+       * batted a few eshays on the ride down, and found all five of Act 0's
+       * obligations answering `level 1 only`. The only way to out-level a rung
+       * is to play. Nothing is accepted here: the rung-3 case below needs the
+       * job still untaken.
        */
       hero.level = 4;
-      engine.handle(hero.id, QUEST_OP.ACCEPT, 'check-rung3', '', 0, at());
-      check(record.quests['check-rung3'] === undefined, 'a rung-3 job is refused one rung **above** it');
-      check(!offered(), 'and is not in the register at level 4');
-      check(markerFor(clerk3, facts(), view()) === 'none', 'and its giver draws no "!" at level 4');
+      check(offered(), 'a rung-3 job is still in the register one rung **above** it');
+      check(markerFor(clerk3, facts(), view()) === 'offer', 'and its giver still draws the "!" at level 4');
+      check(record.quests['check-rung3'] === undefined, 'and asking about it took nothing');
 
       hero.level = 3;
       check(offered(), 'on the rung itself it is in the register');

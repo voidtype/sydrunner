@@ -517,13 +517,14 @@ export function verifyGiverMap(): string[] {
     if (!atOne.has('pool')) failures.push('A level-1 player was not shown a rung-1 giver.');
     if (!atOne.has('signpost')) failures.push('A level-1 player was not shown the exempt giver.');
 
-    // And at level 2 the pool quest is off the register -- `level 1 only` -- and
-    // the exempt one is not. This is the whole of `Quest.anyRung`, seen from the
-    // map, and it is not a rule this file knows: it is `questRefusal`'s.
+    // And at level 2 **both** are still on the register: the rung is a floor, so
+    // a rung-1 job does not fall off the map when its player climbs past it.
+    // This is not a rule this file knows -- it is `questRefusal`'s -- and the
+    // map is simply the place it is easiest to see.
     dots.refresh(2, 0, 0, source(12));
     const atTwelve = new Set<string>();
     for (let i = 0; i < dots.count; i++) atTwelve.add(dots.at(i).id);
-    if (atTwelve.has('pool')) failures.push('A rung-2 player was shown a rung-1 giver; the register refuses that job.');
+    if (!atTwelve.has('pool')) failures.push('A rung-2 player lost a rung-1 giver; the rung is a floor, not a window.');
     if (!atTwelve.has('signpost')) failures.push('An anyRung giver vanished for a player past the rung. A signpost that disappears once you are lost is not a signpost.');
 
     // The beat is what gates the sweep: the same beat twice is one sweep.

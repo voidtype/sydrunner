@@ -116,12 +116,16 @@
  *
  * Three consequences, all of them deliberate:
  *
- *   - **A rung can be missed.** Reach level 3 without taking the level-2 job
- *     and it is gone -- until next Monday, when the level resets to 1 and the
- *     climb comes back through 2. That is rule 3 of `DESIGN.md` doing real work
- *     rather than being a technicality: the week is the epic, and the register
- *     is what makes a level feel like a place you were rather than a number you
- *     passed.
+ *   - **A rung cannot be missed, and that is a reversal.** It could once: reach
+ *     level 3 without taking the level-2 job and it was gone until Monday, and
+ *     the argument was rule 3 of `DESIGN.md` -- the week is the epic, and a
+ *     register that forgets makes a level a place you were rather than a number
+ *     you passed. It is a good argument and it lost to a real player. The only
+ *     way to out-level a rung is to *play* -- a knockout pays xp and the
+ *     register never saw it coming -- so the mechanic punished exactly the
+ *     person enjoying the game most, and it did it silently, at a counter, with
+ *     `level 1 only` as the whole explanation. The week still resets and the
+ *     seven-day arc is untouched; the rung is a floor now, not a window.
  *   - **A quest already accepted is unaffected.** The rung gates the *offer*,
  *     not the walking or the turn-in, so levelling up mid-job never strands
  *     anybody: `questRefusal` is asked before a cursor exists and never after.
@@ -375,9 +379,9 @@ export interface Quest {
   /** The dialog NPC who hands it out and takes it back. */
   giver: string;
   /**
-   * **The rung.** Exact, 1 to `REGISTER_LEVELS`, and not a minimum -- see the
-   * header. A quest is offered while `rungOf(player.level) === level` and at no
-   * other time.
+   * **The rung.** A floor, 1 to `REGISTER_LEVELS` -- see the header. A quest is
+   * offered once `rungOf(player.level) >= level` and stays offered above it, so
+   * the register climbs in order and nothing on it expires.
    */
   level: number;
   /** `''`, `'Marita'` or `'DeFAULT'`. The spellings are law; see `game/teams.ts`. */
@@ -393,14 +397,15 @@ export interface Quest {
   /**
    * Exempt from the rung, and the only exemption the register allows.
    *
-   * The register is exact on purpose -- a job belongs to one rung and a player
-   * past it is told "level 3 only" -- and that rule is what makes the ladder
-   * mean something. It has exactly one bad case: **a job whose whole purpose is
-   * to be seen by somebody who has not been shown anything yet.** The tutorial
-   * stands 45 m from the spawn with a mark over his head, and on the day it
-   * shipped a level-2 player standing in Sydney Park could not see him at all,
-   * because the register had correctly refused a rung-1 job to a rung-2 player.
-   * A signpost that disappears once you are lost is not a signpost.
+   * The rung is a floor now, so the case this was written for -- a level-2
+   * player in Sydney Park who could not see the tutorial at all, because the
+   * register had correctly refused a rung-1 job to a rung-2 player -- cannot
+   * happen any more. A signpost that disappears once you are lost is not a
+   * signpost, and nothing disappears upward now.
+   *
+   * What is left is the other direction, and it is the only thing this flag
+   * still means: a quest that may be taken **below** its rung. `quest.level`
+   * then says only where it sits on the register.
    *
    * So a quest may opt out, and `quest.level` then means *where it sits in the
    * register's listing* rather than *who may take it*. Content sets this; the
@@ -1316,15 +1321,15 @@ export function questRefusal(quest: Quest, facts: PlayerFacts, cursors: QuestCur
     return quest.repeatable ? 'done for the week' : 'you have done that one';
   }
   if (cursors[quest.id] !== undefined) return 'you are already on that';
-  // **The rung, exact.** Two sentences rather than one, because "level 3 first"
-  // read by somebody who is level 5 is a lie about which direction they are
-  // wrong in -- and the whole point of a register is that a player can tell
-  // which rung a job belongs to. See the header.
+  // **The rung is a floor.** It was exact once -- a job belonged to one rung and
+  // a player past it was told "level 3 only" -- and the argument for that is in
+  // the header, along with why it is no longer the argument that wins: a player
+  // who out-levels a rung loses the work on it, and the only person who ever
+  // does that is somebody enjoying the other half of the game. Levelling up is
+  // not a thing to be punished for. The floor stays, so a rung still means
+  // "not yet" on the way up and the register still climbs in order.
   const rung = rungOf(facts.level);
-  if (!quest.anyRung) {
-    if (rung < quest.level) return `level ${quest.level} first`;
-    if (rung > quest.level) return `level ${quest.level} only`;
-  }
+  if (!quest.anyRung && rung < quest.level) return `level ${quest.level} first`;
   if (quest.faction !== '' && facts.faction !== quest.faction) return `that is ${quest.faction} work`;
   for (const need of quest.requires) {
     if (!facts.story.has(completionFlag(need))) return 'not yet';
@@ -2066,16 +2071,20 @@ export function verifyQuests(): string[] {
     } else {
       if (questRefusal(three, facts(3), {}) !== '') failures.push('A level-3 quest was refused at level 3.');
       if (questRefusal(three, facts(2), {}) === '') failures.push('A level-3 quest was offered at level 2.');
-      if (questRefusal(three, facts(4), {}) === '') {
-        failures.push('A level-3 quest was still offered at level 4; the rung is exact, not a minimum.');
-      }
-      // And the sentence points the right way, because "level 3 first" read at
-      // level 5 is the game lying about which direction you are wrong in.
+      // Below the rung it still refuses, and the sentence points up.
       if (questRefusal(three, facts(2), {}) !== 'level 3 first') {
         failures.push(`Below the rung the refusal reads ${JSON.stringify(questRefusal(three, facts(2), {}))}.`);
       }
-      if (questRefusal(three, facts(4), {}) !== 'level 3 only') {
-        failures.push(`Above the rung the refusal reads ${JSON.stringify(questRefusal(three, facts(4), {}))}.`);
+      // **Above it, nothing.** The reversal this file exists to remember: a
+      // rung-3 job stays on the register at 4, at 9 and at the tenth-rung
+      // landing, because out-levelling a job is something a player does by
+      // playing and it never meant they should lose the work.
+      for (const over of [4, 9, 10, 14]) {
+        if (questRefusal(three, facts(over), {}) !== '') {
+          failures.push(
+            `A rung-3 job at level ${over} reads ${JSON.stringify(questRefusal(three, facts(over), {}))}, not offered.`,
+          );
+        }
       }
       // The one exemption, and it is exactly one. A signpost that vanishes once
       // you are lost is not a signpost -- see `Quest.anyRung` -- so a quest that
@@ -2127,7 +2136,11 @@ export function verifyQuests(): string[] {
       // And the standing the register draws, for each of the five words.
       const cursor = blankCursor(weekly);
       if (questStanding(weekly, facts(2), {}) !== 'available') failures.push('A takeable job did not read as available.');
-      if (questStanding(weekly, facts(3), {}) !== 'locked') failures.push('A job on another rung did not read as locked.');
+      // Above its rung a job reads **available**, not locked: the rung is a
+      // floor and the register keeps what a player climbed past.
+      if (questStanding(weekly, facts(3), {}) !== 'available') {
+        failures.push('A job one rung below the player did not read as available; the rung is a floor.');
+      }
       if (questStanding(weekly, facts(2, [weeklyFlag('weekly')]), {}) !== 'done') failures.push('A finished job did not read as done.');
       if (questStanding(weekly, facts(2), { weekly: cursor }) !== 'on') failures.push('A job in progress did not read as on.');
       if (questStanding(weekly, facts(2), { weekly: { ...cursor, d: true } }) !== 'ready') {
@@ -2185,7 +2198,9 @@ export function verifyQuests(): string[] {
       const view = (cursors: QuestCursors): QuestView => questView(quests, cursors);
       if (markerFor(npc, facts(3), view({})) !== 'offer') failures.push('An NPC with a takeable job got no "!".');
       if (markerFor(npc, facts(2), view({})) !== 'none') failures.push('An NPC got a "!" for a job one rung up.');
-      if (markerFor(npc, facts(4), view({})) !== 'none') failures.push('An NPC got a "!" for a job one rung down.');
+      if (markerFor(npc, facts(4), view({})) !== 'offer') {
+        failures.push('An NPC lost its "!" for a job one rung down; the rung is a floor.');
+      }
       if (markerFor(npc, facts(3, [completionFlag('three')]), view({})) !== 'none') {
         failures.push('An NPC got a "!" for a job already done.');
       }
@@ -2297,8 +2312,8 @@ export function verifyQuests(): string[] {
       const [take, hand, ghost] = npc.nodes[0].choices;
       if (choiceRefusal(take, facts) !== '') failures.push('A choice with no gates of its own was refused without a view.');
       if (choiceRefusal(take, facts, questView(quests, {})) !== '') failures.push('A takeable job was refused through the view.');
-      if (choiceRefusal(take, { ...facts, level: 3 }, questView(quests, {})) === '') {
-        failures.push('A job one rung down was still offered by its button; the panel would not grey it.');
+      if (choiceRefusal(take, { ...facts, level: 3 }, questView(quests, {})) !== '') {
+        failures.push('A job one rung down was greyed out by its button; the rung is a floor.');
       }
       if (choiceRefusal(ghost, facts, questView(quests, {})) !== 'not available') {
         failures.push('A choice accepting a quest that does not exist did not say so.');
