@@ -321,6 +321,15 @@ class Terrain:
             "min": float(heights.min()),
             "max": float(heights.max()),
         }
+        # The DEM mosaic (~270 MB at 60 km) is dead the moment the lattice is
+        # sampled off it: `stats["pixels"]` above is its last reader, and the
+        # conform and water passes below draw on `field.sample` -- the lattice --
+        # not the raster. Freeing it here rather than at return hands the ~270 MB
+        # back before the conform allocates its own arrays, which is the one place
+        # the head's memory is worth trimming on a machine that solves it at all.
+        # It cannot change a byte: `heights` is already final. See the cache in
+        # `terraincache`, which is what stops this solve running most rounds.
+        del dem
         field = cls(_Lattice(heights, -reach, -reach, spacing), base, stats)
         if conform_roads:
             # The solve reads the *unconformed* surface through `field.sample`
