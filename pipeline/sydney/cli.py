@@ -68,6 +68,7 @@ from . import (
     water,
 )
 from .sources import msbuildings, osm
+from . import terraincache
 from .terrain import Terrain
 
 # How far past the stage radius the suburb label nodes are read. See
@@ -438,7 +439,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     _report_suppression(anchors, suppressed)
 
     print("  reading the terrain ...")
-    terrain = Terrain.load(stage.radius_m)
+    terrain = terraincache.load(stage.radius_m, use_cache=not args.no_terrain_cache)
     _report_terrain(terrain)
     _report_water(terrain)
 
@@ -6240,6 +6241,15 @@ def main(argv: list[str] | None = None) -> int:
         " keeps the tiles and the index entries it already has -- see"
         " `_carry_index_tiles`. For verifying a local change without a citywide"
         " rebuild.",
+    )
+    b.add_argument(
+        "--no-terrain-cache",
+        action="store_true",
+        help="solve the terrain lattice fresh rather than loading the cached"
+        " solve. The cache is keyed on the DEM, the OSM extract and the source"
+        " of every module that shapes the lattice, so it is only ever a hit when"
+        " all of those are unchanged; this forces a recompute when you do not"
+        " trust that -- see `terraincache`.",
     )
     b.set_defaults(func=cmd_build)
 
