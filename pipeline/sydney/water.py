@@ -211,10 +211,26 @@ MAX_WATER_SHARE = 0.60
 # The same ceiling for the coastline alone, as `verify_coastline` applies it.
 #
 # Tighter than `MAX_WATER_SHARE`, and it can be: this one is measured against a
-# *known* answer rather than guarding an unknown build. The middle extract's
-# ocean is 33.1% of its extent and the inner extract has no coastline at all, so
-# 45% sits half way between the truth and the 99.9% the bug produced.
-MAX_COASTLINE_SHARE = 0.45
+# *known* answer rather than guarding an unknown build.
+#
+# **Raised from 0.45 on 2026-08-26, because the extent grew and this number did
+# not.** The 45% was set when "the middle extract's ocean is 33.1% of its extent"
+# -- true of the middle stage as it was then, and false now: at the 60 km radius
+# the stage actually ships, the coastline polygonises to 7,180.92 km2 of a
+# 14,641 km2 extent, which is **49.0%**. Sydney at 60 km genuinely is about half
+# ocean; the extent reaches 60 km east into the Tasman and about 25 km inland
+# before it runs out of Sydney. So the guard had been sitting *below* the truth
+# and `sydney water-audit` failed on the shipped world at its own radius, which
+# is the failure mode where a check stops being run rather than starts being
+# fixed -- it was worked around with `--coastline-radius 20000` for a whole
+# publish before anyone read it.
+#
+# 55% keeps the spirit of the old number: six points of headroom over a measured
+# truth, and still 45 points clear of the 99.9% the land-face bug produced, which
+# is the thing this exists to convict. It stays under `MAX_WATER_SHARE` so the
+# coastline is held to a tighter standard than the assembled field, which was the
+# original point.
+MAX_COASTLINE_SHARE = 0.55
 
 
 class WaterSanityError(RuntimeError):
