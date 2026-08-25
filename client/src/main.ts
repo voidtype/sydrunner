@@ -30,6 +30,14 @@ import { SunFeature, verifySunButtonRenderer } from './world/sunbutton.ts';
 import { EXPOSURE } from './sky/calibration.ts';
 import { SydneySky } from './sky/sky.ts';
 import { CYCLE_MS, verifyCycle } from './sky/cycle.ts';
+/*
+ * The TSL surface, registered rather than statically imported by
+ * `world/trippass.ts`. See that file: a named import list of twenty node
+ * functions is twenty chances that a three upgrade breaks the *boot* of a client
+ * whose mushroom pass nobody is using, and this way a missing name throws inside
+ * the pass -- which latches and falls back to the plain city.
+ */
+import * as TSL from 'three/tsl';
 import { verifyDuskRig } from './sky/dusk.ts';
 import { verifyLunar } from './sky/lunar.ts';
 import { verifyMoonDisc } from './sky/moon.ts';
@@ -267,7 +275,8 @@ import { MushroomField } from './world/mushrooms.ts';
 import { TripStack } from './game/trips.ts';
 import { verifyTrips } from './game/trips.ts';
 import { fxSetTrip } from './game/teamfx.ts';
-import { verifyTripView } from './world/tripview.ts';
+import { CALM, easeLook, tripLook, verifyTripView } from './world/tripview.ts';
+import { TripPass } from './world/trippass.ts';
 import { verifyQuestAim } from './game/questaim.ts';
 import { verifyQuestAreas } from './game/questareas.ts';
 import { verifyBuildBudget } from './world/buildbudget.ts';
@@ -3234,6 +3243,18 @@ async function main(): Promise<void> {
     }
   };
 
+  (globalThis as unknown as { __THREE_TSL__: unknown }).__THREE_TSL__ = TSL;
+  /** The psychedelic pass. Built on the first mushroom, never before. */
+  const tripPass = new TripPass({ renderer, scene, camera });
+  /** Eased toward `tripLook(stack)`; see `world/tripview.ts`. */
+  let tripLookNow = CALM;
+  /**
+   * The frame delta, carried from the step that has one to the render that does
+   * not. The pass needs it only to advance its own clock -- the waves crawl on
+   * it -- and the render call sits in a different closure from the update.
+   */
+  let tripDt = 0;
+
   const mushroomEpoch = (Math.random() * 0x7fffffff) | 0;
   const mushrooms = new MushroomField(scene, mushroomEpoch);
   streamer.setMushroomSink(mushrooms);
@@ -4977,6 +4998,10 @@ async function main(): Promise<void> {
      * and `game/teamfx.ts` treats it as one.
      */
     fxSetTrip(playerCombat.id, trips.powers(sky.now.nowMs));
+    // The look eases toward the stack rather than switching with it: `bite` is
+    // instant and the screen is not. See `world/tripview.easeLook`.
+    tripLookNow = easeLook(tripLookNow, tripLook(trips.count(sky.now.nowMs)), dt);
+    tripDt = dt;
     drawTrips(dt);
   };
   window.addEventListener(
@@ -11660,7 +11685,13 @@ async function main(): Promise<void> {
     // internals and nothing to keep in step. See `world/warmup.ts`.
     frameProfile.at(FSEC.render);
     pipelineWatch.begin(renderer);
-    renderGuard.run(() => renderer.render(scene, camera), scene, hud);
+    renderGuard.run(() => {
+      // **The ordinary path is untouched.** `TripPass.render` returns false for
+      // a clear look -- which is every frame of every sober session -- and for
+      // any session where it has already failed, so a player who has eaten
+      // nothing goes through exactly the call that was here before it existed.
+      if (!tripPass.render(tripLookNow, tripDt)) renderer.render(scene, camera);
+    }, scene, hud);
     pipelineWatch.end(renderer, performance.now() - now);
     frameProfile.at(FSEC.present);
 
