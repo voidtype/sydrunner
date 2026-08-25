@@ -35,7 +35,7 @@
 
 import { PostProcessing, type WebGPURenderer } from 'three/webgpu';
 import type { Camera, Scene } from 'three';
-import { looksClear, type TripLook } from './tripview.ts';
+import { CALM as CALM_LOOK, looksClear, type TripLook } from './tripview.ts';
 
 /** What the pass needs from the frame. */
 export interface TripPassDeps {
@@ -89,7 +89,30 @@ export class TripPass {
    */
   render(look: TripLook, dt: number): boolean {
     this.engagedLast = false;
-    if (this.failed || looksClear(look)) return false;
+    if (this.failed) return false;
+    /*
+     * **It does not toggle, and that is the fix rather than an optimisation.**
+     *
+     * A post pass renders the scene into an offscreen target, and a pipeline is
+     * keyed partly on the target it draws into -- so the frame the pass switches
+     * on is the frame every visible material needs a second variant compiled.
+     * With a resident ring of tiles that is several hundred pipelines in one
+     * frame, which is the stall the owner reported on eating his first mushroom
+     * and the same fault `LoadedTile.warm` documents for turning on the spot.
+     *
+     * Awaiting it does not help: `renderAsync` yields, but the work is still the
+     * main thread's. The only arrangement with no stall is one with no
+     * transition, so once the pass is up it stays up and a sober player is drawn
+     * through it with every parameter at rest. That costs one fullscreen
+     * triangle and four texture reads a frame, forever, against a stall of a
+     * fifth of a second exactly once -- and the owner's standard is that nothing
+     * blocks the gameplay thread, not that nothing costs anything.
+     *
+     * `warm()` gets the compile behind the loading curtain, where a stall is
+     * free, so in the ordinary case it has already happened before anybody
+     * plays.
+     */
+    void looksClear;
     this.timeS += dt;
     this.look = look;
     try {
@@ -128,6 +151,31 @@ export class TripPass {
       this.post = null;
       console.warn('[trip] the post pass failed and has been dropped for this session:', err);
       return false;
+    }
+  }
+
+  /**
+   * Compile it behind the loading curtain.
+   *
+   * Called from the boot warm-up, where a stall costs nothing because nobody is
+   * playing yet. Failure is the same latch as everywhere else here: the pass is
+   * dropped and the session renders directly, which is a city with no waviness
+   * rather than a black screen.
+   */
+  async warm(): Promise<void> {
+    if (this.failed || this.ready) return;
+    try {
+      if (this.post === null) this.post = this.build();
+      this.look = CALM_LOOK;
+      const p = this.post as unknown as { renderAsync?: () => Promise<void> };
+      if (typeof p.renderAsync === 'function') await p.renderAsync();
+      else this.post.render();
+      this.ready = true;
+      this.compiling = true;
+    } catch (err) {
+      this.failed = true;
+      this.post = null;
+      console.warn('[trip] the post pass failed to compile and has been dropped:', err);
     }
   }
 

@@ -2739,6 +2739,16 @@ async function main(): Promise<void> {
    * worse than the thing it is guarding. `sydney.warmupAudit()` runs it on
    * demand, which is what to type after adding a renderer.
    */
+  /**
+   * What counts as blocking the gameplay thread.
+   *
+   * Four frames at 60 Hz. Not a budget -- the budgets are `PERFORMANCE.md`'s --
+   * but the point past which a person stops reading it as the game being busy
+   * and starts reading it as the game being broken, which is the thing worth
+   * printing a line about.
+   */
+  const LONG_FRAME_MS = 66;
+  let lastLongFrameAt = 0;
   const pipelineWatch = new PipelineWatch();
   const auditNow = (): ReturnType<typeof auditWarmup> =>
     auditWarmup(renderer, scene, warmupParts, warmupExtras, warmup?.pipelinesAfter ?? -1, pipelineWatch);
@@ -9966,6 +9976,15 @@ async function main(): Promise<void> {
     ...questMarkers.warmupParts(),
   ]);
   scene.add(lateWarmup.holder);
+  /*
+   * The psychedelic pass, compiled here for the reason everything else in this
+   * block is compiled here: behind the curtain it costs nothing, and the same
+   * compile on the frame somebody eats a mushroom is a fifth of a second of the
+   * gameplay thread. It is not awaited with the scene pass because it does not
+   * gate anything -- a player who reaches the world before it lands simply has
+   * no waviness available for a moment. See `TripPass.warm`.
+   */
+  void tripPass.warm();
   const scenePass = await withDeadline(
     renderer.compileAsync(scene, camera).finally(() => lateWarmup.release()),
     // WORKSTREAM AB: the shader budget, not the asset one. This pass reaches
@@ -11919,6 +11938,36 @@ async function main(): Promise<void> {
     // 200 ms are dropped rather than recorded: they mean the browser stopped
     // issuing frames, not that the frame took that long to draw.
     const frameMs = performance.now() - now;
+    /*
+     * --- A frame that blocked the gameplay thread reports itself.
+     *
+     * The owner's standard is that **nothing** should block it, and the honest
+     * problem with holding that standard has been that a stall is over before
+     * anybody can ask the game what happened: `sydney.warmupAudit()` answers it
+     * but has to be typed after the fact, by which time the frame profiler's
+     * two-second ring has moved on and the pipeline counter has been reset by
+     * the next tile.
+     *
+     * So the frame that stalls prints its own breakdown, on the spot, with the
+     * section that ate it and how many shader pipelines were compiled inside it
+     * -- which is the one number that separates "this frame did too much work"
+     * from "this frame waited for a driver". Rate-limited to one report every
+     * five seconds, because a genuinely bad minute must not become a console
+     * that is itself the problem.
+     */
+    if (frameMs > LONG_FRAME_MS && now - lastLongFrameAt > 5000) {
+      lastLongFrameAt = now;
+      const r = frameProfile.report();
+      const worst = r.sections
+        .slice(0, 4)
+        .map((sec) => `${sec.name} ${sec.worstMs.toFixed(1)}ms`)
+        .join(', ');
+      console.warn(
+        `[frame] ${frameMs.toFixed(0)} ms — worst sections: ${worst || '(none)'}` +
+          `  |  pipelines compiled in stalled frames so far: ${pipelineWatch.pipelines}` +
+          ` over ${pipelineWatch.frames} frame(s), worst ${pipelineWatch.worstMs.toFixed(0)} ms`,
+      );
+    }
     if (frameDt < 0.2) {
       frameTimes[frameCursor] = frameMs;
       frameCursor = (frameCursor + 1) % frameTimes.length;
