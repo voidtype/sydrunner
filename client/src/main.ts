@@ -270,11 +270,13 @@ import {
   verifyQuests,
   type ContentBundle,
 } from './game/questmodel.ts';
-import { verifyMushrooms } from './game/mushrooms.ts';
+import { MAX_STACK, verifyMushrooms } from './game/mushrooms.ts';
+import { GodRoom } from './world/godroom.ts';
+import { verifyMandala } from './game/mandala.ts';
 import { MushroomField } from './world/mushrooms.ts';
 import { TripStack } from './game/trips.ts';
 import { verifyTrips } from './game/trips.ts';
-import { fxSetSlow, fxSetTrip } from './game/teamfx.ts';
+import { fxSetDoubleHealth, fxSetSlow, fxSetTrip } from './game/teamfx.ts';
 import { CALM, easeLook, tripLook, verifyTripView } from './world/tripview.ts';
 import { TripPass } from './world/trippass.ts';
 import { verifyQuestAim } from './game/questaim.ts';
@@ -3255,6 +3257,104 @@ async function main(): Promise<void> {
    */
   let tripDt = 0;
 
+  /*
+   * --- The seventh mushroom.
+   *
+   * The room is a subtree that gets shown with the world hidden behind it, so
+   * leaving is a boolean and there is no second simulation to keep in step. The
+   * conversation is the client's to hold: every turn posts the whole exchange
+   * back, which is why a server restart mid-audience loses nothing and why the
+   * server keeps no per-player session. The one thing it does keep is the grant.
+   */
+  const godRoom = new GodRoom();
+  scene.add(godRoom.group);
+  const godPanel = document.getElementById('god');
+  const godLines = document.getElementById('god-lines');
+  const godSay = document.getElementById('god-say') as HTMLInputElement | null;
+  const godSend = document.getElementById('god-send');
+  const godTurns: Array<{ who: 'player' | 'god'; text: string }> = [];
+  let godBusy = false;
+
+  const godWrite = (who: 'player' | 'god', text: string): void => {
+    if (godLines === null || text === '') return;
+    const el = document.createElement('div');
+    el.className = `said ${who === 'god' ? 'god' : 'you'}`;
+    // `textContent`, never `innerHTML`: this string came off a third-party
+    // endpoint, and that is the whole of the rule the dialog panel follows.
+    el.textContent = text;
+    godLines.appendChild(el);
+    godLines.scrollTop = godLines.scrollHeight;
+  };
+
+  const godClose = (blessed: boolean): void => {
+    godRoom.leave();
+    godPanel?.classList.add('hidden');
+    // Seven is spent whatever happened: the room is not somewhere to loiter.
+    trips.clear();
+    if (blessed) {
+      fxSetDoubleHealth(playerCombat.id, true);
+      hud.notice('you came back with something');
+    } else {
+      hud.notice('the light goes out');
+    }
+  };
+
+  const godTurn = async (said: string): Promise<void> => {
+    if (godBusy) return;
+    godBusy = true;
+    if (said !== '') {
+      godTurns.push({ who: 'player', text: said });
+      godWrite('player', said);
+    }
+    try {
+      const base = netUrl === null ? '' : netUrl.replace(/^ws/, 'http').replace(/\/ws\b.*$/, '');
+      const res = await fetch(`${base}/god`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ turns: godTurns }),
+      });
+      const body = (await res.json()) as { text?: string; verdict?: string; quiet?: boolean };
+      if (body.quiet === true || (body.text ?? '') === '') {
+        // God being briefly unreachable is in character; an error is not.
+        godWrite('god', '...');
+      } else {
+        godTurns.push({ who: 'god', text: body.text ?? '' });
+        godWrite('god', body.text ?? '');
+      }
+      if (body.verdict === 'blessed') setTimeout(() => godClose(true), 2600);
+      else if (body.verdict === 'refused') setTimeout(() => godClose(false), 2600);
+    } catch {
+      godWrite('god', '...');
+    } finally {
+      godBusy = false;
+    }
+  };
+
+  const godEnter = (): void => {
+    godTurns.length = 0;
+    if (godLines !== null) godLines.replaceChildren();
+    godRoom.enter(player.position.x, player.position.y - EYE_HEIGHT, player.position.z);
+    godPanel?.classList.remove('hidden');
+    if (document.pointerLockElement) document.exitPointerLock();
+    godSay?.focus();
+    void godTurn('');
+  };
+
+  godSend?.addEventListener('click', () => {
+    const said = (godSay?.value ?? '').trim();
+    if (said === '' || godSay === null) return;
+    godSay.value = '';
+    void godTurn(said);
+  });
+  godSay?.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key !== 'Enter') return;
+    const said = godSay.value.trim();
+    if (said === '') return;
+    godSay.value = '';
+    void godTurn(said);
+  });
+
   const mushroomEpoch = (Math.random() * 0x7fffffff) | 0;
   const mushrooms = new MushroomField(scene, mushroomEpoch);
   streamer.setMushroomSink(mushrooms);
@@ -4719,6 +4819,7 @@ async function main(): Promise<void> {
     ...verifyMushrooms(),
     ...verifyTrips(),
     ...verifyTripView(),
+    ...verifyMandala(),
     ...verifyQuestAim(),
     ...verifyQuestAreas(),
     ...verifyBuildBudget(),
@@ -4989,7 +5090,8 @@ async function main(): Promise<void> {
           fxSetSlow(playerCombat.id, bite.slowUntilMs);
           hud.notice('that one was orange. your legs have gone.');
         } else if (bite.kind === 'trip') {
-          hud.notice(bite.stack === 1 ? 'the trees look interesting' : `${bite.stack} of them now`);
+          if (bite.stack >= MAX_STACK) godEnter();
+          else hud.notice(bite.stack === 1 ? 'the trees look interesting' : `${bite.stack} of them now`);
         } else {
           hud.notice('you could not eat another thing');
         }
@@ -5009,6 +5111,7 @@ async function main(): Promise<void> {
     // instant and the screen is not. See `world/tripview.easeLook`.
     tripLookNow = easeLook(tripLookNow, tripLook(trips.count(sky.now.nowMs)), dt);
     tripDt = dt;
+    godRoom.update(dt);
     drawTrips(dt);
   };
   window.addEventListener(

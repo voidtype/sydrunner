@@ -267,7 +267,8 @@ import { verifySim } from './sim.ts';
 import { verifyMushrooms } from '../client/src/game/mushrooms.ts';
 import { verifyTrips } from '../client/src/game/trips.ts';
 import { verifyTripView } from '../client/src/world/tripview.ts';
-import { verifyGod } from './god.ts';
+import { Audience, MAX_TURNS, askGod, verifyGod } from './god.ts';
+import { verifyMandala } from '../client/src/game/mandala.ts';
 import { verifyQuestAim } from '../client/src/game/questaim.ts';
 import { verifyQuestAreas } from '../client/src/game/questareas.ts';
 import { verifyBuildBudget } from '../client/src/world/buildbudget.ts';
@@ -737,6 +738,7 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     ['verifyTrips', verifyTrips()],
     ['verifyTripView', verifyTripView()],
     ['verifyGod', verifyGod()],
+    ['verifyMandala', verifyMandala()],
     ['verifyQuestAim', verifyQuestAim()],
     ['verifyQuestAreas', verifyQuestAreas()],
     ['verifyBuildBudget', verifyBuildBudget()],
@@ -1218,7 +1220,10 @@ const server = Bun.serve<Conn>({
   port: PORT,
   hostname: '0.0.0.0',
 
-  fetch(req, srv) {
+  // `async` since the seventh mushroom: `POST /god` awaits a third-party
+  // endpoint. Every other route returns synchronously and is unaffected -- a
+  // handler that returns a `Response` rather than a promise still works.
+  async fetch(req, srv) {
     const url = new URL(req.url);
     if (url.pathname === '/health') {
       let bots = 0;
@@ -1391,6 +1396,47 @@ const server = Bun.serve<Conn>({
      * this same copy. See `QuestEngine.node`.
      */
     if (url.pathname === '/content') return contentResponse(content, req);
+
+    /*
+     * --- The seventh mushroom's conversation.
+     *
+     * POST the exchange so far, get God's next line and his verdict. Stateless
+     * on purpose: the audience lives in the client's hand and comes back every
+     * turn, so a server restart mid-conversation loses nothing and there is no
+     * per-player session to leak. What the server keeps is the *grant*, which is
+     * the only part a client must not be able to invent.
+     *
+     * Rate-limited by the turn cap inside `Audience`, which the server rebuilds
+     * from the posted turns rather than trusting -- a client that posts fifty
+     * turns gets an audience that closed at twelve.
+     */
+    if (url.pathname === '/god' && req.method === 'POST') {
+      try {
+        const body = (await req.json()) as { turns?: Array<{ who?: string; text?: string }> };
+        const audience = new Audience();
+        for (const t of (body.turns ?? []).slice(0, MAX_TURNS * 2)) {
+          if (t.who !== 'player' && t.who !== 'god') continue;
+          audience.say(t.who, String(t.text ?? ''));
+        }
+        if (audience.closed) {
+          return Response.json({ text: '', verdict: 'refused', closed: true }, { headers: { 'access-control-allow-origin': '*' } });
+        }
+        const said = await askGod(audience, {
+          url: process.env.SYDNEY_DIALOG_AI_URL ?? '',
+          key: process.env.SYDNEY_DIALOG_AI_KEY ?? '',
+          model: process.env.SYDNEY_DIALOG_AI_MODEL ?? 'qwen3-5-4b',
+        });
+        if (said === null) {
+          return Response.json({ text: '', verdict: 'open', quiet: true }, { headers: { 'access-control-allow-origin': '*' } });
+        }
+        return Response.json(
+          { text: said.text, verdict: said.verdict },
+          { headers: { 'access-control-allow-origin': '*' } },
+        );
+      } catch {
+        return Response.json({ text: '', verdict: 'open', quiet: true }, { headers: { 'access-control-allow-origin': '*' } });
+      }
+    }
     /*
      * `/auth/*` -- sign up, log in, log out, and the landing page's live handle
      * check. Workstream G; see `server/accounts.ts` for all four and for why

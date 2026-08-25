@@ -1057,6 +1057,33 @@
          to read it: a row of squares under the vitals, each with a countdown and
          a mouseover that says what it is doing. Gold border deepens with the
          stack so the row itself reads as a state at a glance. */
+      /* God. Deliberately unlike every other panel here: no border, no card, no
+         background of its own. You are inside the thing already, so a window
+         floating in front of it would be a browser on top of a cathedral. Just
+         light text, low in the frame, clear of the face. */
+      #god {
+        position: fixed; left: 50%; transform: translateX(-50%); bottom: 6vh;
+        width: min(760px, 88vw); z-index: 60; display: flex;
+        flex-direction: column; gap: 12px; pointer-events: auto;
+      }
+      #god.hidden { display: none; }
+      #god-lines { display: flex; flex-direction: column; gap: 10px; max-height: 42vh; overflow-y: auto; }
+      #god-lines .said { font: 400 15px/1.55 Georgia, "Times New Roman", serif; text-shadow: 0 2px 14px rgba(0,0,0,.9); }
+      #god-lines .said.god { color: #ffe9a8; }
+      #god-lines .said.you { color: #bcd4e8; font-style: italic; }
+      #god-row { display: flex; gap: 8px; }
+      #god-say {
+        flex: 1 1 auto; padding: 9px 13px; border-radius: 999px;
+        background: rgba(9, 5, 18, .72); border: 1px solid rgba(255, 233, 168, .3);
+        color: #ffe9a8; font: 400 14px/1.4 Georgia, serif; outline: none;
+      }
+      #god-say::placeholder { color: rgba(255, 233, 168, .38); }
+      #god-send {
+        padding: 9px 18px; border-radius: 999px; cursor: pointer;
+        background: rgba(255, 233, 168, .12); border: 1px solid rgba(255, 233, 168, .45);
+        color: #ffe9a8; font: 600 13px/1.4 Georgia, serif;
+      }
+      #god-send:hover { background: rgba(255, 233, 168, .22); }
       #trips {
         position: fixed; left: 50%; transform: translateX(-50%);
         bottom: calc(8vh + 62px); display: flex; gap: 6px; z-index: 38;
@@ -2728,6 +2755,16 @@
       <div id="dialog-who"></div>
       <div id="dialog-line"></div>
       <div id="dialog-choices"></div>
+    </div>
+    <!-- The seventh mushroom. A conversation laid over a dome you are inside;
+         `world/godroom.ts` is the room and `server/god.ts` is who you are
+         talking to. Hidden until the seventh. -->
+    <div id="god" class="hidden">
+      <div id="god-lines"></div>
+      <div id="god-row">
+        <input id="god-say" type="text" maxlength="400" autocomplete="off" placeholder="say something" />
+        <button id="god-send" type="button">speak</button>
+      </div>
     </div>
     <div id="trips"></div>
       <div id="dialog-prompt"><b>E</b> &nbsp;talk to <span id="dialog-prompt-name"></span></div>

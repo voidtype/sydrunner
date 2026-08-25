@@ -148,6 +148,41 @@ export function unbless(record: BlessRecord, playerId: number, nowMs: number): v
   }
 }
 
+/**
+ * Ask God, over the same endpoint the improv lines use.
+ *
+ * Returns the reply and the verdict. A `null` reply is "the endpoint did not
+ * answer" -- which the caller shows as silence rather than as an error, because
+ * God being briefly unreachable is in character and a stack trace is not.
+ */
+export async function askGod(
+  audience: Audience,
+  cfg: { url: string; key: string; model: string; fetchImpl?: typeof fetch },
+): Promise<{ text: string; verdict: GodVerdict } | null> {
+  if (cfg.url === '' || cfg.key === '') return null;
+  const f = cfg.fetchImpl ?? fetch;
+  try {
+    const res = await f(`${cfg.url.replace(/\/+$/, '')}/chat/completions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${cfg.key}` },
+      body: JSON.stringify({
+        model: cfg.model,
+        messages: audience.messages(),
+        max_tokens: 180,
+        temperature: 0.85,
+      }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const raw = body.choices?.[0]?.message?.content ?? '';
+    if (raw === '') return null;
+    return readVerdict(raw);
+  } catch {
+    return null;
+  }
+}
+
 export function verifyGod(): string[] {
   const failures: string[] = [];
 
