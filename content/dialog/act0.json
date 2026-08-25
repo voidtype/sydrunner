@@ -55,7 +55,7 @@
         },
         {
           "id": "job",
-          "line": "Adlay, you need some more ascay! Get down to Cenno and tell em you did 5 job interviews this week, eshay bruv! Grab this lime bike and ride down to the fern cuz, its just straight down here then right!",
+          "line": "Adlay, you need some more ascay! Get down to Cenno and tell em you did 5 job interviews this week, eshay bruv! Grab this lime bike and ride down to Cenno cuz, its just out the park and up the road!",
           "choices": [
             { "text": "Righto. Where's the bike?", "accept": "act0-ladmaster", "denyFlag": "act0:shown" },
             { "text": "Adlay?", "goto": "adlay" },
@@ -80,7 +80,7 @@
         },
         {
           "id": "nudge",
-          "line": "The fern cuz. Straight down here, then right. Big square, glass front, blokes on the bench out the front. If ya lost the bike thats on you, I only had the one.",
+          "line": "Out the park and up the road cuz. Big square, glass front, blokes on the bench out the front. If ya lost the bike thats on you, I only had the one.",
           "choices": [{ "text": "Got it.", "goto": "" }]
         },
         {
@@ -98,8 +98,8 @@
     {
       "id": "rabbitohs-ray",
       "name": "Rabbitohs Ray",
-      "x": -938.3,
-      "z": 2669.9,
+      "x": -3316.9,
+      "z": 4211.1,
       "radius": 5,
       "root": "hello",
       "nodes": [
@@ -184,8 +184,8 @@
     {
       "id": "centrelink-clerk",
       "name": "Denise, Services Australia",
-      "x": -925.2,
-      "z": 2645.2,
+      "x": -3344.9,
+      "z": 4208.3,
       "radius": 5,
       "root": "hello",
       "nodes": [

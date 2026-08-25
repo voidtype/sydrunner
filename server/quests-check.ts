@@ -831,7 +831,12 @@ async function main(): Promise<void> {
       check(tutorial.reward.cash === 10 && tutorial.reward.xp === 2, 'it pays $10 and 2 xp', `$${tutorial.reward.cash}, ${tutorial.reward.xp} xp`);
       const first = tutorial.steps[0];
       check(tutorial.steps.length === 1 && first?.kind === 'goto', 'it is one goto and nothing else', `${tutorial.steps.length} step(s)`);
-      check((first?.objective ?? '') === 'GET TO REDFERN', 'whose banner reads GET TO REDFERN', JSON.stringify(first?.objective));
+      // The literal moves with the content, and it is pinned rather than loosened
+      // because the banner is the one line of the tutorial a player reads while
+      // riding. It said GET TO REDFERN until the destination became a real
+      // Centrelink -- the Redfern point was a hand-looked-up backstop OSM had
+      // nothing for, and the nearest office OSM actually tags is in St Peters.
+      check((first?.objective ?? '') === 'GET TO CENNO', 'whose banner reads GET TO CENNO', JSON.stringify(first?.objective));
       // The step points at Ray rather than at Denise: he is the one who takes it
       // back, and a waypoint that landed the player at a counter with nothing to
       // hand over is the tutorial's one unrecoverable moment.

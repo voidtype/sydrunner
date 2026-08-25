@@ -53,7 +53,7 @@
     {
       "id": "act0-ladmaster",
       "act": 0,
-      "title": "Down to the Fern",
+      "title": "Down to Cenno",
       "blurb": "Some bloke in the park reckons Cenno owes you money and has a bike you can borrow. He may be right about one of those.",
       "giver": "ladmaster",
       "level": 1,
@@ -62,11 +62,11 @@
       "steps": [
         {
           "kind": "goto",
-          "x": -938.3,
-          "z": 2669.9,
+          "x": -3316.9,
+          "z": 4211.1,
           "radius": 30,
-          "label": "ride down to Redfern and find Ray",
-          "objective": "GET TO REDFERN"
+          "label": "ride down to Cenno and find Ray",
+          "objective": "GET TO CENNO"
         }
       ],
       "reward": { "cash": 10, "xp": 2, "unlock": ["act0:shown"] }
@@ -79,7 +79,7 @@
       "giver": "centrelink-clerk",
       "level": 1,
       "steps": [
-        { "kind": "goto", "x": -925.2, "z": 2645.2, "radius": 30, "label": "get to the Redfern service centre" }
+        { "kind": "goto", "x": -3344.9, "z": 4208.3, "radius": 30, "label": "get to the St Peters service centre" }
       ],
       "reward": { "cash": 20, "xp": 100, "unlock": ["act0:reported"] }
     },
@@ -147,7 +147,7 @@
       "level": 2,
       "requires": ["act0-training"],
       "steps": [
-        { "kind": "goto", "x": -925.2, "z": 2645.2, "radius": 30, "label": "get back to Redfern" },
+        { "kind": "goto", "x": -3344.9, "z": 4208.3, "radius": 30, "label": "get back to the service centre" },
         { "kind": "dialog", "npc": "centrelink-clerk", "node": "review", "label": "sit through the review" }
       ],
       "reward": { "cash": 80, "xp": 400, "unlock": ["act0:done", "act1:open"] }
