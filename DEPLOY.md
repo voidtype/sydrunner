@@ -669,6 +669,53 @@ block from it. So:
 round (382 tiles, 36 hexagons): tile→hex mapping, before/after audits, the
 terrain diff, and the wrangler uploader. Reuse them.
 
+**When the S3 token is dead, and how to publish without a snapshot.**
+Both of these were true on 2026-08-25 and neither is in the runbook above,
+because the runbook assumes the happy path for each.
+
+*The token.* `rclone lsf R2:sydrunner-world --max-depth 1`, with the environment
+configured exactly as `publish-world-r2.sh` configures it, returned **403 Access
+Denied on read** -- the pair in `~/.config/sydney/r2.env` has been rolled again
+(the keys are still well-formed: 32-char id, 64-char secret, so "it 403s" is the
+only symptom). Minting a replacement is a dashboard action on the owner's
+Cloudflare account and is not something to do unattended. The fallback in step 4
+above is the whole answer and it works: **`wrangler` is logged in with an OAuth
+token** (`npx wrangler@latest whoami` -> pollack.evan@gmail.com, account
+b7f27f4a…, and `r2 bucket list` shows `sydrunner-world`), so per-object
+`r2 object put --remote` publishes with no new credential at all. It is an order
+of magnitude slower than an rclone checksum sync, which is what makes the next
+paragraph necessary rather than merely tidy.
+
+*The snapshot.* Step 1 says to copy the world before building so the upload can
+send only what changed. If that was not done, the diff is still recoverable and
+the recovery is **better evidence than the snapshot would have been**, because it
+compares against what is actually being served rather than against what we
+believe we last sent: **R2 sets an object's ETag to the MD5 of its content** for
+any single-part upload, and every file in this world is far under the multipart
+threshold. So `curl -I https://world.3rp.uk/<key>` hands back the hash, free and
+unauthenticated. `scripts/world-round/cdn-diff.py` walks the world, hashes each
+file, HEADs the CDN and prints the keys that differ; `--limit` samples instead of
+walking, which is how to ask "did terrain move" in ten seconds rather than "what
+do I upload" in two minutes. `scripts/world-round/upload-changed.sh` takes that
+list and drives `upload-one.sh` N at a time with a retry round, and refuses to
+exit 0 with anything still failing. Together they are the no-snapshot,
+no-S3-token publish path end to end.
+
+Prove one object landed before the bulk either way. The cheapest proof that
+costs nothing and creates nothing: fetch an existing object from the CDN and put
+the identical bytes back, then check the ETag is unchanged.
+
+**A retile that adds a new kind of sheet must re-check `wy`.** `index.json`
+carries `wv` (the client's fetch test, a vertex count) and `wy` (the *wading*
+level) per tile, and until the creeks arrived one condition gated both. They are
+not the same question. `wv` must count every vertex in `.water.bin`, creeks
+included, or a tile with a creek and no harbour never fetches its own water;
+`wy` must come only from water the wading rule should see, and creeks are
+deliberately excluded from it. Gating both on the vertex count writes `wy: 0`
+onto every creek-only tile -- 11,959 of 22,928 -- and `wy: 0` is not "no water",
+it is a surface at 71 m AHD, which is over the heads of four fifths of Sydney.
+`sydney water-audit` now convicts a `wy` that no sheet on that tile is at.
+
 **Partial retile helpers.** The 2026-08-17 station round's scratch scripts are
 now in `scripts/world-round/`, so the next partial retile does not rediscover
 them. `restore-region-mtimes.py` takes `--before`/`--world` and, with
