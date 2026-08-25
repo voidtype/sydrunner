@@ -1807,7 +1807,41 @@ export class TileStreamer implements LampSource {
           // best and a walk over disposed buffers at worst.
           if (this.loaded.get(next.entry.key) !== next) continue;
           try {
+            /*
+             * **Both shadow roles, because the flags decide the pipeline.**
+             *
+             * A tile is built casting and *not* receiving -- `buildTile` says so
+             * and gives the good reason: a tile that streams in at 1.5 km should
+             * never compile a receiving variant it will never draw.
+             * `applyShadowRole` then switches receiving **on** the first frame it
+             * is close enough to be in the sun's reach.
+             *
+             * So this compiled the role a tile *arrives* in, and the other one --
+             * the role every tile near the player ends up in -- was compiled
+             * inside the frame it flipped on. `LoadedTile.warm`'s own note says
+             * the freeze on turning was the frame a tile enters the view; the
+             * instanced-uuid half of that was fixed here and this half was not,
+             * so turning still paid for whatever crossed the shadow range.
+             *
+             * The arriving role first, so the tile is drawable as early as
+             * possible, then the other, then put back. Both are off the frame --
+             * this is already a queue that awaits -- and `warm` is still set only
+             * after both have landed, so nothing is drawn in a role nothing has
+             * compiled.
+             */
             await this.precompile?.(next.group);
+            const flipped: Mesh[] = [];
+            next.group.traverse((o) => {
+              const mesh = o as Mesh;
+              if ((mesh as { isMesh?: boolean }).isMesh !== true) return;
+              if (mesh.userData.noShadow === true) return;
+              mesh.receiveShadow = !mesh.receiveShadow;
+              flipped.push(mesh);
+            });
+            if (flipped.length > 0) {
+              await this.precompile?.(next.group);
+              for (const mesh of flipped) mesh.receiveShadow = !mesh.receiveShadow;
+            }
           } catch {
             // A tile that would not compile is a tile that hitches once, which
             // is what every tile did before this existed.
@@ -1863,14 +1897,31 @@ export class TileStreamer implements LampSource {
       });
     }
 
-    // The terrain mesh, which wears the same material as the far ground and is
-    // the only other thing `buildTerrainMesh` produces.
+    /*
+     * The terrain mesh, which wears the same material as the far ground and is
+     * the only other thing `buildTerrainMesh` produces.
+     *
+     * **Both shadow roles, and this was `[true]`.** A ground sheet arrives
+     * receiving and `applyGroundShadowRole` switches it off the first frame it
+     * is out of the sun's reach -- and three keys the render pipeline on
+     * `receiveShadow`, so the *off* variant was a pipeline nothing had ever
+     * compiled. Every sheet crossing that threshold compiled one inside the
+     * frame it crossed on, which is a stall felt while walking and while the
+     * resident ring turns over around a player who is only looking about.
+     *
+     * The hysteresis in `applyGroundShadowRole` stops a sheet flapping across
+     * the line; it does nothing about the *first* crossing, and the first
+     * crossing is the one that pays.
+     *
+     * Two pipelines at boot, behind the curtain, against one stall per sheet for
+     * the life of the session.
+     */
     parts.push({
       geometry: warmupGeometry({ normal: true, uv: true }),
       owned: true,
       material: this.groundMaterial,
       casts: false,
-      receives: [true],
+      receives: [true, false],
     });
 
     // The water, which wears the same material as the far sheet. Warmed with a
