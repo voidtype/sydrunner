@@ -267,6 +267,7 @@ import { verifySim } from './sim.ts';
 import { verifyMushrooms } from '../client/src/game/mushrooms.ts';
 import { verifyTrips } from '../client/src/game/trips.ts';
 import { verifyTripView } from '../client/src/world/tripview.ts';
+import { verifyGod } from './god.ts';
 import { verifyQuestAim } from '../client/src/game/questaim.ts';
 import { verifyQuestAreas } from '../client/src/game/questareas.ts';
 import { verifyBuildBudget } from '../client/src/world/buildbudget.ts';
@@ -735,6 +736,7 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     ['verifyMushrooms', verifyMushrooms()],
     ['verifyTrips', verifyTrips()],
     ['verifyTripView', verifyTripView()],
+    ['verifyGod', verifyGod()],
     ['verifyQuestAim', verifyQuestAim()],
     ['verifyQuestAreas', verifyQuestAreas()],
     ['verifyBuildBudget', verifyBuildBudget()],
