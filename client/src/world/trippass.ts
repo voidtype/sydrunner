@@ -220,7 +220,7 @@ export class TripPass {
    * nothing: the frame is a plain `renderer.render` in that case and the canvas
    * context is the right one after all.
    */
-  async warmInto<T>(fn: () => Promise<T>): Promise<T> {
+  warmInto<T>(fn: () => Promise<T>): Promise<T> {
     const { renderer } = this.deps;
     const target = this.scenePass?.renderTarget as
       | Parameters<typeof renderer.setRenderTarget>[0]
@@ -233,8 +233,25 @@ export class TripPass {
     if (mrt !== undefined && mrt !== null) {
       renderer.setMRT(mrt as Parameters<typeof renderer.setMRT>[0]);
     }
+    // **Started, then unbound -- not awaited.** The binding must cover the
+    // synchronous prefix of `compileAsync` and *nothing after it*, which is a
+    // correctness requirement rather than tidiness. Holding it across the await
+    // leaves the renderer pointing at the pass's own texture for as long as a
+    // compile takes, and a frame that lands in that window ends with
+    // `PostProcessing` drawing its output quad into the very texture it samples:
+    //
+    //     [Texture "output"] usage (TextureBinding|RenderAttachment) includes
+    //     writable usage and another usage in the same synchronization scope.
+    //
+    // -- which is a dead canvas, not a slow one. Tiles warm continuously while
+    // somebody is playing, so that window is open more or less always.
+    //
+    // The prefix is enough because that is where three reads the target:
+    // `compileAsync` resolves its render context, builds the whole render list
+    // and queues its work items before its first yield, which is the same fact
+    // `warmGroupOffCamera` already relies on for `visible` and `frustumCulled`.
     try {
-      return await fn();
+      return fn();
     } finally {
       renderer.setRenderTarget(prevTarget);
       renderer.setMRT(prevMrt);
@@ -441,14 +458,44 @@ export function verifyTripPass(): string[] {
   if (sawMrt !== mrt) {
     failures.push('warmInto did not bind the pass MRT, which is half of the render context key');
   }
-  // The restore is deliberately **not** asserted here. It happens in a `finally`
-  // after the compile's promise settles, so a synchronous self-check cannot see
-  // it without awaiting -- and this check has to stay synchronous to sit in the
-  // boot list beside every other `verify*`. What regressed was the binding, and
-  // the binding is what this pins. The restore is two lines of `finally` that
-  // the type checker covers, and every other consumer of the render target --
-  // the frame loop, three's own `PassNode`, the shadow pass -- saves and puts
-  // back around itself for the same reason, so a binding held across a frame is
-  // survivable where a warm compiled into the wrong context is not.
+  if (bound !== outer || boundMrt !== outerMrt) {
+    failures.push('warmInto did not put the previous target back; the frame loop binds its own');
+  }
+
+  // **And it must be back before the compile finishes, not after.** This is the
+  // one that matters most and the one that shipped broken: awaiting `fn` inside
+  // the binding leaves the renderer aimed at the pass's own texture for the
+  // whole compile, and a frame landing in that window draws the output quad into
+  // the texture it samples -- "usage includes writable usage and another usage
+  // in the same synchronization scope", which is a dead canvas. Tiles warm
+  // continuously during play, so the window is open essentially always.
+  let release: (() => void) | null = null;
+  const pending = pass.warmInto(
+    () =>
+      new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+  );
+  if (bound !== outer) {
+    failures.push(
+      'warmInto held the pass target bound across an unfinished compile; a frame in' +
+        ' that window renders the post output into its own input texture',
+    );
+  }
+  (release as (() => void) | null)?.();
+  void pending;
+
+  // A throw restores too, or one failed compile aims the renderer at an
+  // offscreen target for the rest of the session.
+  try {
+    void pass.warmInto(() => {
+      throw new Error('compile failed');
+    });
+  } catch {
+    // expected
+  }
+  if (bound !== outer) {
+    failures.push('warmInto left the pass target bound after a failed compile');
+  }
   return failures;
 }
