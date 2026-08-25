@@ -1831,13 +1831,13 @@ export class TileStreamer implements LampSource {
              */
             await this.precompile?.(next.group);
             const flipped: Mesh[] = [];
-            next.group.traverse((o) => {
-              const mesh = o as Mesh;
-              if ((mesh as { isMesh?: boolean }).isMesh !== true) return;
-              if (mesh.userData.noShadow === true) return;
+            for (const child of next.group.children) {
+              const mesh = child as Mesh;
+              if (!mesh.isMesh) continue;
+              if (mesh.userData.noShadow === true) continue;
               mesh.receiveShadow = !mesh.receiveShadow;
               flipped.push(mesh);
-            });
+            }
             if (flipped.length > 0) {
               await this.precompile?.(next.group);
               for (const mesh of flipped) mesh.receiveShadow = !mesh.receiveShadow;
