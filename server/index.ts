@@ -265,6 +265,7 @@ import { verifySim } from './sim.ts';
  * refused) and the **wire** is `client/src/net/quests.ts`.
  */
 import { verifyMushrooms } from '../client/src/game/mushrooms.ts';
+import { verifyTrips } from '../client/src/game/trips.ts';
 import { verifyQuestAim } from '../client/src/game/questaim.ts';
 import { verifyQuestAreas } from '../client/src/game/questareas.ts';
 import { verifyBuildBudget } from '../client/src/world/buildbudget.ts';
@@ -731,6 +732,7 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // NPC* -- a real node, with real choices, which this side then acts on --
     // so the player clicks "take the job" and is told about the weather.
     ['verifyMushrooms', verifyMushrooms()],
+    ['verifyTrips', verifyTrips()],
     ['verifyQuestAim', verifyQuestAim()],
     ['verifyQuestAreas', verifyQuestAreas()],
     ['verifyBuildBudget', verifyBuildBudget()],

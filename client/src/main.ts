@@ -263,6 +263,7 @@ import {
   type ContentBundle,
 } from './game/questmodel.ts';
 import { verifyMushrooms } from './game/mushrooms.ts';
+import { verifyTrips } from './game/trips.ts';
 import { verifyQuestAim } from './game/questaim.ts';
 import { verifyQuestAreas } from './game/questareas.ts';
 import { verifyBuildBudget } from './world/buildbudget.ts';
@@ -4607,6 +4608,7 @@ async function main(): Promise<void> {
    */
   const dialogFailures = [
     ...verifyMushrooms(),
+    ...verifyTrips(),
     ...verifyQuestAim(),
     ...verifyQuestAreas(),
     ...verifyBuildBudget(),
