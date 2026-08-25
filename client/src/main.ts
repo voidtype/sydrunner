@@ -282,7 +282,9 @@ import { TripStack } from './game/trips.ts';
 import { countdownText, verifyTrips } from './game/trips.ts';
 import { fxSetDoubleHealth, fxSetSlow, fxSetTrip } from './game/teamfx.ts';
 import { CALM, easeLook, tripLook, verifyTripView } from './world/tripview.ts';
-import { TripPass } from './world/trippass.ts';
+import { TripPass,
+  verifyTripPass,
+} from './world/trippass.ts';
 import { verifyQuestAim } from './game/questaim.ts';
 import { verifyQuestAreas } from './game/questareas.ts';
 import { verifyBuildBudget } from './world/buildbudget.ts';
@@ -2800,6 +2802,14 @@ async function main(): Promise<void> {
   // function: `FarHexes` compiles a staged, detached group of slab meshes
   // before moving them into the scene, on exactly this argument. Two copies of
   // the visibility dance would be two chances to get it wrong.
+  /*
+   * Bound to `TripPass.warmInto` once the pass exists, a few hundred lines below.
+   * A holder rather than a direct reference because `precompileGroup` is defined
+   * here and `tripPass` is constructed later, and a tile that somehow warmed in
+   * between should compile for the canvas rather than throw.
+   */
+  let bindWarmTarget: <T>(fn: () => Promise<T>) => Promise<T> = (fn) => fn();
+
   const precompileGroup = async (group: Group): Promise<void> => {
     // Visible for the walk and hidden again immediately, because the two
     // visibilities are the same flag: `_projectObject` skips an invisible object
@@ -2842,7 +2852,14 @@ async function main(): Promise<void> {
     // and assert on what the walk was allowed to see -- which is the only thing
     // that separates a warm-up that compiled nothing from one that had nothing
     // to do. See `verifyWarmup`.
-    await warmGroupOffCamera(renderer, group, camera, scene);
+    //
+    // Wrapped in `warmInto`, which binds the render target the frame will
+    // actually draw into. `TripPass` renders the world through a post pass on
+    // every frame now, and three keys a pipeline on the render context -- so a
+    // compile with no target bound compiles for the canvas and the frame throws
+    // it away. See `TripPass.warmInto`; without it this whole function is an
+    // expensive no-op.
+    await bindWarmTarget(() => warmGroupOffCamera(renderer, group, camera, scene));
   };
   streamer.setPrecompiler(precompileGroup);
 
@@ -3308,6 +3325,9 @@ async function main(): Promise<void> {
   (globalThis as unknown as { __THREE_TSL__: unknown }).__THREE_TSL__ = TSL;
   /** The psychedelic pass. Built on the first mushroom, never before. */
   const tripPass = new TripPass({ renderer, scene, camera });
+  // See `bindWarmTarget` above and `TripPass.warmInto`: from here on every
+  // precompile in this client compiles into the target the frame draws into.
+  bindWarmTarget = (fn) => tripPass.warmInto(fn);
   /** Eased toward `tripLook(stack)`; see `world/tripview.ts`. */
   let tripLookNow = CALM;
   /**
@@ -4924,6 +4944,7 @@ async function main(): Promise<void> {
     ...verifyMushrooms(),
     ...verifyTrips(),
     ...verifyTripView(),
+    ...verifyTripPass(),
     ...verifyMandala(),
     ...verifyQuestAim(),
     ...verifyQuestAreas(),
@@ -10012,9 +10033,22 @@ async function main(): Promise<void> {
    * gate anything -- a player who reaches the world before it lands simply has
    * no waviness available for a moment. See `TripPass.warm`.
    */
-  void tripPass.warm();
+  /*
+   * **Awaited, and the scene pass compiles into its target.** This was
+   * fire-and-forget on the argument that the pass gates nothing, which was true
+   * while it only engaged for a player who had eaten something. It is permanent
+   * now -- see `TripPass.render` -- so the target it owns is the render context
+   * every material in the world is drawn in, and a scene pass that ran before it
+   * existed spent its whole 25-second budget compiling pipelines for the canvas
+   * that no frame would ever look up. Measured, that was "the scene shader pass
+   * did not finish in 25000 ms" followed by 1,384 pipelines compiled inside
+   * rendered frames.
+   */
+  await tripPass.warm();
   const scenePass = await withDeadline(
-    renderer.compileAsync(scene, camera).finally(() => lateWarmup.release()),
+    tripPass
+      .warmInto(() => renderer.compileAsync(scene, camera))
+      .finally(() => lateWarmup.release()),
     // WORKSTREAM AB: the shader budget, not the asset one. This pass reaches
     // every instanced set in the world and is the only thing that can -- see
     // the paragraph above -- so timing it out is not "we lose the skyline", it

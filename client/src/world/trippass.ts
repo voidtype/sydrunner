@@ -47,6 +47,17 @@ export interface TripPassDeps {
 export class TripPass {
   private readonly deps: TripPassDeps;
   private post: PostProcessing | null = null;
+  /**
+   * The scene pass node, kept for one reason: `warmInto`.
+   *
+   * `pass(scene, camera)` renders the world into **its own render target**, and
+   * three keys a render pipeline partly on the render context -- which is
+   * derived from the bound target. So once this pass is permanent (see
+   * `render`), the target it owns *is* the context every material in the world
+   * is drawn in, and a warm-up that compiles with no target bound compiles for
+   * the canvas and is thrown away in its entirety.
+   */
+  private scenePass: { renderTarget?: unknown; _mrt?: unknown } | null = null;
   private failed = false;
   /**
    * The pass is compiled **off the frame**, and this is the state machine for it.
@@ -179,9 +190,61 @@ export class TripPass {
     }
   }
 
+  /**
+   * Run a compile with the renderer bound to the target the frame will draw into.
+   *
+   * ---------------------------------------------------------------------------
+   * **Without this, every warm-up in the client is wasted work.** Three's
+   * `Renderer.compileAsync` builds its render context from
+   * `this._renderTarget || this._outputRenderTarget`, and its own comment says
+   * why that matters -- "use frameBufferTarget when needsFrameBufferTarget is
+   * true ... this ensures cache keys match between compileAsync and render". A
+   * `RenderObject` is keyed on that context, so a pipeline compiled with no
+   * target bound is a pipeline for the canvas.
+   *
+   * That was true and harmless while the trip pass only engaged for a player who
+   * had eaten something: a sober frame was `renderer.render(scene, camera)`
+   * straight to the canvas, and the warm matched. Making the pass permanent --
+   * which it had to be, because *toggling* it is what stalled on the first
+   * mushroom -- moved every frame into the pass's target and left every warm
+   * behind, compiling into a context nothing draws in. The symptom is a client
+   * that warms diligently at boot, reports success, and then compiles **1,384
+   * pipelines inside rendered frames** while the player turns around.
+   *
+   * So both warm paths -- the boot scene pass and each tile's precompile -- run
+   * through here. Bound and restored around the call, because the frame loop and
+   * the shadow pass both set the target for themselves and neither expects to
+   * find one already bound.
+   *
+   * A pass that has not been built, or that has failed and been dropped, binds
+   * nothing: the frame is a plain `renderer.render` in that case and the canvas
+   * context is the right one after all.
+   */
+  async warmInto<T>(fn: () => Promise<T>): Promise<T> {
+    const { renderer } = this.deps;
+    const target = this.scenePass?.renderTarget as
+      | Parameters<typeof renderer.setRenderTarget>[0]
+      | undefined;
+    if (this.failed || this.post === null || !target) return fn();
+    const prevTarget = renderer.getRenderTarget();
+    const prevMrt = renderer.getMRT();
+    renderer.setRenderTarget(target);
+    const mrt = this.scenePass?._mrt;
+    if (mrt !== undefined && mrt !== null) {
+      renderer.setMRT(mrt as Parameters<typeof renderer.setMRT>[0]);
+    }
+    try {
+      return await fn();
+    } finally {
+      renderer.setRenderTarget(prevTarget);
+      renderer.setMRT(prevMrt);
+    }
+  }
+
   dispose(): void {
     this.post?.dispose?.();
     this.post = null;
+    this.scenePass = null;
   }
 
   /**
@@ -199,6 +262,7 @@ export class TripPass {
     const { renderer, scene, camera } = this.deps;
 
     const scenePass = pass(scene, camera);
+    this.scenePass = scenePass as unknown as { renderTarget?: unknown; _mrt?: unknown };
     const colour = scenePass.getTextureNode();
 
     // The uniforms, read from `this.look` every frame by the closures below.
@@ -308,4 +372,83 @@ function tslApi(): Record<string, any> {
   ];
   for (const k of need) if (typeof mod[k] !== 'function') throw new Error(`TSL is missing ${k}`);
   return mod;
+}
+
+
+/**
+ * `warmInto` binds the frame's target and gives it back.
+ *
+ * This is the check for the regression that made every warm-up in the client
+ * free of charge and free of effect: the pass became permanent, the frame moved
+ * into its render target, and `compileAsync` kept compiling for the canvas. The
+ * symptom was invisible from inside -- the warm-up ran, counted its pipelines
+ * and reported success -- and showed up only as 1,384 pipelines compiled inside
+ * rendered frames while the player turned around.
+ *
+ * So what is asserted is the only thing that separates the two: what was bound
+ * while the compile ran, and that it was put back. A stub renderer, no GPU.
+ */
+export function verifyTripPass(): string[] {
+  const failures: string[] = [];
+  const target = { id: 'pass-target' };
+  const mrt = { id: 'pass-mrt' };
+  const outer = { id: 'outer-target' };
+  const outerMrt = { id: 'outer-mrt' };
+
+  let bound: unknown = outer;
+  let boundMrt: unknown = outerMrt;
+  const renderer = {
+    getRenderTarget: () => bound,
+    setRenderTarget: (t: unknown) => {
+      bound = t;
+    },
+    getMRT: () => boundMrt,
+    setMRT: (m: unknown) => {
+      boundMrt = m;
+    },
+  };
+  const pass = new TripPass({ renderer } as unknown as TripPassDeps);
+
+  // Before the pass exists there is nothing to bind, and the canvas context is
+  // the right one -- a frame with no pass is a plain `renderer.render`.
+  let sawEarly: unknown = null;
+  void pass.warmInto(async () => {
+    sawEarly = bound;
+  });
+  if (sawEarly !== outer) {
+    failures.push('warmInto bound a target before the pass was built');
+  }
+
+  const inner = pass as unknown as {
+    post: unknown;
+    scenePass: { renderTarget: unknown; _mrt: unknown } | null;
+  };
+  inner.post = {};
+  inner.scenePass = { renderTarget: target, _mrt: mrt };
+
+  let sawTarget: unknown = null;
+  let sawMrt: unknown = null;
+  void pass.warmInto(async () => {
+    sawTarget = bound;
+    sawMrt = boundMrt;
+  });
+  if (sawTarget !== target) {
+    failures.push(
+      'warmInto did not bind the pass render target, so every precompile in this' +
+        ' client compiles for a context no frame draws in',
+    );
+  }
+  if (sawMrt !== mrt) {
+    failures.push('warmInto did not bind the pass MRT, which is half of the render context key');
+  }
+  // The restore is deliberately **not** asserted here. It happens in a `finally`
+  // after the compile's promise settles, so a synchronous self-check cannot see
+  // it without awaiting -- and this check has to stay synchronous to sit in the
+  // boot list beside every other `verify*`. What regressed was the binding, and
+  // the binding is what this pins. The restore is two lines of `finally` that
+  // the type checker covers, and every other consumer of the render target --
+  // the frame loop, three's own `PassNode`, the shadow pass -- saves and puts
+  // back around itself for the same reason, so a binding held across a frame is
+  // survivable where a warm compiled into the wrong context is not.
+  return failures;
 }
