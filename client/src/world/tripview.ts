@@ -97,10 +97,15 @@ export function tripLook(n: number): TripLook {
  *
  * A buff landing or expiring must not switch the screen in a frame: `bite` is
  * instant and the *look* is not, or eating a fifth mushroom is a jump-cut into a
- * kaleidoscope. Half a second to travel a whole rung, which is fast enough to
- * feel caused by the mushroom and slow enough not to be a cut.
+ * kaleidoscope.
+ *
+ * **Slower than it was**, because half a second still read as switching on. The
+ * owner's words were that it is fine for the waviness to take a few seconds and
+ * better if it faded in -- which is also what a mushroom does. A rung takes
+ * about two seconds now, so the first one arrives the way it should: you notice
+ * the world has changed before you notice when it changed.
  */
-export const EASE_PER_S = 2;
+export const EASE_PER_S = 0.8;
 
 export function easeLook(from: TripLook, to: TripLook, dt: number): TripLook {
   const t = Math.max(0, Math.min(1, dt * EASE_PER_S));
@@ -195,13 +200,29 @@ export function verifyTripView(): string[] {
 
   // --- The ease arrives, and never overshoots.
   {
+    // Sixty seconds of frames: the ease is deliberately slow enough that ten
+    // was not enough, which is what this loop's length is now recording.
     let look = CALM;
     const target = tripLook(6);
-    for (let i = 0; i < 600; i++) look = easeLook(look, target, 1 / 60);
+    for (let i = 0; i < 3600; i++) look = easeLook(look, target, 1 / 60);
     if (Math.abs(look.wave - target.wave) > 1e-6) failures.push('The look never reaches its target.');
     let back = tripLook(6);
-    for (let i = 0; i < 600; i++) back = easeLook(back, CALM, 1 / 60);
+    for (let i = 0; i < 3600; i++) back = easeLook(back, CALM, 1 / 60);
     if (!looksClear(back)) failures.push('Coming down never gets all the way back to the world.');
+    // And it is a fade rather than a switch: the first mushroom must take a few
+    // seconds to arrive, which is what the owner asked for and what a mushroom
+    // does. Measured to 95% of the target rather than to the target, because an
+    // exponential ease never technically arrives.
+    let one = CALM;
+    const first = tripLook(1);
+    let frames = 0;
+    for (; frames < 3600; frames++) {
+      one = easeLook(one, first, 1 / 60);
+      if (Math.abs(one.wave - first.wave) < first.wave * 0.05) break;
+    }
+    const secs = frames / 60;
+    if (secs < 1.5) failures.push(`The first mushroom lands in ${secs.toFixed(1)} s, which reads as switching on.`);
+    if (secs > 7) failures.push(`The first mushroom takes ${secs.toFixed(1)} s, by which time nobody connects it to the mushroom.`);
     // One frame moves a fraction, not the whole way: the jump-cut this exists
     // to prevent.
     const oneFrame = easeLook(CALM, target, 1 / 60);

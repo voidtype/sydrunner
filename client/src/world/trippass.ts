@@ -48,6 +48,21 @@ export class TripPass {
   private readonly deps: TripPassDeps;
   private post: PostProcessing | null = null;
   private failed = false;
+  /**
+   * The pass is compiled **off the frame**, and this is the state machine for it.
+   *
+   * Building a `PostProcessing` is cheap; the expensive part is the pipeline the
+   * first `render()` compiles, and that is a synchronous stall of exactly the
+   * kind this client is already fighting. The first mushroom paid it in one
+   * frame and the owner reported the game blocking outright.
+   *
+   * So the first non-clear look kicks off `renderAsync`, this frame draws
+   * plainly, and the pass only starts drawing once the compile has landed. The
+   * side effect is the thing he asked for in the same breath: the waviness
+   * arrives a moment late and eases in rather than snapping on.
+   */
+  private compiling = false;
+  private ready = false;
   /** Uniform-ish state read by the node graph through these closures. */
   private look: TripLook | null = null;
   private timeS = 0;
@@ -79,6 +94,30 @@ export class TripPass {
     this.look = look;
     try {
       if (this.post === null) this.post = this.build();
+      if (!this.ready) {
+        // Compile off the frame. Until it lands the caller draws the world.
+        if (!this.compiling) {
+          this.compiling = true;
+          const p = this.post as unknown as { renderAsync?: () => Promise<void> };
+          if (typeof p.renderAsync === 'function') {
+            void p
+              .renderAsync()
+              .then(() => {
+                this.ready = true;
+              })
+              .catch((err: unknown) => {
+                this.failed = true;
+                this.post = null;
+                console.warn('[trip] the post pass failed to compile and has been dropped:', err);
+              });
+          } else {
+            // No async path on this three: compile on the frame after all, which
+            // is the old behaviour and still better than not drawing at all.
+            this.ready = true;
+          }
+        }
+        return false;
+      }
       this.post.render();
       this.engagedLast = true;
       return true;

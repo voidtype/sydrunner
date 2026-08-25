@@ -3205,8 +3205,28 @@ async function main(): Promise<void> {
    * shows the second number and the stack stores the first; `game/trips.ts` says
    * why that split is not an accident.
    */
-  const MS_PER_GAME_HOUR = 3_600_000;
-  const GAME_MS_PER_REAL_MS = (24 * MS_PER_GAME_HOUR) / CYCLE_MS;
+  /**
+   * How long an in-game hour is **on the clock the stack actually reads**.
+   *
+   * `SkyClock.nowMs` is documented as "the wall-clock instant this was computed
+   * for" -- it is `Date.now()`, real milliseconds, 1x. What runs at 24x is the
+   * *phase*, because `cyclePhase` is `nowMs % CYCLE_MS` and `CYCLE_MS` is one
+   * real hour for a whole in-game day.
+   *
+   * The first version of this read that backwards: it treated `nowMs` as an
+   * in-game clock, made an in-game hour 3,600,000 of its milliseconds, and then
+   * divided the countdown by 24 to "convert". Both halves were wrong and they
+   * hid each other -- the bar said 7m30s, which was right, while the buff really
+   * lasted three real hours and the number fell one second per twenty-four. The
+   * owner reported both symptoms and was right both times.
+   *
+   * An in-game hour is a twenty-fourth of an in-game day, and an in-game day is
+   * `CYCLE_MS` of real milliseconds. There is no conversion after that, which is
+   * why the rate below is 1: the stack is already counting in the units the
+   * countdown is displayed in.
+   */
+  const MS_PER_GAME_HOUR = CYCLE_MS / 24;
+  const GAME_MS_PER_REAL_MS = 1;
 
   /**
    * The buff bar, redrawn on its own beat.
