@@ -254,21 +254,11 @@ export function minimapVisible(hands: Hands): boolean {
  */
 export function minimapScale(hands: Hands, raised: boolean): number {
   if (!minimapVisible(hands)) return 0;
-  return raised && hands.primary === SLOT.PHONE ? MINIMAP_RAISED : MINIMAP_CORNER;
-}
-
-/**
- * Is the phone actually in one of the two hands?
- *
- * What `minimapVisible` used to mean, kept under an honest name because the
- * question is still a real one -- the handset's prop, its screen texture and
- * its apps all turn on it -- and because a function called `minimapVisible`
- * that answers "is the phone out" is how the next pass gets this wrong again.
- * Nothing in the compass reads it; it is here so that the thing the reversal
- * took away from `minimapVisible` still exists somewhere with the right name.
- */
-export function phoneInHand(hands: Hands): boolean {
-  return hands.primary === SLOT.PHONE || hands.secondary === SLOT.PHONE;
+  // `raised` is the whole test now. It used to be `raised && the phone is the
+  // primary`, and the second half stopped being answerable when the phone
+  // stopped being a slot at all: `money.ts` passes `phone.visible && first
+  // person`, which is exactly what the pair used to mean between them.
+  return raised ? MINIMAP_RAISED : MINIMAP_CORNER;
 }
 
  // --- The `M` key ------------------------------------------------------------------
@@ -716,16 +706,23 @@ export function verifyPhoneModel(): string[] {
       }
     }
 
-    // The raise, which is the one thing left that the hands decide. It needs
-    // the phone in the **right** hand: an off-hand phone is a thing you are
-    // holding, not a thing you are reading.
+    /*
+     * The raise, which **the hands no longer decide at all**.
+     *
+     * It used to need the phone in the right hand, and that was a real rule
+     * while the phone was slot `3`. It is not a slot any more -- `Q` shows it
+     * and your hands keep the bat -- so the caller passes `phone.visible && in
+     * first person` and this function's job is to believe it. Asserted from a
+     * *fighting* loadout on purpose: that is the ordinary case now, a player
+     * reading the register with a bat still in his hand, and under the old rule
+     * it was the case that drew the corner map by mistake.
+     */
     const fighting = defaultHands();
-    if (minimapScale(fighting, true) !== MINIMAP_CORNER) {
-      failures.push(`A bat/footy loadout drew the raised map at ${minimapScale(fighting, true)}; there is no phone in front of the eye.`);
+    if (minimapScale(fighting, true) !== MINIMAP_RAISED) {
+      failures.push(`A bat loadout with the phone up drew ${minimapScale(fighting, true)} rather than the raised map.`);
     }
-    const offHand: Hands = { primary: SLOT.BAT, secondary: SLOT.PHONE };
-    if (minimapScale(offHand, false) !== MINIMAP_CORNER || minimapScale(offHand, true) !== MINIMAP_CORNER) {
-      failures.push('An off-hand phone drew the compass at something other than its corner size.');
+    if (minimapScale(fighting, false) !== MINIMAP_CORNER) {
+      failures.push(`A bat loadout with the phone down drew ${minimapScale(fighting, false)} rather than the corner map.`);
     }
     const raised: Hands = { primary: SLOT.PHONE, secondary: SLOT.FOOTY };
     if (minimapScale(raised, false) !== MINIMAP_CORNER) {
@@ -738,10 +735,10 @@ export function verifyPhoneModel(): string[] {
     if (MINIMAP_RAISED <= MINIMAP_CORNER || MINIMAP_RAISED > 1.7) {
       failures.push(`The raised scale is ${MINIMAP_RAISED}; it must be over ${MINIMAP_CORNER} and under 1.7.`);
     }
-    // `phoneInHand` is what `minimapVisible` used to mean, and it is checked so
-    // that the meaning survives somewhere with the right name on it.
-    if (phoneInHand(defaultHands())) failures.push('A bat and a football counted as a phone in hand.');
-    if (!phoneInHand(offHand) || !phoneInHand(raised)) failures.push('A phone in a hand did not read as a phone in hand.');
+    // `phoneInHand` used to be checked here. It is gone with the slot: nothing
+    // can put a phone in a hand any more, so a function answering "is it in
+    // one" answered a question the game cannot ask, and a test of it asserted a
+    // state no player can reach.
   }
 
   // --- `M` is now the map itself, and it touches no hand.

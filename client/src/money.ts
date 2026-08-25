@@ -532,9 +532,11 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
     // for why this is a push rather than a pull.
     deps.setWeaponVisible(hands.primary === SLOT.BAT, hands.secondary === SLOT.FOOTY);
     const angles = deps.angles();
-    const raised = hands.primary === SLOT.PHONE && deps.firstPerson();
+    // `phone.visible`, not the hands: `Q` is what puts it in front of you now.
+    syncPhoneProp();
+    const raised = phone.visible && deps.firstPerson();
     viewmodel.update(dt, {
-      out: hands.primary === SLOT.PHONE,
+      out: phone.visible,
       speed: deps.speed(),
       yaw: angles.yaw,
       pitch: angles.pitch,
@@ -596,7 +598,24 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
    * two is which mouse button they answer to and nothing about the scene graph.
    * The phone is the exception, and it is created here and disposed here.
    */
+  /**
+   * **The phone is not a hand slot any more, and this is the one door it is
+   * refused at.**
+   *
+   * It was `3`, it lived in a hand, and everything about it was a loadout
+   * decision: the prop, the viewmodel, the raised compass and the overlay all
+   * keyed off `hands.primary === SLOT.PHONE`. That made the map, the wallet and
+   * the register cost you your bat -- you put the weapon down to look something
+   * up, which is a trade nothing in this game should ask for. `Q` shows it now
+   * and your hands never move.
+   *
+   * `SLOT.PHONE` survives as a constant because it is what `PhoneProp` and
+   * `PhoneViewmodel` are keyed on and it is a wire value; what does not survive
+   * is any way for a player to put it in a hand. Everything the hands used to
+   * decide is decided by `phone.visible` -- see `syncPhoneProp`.
+   */
   function equip(slot: Slot, hand: 'primary' | 'secondary'): void {
+    if (slot === SLOT.PHONE) return;
     if (!selectSlot(hands, slot, hand)) return;
     handsChanged();
   }
@@ -608,29 +627,31 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
    * the consequences and differ only in how they decided. `M` no longer changes
    * hands -- it toggles the map -- so this is called only by the number row.
    */
-  function handsChanged(): void {
-    const wantProp = hands.primary === SLOT.PHONE || hands.secondary === SLOT.PHONE;
-    if (wantProp && prop === null) {
-      prop = new PhoneProp(phoneAssets, deps.selfActor, hands.primary === SLOT.PHONE ? 'right' : 'left');
-      // On your own body, so what it contributes is a shadow. The viewmodel is
-      // the one you look at. `BatProp.castShadowOnly`'s arrangement exactly.
+  /**
+   * The handset in the world, which now tracks the overlay rather than a hand.
+   *
+   * Reconciled once a frame instead of on a slot change, because the thing it
+   * follows -- `phone.visible` -- is moved by `Q`, by Escape, by the Map tile
+   * and by `close()` from half a dozen places, and a push from each of them is
+   * six chances to miss one. Two boolean compares a frame is cheaper than that
+   * bookkeeping and cannot drift.
+   */
+  function syncPhoneProp(): void {
+    const want = phone.visible;
+    if (want && prop === null) {
+      prop = new PhoneProp(phoneAssets, deps.selfActor, 'right');
       prop.castShadowOnly();
-    } else if (!wantProp && prop !== null) {
+    } else if (!want && prop !== null) {
       prop.dispose();
       prop = null;
-    } else if (wantProp && prop !== null) {
-      // It moved hands: rebuild rather than re-parent, because the hold pose is
-      // mirrored and re-parenting would leave the near hand's rotation on the
-      // off hand's bone.
-      prop.dispose();
-      prop = new PhoneProp(phoneAssets, deps.selfActor, hands.primary === SLOT.PHONE ? 'right' : 'left');
-      prop.castShadowOnly();
     }
-    // Putting the phone away closes what it had open. The reverse is not true:
-    // selecting the phone raises it and does **not** open the overlay, because
-    // an overlay that appeared on a number key would take the pointer away from
-    // a player who was reaching for the footy.
-    if (hands.primary !== SLOT.PHONE) phone.close();
+  }
+
+  function handsChanged(): void {
+    // The prop used to be built here, because the phone was a slot and a slot
+    // change was the only thing that could move it. It follows the overlay now
+    // -- `syncPhoneProp`, once a frame -- so what is left of this function is
+    // the notice, and changing weapons neither opens nor closes the phone.
     deps.hud.notice(`${SLOT_NAME[hands.primary]} · ${SLOT_NAME[hands.secondary]}`);
   }
 
@@ -650,6 +671,14 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
       // project is a `code`.
       const digit = ['Digit1', 'Digit2', 'Digit3', 'Digit4'].indexOf(code);
       if (digit >= 0) {
+        // `3` was the phone and is now nothing a hand can hold. It is answered
+        // rather than ignored, because a key that used to do something and now
+        // silently does not is the worst of the three options -- and the notice
+        // is where a player finds out `Q` replaced it.
+        if ((digit as Slot) === SLOT.PHONE) {
+          deps.hud.notice('the phone is on q now');
+          return true;
+        }
         equip(digit as Slot, shift ? 'secondary' : 'primary');
         return true;
       }
@@ -674,21 +703,19 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
         return true;
       }
       /*
-       * `Q`: the quest log, and it **toggles** on `KeyM`'s argument exactly --
-       * a log is a glance, so the key that opens it is the one that closes it.
+       * `Q`: QuestBuddy, and the phone under it. It **toggles** on `KeyM`'s
+       * argument exactly -- a log is a glance, so the key that opens it is the
+       * one that closes it.
        *
-       * Unlike `M` this one *does* move the hands, and it has to: the handset
-       * only stays on screen while the phone is the primary -- see the
-       * `hands.primary !== SLOT.PHONE` close in the frame step -- so a `Q` that
-       * did not equip it would open the register and have it shut again on the
-       * very next frame.
+       * It moves no hands, which is the whole of the change that came with it:
+       * the phone used to be slot `3` and looking anything up cost you your
+       * bat. Nothing is equipped or unequipped here; `syncPhoneProp` sees
+       * `phone.visible` go true on the next frame and puts the handset in the
+       * player's hand for the look of it.
        */
       if (code === 'KeyQ') {
         if (phone.visible) phone.close();
-        else {
-          equip(SLOT.PHONE, 'primary');
-          phone.openObligations();
-        }
+        else phone.openObligations();
         return true;
       }
       /**

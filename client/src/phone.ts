@@ -227,7 +227,13 @@ const APPS: readonly AppDef[] = [
    *
    * `§` because it is a form. The joke is the whole point of Act 0.
    */
-  { id: 'obligations', glyph: '§', label: 'obligations' },
+  // **QuestBuddy**, which is what a player calls it and therefore what the tile
+  // says. The `AppId` underneath stays `obligations` on purpose: it is an
+  // internal key, and Act 0's whole fiction is Centrelink's *mutual
+  // obligations* -- Denise's dialog, the `act0:` flags and the register's own
+  // captions are written around that word. Renaming the key would rename the
+  // joke; renaming the label is what was asked for.
+  { id: 'obligations', glyph: '!', label: 'QuestBuddy' },
 ];
 
 /** How long the viewfinder flashes white after the shutter, milliseconds. */
@@ -550,7 +556,7 @@ export class Phone {
         break;
 
       case 'obligations':
-        this.title.textContent = 'obligations';
+        this.title.textContent = 'QuestBuddy';
         rows.push(
           this.source.obligations?.() ??
             '<div class="phone-note">no participation requirements are recorded for this session.</div>',
