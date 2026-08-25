@@ -3288,6 +3288,7 @@ async function main(): Promise<void> {
   const godClose = (blessed: boolean): void => {
     godRoom.leave();
     godPanel?.classList.add('hidden');
+    document.body.classList.remove('in-god');
     // Seven is spent whatever happened: the room is not somewhere to loiter.
     trips.clear();
     if (blessed) {
@@ -3349,6 +3350,8 @@ async function main(): Promise<void> {
     if (godLines !== null) godLines.replaceChildren();
     godRoom.enter(player.position.x, player.position.y - EYE_HEIGHT, player.position.z);
     godPanel?.classList.remove('hidden');
+    // The buff bar and the conversation are both wide and both bottom-centre.
+    document.body.classList.add('in-god');
     if (document.pointerLockElement) document.exitPointerLock();
     godSay?.focus();
     void godTurn('');

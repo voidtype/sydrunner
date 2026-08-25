@@ -1067,6 +1067,19 @@
         flex-direction: column; gap: 12px; pointer-events: auto;
       }
       #god.hidden { display: none; }
+      /* **The bar goes away while God is talking.** Both live bottom-centre and
+         both are wide, so they were drawn straight through each other -- and a
+         countdown is meaningless in there anyway, since arriving spends the
+         stack. `body.in-god` rather than a rule on `#god` because they are
+         siblings and a sibling cannot hide a sibling that precedes it. */
+      body.in-god #trips { display: none; }
+      /* And the lines get a ground of their own. The dome is bright at the top
+         of its breath and cream text on it is unreadable; a soft dark wash
+         behind the block costs nothing and does not read as a panel. */
+      #god-lines {
+        padding: 14px 16px; border-radius: 10px;
+        background: linear-gradient(rgba(6, 3, 12, .0), rgba(6, 3, 12, .62) 18%, rgba(6, 3, 12, .72));
+      }
       #god-lines { display: flex; flex-direction: column; gap: 10px; max-height: 42vh; overflow-y: auto; }
       #god-lines .said { font: 400 15px/1.55 Georgia, "Times New Roman", serif; text-shadow: 0 2px 14px rgba(0,0,0,.9); }
       #god-lines .said.god { color: #ffe9a8; }
