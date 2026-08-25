@@ -164,6 +164,7 @@ import {
   applyWorldDamage,
   CAST_RADIUS,
   MAX_HEALTH,
+  maxHealthOf,
   MAX_STAMINA,
   REACH,
   STAMINA_RECOVERY,
@@ -3313,9 +3314,18 @@ async function main(): Promise<void> {
     trips.clear();
     if (blessed) {
       fxSetDoubleHealth(playerCombat.id, true);
-      hud.notice('you came back with something');
+      /*
+       * **Say what it is.** "you came back with something" was written as a
+       * line and read as a shrug: the owner asked what it meant, which is the
+       * only review a reward message needs. A permanent doubling of the one
+       * number a player watches all game should name itself and name the
+       * number, and the number is read back out of `maxHealthOf` rather than
+       * written here, so a talented player is told eight and not six.
+       */
+      const pips = maxHealthOf(playerCombat);
+      hud.notice(`DOUBLE HEALTH — ${pips} pips until Monday`);
     } else {
-      hud.notice('the light goes out');
+      hud.notice('the light goes out. nothing came back with you.');
     }
   };
 
@@ -10501,7 +10511,22 @@ async function main(): Promise<void> {
 
     hud.vitals({
       health: playerCombat.health,
-      maxHealth: MAX_HEALTH,
+      /*
+       * **The composed ceiling, not the constant.**
+       *
+       * This was `MAX_HEALTH`, so the bar drew three pips whatever the player
+       * had earned. Big Night's fourth pip, a Servo Pie's borrowed one and
+       * God's doubling are all real in `combat.maxHealthOf` -- which is what
+       * damage, regen and the respawn are capped against -- and not one of them
+       * had ever been *drawn*. The owner came back from the god realm with six
+       * pips and a bar showing three, which is the first time the gap was
+       * visible enough to report.
+       *
+       * `maxHealthOf` is the one place the ceiling is composed and the same one
+       * the simulation asks, so the bar and the fight now agree by construction
+       * rather than by both being handed the same number separately.
+       */
+      maxHealth: maxHealthOf(playerCombat),
       stamina: playerCombat.stamina,
       maxStamina: MAX_STAMINA,
       recharge: Math.min(1, playerCombat.staminaT / STAMINA_RECOVERY),
