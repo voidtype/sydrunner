@@ -26,7 +26,19 @@ case "$key" in
   *.bin) ct="application/octet-stream" ;;
   *) ct="application/octet-stream" ;;
 esac
-if npx --yes wrangler@latest r2 object put "sydrunner-world/$key" --file "$WORLD/$key" --remote --content-type "$ct" --cache-control "public, max-age=31536000, immutable" >/dev/null 2>&1; then
+# `npx --yes wrangler@latest` re-resolves the package on every call, which at
+# 22,000 objects is most of the wall clock. `WRANGLER_BIN` points at a local
+# install (`npm i wrangler@latest` in a scratch dir, then
+# `WRANGLER_BIN=<dir>/node_modules/.bin/wrangler`) and takes a put from about
+# four seconds to about two. The npx form stays as the default so a caller that
+# has not installed anything still works.
+WR="${WRANGLER_BIN:-}"
+if [ -n "$WR" ]; then
+  set -- "$WR"
+else
+  set -- npx --yes wrangler@latest
+fi
+if "$@" r2 object put "sydrunner-world/$key" --file "$WORLD/$key" --remote --content-type "$ct" --cache-control "public, max-age=31536000, immutable" >/dev/null 2>&1; then
   echo "OK $key" >> "$RESULTS"
 else
   echo "FAIL $key" >> "$RESULTS"

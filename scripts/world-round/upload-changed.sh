@@ -30,7 +30,10 @@ run_round() {
   export RESULTS="$results"
   # `xargs -P` rather than a job-control loop: it keeps exactly N in flight and
   # does not leave orphans when this script is interrupted.
-  grep -vE '^(index|root)\.json$' "$list" | xargs -P "$JOBS" -I{} "$HERE/upload-one.sh" {}
+  # Invoked through `bash` rather than as an executable, because a lost +x bit
+  # made xargs print "Permission denied" per key and produced neither an OK nor a
+  # FAIL line -- which the count below then read as "nothing failed".
+  grep -vE '^(index|root)\.json$' "$list" | xargs -P "$JOBS" -I{} bash "$HERE/upload-one.sh" {}
 }
 
 TMP="$(mktemp -d)"
@@ -53,5 +56,13 @@ if [ "$n1" -gt 0 ]; then
     echo "STILL FAILING:"; sed 's/^/  /' "$TMP/failed2"
     exit 1
   fi
+fi
+# Counted against the input rather than against the absence of failures. The
+# first version asserted "no FAIL lines", which is also true when nothing ran at
+# all -- and that is exactly what happened the first time this was used.
+ok=$(cat "$TMP"/r?  2>/dev/null | grep -c '^OK ' || true)
+if [ "$ok" -ne "$total" ]; then
+  echo "counted $ok OK against $total keys -- something did not run. Not declaring success."
+  exit 1
 fi
 echo "all $total objects uploaded"

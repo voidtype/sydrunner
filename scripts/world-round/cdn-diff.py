@@ -35,6 +35,7 @@ import hashlib
 import os
 import sys
 import threading
+import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -52,14 +53,32 @@ def md5_of(path: Path) -> str:
     return h.hexdigest()
 
 
+# Cloudflare answers **403** to the default `Python-urllib/3.x` user agent, on
+# every method, for every key. A bot rule, presumably, and it is the one trap in
+# this file: the failure is indistinguishable from "the object is not there", so
+# a run without this header reports the whole world as missing from the CDN and
+# an uploader downstream would cheerfully re-send 195,000 objects. Curl's UA is
+# accepted, which is why the manual `curl -sI` probes in DEPLOY.md work and the
+# first version of this script did not.
+_UA = "curl/8.4.0"
+
+
+class RemoteError(Exception):
+    """A HEAD that failed for a reason that is not "the object is absent"."""
+
+
 def remote_etag(base: str, key: str, timeout: float) -> str | None:
-    req = urllib.request.Request(f"{base}/{key}", method="HEAD")
+    req = urllib.request.Request(f"{base}/{key}", method="HEAD", headers={"User-Agent": _UA})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             tag = r.headers.get("ETag", "")
             return tag.strip('"') or None
-    except Exception:
-        return None
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None
+        raise RemoteError(f"{key}: HTTP {e.code}") from e
+    except Exception as e:  # timeouts, resets -- retried by the caller
+        raise RemoteError(f"{key}: {type(e).__name__}") from e
 
 
 def main() -> int:
@@ -91,13 +110,26 @@ def main() -> int:
     lock = threading.Lock()
     changed: list[str] = []
     absent: list[str] = []
+    errors: list[str] = []
     same = 0
     done = 0
 
     def one(key: str) -> None:
         nonlocal same, done
         local = md5_of(root / key)
-        tag = remote_etag(args.base, key, args.timeout)
+        # Retried rather than swallowed, because a transport failure that counted
+        # as "absent" is a file this would tell the uploader to send again. The
+        # only thing allowed to mean absent is a 404.
+        tag = None
+        for attempt in range(3):
+            try:
+                tag = remote_etag(args.base, key, args.timeout)
+                break
+            except RemoteError as e:
+                if attempt == 2:
+                    with lock:
+                        errors.append(str(e))
+                    return
         with lock:
             done += 1
             if tag is None:
@@ -119,9 +151,16 @@ def main() -> int:
     for key in sorted(changed) + sorted(absent):
         print(key)
     print(
-        f"same {same:,}   changed {len(changed):,}   not on the CDN {len(absent):,}",
+        f"same {same:,}   changed {len(changed):,}   not on the CDN {len(absent):,}"
+        + (f"   UNRESOLVED {len(errors):,}" if errors else ""),
         file=sys.stderr,
     )
+    if errors:
+        for e in errors[:10]:
+            print(f"  unresolved: {e}", file=sys.stderr)
+        # A non-zero exit, because an unresolved key is one the caller cannot
+        # decide about and must not silently treat as unchanged.
+        return 2
     return 0
 
 
