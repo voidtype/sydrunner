@@ -52,6 +52,7 @@ import pygltflib as gl
 from . import (
     config,
     contact,
+    creeks,
     decks,
     fences,
     furniture,
@@ -2043,8 +2044,33 @@ def build_tile(
         if terrain is not None and getattr(terrain, "water", None) is not None
         else []
     )
+    # The creeks, on the same terms and into the same sidecar. Attached to the
+    # terrain by `cmd_build` *after* the solve rather than inside `Terrain.load`,
+    # because the whole point of the module is that it does not move the ground --
+    # see `creeks.py`'s header on why it is not in the terrain cache key. A tile
+    # with no creek on it queries an r-tree and gets nothing back.
+    #
+    # **Kept in their own list, and the reason is the wading rule below.** A tile
+    # carries one water level for gameplay -- `wy`, the level of its largest sheet
+    # -- and `world/wading.ts` states the invariant that makes that sound: a tile
+    # has at most one body of water on it, so one number describes all of it. A
+    # creek breaks that outright. Its sheets are dozens of 10 m reaches at dozens
+    # of levels, none of them the tile's water, and the largest of them would set a
+    # tile-wide level from a puddle -- so a player standing in the gully the creek
+    # has *already run down*, ten metres below the reach that happened to win,
+    # would be ten metres under water on dry ground and unable to move.
+    #
+    # So creeks are drawn and never waded. That costs nothing worth having: a
+    # reach is `creeks.CREEK_STAND_M` deep at its deepest, which is 40 cm, and
+    # ankle-deep water that slows you slightly is the one part of this the player
+    # would never notice missing.
+    creek_sheets = (
+        creeks.tile_sheets(getattr(terrain, "creeks", None), tile_key, terrain)
+        if terrain is not None
+        else []
+    )
     water_verts, water_tris, water_bytes = write_water(
-        config.TILE_DIR / f"{tile_key}.water.bin", sheets, origin
+        config.TILE_DIR / f"{tile_key}.water.bin", sheets + creek_sheets, origin
     )
     # The level of the sheet with the most area on this tile. One number for a
     # tile that may carry several, because what reads it is the wading rule and a

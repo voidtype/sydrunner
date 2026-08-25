@@ -204,6 +204,46 @@ from .sources import osm
 # else. `landmarks._deck_run` picked the same number for the same reason.
 STATION_M = 6.0
 
+# The tallest step a prism may present to the thing walking or driving up it.
+#
+# `STATION_M` above is the *design* answer to this and it is only correct while
+# the grade clamp holds: 6 m at the 7% ceiling is a 0.42 m step, which is exactly
+# what a body climbs. But the ceiling is a ceiling on the **free** nodes -- the
+# header says so, twice, and means it: "Where a touchdown genuinely demands more
+# than 7% ... the clamp gives way and the touchdown wins, which is the right way
+# round." It is the right way round for the *profile*. Nothing then re-asked what
+# it had done to the *staircase*.
+#
+# Measured over the shipped 60 km solve, 29,519 deck segments:
+#
+#     step   p50 0.135 m   p95 0.611 m   max 17.93 m
+#     over the 0.47 m a body can climb:  3,829 segments (12.97%) on 843 runs
+#
+# 13% of every bridge in Sydney was a wall. `CollisionWorld.solidFor`'s first
+# clause is `feetY >= prism.top - 0.05` and the caller adds `driving.NOSE_STEP` =
+# 0.42, so a step over 0.47 m is not a bump: the body stops, and a *car* stops
+# with the full crash penalty `driving.ts` describes -- two thirds of its speed
+# and a crash's damage every cooldown for as long as the geometry keeps passing
+# under the bonnet. The owner's report was "i cant actually drive onto this
+# bridge", from Epping, and Epping Road's ramp is 3.19 m of step in the list this
+# number came out of.
+#
+# 0.35 rather than 0.47, because the allowance is not headroom to spend: the
+# 0.42 the caller adds is measured from *unlifted* feet and a car's nose probe
+# meets the step at whatever pitch the last one left it at. A quarter of the
+# budget in hand is the difference between "climbs it" and "climbs it from here".
+MAX_STEP_M = 0.35
+
+# Above this grade a segment is a cliff in the solve rather than a ramp sampled
+# too coarsely, and subdividing it makes a finer staircase up the same cliff.
+#
+# 20% is chosen where the population splits rather than from a standard: of the
+# 3,829 over-steps measured above, 3,676 are under 20% -- real ramps, badly
+# sampled, and fixed exactly by the restation -- and 153 are over it, which is
+# 0.5% of the network and is a bad touchdown somewhere. Sydney's steepest public
+# street is about 15%, so nothing at 20% is a road.
+CLIFF_GRADE = 0.20
+
 # The grade ceiling on a solved deck.
 #
 # 7% rather than the streets' 15%, because the two are different objects: a
@@ -398,6 +438,71 @@ SLOT_DECK = "road_asphalt"
 SLOT_STRUCTURE = "footpath_concrete"
 
 
+def _restation_steep(run: "DeckRun", terrain) -> "DeckRun":
+    """Insert stations along any segment whose step is taller than a body climbs.
+
+    ---------------------------------------------------------------------------
+    **This does not move one millimetre of the drawn deck, and that is the whole
+    reason it is the right fix.**
+
+    The profile is piecewise linear between stations -- `_solve` produces one
+    height per station and everything downstream, the ribbon and the prisms
+    alike, joins them with straight lines. So a station placed *on* an existing
+    segment at the height that segment already has at that chainage is a point
+    the surface already passed through. The deck is identical afterwards. What
+    changes is only how finely the collision staircase samples it, which is the
+    thing that was wrong.
+
+    The alternative was to re-solve steep runs at a finer `STATION_M`, and it is
+    worse in the way that matters here: re-solving moves the surface, so a fix
+    for the 3,676 segments that are a fine ramp badly sampled would also have
+    quietly redrawn every bridge in the city. This changes the collision and
+    nothing else, which is a change that can be reasoned about.
+
+    `ground` is **resampled** rather than interpolated, because it is the real
+    terrain under the new station and it is what the clearance, the parapet test
+    and the pier bases are read from -- interpolating it would put a pier's foot
+    in the air over a gully wall. `deck_y` is interpolated, because interpolating
+    it is the definition of the surface.
+
+    What this cannot fix is a segment whose *profile* is a cliff rather than a
+    ramp: 153 segments of 29,519 come out of the solve steeper than 20%, and
+    subdividing one of those produces a finer staircase up the same cliff.
+    `DeckNetwork.load` counts them and the build reports them, because a number
+    that is reported is a number somebody can go and look at, and a cliff is a
+    bad touchdown rather than a bad sampling.
+    """
+    y = run.deck_y
+    if len(y) < 2:
+        return run
+    d = np.abs(np.diff(y))
+    if not (d > MAX_STEP_M).any():
+        return run
+
+    # How many pieces each segment is cut into. One means untouched.
+    cuts = np.maximum(np.ceil(d / MAX_STEP_M).astype(np.int64), 1)
+    pts: list[np.ndarray] = []
+    deck: list[float] = []
+    for i, n in enumerate(cuts):
+        a, b = run.pts[i], run.pts[i + 1]
+        for k in range(n):
+            t = k / n
+            pts.append(a + (b - a) * t)
+            deck.append(float(y[i] + (y[i + 1] - y[i]) * t))
+    pts.append(run.pts[-1])
+    deck.append(float(y[-1]))
+
+    p = np.asarray(pts, dtype=np.float64)
+    ground = np.asarray(terrain.sample(p[:, 0], p[:, 1]), dtype=np.float64)
+    return DeckRun(
+        road=run.road,
+        pts=p,
+        deck_y=np.asarray(deck, dtype=np.float64),
+        ground=ground,
+        half_width=run.half_width,
+    )
+
+
 @dataclass
 class DeckRun:
     """One continuous elevated run, solved and stationed.
@@ -495,7 +600,32 @@ class DeckNetwork:
             terrain,
             [r for r in roads if _is_ground_carriageway(r) and r.highway not in PRIVATE_CLASSES],
         )
+        # After the solve and before anything reads a station, because everything
+        # that reads one -- the ribbon, the prisms, the piers, the tile index --
+        # reads the same array and must see one stationing. See `_restation_steep`
+        # and `MAX_STEP_M`: the profile is untouched, the staircase is not.
+        cliffs = 0
+        restationed = 0
+        # The grade population is read *here*, off the solved stationing, and kept
+        # for the stats below. Subdividing preserves every segment's slope exactly
+        # but replaces one steep segment with several, so measuring the grade
+        # afterwards would report a distribution reweighted by the fix rather than
+        # the profile the solve produced -- and the profile is what the grade
+        # percentiles are a statement about.
+        grade_pop: list[np.ndarray] = []
+        for i, run in enumerate(runs):
+            if len(run.deck_y) < 2:
+                continue
+            step = np.abs(np.diff(run.deck_y))
+            seg = np.maximum(np.hypot(*np.diff(run.pts, axis=0).T), 1e-6)
+            grade_pop.append(step / seg)
+            cliffs += int(((step > MAX_STEP_M) & (step / seg > CLIFF_GRADE)).sum())
+            if (step > MAX_STEP_M).any():
+                runs[i] = _restation_steep(run, terrain)
+                restationed += 1
         stats = {
+            "restationed_runs": restationed,
+            "cliff_segments": cliffs,
             "bridge_ways": len(bridges),
             "bridge_length_m": sum(
                 float(np.hypot(*np.diff(r.line, axis=0).T).sum()) for r in bridges
@@ -506,12 +636,15 @@ class DeckNetwork:
             **solve_stats,
         }
         if runs:
-            grade = np.concatenate(
-                [np.abs(np.diff(r.deck_y)) / np.maximum(np.hypot(*np.diff(r.pts, axis=0).T), 1e-6)
-                 for r in runs if len(r.pts) > 1]
-            )
+            grade = np.concatenate(grade_pop) if grade_pop else np.zeros(1)
             clear = np.concatenate([r.clearance for r in runs])
+            step = np.concatenate([np.abs(np.diff(r.deck_y)) for r in runs if len(r.pts) > 1])
             stats.update(
+                step_p50=float(np.percentile(step, 50)),
+                step_p95=float(np.percentile(step, 95)),
+                step_max=float(step.max()),
+                over_step=int((step > MAX_STEP_M).sum()),
+                stations=int(len(step)),
                 grade_p50=float(np.percentile(grade, 50)),
                 grade_p95=float(np.percentile(grade, 95)),
                 grade_max=float(grade.max()),
@@ -1683,3 +1816,126 @@ def _along(pts: np.ndarray, i: int) -> np.ndarray:
     d = pts[min(i + 1, len(pts) - 1)] - pts[max(i - 1, 0)]
     n = float(np.hypot(d[0], d[1]))
     return d / n if n > 1e-9 else np.array([1.0, 0.0])
+
+
+def verify_decks() -> list[str]:
+    """The restation's one claim, and the reason it is the fix rather than a fix.
+
+    `_restation_steep` is allowed to change the collision staircase and nothing
+    else. If it moved the surface it would be redrawing every steep bridge in
+    Sydney as a side effect of making them climbable, and the way that failure
+    presents is a deck that is fine everywhere the check looked and 20 cm out
+    where it did not -- which is exactly the class of thing a self-check exists
+    for and eyes do not.
+
+    So: build a run whose profile is a ramp too steep for 6 m stations, restation
+    it, and assert the surface is the same surface -- every original station still
+    there at its original height, every inserted one exactly on the line between
+    its neighbours, the plan length unchanged -- and that the steps are now inside
+    the budget. Made-up geometry and a made-up ground, so it costs microseconds.
+    """
+    failures: list[str] = []
+
+    # A 60 m ramp at 20%: 10 stations of 6 m, each a 1.2 m step. Nothing climbs it.
+    n = 11
+    pts = np.column_stack((np.linspace(0.0, 60.0, n), np.zeros(n)))
+    deck = np.linspace(0.0, 12.0, n)
+    ground = np.zeros(n)
+
+    class _Flat:
+        @staticmethod
+        def sample(e, north):
+            return np.zeros(np.shape(e))
+
+    run = DeckRun(road=None, pts=pts, deck_y=deck, ground=ground, half_width=5.0)
+    out = _restation_steep(run, _Flat)
+
+    step = np.abs(np.diff(out.deck_y))
+    if step.size and step.max() > MAX_STEP_M + 1e-9:
+        failures.append(
+            f"the restation left a {step.max():.3f} m step against a {MAX_STEP_M} m budget"
+        )
+    if len(out.pts) <= len(pts):
+        failures.append("the restation inserted no stations into a 20% ramp")
+
+    # The surface, sampled by chainage against the original profile. This is the
+    # claim: interpolating a piecewise-linear profile at points on its own
+    # segments reproduces it exactly.
+    def _profile(p, y, at):
+        chain = np.concatenate(([0.0], np.cumsum(np.hypot(*np.diff(p, axis=0).T))))
+        return np.interp(at, chain, y)
+
+    probe = np.linspace(0.0, 60.0, 601)
+    before = _profile(pts, deck, probe)
+    after = _profile(out.pts, out.deck_y, probe)
+    if not np.allclose(before, after, atol=1e-9):
+        worst = float(np.abs(before - after).max())
+        failures.append(f"the restation moved the drawn deck by up to {worst:.4f} m")
+
+    # Every original station survives, in place. A restation that resampled the
+    # run uniformly would pass the profile test above and fail this one, and it
+    # would have thrown away the solved touchdown pins to do it.
+    for i in range(n):
+        j = int(np.argmin(np.abs(out.pts[:, 0] - pts[i, 0])))
+        if abs(out.pts[j, 0] - pts[i, 0]) > 1e-9 or abs(out.deck_y[j] - deck[i]) > 1e-9:
+            failures.append(f"the restation lost the solved station at chainage {pts[i, 0]:.1f}")
+            break
+
+    plan_before = float(np.hypot(*np.diff(pts, axis=0).T).sum())
+    plan_after = float(np.hypot(*np.diff(out.pts, axis=0).T).sum())
+    if abs(plan_before - plan_after) > 1e-9:
+        failures.append(f"the restation changed the plan length: {plan_before} -> {plan_after}")
+
+    # A run that is gentle everywhere except one segment. The uniform ramp above
+    # cannot tell "cut the steep segment" apart from "cut every segment by the
+    # worst ratio", and the second is what a deck with one bad touchdown and 200 m
+    # of flat viaduct behind it would get -- forty times the prisms for the flat
+    # part, to fix six metres of it.
+    mixed_pts = np.column_stack((np.linspace(0.0, 60.0, n), np.zeros(n)))
+    mixed_y = np.zeros(n)
+    mixed_y[5:] = 2.0  # one 2 m step in the middle, flat either side
+    mixed = _restation_steep(
+        DeckRun(road=None, pts=mixed_pts, deck_y=mixed_y, ground=ground, half_width=5.0),
+        _Flat,
+    )
+    if np.abs(np.diff(mixed.deck_y)).max() > MAX_STEP_M + 1e-9:
+        failures.append("the restation left the one steep segment of a mixed run over budget")
+    want_most = n + int(np.ceil(2.0 / MAX_STEP_M)) - 1
+    if len(mixed.pts) > want_most:
+        failures.append(
+            f"a run with one steep segment came back with {len(mixed.pts)} stations, not"
+            f" {want_most}: the whole run was subdivided to fix six metres of it"
+        )
+
+    # A gentle run is returned untouched -- identity, not a rebuild, because a
+    # rebuild would resample `ground` for 176 km of deck to no purpose.
+    easy = DeckRun(
+        road=None,
+        pts=pts,
+        deck_y=np.linspace(0.0, 1.0, n),
+        ground=ground,
+        half_width=5.0,
+    )
+    if _restation_steep(easy, _Flat) is not easy:
+        failures.append("a deck already inside the step budget was rebuilt anyway")
+
+    # And the two numbers this all rests on, against the collision they are for.
+    # `driving.NOSE_STEP` is 0.42 and `CollisionWorld.solidFor` gives 0.05 more.
+    if MAX_STEP_M >= 0.42 + 0.05:
+        failures.append(
+            f"MAX_STEP_M {MAX_STEP_M} is not under the 0.47 m a body climbs, so the"
+            " budget does not buy anything"
+        )
+    # The budget is *deliberately* tighter than the station design -- 6 m at the 7%
+    # ceiling steps 0.42 m and the budget is 0.35 -- so a deck at the ceiling is
+    # restationed on purpose and that is not the thing to check for. What would be
+    # a mistake is a budget so tight that the restation stops being a repair for
+    # steep runs and becomes a blanket resampling of all 176 km: at a third of the
+    # ceiling step, every deck in the city is subdivided to buy nothing.
+    if MAX_STEP_M * 3 < STATION_M * MAX_GRADE:
+        failures.append(
+            f"MAX_STEP_M {MAX_STEP_M} is under a third of a {STATION_M} m station at"
+            f" the {MAX_GRADE:.0%} ceiling ({STATION_M * MAX_GRADE:.2f} m), so this is"
+            " no longer a repair for steep runs -- it resamples the whole network"
+        )
+    return failures

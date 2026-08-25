@@ -158,7 +158,23 @@ export interface WaterContract {
 }
 
 /**
- * Build one mesh per sheet, in the frame the payload was written in.
+ * Build **one mesh for the tile**, in the frame the payload was written in.
+ *
+ * One per sheet until the creeks arrived, and the change is theirs. A creek
+ * cannot be one flat sheet -- it runs downhill -- so `pipeline/sydney/creeks.py`
+ * cuts it into 10 m reaches and each reach is its own level, which is exactly
+ * what `write_water`'s format was built to allow. A tile the creek crosses
+ * diagonally carries about seventy of them. Seventy sheets was seventy meshes,
+ * seventy draw calls and seventy render objects for perhaps five hundred
+ * vertices, which is the cost model inverted.
+ *
+ * Merging is free here because of a decision already made below: the sheet's
+ * level is **written into every vertex** rather than carried as a group offset,
+ * so vertices from different levels sit in one buffer with nothing to
+ * reconcile. Nothing else about a sheet differs -- one material for the whole
+ * world, one attribute layout, one set of flags -- so the merge is a
+ * concatenation and an index rebase, and the harbour tiles that used to carry a
+ * bay and a pond as two meshes now carry one.
  *
  * Tile-local for a `.water.bin` and world metres for `far-water.bin`, which is
  * the same distinction `far.ts` makes and needs no flag here: the tile-local
@@ -178,22 +194,37 @@ export interface WaterContract {
  */
 export function buildWaterMeshes(data: TileWater, material: Material): Mesh[] {
   const out: Mesh[] = [];
+  let count = 0;
+  let indices = 0;
   for (const sheet of data.sheets) {
-    const position = new Float32Array(sheet.count * 3);
-    const normal = new Float32Array(sheet.count * 3);
-    const depth = new Float32Array(sheet.count);
-    for (let i = 0; i < sheet.count; i++) {
-      position[i * 3] = sheet.vertices[i * 3];
-      position[i * 3 + 1] = sheet.surface;
-      position[i * 3 + 2] = sheet.vertices[i * 3 + 1];
-      normal[i * 3 + 1] = 1;
-      depth[i] = sheet.vertices[i * 3 + 2];
+    count += sheet.count;
+    indices += sheet.indices.length;
+  }
+  if (count > 0) {
+    const position = new Float32Array(count * 3);
+    const normal = new Float32Array(count * 3);
+    const depth = new Float32Array(count);
+    const index = new Uint32Array(indices);
+    let v = 0;
+    let t = 0;
+    for (const sheet of data.sheets) {
+      for (let i = 0; i < sheet.count; i++) {
+        const o = (v + i) * 3;
+        position[o] = sheet.vertices[i * 3];
+        position[o + 1] = sheet.surface;
+        position[o + 2] = sheet.vertices[i * 3 + 1];
+        normal[o + 1] = 1;
+        depth[v + i] = sheet.vertices[i * 3 + 2];
+      }
+      for (let i = 0; i < sheet.indices.length; i++) index[t + i] = sheet.indices[i] + v;
+      v += sheet.count;
+      t += sheet.indices.length;
     }
     const geometry = new BufferGeometry();
     geometry.setAttribute('position', new BufferAttribute(position, 3));
     geometry.setAttribute('normal', new BufferAttribute(normal, 3));
     geometry.setAttribute('waterDepth', new BufferAttribute(depth, 1));
-    geometry.setIndex(new BufferAttribute(sheet.indices, 1));
+    geometry.setIndex(new BufferAttribute(index, 1));
 
     const mesh = new Mesh(geometry, material);
     mesh.name = 'water';
@@ -224,26 +255,32 @@ export function buildWaterMeshes(data: TileWater, material: Material): Mesh[] {
  * triangles, so 13 kB against the sidecar's 20 -- and it is held for exactly as
  * long as the tile is, so a player who never goes near the harbour holds none.
  *
- * Only the sheet with the most triangles is taken. A tile with a bay and a pond
- * on it would lose the pond from the *map*, which is a dot at this scale; the
- * alternative is a second array and a second loop in the redraw for a case that
- * does not occur in this extent.
+ * **Every sheet, not just the biggest.** This took only the sheet with the most
+ * triangles, on the argument that a tile with a bay and a pond on it would lose
+ * a dot from the map and the alternative was a second loop for a case that does
+ * not occur in this extent. The creeks are that case: a creek tile's sheets are
+ * seventy 10 m reaches and no one of them is the tile's water, so the largest
+ * would have drawn a single puddle. And a creek is worth more on a map than the
+ * harbour is -- the harbour is the shape you navigate by, but the creek is the
+ * thing you are looking for a way across. The second loop is a concatenation.
  */
 export function waterPlanWorld(
   data: TileWater,
   originX: number,
   originZ: number,
 ): Float32Array | null {
-  let best: WaterSheet | null = null;
+  let corners = 0;
+  for (const sheet of data.sheets) corners += sheet.indices.length;
+  if (corners === 0) return null;
+  const out = new Float32Array(corners * 2);
+  let at = 0;
   for (const sheet of data.sheets) {
-    if (best === null || sheet.indices.length > best.indices.length) best = sheet;
-  }
-  if (best === null) return null;
-  const out = new Float32Array(best.indices.length * 2);
-  for (let i = 0; i < best.indices.length; i++) {
-    const v = best.indices[i] * 3;
-    out[i * 2] = best.vertices[v] + originX;
-    out[i * 2 + 1] = best.vertices[v + 1] + originZ;
+    for (let i = 0; i < sheet.indices.length; i++) {
+      const v = sheet.indices[i] * 3;
+      out[at * 2] = sheet.vertices[v] + originX;
+      out[at * 2 + 1] = sheet.vertices[v + 1] + originZ;
+      at++;
+    }
   }
   return out;
 }
@@ -610,6 +647,59 @@ export function verifyWater(): string[] {
   new DataView(wrongMagic).setUint32(0, 0x12345678, true);
   if (decodeWater(wrongMagic) !== null) {
     failures.push('decodeWater accepted a payload with the wrong magic.');
+  }
+
+  // --- 1b. The merge, which the creeks made load-bearing.
+  //
+  // A tile's sheets are concatenated into one mesh and their indices rebased, and
+  // a rebase that forgets its base is the classic version of this bug: it produces
+  // a mesh, at plausible coordinates, whose second sheet's triangles all point at
+  // the first sheet's vertices. On the harbour that is a fold in the water; on a
+  // creek it is seventy reaches drawn on top of the first one. So this asserts the
+  // two things a concatenation can get wrong -- that every vertex kept its own
+  // sheet's level, and that every index still points at the vertex it was written
+  // for.
+  {
+    const sheets: WaterSheet[] = [
+      {
+        surface: -71.075,
+        count: 3,
+        vertices: new Float32Array([0, 0, 3.5, 10, 0, 2, 0, -10, 1]),
+        indices: new Uint32Array([0, 1, 2]),
+      },
+      {
+        surface: 12.5,
+        count: 3,
+        vertices: new Float32Array([100, -100, 0.4, 110, -100, 0.3, 100, -110, 0.2]),
+        indices: new Uint32Array([0, 1, 2]),
+      },
+    ];
+    const merged = buildWaterMeshes({ sheets } as TileWater, new MeshStandardNodeMaterial());
+    if (merged.length !== 1) {
+      failures.push(`two sheets built ${merged.length} meshes; a creek tile carries seventy of them`);
+    } else {
+      const geometry = merged[0].geometry;
+      const position = geometry.getAttribute('position');
+      const index = geometry.getIndex();
+      if (position.count !== 6 || index === null || index.count !== 6) {
+        failures.push('the merged mesh lost vertices or indices');
+      } else {
+        // Compared with a tolerance, because the buffers are f32 and the
+        // literals above are f64: -71.075 is stored as -71.07499694824219 and an
+        // exact test fails on a merge that is perfectly correct.
+        const near = (a: number, b: number): boolean => Math.abs(a - b) < 1e-4;
+        if (!near(position.getY(0), -71.075) || !near(position.getY(3), 12.5)) {
+          failures.push('the merge did not write each sheet its own level, so a creek runs at the harbour surface');
+        }
+        if (index.getX(3) !== 3 || index.getX(5) !== 5) {
+          failures.push('the merge did not rebase the second sheet indices, so its triangles point at the first sheet');
+        }
+        if (!near(position.getX(3), 100) || !near(geometry.getAttribute('waterDepth').getX(3), 0.4)) {
+          failures.push('the merge misplaced the second sheet vertices or their depths');
+        }
+      }
+      geometry.dispose();
+    }
   }
 
   // --- 2. The two tile lookups, against each other, in all four quadrants.

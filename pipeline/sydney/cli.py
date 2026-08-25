@@ -46,6 +46,7 @@ from . import (
     bays,
     config,
     contact,
+    creeks,
     decks,
     elevated,
     fences,
@@ -539,6 +540,25 @@ def cmd_build(args: argparse.Namespace) -> int:
     terrain = terraincache.load(stage.radius_m, use_cache=not args.no_terrain_cache)
     _report_terrain(terrain)
     _report_water(terrain)
+
+    # The creeks, built here and hung on the terrain rather than solved inside
+    # `Terrain.load` -- deliberately, and `creeks.py`'s header is the argument.
+    # Two consequences follow from that one line and both matter:
+    #
+    #   * `terraincache._CODE_FILES` does not hash `creeks.py`, so adding the
+    #     drainage network to this world does **not** re-solve the 60 km lattice
+    #     and does not change one byte of any `.terr.bin`. That is what makes the
+    #     world publish's terrain byte-diff mean something across this change.
+    #   * it is attached *after* every conform, which is the only order that
+    #     works: a creek is drawn on the ground the player walks on, and that
+    #     ground is the one the roads and the harbour have already moved.
+    #
+    # Set on the instance rather than passed through `_emit_one`, because the
+    # parallel emit forks and inherits the context copy-on-write; a new positional
+    # argument would be pickled to every worker instead.
+    print("  reading the creeks ...")
+    terrain.creeks = creeks.load(stage.radius_m, terrain.sample, getattr(terrain, "water", None))
+    _report_creeks(terrain.creeks)
 
     # The ways, read once here and handed to the three passes that need them.
     # `elevated`, `streets` and `decks` each used to read the extract's `lines`
@@ -1107,6 +1127,24 @@ def _report_decks(net: decks.DeckNetwork) -> None:
         f"  max {100 * s['grade_max']:.2f}%"
         f"   over {100 * decks.MAX_GRADE:.0f}%: {s['over_max']:,} of {s['segments']:,} segments"
     )
+    # The step, which is the number that decides whether the bridge can be driven
+    # onto at all -- a prism has one top, so a deck is a staircase, and a step over
+    # `driving.NOSE_STEP` + the collision margin is a wall a car crashes into
+    # rather than a bump. Reported beside the grade because for a decade of this
+    # module's life the grade was reported *instead* of it and 13% of the network
+    # was unclimbable without a line of output saying so. See `decks.MAX_STEP_M`.
+    print(
+        f"    deck step  p50 {s['step_p50']:.3f} m  p95 {s['step_p95']:.3f} m"
+        f"  max {s['step_max']:.3f} m"
+        f"   over {decks.MAX_STEP_M:.2f} m: {s['over_step']:,} of {s['stations']:,}"
+        f"   ({s['restationed_runs']:,} runs restationed)"
+    )
+    if s.get("cliff_segments"):
+        print(
+            f"      {s['cliff_segments']:,} segments steeper than"
+            f" {100 * decks.CLIFF_GRADE:.0f}% are a cliff in the solve, not a coarse"
+            f" staircase -- restationing makes them finer, not climbable"
+        )
     print(
         f"    clearance over the ground p50 {s['clear_p50']:.2f} m  max {s['clear_max']:.2f} m"
         f"  min {s['clear_min']:.2f} m;"
@@ -1375,6 +1413,28 @@ def _report_far_water(contract: dict | None) -> None:
         # would be a shame to reintroduce it one layer up.
         f" sunk {far['sink_m']:.2f} m under the streamed sheets"
     )
+
+
+def _report_creeks(field) -> None:
+    """What the drainage network came to, and the two numbers that shape it.
+
+    The stand and the reach length are printed with the counts on purpose: they
+    are one decision (see `creeks.py`), and a build whose creeks came out wrong is
+    almost always a build where one of them was moved without the other.
+    """
+    if field is None:
+        return
+    st = field.stats
+    kinds = ", ".join(f"{k} {n:,}" for k, n in sorted(st["by_kind"].items(), key=lambda kv: -kv[1]))
+    print(
+        f"    creeks: {st['length_km']:,} km over {st['ways']:,} ways"
+        f" -> {st['reaches']:,} reaches, {st['area_m2'] / 1e6:.2f} km2"
+    )
+    print(
+        f"      {kinds}"
+        f"  ({st['dropped_covered']:,} reaches already under a water polygon)"
+    )
+    print(f"      {st['stand_m']:.2f} m stand over {st['reach_m']:.0f} m reaches")
 
 
 def _report_water_tiles(results: list[tiles.TileResult]) -> None:
@@ -2468,6 +2528,11 @@ def cmd_water_audit(args: argparse.Namespace) -> int:
     bad_rule = water.verify_polygonise()
     radius = args.coastline_radius or index["radius_m"]
     bad_rule += water.verify_coastline(radius)
+    # The creeks ride this sidecar and this audit, because they *are* water sheets
+    # -- same format, same clip, same material. Their own invariants are about the
+    # two numbers that shape a reach and are checked on made-up geometry, so they
+    # cost milliseconds and need neither the extract nor a solve.
+    bad_rule += creeks.verify_creeks()
     for failure in bad_rule:
         print(f"  SELF-CHECK   {failure}")
     if bad_rule:
