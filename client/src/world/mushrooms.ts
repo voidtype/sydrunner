@@ -127,16 +127,19 @@ export class MushroomField {
    */
   adopt(
     tileKey: string,
-    tileX: number,
-    tileZ: number,
+    veg: { count: number; x: Float32Array; z: Float32Array },
     originX: number,
     originZ: number,
-    count: number,
-    localX: Float32Array,
-    localZ: Float32Array,
     groundAt: (x: number, z: number) => number,
   ): void {
     if (this.byTile.has(tileKey)) return;
+    // The tile's own integers, off its key, so the hash is the same pair the
+    // server would use. A key is `<x>_<z>`; anything else is not a tile.
+    const parts = tileKey.split('_');
+    const tileX = Number(parts[0]);
+    const tileZ = Number(parts[1]);
+    if (!Number.isFinite(tileX) || !Number.isFinite(tileZ)) return;
+    const { count, x: localX, z: localZ } = veg;
     const grown: Resident[] = [];
     for (let i = 0; i < count; i++) {
       const wx = originX + localX[i];

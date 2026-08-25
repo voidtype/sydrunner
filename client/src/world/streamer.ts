@@ -236,6 +236,7 @@ import {
   type GlbPrimitive,
   type TileDecodeRequest,
   type TileDecodeResult,
+  type TileVegetation,
 } from './tile-decode.ts';
 import { TerrainField, buildTerrainMesh, sampleTileGrid, type TileCut, type TileSeam } from './terrain.ts';
 import type { SeamField } from './seam.ts';
@@ -936,6 +937,25 @@ export interface StreamerOptions {
   buildBudgetMs?: number;
 }
 
+/**
+ * Where a tile's mushrooms go. Implemented by `world/mushrooms.MushroomField`.
+ *
+ * Declared here rather than imported so the streamer depends on the *shape* and
+ * not on the feature -- the same arrangement `PowerupSink` has, and the reason
+ * a client that never builds a field costs nothing but a null check.
+ */
+export interface MushroomSink {
+  adopt(
+    tileKey: string,
+    veg: TileVegetation,
+    originX: number,
+    originZ: number,
+    groundAt: (x: number, z: number) => number,
+  ): void;
+  release(tileKey: string): void;
+}
+
+
 export class TileStreamer implements LampSource {
   readonly root = new Group();
 
@@ -1147,6 +1167,11 @@ export class TileStreamer implements LampSource {
    * `setPowerupSink`.
    */
   private powerupSink: PowerupSink | null = null;
+  /**
+   * What grows under this tile's trees. Null on most clients for most of a
+   * session: mushrooms exist in one three-kilometre circle of Sydney.
+   */
+  private mushroomSink: MushroomSink | null = null;
   /**
    * Whoever owns the moving traffic, told about each tile as it arrives and
    * leaves. Set the same way `powerupSink` is and for the same reason -- it
@@ -1651,6 +1676,15 @@ export class TileStreamer implements LampSource {
    * behaviour for a world with no game in it and is what makes the tile loader
    * testable on its own.
    */
+  /**
+   * Where the mushrooms go, on `setPowerupSink`'s terms exactly: the streamer
+   * knows which trees a tile has and when it loses them, and knows nothing about
+   * what grows under them. See `world/mushrooms.ts`.
+   */
+  setMushroomSink(sink: MushroomSink): void {
+    this.mushroomSink = sink;
+  }
+
   setPowerupSink(sink: PowerupSink): void {
     this.powerupSink = sink;
   }
@@ -3694,6 +3728,11 @@ export class TileStreamer implements LampSource {
           if (++built % TREE_MESHES_PER_STEP === 0) yield;
         }
         trees = veg.count;
+        // The mushrooms, from the same array the meshes were just built from.
+        // After the build rather than before it, so a tile that throws while
+        // building its trees leaves nothing growing under trees that are not
+        // there. `adopt` rejects the whole city on a distance test first.
+        this.mushroomSink?.adopt(entry.key, veg, entry.bounds[0], entry.bounds[1], groundAt);
         step('trees');
         yield;
       }
@@ -4735,6 +4774,8 @@ export class TileStreamer implements LampSource {
     // points so a respawn clock started before the eviction is the same clock
     // still running when the tile comes back -- see `PowerupField`.
     this.powerupSink?.release(key);
+    // Its trees are going, so what grew under them goes too.
+    this.mushroomSink?.release(key);
     // And the traffic. Unlike the powerups this releases *everything* the tile
     // contributed, because a lane graph carries no state: a car's position is a
     // pure function of the tick, so the identical cars reappear in the identical
