@@ -517,6 +517,18 @@ def cmd_build(args: argparse.Namespace) -> int:
 
     print(f"stage {stage.index} '{stage.name}' -- {stage.description}")
     print(f"radius {stage.radius_m / 1000:.0f} km")
+
+    # The two self-checks that are about *constants* rather than data, run before
+    # anything is read. Both guard a relationship between numbers that live in
+    # different files and whose drift is silent -- the deck step against what
+    # `driving.NOSE_STEP` climbs, the creek stand against the reach length -- and
+    # a retile is hours, so the moment to find out that one of them moved is now
+    # rather than at the end. They cost milliseconds and touch no data.
+    gate = decks.verify_decks() + creeks.verify_creeks()
+    for failure in gate:
+        print(f"  SELF-CHECK   {failure}")
+    if gate:
+        return 1
     t0 = time.time()
     progress.begin(f"stage {stage.name}")
     progress.phase("head", message="loading buildings")
@@ -557,7 +569,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     # parallel emit forks and inherits the context copy-on-write; a new positional
     # argument would be pickled to every worker instead.
     print("  reading the creeks ...")
-    terrain.creeks = creeks.load(stage.radius_m, terrain.sample, getattr(terrain, "water", None))
+    terrain.creeks = creeks.load(stage.radius_m, terrain.sample)
     _report_creeks(terrain.creeks)
 
     # The ways, read once here and handed to the three passes that need them.
@@ -1431,9 +1443,7 @@ def _report_creeks(field) -> None:
         f" -> {st['reaches']:,} reaches, {st['area_m2'] / 1e6:.2f} km2"
     )
     print(
-        f"      {kinds}"
-        f"  ({st['dropped_covered']:,} reaches already under a water polygon)"
-    )
+        f"      {kinds}")
     print(f"      {st['stand_m']:.2f} m stand over {st['reach_m']:.0f} m reaches")
 
 

@@ -288,48 +288,74 @@ def _reach_plan(total: float) -> tuple[int, float, int]:
     return n, step, per
 
 
-def _reach_levels(line: np.ndarray, chain: np.ndarray, sample) -> tuple[np.ndarray, float, int]:
+def _reach_levels(
+    line: np.ndarray, chain: np.ndarray, half: float, sample
+) -> tuple[np.ndarray, float, int]:
     """Every reach's surface along one way, in **one** terrain lookup.
 
-    A reach sits `CREEK_STAND_M` above the *lowest* ground along it rather than
-    the mean, and that is the choice the geometry turns on: taking the mean would
-    put half of every reach above its own water, and `water._wet_pieces` would
-    then clip that half away. The low end is the end the water is at.
+    A reach sits `CREEK_STAND_M` above the lowest ground **anywhere under its
+    ribbon** -- three lines of samples, the centreline and both edges, not the
+    centreline alone. Two things follow and both are the point:
+
+      * **The depth is capped at the stand by construction.** Depth is
+        `surface - ground` and the surface is `min(ground) + stand`, so no vertex
+        can be deeper than the stand. Read off the centreline instead, the ground
+        under the ribbon's edge can be lower than anything the centreline saw --
+        measured over eight sample tiles, 468 of 484 sheets went deeper than the
+        40 cm stand and the worst was 2.07 m, which is a stream pouring over the
+        lip of a gorge because nothing asked what was under its far edge.
+      * **On a steep cross-slope the creek narrows to the low line.** Taking the
+        minimum lowers the surface, and `water._wet_pieces` then clips the ribbon
+        back to wherever the ground is actually under it. A 3 m ribbon draped
+        across a 1:1 bank comes out as the half-metre of it that is in the gully,
+        which is where the water would be.
+
+    The edges are sampled at 0.8 of the half-width rather than at it, because the
+    outermost strip is exactly the part the clip is most likely to trim, and
+    letting it set the level for the whole reach would pull the water down for a
+    strip that is not going to be drawn.
     """
     total = float(chain[-1])
     n, step, per = _reach_plan(total)
     at = (np.arange(n)[:, None] * step + np.linspace(0.0, step, per)[None, :]).ravel()
     pts = _points_at(line, chain, at)
-    h = np.asarray(sample(pts[:, 0], pts[:, 1]), dtype=np.float64).reshape(n, per)
-    return h.min(axis=1) + CREEK_STAND_M, step, per
+    # Left-of-travel normals at each sample, from the local direction. Central
+    # differences inside, one-sided at the ends -- `np.gradient`'s own rule.
+    d = np.gradient(pts, axis=0)
+    norm = np.hypot(d[:, 0], d[:, 1])
+    norm[norm < 1e-9] = 1.0
+    left = np.column_stack((-d[:, 1] / norm, d[:, 0] / norm))
+    off = left * (half * 0.8)
+    h = np.stack(
+        [
+            np.asarray(sample(p[:, 0], p[:, 1]), dtype=np.float64)
+            for p in (pts, pts + off, pts - off)
+        ]
+    ).min(axis=0)
+    return h.reshape(n, per).min(axis=1) + CREEK_STAND_M, step, per
 
 
-def load(
-    radius_m: float,
-    sample,
-    water_field: water.WaterField | None = None,
-    path: Path = osm.PBF_PATH,
-) -> CreekField:
+def load(radius_m: float, sample, path: Path = osm.PBF_PATH) -> CreekField:
     """Read the waterway network and turn it into flat reaches on the found ground.
 
     `sample` is `Terrain.sample` **after** every conform has run, which is the only
     order that works: a creek is drawn on the ground the player walks on, and the
     ground the player walks on is the one the roads and the harbour already moved.
+
+    **What already-mapped water this runs into is not decided here.** It was, and
+    it was the whole cost of the module: answering "does this stream reach the
+    harbour" per way means unioning every water level whose bounding box overlaps
+    it, and the harbour's bounding box is most of Sydney. Measured, that union was
+    172 of the 236 seconds a 300-way sample took -- an hour and a half over the
+    extent, to subtract water from 94 ways in 300.
+
+    It is `tile_sheets`' job instead, and belongs there for a better reason than
+    speed: the subtraction is a *drawing* decision, and at the tile it is made
+    against one 500 m cell's worth of water rather than against the harbour.
     """
     ways = read_ways(radius_m, path)
 
-    # What the polygons already cover, as one r-tree. Subtracted **once per way**
-    # rather than once per reach, which is the difference between a minute and an
-    # hour: a way is 200 m of creek and 20 reaches, the water it runs into is the
-    # same water for all of them, and `union_all` over the hits is the expensive
-    # call in this module.
-    existing: list[BaseGeometry] = []
-    if water_field is not None:
-        existing = [lvl.geom for lvl in water_field.levels]
-    exist_tree = STRtree(existing) if existing else None
-
     reaches: list[CreekReach] = []
-    dropped_covered = 0
     dropped_empty = 0
     by_kind: dict[str, int] = {}
     length_m = 0.0
@@ -341,42 +367,11 @@ def load(
         if total < MIN_WAY_M:
             continue
         half = way.width * 0.5
+        surfaces, step, per = _reach_levels(line, chain, half, sample)
 
-        # The water this way runs into, or None. Three filters in increasing cost,
-        # and the order is the point: almost every stream in this extent is a
-        # gully in the hills that never meets a mapped polygon at all, and the
-        # expensive operation here -- differencing 20 reach ribbons against the
-        # union of the harbour -- must not be reached by one of those. The r-tree
-        # query is a bounding box and the harbour's box is most of Sydney, so a
-        # real `intersects` between the query and the union is what actually
-        # decides it, and it is paid once per way rather than once per reach.
-        cover: BaseGeometry | None = None
-        if exist_tree is not None:
-            whole = LineString(line).buffer(half, cap_style=2, join_style=1)
-            hits = exist_tree.query(whole)
-            if len(hits) > 0:
-                merged = shapely.union_all([existing[int(i)] for i in hits])
-                if merged.intersects(whole):
-                    cover = merged
-                    shapely.prepare(cover)
-
-        # Every reach's sample points in one array, so the terrain is asked once
-        # per way instead of once per reach. `Terrain.sample` is a vectorised
-        # bilinear lookup and the cost is almost entirely the call.
-        surfaces, step, per = _reach_levels(line, chain, sample)
-        n_reach = len(surfaces)
-
-        for k in range(n_reach):
+        for k in range(len(surfaces)):
             piece = LineString(_points_at(line, chain, np.linspace(k * step, (k + 1) * step, per)))
             ribbon = piece.buffer(half, cap_style=2, join_style=1)
-            if ribbon.is_empty:
-                dropped_empty += 1
-                continue
-            if cover is not None:
-                ribbon = ribbon.difference(cover)
-                if ribbon.is_empty:
-                    dropped_covered += 1
-                    continue
             parts = water._parts(ribbon, MIN_PIECE_M2)
             if not parts:
                 dropped_empty += 1
@@ -400,7 +395,6 @@ def load(
         "length_km": round(length_m / 1000.0, 1),
         "area_m2": round(float(sum(r.polygon.area for r in reaches)), 1),
         "by_kind": by_kind,
-        "dropped_covered": dropped_covered,
         "dropped_empty": dropped_empty,
         "stand_m": CREEK_STAND_M,
         "reach_m": REACH_M,
@@ -420,7 +414,16 @@ def tile_sheets(field: CreekField | None, tile_key: str, terrain) -> list[water.
     that is actually under the surface. The last of those is what gives a creek a
     bank -- `water._wet_pieces` keeps only the half-plane where the facet's own
     plane is below this reach's level, so the drawn edge is the waterline the
-    player can see rather than the ribbon this module buffered.
+    player can see rather than the ribbon `load` buffered.
+
+    And one cut of its own, first: **whatever `water.py` already draws here.** The
+    wide rivers are mapped both ways -- Parramatta River has a centreline *and* an
+    area -- so a creek must not be drawn on top of the polygon it becomes, and the
+    same subtraction is what stops one being drawn across the harbour it drains
+    into. Done here rather than in `load` because here the water is one tile's
+    worth: the levels are clipped to a 500 m cell before they are unioned, so the
+    difference runs against a few hundred square metres instead of against the
+    harbour. See `load` for what that cost when it was the other way round.
     """
     if field is None or field.tree is None:
         return []
@@ -428,12 +431,33 @@ def tile_sheets(field: CreekField | None, tile_key: str, terrain) -> list[water.
     s = config.TILE_SIZE
     cell = box(tx * s, tz * s, (tx + 1) * s, (tz + 1) * s)
 
+    hits = field.tree.query(cell)
+    if len(hits) == 0:
+        return []
+
+    # This tile's already-drawn water, clipped to the tile and unioned once.
+    cover: BaseGeometry | None = None
+    wf = getattr(terrain, "water", None)
+    if wf is not None:
+        local = [
+            lvl.geom.intersection(cell)
+            for lvl in wf.levels
+            if lvl.geom.intersects(cell)
+        ]
+        local = [g for g in local if not g.is_empty]
+        if local:
+            cover = shapely.union_all(local)
+
     out: list[water.WaterSheet] = []
-    for idx in field.tree.query(cell):
+    for idx in hits:
         reach = field.reaches[int(idx)]
         clipped = reach.polygon.intersection(cell)
         if clipped.is_empty:
             continue
+        if cover is not None:
+            clipped = clipped.difference(cover)
+            if clipped.is_empty:
+                continue
         pieces: list[Polygon] = []
         for part in water._parts(clipped, MIN_PIECE_M2):
             pieces.extend(water._wet_pieces(part, terrain, reach.surface))
@@ -474,7 +498,7 @@ def verify_creeks() -> list[str]:
     line = np.asarray([[0.0, 0.0], [100.0, 0.0]])
     chain = _chainage(line)
     flat = lambda e, n: np.zeros(np.shape(e))  # noqa: E731
-    levels, step, per = _reach_levels(line, chain, flat)
+    levels, step, per = _reach_levels(line, chain, 1.5, flat)
     if not np.allclose(levels, CREEK_STAND_M):
         failures.append(f"a reach on flat ground stands at {levels[:3]}, not {CREEK_STAND_M}")
 
@@ -482,7 +506,7 @@ def verify_creeks() -> list[str]:
     # mean, because the alternative leaves the upper half of every reach above its
     # own water and `water._wet_pieces` clips it away.
     ramp = lambda e, n: -np.asarray(e, dtype=np.float64) * 0.03  # noqa: E731
-    levels, step, per = _reach_levels(line, chain, ramp)
+    levels, step, per = _reach_levels(line, chain, 1.5, ramp)
     want = -0.03 * (np.arange(len(levels)) + 1) * step + CREEK_STAND_M
     if not np.allclose(levels, want):
         failures.append("a reach on a 3% fall does not stand at its own low end")
@@ -507,6 +531,19 @@ def verify_creeks() -> list[str]:
     want_pts = np.asarray([[0, 0], [5, 0], [10, 0], [10, 5], [10, 10]], dtype=np.float64)
     if not np.allclose(got, want_pts):
         failures.append(f"_points_at walked off the line: {got.tolist()}")
+
+    # A cross-slope: the level must come off the ribbon's low edge, not its
+    # middle, or the far edge floats over ground the surface never saw.
+    across = lambda e, n: -np.asarray(n, dtype=np.float64) * 1.0  # noqa: E731
+    levels, _, _ = _reach_levels(line, chain, 3.0, across)
+    # The line runs along +x, so the fall is across it: the low edge is at
+    # n = +2.4 (0.8 of the 3 m half-width), which is 2.4 m down.
+    if not np.allclose(levels, CREEK_STAND_M - 2.4):
+        failures.append(
+            f"a reach on a cross-slope stands at {levels[0]:.3f}, not at its low edge"
+            f" {CREEK_STAND_M - 2.4:.3f} -- the far half of the ribbon would be deeper"
+            " than the stand"
+        )
 
     # Widths: a tagged one is believed inside the clamp and ignored outside it.
     for kind, w in CHANNEL_WIDTH_M.items():
