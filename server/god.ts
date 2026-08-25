@@ -34,6 +34,7 @@
  */
 
 import { fxSetDoubleHealth } from '../client/src/game/teamfx.ts';
+import { WEEKLY_FLAG_PREFIX } from '../client/src/game/questmodel.ts';
 
 /**
  * What the endpoint is told happened, when a player has said nothing yet.
@@ -157,6 +158,22 @@ export function bless(record: BlessRecord, playerId: number, nowMs: number): boo
   return true;
 }
 
+/**
+ * The flag a blessed player carries.
+ *
+ * A **story flag with the weekly prefix**, rather than a field of its own, and
+ * that is the whole of the persistence design. `net/accounts.resetIfNewWeek`
+ * already sweeps every `w:` flag on Monday and already leaves the rest of
+ * `record.story` alone, so "lasts till the weekly reset" is not a rule this
+ * feature has to implement, remember to run, or get right in a second place. It
+ * is the rule the quest register's weekly turn-ins already run on.
+ *
+ * It also arrives at the client for free: story flags are already in the quest
+ * state frame, so a blessed player's browser learns about it the same way it
+ * learns it has finished a job, and a reload finds it still there.
+ */
+export const BLESSED_FLAG = 'w:blessed';
+
 /** Monday swept the ladder; it sweeps this too. */
 export function unbless(record: BlessRecord, playerId: number, nowMs: number): void {
   if (record.blessedWeek !== weekKey(nowMs)) {
@@ -257,6 +274,19 @@ export function verifyGod(): string[] {
     const m = a.messages();
     if (m[0].role !== 'system') failures.push('The brief is not the first message.');
     if (m[1].content !== 'am i good' || m[2].role !== 'assistant') failures.push('The exchange is out of order or misattributed.');
+  }
+
+  // --- **The whole of the persistence, in one assertion.**
+  //
+  // "Lasts till the weekly reset" is not code this feature runs; it is a
+  // property of the flag's prefix. `resetIfNewWeek` drops every `w:` flag and
+  // leaves the rest of `record.story` alone, so a blessing survives a reload and
+  // dies on Monday because of this one character. A rename that dropped the
+  // prefix would make it permanent, silently, and nothing else would notice.
+  if (!BLESSED_FLAG.startsWith(WEEKLY_FLAG_PREFIX)) {
+    failures.push(
+      `The blessing is "${BLESSED_FLAG}", which the Monday sweep does not match: it would last forever.`,
+    );
   }
 
   // --- One blessing a week, and Monday takes it back.

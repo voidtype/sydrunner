@@ -267,7 +267,7 @@ import { verifySim } from './sim.ts';
 import { verifyMushrooms } from '../client/src/game/mushrooms.ts';
 import { verifyTrips } from '../client/src/game/trips.ts';
 import { verifyTripView } from '../client/src/world/tripview.ts';
-import { Audience, MAX_TURNS, askGod, verifyGod } from './god.ts';
+import { Audience, BLESSED_FLAG, MAX_TURNS, askGod, verifyGod } from './god.ts';
 import { verifyMandala } from '../client/src/game/mandala.ts';
 import { verifyQuestAim } from '../client/src/game/questaim.ts';
 import { verifyQuestAreas } from '../client/src/game/questareas.ts';
@@ -1428,6 +1428,28 @@ const server = Bun.serve<Conn>({
         });
         if (said === null) {
           return Response.json({ text: '', verdict: 'open', quiet: true }, { headers: { 'access-control-allow-origin': '*' } });
+        }
+        /*
+         * **The grant is written here or it is not written.**
+         *
+         * The client relays the conversation; it never asserts the outcome. The
+         * server made the call, read the verdict off the reply, and is the only
+         * thing that touches the record -- so a client that posts a made-up
+         * "blessed" back at us changes nothing, because nothing here reads what
+         * the client thinks happened.
+         *
+         * A blessing needs an account, which is the honest cost of persisting
+         * it: a guest can meet God and be told yes, and will keep the doubling
+         * for the session, but there is nowhere to write it down.
+         */
+        if (said.verdict === 'blessed') {
+          const account = accounts.byToken(bearerOf(req));
+          if (account !== null && !account.story.includes(BLESSED_FLAG)) {
+            account.story.push(BLESSED_FLAG);
+            // `seen` is the public "this record changed, schedule a write";
+            // `touch` is the store's own and is private, correctly.
+            accounts.seen(account);
+          }
         }
         return Response.json(
           { text: said.text, verdict: said.verdict },

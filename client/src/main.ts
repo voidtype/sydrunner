@@ -273,6 +273,8 @@ import {
 } from './game/questmodel.ts';
 import { MAX_STACK, verifyMushrooms } from './game/mushrooms.ts';
 import { GodRoom } from './world/godroom.ts';
+/** The flag God's blessing is, and the only thing that persists it. See `server/god.ts`. */
+const BLESSED_FLAG = 'w:blessed';
 import { verifyMandala } from './game/mandala.ts';
 import { MushroomField } from './world/mushrooms.ts';
 import { TripStack } from './game/trips.ts';
@@ -3313,6 +3315,10 @@ async function main(): Promise<void> {
     // Seven is spent whatever happened: the room is not somewhere to loiter.
     trips.clear();
     if (blessed) {
+      // Shown at once so the moment lands; the *authority* is the flag the
+      // server just wrote, which the frame step below reads every tick. If this
+      // client is a guest there is nowhere to write it down and the doubling
+      // lasts the session -- which is the honest cost of not having an account.
       fxSetDoubleHealth(playerCombat.id, true);
       /*
        * **Say what it is.** "you came back with something" was written as a
@@ -3376,6 +3382,20 @@ async function main(): Promise<void> {
      */
     trips.clear();
     fxSetTrip(playerCombat.id, trips.powers(sky.now.nowMs));
+    /*
+     * **The blessing is read, not remembered.**
+     *
+     * `w:blessed` is a story flag the server wrote and the quest state frame
+     * already carries, so this is the same sentence on the frame after God said
+     * yes, on the frame after a reload, and on the Monday after the sweep took
+     * it away. Nothing here has to know when a week ends: `resetIfNewWeek`
+     * already drops every `w:` flag, and this stops seeing one.
+     *
+     * The `||` keeps a guest's session-long grant alive: they have no account to
+     * carry the flag, and taking it back off them a frame after God gave it
+     * would be worse than not persisting it.
+     */
+    if (questFrame().flags.includes(BLESSED_FLAG)) fxSetDoubleHealth(playerCombat.id, true);
     godTurns.length = 0;
     if (godLines !== null) godLines.replaceChildren();
     godRoom.enter(player.position.x, player.position.y - EYE_HEIGHT, player.position.z);
