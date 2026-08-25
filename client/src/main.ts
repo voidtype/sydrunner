@@ -266,6 +266,7 @@ import { verifyMushrooms } from './game/mushrooms.ts';
 import { MushroomField } from './world/mushrooms.ts';
 import { TripStack } from './game/trips.ts';
 import { verifyTrips } from './game/trips.ts';
+import { verifyTripView } from './world/tripview.ts';
 import { verifyQuestAim } from './game/questaim.ts';
 import { verifyQuestAreas } from './game/questareas.ts';
 import { verifyBuildBudget } from './world/buildbudget.ts';
@@ -4695,6 +4696,7 @@ async function main(): Promise<void> {
   const dialogFailures = [
     ...verifyMushrooms(),
     ...verifyTrips(),
+    ...verifyTripView(),
     ...verifyQuestAim(),
     ...verifyQuestAreas(),
     ...verifyBuildBudget(),
