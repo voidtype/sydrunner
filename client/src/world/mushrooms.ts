@@ -43,11 +43,16 @@ import {
 /**
  * The most that may be resident at once.
  *
- * At 0.05% of trees, a full ring of bushland tiles is a few hundred; this is
- * four times that so the buffers never resize, and an `InstancedMesh` that never
- * resizes is one pipeline for the life of the session.
+ * At the shipping 0.05% a full ring of bushland tiles is a few hundred. This is
+ * sized for the **temporary 5% test rate** instead, where a single bushland tile
+ * carries ninety-odd and a resident ring carries thousands -- because the buffer
+ * must never resize (an `InstancedMesh` that grows is a fresh pipeline every
+ * time it grows) and a capacity that silently truncated would look exactly like
+ * a spawn bug while testing the spawn.
+ *
+ * The cost of the headroom is one allocation of empty matrices, once.
  */
-export const CAPACITY = 2048;
+export const CAPACITY = 12288;
 
 /** How tall the whole thing stands, metres. Small enough to be a find. */
 export const STEM_HEIGHT_M = 0.17;

@@ -48,8 +48,19 @@ export const REGION_NORTH = 8684;
 /** How far from the anchor a mushroom may grow. */
 export const REGION_RADIUS_M = 3000;
 
-/** Trees in ten thousand that carry one. The owner's 0.05%. */
-export const SPAWN_RATE = 0.0005;
+/**
+ * How many trees carry one.
+ *
+ * **TEMPORARY: 5% for testing, not the shipping number.** The owner's rate is
+ * `0.0005` -- five trees in ten thousand -- which is a find rather than a
+ * feature you can walk to on purpose, and is what this must go back to before
+ * anybody else plays. One line, and `SHIPPING_SPAWN_RATE` below is what to put
+ * in it.
+ */
+export const SPAWN_RATE = 0.05;
+
+/** What `SPAWN_RATE` is when the testing is over. See the note above it. */
+export const SHIPPING_SPAWN_RATE = 0.0005;
 
 /** How far from the trunk it sits, metres. Close enough to read as "its". */
 export const OFFSET_MIN_M = 0.35;
