@@ -107,6 +107,7 @@ import type { HazardSource, MarkerKind, MarkerSink } from './minimap.ts';
 // why the literal is in a three-free module and the argument for it is in
 // `world/questmarkers.ts`.
 import { GIVER_GOLD_CSS } from './game/givermap.ts';
+import { questAreas, type AreaPoint } from './game/questareas.ts';
 import {
   HAZARD_FILL,
   HAZARD_INK,
@@ -1427,6 +1428,52 @@ export class BigMap implements MarkerSink {
 
   // --- The live layer -----------------------------------------------------------
 
+  /**
+   * The gold blobs, and the one label each.
+   *
+   * Filled very faintly and ringed, because this sits *under* a city map that a
+   * player is reading for streets: an area that obscured the roads inside it
+   * would be a worse answer to "where do I go" than the marks alone. The label
+   * is drawn once per area at its centre and only when the circle is big enough
+   * on screen to hold it -- at the sixty-kilometre zoom an area is eight pixels
+   * across and a word beside it is noise.
+   */
+  private drawQuestAreas(ctx: CanvasRenderingContext2D, view: MapView): void {
+    const points: AreaPoint[] = [];
+    for (let i = 0; i < this.dotCount; i++) {
+      const d = this.pool[i];
+      if (d.kind === 'giver' || d.kind === 'giver-turnin') points.push({ x: d.x, z: d.z });
+    }
+    if (points.length === 0) return;
+    const areas = questAreas(points);
+    if (areas.length === 0) return;
+
+    ctx.save();
+    for (const area of areas) {
+      const cx = projectX(view, area.x);
+      const cy = projectY(view, area.z);
+      const r = area.radiusM * view.scale;
+      if (r < 4) continue;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 242, 26, 0.07)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 242, 26, 0.34)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (r >= 26) {
+        ctx.fillStyle = GIVER_GOLD_CSS;
+        ctx.font = '600 10px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`quest area · ${area.count}`, cx, cy - r - 7);
+      }
+    }
+    ctx.restore();
+  }
+
   private drawMarkers(ctx: CanvasRenderingContext2D, view: MapView): void {
     if (this.markers === null) return;
     const half = ZOOMS[this.zoomIndex].halfM;
@@ -1438,6 +1485,14 @@ export class BigMap implements MarkerSink {
     // The diagonal, so a source that culls on the radius it is handed does not
     // clip the corners of a square view. The box above is the real cull.
     this.markers.collect(this, this.centreX, this.centreZ, half * Math.SQRT2);
+
+    // **The areas, under the marks.** See `game/questareas.ts`: the individual
+    // `!`s answer "is there a job there" for somewhere you are already looking,
+    // and this answers the question a player actually has, which is where to go.
+    // Drawn from the dots already collected, so it can never point at work the
+    // map was not going to offer, and in world metres so it is the same place at
+    // every zoom.
+    this.drawQuestAreas(ctx, view);
 
     let kind: MarkerKind | '' = '';
     ctx.lineWidth = 1.5;

@@ -778,10 +778,13 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
       // the phone in the off hand opens it with the right button. Consumed, so
       // `main.ts` does not also arm a swing with it.
       const wantsPhone =
-        (button === 0 && hands.primary === SLOT.PHONE) ||
-        (button === 2 && hands.secondary === SLOT.PHONE);
+        // **Not the hands any more.** This asked whether the phone was the
+        // slot under the button, which was the old "3 then left click" flow and
+        // has been unanswerable since the phone stopped being equippable. What
+        // it means now is the honest version of what it always meant: while the
+        // handset is up, a click belongs to the handset and not to the bat.
+        button === 0 && phone.visible;
       if (!wantsPhone) return false;
-      phone.toggle();
       return true;
     },
     isPhoneVisible: () => phone.visible,

@@ -496,9 +496,30 @@ const STANDING_WORD: Record<QuestStanding, string> = {
 export function registerRows(bundle: ContentBundle, state: QuestStateFrame, facts: PlayerFacts): RegisterRow[] {
   const rung = rungOf(facts.level);
   const cursors = Object.fromEntries([...cursorMap(state)]);
-  const rows: RegisterRow[] = [{ kind: 'caption', label: `level ${rung} \u2014 this week`, value: '' }];
+  const rows: RegisterRow[] = [{ kind: 'caption', label: `level ${rung} \u2014 what you can take now`, value: '' }];
 
-  const here = bundle.quests.filter((q) => q.level === rung || cursors[q.id] !== undefined);
+  /*
+   * **Everything at or below the rung, not everything *on* it.**
+   *
+   * This filtered on `q.level === rung`, which was exactly right while a rung was
+   * a window: a job belonged to one level and the register drew that level. The
+   * rung is a floor now -- a job opens at its level and stays open above it --
+   * and this line did not move with it, so a level-2 player was shown rung-2
+   * work and *none* of the five Act 0 obligations he could actually walk in and
+   * take. The register said "not yet" down the screen and the owner, who wrote
+   * the game, could not tell where he was meant to go.
+   *
+   * Sorted so the answer to that question is the top of the list: what is in
+   * progress, then what is ready to hand in, then what is takeable, then what is
+   * shut and why. A register that leads with its refusals is a register nobody
+   * reads to the bottom of.
+   */
+  const RANK: Record<QuestStanding, number> = { ready: 0, on: 1, available: 2, locked: 3, done: 4 };
+  const here = bundle.quests
+    .filter((q) => q.level <= rung || cursors[q.id] !== undefined)
+    .map((q) => ({ quest: q, standing: questStanding(q, facts, cursors) }))
+    .sort((a, b) => RANK[a.standing] - RANK[b.standing] || a.quest.level - b.quest.level)
+    .map((e) => e.quest);
   for (const quest of here) {
     const standing = questStanding(quest, facts, cursors);
     const value =
@@ -522,10 +543,11 @@ export function registerRows(bundle: ContentBundle, state: QuestStateFrame, fact
     });
   }
 
-  // --- The rungs you are not on.
+  // --- The rungs still ahead of you. Behind you is in the list above now, so
+  //     only the levels you have not reached are summarised here.
   const elsewhere: RegisterRow[] = [];
   for (let level = 1; level <= REGISTER_LEVELS; level++) {
-    if (level === rung) continue;
+    if (level <= rung) continue;
     const on = bundle.quests.filter((q) => q.level === level);
     if (on.length === 0) continue;
     const done = on.filter((q) => questStanding(q, facts, cursors) === 'done').length;
@@ -537,7 +559,7 @@ export function registerRows(bundle: ContentBundle, state: QuestStateFrame, fact
   }
   if (elsewhere.length > 0) {
     rows.push({ kind: 'gap', label: '', value: '' });
-    rows.push({ kind: 'caption', label: 'the rest of the register', value: '' });
+    rows.push({ kind: 'caption', label: 'still ahead of you', value: '' });
     rows.push(...elsewhere);
   }
 
@@ -730,20 +752,29 @@ export function verifyDialogPanel(): string[] {
       cursors,
     });
 
+    /*
+     * **The register lists everything takeable, which is every rung at or below
+     * the player's.** It drew one level while a rung was a window; the rung is a
+     * floor now, and a register still drawing one level showed a level-2 player
+     * none of the five Act 0 obligations he could walk in and take. See
+     * `registerRows`.
+     */
     const at2 = registerRows(bundle, state(2), facts(2));
     const titles = at2.filter((r) => r.kind === 'entry').map((r) => r.label);
-    if (titles.length !== 2 || !titles.includes('The Second Rung')) {
-      failures.push(`The register on rung 2 listed ${JSON.stringify(titles)}; both level-2 jobs belong on it.`);
+    if (titles.length !== 3 || !titles.includes('The Second Rung') || !titles.includes('A Level One Job')) {
+      failures.push(`The register on rung 2 listed ${JSON.stringify(titles)}; both rung-2 jobs and the rung-1 one are takeable.`);
     }
     if (at2.filter((r) => r.kind === 'entry').some((r) => r.value !== 'available')) {
       failures.push('A takeable job on this rung did not read as available.');
     }
     const text = at2.map((r) => `${r.label} ${r.value}`).join(' | ');
-    for (const leaked of ['A Level One Job', 'Miles Away']) {
-      if (text.includes(leaked)) failures.push(`The register named "${leaked}", which is on another rung. That is a walkthrough.`);
+    // A rung the player has not reached is still a summary rather than a
+    // walkthrough: naming its jobs hands over the rest of the game.
+    if (text.includes('Miles Away')) {
+      failures.push('The register named a job on a rung the player has not reached. That is a walkthrough.');
     }
-    if (!text.includes('level 1') || !text.includes('level 5')) {
-      failures.push('The register did not summarise the rungs the player is not on; there is no reason to climb.');
+    if (!text.includes('level 5')) {
+      failures.push('The register did not summarise the rungs still ahead; there is no reason to climb.');
     }
     if (text.includes('level 3')) failures.push('The register listed a rung with nothing on it.');
 
@@ -751,10 +782,12 @@ export function verifyDialogPanel(): string[] {
     const done = registerRows(bundle, state(2), facts(2, ['q:two-a']));
     const doneRow = done.find((r) => r.kind === 'entry' && r.label === 'The Second Rung');
     if (doneRow?.value !== 'done') failures.push(`A finished job on this rung reads "${doneRow?.value}", not done.`);
-    // And on another rung it becomes part of that rung's count rather than a title.
+    // A finished job on a rung *behind* the player stays in the list by name and
+    // reads done, rather than collapsing into a count: it is work this player
+    // did, and the register is the place that says so.
     const counted = registerRows(bundle, state(2), facts(2, ['q:one']));
-    const summary = counted.find((r) => r.kind === 'summary' && r.label === 'level 1');
-    if (summary?.value !== '1 of 1 done') failures.push(`Rung 1 summarised as "${summary?.value}" after its only job was done.`);
+    const oneRow = counted.find((r) => r.kind === 'entry' && r.label === 'A Level One Job');
+    if (oneRow?.value !== 'done') failures.push(`A finished rung-1 job reads "${oneRow?.value}" for a rung-2 player, not done.`);
 
     // Levelled up mid-job. The job is on rung 2, the player is on rung 3, and
     // the tracker must still be showing it with the step they are on.

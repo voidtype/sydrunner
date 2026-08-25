@@ -262,6 +262,7 @@ import {
   verifyQuests,
   type ContentBundle,
 } from './game/questmodel.ts';
+import { verifyQuestAreas } from './game/questareas.ts';
 import { verifyBuildBudget } from './world/buildbudget.ts';
 import { verifyInterpDelay } from './net/interpdelay.ts';
 import { blankQuestState } from './net/quests.ts';
@@ -4603,6 +4604,7 @@ async function main(): Promise<void> {
    * the Escape that actually closed something.
    */
   const dialogFailures = [
+    ...verifyQuestAreas(),
     ...verifyBuildBudget(),
     ...verifyInterpDelay(),
     ...verifyQuests(),
@@ -6873,7 +6875,18 @@ async function main(): Promise<void> {
       // The suggestions box joins the list for a reason of its own: it is the
       // one panel here that **scrolls**, so a wheel over it is a player reading
       // the list rather than asking for a camera.
-      if (hud.typing || bigmap.visible || hud.helpVisible || hud.leaderboardVisible || suggestions.visible) {
+      // The phone joins this list for the suggestions box's reason exactly: it
+      // scrolls. QuestBuddy's register runs past the glass on any account that
+      // has played an evening, and a wheel over it was scrolling the list *and*
+      // pulling the camera in and out underneath it.
+      if (
+        hud.typing ||
+        bigmap.visible ||
+        hud.helpVisible ||
+        hud.leaderboardVisible ||
+        suggestions.visible ||
+        money.isPhoneVisible()
+      ) {
         wheelCamera = 0;
         return;
       }
