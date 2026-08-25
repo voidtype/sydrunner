@@ -31,7 +31,7 @@
  * hash, so a client that lies about it poisons nobody.
  */
 
-import { InstancedMesh, Matrix4, Mesh, MeshBasicNodeMaterial, type Group } from 'three/webgpu';
+import { InstancedMesh, Matrix4, Mesh, MeshBasicNodeMaterial, type Object3D } from 'three/webgpu';
 import { CylinderGeometry, SphereGeometry } from 'three';
 import {
   EAT_RADIUS_M,
@@ -83,7 +83,7 @@ export class MushroomField {
   /** Rolled once per session. See `game/mushrooms.ts`: temp, not perma. */
   readonly epoch: number;
 
-  constructor(parent: Group, epoch: number) {
+  constructor(parent: Object3D, epoch: number) {
     this.epoch = epoch;
     const stemGeo = new CylinderGeometry(0.022, 0.03, STEM_HEIGHT_M, 5, 1);
     stemGeo.translate(0, STEM_HEIGHT_M / 2, 0);

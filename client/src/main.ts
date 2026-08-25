@@ -29,7 +29,7 @@ import { sunScreaming, sunScreamMix, verifySunButton } from './game/sunbutton.ts
 import { SunFeature, verifySunButtonRenderer } from './world/sunbutton.ts';
 import { EXPOSURE } from './sky/calibration.ts';
 import { SydneySky } from './sky/sky.ts';
-import { verifyCycle } from './sky/cycle.ts';
+import { CYCLE_MS, verifyCycle } from './sky/cycle.ts';
 import { verifyDuskRig } from './sky/dusk.ts';
 import { verifyLunar } from './sky/lunar.ts';
 import { verifyMoonDisc } from './sky/moon.ts';
@@ -263,6 +263,8 @@ import {
   type ContentBundle,
 } from './game/questmodel.ts';
 import { verifyMushrooms } from './game/mushrooms.ts';
+import { MushroomField } from './world/mushrooms.ts';
+import { TripStack } from './game/trips.ts';
 import { verifyTrips } from './game/trips.ts';
 import { verifyQuestAim } from './game/questaim.ts';
 import { verifyQuestAreas } from './game/questareas.ts';
@@ -3169,6 +3171,73 @@ async function main(): Promise<void> {
   const powerups = new PowerupField();
   streamer.setPowerupSink(powerups);
 
+  /*
+   * --- The mushrooms, and the one place a session's epoch is chosen.
+   *
+   * `game/mushrooms.ts` decides where they grow from `(tile, tree, epoch)`; the
+   * epoch is rolled here, once, and never again for the life of the tab. That is
+   * the whole of "temp perma": walk away and come back and the patch is where you
+   * left it, close the tab and it is somewhere else tomorrow.
+   *
+   * `Math.random` is legitimate here and nowhere near the simulation -- this
+   * number is a *choice*, not a computation both ends have to agree on, and it
+   * travels to the server with the eat rather than being derived twice.
+   */
+  /**
+   * In-game milliseconds in an in-game hour, and the rate between the two clocks.
+   *
+   * `sky/cycle.CYCLE_MS` is one real hour for a whole in-game day, so the world
+   * runs 24x -- which makes a three-in-game-hour buff seven and a half real
+   * minutes, and an orange cap's half hour seventy-five real seconds. The bar
+   * shows the second number and the stack stores the first; `game/trips.ts` says
+   * why that split is not an accident.
+   */
+  const MS_PER_GAME_HOUR = 3_600_000;
+  const GAME_MS_PER_REAL_MS = (24 * MS_PER_GAME_HOUR) / CYCLE_MS;
+
+  /**
+   * The buff bar, redrawn on its own beat.
+   *
+   * 4 Hz rather than every frame, and guarded on a string, for `DialogPanel`'s
+   * reason exactly: this is a DOM rebuild and a countdown that ticks in whole
+   * seconds cannot show anything a hundred and twenty times a second that it did
+   * not show four times a second. The key is every glyph and every whole second,
+   * so a redraw happens when something a player can *see* has changed.
+   */
+  const tripsBar = document.getElementById('trips');
+  let tripsDrawn = '';
+  let tripsSince = Infinity;
+  const drawTrips = (dt: number): void => {
+    tripsSince += dt;
+    if (tripsSince < 0.25 || tripsBar === null) return;
+    tripsSince = 0;
+    const icons = trips.icons(sky.now.nowMs, GAME_MS_PER_REAL_MS);
+    const key = icons.map((i) => `${i.glyph}${Math.ceil(i.seconds)}`).join('|');
+    if (key === tripsDrawn) return;
+    tripsDrawn = key;
+    tripsBar.replaceChildren();
+    for (const icon of icons) {
+      const el = document.createElement('div');
+      el.className = 'trip';
+      // `textContent`, never `innerHTML`: the glyph is ours but the fact is a
+      // string and this file's rule about strings is the dialog panel's.
+      el.textContent = icon.glyph;
+      el.dataset.fact = icon.fact;
+      const left = document.createElement('span');
+      left.className = 'left';
+      const s = Math.max(0, Math.ceil(icon.seconds));
+      left.textContent = s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s}s`;
+      el.appendChild(left);
+      tripsBar.appendChild(el);
+    }
+  };
+
+  const mushroomEpoch = (Math.random() * 0x7fffffff) | 0;
+  const mushrooms = new MushroomField(scene, mushroomEpoch);
+  streamer.setMushroomSink(mushrooms);
+  /** The live stack. See `game/trips.ts`; the sim reads it, the bar draws it. */
+  const trips = new TripStack();
+
   // The traffic. Two objects and no lifecycle: the field is told about a tile's
   // routes as it streams in and forgets them as it leaves, and the movers are
   // one instanced set for the whole visible world that is refilled every frame.
@@ -3681,9 +3750,28 @@ async function main(): Promise<void> {
       investigationOf: (id) => factions.investigationOf(id),
       damagePlayer: (id, pips, actor) => {
         if (id !== playerCombat.id) return;
-        if (playerCombat.phase === 'ko' || playerCombat.health <= 0) return;
-        playerCombat.health = Math.max(0, playerCombat.health - pips);
-        if (playerCombat.health <= 0) {
+        hurtLocalPlayer(pips, actor);
+      },
+      emit: (e) => factions.events.push(e),
+    };
+  }
+
+  /**
+   * Take pips off the local player, and knock them out if that empties them.
+   *
+   * Lifted out of `offlineFactionCtx.damagePlayer` when the mushrooms arrived:
+   * an orange cap costs a pip and a white one kills, and both of those are the
+   * *same* knockout as a cop's baton -- the phase, the clock, the respawn, the
+   * bike and the investigation all have to move together, and a second copy of
+   * that sequence is a second place for it to fall out of step. `actor` is
+   * optional now, because the world does this to you sometimes and there is
+   * nobody to name in the feed.
+   */
+  function hurtLocalPlayer(pips: number, actor?: { kind: number }, cause?: string): void {
+    {
+      if (playerCombat.phase === 'ko' || playerCombat.health <= 0) return;
+      playerCombat.health = Math.max(0, playerCombat.health - pips);
+      if (playerCombat.health <= 0) {
           // The knockout, on `combat.applyHit`'s own terms but with no puncher:
           // the phase, the clock and the respawn are the shared machine's, so
           // the animation byte, the movement lock and the respawn sweep all keep
@@ -3709,13 +3797,11 @@ async function main(): Promise<void> {
           // inventing a cause byte for a kill feed would be a protocol change
           // for a line of text.
           const def = actor ? npcKind(actor.kind) : undefined;
-          pushKill(def ? feedLine(def.feedKo, 'you') : 'you got done by the cops');
-        } else {
-          feedback.hitTaken();
-        }
-      },
-      emit: (e) => factions.events.push(e),
-    };
+          pushKill(cause ?? (def ? feedLine(def.feedKo, 'you') : 'you got done by the cops'));
+      } else {
+        feedback.hitTaken();
+      }
+    }
   }
   /**
    * How many bystanders have been knocked over this session. Diagnostics only,
@@ -4846,6 +4932,39 @@ async function main(): Promise<void> {
       for (const o of giverLamps.objects) scene.add(o);
     }
     waypoint.update(dt);
+
+    /*
+     * --- The mushrooms: walk onto one and it is eaten.
+     *
+     * On the frame step rather than the fixed step because it is a *pickup*, not
+     * a physics event: the radius is over a metre and a walking player crosses a
+     * few centimetres a frame, so there is nothing to tunnel through and no
+     * reason to pay for it sixty times a second inside the simulation.
+     *
+     * The field reports; every decision about what it *did* is here, and the
+     * decision itself is `game/trips.bite`'s -- which returns a tagged union so
+     * this cannot handle the good case and forget the one that kills.
+     */
+    if (playerCombat.phase !== 'ko') {
+      const found = mushrooms.nearest(player.position.x, player.position.z);
+      if (found !== null) {
+        mushrooms.eat(found);
+        const bite = trips.bite(found.cap, sky.now.nowMs, MS_PER_GAME_HOUR);
+        if (bite.kind === 'death') {
+          // The white one. No saving throw, and the feed says what it was.
+          hurtLocalPlayer(playerCombat.health, undefined, 'you ate the white one');
+          trips.clear();
+        } else if (bite.kind === 'poison') {
+          hurtLocalPlayer(bite.damage, undefined, 'the orange one got you');
+          hud.notice('that one was orange. your legs have gone.');
+        } else if (bite.kind === 'trip') {
+          hud.notice(bite.stack === 1 ? 'the trees look interesting' : `${bite.stack} of them now`);
+        } else {
+          hud.notice('you could not eat another thing');
+        }
+      }
+    }
+    drawTrips(dt);
   };
   window.addEventListener(
     'keydown',
