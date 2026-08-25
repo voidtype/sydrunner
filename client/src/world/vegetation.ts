@@ -1286,11 +1286,11 @@ const _stem = /*#__PURE__*/ newStemVariation();
  * base is placed here rather than baked in the pipeline, and a tree on a slope
  * stands vertically in the ground rather than leaning out of it.
  */
-export function buildTileTrees(
+export function* buildTileTrees(
   data: TileVegetation,
   assets: VegetationAssets,
   groundAt: (x: number, z: number) => number = () => 0,
-): InstancedMesh[] {
+): Generator<InstancedMesh> {
   // Bucketed by species **and crown archetype**, because an archetype is a
   // different geometry and therefore a different mesh. `stemCrown` is the
   // cheap half of `stemVariation` and exists so this pass can be made without
@@ -1306,7 +1306,6 @@ export function buildTileTrees(
     perBucket[s * CROWN_COUNT + stemCrown(s, data.seed[i], data.x[i], data.z[i])].push(i);
   }
 
-  const out: InstancedMesh[] = [];
   for (let bucket = 0; bucket < perBucket.length; bucket++) {
     const members = perBucket[bucket];
     if (members.length === 0) continue;
@@ -1374,9 +1373,21 @@ export function buildTileTrees(
     // disposal, where the geometry is *shared* and must not be released with
     // the tile.
     mesh.userData.vegetation = true;
-    out.push(mesh);
+    /*
+     * **Yielded rather than collected, so the caller can stop.**
+     *
+     * This returned an array, which meant a tile's whole vegetation was built
+     * before the streamer saw the first mesh -- and `BUILD_BUDGET_MS` is a check
+     * *between* steps, so it could not interrupt it. That was fine when the
+     * streamer's header measured "under 1.5 ms on the worst tile in the build";
+     * the bushland round then took the world from 1.77 M trees to 17.4 M and
+     * nothing re-measured the assumption. A tile buckets into as many as
+     * `SPECIES_COUNT * CROWN_COUNT` meshes and each is a matrix loop over its own
+     * members, so handing them over one at a time gives the budget somewhere to
+     * breathe.
+     */
+    yield mesh;
   }
-  return out;
 }
 
 // --- Park grass ---------------------------------------------------------------

@@ -97,7 +97,6 @@ import {
   EVENT,
   EVENT_FLAG,
   FLAG,
-  INTERP_DELAY_MS,
   MSG,
   PROTOCOL_VERSION,
   SNAPSHOT_HZ,
@@ -141,6 +140,7 @@ import {
   type SnapshotNpc,
   type SnapshotPlayer,
 } from './protocol.ts';
+import { InterpDelay } from './interpdelay.ts';
 // Teams and talents. Workstream V: the contract, the aura fold, and the wire.
 import {
   EMPTY_MASK,
@@ -507,6 +507,12 @@ interface TimedSnapshot {
 export class NetClient {
   private readonly transport: NetTransport;
   private readonly handlers: NetHandlers;
+
+  /**
+   * How far in the past remotes are drawn, measured rather than assumed.
+   * See `net/interpdelay.ts`; `INTERP_DELAY_MS` is now this object's floor.
+   */
+  readonly interp = new InterpDelay();
 
   status: NetStatus = 'connecting';
   statusDetail = '';
@@ -2964,7 +2970,10 @@ export class NetClient {
   private interpolate(frameDt: number): void {
     if (this.snapshots.length === 0) return;
     this.frame++;
-    const renderTick = this.serverTick - (INTERP_DELAY_MS / 1000) * TICK_HZ;
+    // The measured delay, eased once a frame. `INTERP_DELAY_MS` is its floor
+    // rather than its value now -- see `net/interpdelay.ts`.
+    const delayMs = this.interp.update(frameDt);
+    const renderTick = this.serverTick - (delayMs / 1000) * TICK_HZ;
 
     // The pair bracketing `renderTick`. Walked from the newest because that is
     // where the answer almost always is -- one comparison in the steady state.
@@ -2981,6 +2990,15 @@ export class NetClient {
       // Render time is before everything held -- the first 100 ms of a session.
       older = this.snapshots[0];
       newer = this.snapshots[1] ?? null;
+    }
+
+    // **The buffer ran dry**: everything held is older than the time being
+    // drawn, so the interpolator is about to hold a remote still. Counted rather
+    // than fixed here -- the fix is upstream, in a wider delay a second from now
+    // -- and reported so it can be seen instead of guessed at.
+    if (newer === null) {
+      const newest = this.snapshots[this.snapshots.length - 1];
+      if (newest !== undefined && newest.tick < renderTick) this.interp.starve();
     }
 
     const span = newer ? newer.tick - older.tick : 0;
@@ -3186,11 +3204,21 @@ export class NetClient {
   }
 
   /** For the HUD: how many are connected, and what the buffer looks like. */
-  get report(): { players: number; ping: number; buffer: number; corrections: number; snaps: number } {
+  get report(): {
+    players: number;
+    ping: number;
+    buffer: number;
+    corrections: number;
+    snaps: number;
+    interpMs: number;
+    starved: number;
+  } {
     return {
       players: this.remotes.size + (this.status === 'online' ? 1 : 0),
       ping: this.rtt,
       buffer: this.snapshots.length,
+      interpMs: this.interp.ms,
+      starved: this.interp.starved,
       corrections: this.corrections,
       snaps: this.snaps,
     };

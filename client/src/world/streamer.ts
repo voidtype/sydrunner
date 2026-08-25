@@ -268,6 +268,7 @@ import {
   createParkGrassMaterial,
   createWetlandMudMaterial,
 } from './vegetation.ts';
+import { buildBudgetFor } from './buildbudget.ts';
 
 export interface TileEntry {
   key: string;
@@ -629,6 +630,18 @@ const BUILD_BUDGET_MS = 2.5;
  * twenty primitives, so this is two or three yields rather than twenty.
  */
 const GLB_PRIMITIVES_PER_STEP = 8;
+
+/**
+ * Instanced tree meshes lifted before the builder yields.
+ *
+ * Lower than `GLB_PRIMITIVES_PER_STEP` because these steps are the opposite kind
+ * of cheap: a GLB primitive is a few `BufferAttribute` wrappers over arrays the
+ * decode thread already built, while a tree mesh is a matrix loop over every
+ * stem in its bucket -- a position, a yaw, a lean and a scale each. Four keeps
+ * the longest single step near what `BUILD_BUDGET_MS`'s own paragraph claims of
+ * it, which stopped being true when the world went from 1.77 M trees to 17.4 M.
+ */
+const TREE_MESHES_PER_STEP = 4;
 
 /**
  * A tile that has been fetched and decoded and is now being built, one budgeted
@@ -1192,6 +1205,9 @@ export class TileStreamer implements LampSource {
    * `setFarCity`.
    */
   private farCity: FarCity | null = null;
+  /** `performance.now()` at the last `pumpBuilds`, for the frame-aware budget. */
+  private lastPumpAt = 0;
+
   /** What compiles a tile's shaders before it is drawn. See `setPrecompiler`. */
   private precompile: ((group: Group) => Promise<void>) | null = null;
   /** Tiles built and waiting to be compiled, nearest-first. See `warmTile`. */
@@ -2404,7 +2420,12 @@ export class TileStreamer implements LampSource {
     const field = this.terrainField;
     if (field === null || this.index === null) return;
 
-    const deadline = performance.now() + GROUND_BUDGET_MS;
+    // Tapered on the same terms as `pumpBuilds`, and from the same measurement:
+    // a frame that is already long should not also pay for ground sheets. The
+    // floor keeps a struggling client building ground rather than standing on
+    // nothing. See `world/buildbudget.ts`.
+    const groundNow = performance.now();
+    const deadline = groundNow + buildBudgetFor(GROUND_BUDGET_MS, this.lastPumpAt > 0 ? groundNow - this.lastPumpAt : 0);
     let budgetLeft = true;
     let waitingOn = 0;
     for (const { entry } of wanted) {
@@ -3088,7 +3109,13 @@ export class TileStreamer implements LampSource {
    */
   private pumpBuilds(): void {
     if (this.buildQueue.length === 0) return;
-    const deadline = performance.now() + this.buildBudgetMs;
+    const now = performance.now();
+    // The streamer's own frame spacing: `pumpBuilds` runs once per `update`, so
+    // the gap since the last one *is* the last frame, and no caller has to
+    // thread a delta in. See `world/buildbudget.ts` for why the budget bends.
+    const frameMs = this.lastPumpAt > 0 ? now - this.lastPumpAt : 0;
+    this.lastPumpAt = now;
+    const deadline = now + buildBudgetFor(this.buildBudgetMs, frameMs);
     do {
       const job = this.buildQueue[0];
       let done = false;
@@ -3655,10 +3682,16 @@ export class TileStreamer implements LampSource {
       const veg = decoded.veg;
       let trees = 0;
       if (veg !== null) {
+        let built = 0;
         for (const mesh of buildTileTrees(veg, this.vegetation, groundAt)) {
           mesh.castShadow = true;
           mesh.receiveShadow = false;
           group.add(mesh);
+          // The budget's checkpoint, on `GLB_PRIMITIVES_PER_STEP`'s terms
+          // exactly. `buildTileTrees` is a generator for this line's sake: it
+          // used to hand back a finished array, so a tile's whole vegetation
+          // was one step no budget could interrupt.
+          if (++built % TREE_MESHES_PER_STEP === 0) yield;
         }
         trees = veg.count;
         step('trees');

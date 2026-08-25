@@ -262,6 +262,8 @@ import {
   verifyQuests,
   type ContentBundle,
 } from './game/questmodel.ts';
+import { verifyBuildBudget } from './world/buildbudget.ts';
+import { verifyInterpDelay } from './net/interpdelay.ts';
 import { blankQuestState } from './net/quests.ts';
 // WORKSTREAM AN: the `!` and the `?` in the street. Wired in the same block.
 import { QuestMarkerField, verifyQuestMarkers, type QuestMarkerSource } from './world/questmarkers.ts';
@@ -4601,6 +4603,8 @@ async function main(): Promise<void> {
    * the Escape that actually closed something.
    */
   const dialogFailures = [
+    ...verifyBuildBudget(),
+    ...verifyInterpDelay(),
     ...verifyQuests(),
     ...verifyDialog(),
     ...verifyDialogPanel(),

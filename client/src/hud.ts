@@ -338,6 +338,19 @@ export interface HudState {
     corrections: number;
     snaps: number;
     lastCorrection: number;
+    /**
+     * How far in the past remotes are drawn, and how often the buffer ran dry.
+     * See `net/interpdelay.ts`.
+     *
+     * These are the two numbers that say whether *other people* look right, and
+     * nothing else here answers that: `ping` is a round trip and says nothing
+     * about whether packets arrive evenly, and a remote freezing for 80 ms on a
+     * 40 ms ping is the ordinary complaint. `interpMs` is what the client
+     * decided it needed; `starved` is how often it decided too late, and a count
+     * that climbs while you play is a symptom with no other tell.
+     */
+    interpMs: number;
+    starved: number;
   } | null;
   /** The last few kills, newest first. See `Hud.kill`. */
   feed: readonly string[];
@@ -1494,7 +1507,9 @@ export class Hud {
             `${s.net.players} in the world, ${s.net.ping.toFixed(0)} ms ping, ` +
             `${s.net.buffer} snapshots buffered` +
             `\n      ${s.net.corrections} corrections (last ${(s.net.lastCorrection * 100).toFixed(1)} cm), ` +
-            `${s.net.snaps} snaps`
+            `${s.net.snaps} snaps` +
+            `\n      drawing remotes ${s.net.interpMs.toFixed(0)} ms back` +
+            `${s.net.starved > 0 ? `, buffer ran dry ${s.net.starved}x` : ''}`
         : `net   offline — local dummies, local combat`,
       ...(s.feed.length ? ['feed  ' + s.feed.join('\n      ')] : []),
     ].join('\n');
