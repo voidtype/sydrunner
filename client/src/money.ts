@@ -673,6 +673,24 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
         else deps.closeMap();
         return true;
       }
+      /*
+       * `Q`: the quest log, and it **toggles** on `KeyM`'s argument exactly --
+       * a log is a glance, so the key that opens it is the one that closes it.
+       *
+       * Unlike `M` this one *does* move the hands, and it has to: the handset
+       * only stays on screen while the phone is the primary -- see the
+       * `hands.primary !== SLOT.PHONE` close in the frame step -- so a `Q` that
+       * did not equip it would open the register and have it shut again on the
+       * very next frame.
+       */
+      if (code === 'KeyQ') {
+        if (phone.visible) phone.close();
+        else {
+          equip(SLOT.PHONE, 'primary');
+          phone.openObligations();
+        }
+        return true;
+      }
       /**
        * Escape: **one step back**, and the ladder is the phone's.
        *

@@ -1032,6 +1032,10 @@
         background: none; border: 0; border-top: 1px solid rgba(207, 226, 242, .07);
         color: #cfe2f2; font: inherit; cursor: pointer;
       }
+      /* The row is `space-between` and now has three children rather than two,
+         so the text takes the slack: without this the mark sits left, the
+         refusal right and the *line itself* drifts into the middle. */
+      .dialog-choice > span { flex: 1 1 auto; }
       .dialog-choice:first-child { border-top: 0; }
       .dialog-choice:hover:not(.locked) { background: rgba(120, 214, 236, .13); }
       /* A locked choice is **shown and greyed**, never hidden. A door you can
@@ -1039,6 +1043,17 @@
          and a door that is not there is not. The refusal is the server's own
          sentence, drawn small on the right. */
       .dialog-choice.locked { color: #6d8091; cursor: default; }
+      /* The quest mark, in the giver gold `game/givermap.GIVER_GOLD` draws the
+         street's `!` in, so the thing you were looking for out there and the
+         line that gives it to you in here are the same colour. Fixed width so
+         the text after it still starts in a column whether it is there or not,
+         and `flex: none` because the row is a flexbox that would otherwise
+         stretch it. */
+      .dialog-choice .dialog-mark {
+        flex: none; width: 12px; margin-right: -4px;
+        color: rgb(255, 242, 26); font-weight: 700; text-align: center;
+      }
+      .dialog-choice.locked .dialog-mark { color: #6d5a1f; }
       .dialog-choice em { font-style: normal; font-size: 11px; color: #7f95ab; white-space: nowrap; }
       .dialog-choice.locked em { color: #86603f; }
 
@@ -2254,6 +2269,10 @@
            Centrelink list and the rideshare job all at once. See
            `client/src/phone.ts`. -->
       <div class="more wrap">1 bat · 2 footy · 3 phone · 4 fists · shift+n off hand</div>
+      <!-- `q` is on the always-on line rather than only in the full list,
+           because a quest log a player has to go looking for is the problem it
+           was added to solve. See `Phone.openObligations`. -->
+      <div class="more wrap">q — quests · m — map</div>
     </div>
 
     <div id="helpfull">
@@ -2457,6 +2476,7 @@
         <div><kbd>left click</kbd>use what is in your right hand</div>
         <div><kbd>right click</kbd>use what is in your off hand</div>
         <div><kbd>3</kbd>then <kbd>left click</kbd>opens the phone — the world keeps moving</div>
+        <div><kbd>q</kbd>the obligations register: every job, and where it stands</div>
         <div>the phone has your wallet, Centrelink, SydRide, the map and a camera</div>
         <!-- The compass moved onto the phone and then came back off it: the
              owner reversed the loadout rule the day he could not find a quest

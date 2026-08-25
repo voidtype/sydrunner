@@ -252,9 +252,16 @@ async function run(): Promise<void> {
   check(hero.walletNote === '', 'and a success says nothing', JSON.stringify(hero.walletNote));
   check(hasNode(record.talents, bigNight), 'and it is on the account record');
 
+  /*
+   * **The fork, through the real op.** `TIER_REQ` is `[0, 1, 2, 5]`: one node
+   * opens the tier above it, so Surge -- tier 2 of Servo -- is takeable on the
+   * single point Big Night just spent. This probe used to be Surge and used to
+   * expect a refusal, which is the ladder the owner complained about; it is a
+   * *tier-3* node now, because that is the first gate one point cannot open.
+   */
   clearPill(hero);
-  sim.teamOp(hero.id, TEAM_OP.TAKE, surge);
-  check(!hasNode(hero.talents, surge), 'a tier-2 node on one point in the tree is refused');
+  sim.teamOp(hero.id, TEAM_OP.TAKE, loanShark);
+  check(!hasNode(hero.talents, loanShark), 'a tier-3 node on one point in the tree is refused');
   check(/needs 2 in Servo/.test(pill(sim, hero)), 'with the reason', JSON.stringify(hero.walletNote));
 
   clearPill(hero);
@@ -262,7 +269,7 @@ async function run(): Promise<void> {
   check(hasNode(hero.talents, tapOn), 'the second tier-1 node fits in the two points a level 2 has');
   clearPill(hero);
   sim.teamOp(hero.id, TEAM_OP.TAKE, surge);
-  check(!hasNode(hero.talents, surge), 'and now the tier is open but the points are gone');
+  check(!hasNode(hero.talents, surge), 'and the tier above is open now, but the points are gone');
   check(/no points left/.test(pill(sim, hero)), 'with that reason instead', JSON.stringify(hero.walletNote));
 
   // --- Level 10, so the rest of the tree can be bought.
@@ -303,20 +310,32 @@ async function run(): Promise<void> {
   sim.teamOp(hero.id, TEAM_OP.TAKE, cashRules);
   check(hasNode(hero.talents, cashRules), `and allowed at level ${MEGA_LEVEL}`, JSON.stringify(hero.walletNote));
 
-  // --- Refunding out from under it is refused.
+  /*
+   * --- Refunding out from under it, which needs one more step than it used to.
+   *
+   * `TIER_REQ[3]` is 5 and the tree holds six, so the mega has exactly one
+   * spare: the first refund is legitimate and the tree still holds it up, and
+   * the *second* is the one that would orphan it. Under the old whole-tree gate
+   * there was no spare and the first refund was already the illegal one -- so
+   * this reads as two steps now rather than one, and the extra step is the
+   * fork's change showing up in the refund rule where it should.
+   */
   clearPill(hero);
   sim.teamOp(hero.id, TEAM_OP.REFUND, bigNight);
-  check(hasNode(hero.talents, bigNight), 'a node the mega stands on cannot be refunded');
+  check(!hasNode(hero.talents, bigNight), 'a node the mega has a spare for refunds');
+  clearPill(hero);
+  sim.teamOp(hero.id, TEAM_OP.REFUND, tapOn);
+  check(hasNode(hero.talents, tapOn), 'but the one the mega then stands on cannot be refunded');
   check(/depends on it/.test(pill(sim, hero)), 'and the reason names what depends on it', JSON.stringify(hero.walletNote));
 
   // The mega itself comes back out, and then the node under it does.
   clearPill(hero);
   sim.teamOp(hero.id, TEAM_OP.REFUND, cashRules);
   check(!hasNode(hero.talents, cashRules), 'the mega refunds');
-  sim.teamOp(hero.id, TEAM_OP.REFUND, bigNight);
-  check(!hasNode(hero.talents, bigNight), 'and now so does the node it stood on');
+  sim.teamOp(hero.id, TEAM_OP.REFUND, tapOn);
+  check(!hasNode(hero.talents, tapOn), 'and now so does the node it stood on');
   sim.teamOp(hero.id, TEAM_OP.TAKE, bigNight);
-  check(hasNode(hero.talents, bigNight), 'and goes back in');
+  check(hasNode(hero.talents, bigNight), 'and Big Night goes back in');
 
   // --- RESET_ALL, once a day.
   {

@@ -28,12 +28,15 @@
  *   ten is where the ladder's numbers stop meaning anything at "10 kills a
  *   level" inside a week.
  * - **Three trees per team, mirrored in structure**: 3 tiers x 2 nodes + 1
- *   mega. Tier 2 needs 2 points in the tree, tier 3 needs 4, the mega needs
- *   the whole tree (6) *and* level 8. Ten points therefore buys exactly one
- *   mega, and only if you commit -- and every team has one tier-1 node (Big
- *   Night) everybody takes, which is the WoW-style tax that makes the choice
- *   real: 9 left = one full tree + its mega + two spares, or two half-trees
- *   and no mega.
+ *   mega. **One node opens the tier above it** -- tier 2 needs 1 in the tree,
+ *   tier 3 needs 2 -- so a tree has eight paths through it and two players in
+ *   the same tree can have met different halves. The mega is the exception and
+ *   is meant to be: 5 of the 6 *and* level 8, so it still costs most of a tree.
+ *   Every team has one tier-1 node (Big Night) everybody takes, which is the
+ *   WoW-style tax that makes the rest of the choice real: Big Night plus a
+ *   mega's five plus the mega is 7 of 10, leaving three to spend elsewhere --
+ *   or three separate paths and no mega at all. See `TIER_REQ`, which carries
+ *   the reversal and the reason for it.
  * - **No speed buffs.** The owner dislikes them. Where a mock had "+% sprint"
  *   the node became something else; two *dashes* survive as abilities (a burst,
  *   not a stat), and are flagged so they can be removed in one place.
@@ -73,12 +76,26 @@ export const TEAM_CHOICE_LEVEL = 2;
 /** One point per level, up to this many. */
 export const TALENT_MAX_POINTS = 10;
 /**
- * Points-in-tree needed to open each tier: t1, t2, t3, mega. A tree has six
- * non-mega nodes, so the mega opens on a *full* tree (6): with Big Night taken
- * that is 1 + 6 + 1 = 8 of 10 points, leaving two spares -- one mega, or two
- * half-trees and none. (The mock said 7; six is the arithmetic.)
+ * Points-in-tree needed to open each tier: t1, t2, t3, mega.
+ *
+ * **A TIER OPENS ON ONE NODE, NOT ON THE WHOLE ROW, AND THAT IS THE DIFFERENCE
+ * BETWEEN A TREE AND A LADDER.**
+ *
+ * It was `[0, 2, 4, 6]`, and a tier holds exactly two nodes -- so tier 2 needed
+ * *both* of tier 1, and the mega needed all six. Every gate demanded the
+ * complete row beneath it, which means there was never a fork: the only build
+ * was "take everything in order". The owner called it after playing to level 2
+ * -- "i dont have any choice but to skill out entire tiers, its more like
+ * straight up levels" -- and he was describing the arithmetic exactly.
+ *
+ * One per tier opens the next, so a tree now has **eight distinct paths**
+ * through it (2 x 2 x 2) instead of one, and two players in the same tree can
+ * have met different halves of it. The mega is left as a capstone rather than a
+ * fork: five of the six, so it still costs most of a tree -- Big Night plus five
+ * plus the mega is 7 of 10 points -- and it is still the thing you give a week
+ * up for.
  */
-export const TIER_REQ = [0, 2, 4, 6] as const;
+export const TIER_REQ = [0, 1, 2, 5] as const;
 /** The mega also needs this level. */
 export const MEGA_LEVEL = 8;
 
@@ -486,15 +503,43 @@ export function verifyTeams(): string[] {
   const mega = streets.find((n) => n.tier === 3)!;
   if (takeRefusal(m, TEAM.MARITA, 10, mega.id) === '') bad.push('A mega was takeable with 0 in its tree.');
   const nonMega = streets.filter((x) => x.tier < 3);
-  for (const n of nonMega.slice(0, 5)) m = withNode(m, n.id); // 5 in Streets
-  if (takeRefusal(m, TEAM.MARITA, 10, mega.id) === '') bad.push('A mega was takeable with 5 in its tree; it needs the whole tree.');
-  m = withNode(m, nonMega[5].id); // 6 in Streets: Big Night + 6 = 7 spent
-  if (takeRefusal(m, TEAM.MARITA, 10, mega.id) !== '') bad.push(`A full tree at level 10 did not open the mega: ${takeRefusal(m, TEAM.MARITA, 10, mega.id)}`);
+  /*
+   * **The fork, which is the whole of `TIER_REQ`'s reversal.** A tier holds two
+   * nodes and one of them opens the next tier, so a player may walk a single
+   * side of a tree all the way down. Asserted from a mask carrying exactly one
+   * tier-0 node: if this ever needs two again, the tree is a ladder and the
+   * owner's complaint is back.
+   */
+  {
+    const one = withNode({ lo: 0, hi: 0 }, nonMega[0].id);
+    const tier1 = nonMega.find((n) => n.tier === 1)!;
+    if (takeRefusal(one, TEAM.MARITA, 10, tier1.id) !== '') {
+      bad.push(`One tier-0 node did not open tier 2: ${takeRefusal(one, TEAM.MARITA, 10, tier1.id)}`);
+    }
+    const two = withNode(one, tier1.id);
+    const tier2 = nonMega.find((n) => n.tier === 2)!;
+    if (takeRefusal(two, TEAM.MARITA, 10, tier2.id) !== '') {
+      bad.push(`One node a tier did not open tier 3: ${takeRefusal(two, TEAM.MARITA, 10, tier2.id)}`);
+    }
+    // ...and a path of three is still short of the mega, which is a capstone.
+    const three = withNode(two, tier2.id);
+    if (takeRefusal(three, TEAM.MARITA, 10, mega.id) === '') {
+      bad.push('A three-node path opened the mega; the mega is meant to cost most of a tree.');
+    }
+  }
+  for (const n of nonMega.slice(0, TIER_REQ[3] - 1)) m = withNode(m, n.id);
+  if (takeRefusal(m, TEAM.MARITA, 10, mega.id) === '') {
+    bad.push(`A mega was takeable with ${TIER_REQ[3] - 1} in its tree; it needs ${TIER_REQ[3]}.`);
+  }
+  m = withNode(m, nonMega[TIER_REQ[3] - 1].id);
+  if (takeRefusal(m, TEAM.MARITA, 10, mega.id) !== '') bad.push(`${TIER_REQ[3]} in the tree at level 10 did not open the mega: ${takeRefusal(m, TEAM.MARITA, 10, mega.id)}`);
   if (takeRefusal(m, TEAM.MARITA, 7, mega.id) === '') bad.push('A mega was takeable below level 8.');
   if (TIER_REQ[3] > 6) bad.push(`TIER_REQ[3] is ${TIER_REQ[3]} but a tree only has 6 non-mega nodes; the mega could never open.`);
   // Refund rule
   const full = withNode(m, mega.id);
-  if (refundRefusal(full, TEAM.MARITA, streets[0].id) === '') bad.push('Refunding a tier-1 node under a mega was allowed; the mega depends on it.');
+  if (refundRefusal(full, TEAM.MARITA, streets[0].id) === '') {
+    bad.push('Refunding a node under a mega standing on the minimum was allowed; the mega depends on it.');
+  }
   // Scalars
   const one = withNode({ lo: 0, hi: 0 }, 14); // Front Bar
   if (ownScalar(one, FX.SWING_DAMAGE) !== 0.2) bad.push('ownScalar did not read Front Bar\'s swing damage.');

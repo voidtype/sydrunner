@@ -326,6 +326,24 @@ export class Phone {
     this.setOpen(!this.open);
   }
 
+  /**
+   * Open the handset straight onto the obligations register. `Q`'s route in.
+   *
+   * The register has been on the phone since workstream AN and it is a real
+   * quest log -- every job with its standing, or the server's own sentence for
+   * why it is shut -- but it sat behind a tile marked `§` that a player has to
+   * know to press, and a log nobody can find is a log nobody has. `Q` is the
+   * key every game with a quest log uses and it was bound to nothing.
+   *
+   * `setOpen` first and the app second, in that order: `setOpen(true)` resets
+   * the handset to its home screen, so opening the app before it would be undone
+   * on the same press.
+   */
+  openObligations(): void {
+    this.setOpen(true);
+    this.openApp('obligations');
+  }
+
   close(): void {
     this.setCamera(false);
     this.setOpen(false);

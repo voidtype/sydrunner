@@ -333,6 +333,22 @@ export class DialogPanel {
       const el = document.createElement('button');
       el.type = 'button';
       el.className = 'dialog-choice';
+      /*
+       * **The same two glyphs the street uses, in front of the line that does
+       * the same thing.** `world/questmarkers.ts` draws `!` over a giver with
+       * work and `?` over one waiting to be paid, and the panel used to give a
+       * player no way at all to tell which of six lines was the job -- "Righto.
+       * Where's the bike?" reads exactly like "Adlay?" until you click it. One
+       * vocabulary, two places: if a choice takes a quest it wears the `!`, if
+       * it hands one in it wears the `?`, and everything else stays quiet.
+       */
+      const mark = row.choice.accept !== '' ? '!' : row.choice.turnin !== '' ? '?' : '';
+      if (mark !== '') {
+        const glyph = document.createElement('b');
+        glyph.className = 'dialog-mark';
+        glyph.textContent = mark;
+        el.appendChild(glyph);
+      }
       const label = document.createElement('span');
       label.textContent = row.text;
       el.appendChild(label);
