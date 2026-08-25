@@ -119,10 +119,11 @@ import {
   Group,
   Mesh,
   MeshBasicNodeMaterial,
+  PerspectiveCamera,
+  Scene,
   type Camera,
   type Material,
   type Object3D,
-  type Scene,
   type WebGPURenderer,
 } from 'three/webgpu';
 
@@ -761,6 +762,71 @@ export function auditWarmup(
  * imports nothing that does. Cheap enough for the boot list -- it builds six
  * one-triangle geometries and one throwaway material.
  */
+/**
+ * What `warmGroupOffCamera` needs of a renderer. An interface rather than
+ * `WebGPURenderer` so the self-check can pass a recorder and assert on what the
+ * walk actually saw, with no device and no canvas.
+ */
+export interface GroupWarmer {
+  compileAsync(scene: Object3D, camera: Camera, targetScene?: Scene | null): Promise<void>;
+}
+
+/**
+ * Compile a group's pipelines with `compileAsync` -- **all of it**, wherever the
+ * camera happens to be pointing.
+ *
+ * ---------------------------------------------------------------------------
+ * This exists because `compileAsync` is not the whole-object compile its name
+ * suggests. It walks the scene exactly as `render` does, and `_projectObject`
+ * pushes a mesh into the render list only
+ *
+ *     if (!object.frustumCulled || frustum.intersectsObject(object))
+ *
+ * so a group warmed while it is off camera compiles **nothing at all**, and the
+ * caller marks it warm. For the tile streamer that was four tiles in five -- a
+ * tile arrives anywhere in a ring and the camera faces about a fifth of it -- and
+ * everything the walk was supposed to pay for (the node graph, the vertex and
+ * index buffers, the bind groups, the pipeline) was paid instead on the frame the
+ * player's own turn brought the tile into view. Which is precisely the bug this
+ * file's header describes the streamer's precompiler as having fixed: *"one
+ * 360-degree turn with 56 tiles resident compiled 589 pipelines and put a
+ * 1,492 ms frame in the middle of it."* The fix went in and the frustum test
+ * inside it ate the fix, silently, because a warm-up that compiles nothing looks
+ * exactly like a warm-up that had nothing to do.
+ *
+ * Two flags, cleared for the synchronous half of the call and put straight back:
+ *
+ *   - **`frustumCulled`, per mesh.** Culling is decided per object, so clearing
+ *     it on the group achieves nothing; `FarHexes.setFrustumCulled` carries the
+ *     same sentence for the same reason.
+ *   - **`visible`**, because `_projectObject` skips an invisible object in the
+ *     compile walk exactly as it does in the render walk, and a streaming group
+ *     is held invisible until it is warm.
+ *
+ * Both go back before the `await`, which is sound rather than lucky:
+ * `compileAsync` builds its whole render list synchronously, before it yields.
+ * The asynchronous half reads neither flag.
+ */
+export function warmGroupOffCamera(
+  renderer: GroupWarmer,
+  group: Object3D,
+  camera: Camera,
+  scene: Scene,
+): Promise<void> {
+  const culled: Object3D[] = [];
+  group.traverse((object) => {
+    if (object.frustumCulled !== true) return;
+    object.frustumCulled = false;
+    culled.push(object);
+  });
+  const wasVisible = group.visible;
+  group.visible = true;
+  const compiled = renderer.compileAsync(group, camera, scene);
+  group.visible = wasVisible;
+  for (const object of culled) object.frustumCulled = true;
+  return compiled;
+}
+
 export function verifyWarmup(): string[] {
   const failures: string[] = [];
   const material = new MeshBasicNodeMaterial();
@@ -836,6 +902,67 @@ export function verifyWarmup(): string[] {
   stand.release();
   if (stand.holder.parent !== null) {
     failures.push('warmupStandins.release left the holder parented, so its stand-ins stay in the render list for the session');
+  }
+
+  /*
+   * `warmGroupOffCamera`, against a recorder rather than a device.
+   *
+   * This is the case that would have caught the streamer's precompiler compiling
+   * nothing for four tiles in five. It cannot be caught by counting pipelines --
+   * a warm-up that compiled nothing and a warm-up that had nothing to do produce
+   * the same number -- so what is asserted here is the only thing that separates
+   * them: what the walk was *allowed to see*. The recorder reads the flags at the
+   * moment `compileAsync` would have projected, which is the only moment they are
+   * meant to be clear.
+   */
+  {
+    const seen: { visible: boolean; culled: boolean[] } = { visible: false, culled: [] };
+    const recorder: GroupWarmer = {
+      compileAsync(walked: Object3D): Promise<void> {
+        seen.visible = walked.visible;
+        walked.traverse((object) => {
+          if ((object as Mesh).isMesh === true) seen.culled.push(object.frustumCulled);
+        });
+        return Promise.resolve();
+      },
+    };
+    const tile = new Group();
+    tile.visible = false;
+    const near = new Mesh(warmupGeometry({ normal: true }), material);
+    const nested = new Group();
+    const deep = new Mesh(warmupGeometry({ normal: true }), material);
+    // One mesh that already opts out, which the restore must not switch back on:
+    // every instanced set in this project is drawn with culling off on purpose.
+    const instancedLike = new Mesh(warmupGeometry({ normal: true }), material);
+    instancedLike.frustumCulled = false;
+    nested.add(deep);
+    tile.add(near, nested, instancedLike);
+
+    // Deliberately not awaited: the flags are cleared and restored on the
+    // synchronous side, and that is exactly the claim being tested.
+    void warmGroupOffCamera(recorder, tile, new PerspectiveCamera(), new Scene());
+
+    if (!seen.visible) {
+      failures.push('warmGroupOffCamera walked an invisible group, so _projectObject would have skipped every mesh in it');
+    }
+    if (seen.culled.length !== 3) {
+      failures.push(`warmGroupOffCamera walked ${seen.culled.length} meshes of 3, so a nested mesh compiles nothing`);
+    }
+    if (seen.culled.includes(true)) {
+      failures.push('warmGroupOffCamera left frustum culling on, so a group warmed off camera compiles nothing and is marked warm anyway');
+    }
+    if (tile.visible !== false) {
+      failures.push('warmGroupOffCamera left the group visible, so a tile is drawn before it is warm');
+    }
+    if (near.frustumCulled !== true || deep.frustumCulled !== true) {
+      failures.push('warmGroupOffCamera did not restore frustum culling, so every warmed mesh is drawn for the rest of the session');
+    }
+    if (instancedLike.frustumCulled !== false) {
+      failures.push('warmGroupOffCamera switched culling *on* for a mesh that had opted out, which is a frame budget rather than a warm-up');
+    }
+    near.geometry.dispose();
+    deep.geometry.dispose();
+    instancedLike.geometry.dispose();
   }
 
   material.dispose();

@@ -104,6 +104,7 @@ import {
   auditWarmup,
   verifyWarmup,
   warmUpPipelines,
+  warmGroupOffCamera,
   warmupStandins,
   type WarmupPart,
 } from './world/warmup.ts';
@@ -2811,10 +2812,37 @@ async function main(): Promise<void> {
     // The three-argument form names the real scene as the target, which is what
     // makes the cache keys the ones `render` will look up: the lights node, the
     // clipping context and the render-target formats all come from there.
-    group.visible = true;
-    const compiled = renderer.compileAsync(group, camera, scene);
-    group.visible = false;
-    await compiled;
+    //
+    // **And culling is cleared across every mesh first, which is the whole reason
+    // this function was not doing its job.** `compileAsync` runs the same
+    // per-object frustum test `render` does -- `_projectObject` pushes a mesh into
+    // the render list only `if (!object.frustumCulled ||
+    // frustum.intersectsObject(object))` -- so a tile warmed while it is behind
+    // the player compiles *nothing at all*, and is then marked warm. The camera
+    // faces about a fifth of the ring a tile can arrive in, so four tiles in five
+    // arrived with an empty walk behind them and everything the walk was supposed
+    // to pay for -- the node graph, the vertex and index buffers, the bind groups,
+    // the pipeline -- was paid on the frame the player's own turn brought the tile
+    // into view.
+    //
+    // Which is, word for word, the bug this function was written to fix.
+    // `warmup.ts`'s header: "the streamer flips `group.visible` from a frustum
+    // test, so before this the compiles landed on the frame the player's own turn
+    // brought the tile into view -- one 360-degree turn with 56 tiles resident
+    // compiled 589 pipelines and put a 1,492 ms frame in the middle of it." The
+    // fix went in, and the frustum test inside it ate the fix.
+    //
+    // The far layer already knows this: the boot clears `far.slabs` culling around
+    // its own compile and says why, and `FarHexes.setFrustumCulled` carries the
+    // reason in its doc comment. The tile path had the same problem and never got
+    // the same line. Cleared per mesh rather than on the group, because culling is
+    // decided per mesh and a group's own flag is never consulted.
+    // The flag dance itself lives in `world/warmup.ts` beside the pass that has
+    // the same problem, because a self-check can hold a recorder up to it there
+    // and assert on what the walk was allowed to see -- which is the only thing
+    // that separates a warm-up that compiled nothing from one that had nothing
+    // to do. See `verifyWarmup`.
+    await warmGroupOffCamera(renderer, group, camera, scene);
   };
   streamer.setPrecompiler(precompileGroup);
 
