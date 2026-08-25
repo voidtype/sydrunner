@@ -262,6 +262,7 @@ import {
   verifyQuests,
   type ContentBundle,
 } from './game/questmodel.ts';
+import { verifyMushrooms } from './game/mushrooms.ts';
 import { verifyQuestAim } from './game/questaim.ts';
 import { verifyQuestAreas } from './game/questareas.ts';
 import { verifyBuildBudget } from './world/buildbudget.ts';
@@ -4605,6 +4606,7 @@ async function main(): Promise<void> {
    * the Escape that actually closed something.
    */
   const dialogFailures = [
+    ...verifyMushrooms(),
     ...verifyQuestAim(),
     ...verifyQuestAreas(),
     ...verifyBuildBudget(),

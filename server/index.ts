@@ -264,6 +264,7 @@ import { verifySim } from './sim.ts';
  * the browser, because a dialog gate has to be greyed out the same way it is
  * refused) and the **wire** is `client/src/net/quests.ts`.
  */
+import { verifyMushrooms } from '../client/src/game/mushrooms.ts';
 import { verifyQuestAim } from '../client/src/game/questaim.ts';
 import { verifyQuestAreas } from '../client/src/game/questareas.ts';
 import { verifyBuildBudget } from '../client/src/world/buildbudget.ts';
@@ -729,6 +730,7 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // `NODE` op decoded one byte out resolves a *different node of the same
     // NPC* -- a real node, with real choices, which this side then acts on --
     // so the player clicks "take the job" and is told about the weather.
+    ['verifyMushrooms', verifyMushrooms()],
     ['verifyQuestAim', verifyQuestAim()],
     ['verifyQuestAreas', verifyQuestAreas()],
     ['verifyBuildBudget', verifyBuildBudget()],
