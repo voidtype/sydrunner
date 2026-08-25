@@ -2359,7 +2359,23 @@ def write_index(
                 # so a dry tile carrying `wy: 0` would be a tile claiming a lake
                 # at eye level over Surry Hills. Absent means no water, which is
                 # the same contract `v`, `c` and `pw` have.
-                **({"wv": r.water_verts, "wy": round(r.water_y, 3)} if r.water_verts else {}),
+                #
+                # **And the two are gated on different things, which the creeks
+                # made necessary.** `wv` is the client's fetch test and must count
+                # every vertex in the sidecar, creeks included, or a tile with a
+                # creek on it and no harbour never asks for its own water. `wy` is
+                # the *wading* level and creeks are deliberately not in it -- see
+                # `build_tile`, where the creek sheets are kept out of the area
+                # comparison for a whole paragraph's worth of reason. So on a
+                # creek-only tile `water_verts` is thousands and `water_area` is
+                # zero, and gating `wy` on the vertex count would have written
+                # `wy: 0` on 11,959 of this world's tiles: a lake at 71 m AHD over
+                # four fifths of Sydney, and every player standing under it
+                # rejected by the deep-entry rule on dry ground. The paragraph
+                # above describes that exact failure for a dry tile; the creeks
+                # are how a *wet* one gets it.
+                **({"wv": r.water_verts} if r.water_verts else {}),
+                **({"wy": round(r.water_y, 3)} if r.water_area > 0.0 else {}),
                 # This tile's `.lanes.bin`. `lw` is the way-span count and `lr`
                 # the route count, and the client's fetch test is the union --
                 # a tile can carry streets with no traffic scheduled on them

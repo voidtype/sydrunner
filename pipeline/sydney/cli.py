@@ -2591,6 +2591,8 @@ def cmd_water_audit(args: argparse.Namespace) -> int:
     levels: dict[str, float] = {}
     missing: list[str] = []
     unlisted: list[str] = []
+    # Tiles whose index `wy` names a level no sheet on them is at. See below.
+    stray_level: list[str] = []
     sheets_by_tile: dict[str, list[dict]] = {}
     for key, entry in entries.items():
         path = config.TILE_DIR / f"{key}.water.bin"
@@ -2609,12 +2611,29 @@ def cmd_water_audit(args: argparse.Namespace) -> int:
             shipped_area += _sheet_area(s)
             triangles += len(s["tris"])
         payload += path.stat().st_size
-        levels[key] = float(entry.get("wy", sheets[0]["surface"]))
+        # `wy` is the wading level and it must be a level some sheet on this tile
+        # is actually at. Two ways it can be wrong and both are silent: absent
+        # where it is needed is a harbour the player walks across; present where
+        # it is not is a lake nobody can see. The second is the one the creeks
+        # nearly shipped -- `wv` counts creek vertices because it is the *fetch*
+        # test, and gating `wy` on it too would have written `wy: 0` onto 11,959
+        # tiles, which is a surface at 71 m AHD over four fifths of Sydney and
+        # every player under it rejected by the deep-entry rule on dry ground.
+        # So the audit asks the one question that separates them, against the
+        # shipped bytes rather than against the writer's intent: is there a sheet
+        # at this level?
+        wy = entry.get("wy")
+        if wy is not None and not any(
+            abs(float(sh["surface"]) - float(wy)) < 0.01 for sh in sheets
+        ):
+            stray_level.append(f"{key} wy={float(wy):.3f}")
+        levels[key] = float(wy) if wy is not None else float(sheets[0]["surface"])
     print(
         f"  sidecars      {wet_tiles:,} tiles carry water, {triangles:,} triangles,"
         f" {shipped_area / 1e6:.3f} km2, {payload / 1024:,.0f} kB"
         + ("" if not missing else f"   MISSING {len(missing)}: {', '.join(missing[:6])}")
         + ("" if not unlisted else f"   UNLISTED {len(unlisted)}: {', '.join(unlisted[:6])}")
+        + ("" if not stray_level else f"   STRAY wy {len(stray_level)}: {', '.join(stray_level[:6])}")
     )
 
     far = _read_water(config.OUT_ROOT / "far-water.bin")
@@ -2744,7 +2763,7 @@ def cmd_water_audit(args: argparse.Namespace) -> int:
                 f" and will pick it up on the next build."
             )
 
-    bad = violations > 0 or missing or steps > 0 or far is None
+    bad = violations > 0 or missing or steps > 0 or far is None or bool(stray_level)
     return 1 if bad else 0
 
 
