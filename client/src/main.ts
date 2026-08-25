@@ -3330,6 +3330,21 @@ async function main(): Promise<void> {
   };
 
   const godEnter = (): void => {
+    /*
+     * **The stack is spent on the way in, and that is not bookkeeping.**
+     *
+     * The room *is* the seventh state. Leaving the buffs up means the pass is
+     * still running when you arrive -- at seven that is a ten-fold kaleidoscope
+     * over 98.5% of the screen -- so the dome, the mandala and the face were
+     * being folded into something nobody could recognise as a room. The owner
+     * arrived, saw it, and reported snapping straight back out.
+     *
+     * Clearing here also turns the pass off by the only mechanism it has: a
+     * clear look is a look it declines to run. The room renders plainly, which
+     * is what a room is for.
+     */
+    trips.clear();
+    fxSetTrip(playerCombat.id, trips.powers(sky.now.nowMs));
     godTurns.length = 0;
     if (godLines !== null) godLines.replaceChildren();
     godRoom.enter(player.position.x, player.position.y - EYE_HEIGHT, player.position.z);
@@ -5069,7 +5084,7 @@ async function main(): Promise<void> {
      * decision itself is `game/trips.bite`'s -- which returns a tagged union so
      * this cannot handle the good case and forget the one that kills.
      */
-    if (playerCombat.phase !== 'ko') {
+    if (playerCombat.phase !== 'ko' && !godRoom.visible) {
       // `player.position` is the eye; the feet are what stands beside a mushroom.
       const found = mushrooms.nearest(
         player.position.x,
@@ -9931,6 +9946,24 @@ async function main(): Promise<void> {
     input.forward = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
     input.jump = keys.has('Space');
     input.sprint = keys.has('ShiftLeft') || keys.has('ShiftRight');
+    /*
+     * **Nothing moves in the room**, and this overrides rather than returns.
+     *
+     * The dome is built around where you stood and is forty-six metres across,
+     * so a player who kept walking simply left it -- which reads as the
+     * dimension ending rather than as walking out of one. There is nowhere to go
+     * in there anyway; the only way on is the conversation.
+     *
+     * The first draft of this bailed out of the frame here, which would have
+     * skipped the render and `godRoom.update` along with the movement: the room
+     * would have been frozen *and* invisible, which is a far better description
+     * of "snapped out of it" than the bug it was written to fix.
+     */
+    if (godRoom.visible) {
+      input.forward = 0;
+      input.jump = false;
+      input.sprint = false;
+    }
 
     // `A`/`D`: a strafe on foot, and the **handlebars** on a bike.
     //
@@ -9952,7 +9985,7 @@ async function main(): Promise<void> {
       frameDt,
       rideSteering,
     );
-    input.right = rideSteering.right;
+    input.right = godRoom.visible ? 0 : rideSteering.right;
     input.yaw += rideSteering.yawDelta;
     // And the wheel, on the bars' own terms exactly -- see the paragraph above,
     // which is the whole argument for why steering is an input remap and not a
