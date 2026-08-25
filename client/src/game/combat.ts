@@ -167,6 +167,7 @@
  */
 
 import { Vector3 } from 'three/webgpu';
+import { fxSlowScale } from './teamfx.ts';
 
 import { BODY_HEIGHT_M, type CollisionWorld, type MoveResolver } from '../player/collision.ts';
 import { createAboardSlot, type AboardSlot } from './riding.ts';
@@ -1263,7 +1264,12 @@ export function advance(
     world?.waterSurface?.(c.body.position.x, c.body.position.z) ?? NO_WATER,
     feetBefore,
   );
-  movement.speedScale = speedScale(c) * wadeSpeedScale(depthBefore);
+  // The orange cap, folded in where every other speed already is. One place
+  // composes movement speed and this is it -- a slow applied anywhere else would
+  // be a second opinion the wading and the powerups could disagree with. See
+  // `game/mushrooms.ts`: it is a *debuff*, and the only one in this project that
+  // touches speed at all, because the owner's refusal is about buffs.
+  movement.speedScale = speedScale(c) * wadeSpeedScale(depthBefore) * fxSlowScale(c.id);
   movement.jumpScale = jumpScale(c);
   // And the bike, last, multiplying both of the above rather than replacing
   // them -- see `game/bikes.ts`. Read off the combatant for the identical

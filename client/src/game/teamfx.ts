@@ -411,6 +411,43 @@ export function fxSetTrip(playerId: number, powers: TripPowers | null): void {
   else tripByPlayer.set(playerId, powers);
 }
 
+/**
+ * How slow an orange cap has made this player. 1 is not slowed.
+ *
+ * Separate from `TripPowers` because it is not on the ladder: an orange cap is a
+ * mistake rather than a rung, and folding it into the same object would mean a
+ * player on five brown caps could be handed the mistake's number by a lookup
+ * that meant to ask about the good ones.
+ */
+const slowedUntil = new Map<number, number>();
+
+/** `untilGameMs` in the sim's in-game clock; 0 clears. */
+export function fxSetSlow(playerId: number, untilGameMs: number): void {
+  if (untilGameMs <= 0) slowedUntil.delete(playerId);
+  else slowedUntil.set(playerId, untilGameMs);
+}
+
+/** The multiplier on movement. See `game/combat.ts`, which is the only caller. */
+export function fxSlowScale(playerId: number): number {
+  const until = slowedUntil.get(playerId);
+  if (until === undefined) return 1;
+  if (fxNow() >= until) {
+    slowedUntil.delete(playerId);
+    return 1;
+  }
+  return ORANGE_SLOW_SCALE;
+}
+
+/**
+ * How much of your legs an orange cap takes.
+ *
+ * Slow enough to be a real half hour of consequence and not so slow that the
+ * walk home is a punishment nobody sits through -- the mushroom already cost a
+ * pip, and a game that makes you wait is not the same as a game that costs you
+ * something.
+ */
+export const ORANGE_SLOW_SCALE = 0.62;
+
 /** What the stack is worth for this player right now. */
 export function fxTrip(playerId: number): TripPowers {
   return tripByPlayer.get(playerId) ?? tripPowers(0);

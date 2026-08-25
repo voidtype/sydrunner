@@ -274,7 +274,7 @@ import { verifyMushrooms } from './game/mushrooms.ts';
 import { MushroomField } from './world/mushrooms.ts';
 import { TripStack } from './game/trips.ts';
 import { verifyTrips } from './game/trips.ts';
-import { fxSetTrip } from './game/teamfx.ts';
+import { fxSetSlow, fxSetTrip } from './game/teamfx.ts';
 import { CALM, easeLook, tripLook, verifyTripView } from './world/tripview.ts';
 import { TripPass } from './world/trippass.ts';
 import { verifyQuestAim } from './game/questaim.ts';
@@ -4980,6 +4980,8 @@ async function main(): Promise<void> {
           trips.clear();
         } else if (bite.kind === 'poison') {
           hurtLocalPlayer(bite.damage, undefined, 'the orange one got you');
+          // The legs, through the one registry that composes movement speed.
+          fxSetSlow(playerCombat.id, bite.slowUntilMs);
           hud.notice('that one was orange. your legs have gone.');
         } else if (bite.kind === 'trip') {
           hud.notice(bite.stack === 1 ? 'the trees look interesting' : `${bite.stack} of them now`);
