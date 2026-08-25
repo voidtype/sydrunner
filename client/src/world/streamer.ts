@@ -3732,7 +3732,13 @@ export class TileStreamer implements LampSource {
         // After the build rather than before it, so a tile that throws while
         // building its trees leaves nothing growing under trees that are not
         // there. `adopt` rejects the whole city on a distance test first.
-        this.mushroomSink?.adopt(entry.key, veg, entry.bounds[0], entry.bounds[1], groundAt);
+        // **The group's own position, not the bounds.** A tile group sits at
+        // `(minX, 0, minZ + tileSize)` -- the Z origin is the *far* edge, which
+        // is what keeps float32 vertex precision constant across the extent --
+        // so `bounds[1]` is a tile out in Z and everything placed against it
+        // lands in the neighbour. `groundAt` is tile-local for the same reason;
+        // the trees above are placed the same way.
+        this.mushroomSink?.adopt(entry.key, veg, group.position.x, group.position.z, groundAt);
         step('trees');
         yield;
       }

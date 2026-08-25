@@ -4970,7 +4970,12 @@ async function main(): Promise<void> {
      * this cannot handle the good case and forget the one that kills.
      */
     if (playerCombat.phase !== 'ko') {
-      const found = mushrooms.nearest(player.position.x, player.position.z);
+      // `player.position` is the eye; the feet are what stands beside a mushroom.
+      const found = mushrooms.nearest(
+        player.position.x,
+        player.position.y - EYE_HEIGHT,
+        player.position.z,
+      );
       if (found !== null) {
         mushrooms.eat(found);
         const bite = trips.bite(found.cap, sky.now.nowMs, MS_PER_GAME_HOUR);

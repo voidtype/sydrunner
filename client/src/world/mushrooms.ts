@@ -34,6 +34,7 @@
 import { InstancedMesh, Matrix4, Mesh, MeshBasicNodeMaterial, type Object3D } from 'three/webgpu';
 import { CylinderGeometry, SphereGeometry } from 'three';
 import {
+  EAT_HEIGHT_M,
   EAT_RADIUS_M,
   insideRegion,
   mushroomFor,
@@ -55,8 +56,16 @@ import {
 export const CAPACITY = 12288;
 
 /** How tall the whole thing stands, metres. Small enough to be a find. */
-export const STEM_HEIGHT_M = 0.17;
-export const CAP_RADIUS_M = 0.11;
+/**
+ * How big one stands.
+ *
+ * A real field mushroom is about ten centimetres and that is what this was;
+ * the owner walked over one without seeing it, which is the answer to whether
+ * ten centimetres reads at eye height through grass. Thirty is still small
+ * enough to be a find and large enough to be a *findable* one.
+ */
+export const STEM_HEIGHT_M = 0.3;
+export const CAP_RADIUS_M = 0.2;
 
 const CAP_COLOURS: readonly number[] = [0x6b4a2f, 0xd2691e, 0xf2efe6];
 const STEM_COLOUR = 0xf3f1ea;
@@ -90,7 +99,7 @@ export class MushroomField {
 
   constructor(parent: Object3D, epoch: number) {
     this.epoch = epoch;
-    const stemGeo = new CylinderGeometry(0.022, 0.03, STEM_HEIGHT_M, 5, 1);
+    const stemGeo = new CylinderGeometry(0.04, 0.055, STEM_HEIGHT_M, 5, 1);
     stemGeo.translate(0, STEM_HEIGHT_M / 2, 0);
     const stemMat = new MeshBasicNodeMaterial({ color: STEM_COLOUR });
     this.stems = new InstancedMesh(stemGeo, stemMat, CAPACITY);
@@ -154,9 +163,20 @@ export class MushroomField {
       if (!insideRegion(wx, wz)) continue;
       const m = mushroomFor(tileX, tileZ, i, this.epoch, localX[i], localZ[i]);
       if (m === null) continue;
-      const mx = originX + m.x;
-      const mz = originZ + m.z;
-      grown.push({ x: mx, y: groundAt(mx, mz), z: mz, cap: m.cap, slot: -1, tileKey, treeIndex: i, eaten: false });
+      // **`groundAt` is tile-local**, like the trees': it reads the tile's own
+      // height grid and a world coordinate would index a metre off the end of
+      // it. The group has no Y offset, so a local height is a world height.
+      const y = groundAt(m.x, m.z);
+      grown.push({
+        x: originX + m.x,
+        y,
+        z: originZ + m.z,
+        cap: m.cap,
+        slot: -1,
+        tileKey,
+        treeIndex: i,
+        eaten: false,
+      });
     }
     if (grown.length === 0) return;
     this.byTile.set(tileKey, grown);
@@ -175,12 +195,20 @@ export class MushroomField {
    * inside the one region in Sydney where any of them exist -- everywhere else
    * this is a loop over nothing.
    */
-  nearest(x: number, z: number): Resident | null {
+  nearest(x: number, y: number, z: number): Resident | null {
     let best: Resident | null = null;
     let bestD2 = EAT_RADIUS_M * EAT_RADIUS_M;
     for (const list of this.byTile.values()) {
       for (const r of list) {
         if (r.eaten) continue;
+        // **Height counts.** It did not, and that hid a bug rather than saving
+        // a comparison: the ground query was being handed world coordinates it
+        // could not index, so mushrooms stood fifty-odd metres over the park --
+        // invisible, and still edible, because a flat distance cannot tell the
+        // difference between "at your feet" and "above your head". The owner
+        // walked over one, got the buff, and saw nothing. A vertical bound would
+        // have convicted it on the first bite.
+        if (Math.abs(r.y - y) > EAT_HEIGHT_M) continue;
         const dx = r.x - x;
         const dz = r.z - z;
         const d2 = dx * dx + dz * dz;

@@ -69,6 +69,17 @@ export const OFFSET_MAX_M = 1.6;
 /** Walk within this of one to eat it. */
 export const EAT_RADIUS_M = 1.1;
 
+/**
+ * ...and within this of it vertically.
+ *
+ * Generous enough to cover standing on a kerb beside one, and tight enough that
+ * a mushroom which is not on your ground cannot be eaten. It exists because the
+ * first version had no such bound: a coordinate-frame bug put them fifty metres
+ * in the air where they were invisible and still edible, and a flat distance
+ * cannot tell "at your feet" from "above your head".
+ */
+export const EAT_HEIGHT_M = 2.2;
+
 export const CAP_BROWN = 0;
 export const CAP_ORANGE = 1;
 export const CAP_WHITE = 2;
