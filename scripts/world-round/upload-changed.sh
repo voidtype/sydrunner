@@ -24,6 +24,34 @@ WORLD="${WORLD:-client/public/world}"
 export WORLD
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
+# Which per-object uploader. `r2-put.sh` is a single curl against the R2 REST API
+# using the **same** wrangler OAuth grant, and it is preferred for one measured
+# reason: `upload-one.sh` spawns a node process per object, which held the
+# 2026-08-26 round to about 5 objects a second at 16 slots, where curl does the
+# same work with nothing resident. The wrangler path stays for a machine with no
+# wrangler login file to read.
+#
+# The bearer is lifted out of wrangler's own config into a 0600 curl config, so
+# it never appears in a command line where `ps` would show it to the machine.
+R2_ACCOUNT="${R2_ACCOUNT:-b7f27f4a44cf2aea00155a84949b3879}"
+R2_BUCKET="${R2_BUCKET:-sydrunner-world}"
+export R2_ACCOUNT R2_BUCKET
+WRANGLER_CFG="${WRANGLER_CFG:-$HOME/Library/Preferences/.wrangler/config/default.toml}"
+PUTTER="$HERE/upload-one.sh"
+if [ -f "$WRANGLER_CFG" ] && command -v curl >/dev/null 2>&1; then
+  R2_CURL_CFG="$(mktemp)"
+  chmod 600 "$R2_CURL_CFG"
+  awk -F'"' '/^oauth_token/ {print "header = \"Authorization: Bearer " $2 "\""; exit}' "$WRANGLER_CFG" > "$R2_CURL_CFG"
+  if [ -s "$R2_CURL_CFG" ]; then
+    export R2_CURL_CFG
+    PUTTER="$HERE/r2-put.sh"
+  else
+    rm -f "$R2_CURL_CFG"
+  fi
+fi
+export PUTTER
+echo "putter   $(basename "$PUTTER")"
+
 run_round() {
   local list="$1" results="$2"
   : > "$results"
@@ -33,11 +61,11 @@ run_round() {
   # Invoked through `bash` rather than as an executable, because a lost +x bit
   # made xargs print "Permission denied" per key and produced neither an OK nor a
   # FAIL line -- which the count below then read as "nothing failed".
-  grep -vE '^(index|root)\.json$' "$list" | xargs -P "$JOBS" -I{} bash "$HERE/upload-one.sh" {}
+  grep -vE '^(index|root)\.json$' "$list" | xargs -P "$JOBS" -I{} bash "$PUTTER" {}
 }
 
 TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+trap 'rm -rf "$TMP"; [ -n "${R2_CURL_CFG:-}" ] && rm -f "$R2_CURL_CFG"' EXIT
 
 total=$(grep -vcE '^(index|root)\.json$' "$LIST" || true)
 echo "uploading $total objects, $JOBS at a time"

@@ -673,18 +673,43 @@ terrain diff, and the wrangler uploader. Reuse them.
 Both of these were true on 2026-08-25 and neither is in the runbook above,
 because the runbook assumes the happy path for each.
 
-*The token.* `rclone lsf R2:sydrunner-world --max-depth 1`, with the environment
-configured exactly as `publish-world-r2.sh` configures it, returned **403 Access
-Denied on read** -- the pair in `~/.config/sydney/r2.env` has been rolled again
-(the keys are still well-formed: 32-char id, 64-char secret, so "it 403s" is the
-only symptom). Minting a replacement is a dashboard action on the owner's
-Cloudflare account and is not something to do unattended. The fallback in step 4
-above is the whole answer and it works: **`wrangler` is logged in with an OAuth
-token** (`npx wrangler@latest whoami` -> pollack.evan@gmail.com, account
-b7f27f4a…, and `r2 bucket list` shows `sydrunner-world`), so per-object
-`r2 object put --remote` publishes with no new credential at all. It is an order
-of magnitude slower than an rclone checksum sync, which is what makes the next
-paragraph necessary rather than merely tidy.
+*The token.* Both credentials in `~/.config/sydney/r2.env` are dead as of
+2026-08-26 and the symptoms differ, so check both: the **S3 pair** returns 403 on
+`HeadObject`, `GetObject` *and* `ListObjectsV2` (so it is not a missing List
+permission -- that was checked), and the **`R2_API_TOKEN`** returns `10000
+Authentication error` against `/accounts/{id}/r2/buckets`. The keys are still
+well-formed, so "it 403s" is the only symptom either gives.
+
+**None of that blocks a publish, and no new credential is needed.** `wrangler` is
+logged in with an OAuth grant (`whoami` -> pollack.evan@gmail.com, account
+b7f27f4a…) which reaches R2 fine -- `GET /accounts/{id}/r2/buckets` succeeds --
+and `scripts/world-round/r2-put.sh` uses **that same grant** over the R2 REST API
+to PUT objects directly. Measured on the 2026-08-26 round: **33 objects a second
+at 48 in flight**, against about 5/s for `wrangler r2 object put`, because that
+spawns a node process per object and this is one curl. 14,302 objects went from
+54 minutes to about 7.
+
+Two things about the REST path that are not obvious and are both load-bearing:
+
+  * **`Cache-Control` must be sent explicitly.** The REST PUT neither inherits
+    nor defaults it, so an object uploaded without the header is served with *no*
+    `cache-control` at all -- a revalidation on every asset of every visit, for a
+    world whose whole caching story is an immutable `?v=`. Found by putting one
+    object without it and reading the header back off the CDN, which is also how
+    to check it: `curl -sI https://world.3rp.uk/<key> | grep cache-control`.
+  * **The bearer must never reach a command line.** `curl -H "Authorization: …"`
+    puts it in argv where `ps` shows it to every process on the machine.
+    `upload-changed.sh` lifts it out of wrangler's own config into a 0600 curl
+    `--config` file and deletes it on exit.
+
+Reissuing the S3 pair is still worth doing -- `publish-world-r2.sh`'s rclone
+checksum sync is a better tool than any of this -- but it is a dashboard action.
+It **cannot** be done from this machine: the wrangler OAuth grant carries
+`account (read)`, `user (read)`, `workers (write)` and friends but **no
+`api_tokens` scope**, so `/accounts/{id}/tokens/permission_groups` and
+`/user/tokens` both return `9109 Unauthorized`. Dashboard -> R2 -> Manage R2 API
+Tokens -> Create, Object Read & Write on `sydrunner-world` only, then put the id
+and secret into `r2.env` at mode 0600.
 
 *The snapshot.* Step 1 says to copy the world before building so the upload can
 send only what changed. If that was not done, the diff is still recoverable and
