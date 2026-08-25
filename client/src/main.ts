@@ -262,6 +262,7 @@ import {
   verifyQuests,
   type ContentBundle,
 } from './game/questmodel.ts';
+import { verifyQuestAim } from './game/questaim.ts';
 import { verifyQuestAreas } from './game/questareas.ts';
 import { verifyBuildBudget } from './world/buildbudget.ts';
 import { verifyInterpDelay } from './net/interpdelay.ts';
@@ -4604,6 +4605,7 @@ async function main(): Promise<void> {
    * the Escape that actually closed something.
    */
   const dialogFailures = [
+    ...verifyQuestAim(),
     ...verifyQuestAreas(),
     ...verifyBuildBudget(),
     ...verifyInterpDelay(),
@@ -4684,6 +4686,11 @@ async function main(): Promise<void> {
   const questFaction = () => TEAM_NAME[net?.myTeam ?? TEAM.NONE];
   const questCash = () => net?.wallet.balance ?? 0;
   const dialog = new DialogPanel({
+    // The arrow, so a row can say `guiding` while it is the one being pointed
+    // at. Read rather than pushed: the pin is `WaypointBanner`'s state and two
+    // copies of it is how the button and the arrow end up disagreeing.
+    pinnedQuest: () => waypoint.pinnedQuest,
+    aimAt: (questId) => void waypoint.pin(questId),
     content: () => questBundle,
     state: questFrame,
     position: () => ({ x: player.position.x, z: player.position.z }),
@@ -4794,6 +4801,9 @@ async function main(): Promise<void> {
     quests: () => questBundle.quests,
     cursors: () => cursorsFrom(questFrame()),
     pose: () => ({ x: player.position.x, z: player.position.z, yaw: player.yaw }),
+    // The same bundle the panel and the markers read, so a pinned arrow and the
+    // register can never disagree about where somebody is standing.
+    npcs: () => questBundle.npcs,
   };
   const waypoint = new WaypointBanner(waypointSource);
   /**
@@ -6351,6 +6361,7 @@ async function main(): Promise<void> {
     // this literal is where every phone screen is handed in and a second route
     // for one of them would be worse than a line here.
     obligations: () => dialog.obligationsHtml(),
+    aimAt: (questId) => void waypoint.pin(questId),
     // --- Both maps and the camera. See `client/src/game/phone.ts`.
     //
     // The `KeyM` block that used to sit in the keydown listener below is gone:

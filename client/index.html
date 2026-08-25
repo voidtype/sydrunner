@@ -1049,6 +1049,18 @@
          the text after it still starts in a column whether it is there or not,
          and `flex: none` because the row is a flexbox that would otherwise
          stretch it. */
+      /* QuestBuddy's *take me there*. Small, gold and quiet: it sits on every
+         entry row of a list that can run to forty, so anything with a border or
+         a fill would turn the register into a wall of buttons. `on` is the row
+         the overhead arrow is currently held on. */
+      .phone-aim-wrap { display: inline-flex; align-items: baseline; gap: 8px; }
+      .phone-aim {
+        background: none; border: 0; padding: 0; cursor: pointer; font: inherit;
+        font-size: 10px; letter-spacing: .02em; color: rgba(255, 242, 26, .72);
+        text-decoration: underline dotted; text-underline-offset: 2px;
+      }
+      .phone-aim:hover { color: rgb(255, 242, 26); }
+      .phone-aim.on { color: rgb(255, 242, 26); text-decoration: none; font-weight: 700; }
       .dialog-choice .dialog-mark {
         flex: none; width: 12px; margin-right: -4px;
         color: rgb(255, 242, 26); font-weight: 700; text-align: center;

@@ -157,6 +157,8 @@ export interface MoneyDeps {
    * file arrives as a closure like every other one. See `PhoneSource.obligations`.
    */
   obligations?(): string;
+  /** QuestBuddy's *take me there*, passed through to the handset. */
+  aimAt?(questId: string): void;
   /** Put the big map away. Escape from a map the phone opened; see `keydown`. */
   closeMap(): void;
   /** Is the big map up? Sampled before Escape decides what a press meant. */
@@ -421,6 +423,7 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
     },
     openTalents: () => deps.openTalents(),
     obligations: () => deps.obligations?.() ?? '',
+    aimAt: (questId: string) => deps.aimAt?.(questId),
   });
   let online = false;
   /**

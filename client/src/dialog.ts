@@ -117,6 +117,17 @@ import { NODE_OPENED, QUEST_OP, blankQuestState, type QuestStateFrame } from './
 
 /** Everything the panel reads and the one thing it does. Supplied by `main.ts`. */
 export interface DialogSource {
+  /**
+   * Which job the overhead arrow is being held on, if any.
+   *
+   * Optional because the register is drawn in tests and by `verifyDialogPanel`
+   * with no arrow behind it, and a button that reads "take me there" when
+   * nothing can take you anywhere is still an honest button -- `aim` simply does
+   * nothing. See `WaypointBanner.pin`.
+   */
+  pinnedQuest?(): string | null;
+  /** Point the overhead arrow at a job. Returns what it aimed for, or null. */
+  aimAt?(questId: string): void;
   /** The pack, or an empty bundle before `/content` has answered. */
   content(): ContentBundle;
   /** This player's cursors, flags, xp and any improv line. Off `NetClient`. */
@@ -440,6 +451,27 @@ export class DialogPanel {
         out.push(`<div class="phone-note">${escapeHtml(row.label)}</div>`);
       } else if (row.kind === 'gap') {
         out.push('<div class="phone-note">&nbsp;</div>');
+      } else if (row.kind === 'entry' && row.questId !== undefined) {
+        /*
+         * **Take me there.** The register says what a job is; this says where it
+         * is, which is the half a player standing in a park actually needs. It
+         * points at the giver for a job not taken, the open step for one in
+         * progress and back at the giver for one ready to hand in -- see
+         * `game/questaim.ts`, which is the only place that decides.
+         *
+         * `data-act`/`data-qid` rather than a listener here: `phone.ts` rebinds
+         * one delegated pass over the body after every redraw, and this screen
+         * redraws four times a second.
+         */
+        const pinned = this.source.pinnedQuest?.() === row.questId;
+        out.push(
+          `<div class="phone-row"><span>${escapeHtml(row.label)}</span>` +
+            `<span class="phone-aim-wrap">` +
+            `<button type="button" class="phone-aim${pinned ? ' on' : ''}" data-act="aim" ` +
+            `data-qid="${escapeHtml(row.questId)}" title="point the arrow at this job">` +
+            `${pinned ? 'guiding' : 'take me there'}</button>` +
+            `<span>${escapeHtml(row.value)}</span></span></div>`,
+        );
       } else {
         out.push(
           `<div class="phone-row"><span>${escapeHtml(row.label)}</span><span>${escapeHtml(row.value)}</span></div>`,
@@ -458,6 +490,15 @@ export interface RegisterRow {
   kind: 'caption' | 'entry' | 'detail' | 'summary' | 'gap';
   label: string;
   value: string;
+  /**
+   * Which job this row is, on `entry` rows only.
+   *
+   * Carried so the markup can hang a *take me there* button on it. The rows are
+   * a shape rather than markup on purpose -- `obligationsHtml` is the only thing
+   * that renders them -- so the id travels as data and the button is built where
+   * the escaping is.
+   */
+  questId?: string;
 }
 
 /**
@@ -524,7 +565,7 @@ export function registerRows(bundle: ContentBundle, state: QuestStateFrame, fact
     const standing = questStanding(quest, facts, cursors);
     const value =
       standing === 'locked' ? questRefusal(quest, facts, cursors) || STANDING_WORD.locked : STANDING_WORD[standing];
-    rows.push({ kind: 'entry', label: shortLabel(quest.title), value });
+    rows.push({ kind: 'entry', label: shortLabel(quest.title), value, questId: quest.id });
     // The step you are on, under the job you are on. Only for the two standings
     // that have a next thing to do: "available" has no step yet and "done" has
     // no step left, and a detail line under either would be noise.

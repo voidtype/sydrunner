@@ -130,6 +130,8 @@ export interface PhoneSource {
    * -- draws a tile that says so rather than a tile that throws.
    */
   obligations?(): string;
+  /** QuestBuddy's *take me there*. See `dialog.DialogSource.aimAt`. */
+  aimAt?(questId: string): void;
   /**
    * The album, owned by `money.ts`.
    *
@@ -632,7 +634,10 @@ export class Phone {
     for (const el of Array.from(this.body.querySelectorAll('[data-act]'))) {
       const act = (el as HTMLElement).dataset.act ?? '';
       const id = Number((el as HTMLElement).dataset.id ?? '0');
-      el.addEventListener('click', () => this.act(act, id));
+      // `data-qid` is the string half: the gallery's actions key on a photo's
+      // number and QuestBuddy's key on a quest id, which is text.
+      const qid = (el as HTMLElement).dataset.qid ?? '';
+      el.addEventListener('click', () => this.act(act, id, qid));
     }
   }
 
@@ -644,8 +649,17 @@ export class Phone {
    * only destructive one and that it is the only one that redraws the list
    * rather than a photograph.
    */
-  private act(action: string, id: number): void {
+  private act(action: string, id: number, qid = ''): void {
     switch (action) {
+      case 'aim':
+        // The arrow is `main.ts`'s and the register is `dialog.ts`'s, so the
+        // phone only carries the press across. Redrawn immediately so the
+        // button can say `guiding` on the same click that made it true.
+        this.source.aimAt?.(qid);
+        this.drawn = '';
+        this.draw();
+        break;
+
       case 'online':
         this.source.setOnline(!this.source.online());
         this.drawn = '';

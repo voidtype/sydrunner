@@ -47,9 +47,11 @@ import {
   screenBearing,
   waypointRange,
   waypointRangeText,
+  waypointReached,
   type Waypoint,
 } from './game/waypoint.ts';
-import type { Quest, QuestCursors } from './game/questmodel.ts';
+import type { DialogNpc, Quest, QuestCursors } from './game/questmodel.ts';
+import { questAim, type AimKind } from './game/questaim.ts';
 
 /**
  * Everything the banner reads, supplied by `main.ts` as closures.
@@ -66,6 +68,8 @@ export interface WaypointSource {
   cursors(): QuestCursors;
   /** Where the player is standing and which way they are looking. */
   pose(): { x: number; z: number; yaw: number };
+  /** The dialog pack, for `pin`: a giver's position lives on his NPC record. */
+  npcs(): readonly DialogNpc[];
 }
 
 /** How often the text and the distance are re-derived. The needle is every frame. */
@@ -80,6 +84,23 @@ export class WaypointBanner {
 
   /** The live objective, re-derived on the beat. Null is "nothing to point at". */
   private current: Waypoint | null = null;
+  /**
+   * A job the player asked to be taken to, which outranks the automatic pick.
+   *
+   * The arrow's ordinary behaviour is "the nearest open step of a job you have
+   * taken", and that is right when nobody has said otherwise. A player who
+   * presses *take me there* in the register has said otherwise, and about a job
+   * the automatic rule frequently cannot even see -- an untaken one has no
+   * cursor and a finished one has no open step. So a pin is held here and
+   * `update` prefers it.
+   *
+   * It is **cleared by arriving**, not by a timer and not by another rescan:
+   * an arrow that gave up while you were still walking would be worse than no
+   * arrow, and one that never gave up would follow you around after you got
+   * there. Pinning a different job replaces it; pinning the pinned one clears
+   * it, so the button is a toggle.
+   */
+  private pinned: string | null = null;
   /** What was last written, so the slow half is a string compare. */
   private drawn = '';
   private sinceRescan = Infinity;
@@ -131,7 +152,13 @@ export class WaypointBanner {
     const pose = this.source.pose();
     if (this.sinceRescan >= 1 / WAYPOINT_RESCAN_HZ) {
       this.sinceRescan = 0;
-      this.current = activeWaypoint(this.source.quests(), this.source.cursors(), pose.x, pose.z);
+      this.current = this.pinnedWaypoint() ?? activeWaypoint(this.source.quests(), this.source.cursors(), pose.x, pose.z);
+      // Arriving is what takes the pin down. Checked here rather than in `pin`
+      // for the obvious reason: the player is not standing there when they press
+      // the button, and this is the beat that knows where they are now.
+      if (this.pinned !== null && this.current !== null && waypointReached(this.current, pose.x, pose.z)) {
+        this.pinned = null;
+      }
       this.drawSlow(pose.x, pose.z);
     }
     const target = this.current;
@@ -141,6 +168,59 @@ export class WaypointBanner {
     // rather than leaving the sign of this project's yaw to a caller.
     const deg = (screenBearing(pose.x, pose.z, target.x, target.z, pose.yaw) * 180) / Math.PI;
     this.needle.style.transform = `rotate(${deg.toFixed(1)}deg)`;
+  }
+
+  /**
+   * Point at this job, or unpin it if it is already the one being pointed at.
+   *
+   * Returns what the arrow will now aim for, so a caller can say so; `null` is
+   * "there is nowhere to point", which is a quest whose giver is not in the
+   * pack -- a content fault the register still has to survive.
+   */
+  pin(questId: string): AimKind | null {
+    if (this.pinned === questId) {
+      this.pinned = null;
+      this.sinceRescan = Infinity;
+      return null;
+    }
+    const target = this.aimFor(questId);
+    if (target === null) return null;
+    this.pinned = questId;
+    // Re-derived on the next frame rather than next beat: the button was a
+    // deliberate act and a quarter-second of the old arrow reads as a miss.
+    this.sinceRescan = Infinity;
+    return target.kind;
+  }
+
+  /** Which job the arrow is being held on, if any. For the register's button. */
+  get pinnedQuest(): string | null {
+    return this.pinned;
+  }
+
+  private aimFor(questId: string): ReturnType<typeof questAim> {
+    const quest = this.source.quests().find((q) => q.id === questId);
+    if (quest === undefined) return null;
+    return questAim(quest, this.source.npcs(), this.source.cursors()[questId]);
+  }
+
+  /** The pinned job as a `Waypoint`, or null if it went away underneath us. */
+  private pinnedWaypoint(): Waypoint | null {
+    if (this.pinned === null) return null;
+    const target = this.aimFor(this.pinned);
+    if (target === null) {
+      // The job left the pack, or its giver did. Drop the pin rather than hold
+      // an arrow pointing at a memory.
+      this.pinned = null;
+      return null;
+    }
+    return {
+      questId: target.questId,
+      stepIndex: 0,
+      text: target.text,
+      x: target.x,
+      z: target.z,
+      radius: target.radius,
+    };
   }
 
   /** The text half. Guarded on a string, because it is a reflow. */
