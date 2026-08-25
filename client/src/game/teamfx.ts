@@ -129,6 +129,7 @@ import {
   type Team,
   type TeamLookup,
 } from './teams.ts';
+import { tripPowers, type TripPowers } from './mushrooms.ts';
 
 // --- The injection point ---------------------------------------------------------------
 
@@ -350,7 +351,10 @@ export function fxTrackedPlayers(): number {
  * you bought, and somebody with both should be carrying five.
  */
 export function fxMaxPips(playerId: number, base: number): number {
-  return base + lookup.scalar(playerId, FX.MAX_PIPS) + lookup.scalar(playerId, FX.GROUP_PIPS) + fxTempPips(playerId);
+  const pips = base + lookup.scalar(playerId, FX.MAX_PIPS) + lookup.scalar(playerId, FX.GROUP_PIPS) + fxTempPips(playerId);
+  // God's, and applied last so it doubles the total rather than the base: three
+  // becomes six and a talented four becomes eight, which is what was promised.
+  return doubled.has(playerId) ? pips * 2 : pips;
 }
 
 /**
@@ -383,6 +387,54 @@ export function fxCashStatPercent(playerId: number): number {
  * ability windows and `game/abilities.ts` owns the window, so their damage
  * arrives through `fxAbilitySwingBonus` below and is added by the same caller.
  */
+/**
+ * --- The mushrooms, folded into the same four questions the talents answer.
+ *
+ * A brown-cap stack changes how hard you hit, how hard you are hit, how fast you
+ * recover and -- once God has said so -- how many pips you have. Those are
+ * exactly `fxSwingDamageScale`, `fxDamageTakenScale`, `fxRegenTick` and
+ * `fxMaxPips`, which both ends already call and which already compose several
+ * sources. So the stack contributes *here* rather than growing a second,
+ * parallel notion of a multiplier that the two would have to be kept in step by
+ * hand -- which is the arrangement that eventually disagrees.
+ *
+ * A **multiplier** and not a scalar key: the talent keys are additive bonuses
+ * summed by `lookup`, and a mushroom that doubles your output is not "+100% in
+ * the same pile" -- it multiplies whatever the build already earned, so a
+ * Bloodhouse player on six mushrooms gets both and neither is cancelled.
+ */
+const tripByPlayer = new Map<number, TripPowers>();
+
+/** Set (or clear) a player's live mushroom powers. See `game/trips.ts`. */
+export function fxSetTrip(playerId: number, powers: TripPowers | null): void {
+  if (powers === null) tripByPlayer.delete(playerId);
+  else tripByPlayer.set(playerId, powers);
+}
+
+/** What the stack is worth for this player right now. */
+export function fxTrip(playerId: number): TripPowers {
+  return tripByPlayer.get(playerId) ?? tripPowers(0);
+}
+
+/**
+ * God said you were a good person. Doubles the pip count until Monday.
+ *
+ * A set rather than a scalar key because it is *not* a bonus that stacks with
+ * anything: it is a doubling of whatever `fxMaxPips` had already arrived at,
+ * which is what makes "default 3 -> 6, a talented 4 -> 8" true without the
+ * feature having to know what a talent is.
+ */
+const doubled = new Set<number>();
+
+export function fxSetDoubleHealth(playerId: number, on: boolean): void {
+  if (on) doubled.add(playerId);
+  else doubled.delete(playerId);
+}
+
+export function fxHasDoubleHealth(playerId: number): boolean {
+  return doubled.has(playerId);
+}
+
 export function fxSwingDamageScale(playerId: number): number {
   let scale = 1 + lookup.scalar(playerId, FX.SWING_DAMAGE);
   const perStar = lookup.scalar(playerId, FX.STAR_DAMAGE);
@@ -392,7 +444,7 @@ export function fxSwingDamageScale(playerId: number): number {
   }
   const cash = fxCashStatPercent(playerId);
   if (cash > 0) scale += cash / 100;
-  return scale;
+  return scale * fxTrip(playerId).outgoing;
 }
 
 /**
@@ -407,7 +459,11 @@ export function fxDamageTakenScale(playerId: number): number {
   let reduction = lookup.scalar(playerId, FX.DAMAGE_TAKEN);
   const cash = fxCashStatPercent(playerId);
   if (cash > 0) reduction += cash / 100;
-  const scale = 1 - reduction;
+  // The mushrooms multiply what the build already earned, and the floor is
+  // applied *after* them for the reason the floor exists at all: an
+  // invulnerable player is a worse outcome than a very tough one, and six
+  // mushrooms on top of two auras could otherwise reach it.
+  const scale = (1 - reduction) * fxTrip(playerId).incoming;
   return scale < 0.05 ? 0.05 : scale > 1 ? 1 : scale;
 }
 
@@ -522,11 +578,30 @@ export function fxKnockbackExtraM(playerId: number): number {
  */
 export const REGEN_OUT_OF_COMBAT_S = 8;
 
+/**
+ * The period a mushroom regenerates on for a player who has no regen talent.
+ *
+ * Twelve seconds a pip is slow enough to be worthless on its own and is never
+ * reached: it only exists to be *divided* by the stack, so one mushroom is 7.5 s
+ * and six is one second a pip, which is the "unbelievably strong" the owner
+ * asked for without handing a sober player a talent they did not buy.
+ */
+export const MUSHROOM_BASE_REGEN_S = 12;
+
 export function fxRegenTick(playerId: number, dt: number, nowMs: number): number {
   let period = lookup.scalar(playerId, FX.REGEN_PIP_S);
-  if (period <= 0) return 0;
+  const trip = fxTrip(playerId);
+  // **A mushroom can start the clock, not only speed it up.** Without this a
+  // player with no regen talent has a period of zero and the stack multiplies
+  // nothing -- so the whole ladder would be invisible to exactly the players
+  // most likely to be eating mushrooms in a park.
+  if (period <= 0) {
+    if (trip.regen <= 1) return 0;
+    period = MUSHROOM_BASE_REGEN_S;
+  }
   const faster = lookup.scalar(playerId, FX.GROUP_REGEN_X);
   if (faster > 1) period = period / faster;
+  if (trip.regen > 1) period = period / trip.regen;
   const s = fxState(playerId);
   if (nowMs - s.lastCombatMs < REGEN_OUT_OF_COMBAT_S * 1000) {
     s.regenT = 0;

@@ -266,6 +266,7 @@ import { verifyMushrooms } from './game/mushrooms.ts';
 import { MushroomField } from './world/mushrooms.ts';
 import { TripStack } from './game/trips.ts';
 import { verifyTrips } from './game/trips.ts';
+import { fxSetTrip } from './game/teamfx.ts';
 import { verifyTripView } from './world/tripview.ts';
 import { verifyQuestAim } from './game/questaim.ts';
 import { verifyQuestAreas } from './game/questareas.ts';
@@ -4966,6 +4967,16 @@ async function main(): Promise<void> {
         }
       }
     }
+    /*
+     * The stack, handed to the one registry that already answers "how hard does
+     * this player hit, how hard is he hit, how fast does he recover".
+     *
+     * Pushed every frame rather than on a bite, because it *expires* -- a buff
+     * that ran out three seconds ago must stop multiplying anything, and there is
+     * no event for that. `fxSetTrip` with a count of zero is the sober player,
+     * and `game/teamfx.ts` treats it as one.
+     */
+    fxSetTrip(playerCombat.id, trips.powers(sky.now.nowMs));
     drawTrips(dt);
   };
   window.addEventListener(
