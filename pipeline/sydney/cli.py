@@ -24,6 +24,7 @@ run picks up where it stopped rather than starting over.
 from __future__ import annotations
 
 import argparse
+import bisect
 import concurrent.futures
 import functools
 import json
@@ -2487,7 +2488,28 @@ def _sheet_area(sheet: dict) -> float:
     return float(np.abs(cross).sum() * 0.5)
 
 
+# Seam steps the shipped world is allowed, on the same ratchet terms as
+# `overpass-clearance-check`'s two budgets and `undrawn-solids-check`'s.
+#
+# The seam test compares *levels*, because a level is what the shipped bytes
+# carry -- there is no body identity in a `.water.bin`. So it cannot tell "one
+# body crossing a seam at two heights", which is the bug, from "two different
+# bodies that happen to meet at a seam", which is a coastline. Both survivors in
+# the 2026-08-26 bake are the second: a lagoon at y = -62.86 meeting the sea at
+# -71.08 across the tiles at (-55, 79..80) and (-56, 80).
+#
+# Measured the same day, the rest of the harbour agrees exactly: 5,774 tile pairs
+# share a flat level across their seam and every one of them matches to a
+# millimetre. And the rule is not blind -- moving one side of a shared level by
+# 20 cm is convicted, which was run as a control.
+#
+# Lower it if a round removes one. Never raise it to make a run pass.
+SEAM_BUDGET = 2
+
+
 @_audit
+
+
 def cmd_water_audit(args: argparse.Namespace) -> int:
     """Read the emitted water back and check that it is water rather than paint.
 
@@ -2701,6 +2723,29 @@ def cmd_water_audit(args: argparse.Namespace) -> int:
     # every one of which is a Centennial Park pond next to a tile of open water.
     # What a step actually is: one body of water crossing a seam at two different
     # heights, which shows only in the sheets that touch the seam.
+    #
+    # **And only for water that is supposed to be flat.** A creek is not: it runs
+    # downhill, and `creeks.py` draws it as 10 m reaches each at its own level, so
+    # a creek crossing a tile boundary changes height across the seam *by design*.
+    # The first bake with creeks in it reported 421 steps and every one of them was
+    # that -- measured, 0 of 421 had a real body on both sides, and the median gap
+    # was 0.149 m, which is one reach of a 1.5% creek.
+    #
+    # So the comparison is restricted to sheets whose level belongs to the
+    # assembled water field. That is exact rather than a heuristic: `field.levels`
+    # is every flat body `water.py` unioned, a creek reach's level can never be one
+    # of them because creeks are not in the field at all, and every real body stays
+    # in scope -- including a secondary pond on a tile whose `wy` names something
+    # else, which is why this is not done by filtering on `wy`.
+    flat_levels = sorted({round(lvl.surface, 3) for lvl in field.levels}) if field else []
+
+    def _is_flat_body(level: float) -> bool:
+        """Is this sheet's level one the water field assembled, rather than a creek?"""
+        if not flat_levels:
+            return True
+        i = bisect.bisect_left(flat_levels, level - 1e-3)
+        return i < len(flat_levels) and abs(flat_levels[i] - level) <= 1e-3
+
     steps = 0
     for key, sheets in sheets_by_tile.items():
         tx, tz = (int(v) for v in key.split("_"))
@@ -2713,16 +2758,19 @@ def cmd_water_audit(args: argparse.Namespace) -> int:
                 continue
             across = _edge_levels(other, theirs)
             for level in mine:
-                if not any(abs(level - o) <= 1e-3 for o in across) and across:
+                if not _is_flat_body(level):
+                    continue
+                flat_across = [o for o in across if _is_flat_body(o)]
+                if flat_across and not any(abs(level - o) <= 1e-3 for o in flat_across):
                     steps += 1
     tidal_level = contract["surface_y"]
     near_far_gap = (
         min(abs(tidal_level - s["surface"]) for s in far) if far else float("nan")
     )
     print(
-        f"  seams         {steps:,} neighbouring wet tiles at different levels;"
-        f" near sheets sit {near_far_gap:.2f} m over the far one"
-        + ("" if steps == 0 else "   WARNING: a step in the harbour")
+        f"  seams         {steps:,} of {SEAM_BUDGET} allowed; near sheets sit"
+        f" {near_far_gap:.2f} m over the far one"
+        + ("" if steps <= SEAM_BUDGET else "   WARNING: a step in the harbour")
     )
 
     # --- 5. Coverage: what the field says is wet against what the tiles carry.
@@ -2763,7 +2811,13 @@ def cmd_water_audit(args: argparse.Namespace) -> int:
                 f" and will pick it up on the next build."
             )
 
-    bad = violations > 0 or missing or steps > 0 or far is None or bool(stray_level)
+    bad = (
+        violations > 0
+        or missing
+        or steps > SEAM_BUDGET
+        or far is None
+        or bool(stray_level)
+    )
     return 1 if bad else 0
 
 
