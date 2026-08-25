@@ -633,10 +633,17 @@
          composited div against a full-screen read-modify-write of a 3.7 Mpixel
          target, for a red flash nobody looks at directly. Spec 8.2 says sell it
          through audio and camera, so this is deliberately the cheap half. */
+      /* The origin is a variable so a hit can say which way it came from: the
+         gradient's clear end slides *away* from the attacker, which puts the red
+         on the edge they are standing behind. `game/hurtdir.ts` argues why this
+         is a bias on the pulse rather than a wedge of its own -- DESIGN.md rule
+         6, the UI does not shout -- and the fallback is the centred pulse this
+         has always been, which is what a car or a fall still gets. */
       #vignette {
         position: fixed; inset: 0; opacity: 0; pointer-events: none;
-        background: radial-gradient(ellipse at center,
+        background: radial-gradient(ellipse at var(--hurt-origin, 50% 50%),
           rgba(150,10,10,0) 32%, rgba(168,14,10,.55) 74%, rgba(120,6,4,.92) 100%);
+        transition: background-position 90ms linear;
       }
 
       /* Spec 8.2: "No world-space health bars. Health pips in the corner."

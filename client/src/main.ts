@@ -298,7 +298,9 @@ import { GiverBodyField, verifyGiverBodyField, type GiverBodySource } from './wo
 // WORKSTREAM AP: the arrow that says which way the job is, and the one street
 // light in this game that a content file asks for. See `game/waypoint.ts` and
 // `world/giverlamp.ts` -- both are argued at length in their own headers.
-import { verifyWaypoint } from './game/waypoint.ts';
+import { screenBearing, verifyWaypoint } from './game/waypoint.ts';
+// Which way the hit came from, said with the red that is already on the screen.
+import { verifyHurtDir } from './game/hurtdir.ts';
 // The givers on the map: pure, three-free, and in the server's boot list as
 // well as this one. See `game/givermap.ts`.
 import { GiverDots, verifyGiverMap } from './game/givermap.ts';
@@ -479,6 +481,9 @@ import {
 } from './game/camera.ts';
 import { FOV_BASE, Feedback } from './game/feedback.ts';
 import { Locator, verifyLocator } from './game/locator.ts';
+// The drive, narrated sparingly, through the notice channel that already
+// exists. See `game/ticker.ts` -- the module is the rate limit, not the words.
+import { Ticker, verifyTicker } from './game/ticker.ts';
 // WORKSTREAM N (carry): "back where you left off", the one sentence a restored
 // session is visible as. See `game/carry.ts` for why the suburb is this end's.
 import { installRestoredNotice, verifyCarry } from './game/carry.ts';
@@ -4944,6 +4949,8 @@ async function main(): Promise<void> {
     ...verifyMushrooms(),
     ...verifyTrips(),
     ...verifyTripView(),
+    ...verifyHurtDir(),
+    ...verifyTicker(),
     ...verifyTripPass(),
     ...verifyMandala(),
     ...verifyQuestAim(),
@@ -6365,6 +6372,9 @@ async function main(): Promise<void> {
   // which is a better boot than a loading screen held open for a lookup table.
   const locator = new Locator(streamer, '/world', streamer.assetVersion);
   void locator.loadSuburbs();
+  // The drive's narration, and the suburb it last said. See the frame loop.
+  const ticker = new Ticker();
+  let tickerSuburb: string | null = null;
 
   // WORKSTREAM N (carry): *"logging off should save my location till next log
   // in"*, said out loud. Here rather than beside the welcome eight hundred lines
@@ -7684,9 +7694,34 @@ async function main(): Promise<void> {
       handsViewmodel.connect();
     }
     if (r.victim === playerCombat.id) {
-      if (r.ko) feedback.knockedOut();
-      else feedback.hitTaken();
+      const from = hurtBearing(r.attacker);
+      if (r.ko) feedback.knockedOut(from);
+      else feedback.hitTaken(from);
     }
+  }
+
+  /**
+   * Which way a hit came from, for the pulse. See `game/hurtdir.ts`.
+   *
+   * The attacker is looked up in the same `fighters` list the adjudication just
+   * used, so a bearing exists exactly when the thing that hit you is a body in
+   * the world. A car, a fall, a ball thrown by somebody who has since despawned
+   * -- all of them return `null` and get the centred pulse this has always had.
+   * `attacker === victim` is the "the world did this" sentinel and is one of
+   * them by construction.
+   */
+  function hurtBearing(attackerId: number): number | null {
+    if (attackerId === playerCombat.id) return null;
+    const from = fighters.find((f) => f.combat.id === attackerId);
+    if (from === undefined) return null;
+    const at = from.combat.body.position;
+    return screenBearing(
+      playerCombat.body.position.x,
+      playerCombat.body.position.z,
+      at.x,
+      at.z,
+      player.yaw,
+    );
   }
 
   /**
@@ -7702,8 +7737,9 @@ async function main(): Promise<void> {
   function onFootyHit(r: HitReport): void {
     if (r.attacker === playerCombat.id) feedback.hitLanded(r.ko);
     if (r.victim === playerCombat.id) {
-      if (r.ko) feedback.knockedOut();
-      else feedback.hitTaken();
+      const from = hurtBearing(r.attacker);
+      if (r.ko) feedback.knockedOut(from);
+      else feedback.hitTaken(from);
     }
   }
 
@@ -10756,6 +10792,31 @@ async function main(): Promise<void> {
     // not changed -- which is all but one frame in a hundred.
     locator.update(frameDt, player.position.x, player.position.z);
     minimap.setReadout(locator.text);
+
+    /*
+     * And the ticker, off the same reading.
+     *
+     * The owner's report on the first long drive was "on the ride from the park
+     * to redfern, stuff should happen, its all just passive rn", and the
+     * cheapest true thing this client can say is where you are: the locator has
+     * already worked it out, for a strip under the minimap that nobody driving
+     * is looking at. So a suburb boundary crossed at speed is posted, and
+     * `game/ticker.ts` decides whether it is worth saying -- which is nearly
+     * always "not yet", because Sydney's suburbs are small and the notice
+     * channel is shared with the knockouts and the Karens.
+     *
+     * `hud.notice` rather than a panel of its own: DESIGN.md rule 6, the UI does
+     * not shout, and a line nobody reads should cost one fade.
+     */
+    {
+      const where = locator.stats().suburb ?? null;
+      if (where !== null && where !== tickerSuburb) {
+        tickerSuburb = where;
+        ticker.post(`suburb:${where}`, `entering ${where}`);
+      }
+      const said = ticker.update(frameDt, Math.hypot(player.velocity.x, player.velocity.z));
+      if (said !== null) hud.notice(said);
+    }
 
     frameProfile.at(FSEC.sky);
     // Night factor drives the lit-window shader. Ramps across civil twilight.

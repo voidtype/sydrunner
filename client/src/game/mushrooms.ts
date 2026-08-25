@@ -49,18 +49,23 @@ export const REGION_NORTH = 8684;
 export const REGION_RADIUS_M = 3000;
 
 /**
- * How many trees carry one.
+ * How many trees carry one: five in ten thousand.
  *
- * **TEMPORARY: 5% for testing, not the shipping number.** The owner's rate is
- * `0.0005` -- five trees in ten thousand -- which is a find rather than a
- * feature you can walk to on purpose, and is what this must go back to before
- * anybody else plays. One line, and `SHIPPING_SPAWN_RATE` below is what to put
- * in it.
+ * The owner's number, and the design of the whole ladder rests on it. A trip is
+ * meant to be *found* -- you were walking through the bushland and there was one
+ * -- rather than farmed, and at the 5% the testing ran on there was one every
+ * few metres, which turns "I found a white one" into "I went and got a white
+ * one" and takes the ladder with it: the seventh cap should be something that
+ * happens to a player perhaps once, not a resource.
+ *
+ * Restored 2026-08-26, after the testing it was raised for. `TESTING_SPAWN_RATE`
+ * stays beside it so the next round raises this line and puts it back from the
+ * same place rather than typing a number twice.
  */
-export const SPAWN_RATE = 0.05;
+export const SPAWN_RATE = 0.0005;
 
-/** What `SPAWN_RATE` is when the testing is over. See the note above it. */
-export const SHIPPING_SPAWN_RATE = 0.0005;
+/** What `SPAWN_RATE` goes to for a testing round, so a walk finds them. */
+export const TESTING_SPAWN_RATE = 0.05;
 
 /** How far from the trunk it sits, metres. Close enough to read as "its". */
 export const OFFSET_MIN_M = 0.35;

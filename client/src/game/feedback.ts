@@ -56,6 +56,8 @@ const TAKE_DEGREES = 1.5;
 const VIGNETTE_SECONDS = 0.45;
 const VIGNETTE_PEAK = 0.62;
 
+import { vignetteOriginCss } from './hurtdir.ts';
+
 /** The reticle's kick. Short -- it is a confirmation, not an animation. */
 const RETICLE_SECONDS = 0.16;
 
@@ -111,6 +113,8 @@ export class Feedback {
   private clock = 0;
 
   private vignetteT = 0;
+  /** Where the last pulse bloomed from. See `game/hurtdir.ts`. */
+  private hurtOrigin = '50.0% 50.0%';
   private reticleT = 0;
 
   /** Spec 8.3's Flat White: 0 or 1, and the eased value chasing it. */
@@ -152,16 +156,29 @@ export class Feedback {
     this.reticleT = RETICLE_SECONDS;
   }
 
-  /** Someone landed one on you. */
-  hitTaken(): void {
+  /**
+   * Someone landed one on you.
+   *
+   * `bearing` is `waypoint.screenBearing`'s -- radians clockwise from straight
+   * up, zero dead ahead -- and it moves the pulse's origin so the red is
+   * heaviest on the edge the attacker is behind. `null`, or nothing at all, is
+   * the old centred pulse: a car, a fall, a cop nobody saw. See
+   * `game/hurtdir.ts` for why this is a bias on the thing already on the screen
+   * rather than a wedge of its own.
+   */
+  hitTaken(bearing: number | null = null): void {
     this.startShake(TAKE_SECONDS, TAKE_DEGREES * DEG);
     this.vignetteT = VIGNETTE_SECONDS;
+    this.hurtOrigin = vignetteOriginCss(bearing);
+    if (this.vignette) this.vignette.style.setProperty('--hurt-origin', this.hurtOrigin);
   }
 
   /** The last pip. The same red, held longer, so a knockout reads as more than a hit. */
-  knockedOut(): void {
+  knockedOut(bearing: number | null = null): void {
     this.startShake(TAKE_SECONDS * 1.6, TAKE_DEGREES * 1.5 * DEG);
     this.vignetteT = VIGNETTE_SECONDS * 2.2;
+    this.hurtOrigin = vignetteOriginCss(bearing);
+    if (this.vignette) this.vignette.style.setProperty('--hurt-origin', this.hurtOrigin);
   }
 
   /**
