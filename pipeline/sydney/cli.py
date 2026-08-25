@@ -2457,6 +2457,64 @@ def _sample_tile_grid(grid: np.ndarray, n: int, local_x: float, local_z: float) 
     return nw + (sw - nw) * fr + (se - sw) * fc
 
 
+def _sample_tile_grid_many(grid: np.ndarray, n: int, xs: np.ndarray, zs: np.ndarray) -> np.ndarray:
+    """`_sample_tile_grid` over whole arrays, and it must agree with it exactly.
+
+    The scalar form above is the readable statement of the rule and stays the
+    definition; this is the same arithmetic with the branch turned into a mask.
+    `verify_tile_grid_sampler` asserts the two agree over a random cloud, because
+    a fast copy of a check that quietly disagrees with the check is worse than no
+    fast copy.
+
+    It exists because the bed test samples **every vertex of every sheet in the
+    world**, and the creeks took that from about 800,000 vertices to 7,623,838.
+    One Python call each ran the audit for 91 minutes of CPU, which is long enough
+    that nobody runs it, which is the same as not having it.
+    """
+    spacing = config.TILE_SIZE / n
+    cf = np.clip(xs / spacing, 0.0, float(n))
+    rf = np.clip((zs + config.TILE_SIZE) / spacing, 0.0, float(n))
+    c = np.minimum(cf.astype(np.int64), n - 1)
+    r = np.minimum(rf.astype(np.int64), n - 1)
+    fc = cf - c
+    fr = rf - r
+    nw = grid[r, c].astype(np.float64)
+    ne = grid[r, c + 1].astype(np.float64)
+    sw = grid[r + 1, c].astype(np.float64)
+    se = grid[r + 1, c + 1].astype(np.float64)
+    upper = nw + (ne - nw) * fc + (se - ne) * fr
+    lower = nw + (sw - nw) * fr + (se - sw) * fc
+    return np.where(fc >= fr, upper, lower)
+
+
+def verify_tile_grid_sampler(seed: int = 7) -> list[str]:
+    """The vectorised sampler against the scalar one it copies.
+
+    Both triangles of the split, both clamps, and the diagonal itself -- which is
+    the one place the branch could be taken differently by the two forms.
+    """
+    failures: list[str] = []
+    rng = np.random.default_rng(seed)
+    n = 16
+    grid = rng.normal(size=(n + 1, n + 1)).astype("<f4")
+    xs = rng.uniform(-50.0, config.TILE_SIZE + 50.0, 4000)
+    zs = rng.uniform(-config.TILE_SIZE - 50.0, 50.0, 4000)
+    # Points exactly on the diagonal of a cell, where fc == fr.
+    spacing = config.TILE_SIZE / n
+    diag = np.arange(0, n) * spacing + spacing * 0.5
+    xs = np.concatenate([xs, diag])
+    zs = np.concatenate([zs, diag - config.TILE_SIZE])
+    want = np.asarray([_sample_tile_grid(grid, n, float(x), float(z)) for x, z in zip(xs, zs)])
+    got = _sample_tile_grid_many(grid, n, xs, zs)
+    if not np.allclose(want, got, rtol=0, atol=1e-9):
+        i = int(np.argmax(np.abs(want - got)))
+        failures.append(
+            f"the vectorised tile-grid sampler disagrees with the scalar one by"
+            f" {abs(want[i] - got[i]):.6g} m at ({xs[i]:.2f}, {zs[i]:.2f})"
+        )
+    return failures
+
+
 def _edge_levels(sheets: list[dict], side: str) -> list[float]:
     """The surface levels of the sheets that reach one edge of a tile.
 
@@ -2565,6 +2623,10 @@ def cmd_water_audit(args: argparse.Namespace) -> int:
     # two numbers that shape a reach and are checked on made-up geometry, so they
     # cost milliseconds and need neither the extract nor a solve.
     bad_rule += creeks.verify_creeks()
+    # And the fast bed sampler against the scalar one it copies -- run here rather
+    # than trusted, because everything this command reports about the bed is read
+    # through it.
+    bad_rule += verify_tile_grid_sampler()
     for failure in bad_rule:
         print(f"  SELF-CHECK   {failure}")
     if bad_rule:
@@ -2685,9 +2747,7 @@ def cmd_water_audit(args: argparse.Namespace) -> int:
         for s in sheets:
             xs = s["xz"][:, 0]
             zs = s["xz"][:, 1]
-            ground = np.asarray(
-                [_sample_tile_grid(grid, n, float(x), float(z)) for x, z in zip(xs, zs)]
-            )
+            ground = _sample_tile_grid_many(grid, n, xs, zs)
             clearance = s["surface"] - ground
             clearances.append(clearance)
             checked += len(clearance)
