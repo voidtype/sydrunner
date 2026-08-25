@@ -275,7 +275,7 @@ import { GodRoom } from './world/godroom.ts';
 import { verifyMandala } from './game/mandala.ts';
 import { MushroomField } from './world/mushrooms.ts';
 import { TripStack } from './game/trips.ts';
-import { verifyTrips } from './game/trips.ts';
+import { countdownText, verifyTrips } from './game/trips.ts';
 import { fxSetDoubleHealth, fxSetSlow, fxSetTrip } from './game/teamfx.ts';
 import { CALM, easeLook, tripLook, verifyTripView } from './world/tripview.ts';
 import { TripPass } from './world/trippass.ts';
@@ -3238,8 +3238,7 @@ async function main(): Promise<void> {
       el.dataset.fact = icon.fact;
       const left = document.createElement('span');
       left.className = 'left';
-      const s = Math.max(0, Math.ceil(icon.seconds));
-      left.textContent = s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s}s`;
+      left.textContent = countdownText(icon.seconds);
       el.appendChild(left);
       tripsBar.appendChild(el);
     }

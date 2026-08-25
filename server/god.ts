@@ -35,6 +35,15 @@
 
 import { fxSetDoubleHealth } from '../client/src/game/teamfx.ts';
 
+/**
+ * What the endpoint is told happened, when a player has said nothing yet.
+ *
+ * Not shown to anybody: it exists so the first request is a conversation rather
+ * than a lone system prompt. Written in the third person because it is a stage
+ * direction and not a line the player chose.
+ */
+export const ARRIVAL = '*They arrive, having eaten the seventh mushroom. They have not spoken yet.*';
+
 /** The most exchanges before God has heard enough. */
 export const MAX_TURNS = 12;
 
@@ -103,12 +112,20 @@ export class Audience {
     this.turns.push({ who, text: text.slice(0, MAX_UTTERANCE) });
   }
 
-  /** The messages for the endpoint: the brief, then the exchange. */
+  /**
+   * The messages for the endpoint: the brief, then the exchange.
+   *
+   * **A system message on its own is not a conversation**, and most chat
+   * endpoints answer it with nothing at all -- which is what happened the first
+   * time a player arrived: God was asked to open, was handed only his brief, and
+   * said nothing. So an empty exchange gets the arrival itself as the first
+   * thing said, which is true (they did arrive) and gives him something to
+   * answer.
+   */
   messages(): Array<{ role: string; content: string }> {
-    return [
-      { role: 'system', content: godPrompt() },
-      ...this.turns.map((t) => ({ role: t.who === 'player' ? 'user' : 'assistant', content: t.text })),
-    ];
+    const said = this.turns.map((t) => ({ role: t.who === 'player' ? 'user' : 'assistant', content: t.text }));
+    if (said.length === 0) said.push({ role: 'user', content: ARRIVAL });
+    return [{ role: 'system', content: godPrompt() }, ...said];
   }
 }
 
@@ -223,6 +240,13 @@ export function verifyGod(): string[] {
     const c = new Audience();
     c.say('player', 'x'.repeat(MAX_UTTERANCE * 3));
     if (c.turns[0].text.length !== MAX_UTTERANCE) failures.push('A long utterance was not trimmed to the cap.');
+  }
+
+  // --- An empty exchange is still a conversation, or God opens with silence.
+  {
+    const m = new Audience().messages();
+    if (m.length < 2) failures.push('An empty audience sent only a system message; the endpoint answers that with nothing.');
+    if (m[m.length - 1].role !== 'user') failures.push('The last message is not the player\'s; a model has nothing to answer.');
   }
 
   // --- The messages carry the brief first and the exchange in order.

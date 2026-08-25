@@ -82,6 +82,28 @@ const FACTS: readonly string[] = [
   'Seven. You are not here any more.',
 ];
 
+/**
+ * A countdown a person can read at a glance, in the units it is actually in.
+ *
+ * It was `m:ss` -- so three in-game hours, which really is seven and a half real
+ * minutes, rendered as **"7:30"**, and the owner read it as seven hours and
+ * reported the buff as lasting all evening. He was right about the label and the
+ * duration was right all along. A colon means whatever the reader assumes; a
+ * letter does not, so this never prints one without a unit beside it.
+ */
+export function countdownText(seconds: number): string {
+  const s = Math.max(0, Math.ceil(seconds));
+  if (s < 60) return `${s}s`;
+  if (s < 3600) {
+    const m = Math.floor(s / 60);
+    const rest = s % 60;
+    return rest === 0 ? `${m}m` : `${m}m${String(rest).padStart(2, '0')}s`;
+  }
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, '0')}m`;
+}
+
 export class TripStack {
   private trips: Trip[] = [];
   /** In-game ms until the orange slow lifts. Zero is not slowed. */
@@ -225,6 +247,33 @@ export function verifyTrips(): string[] {
     if (Math.abs(left - (HOUR * 3) / 10 / 1000) > 1e-6) {
       failures.push(`A fresh buff read ${left.toFixed(1)} real seconds against the world clock's rate.`);
     }
+  }
+
+  // --- The countdown says what unit it is in, always.
+  {
+    const cases: Array<[number, string]> = [
+      [0, '0s'],
+      [1, '1s'],
+      [45, '45s'],
+      // Rounds *up*, so a fraction under a minute is a minute -- a countdown
+      // that showed "60s" and then "1m" would tick backwards to a reader.
+      [59.2, '1m'],
+      [59, '59s'],
+      [60, '1m'],
+      [90, '1m30s'],
+      [450, '7m30s'],
+      [3600, '1h'],
+      [3720, '1h02m'],
+    ];
+    for (const [secs, want] of cases) {
+      const got = countdownText(secs);
+      if (got !== want) failures.push(`${secs}s rendered as "${got}", not "${want}".`);
+    }
+    // The one that caused the report: three in-game hours must never look like
+    // three real ones, or seven.
+    if (!countdownText(450).includes('m')) failures.push('A minutes-long countdown does not say minutes.');
+    if (countdownText(450).includes(':')) failures.push('The countdown uses a colon, which means whatever the reader assumes.');
+    if (countdownText(-5) !== '0s') failures.push('An expired buff counted below zero.');
   }
 
   return failures;
