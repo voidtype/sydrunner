@@ -44,6 +44,15 @@ export interface TripPassDeps {
   camera: Camera;
 }
 
+/**
+ * How many times a warm may try to build the graph before giving up.
+ *
+ * More than one because the first warm can land before the rest of the module
+ * has finished wiring itself up, and exactly that cost a night once. Small,
+ * because a genuinely unbuildable pass should not throw on every tile forever.
+ */
+const LAZY_BUILD_TRIES = 8;
+
 export class TripPass {
   private readonly deps: TripPassDeps;
   private post: PostProcessing | null = null;
@@ -58,6 +67,8 @@ export class TripPass {
    * the canvas and is thrown away in its entirety.
    */
   private scenePass: { renderTarget?: unknown; _mrt?: unknown } | null = null;
+  /** Lazy-build attempts spent. See `warmInto`; not the same as `failed`. */
+  private buildTries = 0;
   private failed = false;
   /**
    * The pass is compiled **off the frame**, and this is the state machine for it.
@@ -236,12 +247,23 @@ export class TripPass {
      * compilation, so doing it at the first tile costs nothing and gives every
      * warm from then on the context the frame will look up.
      */
-    if (!this.failed && this.post === null) {
+    if (!this.failed && this.post === null && this.buildTries < LAZY_BUILD_TRIES) {
+      this.buildTries++;
       try {
         this.post = this.build();
       } catch (err) {
-        this.failed = true;
-        console.warn('[trip] the post pass could not be built; warms go to the canvas:', err);
+        // **Not latched.** Latching `failed` here made a fixable ordering slip
+        // permanent: `build()` needs `__THREE_TSL__`, that was registered below
+        // the first warm, and one throw at boot turned `warmInto` into a
+        // pass-through for the entire session while the shadow warm kept
+        // working -- so it read as a partial fix rather than a dead one. A few
+        // retries let the later warms find a graph that can be built; a real
+        // failure still stops after `LAZY_BUILD_TRIES` rather than throwing per
+        // tile forever. The frame path keeps its own latch: a pass that fails
+        // to *render* must stay off.
+        if (this.buildTries === LAZY_BUILD_TRIES) {
+          console.warn('[trip] the post pass could not be built; warms go to the canvas:', err);
+        }
       }
     }
     const target = this.scenePass?.renderTarget as

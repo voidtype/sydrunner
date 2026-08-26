@@ -160,6 +160,7 @@ export class ShadowWarm {
 /** Anything with children: `Object3D` satisfies this structurally. */
 export interface SweepNode {
   readonly children?: readonly SweepNode[];
+  readonly isMesh?: boolean;
 }
 
 /**
@@ -174,12 +175,20 @@ export interface SweepNode {
  * layer, the rail and the traffic all hold their contents the same way, and a
  * name test would cover the one case somebody happened to think of.
  */
-export function sweepQueue(children: readonly SweepNode[], fanout = 4): SweepNode[] {
+export function sweepQueue(children: readonly SweepNode[], fanout = 4, depth = 2): SweepNode[] {
   const out: SweepNode[] = [];
   for (const child of children) {
     const kids = child.children;
-    if (kids !== undefined && kids.length > fanout) out.push(...kids);
-    else out.push(child);
+    if (depth > 0 && kids !== undefined && kids.length > fanout) {
+      out.push(...sweepQueue(kids, fanout, depth - 1));
+    } else if (kids !== undefined && kids.length === 0 && child.isMesh !== true) {
+      // An empty node with nothing to draw. Warming it makes three walk a
+      // geometry that has no `position` and log `THREE.AttributeNode: Vertex
+      // attribute "position" not found`, once per tick, for nothing.
+      continue;
+    } else {
+      out.push(child);
+    }
   }
   return out;
 }
@@ -336,14 +345,17 @@ export function verifyShadowWarm(): string[] {
 
   // The sweep.
   const sweep = new ShadowSweep();
-  const leaf = (_name: string): SweepNode => ({ children: [] });
+  const leaf = (_name: string): SweepNode => ({ children: [], isMesh: true });
   const sky = leaf('sky');
   const hud = leaf('hud');
   // The `tiles` group: one child of the scene holding every resident tile.
   const tiles: SweepNode[] = [leaf('t0'), leaf('t1'), leaf('t2'), leaf('t3'), leaf('t4')];
   const tileRoot: SweepNode = { children: tiles };
   const small: SweepNode = { children: [leaf('a'), leaf('b')] };
-  const graph: SweepNode[] = [sky, tileRoot, small, hud];
+  // A node with nothing to draw: warming it makes three log a missing
+  // `position` attribute once per tick, for nothing.
+  const hollow: SweepNode = { children: [] };
+  const graph: SweepNode[] = [sky, tileRoot, small, hollow, hud];
 
   if (sweep.next(false, graph) !== null) {
     failures.push('the sweep handed out work before the shadow rig was known.');
@@ -364,6 +376,9 @@ export function verifyShadowWarm(): string[] {
   }
   if (!seen.includes(small)) {
     failures.push('the sweep opened a small group it should have warmed whole.');
+  }
+  if (seen.includes(hollow)) {
+    failures.push('the sweep warmed a node with nothing to draw; three logs a missing attribute for each.');
   }
   if (seen.length !== 3 + tiles.length) {
     failures.push(`the sweep covered ${seen.length} groups, expected ${3 + tiles.length}.`);

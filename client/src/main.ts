@@ -2898,8 +2898,25 @@ async function main(): Promise<void> {
    * resident when that first shadow render happened -- the boot tiles, which
    * are otherwise the whole of the first minute of stalls.
    */
+  /*
+   * **TSL is registered here, above the pass, and the order is the point.**
+   * `TripPass.build()` reads `__THREE_TSL__` and throws without it. Since the
+   * graph is now built on the first tile warm rather than on the first mushroom,
+   * a registration further down the file means every warm in the session finds a
+   * pass that failed to build, and `warmInto` degrades to the canvas -- silently,
+   * for the whole session. That shipped once and cost a night: the shadow
+   * warm-up kept working, so it looked like a partial fix rather than a dead one.
+   */
+  (globalThis as unknown as { __THREE_TSL__: unknown }).__THREE_TSL__ = TSL;
   const shadowWarm = new ShadowWarm();
   shadowWarm.observe(renderer, scene);
+  /**
+   * A frame this long or longer is already in trouble; the catch-up sweep waits
+   * for a quieter one. 25 ms is a hair over two 60 Hz frames: enough headroom
+   * that a warm lands on a frame with slack, tight enough that the sweep still
+   * finishes early in a session that is running well.
+   */
+  const SWEEP_FRAME_BUDGET_S = 0.025;
   const shadowSweep = new ShadowSweep();
   const tripPass = new TripPass({ renderer, scene, camera });
   // See `bindWarmTarget` above and `TripPass.warmInto`: from here on every
@@ -3366,7 +3383,6 @@ async function main(): Promise<void> {
     }
   };
 
-  (globalThis as unknown as { __THREE_TSL__: unknown }).__THREE_TSL__ = TSL;
   /** Eased toward `tripLook(stack)`; see `world/tripview.ts`. */
   let tripLookNow = CALM;
   /**
@@ -10895,7 +10911,14 @@ async function main(): Promise<void> {
     // sweep of the whole scene in a single tick is the stall it prevents,
     // moved. See `ShadowSweep`.
     {
-      const catchUp = shadowSweep.next(shadowWarm.ready, scene.children);
+      // **Only on a frame that had room for it.** The sweep is warm-up work
+      // with no deadline, and the frames it was landing on during boot were
+      // already 200 ms and worse -- so it was adding its compile to the frames
+      // least able to carry one, which is the stall it exists to remove, moved.
+      // Below the threshold it does nothing and waits; the queue is one-time
+      // and keeps until the client is idle enough to pay for it.
+      const roomy = frameDt < SWEEP_FRAME_BUDGET_S;
+      const catchUp = shadowSweep.next(shadowWarm.ready && roomy, scene.children);
       if (catchUp !== null) {
         void shadowWarm.warmInto(renderer, scene, () =>
           warmGroupOffCamera(renderer, catchUp as Object3D, camera, scene),
