@@ -1674,20 +1674,6 @@ async function main(): Promise<void> {
 
   const canvas = document.getElementById('viewport') as HTMLCanvasElement;
   const renderer = new WebGPURenderer({ canvas, antialias: true });
-  /*
-   * **The frame is allowed to say "not now".** Every warm-up in this client is a
-   * bet that the set of materials can be enumerated ahead of time, and in a
-   * 60 km city that streams trains, landmarks, car models and mushrooms the bet
-   * cannot be won -- the first sight of any of them stops the frame dead to
-   * compile it. This takes the compile off the frame instead: three is given a
-   * promise array on every frame, which routes it to
-   * `createRenderPipelineAsync`, and an object whose pipeline is not ready yet
-   * is skipped for a frame or two rather than drawn with an undefined pipeline.
-   * Installed here because it must be in place before anything renders. See
-   * `world/asyncpipes.ts` for what this does *not* move.
-   */
-  const asyncPipes = new AsyncPipelines();
-  asyncPipes.install(renderer as unknown as PipelineHost);
   // Spec section 1: 2560x1440 is 3.7 M pixels and a real fill-rate load. Degrade
   // resolution before draw distance or facade quality, so this starts at 0.75.
   let renderScale = 0.75;
@@ -1782,6 +1768,25 @@ async function main(): Promise<void> {
   // reasoning where it is defined.
   renderer.toneMappingExposure = EXPOSURE;
   await renderer.init();
+  /*
+   * **The frame is allowed to say "not now", and this must come after `init()`.**
+   * Every warm-up in this client is a bet that the set of materials can be
+   * enumerated ahead of time, and in a 60 km city streaming trains, landmarks,
+   * car models and mushrooms the bet cannot be won: the first sight of any of
+   * them stops the frame dead to compile it. This takes the compile off the
+   * frame instead -- three is handed a promise array on every frame, which
+   * routes it to `createRenderPipelineAsync`, and an object whose pipeline is
+   * not ready is skipped for a frame or two rather than drawn with an undefined
+   * one.
+   *
+   * Immediately below `init()` because three builds `_pipelines` there and not
+   * in the constructor; installing above it read `getForRender` off null and
+   * took the whole boot down. See `world/asyncpipes.ts`.
+   */
+  const asyncPipes = new AsyncPipelines();
+  if (!asyncPipes.install(renderer as unknown as PipelineHost)) {
+    console.warn('[render] the async pipeline gate did not install; compiles will block the frame.');
+  }
 
   /**
    * Intercept the one call in three that has crashed this client three times.

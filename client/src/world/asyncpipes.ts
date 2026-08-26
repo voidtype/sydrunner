@@ -46,11 +46,17 @@
 
 /** The pieces of the renderer this needs, named so a check can stub them. */
 export interface PipelineHost {
-  _pipelines: { getForRender: (renderObject: unknown, promises?: unknown) => unknown };
+  /**
+   * Null until `renderer.init()` has run -- three builds it in `_initialize`,
+   * not in the constructor. Installing before that threw
+   * `Cannot read properties of null (reading 'getForRender')` and took the
+   * whole boot with it, so `install` reports rather than assumes.
+   */
+  _pipelines: { getForRender: (renderObject: unknown, promises?: unknown) => unknown } | null;
   backend: {
     draw: (renderObject: unknown, info: unknown) => void;
     get: (object: unknown) => { pipeline?: unknown; error?: boolean };
-  };
+  } | null;
 }
 
 export class AsyncPipelines {
@@ -75,11 +81,16 @@ export class AsyncPipelines {
    * second install is exactly the sort of thing a later refactor does by
    * accident.
    */
-  install(host: PipelineHost): void {
-    if (this.installed) return;
-    this.installed = true;
-
+  install(host: PipelineHost): boolean {
+    if (this.installed) return true;
     const pipelines = host._pipelines;
+    const backendEarly = host.backend;
+    if (pipelines === null || pipelines === undefined || backendEarly === null || backendEarly === undefined) {
+      // Too early: three fills these in during `init()`. Say so and let the
+      // caller move the call, rather than throwing inside boot.
+      return false;
+    }
+    this.installed = true;
     const innerGet = pipelines.getForRender.bind(pipelines);
     pipelines.getForRender = (renderObject: unknown, promises?: unknown): unknown => {
       // `compileAsync` passes its own array and collects the promises to await.
@@ -96,7 +107,7 @@ export class AsyncPipelines {
       return pipeline;
     };
 
-    const backend = host.backend;
+    const backend = backendEarly;
     const innerDraw = backend.draw.bind(backend);
     backend.draw = (renderObject: unknown, info: unknown): void => {
       const ro = renderObject as { pipeline?: unknown };
@@ -110,6 +121,7 @@ export class AsyncPipelines {
       }
       innerDraw(renderObject, info);
     };
+    return true;
   }
 }
 
@@ -120,30 +132,35 @@ export function verifyAsyncPipes(): string[] {
   const drawn: unknown[] = [];
   const backendData = new Map<unknown, { pipeline?: unknown; error?: boolean }>();
 
-  const host: PipelineHost = {
-    _pipelines: {
-      getForRender: (_ro: unknown, promises?: unknown) => {
-        seen.push({ promises });
-        // Stand in for three filling the array on a cache miss.
-        if (Array.isArray(promises)) promises.push(Promise.resolve());
-        return { id: 'pipeline' };
-      },
-    },
-    backend: {
-      draw: (ro: unknown) => {
-        drawn.push(ro);
-      },
-      get: (o: unknown) => backendData.get(o) ?? {},
+  const pipes = {
+    getForRender: (_ro: unknown, promises?: unknown) => {
+      seen.push({ promises });
+      // Stand in for three filling the array on a cache miss.
+      if (Array.isArray(promises)) promises.push(Promise.resolve());
+      return { id: 'pipeline' };
     },
   };
+  const backend = {
+    draw: (ro: unknown, _info: unknown) => {
+      drawn.push(ro);
+    },
+    get: (o: unknown) => backendData.get(o) ?? {},
+  };
+  const host: PipelineHost = { _pipelines: pipes, backend };
 
   const gate = new AsyncPipelines();
-  gate.install(host);
+
+  // **Before `renderer.init()` three has not built these yet.** Installing then
+  // threw and took the boot down; the caller needs to be told, not thrown at.
+  if (gate.install({ _pipelines: null, backend: null })) {
+    failures.push('claimed to install on a renderer that has not been initialised; that throws at boot.');
+  }
+  if (!gate.install(host)) failures.push('did not install on a ready renderer.');
   gate.install(host); // must not nest
 
   // A frame: three passes null, and that is the null check that routes it to
   // the blocking `createRenderPipeline`. It must not reach the inner call.
-  host._pipelines.getForRender({ id: 'ro' }, null);
+  pipes.getForRender({ id: 'ro' }, null);
   if (seen.length !== 1) failures.push('the pipeline call did not reach three.');
   else if (seen[0].promises === null || seen[0].promises === undefined) {
     failures.push(
@@ -157,7 +174,7 @@ export function verifyAsyncPipes(): string[] {
   // would drop them on the floor and the boot pass would stop waiting for
   // anything.
   const theirs: unknown[] = [];
-  host._pipelines.getForRender({ id: 'ro2' }, theirs);
+  pipes.getForRender({ id: 'ro2' }, theirs);
   if (seen[1].promises !== theirs) {
     failures.push("the warm-up's own promise array was replaced; nothing can await the boot compile.");
   }
@@ -166,7 +183,7 @@ export function verifyAsyncPipes(): string[] {
   // undefined pipeline, which ends the frame with a validation error.
   const compiling = { id: 'compiling' };
   backendData.set(compiling, {});
-  host.backend.draw({ pipeline: compiling }, null);
+  backend.draw({ pipeline: compiling }, null);
   if (drawn.length !== 0) {
     failures.push(
       'drew an object whose pipeline was still compiling; setPipeline(undefined)' +
@@ -178,19 +195,19 @@ export function verifyAsyncPipes(): string[] {
   // Ready: draw it. A gate that never opens is a world that never appears.
   const ready = { id: 'ready' };
   backendData.set(ready, { pipeline: { gpu: true } });
-  host.backend.draw({ pipeline: ready }, null);
+  backend.draw({ pipeline: ready }, null);
   if (drawn.length !== 1) failures.push('a ready pipeline was not drawn; the world would stay empty.');
 
   // A failed pipeline is three's own case; it returns early itself. Swallowing
   // it here would hide a real failure behind a silent skip.
   const broken = { id: 'broken' };
   backendData.set(broken, { error: true });
-  host.backend.draw({ pipeline: broken }, null);
+  backend.draw({ pipeline: broken }, null);
   if (drawn.length !== 2) failures.push('a failed pipeline was skipped here instead of by three.');
   if (gate.skipped !== 1) failures.push('a failed pipeline was counted as still compiling.');
 
   // An object with no pipeline at all is not this gate's business either.
-  host.backend.draw({}, null);
+  backend.draw({}, null);
   if (drawn.length !== 3) failures.push('an object with no pipeline was swallowed.');
   return failures;
 }
