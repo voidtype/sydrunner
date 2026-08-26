@@ -222,10 +222,32 @@ export class TripPass {
    */
   warmInto<T>(fn: () => Promise<T>): Promise<T> {
     const { renderer } = this.deps;
+    /*
+     * **Built on demand, and that is the whole of why the warm-up was still
+     * missing.** The graph is constructed at boot but `warm()` -- the first
+     * thing that calls `build()` -- runs seven thousand lines below
+     * `setPrecompiler`, so for the entire boot and the first minutes of play
+     * `this.post` was null, `warmInto` passed straight through, and every tile
+     * compiled for the canvas while the frame drew into the pass. The compile
+     * then landed on the frame that tile came into view: the owner's "it happens
+     * when I move the camera", exactly.
+     *
+     * `build()` is graph construction -- TSL nodes and a render target -- not
+     * compilation, so doing it at the first tile costs nothing and gives every
+     * warm from then on the context the frame will look up.
+     */
+    if (!this.failed && this.post === null) {
+      try {
+        this.post = this.build();
+      } catch (err) {
+        this.failed = true;
+        console.warn('[trip] the post pass could not be built; warms go to the canvas:', err);
+      }
+    }
     const target = this.scenePass?.renderTarget as
       | Parameters<typeof renderer.setRenderTarget>[0]
       | undefined;
-    if (this.failed || this.post === null || !target) return fn();
+    if (this.failed || !target) return fn();
     const prevTarget = renderer.getRenderTarget();
     const prevMrt = renderer.getMRT();
     renderer.setRenderTarget(target);
@@ -426,22 +448,21 @@ export function verifyTripPass(): string[] {
   };
   const pass = new TripPass({ renderer } as unknown as TripPassDeps);
 
-  // Before the pass exists there is nothing to bind, and the canvas context is
-  // the right one -- a frame with no pass is a plain `renderer.render`.
-  let sawEarly: unknown = null;
-  void pass.warmInto(async () => {
-    sawEarly = bound;
-  });
-  if (sawEarly !== outer) {
-    failures.push('warmInto bound a target before the pass was built');
-  }
-
+  // `build` is stubbed on the instance -- the real one wants TSL and a device.
+  // What is under test is that `warmInto` *reaches* it on first use: a version
+  // that waits for somebody else to build the pass binds nothing for the whole
+  // boot, because `warm()` runs seven thousand lines after `setPrecompiler`.
   const inner = pass as unknown as {
     post: unknown;
     scenePass: { renderTarget: unknown; _mrt: unknown } | null;
+    build: () => unknown;
   };
-  inner.post = {};
-  inner.scenePass = { renderTarget: target, _mrt: mrt };
+  let built = 0;
+  inner.build = () => {
+    built++;
+    inner.scenePass = { renderTarget: target, _mrt: mrt };
+    return {};
+  };
 
   let sawTarget: unknown = null;
   let sawMrt: unknown = null;
@@ -449,6 +470,12 @@ export function verifyTripPass(): string[] {
     sawTarget = bound;
     sawMrt = boundMrt;
   });
+  if (built !== 1) {
+    failures.push(
+      'warmInto did not build the pass on first use, so every tile warmed before the' +
+        ' boot gets round to it compiles for a context no frame draws in',
+    );
+  }
   if (sawTarget !== target) {
     failures.push(
       'warmInto did not bind the pass render target, so every precompile in this' +
@@ -461,14 +488,15 @@ export function verifyTripPass(): string[] {
   if (bound !== outer || boundMrt !== outerMrt) {
     failures.push('warmInto did not put the previous target back; the frame loop binds its own');
   }
+  void pass.warmInto(async () => undefined);
+  if (built !== 1) failures.push('warmInto rebuilt the pass on a later call.');
 
-  // **And it must be back before the compile finishes, not after.** This is the
-  // one that matters most and the one that shipped broken: awaiting `fn` inside
-  // the binding leaves the renderer aimed at the pass's own texture for the
-  // whole compile, and a frame landing in that window draws the output quad into
-  // the texture it samples -- "usage includes writable usage and another usage
-  // in the same synchronization scope", which is a dead canvas. Tiles warm
-  // continuously during play, so the window is open essentially always.
+  // **The binding must be back before the compile finishes, not after.** This is
+  // the one that shipped broken: awaiting `fn` inside the binding leaves the
+  // renderer aimed at the pass's own texture for the whole compile, and a frame
+  // landing in that window draws the output quad into the texture it samples --
+  // "usage includes writable usage and another usage in the same synchronization
+  // scope", which is a dead canvas. Tiles warm continuously during play.
   let release: (() => void) | null = null;
   const pending = pass.warmInto(
     () =>
@@ -497,5 +525,25 @@ export function verifyTripPass(): string[] {
   if (bound !== outer) {
     failures.push('warmInto left the pass target bound after a failed compile');
   }
+
+  // A pass that cannot be built degrades to the canvas rather than throwing at
+  // the caller: a client with no post pass is a city with no waviness, and a
+  // precompile that throws is a tile that never warms at all.
+  const broken = new TripPass({ renderer } as unknown as TripPassDeps);
+  (broken as unknown as { build: () => unknown }).build = () => {
+    throw new Error('no device');
+  };
+  let ran = false;
+  const warn = console.warn; // the broken case logs by design; not at every boot.
+  console.warn = () => {};
+  try {
+    void broken.warmInto(async () => {
+      ran = true;
+    });
+  } finally {
+    console.warn = warn;
+  }
+  if (!ran) failures.push('a pass that could not be built swallowed the compile instead of running it.');
+  if (bound !== outer) failures.push('a failed build left a target bound.');
   return failures;
 }

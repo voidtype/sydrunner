@@ -2866,6 +2866,24 @@ async function main(): Promise<void> {
     // expensive no-op.
     await bindWarmTarget(() => warmGroupOffCamera(renderer, group, camera, scene));
   };
+  /**
+   * The psychedelic pass. Its *graph* is built on the first warm; its pipeline
+   * is still compiled on the first mushroom and never before.
+   *
+   * **Constructed here, immediately above the precompiler, and that placement is
+   * load-bearing.** Everything below this line and the frame loop is boot work
+   * behind `withDeadline` -- the ground bake, the rail bake, the far layer --
+   * and every one of those is an await measured in seconds. Tiles stream and
+   * warm straight through them. When the pass was constructed after that work,
+   * `bindWarmTarget` was the passthrough holder for the whole of it, so the
+   * hundreds of tiles warmed during boot compiled for the canvas rather than for
+   * the target the frame draws into, and each one paid its pipeline again on the
+   * frame it first came into view. Which is the frame the camera turned.
+   */
+  const tripPass = new TripPass({ renderer, scene, camera });
+  // See `bindWarmTarget` above and `TripPass.warmInto`: from here on every
+  // precompile in this client compiles into the target the frame draws into.
+  bindWarmTarget = (fn) => tripPass.warmInto(fn);
   streamer.setPrecompiler(precompileGroup);
 
   /* --- WORKSTREAM AJ: the curtain, and what it now waits for ------------------
@@ -3328,11 +3346,6 @@ async function main(): Promise<void> {
   };
 
   (globalThis as unknown as { __THREE_TSL__: unknown }).__THREE_TSL__ = TSL;
-  /** The psychedelic pass. Built on the first mushroom, never before. */
-  const tripPass = new TripPass({ renderer, scene, camera });
-  // See `bindWarmTarget` above and `TripPass.warmInto`: from here on every
-  // precompile in this client compiles into the target the frame draws into.
-  bindWarmTarget = (fn) => tripPass.warmInto(fn);
   /** Eased toward `tripLook(stack)`; see `world/tripview.ts`. */
   let tripLookNow = CALM;
   /**
