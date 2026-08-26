@@ -193,8 +193,18 @@ export function sweepQueue(children: readonly SweepNode[], fanout = 4, depth = 2
   return out;
 }
 
+/**
+ * How many busy frames in a row the sweep will stand aside for before taking
+ * its turn anyway. Eight is about an eighth of a second of deferral at 60 Hz
+ * and a couple of seconds when the client is struggling -- slow enough to stay
+ * out of the way, fast enough that the queue actually drains.
+ */
+const STARVE_FRAMES = 8;
+
 export class ShadowSweep {
   private queue: SweepNode[] | null = null;
+  /** Frames this has stood aside for a busy frame. See `next`. */
+  private deferred = 0;
   private done = 0;
 
   /** How many groups are still waiting. Zero before the sweep is armed. */
@@ -212,8 +222,21 @@ export class ShadowSweep {
    * use. Returns the group to warm, or null when there is nothing to do --
    * either the rig is not known yet or the sweep has finished.
    */
-  next(ready: boolean, children: readonly SweepNode[]): SweepNode | null {
+  next(ready: boolean, children: readonly SweepNode[], roomy = true): SweepNode | null {
     if (!ready) return null;
+    // **Starvation escape, and it is not a nicety.** Gating purely on a quiet
+    // frame shipped once and made things worse: on a machine where play frames
+    // sit at 200 ms the gate never opened, the sweep never ran, and the tiles it
+    // was meant to warm paid their shadow pipelines on the frame instead --
+    // 614 compiles against 240 before the gate existed. A gate that never opens
+    // is worse than no gate. So a busy frame defers the work at most
+    // `STARVE_FRAMES` times, then it goes through regardless: the queue is
+    // one-time and finite, and finishing it is what stops the stalls.
+    if (!roomy && this.deferred < STARVE_FRAMES) {
+      this.deferred++;
+      return null;
+    }
+    this.deferred = 0;
     if (this.queue === null) this.queue = sweepQueue(children);
     const group = this.queue.pop();
     if (group === undefined) return null;
@@ -356,6 +379,19 @@ export function verifyShadowWarm(): string[] {
   // `position` attribute once per tick, for nothing.
   const hollow: SweepNode = { children: [] };
   const graph: SweepNode[] = [sky, tileRoot, small, hollow, hud];
+
+  // A gate that never opens is worse than no gate: on a slow client every frame
+  // is "busy", and a sweep that always stands aside leaves its whole queue
+  // unwarmed to be paid on the frame instead. That shipped once.
+  const starved = new ShadowSweep();
+  let handed = 0;
+  for (let i = 0; i < 200; i++) {
+    if (starved.next(true, graph, false) !== null) handed++;
+  }
+  if (handed === 0) {
+    failures.push('the sweep never ran on a client whose frames are always busy; its queue never drains.');
+  }
+  if (starved.pending !== 0) failures.push('the sweep did not finish under sustained load.');
 
   if (sweep.next(false, graph) !== null) {
     failures.push('the sweep handed out work before the shadow rig was known.');

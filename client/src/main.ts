@@ -10918,7 +10918,7 @@ async function main(): Promise<void> {
       // Below the threshold it does nothing and waits; the queue is one-time
       // and keeps until the client is idle enough to pay for it.
       const roomy = frameDt < SWEEP_FRAME_BUDGET_S;
-      const catchUp = shadowSweep.next(shadowWarm.ready && roomy, scene.children);
+      const catchUp = shadowSweep.next(shadowWarm.ready, scene.children, roomy);
       if (catchUp !== null) {
         void shadowWarm.warmInto(renderer, scene, () =>
           warmGroupOffCamera(renderer, catchUp as Object3D, camera, scene),
