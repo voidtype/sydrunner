@@ -108,6 +108,7 @@ import {
   warmupStandins,
   type WarmupPart,
 } from './world/warmup.ts';
+import { ShadowWarm, ShadowSweep, verifyShadowWarm } from './world/shadowwarm.ts';
 // WORKSTREAM AB: where the browser frame goes. One import block and one
 // `FrameProfile` in the loop's closure; every `frame.at(FSEC.x)` below is a
 // single line at a boundary that already existed. See `client/src/frameprofile.ts`.
@@ -2865,6 +2866,16 @@ async function main(): Promise<void> {
     // it away. See `TripPass.warmInto`; without it this whole function is an
     // expensive no-op.
     await bindWarmTarget(() => warmGroupOffCamera(renderer, group, camera, scene));
+    // **And again for the shadow pass, which is a different pipeline entirely.**
+    // `Renderer.compile()` walks the opaque and transparent lists and stops --
+    // it never renders shadows -- so until this line every shadow-casting mesh
+    // in this world compiled its shadow pipeline on the frame it first entered
+    // the sun's frustum. The shadow camera tracks the player and the sun, which
+    // is exactly why the owner reported it as "it happens when I turn", and why
+    // it went quiet after a minute or two. See `world/shadowwarm.ts`.
+    await shadowWarm.warmInto(renderer, scene, () =>
+      warmGroupOffCamera(renderer, group, camera, scene),
+    );
   };
   /**
    * The psychedelic pass. Its *graph* is built on the first warm; its pipeline
@@ -2880,6 +2891,16 @@ async function main(): Promise<void> {
    * the target the frame draws into, and each one paid its pipeline again on the
    * frame it first came into view. Which is the frame the camera turned.
    */
+  /**
+   * The shadow pass's warm-up. Learns what the shadow render binds by watching
+   * the first one go past, then every precompile from that point compiles for
+   * both passes. `shadowSweep` is the one-time catch-up over what was already
+   * resident when that first shadow render happened -- the boot tiles, which
+   * are otherwise the whole of the first minute of stalls.
+   */
+  const shadowWarm = new ShadowWarm();
+  shadowWarm.observe(renderer, scene);
+  const shadowSweep = new ShadowSweep();
   const tripPass = new TripPass({ renderer, scene, camera });
   // See `bindWarmTarget` above and `TripPass.warmInto`: from here on every
   // precompile in this client compiles into the target the frame draws into.
@@ -4965,6 +4986,7 @@ async function main(): Promise<void> {
     ...verifyHurtDir(),
     ...verifyTicker(),
     ...verifyTripPass(),
+    ...verifyShadowWarm(),
     ...verifyMandala(),
     ...verifyQuestAim(),
     ...verifyQuestAreas(),
@@ -10867,6 +10889,19 @@ async function main(): Promise<void> {
     // sun's bearing by 1/sin(altitude) and is what decides which tiles are told
     // to receive. See `streamer.sunReceiveRange`.
     streamer.update(camera, sky.shadowVolume, alt);
+    // One group per frame, once, as soon as the shadow rig is known: the tiles
+    // that were already standing when the first shadow render happened never
+    // went past `precompileGroup` with a rig to bind. One per frame because a
+    // sweep of the whole scene in a single tick is the stall it prevents,
+    // moved. See `ShadowSweep`.
+    {
+      const catchUp = shadowSweep.next(shadowWarm.ready, scene.children);
+      if (catchUp !== null) {
+        void shadowWarm.warmInto(renderer, scene, () =>
+          warmGroupOffCamera(renderer, catchUp as Object3D, camera, scene),
+        );
+      }
+    }
     // --- And, for a rider, where they will be rather than where they are.
     //
     // TRAINS.md's deterministic prefetch. The radial guess `update` just made is
