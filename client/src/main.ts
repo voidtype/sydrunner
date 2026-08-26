@@ -109,6 +109,8 @@ import {
   type WarmupPart,
 } from './world/warmup.ts';
 import { ShadowWarm, ShadowSweep, verifyShadowWarm } from './world/shadowwarm.ts';
+import { AsyncPipelines, verifyAsyncPipes } from './world/asyncpipes.ts';
+import type { PipelineHost } from './world/asyncpipes.ts';
 // WORKSTREAM AB: where the browser frame goes. One import block and one
 // `FrameProfile` in the loop's closure; every `frame.at(FSEC.x)` below is a
 // single line at a boundary that already existed. See `client/src/frameprofile.ts`.
@@ -1672,6 +1674,20 @@ async function main(): Promise<void> {
 
   const canvas = document.getElementById('viewport') as HTMLCanvasElement;
   const renderer = new WebGPURenderer({ canvas, antialias: true });
+  /*
+   * **The frame is allowed to say "not now".** Every warm-up in this client is a
+   * bet that the set of materials can be enumerated ahead of time, and in a
+   * 60 km city that streams trains, landmarks, car models and mushrooms the bet
+   * cannot be won -- the first sight of any of them stops the frame dead to
+   * compile it. This takes the compile off the frame instead: three is given a
+   * promise array on every frame, which routes it to
+   * `createRenderPipelineAsync`, and an object whose pipeline is not ready yet
+   * is skipped for a frame or two rather than drawn with an undefined pipeline.
+   * Installed here because it must be in place before anything renders. See
+   * `world/asyncpipes.ts` for what this does *not* move.
+   */
+  const asyncPipes = new AsyncPipelines();
+  asyncPipes.install(renderer as unknown as PipelineHost);
   // Spec section 1: 2560x1440 is 3.7 M pixels and a real fill-rate load. Degrade
   // resolution before draw distance or facade quality, so this starts at 0.75.
   let renderScale = 0.75;
@@ -5003,6 +5019,7 @@ async function main(): Promise<void> {
     ...verifyTicker(),
     ...verifyTripPass(),
     ...verifyShadowWarm(),
+    ...verifyAsyncPipes(),
     ...verifyMandala(),
     ...verifyQuestAim(),
     ...verifyQuestAreas(),
@@ -12159,7 +12176,8 @@ async function main(): Promise<void> {
       console.warn(
         `[frame] ${frameMs.toFixed(0)} ms — worst sections: ${worst || '(none)'}` +
           `  |  pipelines compiled in stalled frames so far: ${pipelineWatch.pipelines}` +
-          ` over ${pipelineWatch.frames} frame(s), worst ${pipelineWatch.worstMs.toFixed(0)} ms`,
+          ` over ${pipelineWatch.frames} frame(s), worst ${pipelineWatch.worstMs.toFixed(0)} ms` +
+          `  |  off-frame compiles ${asyncPipes.compiles}, draws deferred ${asyncPipes.skipped}`,
       );
     }
     if (frameDt < 0.2) {

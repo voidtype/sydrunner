@@ -1,0 +1,196 @@
+/*
+ * asyncpipes.ts -- the frame is allowed to say "not now".
+ *
+ * Every fix before this one tried to warm more: the tile's own pass, then the
+ * shadow pass, then a catch-up sweep. All of them are the same bet -- that a
+ * warm-up can be made exhaustive -- and the owner is right that the bet is
+ * unwinnable. A 60 km city streams trains, landmarks, car models, mushrooms and
+ * pedestrians that no boot pass can enumerate, and the moment one of them is
+ * seen for the first time the frame stops dead to compile it.
+ *
+ * The frame should not be able to stop for that at all. It should hand the work
+ * off and carry on. That is not a wish; WebGPU already provides it:
+ *
+ *     device.createRenderPipeline( ... )       // blocks the caller
+ *     device.createRenderPipelineAsync( ... )  // returns a promise; the
+ *                                              // driver compiles off-thread
+ *
+ * three uses the second form already -- but only from `compileAsync`. The
+ * decision is one null check: `_renderObjectDirect` calls
+ * `this._pipelines.getForRender( renderObject, this._compilationPromises )`,
+ * and `_compilationPromises` is null on a frame, which routes straight to the
+ * blocking call. Give it an array instead and the same code takes the async
+ * path, caches the pipeline object immediately, and fills it in when the driver
+ * is done.
+ *
+ * The other half is missing entirely. `WebGPUBackend.draw()` guards a pipeline
+ * that *failed*:
+ *
+ *     if ( pipelineData.error === true ) return;
+ *
+ * but not one that is merely *not ready yet* -- it would call
+ * `setPipeline(undefined)` and take the frame down. So this adds that guard:
+ * an object whose pipeline is still compiling is simply not drawn this frame.
+ *
+ * The result is the thing the owner asked for: the compile is off the frame and
+ * the draw is pausable. The cost is that a newly seen object appears a frame or
+ * two late instead of arriving on time inside a 600 ms stall.
+ *
+ * **What this does not move.** `getForRender` also builds the WGSL from the
+ * node graph, and that is JavaScript on this thread. The driver compile is
+ * usually the larger half and is what moves here; if the stalls shrink but do
+ * not vanish, the remainder is the node build, and three has an async path for
+ * that too (`Nodes.getForRenderAsync`) which the frame loop cannot reach today.
+ * Worth measuring before building it.
+ */
+
+/** The pieces of the renderer this needs, named so a check can stub them. */
+export interface PipelineHost {
+  _pipelines: { getForRender: (renderObject: unknown, promises?: unknown) => unknown };
+  backend: {
+    draw: (renderObject: unknown, info: unknown) => void;
+    get: (object: unknown) => { pipeline?: unknown; error?: boolean };
+  };
+}
+
+export class AsyncPipelines {
+  private installed = false;
+  /** Draws skipped because the pipeline was still compiling. */
+  private skippedDraws = 0;
+  /** Compiles started off the frame. */
+  private started = 0;
+
+  get skipped(): number {
+    return this.skippedDraws;
+  }
+
+  get compiles(): number {
+    return this.started;
+  }
+
+  /**
+   * Wrap the two methods that decide whether a compile blocks the frame.
+   *
+   * Idempotent: wrapping twice would nest the sinks and double-count, and a
+   * second install is exactly the sort of thing a later refactor does by
+   * accident.
+   */
+  install(host: PipelineHost): void {
+    if (this.installed) return;
+    this.installed = true;
+
+    const pipelines = host._pipelines;
+    const innerGet = pipelines.getForRender.bind(pipelines);
+    pipelines.getForRender = (renderObject: unknown, promises?: unknown): unknown => {
+      // `compileAsync` passes its own array and collects the promises to await.
+      // Leave that path exactly as it is: it is already off the frame, and the
+      // boot pass depends on being able to wait for it.
+      if (promises !== null && promises !== undefined) return innerGet(renderObject, promises);
+      // A frame. Hand it an array so three takes `createRenderPipelineAsync`.
+      // Nothing here awaits it -- the point is not to. The pipeline object is
+      // cached synchronously either way, so the next frame finds it and the
+      // draw guard below decides whether it is ready to use.
+      const sink: unknown[] = [];
+      const pipeline = innerGet(renderObject, sink);
+      if (sink.length > 0) this.started += sink.length;
+      return pipeline;
+    };
+
+    const backend = host.backend;
+    const innerDraw = backend.draw.bind(backend);
+    backend.draw = (renderObject: unknown, info: unknown): void => {
+      const ro = renderObject as { pipeline?: unknown };
+      const data = ro.pipeline === undefined ? undefined : backend.get(ro.pipeline);
+      // `error` is three's own business -- it returns early on that itself, and
+      // second-guessing it here would only hide a real failure. The case three
+      // has no answer for is a pipeline that exists but is still compiling.
+      if (data !== undefined && data.error !== true && data.pipeline === undefined) {
+        this.skippedDraws++;
+        return;
+      }
+      innerDraw(renderObject, info);
+    };
+  }
+}
+
+export function verifyAsyncPipes(): string[] {
+  const failures: string[] = [];
+
+  const seen: { promises: unknown }[] = [];
+  const drawn: unknown[] = [];
+  const backendData = new Map<unknown, { pipeline?: unknown; error?: boolean }>();
+
+  const host: PipelineHost = {
+    _pipelines: {
+      getForRender: (_ro: unknown, promises?: unknown) => {
+        seen.push({ promises });
+        // Stand in for three filling the array on a cache miss.
+        if (Array.isArray(promises)) promises.push(Promise.resolve());
+        return { id: 'pipeline' };
+      },
+    },
+    backend: {
+      draw: (ro: unknown) => {
+        drawn.push(ro);
+      },
+      get: (o: unknown) => backendData.get(o) ?? {},
+    },
+  };
+
+  const gate = new AsyncPipelines();
+  gate.install(host);
+  gate.install(host); // must not nest
+
+  // A frame: three passes null, and that is the null check that routes it to
+  // the blocking `createRenderPipeline`. It must not reach the inner call.
+  host._pipelines.getForRender({ id: 'ro' }, null);
+  if (seen.length !== 1) failures.push('the pipeline call did not reach three.');
+  else if (seen[0].promises === null || seen[0].promises === undefined) {
+    failures.push(
+      'a frame still asked three for a blocking pipeline compile; the frame stops' +
+        ' dead on the first sight of any new material',
+    );
+  }
+  if (gate.compiles !== 1) failures.push(`counted ${gate.compiles} off-frame compiles, expected 1.`);
+
+  // `compileAsync` already collects its own promises. Passing it a fresh sink
+  // would drop them on the floor and the boot pass would stop waiting for
+  // anything.
+  const theirs: unknown[] = [];
+  host._pipelines.getForRender({ id: 'ro2' }, theirs);
+  if (seen[1].promises !== theirs) {
+    failures.push("the warm-up's own promise array was replaced; nothing can await the boot compile.");
+  }
+
+  // A pipeline still compiling: skip the draw rather than handing WebGPU an
+  // undefined pipeline, which ends the frame with a validation error.
+  const compiling = { id: 'compiling' };
+  backendData.set(compiling, {});
+  host.backend.draw({ pipeline: compiling }, null);
+  if (drawn.length !== 0) {
+    failures.push(
+      'drew an object whose pipeline was still compiling; setPipeline(undefined)' +
+        ' takes the whole frame down',
+    );
+  }
+  if (gate.skipped !== 1) failures.push(`counted ${gate.skipped} skipped draws, expected 1.`);
+
+  // Ready: draw it. A gate that never opens is a world that never appears.
+  const ready = { id: 'ready' };
+  backendData.set(ready, { pipeline: { gpu: true } });
+  host.backend.draw({ pipeline: ready }, null);
+  if (drawn.length !== 1) failures.push('a ready pipeline was not drawn; the world would stay empty.');
+
+  // A failed pipeline is three's own case; it returns early itself. Swallowing
+  // it here would hide a real failure behind a silent skip.
+  const broken = { id: 'broken' };
+  backendData.set(broken, { error: true });
+  host.backend.draw({ pipeline: broken }, null);
+  if (drawn.length !== 2) failures.push('a failed pipeline was skipped here instead of by three.');
+  if (gate.skipped !== 1) failures.push('a failed pipeline was counted as still compiling.');
+
+  // An object with no pipeline at all is not this gate's business either.
+  host.backend.draw({}, null);
+  if (drawn.length !== 3) failures.push('an object with no pipeline was swallowed.');
+  return failures;
+}
