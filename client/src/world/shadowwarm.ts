@@ -157,8 +157,35 @@ export class ShadowWarm {
  * relative to a frame if it is one warm; a sweep of the whole scene in a single
  * tick would be the stall it is trying to prevent, just moved.
  */
+/** Anything with children: `Object3D` satisfies this structurally. */
+export interface SweepNode {
+  readonly children?: readonly SweepNode[];
+}
+
+/**
+ * One level of descent, and it is the difference between this sweep working and
+ * being the stall it prevents.
+ *
+ * Every tile in this world hangs off a single group named `tiles`, which is one
+ * child of the scene. Handing that group to a warm is handing it every resident
+ * tile at once -- one frame, every shadow pipeline, which is the 1,500 ms frame
+ * the owner reported, moved rather than removed. So a container is opened and
+ * its children queued in its place. By fan-out rather than by name: the far
+ * layer, the rail and the traffic all hold their contents the same way, and a
+ * name test would cover the one case somebody happened to think of.
+ */
+export function sweepQueue(children: readonly SweepNode[], fanout = 4): SweepNode[] {
+  const out: SweepNode[] = [];
+  for (const child of children) {
+    const kids = child.children;
+    if (kids !== undefined && kids.length > fanout) out.push(...kids);
+    else out.push(child);
+  }
+  return out;
+}
+
 export class ShadowSweep {
-  private queue: unknown[] | null = null;
+  private queue: SweepNode[] | null = null;
   private done = 0;
 
   /** How many groups are still waiting. Zero before the sweep is armed. */
@@ -176,9 +203,9 @@ export class ShadowSweep {
    * use. Returns the group to warm, or null when there is nothing to do --
    * either the rig is not known yet or the sweep has finished.
    */
-  next(ready: boolean, children: readonly unknown[]): unknown | null {
+  next(ready: boolean, children: readonly SweepNode[]): SweepNode | null {
     if (!ready) return null;
-    if (this.queue === null) this.queue = children.slice();
+    if (this.queue === null) this.queue = sweepQueue(children);
     const group = this.queue.pop();
     if (group === undefined) return null;
     this.done++;
@@ -309,23 +336,43 @@ export function verifyShadowWarm(): string[] {
 
   // The sweep.
   const sweep = new ShadowSweep();
-  if (sweep.next(false, ['a', 'b']) !== null) {
+  const leaf = (_name: string): SweepNode => ({ children: [] });
+  const sky = leaf('sky');
+  const hud = leaf('hud');
+  // The `tiles` group: one child of the scene holding every resident tile.
+  const tiles: SweepNode[] = [leaf('t0'), leaf('t1'), leaf('t2'), leaf('t3'), leaf('t4')];
+  const tileRoot: SweepNode = { children: tiles };
+  const small: SweepNode = { children: [leaf('a'), leaf('b')] };
+  const graph: SweepNode[] = [sky, tileRoot, small, hud];
+
+  if (sweep.next(false, graph) !== null) {
     failures.push('the sweep handed out work before the shadow rig was known.');
   }
-  const kids = ['a', 'b', 'c'];
-  const seen: unknown[] = [];
-  for (let i = 0; i < 5; i++) {
-    const g = sweep.next(true, kids);
+  const seen: SweepNode[] = [];
+  for (let i = 0; i < 20; i++) {
+    const g = sweep.next(true, graph);
     if (g !== null) seen.push(g);
   }
-  if (seen.length !== 3) {
-    failures.push(`the sweep covered ${seen.length} of 3 groups, one per tick.`);
+  if (seen.includes(tileRoot)) {
+    failures.push(
+      'the sweep handed the whole tile group to one warm: every resident tile' +
+        ' compiling its shadow pipelines in a single frame is the stall, moved',
+    );
   }
-  if (new Set(seen).size !== 3) failures.push('the sweep warmed the same group twice.');
+  for (const tile of tiles) {
+    if (!seen.includes(tile)) failures.push('the sweep skipped a tile inside the tile group.');
+  }
+  if (!seen.includes(small)) {
+    failures.push('the sweep opened a small group it should have warmed whole.');
+  }
+  if (seen.length !== 3 + tiles.length) {
+    failures.push(`the sweep covered ${seen.length} groups, expected ${3 + tiles.length}.`);
+  }
+  if (new Set(seen).size !== seen.length) failures.push('the sweep warmed the same group twice.');
   if (sweep.pending !== 0) failures.push('the sweep did not finish.');
-  // Children added after the sweep armed are the precompiler's job, not its own.
-  kids.push('d');
-  if (sweep.next(true, kids) !== null) {
+  // Groups added after the sweep armed are the precompiler's job, not its own.
+  graph.push(leaf('late'));
+  if (sweep.next(true, graph) !== null) {
     failures.push('the sweep re-armed from a grown scene; it is a one-time catch-up.');
   }
   return failures;
