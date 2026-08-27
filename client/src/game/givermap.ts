@@ -151,6 +151,25 @@ import {
 export const GIVER_RANGE_M = 500;
 
 /**
+ * What the **big map** asks for, against the compass's five hundred metres.
+ *
+ * The header above argues that a map showing every giver in Greater Sydney is a
+ * quest log with a picture behind it, and that is still true. What it did not
+ * account for is the arithmetic: at 109 quests over sixty kilometres, a
+ * five-hundred-metre disc has an expected giver count of **two in a hundred**,
+ * so the big map at its nine-kilometre zoom showed an empty city and the owner
+ * reported the quest system as undiscoverable. It was not hard to find. It was
+ * absent.
+ *
+ * The field packs fix the density; this fixes the question the big map asks.
+ * 4.5 km is the big map's own radius at that zoom -- it shows what is *on the
+ * map* rather than what is in the compass's disc, which is what a person means
+ * when they open a map. The compass keeps 500 m, because "what you are near" is
+ * still the right question for a thing you read while running.
+ */
+export const MAP_GIVER_RANGE_M = 4500;
+
+/**
  * How many may be on the map at once. `world/questmarkers.MAX_MARKERS`'s twelve.
  *
  * Not imported from there, because that module is a renderer and this one is
@@ -160,6 +179,16 @@ export const GIVER_RANGE_M = 500;
  * other should be looked at rather than followed.
  */
 export const MAX_GIVER_DOTS = 12;
+
+/**
+ * The big map's cap, against the compass's twelve.
+ *
+ * Twelve is a legibility number for a 210 px disc, and the big map is not one:
+ * it is the whole screen, and forty-eight dots across nine kilometres is about
+ * one every two hundred pixels. Still a cap, because the eviction rule is what
+ * keeps the hero from being the one that goes.
+ */
+export const MAX_MAP_GIVER_DOTS = 48;
 
 /**
  * The gold, as the renderer wants it and as a canvas wants it.
@@ -269,8 +298,12 @@ export class GiverDots {
   private beat = -1;
   /** How many candidates the cap turned away on the last sweep. */
   private cut = 0;
-  /** How many givers were inside `GIVER_RANGE_M` and had a mark, before the cap. */
+  /** How many givers were inside the range and had a mark, before the cap. */
   private found = 0;
+  /** The range the live selection was made at. See `refresh`. */
+  private rangeM = GIVER_RANGE_M;
+  /** The cap the live selection was made under. See `refresh`. */
+  private cap = MAX_GIVER_DOTS;
 
   /** How many dots are live. Loop `for (let i = 0; i < count; i++)`. */
   get count(): number {
@@ -291,7 +324,7 @@ export class GiverDots {
    * showing all of them.
    */
   stats(): { shown: number; found: number; dropped: number; rangeM: number; cap: number } {
-    return { shown: this.live, found: this.found, dropped: this.cut, rangeM: GIVER_RANGE_M, cap: MAX_GIVER_DOTS };
+    return { shown: this.live, found: this.found, dropped: this.cut, rangeM: this.rangeM, cap: this.cap };
   }
 
   /**
@@ -303,9 +336,23 @@ export class GiverDots {
    * `view()` and `facts()` builds happen once per sweep rather than once per
    * npc, for the same reason they do there.
    */
-  refresh(beat: number, x: number, z: number, source: GiverMapSource): boolean {
-    if (beat === this.beat) return false;
+  refresh(
+    beat: number,
+    x: number,
+    z: number,
+    source: GiverMapSource,
+    rangeM: number = GIVER_RANGE_M,
+    cap: number = MAX_GIVER_DOTS,
+  ): boolean {
+    // **The range is part of the staleness test, not just the beat.** Opening
+    // the big map changes the question without moving the player or the beat,
+    // and a sweep that returned early on `beat === this.beat` would leave the
+    // compass's dozen on screen under a nine-kilometre map -- which is the bug
+    // this parameter exists to fix, reintroduced by its own cache.
+    if (beat === this.beat && rangeM === this.rangeM && cap === this.cap) return false;
     this.beat = beat;
+    this.rangeM = rangeM;
+    this.cap = cap;
     this.live = 0;
     this.cut = 0;
     this.found = 0;
@@ -313,7 +360,7 @@ export class GiverDots {
     if (npcs.length === 0) return true;
     const view = source.view();
     const facts = source.facts();
-    const range2 = GIVER_RANGE_M * GIVER_RANGE_M;
+    const range2 = rangeM * rangeM;
     for (const npc of npcs) {
       const dx = npc.x - x;
       const dz = npc.z - z;
@@ -343,15 +390,15 @@ export class GiverDots {
    */
   private insert(npc: DialogNpc, d2: number, turnin: boolean): void {
     const hero = npc.marker === NPC_MARKER.HERO;
-    if (this.live >= MAX_GIVER_DOTS) {
+    if (this.live >= this.cap) {
       // The cap is reached. Does this one beat the worst thing already in?
-      const worst = this.pool[MAX_GIVER_DOTS - 1];
+      const worst = this.pool[this.cap - 1];
       if (!GiverDots.better(hero, d2, worst.hero, worst.d2)) {
         this.cut++;
         return;
       }
       this.cut++;
-      this.live = MAX_GIVER_DOTS - 1;
+      this.live = this.cap - 1;
     }
     let slot = this.pool[this.live];
     if (slot === undefined) {
@@ -521,6 +568,43 @@ export function verifyGiverMap(): string[] {
     // a rung-1 job does not fall off the map when its player climbs past it.
     // This is not a rule this file knows -- it is `questRefusal`'s -- and the
     // map is simply the place it is easiest to see.
+    // --- The big map asks a wider question, and the cache must let it.
+    {
+      // A giver two kilometres out: past the compass, well inside the map.
+      const far = [...npcs, npc('across-town', 2000, 0, 'pool')];
+      const wide: GiverMapSource = {
+        npcs: () => far,
+        facts: () => facts(1),
+        view: () => questView(quests, {}),
+      };
+      const d = new GiverDots();
+      d.refresh(7, 0, 0, wide);
+      const near = new Set<string>();
+      for (let i = 0; i < d.count; i++) near.add(d.at(i).id);
+      if (near.has('across-town')) {
+        failures.push('the compass showed a giver two kilometres away; its disc is a short walk, not a city.');
+      }
+      // **Same beat, same player, wider question.** Opening the map moves
+      // neither the beat nor the feet, so a staleness test that looks only at
+      // the beat returns early and leaves the compass's dozen under a
+      // nine-kilometre map -- which is the bug the range parameter exists to
+      // fix, reintroduced by its own cache.
+      if (!d.refresh(7, 0, 0, wide, MAP_GIVER_RANGE_M, MAX_MAP_GIVER_DOTS)) {
+        failures.push('opening the big map did not recompute; the cache answered a question it was not asked.');
+      }
+      const wideSet = new Set<string>();
+      for (let i = 0; i < d.count; i++) wideSet.add(d.at(i).id);
+      if (!wideSet.has('across-town')) {
+        failures.push(
+          'the big map did not show a giver two kilometres away: at this density that map is empty,' +
+            ' which is exactly the "I cannot find any quests" the range exists to answer',
+        );
+      }
+      if (d.stats().rangeM !== MAP_GIVER_RANGE_M) {
+        failures.push('the stats line still reports the compass range under the big map; the console handle would lie.');
+      }
+    }
+
     dots.refresh(2, 0, 0, source(12));
     const atTwelve = new Set<string>();
     for (let i = 0; i < dots.count; i++) atTwelve.add(dots.at(i).id);

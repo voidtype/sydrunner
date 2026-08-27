@@ -208,8 +208,24 @@ export const MAX_CHOICES = 6;
  * refused, loudly, with a reason" -- the behaviour the content pipeline already
  * promises for every other kind of bad pack.
  */
-export const MAX_QUESTS_PER_BUNDLE = 512;
-export const MAX_NPCS_PER_BUNDLE = 256;
+/*
+ * **Raised for the field packs, and the reason the numbers moved is the reason
+ * they exist.** The header above is explicit that these are a backstop against
+ * a server that has gone mad rather than a budget to design against, and they
+ * were set an order of magnitude over the 109 quests of the day. The field
+ * packs are a deliberate 6x: 500 jobs hung off real stations, because at 109
+ * quests over sixty kilometres the compass's five-hundred-metre disc had an
+ * expected giver count of two in a hundred and the feature was, to three
+ * figures, absent.
+ *
+ * So the ceiling moves with the content and keeps the property: ~3x the 609
+ * quests and 605 givers that now ship, which still convicts a runaway loop
+ * long before a browser goes silently blind. What it costs is real and worth
+ * writing down: `/content` is 2.2 MB raw, 316 KB gzipped, fetched once at boot
+ * and parsed by every client. That is the number to watch if this grows again.
+ */
+export const MAX_QUESTS_PER_BUNDLE = 2048;
+export const MAX_NPCS_PER_BUNDLE = 1024;
 
 /** Text caps. Generous for a line, tight for an id. */
 export const MAX_ID_CHARS = 48;

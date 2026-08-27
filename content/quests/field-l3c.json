@@ -1,0 +1,426 @@
+{
+ "pack": "field-l3c",
+ "quests": [
+  {
+   "id": "f3-the-clock-kirrawee",
+   "act": 3,
+   "title": "The Clock at Kirrawee",
+   "blurb": "The clock on this platform has been four minutes fast since I got here and every relief who comes through wants to fix it. Do not fix it. Go and find out who set it, before they retire.",
+   "giver": "field-kirrawee-indira",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -12240,
+     "z": 18678,
+     "radius": 20,
+     "label": "the clock, four minutes fast, for the file"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Kirrawee",
+     "to": "Gymea",
+     "label": "to Gymea, where the old crew drink"
+    },
+    {
+     "kind": "dialog",
+     "npc": "field-kirrawee-indira",
+     "node": "ledger",
+     "label": "bring the name back"
+    }
+   ],
+   "reward": {
+    "cash": 88,
+    "xp": 221,
+    "unlock": [
+     "field:f3-the-clock-kirrawee"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-the-dog-villawood",
+   "act": 3,
+   "title": "The Dog at Villawood",
+   "blurb": "There is a dog that meets the 5:40 at Villawood every weekday and has done for months, and nobody gets off for it. I have decided this is not going to be a sad story. Find out whose it is.",
+   "giver": "field-villawood-ines",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -21525,
+     "z": 1563,
+     "radius": 20,
+     "label": "the end of the platform, at twenty to six"
+    },
+    {
+     "kind": "goto",
+     "x": -21638,
+     "z": 1676,
+     "radius": 25,
+     "label": "the street it walks home to"
+    },
+    {
+     "kind": "dialog",
+     "npc": "field-villawood-ines",
+     "node": "ledger",
+     "label": "tell me it is not a sad story"
+    }
+   ],
+   "reward": {
+    "cash": 88,
+    "xp": 204,
+    "unlock": [
+     "field:f3-the-dog-villawood"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-the-numbers-clyde",
+   "act": 3,
+   "title": "The Book at Clyde",
+   "blurb": "I run a small book on things that are not races and someone is beating it. Not by much and not by luck. Ride the run they ride, watch what they watch, and tell me what they know that I do not.",
+   "giver": "field-clyde-inge",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Clyde",
+     "to": "Granville",
+     "label": "ride the run they ride"
+    },
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "the two who follow you off it"
+    },
+    {
+     "kind": "earn",
+     "dollars": 31,
+     "label": "$31 back off the book"
+    }
+   ],
+   "reward": {
+    "cash": 93,
+    "xp": 206,
+    "unlock": [
+     "field:f3-the-numbers-clyde"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-last-service-kingswood",
+   "act": 3,
+   "title": "Last Service out of Kingswood",
+   "blurb": "The last one through Kingswood carries four people and one of them is always asleep. Ride it to Penrith, photograph what the platform looks like with nobody on it, and come back and tell me it is still there.",
+   "giver": "field-kingswood-ioana",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Kingswood",
+     "to": "Penrith",
+     "label": "ride the late one to Penrith"
+    },
+    {
+     "kind": "photo",
+     "x": -45399,
+     "z": -11343,
+     "radius": 30,
+     "label": "the empty platform, lit and pointless"
+    },
+    {
+     "kind": "dialog",
+     "npc": "field-kingswood-ioana",
+     "node": "ledger",
+     "label": "tell them what you saw"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 209,
+    "unlock": [
+     "field:f3-last-service-kingswood"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-opal-ghost-mulgrave",
+   "act": 3,
+   "title": "The Mulgrave Tap-Off",
+   "blurb": "Somebody taps on at Mulgrave every morning and never taps off. Same card. I want you to ride the run they ride and find where a person can get off this network without a gate seeing them.",
+   "giver": "field-mulgrave-iolanda",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Mulgrave",
+     "to": "Windsor",
+     "label": "ride the run the card rides"
+    },
+    {
+     "kind": "goto",
+     "x": -35554,
+     "z": -25994,
+     "radius": 20,
+     "label": "the gap in the fence everyone knows about"
+    },
+    {
+     "kind": "photo",
+     "x": -35554,
+     "z": -25994,
+     "radius": 25,
+     "label": "photograph the gap before somebody welds it"
+    }
+   ],
+   "reward": {
+    "cash": 75,
+    "xp": 195,
+    "unlock": [
+     "field:f3-opal-ghost-mulgrave"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-coffee-run-st-james",
+   "act": 3,
+   "title": "The St James Order",
+   "blurb": "I do two hundred coffees between six and nine and I know every one of them by the walk. One of my regulars stopped coming. Take a coffee to where they work and find out whether they are dead or just went to the other place.",
+   "giver": "field-st-james-ira",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "order one at the St James kiosk"
+    },
+    {
+     "kind": "goto",
+     "x": 282,
+     "z": 191,
+     "radius": 25,
+     "label": "the office they walk to, or used to"
+    },
+    {
+     "kind": "earn",
+     "dollars": 49,
+     "label": "come back with $49 — I am not running a charity"
+    }
+   ],
+   "reward": {
+    "cash": 84,
+    "xp": 220,
+    "unlock": [
+     "field:f3-coffee-run-st-james"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-timetable-lie-marion",
+   "act": 3,
+   "title": "Four Minutes at Marion",
+   "blurb": "The board at Marion says four minutes. It has said four minutes for as long as anyone can remember and it is a lie about a third of the time. Stand there. Time it. Bring me numbers instead of feelings.",
+   "giver": "field-marion-irina",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5799,
+     "z": 1772,
+     "radius": 18,
+     "label": "stand under the board and wait like everyone else"
+    },
+    {
+     "kind": "photo",
+     "x": -5799,
+     "z": 1772,
+     "radius": 25,
+     "label": "photograph the board saying four minutes"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Marion",
+     "to": "Hawthorne",
+     "label": "ride the one that finally comes"
+    },
+    {
+     "kind": "dialog",
+     "npc": "field-marion-irina",
+     "node": "ledger",
+     "label": "give me the number"
+    }
+   ],
+   "reward": {
+    "cash": 73,
+    "xp": 215,
+    "unlock": [
+     "field:f3-timetable-lie-marion"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-lost-property-chinatown",
+   "act": 3,
+   "title": "Unclaimed at Chinatown",
+   "blurb": "Everything anyone has ever left on a train ends up in a room, and the room is full. Most of it nobody wants. One of them somebody wants very badly and has not come to ask. Find out why.",
+   "giver": "field-chinatown-isabeau",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -252,
+     "z": 955,
+     "radius": 20,
+     "label": "the address on the tag"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "the two who got there before you"
+    },
+    {
+     "kind": "earn",
+     "dollars": 45,
+     "label": "$45 — whatever it is, it is worth that to somebody"
+    }
+   ],
+   "reward": {
+    "cash": 93,
+    "xp": 217,
+    "unlock": [
+     "field:f3-lost-property-chinatown"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-quiet-carriage-padstow",
+   "act": 3,
+   "title": "The Quiet Carriage, Padstow",
+   "blurb": "There is a sign and the sign is not enforced by anybody, which makes it the only law in this city that runs on shame. Somebody has stopped feeling it. Ride the Padstow run and deal with it.",
+   "giver": "field-padstow-isha",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Padstow",
+     "to": "Revesby",
+     "label": "ride the quiet carriage and observe the crime"
+    },
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "apply the shame manually"
+    },
+    {
+     "kind": "photo",
+     "x": -16162,
+     "z": 9390,
+     "radius": 30,
+     "label": "photograph the sign, for the record"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 217,
+    "unlock": [
+     "field:f3-quiet-carriage-padstow"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-the-shortcut-bondi-junction",
+   "act": 3,
+   "title": "The Bondi Junction Shortcut",
+   "blurb": "Every courier in this city has a route that is not on any map and mine goes through Bondi Junction. They have started locking one end of it. Go and find out whether it is locked forever or just locked today.",
+   "giver": "field-bondi-junction-ishaan",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 3500,
+     "z": 2324,
+     "radius": 22,
+     "label": "the end they lock"
+    },
+    {
+     "kind": "goto",
+     "x": 3467,
+     "z": 2254,
+     "radius": 25,
+     "label": "the long way round, so you understand what it costs me"
+    },
+    {
+     "kind": "earn",
+     "dollars": 44,
+     "label": "$44, which is what the long way costs me a week"
+    }
+   ],
+   "reward": {
+    "cash": 77,
+    "xp": 195,
+    "unlock": [
+     "field:f3-the-shortcut-bondi-junction"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

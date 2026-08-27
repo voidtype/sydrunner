@@ -306,7 +306,14 @@ import { screenBearing, verifyWaypoint } from './game/waypoint.ts';
 import { verifyHurtDir } from './game/hurtdir.ts';
 // The givers on the map: pure, three-free, and in the server's boot list as
 // well as this one. See `game/givermap.ts`.
-import { GiverDots, verifyGiverMap } from './game/givermap.ts';
+import {
+  GiverDots,
+  GIVER_RANGE_M,
+  MAP_GIVER_RANGE_M,
+  MAX_GIVER_DOTS,
+  MAX_MAP_GIVER_DOTS,
+  verifyGiverMap,
+} from './game/givermap.ts';
 import { WaypointBanner, type WaypointSource } from './waypoint.ts';
 import { GiverLampField, lampsOver, verifyGiverLamps } from './world/giverlamp.ts';
 import { BuildSheet, verifyBuildSheet } from './buildsheet.ts';
@@ -5249,7 +5256,22 @@ async function main(): Promise<void> {
     // than the camera, as the bodies below use, because this is a map: the disc
     // is centred on where the player is standing and the dots are chosen by
     // distance from that same point.
-    giverDots.refresh(questMarkers.beats, player.position.x, player.position.z, questMarkerSource);
+    // **The big map asks a bigger question than the compass.** A person who
+    // opens a map means "what is out there", and the compass's five-hundred-
+    // metre disc answered "what is within a short walk" -- which over sixty
+    // kilometres of city is almost always nothing. Same sink, same rule, wider
+    // radius and a cap sized for a screen rather than a 210 px disc; the
+    // compass keeps its own numbers because "what you are near" is still the
+    // right question for a thing you read while running.
+    const onMap = bigmap.visible;
+    giverDots.refresh(
+      questMarkers.beats,
+      player.position.x,
+      player.position.z,
+      questMarkerSource,
+      onMap ? MAP_GIVER_RANGE_M : GIVER_RANGE_M,
+      onMap ? MAX_MAP_GIVER_DOTS : MAX_GIVER_DOTS,
+    );
     // **After** the marks, so the body field sees the beat the marks have just
     // taken rather than the previous one. See `GiverBodyField`'s header on the
     // one beat of settle that costs.

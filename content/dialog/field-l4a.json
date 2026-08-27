@@ -1,0 +1,2375 @@
+{
+ "pack": "field-l4a",
+ "npcs": [
+  {
+   "id": "field-milsons-point-isla",
+   "name": "Isla, night-fill supervisor at Milsons Point",
+   "x": 327,
+   "z": -2518,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Ten to six. Six of us, forty aisles, one radio that only gets the one station.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "Somebody knows our roster. They come in off the late train at Milsons Point and they are gone before the first delivery.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-the-shift-milsons-point",
+       "denyFlag": "field:f4-the-shift-milsons-point"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "I have worked nights eight years. You stop being able to tell whether you are tired or just awake at the wrong time.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Knew our roster. Of course they did. Nothing in this job is ever a stranger.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-the-shift-milsons-point"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-tempe-ismail",
+   "name": "Ismail, first-floor tenant at Tempe",
+   "x": -4669,
+   "z": 6350,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Nine years above Tempe. I do not hear the trains any more, which means I hear it instantly when one of them is wrong.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "A month ago the rhythm changed. Same trains, different sound. Go and find out what they did to my track.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-the-window-tempe",
+       "denyFlag": "field:f4-the-window-tempe"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "Everyone says you get used to it. You do. That is the frightening part.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Thank you. Nine years and the first person who went and listened.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-the-window-tempe"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-coalcliff-ivo",
+   "name": "Ivo, stallholder at Coalcliff",
+   "x": -20773,
+   "z": 41821,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Five in the morning at Coalcliff, in the dark, unloading a van by feel.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "He is coming at four now. Four. There is no rule about four because nobody thought a person would do that.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-the-market-coalcliff",
+       "denyFlag": "field:f4-the-market-coalcliff"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "Twenty-six years in this market. The bays are not allocated. They are just known.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Known again. Good. You cannot write it down, that is the trouble with it.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-the-market-coalcliff"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-victoria-cross-jacinta",
+   "name": "Jacinta, station master at Victoria Cross",
+   "x": -281,
+   "z": -3598,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Four minutes fast. Every relief who comes through Victoria Cross wants to be the one who fixes it.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "Somebody set it that way on purpose and everybody who knows why is nearly gone. Find out before they are.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-the-clock-victoria-cross",
+       "denyFlag": "field:f4-the-clock-victoria-cross"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "Half this network runs on things somebody decided in 1974 and never wrote down.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Then it stays four minutes fast, and now two of us know why.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-the-clock-victoria-cross"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-concord-west-jae",
+   "name": "Jae, someone at the end of their patience at Concord West",
+   "x": -11504.3,
+   "z": -1908.1,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Every weekday. The 5:40 into Concord West. Sits at the yellow line and waits and then walks off on its own.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "I am not doing another winter of watching that. Find out where it goes and who it belongs to.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-the-dog-concord-west",
+       "denyFlag": "field:f4-the-dog-concord-west"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "Half the platform knows. Nobody has done anything, including me, for four months.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Not a sad story. I will take it. I badly needed one that was not.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-the-dog-concord-west"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-museum-jamal",
+   "name": "Jamal, bookmaker of the informal kind at Museum",
+   "x": 114,
+   "z": 882,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Nothing illegal. A book on small things. Weather, delays, whether the 7:02 out of Museum is on time.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "Somebody is up four hundred over eleven weeks on the delay market. That is not luck, that is information.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-the-numbers-museum",
+       "denyFlag": "field:f4-the-numbers-museum"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "You cannot beat a delay book unless you can see the roster. Think about who can see the roster.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "The roster. I am not even angry. I am going to hire them.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-the-numbers-museum"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-unsw-high-street-jarrah",
+   "name": "Jarrah, night guard at UNSW High Street",
+   "x": 2447,
+   "z": 5275,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You get to know the last service. Four people out of UNSW High Street and one of them is asleep every single night, and it is never the same one.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "Ride it to Randwick. Photograph the platform with nobody on it. I want to know the place exists when I am not standing in it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-last-service-unsw-high-street",
+       "denyFlag": "field:f4-last-service-unsw-high-street"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "Twenty-two years. I have watched this place empty out twenty-two years and I still do not like the sound it makes.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "There it is. Still there. Good. Some nights I am not sure.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-last-service-unsw-high-street"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-town-hall-jasmina",
+   "name": "Jasmina, ticket inspector at Town Hall",
+   "x": -333.2,
+   "z": 656.3,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Card ending 76. Taps on at Town Hall, six-forty, every weekday. Never taps off. Not once in four months.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "I am not allowed to follow it and you are not employed, which makes you better at this than me. Find where they get off.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-opal-ghost-town-hall",
+       "denyFlag": "field:f4-opal-ghost-town-hall"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "It is not the money. It is ninety cents a day. It is that I cannot work out how.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "A hole in a fence. Four months. I want to be angry and mostly I am impressed.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-opal-ghost-town-hall"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-qvb-javier",
+   "name": "Javier, kiosk operator at QVB",
+   "x": -271.6,
+   "z": 341.9,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Two hundred a morning through QVB. I know them by the walk before I know them by the face.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "One of them stopped. Three weeks. Take one over there and find out if I lost them to the chain up the road.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-coffee-run-qvb",
+       "denyFlag": "field:f4-coffee-run-qvb"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "If it is the chain I would rather they were dead. I am joking. Mostly.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "The chain. Of course it was the chain. Thank you for finding out. I hate it.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-coffee-run-qvb"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-robin-thomas-jaya",
+   "name": "Jaya, relief signaller at Robin Thomas",
+   "x": -18578,
+   "z": -5377,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Four minutes. That board has said four minutes since before the merge. Sometimes it means four minutes.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "Nobody upstairs believes me because I have no data, only twelve years. Go and get me data.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-timetable-lie-robin-thomas",
+       "denyFlag": "field:f4-timetable-lie-robin-thomas"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "A minute of a stranger's life, three hundred times a day. Somebody should write it down.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Now I have a number, and a number is a thing they have to answer.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-timetable-lie-robin-thomas"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-newtown-jelena",
+   "name": "Jelena, lost property clerk at Newtown",
+   "x": -2587,
+   "z": 3414,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Umbrellas. Nine hundred umbrellas. And one thing off the Newtown line that has a name on it and a phone number that rings out.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "I cannot leave the counter. You can. Go to the address on the tag and see who is not answering.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-lost-property-newtown",
+       "denyFlag": "field:f4-lost-property-newtown"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "People come back for the strangest things. Nobody ever comes back for an umbrella.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "That explains the phone. Poor sod. Put it back in the room, would you.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-lost-property-newtown"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-telopea-jemima",
+   "name": "Jemima, commuter of long standing at Telopea",
+   "x": -15675,
+   "z": -7875,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "The quiet carriage works because everyone agrees it works. That is the whole mechanism. There is no other mechanism.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "Speakerphone. Every morning, Telopea to town, speakerphone. I have made eye contact eleven times and it has done nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-quiet-carriage-telopea",
+       "denyFlag": "field:f4-quiet-carriage-telopea"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "I could move carriages. I have thought about it. But then they have won something.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Quiet. Genuinely quiet. I had forgotten what it sounded like.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-quiet-carriage-telopea"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-bulli-jenna",
+   "name": "Jenna, courier at Bulli",
+   "x": -26276,
+   "z": 52220,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Forty drops a day. The difference between the shortcut and the long way at Bulli is nine minutes, and nine minutes is four drops.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "Go and look at the lock. Tell me if it is a padlock or a decision.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-the-shortcut-bulli",
+       "denyFlag": "field:f4-the-shortcut-bulli"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "A padlock I can live with. A decision I have to reroute around for the rest of my life.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "A decision. Right. Nine minutes, forever. That is what that is.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-the-shortcut-bulli"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-fairfield-jeong",
+   "name": "Jeong, trackwork foreman at Fairfield",
+   "x": -23449,
+   "z": 905,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Midnight to four, Fairfield is mine. Nobody thanks you for it and nobody sees it and by six it looks like nothing happened.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "Somebody is walking through. Not kids. Kids run. This one walks.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-night-works-fairfield",
+       "denyFlag": "field:f4-night-works-fairfield"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "You do not get a second warning out here. You get a grinder and a very long report.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Good. Now I can fill in a form and somebody else can ignore it.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-night-works-fairfield"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-strathfield-jethro",
+   "name": "Jethro, publican at Strathfield",
+   "x": -10498,
+   "z": 487,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Nineteen years. Same stool. Then nothing, and every regular in this bar has gone vague on me at once, which means they know.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "Go and knock. You have got a face nobody here owes anything to.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-the-regular-strathfield",
+       "denyFlag": "field:f4-the-regular-strathfield"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "I have kept the stool. That is either respect or superstition, I have stopped being able to tell.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Ah. Well. I will keep the stool anyway.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-the-regular-strathfield"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-hurlstone-park-jia",
+   "name": "Jia, commuter car park attendant at Hurlstone Park",
+   "x": -7019.9,
+   "z": 4787,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Two hundred bays at Hurlstone Park. I have counted two hundred and forty cars in here on a Tuesday. Do that arithmetic.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "Bay 14 has not moved since March. Photograph it. I want a date somebody can be embarrassed by.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-car-park-hurlstone-park",
+       "denyFlag": "field:f4-car-park-hurlstone-park"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "You cannot tow it without an owner and you cannot find an owner without towing it. That is the whole job.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "March. In writing. Now it is somebody else's March.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-car-park-hurlstone-park"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-mount-colah-jimmy",
+   "name": "Jimmy, council contractor at Mount Colah",
+   "x": -9173,
+   "z": -21831,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Grey. I have one colour and it is grey and it is the same grey in every suburb in this city.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "There is one near Mount Colah that I am scheduled to kill on Thursday. I would like something of it to exist afterwards.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-the-mural-mount-colah",
+       "denyFlag": "field:f4-the-mural-mount-colah"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "I keep the photos. Two hundred and eleven of them. It is the worst gallery in Australia.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Two hundred and twelve. Right. Thursday can have the wall.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-the-mural-mount-colah"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-paddy-s-markets-joaquin",
+   "name": "Joaquin, bus driver on a break at Paddy's Markets",
+   "x": -631.4,
+   "z": 1002.8,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Eleven times a shift past Paddy's Markets and up over that hill. Six years. Never stopped.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "I am not going to stop. That is not the kind of person I turned out to be. So you go.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-the-hill-paddy-s-markets",
+       "denyFlag": "field:f4-the-hill-paddy-s-markets"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "There is a bench up there. I have watched it from a moving bus about fourteen thousand times.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "That is what it looks like. Right. That is what it looks like.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-the-hill-paddy-s-markets"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-international-airport-jocelyn",
+   "name": "Jocelyn, someone with a grievance at International Airport",
+   "x": -3810,
+   "z": 7392,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Two hundred and eighty-five dollars. International Airport. For a thing the sign did not say, because the sign is not there.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "The form wants evidence. How do you photograph a thing not being somewhere? That is your problem now.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-the-fine-international-airport",
+       "denyFlag": "field:f4-the-fine-international-airport"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "It is not the money. It is that the form has a box for it and the box assumes I am lying.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Perfect. Absence, photographed. Let them argue with that.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-the-fine-international-airport"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-juniors-kingsford-johanna",
+   "name": "Johanna, guerrilla gardener at Juniors Kingsford",
+   "x": 2033,
+   "z": 6292,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "A metre of dirt at Juniors Kingsford. Eleven years of nothing and cigarette ends.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "Council mows it on the fifteenth. Council does not know what is in it. I would like the fifteenth to go badly for council.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-the-garden-juniors-kingsford",
+       "denyFlag": "field:f4-the-garden-juniors-kingsford"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "Nobody planted it. I planted it. Nobody is going to know that and that is the point of it.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "It survived. Good. Next year it will be twice that and they will assume it was always there.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-the-garden-juniors-kingsford"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-cronulla-jonty",
+   "name": "Jonty, night-fill supervisor at Cronulla",
+   "x": -5046,
+   "z": 20648,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Ten to six. Six of us, forty aisles, one radio that only gets the one station.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "Somebody knows our roster. They come in off the late train at Cronulla and they are gone before the first delivery.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-the-shift-cronulla",
+       "denyFlag": "field:f4-the-shift-cronulla"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "I have worked nights eight years. You stop being able to tell whether you are tired or just awake at the wrong time.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Knew our roster. Of course they did. Nothing in this job is ever a stranger.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-the-shift-cronulla"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-rouse-hill-jordi",
+   "name": "Jordi, first-floor tenant at Rouse Hill",
+   "x": -26761,
+   "z": -18975,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Nine years above Rouse Hill. I do not hear the trains any more, which means I hear it instantly when one of them is wrong.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "A month ago the rhythm changed. Same trains, different sound. Go and find out what they did to my track.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-the-window-rouse-hill",
+       "denyFlag": "field:f4-the-window-rouse-hill"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "Everyone says you get used to it. You do. That is the frightening part.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Thank you. Nine years and the first person who went and listened.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-the-window-rouse-hill"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-waratah-mills-josefa",
+   "name": "Josefa, stallholder at Waratah Mills",
+   "x": -6328,
+   "z": 3568,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Five in the morning at Waratah Mills, in the dark, unloading a van by feel.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "He is coming at four now. Four. There is no rule about four because nobody thought a person would do that.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-the-market-waratah-mills",
+       "denyFlag": "field:f4-the-market-waratah-mills"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "Twenty-six years in this market. The bays are not allocated. They are just known.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Known again. Good. You cannot write it down, that is the trouble with it.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-the-market-waratah-mills"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-edmondson-park-juliusz",
+   "name": "Juliusz, station master at Edmondson Park",
+   "x": -32135,
+   "z": 11676,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Four minutes fast. Every relief who comes through Edmondson Park wants to be the one who fixes it.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "Somebody set it that way on purpose and everybody who knows why is nearly gone. Find out before they are.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-the-clock-edmondson-park",
+       "denyFlag": "field:f4-the-clock-edmondson-park"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "Half this network runs on things somebody decided in 1974 and never wrote down.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Then it stays four minutes fast, and now two of us know why.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-the-clock-edmondson-park"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-niagara-park-juno",
+   "name": "Juno, someone at the end of their patience at Niagara Park",
+   "x": 12754,
+   "z": -54133,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Every weekday. The 5:40 into Niagara Park. Sits at the yellow line and waits and then walks off on its own.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "I am not doing another winter of watching that. Find out where it goes and who it belongs to.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-the-dog-niagara-park",
+       "denyFlag": "field:f4-the-dog-niagara-park"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "Half the platform knows. Nobody has done anything, including me, for four months.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Not a sad story. I will take it. I badly needed one that was not.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-the-dog-niagara-park"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-narwee-jurgen",
+   "name": "Jurgen, bookmaker of the informal kind at Narwee",
+   "x": -12650.9,
+   "z": 9098,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Nothing illegal. A book on small things. Weather, delays, whether the 7:02 out of Narwee is on time.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "Somebody is up four hundred over eleven weeks on the delay market. That is not luck, that is information.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-the-numbers-narwee",
+       "denyFlag": "field:f4-the-numbers-narwee"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "You cannot beat a delay book unless you can see the roster. Think about who can see the roster.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "The roster. I am not even angry. I am going to hire them.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-the-numbers-narwee"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-macarthur-kabir",
+   "name": "Kabir, night guard at Macarthur",
+   "x": -37756,
+   "z": 23237,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You get to know the last service. Four people out of Macarthur and one of them is asleep every single night, and it is never the same one.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "Ride it to Campbelltown. Photograph the platform with nobody on it. I want to know the place exists when I am not standing in it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-last-service-macarthur",
+       "denyFlag": "field:f4-last-service-macarthur"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "Twenty-two years. I have watched this place empty out twenty-two years and I still do not like the sound it makes.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "There it is. Still there. Good. Some nights I am not sure.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-last-service-macarthur"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-royal-randwick-kaia",
+   "name": "Kaia, ticket inspector at Royal Randwick",
+   "x": 1804,
+   "z": 3879,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Card ending 42. Taps on at Royal Randwick, six-forty, every weekday. Never taps off. Not once in four months.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "I am not allowed to follow it and you are not employed, which makes you better at this than me. Find where they get off.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-opal-ghost-royal-randwick",
+       "denyFlag": "field:f4-opal-ghost-royal-randwick"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "It is not the money. It is ninety cents a day. It is that I cannot work out how.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "A hole in a fence. Four months. I want to be angry and mostly I am impressed.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-opal-ghost-royal-randwick"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-kellyville-kaito",
+   "name": "Kaito, kiosk operator at Kellyville",
+   "x": -25716,
+   "z": -16877,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Two hundred a morning through Kellyville. I know them by the walk before I know them by the face.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "One of them stopped. Three weeks. Take one over there and find out if I lost them to the chain up the road.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-coffee-run-kellyville",
+       "denyFlag": "field:f4-coffee-run-kellyville"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "If it is the chain I would rather they were dead. I am joking. Mostly.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "The chain. Of course it was the chain. Thank you for finding out. I hate it.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-coffee-run-kellyville"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "field-blaxland-kalinda",
+   "name": "Kalinda, relief signaller at Blaxland",
+   "x": -55926,
+   "z": -12845,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Four minutes. That board has said four minutes since before the merge. Sometimes it means four minutes.",
+     "choices": [
+      {
+       "text": "You after something?",
+       "goto": "offer"
+      },
+      {
+       "text": "How long have you been at this?",
+       "goto": "colour"
+      },
+      {
+       "text": "I've done it.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "offer",
+     "line": "Nobody upstairs believes me because I have no data, only twelve years. Go and get me data.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "f4-timetable-lie-blaxland",
+       "denyFlag": "field:f4-timetable-lie-blaxland"
+      },
+      {
+       "text": "Why me?",
+       "goto": "colour"
+      },
+      {
+       "text": "Find someone else.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "colour",
+     "line": "A minute of a stranger's life, three hundred times a day. Somebody should write it down.",
+     "choices": [
+      {
+       "text": "Fine. Give it here.",
+       "goto": "offer"
+      },
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Now I have a number, and a number is a thing they have to answer.",
+     "choices": [
+      {
+       "text": "That's it done.",
+       "turnin": "f4-timetable-lie-blaxland"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,1276 @@
+{
+ "pack": "field-l3b",
+ "quests": [
+  {
+   "id": "f3-night-works-bankstown",
+   "act": 3,
+   "title": "Possession at Bankstown",
+   "blurb": "We own the track between midnight and four and in that window we are the only people in this city doing anything real. Somebody keeps walking through my possession. Find them before a rail grinder does.",
+   "giver": "field-bankstown-gulnaz",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -16081,
+     "z": 5592,
+     "radius": 20,
+     "label": "where they come through the fence"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "the ones who think a hard hat is a costume"
+    },
+    {
+     "kind": "photo",
+     "x": -16081,
+     "z": 5592,
+     "radius": 30,
+     "label": "photograph the gap so I can put a number on the form"
+    }
+   ],
+   "reward": {
+    "cash": 76,
+    "xp": 201,
+    "unlock": [
+     "field:f3-night-works-bankstown"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-the-regular-berala",
+   "act": 3,
+   "title": "The Berala Regular",
+   "blurb": "A man drank in my front bar for nineteen years and then stopped, and nobody in this suburb will tell me why. You are not from here, which makes you the only person who can ask.",
+   "giver": "field-berala-gus",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -16159,
+     "z": 726,
+     "radius": 25,
+     "label": "the house they say he moved to"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you cannot ask a favour empty-handed"
+    },
+    {
+     "kind": "dialog",
+     "npc": "field-berala-gus",
+     "node": "ledger",
+     "label": "come back and tell me straight"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 221,
+    "unlock": [
+     "field:f3-the-regular-berala"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-car-park-north-ryde",
+   "act": 3,
+   "title": "Bay 14, North Ryde",
+   "blurb": "Two hundred bays, two hundred and forty cars, and one of them has not moved since March. It has a ticket on it from March. I have watched people give up and park on the grass because of it.",
+   "giver": "field-north-ryde-hamid",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -6758,
+     "z": -8023,
+     "radius": 25,
+     "label": "the car, and the ticket, and the date on it"
+    },
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 2,
+     "label": "the two arguing over the grass"
+    },
+    {
+     "kind": "earn",
+     "dollars": 46,
+     "label": "$46 in fines nobody is going to collect"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 197,
+    "unlock": [
+     "field:f3-car-park-north-ryde"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-the-mural-birrong",
+   "act": 3,
+   "title": "Whatever Is Under the Grey at Birrong",
+   "blurb": "Council pays me to paint over things. Last week I painted over something good and I have been sick about it since. There is another one two streets from Birrong. Photograph it before Thursday.",
+   "giver": "field-birrong-hana",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -17133,
+     "z": 2982,
+     "radius": 25,
+     "label": "the wall, before Thursday"
+    },
+    {
+     "kind": "photo",
+     "x": -17133,
+     "z": 2982,
+     "radius": 30,
+     "label": "photograph it properly, not a phone-in-a-hurry job"
+    },
+    {
+     "kind": "dialog",
+     "npc": "field-birrong-hana",
+     "node": "ledger",
+     "label": "show me"
+    }
+   ],
+   "reward": {
+    "cash": 84,
+    "xp": 213,
+    "unlock": [
+     "field:f3-the-mural-birrong"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-the-hill-es-marks",
+   "act": 3,
+   "title": "The Hill Above ES Marks",
+   "blurb": "I drive past the same view eleven times a shift and I have never once stopped at it. You have got legs and no timetable. Go up there and photograph what I have been driving past for six years.",
+   "giver": "field-es-marks-hania",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 1643,
+     "z": 4014,
+     "radius": 30,
+     "label": "up the hill, the way the road does not go"
+    },
+    {
+     "kind": "photo",
+     "x": 1643,
+     "z": 4014,
+     "radius": 40,
+     "label": "the view I have never stopped for"
+    },
+    {
+     "kind": "earn",
+     "dollars": 39,
+     "label": "$39, because I am paying you for it"
+    }
+   ],
+   "reward": {
+    "cash": 90,
+    "xp": 208,
+    "unlock": [
+     "field:f3-the-hill-es-marks"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-the-fine-tallawong",
+   "act": 3,
+   "title": "Contesting It at Tallawong",
+   "blurb": "I got done for something I did not do at Tallawong and the form says I need evidence, and the evidence is a sign that is not where the sign is supposed to be. Go and photograph the sign not being there.",
+   "giver": "field-tallawong-hanna",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -28624,
+     "z": -19230,
+     "radius": 20,
+     "label": "where the sign is supposed to be"
+    },
+    {
+     "kind": "photo",
+     "x": -28624,
+     "z": -19230,
+     "radius": 25,
+     "label": "photograph the absence, which is harder than it sounds"
+    },
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "the one who tells you photography is not allowed here"
+    }
+   ],
+   "reward": {
+    "cash": 78,
+    "xp": 215,
+    "unlock": [
+     "field:f3-the-fine-tallawong"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-the-garden-engadine",
+   "act": 3,
+   "title": "The Strip Outside Engadine",
+   "blurb": "There is a metre of dirt between the fence and the footpath at Engadine and it has been dead for eleven years. It is not dead now. I need someone to stand near it and stop a man with a whipper snipper.",
+   "giver": "field-engadine-harjit",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -17493,
+     "z": 22500,
+     "radius": 18,
+     "label": "the strip, which is a garden now"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "the man with the whipper snipper"
+    },
+    {
+     "kind": "photo",
+     "x": -17493,
+     "z": 22500,
+     "radius": 25,
+     "label": "photograph it while it still exists"
+    }
+   ],
+   "reward": {
+    "cash": 76,
+    "xp": 205,
+    "unlock": [
+     "field:f3-the-garden-engadine"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-the-shift-glenbrook",
+   "act": 3,
+   "title": "Night Fill, Glenbrook",
+   "blurb": "Ten to six, nobody in the building but us and a radio. Somebody has been taking things and it is not one of mine, which means it is somebody who knows our roster. Ride in on the late one and watch the door.",
+   "giver": "field-glenbrook-harold",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Lapstone",
+     "to": "Glenbrook",
+     "label": "come in on the late one like they do"
+    },
+    {
+     "kind": "goto",
+     "x": -54768,
+     "z": -9968,
+     "radius": 20,
+     "label": "the loading door nobody watches"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "whoever is standing in it at two in the morning"
+    },
+    {
+     "kind": "earn",
+     "dollars": 32,
+     "label": "$32 of what they took, back"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 207,
+    "unlock": [
+     "field:f3-the-shift-glenbrook"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-the-window-unsw-anzac-parade",
+   "act": 3,
+   "title": "The Window Above UNSW Anzac Parade",
+   "blurb": "I live above the platform at UNSW Anzac Parade and I know this line by sound. Something in the rhythm changed about a month ago and everyone I tell thinks I am mad. Ride it and tell me whether I am mad.",
+   "giver": "field-unsw-anzac-parade-haroon",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "UNSW Anzac Parade",
+     "to": "Kingsford",
+     "label": "ride it and listen to the joins"
+    },
+    {
+     "kind": "photo",
+     "x": 1776,
+     "z": 5209,
+     "radius": 25,
+     "label": "photograph the stretch that sounds wrong"
+    },
+    {
+     "kind": "dialog",
+     "npc": "field-unsw-anzac-parade-haroon",
+     "node": "ledger",
+     "label": "tell me I am not mad"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 200,
+    "unlock": [
+     "field:f3-the-window-unsw-anzac-parade"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-the-market-redfern",
+   "act": 3,
+   "title": "Setting Up at Redfern",
+   "blurb": "Five in the morning, in the dark, and the bloke with the bay next to mine has started arriving at four to take half my frontage. I need a witness and I need them at four.",
+   "giver": "field-redfern-haruka",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1180,
+     "z": 2671,
+     "radius": 22,
+     "label": "the bays, at the hour it happens"
+    },
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 1,
+     "label": "the bloke with the extra trestle"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "you will want one at that hour"
+    },
+    {
+     "kind": "earn",
+     "dollars": 32,
+     "label": "$32 of frontage, recovered"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 197,
+    "unlock": [
+     "field:f3-the-market-redfern"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-the-clock-heathcote",
+   "act": 3,
+   "title": "The Clock at Heathcote",
+   "blurb": "The clock on this platform has been four minutes fast since I got here and every relief who comes through wants to fix it. Do not fix it. Go and find out who set it, before they retire.",
+   "giver": "field-heathcote-hasan",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -18090,
+     "z": 24819,
+     "radius": 20,
+     "label": "the clock, four minutes fast, for the file"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Heathcote",
+     "to": "Engadine",
+     "label": "to Engadine, where the old crew drink"
+    },
+    {
+     "kind": "dialog",
+     "npc": "field-heathcote-hasan",
+     "node": "ledger",
+     "label": "bring the name back"
+    }
+   ],
+   "reward": {
+    "cash": 95,
+    "xp": 205,
+    "unlock": [
+     "field:f3-the-clock-heathcote"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-the-dog-waterloo",
+   "act": 3,
+   "title": "The Dog at Waterloo",
+   "blurb": "There is a dog that meets the 5:40 at Waterloo every weekday and has done for months, and nobody gets off for it. I have decided this is not going to be a sad story. Find out whose it is.",
+   "giver": "field-waterloo-hattie",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -934,
+     "z": 3249,
+     "radius": 20,
+     "label": "the end of the platform, at twenty to six"
+    },
+    {
+     "kind": "goto",
+     "x": -967,
+     "z": 3419,
+     "radius": 25,
+     "label": "the street it walks home to"
+    },
+    {
+     "kind": "dialog",
+     "npc": "field-waterloo-hattie",
+     "node": "ledger",
+     "label": "tell me it is not a sad story"
+    }
+   ],
+   "reward": {
+    "cash": 95,
+    "xp": 205,
+    "unlock": [
+     "field:f3-the-dog-waterloo"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-the-numbers-yennora",
+   "act": 3,
+   "title": "The Book at Yennora",
+   "blurb": "I run a small book on things that are not races and someone is beating it. Not by much and not by luck. Ride the run they ride, watch what they watch, and tell me what they know that I do not.",
+   "giver": "field-yennora-hayley",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Yennora",
+     "to": "Fairfield",
+     "label": "ride the run they ride"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "the two who follow you off it"
+    },
+    {
+     "kind": "earn",
+     "dollars": 38,
+     "label": "$38 back off the book"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 193,
+    "unlock": [
+     "field:f3-the-numbers-yennora"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-last-service-yagoona",
+   "act": 3,
+   "title": "Last Service out of Yagoona",
+   "blurb": "The last one through Yagoona carries four people and one of them is always asleep. Ride it to Birrong, photograph what the platform looks like with nobody on it, and come back and tell me it is still there.",
+   "giver": "field-yagoona-hazel",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Yagoona",
+     "to": "Birrong",
+     "label": "ride the late one to Birrong"
+    },
+    {
+     "kind": "photo",
+     "x": -17157,
+     "z": 4507,
+     "radius": 30,
+     "label": "the empty platform, lit and pointless"
+    },
+    {
+     "kind": "dialog",
+     "npc": "field-yagoona-hazel",
+     "node": "ledger",
+     "label": "tell them what you saw"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 216,
+    "unlock": [
+     "field:f3-last-service-yagoona"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-opal-ghost-wynyard",
+   "act": 3,
+   "title": "The Wynyard Tap-Off",
+   "blurb": "Somebody taps on at Wynyard every morning and never taps off. Same card. I want you to ride the run they ride and find where a person can get off this network without a gate seeing them.",
+   "giver": "field-wynyard-hedda",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Wynyard",
+     "to": "Bridge Street",
+     "label": "ride the run the card rides"
+    },
+    {
+     "kind": "goto",
+     "x": -426,
+     "z": -283,
+     "radius": 20,
+     "label": "the gap in the fence everyone knows about"
+    },
+    {
+     "kind": "photo",
+     "x": -426,
+     "z": -283,
+     "radius": 25,
+     "label": "photograph the gap before somebody welds it"
+    }
+   ],
+   "reward": {
+    "cash": 73,
+    "xp": 206,
+    "unlock": [
+     "field:f3-opal-ghost-wynyard"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-coffee-run-bella-vista",
+   "act": 3,
+   "title": "The Bella Vista Order",
+   "blurb": "I do two hundred coffees between six and nine and I know every one of them by the walk. One of my regulars stopped coming. Take a coffee to where they work and find out whether they are dead or just went to the other place.",
+   "giver": "field-bella-vista-helios",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "order one at the Bella Vista kiosk"
+    },
+    {
+     "kind": "goto",
+     "x": -24794,
+     "z": -14576,
+     "radius": 25,
+     "label": "the office they walk to, or used to"
+    },
+    {
+     "kind": "earn",
+     "dollars": 40,
+     "label": "come back with $40 — I am not running a charity"
+    }
+   ],
+   "reward": {
+    "cash": 94,
+    "xp": 193,
+    "unlock": [
+     "field:f3-coffee-run-bella-vista"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-timetable-lie-gordon",
+   "act": 3,
+   "title": "Four Minutes at Gordon",
+   "blurb": "The board at Gordon says four minutes. It has said four minutes for as long as anyone can remember and it is a lie about a third of the time. Stand there. Time it. Bring me numbers instead of feelings.",
+   "giver": "field-gordon-hemi",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5274,
+     "z": -12564,
+     "radius": 18,
+     "label": "stand under the board and wait like everyone else"
+    },
+    {
+     "kind": "photo",
+     "x": -5274,
+     "z": -12564,
+     "radius": 25,
+     "label": "photograph the board saying four minutes"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Gordon",
+     "to": "Killara",
+     "label": "ride the one that finally comes"
+    },
+    {
+     "kind": "dialog",
+     "npc": "field-gordon-hemi",
+     "node": "ledger",
+     "label": "give me the number"
+    }
+   ],
+   "reward": {
+    "cash": 85,
+    "xp": 214,
+    "unlock": [
+     "field:f3-timetable-lie-gordon"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-lost-property-banksia",
+   "act": 3,
+   "title": "Unclaimed at Banksia",
+   "blurb": "Everything anyone has ever left on a train ends up in a room, and the room is full. Most of it nobody wants. One of them somebody wants very badly and has not come to ask. Find out why.",
+   "giver": "field-banksia-henrietta",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -6128,
+     "z": 8562,
+     "radius": 20,
+     "label": "the address on the tag"
+    },
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 2,
+     "label": "the two who got there before you"
+    },
+    {
+     "kind": "earn",
+     "dollars": 31,
+     "label": "$31 — whatever it is, it is worth that to somebody"
+    }
+   ],
+   "reward": {
+    "cash": 85,
+    "xp": 200,
+    "unlock": [
+     "field:f3-lost-property-banksia"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-quiet-carriage-mount-druitt",
+   "act": 3,
+   "title": "The Quiet Carriage, Mount Druitt",
+   "blurb": "There is a sign and the sign is not enforced by anybody, which makes it the only law in this city that runs on shame. Somebody has stopped feeling it. Ride the Mount Druitt run and deal with it.",
+   "giver": "field-mount-druitt-hina",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Mount Druitt",
+     "to": "Rooty Hill",
+     "label": "ride the quiet carriage and observe the crime"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "apply the shame manually"
+    },
+    {
+     "kind": "photo",
+     "x": -36127,
+     "z": -10238,
+     "radius": 30,
+     "label": "photograph the sign, for the record"
+    }
+   ],
+   "reward": {
+    "cash": 94,
+    "xp": 193,
+    "unlock": [
+     "field:f3-quiet-carriage-mount-druitt"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-the-shortcut-kings-cross",
+   "act": 3,
+   "title": "The Kings Cross Shortcut",
+   "blurb": "Every courier in this city has a route that is not on any map and mine goes through Kings Cross. They have started locking one end of it. Go and find out whether it is locked forever or just locked today.",
+   "giver": "field-kings-cross-hiro",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 1308,
+     "z": 638,
+     "radius": 22,
+     "label": "the end they lock"
+    },
+    {
+     "kind": "goto",
+     "x": 1185,
+     "z": 483,
+     "radius": 25,
+     "label": "the long way round, so you understand what it costs me"
+    },
+    {
+     "kind": "earn",
+     "dollars": 42,
+     "label": "$42, which is what the long way costs me a week"
+    }
+   ],
+   "reward": {
+    "cash": 72,
+    "xp": 205,
+    "unlock": [
+     "field:f3-the-shortcut-kings-cross"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-night-works-pennant-hills",
+   "act": 3,
+   "title": "Possession at Pennant Hills",
+   "blurb": "We own the track between midnight and four and in that window we are the only people in this city doing anything real. Somebody keeps walking through my possession. Find them before a rail grinder does.",
+   "giver": "field-pennant-hills-hoang",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -13020,
+     "z": -14377,
+     "radius": 20,
+     "label": "where they come through the fence"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 3,
+     "label": "the ones who think a hard hat is a costume"
+    },
+    {
+     "kind": "photo",
+     "x": -13020,
+     "z": -14377,
+     "radius": 30,
+     "label": "photograph the gap so I can put a number on the form"
+    }
+   ],
+   "reward": {
+    "cash": 91,
+    "xp": 212,
+    "unlock": [
+     "field:f3-night-works-pennant-hills"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-the-regular-church-street",
+   "act": 3,
+   "title": "The Church Street Regular",
+   "blurb": "A man drank in my front bar for nineteen years and then stopped, and nobody in this suburb will tell me why. You are not from here, which makes you the only person who can ask.",
+   "giver": "field-church-street-holly",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18985,
+     "z": -5682,
+     "radius": 25,
+     "label": "the house they say he moved to"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you cannot ask a favour empty-handed"
+    },
+    {
+     "kind": "dialog",
+     "npc": "field-church-street-holly",
+     "node": "ledger",
+     "label": "come back and tell me straight"
+    }
+   ],
+   "reward": {
+    "cash": 91,
+    "xp": 206,
+    "unlock": [
+     "field:f3-the-regular-church-street"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-car-park-rhodes",
+   "act": 3,
+   "title": "Bay 14, Rhodes",
+   "blurb": "Two hundred bays, two hundred and forty cars, and one of them has not moved since March. It has a ticket on it from March. I have watched people give up and park on the grass because of it.",
+   "giver": "field-rhodes-hugo",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -11403,
+     "z": -4239,
+     "radius": 25,
+     "label": "the car, and the ticket, and the date on it"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "the two arguing over the grass"
+    },
+    {
+     "kind": "earn",
+     "dollars": 32,
+     "label": "$32 in fines nobody is going to collect"
+    }
+   ],
+   "reward": {
+    "cash": 93,
+    "xp": 203,
+    "unlock": [
+     "field:f3-car-park-rhodes"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-the-mural-ngara",
+   "act": 3,
+   "title": "Whatever Is Under the Grey at Ngara",
+   "blurb": "Council pays me to paint over things. Last week I painted over something good and I have been sick about it since. There is another one two streets from Ngara. Photograph it before Thursday.",
+   "giver": "field-ngara-hussein",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -19570,
+     "z": -7108,
+     "radius": 25,
+     "label": "the wall, before Thursday"
+    },
+    {
+     "kind": "photo",
+     "x": -19570,
+     "z": -7108,
+     "radius": 30,
+     "label": "photograph it properly, not a phone-in-a-hurry job"
+    },
+    {
+     "kind": "dialog",
+     "npc": "field-ngara-hussein",
+     "node": "ledger",
+     "label": "show me"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 203,
+    "unlock": [
+     "field:f3-the-mural-ngara"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-the-hill-werrington",
+   "act": 3,
+   "title": "The Hill Above Werrington",
+   "blurb": "I drive past the same view eleven times a shift and I have never once stopped at it. You have got legs and no timetable. Go up there and photograph what I have been driving past for six years.",
+   "giver": "field-werrington-ida",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -41797,
+     "z": -11330,
+     "radius": 30,
+     "label": "up the hill, the way the road does not go"
+    },
+    {
+     "kind": "photo",
+     "x": -41797,
+     "z": -11330,
+     "radius": 40,
+     "label": "the view I have never stopped for"
+    },
+    {
+     "kind": "earn",
+     "dollars": 40,
+     "label": "$40, because I am paying you for it"
+    }
+   ],
+   "reward": {
+    "cash": 74,
+    "xp": 197,
+    "unlock": [
+     "field:f3-the-hill-werrington"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-the-fine-rooty-hill",
+   "act": 3,
+   "title": "Contesting It at Rooty Hill",
+   "blurb": "I got done for something I did not do at Rooty Hill and the form says I need evidence, and the evidence is a sign that is not where the sign is supposed to be. Go and photograph the sign not being there.",
+   "giver": "field-rooty-hill-idris",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -33972,
+     "z": -10294,
+     "radius": 20,
+     "label": "where the sign is supposed to be"
+    },
+    {
+     "kind": "photo",
+     "x": -33972,
+     "z": -10294,
+     "radius": 25,
+     "label": "photograph the absence, which is harder than it sounds"
+    },
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 1,
+     "label": "the one who tells you photography is not allowed here"
+    }
+   ],
+   "reward": {
+    "cash": 85,
+    "xp": 213,
+    "unlock": [
+     "field:f3-the-fine-rooty-hill"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-the-garden-waverton",
+   "act": 3,
+   "title": "The Strip Outside Waverton",
+   "blurb": "There is a metre of dirt between the fence and the footpath at Waverton and it has been dead for eleven years. It is not dead now. I need someone to stand near it and stop a man with a whipper snipper.",
+   "giver": "field-waverton-ignatius",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1090,
+     "z": -3463,
+     "radius": 18,
+     "label": "the strip, which is a garden now"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "the man with the whipper snipper"
+    },
+    {
+     "kind": "photo",
+     "x": -1090,
+     "z": -3463,
+     "radius": 25,
+     "label": "photograph it while it still exists"
+    }
+   ],
+   "reward": {
+    "cash": 92,
+    "xp": 221,
+    "unlock": [
+     "field:f3-the-garden-waverton"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-the-shift-moore-park",
+   "act": 3,
+   "title": "Night Fill, Moore Park",
+   "blurb": "Ten to six, nobody in the building but us and a radio. Somebody has been taking things and it is not one of mine, which means it is somebody who knows our roster. Ride in on the late one and watch the door.",
+   "giver": "field-moore-park-ilona",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Surry Hills",
+     "to": "Moore Park",
+     "label": "come in on the late one like they do"
+    },
+    {
+     "kind": "goto",
+     "x": 1057,
+     "z": 2640,
+     "radius": 20,
+     "label": "the loading door nobody watches"
+    },
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 2,
+     "label": "whoever is standing in it at two in the morning"
+    },
+    {
+     "kind": "earn",
+     "dollars": 44,
+     "label": "$44 of what they took, back"
+    }
+   ],
+   "reward": {
+    "cash": 72,
+    "xp": 219,
+    "unlock": [
+     "field:f3-the-shift-moore-park"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-the-window-cherrybrook",
+   "act": 3,
+   "title": "The Window Above Cherrybrook",
+   "blurb": "I live above the platform at Cherrybrook and I know this line by sound. Something in the rhythm changed about a month ago and everyone I tell thinks I am mad. Ride it and tell me whether I am mad.",
+   "giver": "field-cherrybrook-imani",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Cherrybrook",
+     "to": "Castle Hill",
+     "label": "ride it and listen to the joins"
+    },
+    {
+     "kind": "photo",
+     "x": -16777,
+     "z": -14479,
+     "radius": 25,
+     "label": "photograph the stretch that sounds wrong"
+    },
+    {
+     "kind": "dialog",
+     "npc": "field-cherrybrook-imani",
+     "node": "ledger",
+     "label": "tell me I am not mad"
+    }
+   ],
+   "reward": {
+    "cash": 80,
+    "xp": 199,
+    "unlock": [
+     "field:f3-the-window-cherrybrook"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "f3-the-market-waterfall",
+   "act": 3,
+   "title": "Setting Up at Waterfall",
+   "blurb": "Five in the morning, in the dark, and the bloke with the bay next to mine has started arriving at four to take half my frontage. I need a witness and I need them at four.",
+   "giver": "field-waterfall-imogen",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -19351,
+     "z": 29895,
+     "radius": 22,
+     "label": "the bays, at the hour it happens"
+    },
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "the bloke with the extra trestle"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you will want one at that hour"
+    },
+    {
+     "kind": "earn",
+     "dollars": 40,
+     "label": "$40 of frontage, recovered"
+    }
+   ],
+   "reward": {
+    "cash": 87,
+    "xp": 213,
+    "unlock": [
+     "field:f3-the-market-waterfall"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}
