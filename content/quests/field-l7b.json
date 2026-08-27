@@ -5,7 +5,7 @@
    "id": "f7-quiet-carriage-lewisham",
    "act": 3,
    "title": "The Quiet Carriage, Lewisham",
-   "blurb": "There is a sign and the sign is not enforced by anybody, which makes it the only law in this city that runs on shame. Somebody has stopped feeling it. Ride the Lewisham run and deal with it.",
+   "blurb": "The quiet carriage runs on shame and somebody on the the back of seven out of Lewisham has stopped feeling it. Ride it, see the crime, and apply the shame manually.",
    "giver": "field-lewisham-radha",
    "level": 7,
    "requires": [],
@@ -20,21 +20,21 @@
     },
     {
      "kind": "ko",
-     "npc": "rbt",
+     "npc": "karen",
      "count": 1,
      "label": "apply the shame manually"
     },
     {
      "kind": "photo",
-     "x": -5677,
-     "z": 2911,
+     "x": -5472,
+     "z": 2783,
      "radius": 30,
      "label": "photograph the sign, for the record"
     }
    ],
    "reward": {
-    "cash": 148,
-    "xp": 395,
+    "cash": 146,
+    "xp": 392,
     "unlock": [
      "field:f7-quiet-carriage-lewisham"
     ]
@@ -47,7 +47,7 @@
    "id": "f7-the-shortcut-jannali",
    "act": 3,
    "title": "The Jannali Shortcut",
-   "blurb": "Every courier in this city has a route that is not on any map and mine goes through Jannali. They have started locking one end of it. Go and find out whether it is locked forever or just locked today.",
+   "blurb": "Nine minutes between the shortcut at Jannali and the long way, and nine minutes is four drops. Since the week of the show there has been a padlock on it, and it has been like that since the merge.",
    "giver": "field-jannali-rafferty",
    "level": 7,
    "requires": [],
@@ -55,27 +55,27 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -12981,
+     "x": -13014,
      "z": 16650,
      "radius": 22,
      "label": "the end they lock"
     },
     {
      "kind": "goto",
-     "x": -13104,
+     "x": -13137,
      "z": 16495,
      "radius": 25,
-     "label": "the long way round, so you understand what it costs me"
+     "label": "the long way round, so you understand what it costs"
     },
     {
      "kind": "earn",
-     "dollars": 62,
-     "label": "$62, which is what the long way costs me a week"
+     "dollars": 57,
+     "label": "$57, which is what the long way costs me a week"
     }
    ],
    "reward": {
-    "cash": 144,
-    "xp": 372,
+    "cash": 153,
+    "xp": 392,
     "unlock": [
      "field:f7-the-shortcut-jannali"
     ]
@@ -88,7 +88,7 @@
    "id": "f7-night-works-carlton",
    "act": 3,
    "title": "Possession at Carlton",
-   "blurb": "We own the track between midnight and four and in that window we are the only people in this city doing anything real. Somebody keeps walking through my possession. Find them before a rail grinder does.",
+   "blurb": "Third time at Carlton on a Tuesday. Not kids — kids run. This one walks, and they keep sending a different bloke. I need it stopped before somebody writes a very long report about me.",
    "giver": "field-carlton-raghav",
    "level": 7,
    "requires": [],
@@ -96,28 +96,28 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -7566,
-     "z": 11255,
+     "x": -7777,
+     "z": 11325,
      "radius": 20,
      "label": "where they come through the fence"
     },
     {
      "kind": "ko",
-     "npc": "drunk",
+     "npc": "rbt",
      "count": 2,
      "label": "the ones who think a hard hat is a costume"
     },
     {
      "kind": "photo",
-     "x": -7566,
-     "z": 11255,
+     "x": -7777,
+     "z": 11325,
      "radius": 30,
      "label": "photograph the gap so I can put a number on the form"
     }
    ],
    "reward": {
-    "cash": 139,
-    "xp": 374,
+    "cash": 138,
+    "xp": 377,
     "unlock": [
      "field:f7-night-works-carlton"
     ]
@@ -130,7 +130,7 @@
    "id": "f7-the-regular-exhibition-centre",
    "act": 3,
    "title": "The Exhibition Centre Regular",
-   "blurb": "A man drank in my front bar for nineteen years and then stopped, and nobody in this suburb will tell me why. You are not from here, which makes you the only person who can ask.",
+   "blurb": "A man drank in my front bar by Exhibition Centre for 17 years and then stopped, and every regular in here has gone vague on me at once, which means they know. You are not from here. Go and knock.",
    "giver": "field-exhibition-centre-rahel",
    "level": 7,
    "requires": [],
@@ -138,14 +138,14 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -899,
-     "z": 914,
+     "x": -851,
+     "z": 987,
      "radius": 25,
      "label": "the house they say he moved to"
     },
     {
      "kind": "buy",
-     "powerup": "TRAINING",
+     "powerup": "FLAT WHITE",
      "count": 1,
      "label": "you cannot ask a favour empty-handed"
     },
@@ -157,8 +157,8 @@
     }
    ],
    "reward": {
-    "cash": 147,
-    "xp": 396,
+    "cash": 133,
+    "xp": 395,
     "unlock": [
      "field:f7-the-regular-exhibition-centre"
     ]
@@ -171,7 +171,7 @@
    "id": "f7-car-park-penrith",
    "act": 3,
    "title": "Bay 14, Penrith",
-   "blurb": "Two hundred bays, two hundred and forty cars, and one of them has not moved since March. It has a ticket on it from March. I have watched people give up and park on the grass because of it.",
+   "blurb": "People have started parking on the grass at Penrith because of one abandoned car, and nobody will put it in writing. Photograph it, and the date on the ticket, so somebody can be embarrassed by it.",
    "giver": "field-penrith-raisa",
    "level": 7,
    "requires": [],
@@ -179,26 +179,26 @@
    "steps": [
     {
      "kind": "photo",
-     "x": -47564,
-     "z": -12159,
+     "x": -47770,
+     "z": -12083,
      "radius": 25,
      "label": "the car, and the ticket, and the date on it"
     },
     {
      "kind": "ko",
-     "npc": "police",
+     "npc": "drunk",
      "count": 2,
      "label": "the two arguing over the grass"
     },
     {
      "kind": "earn",
-     "dollars": 77,
-     "label": "$77 in fines nobody is going to collect"
+     "dollars": 59,
+     "label": "$59 in fines nobody is going to collect"
     }
    ],
    "reward": {
-    "cash": 148,
-    "xp": 392,
+    "cash": 151,
+    "xp": 381,
     "unlock": [
      "field:f7-car-park-penrith"
     ]
@@ -211,7 +211,7 @@
    "id": "f7-the-mural-cowan",
    "act": 3,
    "title": "Whatever Is Under the Grey at Cowan",
-   "blurb": "Council pays me to paint over things. Last week I painted over something good and I have been sick about it since. There is another one two streets from Cowan. Photograph it before Thursday.",
+   "blurb": "One colour, grey, the same grey in Cowan as in every other suburb. I would like something of this one to exist afterwards, and they keep sending a different bloke.",
    "giver": "field-cowan-rami",
    "level": 7,
    "requires": [],
@@ -219,15 +219,15 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -4072,
-     "z": -30439,
+     "x": -4037,
+     "z": -30320,
      "radius": 25,
-     "label": "the wall, before Thursday"
+     "label": "the wall, before they get to it"
     },
     {
      "kind": "photo",
-     "x": -4072,
-     "z": -30439,
+     "x": -4037,
+     "z": -30320,
      "radius": 30,
      "label": "photograph it properly, not a phone-in-a-hurry job"
     },
@@ -239,7 +239,7 @@
     }
    ],
    "reward": {
-    "cash": 151,
+    "cash": 148,
     "xp": 387,
     "unlock": [
      "field:f7-the-mural-cowan"
@@ -253,7 +253,7 @@
    "id": "f7-the-hill-central-chalmers-street",
    "act": 3,
    "title": "The Hill Above Central Chalmers Street",
-   "blurb": "I drive past the same view eleven times a shift and I have never once stopped at it. You have got legs and no timetable. Go up there and photograph what I have been driving past for six years.",
+   "blurb": "I drive past the same view above Central Chalmers Street eleven times a shift and I have never once stopped at it. You have got legs and no timetable. Go up and photograph what I have been driving past for 28 years.",
    "giver": "field-central-chalmers-street-ramona",
    "level": 7,
    "requires": [],
@@ -261,15 +261,15 @@
    "steps": [
     {
      "kind": "goto",
-     "x": 133,
-     "z": 1636,
+     "x": 175,
+     "z": 1659,
      "radius": 30,
      "label": "up the hill, the way the road does not go"
     },
     {
      "kind": "photo",
-     "x": 133,
-     "z": 1636,
+     "x": 175,
+     "z": 1659,
      "radius": 40,
      "label": "the view I have never stopped for"
     },
@@ -280,8 +280,8 @@
     }
    ],
    "reward": {
-    "cash": 140,
-    "xp": 384,
+    "cash": 145,
+    "xp": 391,
     "unlock": [
      "field:f7-the-hill-central-chalmers-street"
     ]
@@ -294,7 +294,7 @@
    "id": "f7-the-fine-tramway-avenue",
    "act": 3,
    "title": "Contesting It at Tramway Avenue",
-   "blurb": "I got done for something I did not do at Tramway Avenue and the form says I need evidence, and the evidence is a sign that is not where the sign is supposed to be. Go and photograph the sign not being there.",
+   "blurb": "Done at Tramway Avenue on a wet Monday for something that is only an offence if a sign says so, and nobody will put it in writing. How do you photograph a thing not being somewhere? That is your problem now.",
    "giver": "field-tramway-avenue-ranjit",
    "level": 7,
    "requires": [],
@@ -302,28 +302,28 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -17896,
-     "z": -5272,
+     "x": -17776,
+     "z": -5241,
      "radius": 20,
      "label": "where the sign is supposed to be"
     },
     {
      "kind": "photo",
-     "x": -17896,
-     "z": -5272,
+     "x": -17776,
+     "z": -5241,
      "radius": 25,
      "label": "photograph the absence, which is harder than it sounds"
     },
     {
      "kind": "ko",
-     "npc": "drunk",
+     "npc": "eshay",
      "count": 1,
      "label": "the one who tells you photography is not allowed here"
     }
    ],
    "reward": {
-    "cash": 129,
-    "xp": 388,
+    "cash": 134,
+    "xp": 382,
     "unlock": [
      "field:f7-the-fine-tramway-avenue"
     ]
@@ -336,7 +336,7 @@
    "id": "f7-the-garden-central",
    "act": 3,
    "title": "The Strip Outside Central",
-   "blurb": "There is a metre of dirt between the fence and the footpath at Central and it has been dead for eleven years. It is not dead now. I need someone to stand near it and stop a man with a whipper snipper.",
+   "blurb": "Nobody planted the strip at Central. I did, on every second Friday, at just gone midnight, so nobody would ask. I would like the fifteenth to go badly for council.",
    "giver": "field-central-raphael",
    "level": 7,
    "requires": [],
@@ -344,8 +344,8 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -348,
-     "z": 1691,
+     "x": -90,
+     "z": 1800,
      "radius": 18,
      "label": "the strip, which is a garden now"
     },
@@ -357,15 +357,15 @@
     },
     {
      "kind": "photo",
-     "x": -348,
-     "z": 1691,
+     "x": -90,
+     "z": 1800,
      "radius": 25,
      "label": "photograph it while it still exists"
     }
    ],
    "reward": {
-    "cash": 136,
-    "xp": 379,
+    "cash": 134,
+    "xp": 395,
     "unlock": [
      "field:f7-the-garden-central"
     ]
@@ -378,7 +378,7 @@
    "id": "f7-the-shift-westmead-hospital",
    "act": 3,
    "title": "Night Fill, Westmead Hospital",
-   "blurb": "Ten to six, nobody in the building but us and a radio. Somebody has been taking things and it is not one of mine, which means it is somebody who knows our roster. Ride in on the late one and watch the door.",
+   "blurb": "Ten to six, nobody in the building but us and a radio that gets one station. Somebody has been taking things and they know our roster, which means they come in off the late train at Westmead Hospital.",
    "giver": "field-westmead-hospital-rasha",
    "level": 7,
    "requires": [],
@@ -393,8 +393,8 @@
     },
     {
      "kind": "goto",
-     "x": -20457,
-     "z": -6756,
+     "x": -20251,
+     "z": -6919,
      "radius": 20,
      "label": "the loading door nobody watches"
     },
@@ -406,13 +406,13 @@
     },
     {
      "kind": "earn",
-     "dollars": 59,
-     "label": "$59 of what they took, back"
+     "dollars": 60,
+     "label": "$60 of what they took, back"
     }
    ],
    "reward": {
-    "cash": 136,
-    "xp": 386,
+    "cash": 141,
+    "xp": 392,
     "unlock": [
      "field:f7-the-shift-westmead-hospital"
     ]

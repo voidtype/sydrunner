@@ -4,14 +4,14 @@
   {
    "id": "field-emu-plains-nico",
    "name": "Nico, guerrilla gardener at Emu Plains",
-   "x": -50244,
-   "z": -12618,
+   "x": -50186,
+   "z": -12773,
    "radius": 5,
    "root": "hello",
    "nodes": [
     {
      "id": "hello",
-     "line": "A metre of dirt at Emu Plains. Eleven years of nothing and cigarette ends.",
+     "line": "Everything in there came out of a milk crate on my balcony at Penrith.",
      "choices": [
       {
        "text": "You after something?",
@@ -33,7 +33,7 @@
     },
     {
      "id": "offer",
-     "line": "Council mows it on the fifteenth. Council does not know what is in it. I would like the fifteenth to go badly for council.",
+     "line": "The woman who runs the newsagent waters it now, which was not part of the plan and is the best thing about it.",
      "choices": [
       {
        "text": "Alright. I'll do it.",
@@ -52,7 +52,7 @@
     },
     {
      "id": "colour",
-     "line": "Nobody planted it. I planted it. Nobody is going to know that and that is the point of it.",
+     "line": "I keep a hi-vis with somebody else s name in it by the door for exactly this.",
      "choices": [
       {
        "text": "Fine. Give it here.",
@@ -66,7 +66,7 @@
     },
     {
      "id": "ledger",
-     "line": "It survived. Good. Next year it will be twice that and they will assume it was always there.",
+     "line": "Good. Now do not tell the woman who runs the newsagent. They will put in a form.",
      "choices": [
       {
        "text": "That's it done.",
@@ -83,14 +83,14 @@
   {
    "id": "field-schofields-nikhil",
    "name": "Nikhil, night-fill supervisor at Schofields",
-   "x": -31468,
-   "z": -17596,
+   "x": -31343,
+   "z": -17673,
    "radius": 5,
    "root": "hello",
    "nodes": [
     {
      "id": "hello",
-     "line": "Ten to six. Six of us, forty aisles, one radio that only gets the one station.",
+     "line": "Ten to six. Six of us, forty aisles, one radio.",
      "choices": [
       {
        "text": "You after something?",
@@ -112,7 +112,7 @@
     },
     {
      "id": "offer",
-     "line": "Somebody knows our roster. They come in off the late train at Schofields and they are gone before the first delivery.",
+     "line": "Someone off the 8:02, possibly. I would rather be wrong about that.",
      "choices": [
       {
        "text": "Alright. I'll do it.",
@@ -131,7 +131,7 @@
     },
     {
      "id": "colour",
-     "line": "I have worked nights eight years. You stop being able to tell whether you are tired or just awake at the wrong time.",
+     "line": "You stop being able to tell whether you are tired or just awake at the wrong time.",
      "choices": [
       {
        "text": "Fine. Give it here.",
@@ -145,7 +145,7 @@
     },
     {
      "id": "ledger",
-     "line": "Knew our roster. Of course they did. Nothing in this job is ever a stranger.",
+     "line": "Right. I will sort it quietly, and I have stopped filling in the form.",
      "choices": [
       {
        "text": "That's it done.",
@@ -162,14 +162,14 @@
   {
    "id": "field-macdonaldtown-nils",
    "name": "Nils, first-floor tenant at Macdonaldtown",
-   "x": -2162,
-   "z": 3336,
+   "x": -2118,
+   "z": 3016,
    "radius": 5,
    "root": "hello",
    "nodes": [
     {
      "id": "hello",
-     "line": "Nine years above Macdonaldtown. I do not hear the trains any more, which means I hear it instantly when one of them is wrong.",
+     "line": "28 years above Macdonaldtown. The trains stopped being noise about year two.",
      "choices": [
       {
        "text": "You after something?",
@@ -191,7 +191,7 @@
     },
     {
      "id": "offer",
-     "line": "A month ago the rhythm changed. Same trains, different sound. Go and find out what they did to my track.",
+     "line": "The relief driver says I am imagining it. The relief driver sleeps at the back of the building.",
      "choices": [
       {
        "text": "Alright. I'll do it.",
@@ -210,7 +210,7 @@
     },
     {
      "id": "colour",
-     "line": "Everyone says you get used to it. You do. That is the frightening part.",
+     "line": "On Thursdays they run the long ones and the whole flat moves.",
      "choices": [
       {
        "text": "Fine. Give it here.",
@@ -224,7 +224,7 @@
     },
     {
      "id": "ledger",
-     "line": "Thank you. Nine years and the first person who went and listened.",
+     "line": "Then they did do something. I knew they had done something.",
      "choices": [
       {
        "text": "That's it done.",
@@ -241,14 +241,14 @@
   {
    "id": "field-epping-nina",
    "name": "Nina, stallholder at Epping",
-   "x": -11780,
-   "z": -10464,
+   "x": -11820,
+   "z": -10520,
    "radius": 5,
    "root": "hello",
    "nodes": [
     {
      "id": "hello",
-     "line": "Five in the morning at Epping, in the dark, unloading a van by feel.",
+     "line": "22 years. I have outlasted four councils and a fire.",
      "choices": [
       {
        "text": "You after something?",
@@ -270,7 +270,7 @@
     },
     {
      "id": "offer",
-     "line": "He is coming at four now. Four. There is no rule about four because nobody thought a person would do that.",
+     "line": "A bloke in a council polo saw it and will not say so, because they have to stand next to him every school holidays.",
      "choices": [
       {
        "text": "Alright. I'll do it.",
@@ -289,7 +289,7 @@
     },
     {
      "id": "colour",
-     "line": "Twenty-six years in this market. The bays are not allocated. They are just known.",
+     "line": "I have a esky with no lid that my father used on this same bay.",
      "choices": [
       {
        "text": "Fine. Give it here.",
@@ -303,7 +303,7 @@
     },
     {
      "id": "ledger",
-     "line": "Known again. Good. You cannot write it down, that is the trouble with it.",
+     "line": "Known again. Good.",
      "choices": [
       {
        "text": "That's it done.",
@@ -320,14 +320,14 @@
   {
    "id": "field-sefton-nita",
    "name": "Nita, station master at Sefton",
-   "x": -18202,
-   "z": 2245,
+   "x": -18272,
+   "z": 1972,
    "radius": 5,
    "root": "hello",
    "nodes": [
     {
      "id": "hello",
-     "line": "Four minutes fast. Every relief who comes through Sefton wants to be the one who fixes it.",
+     "line": "Four minutes fast. Every relief through Sefton wants to be the one who fixes it.",
      "choices": [
       {
        "text": "You after something?",
@@ -349,7 +349,7 @@
     },
     {
      "id": "offer",
-     "line": "Somebody set it that way on purpose and everybody who knows why is nearly gone. Find out before they are.",
+     "line": "A kid who should be at school will know. Buy them something first.",
      "choices": [
       {
        "text": "Alright. I'll do it.",
@@ -382,7 +382,7 @@
     },
     {
      "id": "ledger",
-     "line": "Right. Then it stays four minutes fast, and now two of us know why.",
+     "line": "Because of the five in the morning connection. Of course. That is beautiful.",
      "choices": [
       {
        "text": "That's it done.",
@@ -399,14 +399,14 @@
   {
    "id": "field-castle-hill-noa",
    "name": "Noa, someone at the end of their patience at Castle Hill",
-   "x": -18913,
-   "z": -14958,
+   "x": -18775,
+   "z": -14887,
    "radius": 5,
    "root": "hello",
    "nodes": [
     {
      "id": "hello",
-     "line": "Every weekday. The 5:40 into Castle Hill. Sits at the yellow line and waits and then walks off on its own.",
+     "line": "Started around every second Friday. Nobody can tell me when exactly, which bothers me.",
      "choices": [
       {
        "text": "You after something?",
@@ -428,7 +428,7 @@
     },
     {
      "id": "offer",
-     "line": "I am not doing another winter of watching that. Find out where it goes and who it belongs to.",
+     "line": "The woman who runs the newsagent feeds it, which is kind and is also why it keeps coming.",
      "choices": [
       {
        "text": "Alright. I'll do it.",
@@ -447,7 +447,7 @@
     },
     {
      "id": "colour",
-     "line": "Half the platform knows. Nobody has done anything, including me, for four months.",
+     "line": "Somebody left a hi-vis with somebody else s name in it out for it once. It has been there since.",
      "choices": [
       {
        "text": "Fine. Give it here.",
@@ -461,7 +461,7 @@
     },
     {
      "id": "ledger",
-     "line": "Not a sad story. I will take it. I badly needed one that was not.",
+     "line": "Hills Showground? It walks to Hills Showground? Every day?",
      "choices": [
       {
        "text": "That's it done.",
@@ -478,14 +478,14 @@
   {
    "id": "field-cabramatta-noor",
    "name": "Noor, bookmaker of the informal kind at Cabramatta",
-   "x": -25104,
-   "z": 3352,
+   "x": -24873.8,
+   "z": 3398.9,
    "radius": 5,
    "root": "hello",
    "nodes": [
     {
      "id": "hello",
-     "line": "Nothing illegal. A book on small things. Weather, delays, whether the 7:02 out of Cabramatta is on time.",
+     "line": "Nothing illegal. A book on small things. Whether the quarter to six is on time, mostly.",
      "choices": [
       {
        "text": "You after something?",
@@ -507,7 +507,7 @@
     },
     {
      "id": "offer",
-     "line": "Somebody is up four hundred over eleven weeks on the delay market. That is not luck, that is information.",
+     "line": "Someone off the 8:02 takes the same run. That may be nothing.",
      "choices": [
       {
        "text": "Alright. I'll do it.",
@@ -526,7 +526,7 @@
     },
     {
      "id": "colour",
-     "line": "You cannot beat a delay book unless you can see the roster. Think about who can see the roster.",
+     "line": "They pay in cash out of a tallboy of something warm. Every time.",
      "choices": [
       {
        "text": "Fine. Give it here.",
@@ -557,14 +557,14 @@
   {
    "id": "field-burwood-nora",
    "name": "Nora, night guard at Burwood",
-   "x": -9584,
-   "z": 1053,
+   "x": -9668,
+   "z": 1243,
    "radius": 5,
    "root": "hello",
    "nodes": [
     {
      "id": "hello",
-     "line": "You get to know the last service. Four people out of Burwood and one of them is asleep every single night, and it is never the same one.",
+     "line": "Last one is ten past five. After that it is me, the lights, and a Bunnings receipt somebody left on the bench in 2019.",
      "choices": [
       {
        "text": "You after something?",
@@ -586,7 +586,7 @@
     },
     {
      "id": "offer",
-     "line": "Ride it to Strathfield. Photograph the platform with nobody on it. I want to know the place exists when I am not standing in it.",
+     "line": "Ride it to Strathfield. Photograph the platform with nobody on it. I want to know the place is there when I am not standing in it.",
      "choices": [
       {
        "text": "Alright. I'll do it.",
@@ -605,7 +605,7 @@
     },
     {
      "id": "colour",
-     "line": "Twenty-two years. I have watched this place empty out twenty-two years and I still do not like the sound it makes.",
+     "line": "On Thursdays it is worse. You can hear the escalator from the far end.",
      "choices": [
       {
        "text": "Fine. Give it here.",
@@ -619,7 +619,7 @@
     },
     {
      "id": "ledger",
-     "line": "There it is. Still there. Good. Some nights I am not sure.",
+     "line": "That is exactly it. 14 years and somebody finally looked at it properly.",
      "choices": [
       {
        "text": "That's it done.",
@@ -636,14 +636,14 @@
   {
    "id": "field-wiley-park-nuri",
    "name": "Nuri, ticket inspector at Wiley Park",
-   "x": -13040.3,
-   "z": 6383,
+   "x": -13126,
+   "z": 6244,
    "radius": 5,
    "root": "hello",
    "nodes": [
     {
      "id": "hello",
-     "line": "Card ending 23. Taps on at Wiley Park, six-forty, every weekday. Never taps off. Not once in four months.",
+     "line": "Card ending 15. On at Wiley Park, the back of seven, every weekday. Never off. Not once.",
      "choices": [
       {
        "text": "You after something?",
@@ -665,7 +665,7 @@
     },
     {
      "id": "offer",
-     "line": "I am not allowed to follow it and you are not employed, which makes you better at this than me. Find where they get off.",
+     "line": "Ride it to Lakemba and watch who does not go through the gates.",
      "choices": [
       {
        "text": "Alright. I'll do it.",
@@ -684,7 +684,7 @@
     },
     {
      "id": "colour",
-     "line": "It is not the money. It is ninety cents a day. It is that I cannot work out how.",
+     "line": "It is not the money. It is ninety cents. It is that I cannot work out how.",
      "choices": [
       {
        "text": "Fine. Give it here.",
@@ -698,7 +698,7 @@
     },
     {
      "id": "ledger",
-     "line": "A hole in a fence. Four months. I want to be angry and mostly I am impressed.",
+     "line": "A hole in a fence. Months of this. I want to be angry and mostly I am impressed.",
      "choices": [
       {
        "text": "That's it done.",
@@ -715,8 +715,8 @@
   {
    "id": "field-flemington-nyah",
    "name": "Nyah, kiosk operator at Flemington",
-   "x": -12865,
-   "z": -103,
+   "x": -13074,
+   "z": -179,
    "radius": 5,
    "root": "hello",
    "nodes": [
@@ -744,7 +744,7 @@
     },
     {
      "id": "offer",
-     "line": "One of them stopped. Three weeks. Take one over there and find out if I lost them to the chain up the road.",
+     "line": "One of them stopped. Take one over there and find out if it was the chain, or the relief driver finally retiring.",
      "choices": [
       {
        "text": "Alright. I'll do it.",
@@ -763,7 +763,7 @@
     },
     {
      "id": "colour",
-     "line": "If it is the chain I would rather they were dead. I am joking. Mostly.",
+     "line": "I keep a laminated sign under the counter with their names in it. Do not tell them that.",
      "choices": [
       {
        "text": "Fine. Give it here.",
@@ -777,7 +777,7 @@
     },
     {
      "id": "ledger",
-     "line": "The chain. Of course it was the chain. Thank you for finding out. I hate it.",
+     "line": "Moved to Homebush. Well. That I can forgive.",
      "choices": [
       {
        "text": "That's it done.",
@@ -794,14 +794,14 @@
   {
    "id": "field-windsor-oakley",
    "name": "Oakley, relief signaller at Windsor",
-   "x": -37384,
-   "z": -27711,
+   "x": -37257,
+   "z": -27587,
    "radius": 5,
    "root": "hello",
    "nodes": [
     {
      "id": "hello",
-     "line": "Four minutes. That board has said four minutes since before the merge. Sometimes it means four minutes.",
+     "line": "Four minutes. That board has said four minutes for longer than I have worked here. Sometimes it means it.",
      "choices": [
       {
        "text": "You after something?",
@@ -823,7 +823,7 @@
     },
     {
      "id": "offer",
-     "line": "Nobody upstairs believes me because I have no data, only twelve years. Go and get me data.",
+     "line": "Go and get me a number. A number is a thing they have to answer.",
      "choices": [
       {
        "text": "Alright. I'll do it.",
@@ -842,7 +842,7 @@
     },
     {
      "id": "colour",
-     "line": "A minute of a stranger's life, three hundred times a day. Somebody should write it down.",
+     "line": "I have a hi-vis with somebody else s name in it full of times I took myself. It is not evidence, apparently.",
      "choices": [
       {
        "text": "Fine. Give it here.",
@@ -873,14 +873,14 @@
   {
    "id": "field-oatley-odile",
    "name": "Odile, lost property clerk at Oatley",
-   "x": -11736,
-   "z": 12676,
+   "x": -11993,
+   "z": 12542,
    "radius": 5,
    "root": "hello",
    "nodes": [
     {
      "id": "hello",
-     "line": "Umbrellas. Nine hundred umbrellas. And one thing off the Oatley line that has a name on it and a phone number that rings out.",
+     "line": "Umbrellas. Nine hundred of them. And one thing off the Oatley line with a name in it.",
      "choices": [
       {
        "text": "You after something?",
@@ -902,7 +902,7 @@
     },
     {
      "id": "offer",
-     "line": "I cannot leave the counter. You can. Go to the address on the tag and see who is not answering.",
+     "line": "A bloke in a council polo handed it in and would not leave a name, which is its own kind of information.",
      "choices": [
       {
        "text": "Alright. I'll do it.",
@@ -921,7 +921,7 @@
     },
     {
      "id": "colour",
-     "line": "People come back for the strangest things. Nobody ever comes back for an umbrella.",
+     "line": "The room smells like every second Friday in a wet school bag and always has.",
      "choices": [
       {
        "text": "Fine. Give it here.",
@@ -935,7 +935,7 @@
     },
     {
      "id": "ledger",
-     "line": "That explains the phone. Poor sod. Put it back in the room, would you.",
+     "line": "Right. Then it stays in the room, and I am past being reasonable about it.",
      "choices": [
       {
        "text": "That's it done.",
@@ -952,14 +952,14 @@
   {
    "id": "field-westmead-ola",
    "name": "Ola, commuter of long standing at Westmead",
-   "x": -20711,
-   "z": -6456,
+   "x": -20619,
+   "z": -6455,
    "radius": 5,
    "root": "hello",
    "nodes": [
     {
      "id": "hello",
-     "line": "The quiet carriage works because everyone agrees it works. That is the whole mechanism. There is no other mechanism.",
+     "line": "The quiet carriage works because everyone agrees it works. That is the entire mechanism.",
      "choices": [
       {
        "text": "You after something?",
@@ -981,7 +981,7 @@
     },
     {
      "id": "offer",
-     "line": "Speakerphone. Every morning, Westmead to town, speakerphone. I have made eye contact eleven times and it has done nothing.",
+     "line": "I could move carriages. Then they have won something. So: no.",
      "choices": [
       {
        "text": "Alright. I'll do it.",
@@ -1000,7 +1000,7 @@
     },
     {
      "id": "colour",
-     "line": "I could move carriages. I have thought about it. But then they have won something.",
+     "line": "There is a sign. There has always been a sign. The sign does nothing on its own.",
      "choices": [
       {
        "text": "Fine. Give it here.",
@@ -1031,14 +1031,14 @@
   {
    "id": "field-rozelle-bay-olamide",
    "name": "Olamide, courier at Rozelle Bay",
-   "x": -3515,
-   "z": 475,
+   "x": -3273.2,
+   "z": 528.5,
    "radius": 5,
    "root": "hello",
    "nodes": [
     {
      "id": "hello",
-     "line": "Forty drops a day. The difference between the shortcut and the long way at Rozelle Bay is nine minutes, and nine minutes is four drops.",
+     "line": "Forty drops a day. Rozelle Bay is the hinge the whole run turns on.",
      "choices": [
       {
        "text": "You after something?",
@@ -1110,14 +1110,14 @@
   {
    "id": "field-glenfield-oleg",
    "name": "Oleg, trackwork foreman at Glenfield",
-   "x": -29015,
-   "z": 11934,
+   "x": -28880,
+   "z": 12013,
    "radius": 5,
    "root": "hello",
    "nodes": [
     {
      "id": "hello",
-     "line": "Midnight to four, Glenfield is mine. Nobody thanks you for it and nobody sees it and by six it looks like nothing happened.",
+     "line": "Midnight to four, Glenfield is mine. By six it looks like nothing happened, which is the job.",
      "choices": [
       {
        "text": "You after something?",
@@ -1139,7 +1139,7 @@
     },
     {
      "id": "offer",
-     "line": "Somebody is walking through. Not kids. Kids run. This one walks.",
+     "line": "The relief driver, I reckon. But reckoning is not a form.",
      "choices": [
       {
        "text": "Alright. I'll do it.",
@@ -1158,7 +1158,7 @@
     },
     {
      "id": "colour",
-     "line": "You do not get a second warning out here. You get a grinder and a very long report.",
+     "line": "You do not get a second warning out here. You get a grinder.",
      "choices": [
       {
        "text": "Fine. Give it here.",
