@@ -2945,6 +2945,25 @@ async function main(): Promise<void> {
    * finishes early in a session that is running well.
    */
   const SWEEP_FRAME_BUDGET_S = 0.025;
+  /**
+   * Whether the train templates have been walked past a *known* shadow rig.
+   *
+   * They are warmed once at boot, and that warm is half a warm: it runs before
+   * the first frame, so no shadow render has happened, so `ShadowWarm` has
+   * nothing captured and the shadow half of `precompileGroup` is a pass-through
+   * for all seven templates. The catch-up sweep cannot finish the job either --
+   * it walks `scene.children`, and no train is in the scene until one comes
+   * within 260 m.
+   *
+   * The owner saw the gap as trains vanishing at Central as their doors open. A
+   * train at a platform switches to the hero tier -- real interior, real doors,
+   * `train_cab_interior` and `train_cab_windows` and the rest, the materials the
+   * warm-up audit lists as having no boot stand-in -- and casts into the sun's
+   * depth map for the first time. The pipeline is not there, so it compiles, and
+   * `AsyncPipelines` skips the draw until it lands. Before that gate existed the
+   * same fact was a stall instead of a disappearance.
+   */
+  let trainsShadowWarmed = false;
   const shadowSweep = new ShadowSweep();
   const tripPass = new TripPass({ renderer, scene, camera });
   // See `bindWarmTarget` above and `TripPass.warmInto`: from here on every
@@ -10962,6 +10981,12 @@ async function main(): Promise<void> {
       // Below the threshold it does nothing and waits; the queue is one-time
       // and keeps until the client is idle enough to pay for it.
       const roomy = frameDt < SWEEP_FRAME_BUDGET_S;
+      // The templates that are not in the scene, once, as soon as there is a rig
+      // to bind. See `trainsShadowWarmed`.
+      if (shadowWarm.ready && !trainsShadowWarmed) {
+        trainsShadowWarmed = true;
+        void trains.warm(precompileGroup);
+      }
       const catchUp = shadowSweep.next(shadowWarm.ready, scene.children, roomy);
       if (catchUp !== null) {
         void shadowWarm.warmInto(renderer, scene, () =>
