@@ -65,6 +65,22 @@ export class AsyncPipelines {
   private skippedDraws = 0;
   /** Compiles started off the frame. */
   private started = 0;
+  /**
+   * **What is compiling, by material, and why it is worth the eight lines.**
+   *
+   * A long ride across the city reached 3,476 pipelines and 2,320 of them
+   * inside stalled frames. That is not a warm-up curve flattening out, it is
+   * something creating pipelines without bound -- and four rounds of reasoning
+   * about *which* thing produced four different confident answers, two of them
+   * wrong. This is the one place in the client that knows a pipeline is being
+   * created and is still holding the object it is for, so it is the only place
+   * that can answer the question with a name instead of an argument.
+   *
+   * Kept to a tally rather than a log because the owner cannot paste a large
+   * console without it falling over: the whole diagnosis has to fit in one
+   * short line beside the frame time.
+   */
+  private readonly tally = new Map<string, number>();
 
   get skipped(): number {
     return this.skippedDraws;
@@ -72,6 +88,44 @@ export class AsyncPipelines {
 
   get compiles(): number {
     return this.started;
+  }
+
+  /**
+   * Record one compile against the material that caused it.
+   *
+   * The name is the material's own where it has one, and its type where it does
+   * not -- `NodeMaterial` and `MeshStandardNodeMaterial` are both common and
+   * both useless on their own, so the geometry's attribute set is appended:
+   * one material drawn with two different vertex layouts is two pipelines, and
+   * that distinction is invisible from the name alone.
+   */
+  private note(renderObject: unknown): void {
+    const ro = renderObject as {
+      material?: { name?: string; type?: string };
+      geometry?: { attributes?: Record<string, unknown> };
+      object?: { isInstancedMesh?: boolean };
+    };
+    const m = ro.material;
+    const base = (m?.name !== undefined && m.name !== '' ? m.name : m?.type) ?? 'unnamed';
+    const attrs = ro.geometry?.attributes;
+    const layout = attrs === undefined ? '' : `{${Object.keys(attrs).sort().join(',')}}`;
+    const inst = ro.object?.isInstancedMesh === true ? '[inst]' : '';
+    const key = `${base}${layout}${inst}`;
+    this.tally.set(key, (this.tally.get(key) ?? 0) + 1);
+  }
+
+  /** The `n` worst offenders, most first, as one short line. */
+  top(n = 3): string {
+    return [...this.tally.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, n)
+      .map(([k, v]) => `${k} x${v}`)
+      .join(', ');
+  }
+
+  /** How many distinct keys have ever compiled. A bounded client plateaus. */
+  get distinct(): number {
+    return this.tally.size;
   }
 
   /**
@@ -103,7 +157,10 @@ export class AsyncPipelines {
       // draw guard below decides whether it is ready to use.
       const sink: unknown[] = [];
       const pipeline = innerGet(renderObject, sink);
-      if (sink.length > 0) this.started += sink.length;
+      if (sink.length > 0) {
+        this.started += sink.length;
+        this.note(renderObject);
+      }
       return pipeline;
     };
 

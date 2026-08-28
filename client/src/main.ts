@@ -12229,7 +12229,8 @@ async function main(): Promise<void> {
         `[frame] ${frameMs.toFixed(0)} ms — worst sections: ${worst || '(none)'}` +
           `  |  pipelines compiled in stalled frames so far: ${pipelineWatch.pipelines}` +
           ` over ${pipelineWatch.frames} frame(s), worst ${pipelineWatch.worstMs.toFixed(0)} ms` +
-          `  |  off-frame compiles ${asyncPipes.compiles}, draws deferred ${asyncPipes.skipped}`,
+          `  |  compiles ${asyncPipes.compiles} over ${asyncPipes.distinct} keys` +
+          `  |  worst: ${asyncPipes.top(3)}`,
       );
     }
     if (frameDt < 0.2) {
