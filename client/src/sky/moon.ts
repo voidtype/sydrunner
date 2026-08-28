@@ -165,6 +165,41 @@ const QUAD_OVERSIZE = 1.5;
 const MOON_APPARENT_GAIN = 2.4;
 
 /**
+ * **A deliberate lie, asked for by name, and kept where it can be seen.**
+ *
+ * The owner: *"can u make the moon 3x bigger dia for effect and extra
+ * brightness?"* Everything else in this file is measured -- 0.52 degrees off the
+ * ephemeris distance, albedo 0.12 because the moon is the colour of worn
+ * asphalt, an opposition surge that makes the total flux obey the real phase
+ * law. This is not that, and it would be dishonest to fold it into
+ * `MOON_APPARENT_GAIN`, whose whole doc comment is an argument about perceptual
+ * geometry that this number has nothing to do with.
+ *
+ * So it sits beside it as its own thing: three times the diameter, for effect.
+ * Set it to 1 and the sky is physical again.
+ *
+ * **Brightness is not tripled with it.** Three times the diameter is nine times
+ * the area, and radiance is per unit area -- so the moon already puts nine
+ * times the light into the frame at the same disc brightness. Multiplying the
+ * radiance too would clip the disc to a white hole and take the maria with it,
+ * which is the one thing on it worth looking at. The lift below is deliberately
+ * smaller than the eye expects for that reason.
+ */
+const MOON_EFFECT_DIAMETER = 3;
+
+/**
+ * The extra disc brightness that goes with the effect diameter.
+ *
+ * A moon nine times the area at 1.35x the radiance is a little over twelve
+ * times the light -- bright enough to read as "brighter" against the sky it is
+ * painted on, short of the value where the highlands clip and the disc stops
+ * having features. Paired with the diameter rather than independent of it: the
+ * two are one request and one lie, and separating them invites somebody to turn
+ * the size back down and leave a moon that is inexplicably too bright.
+ */
+const MOON_EFFECT_RADIANCE = 1.35;
+
+/**
  * The exponent on `N.L` across the disc.
  *
  * **The famous fact about the full moon is that it has no limb darkening**: it
@@ -388,7 +423,7 @@ export class MoonDisc extends Mesh {
     const d = lunar.direction;
     this.uDirection.value.set(d.x, d.y, d.z);
     this.uHalfSizePx.value =
-      (lunar.angularDiameter / 2) * QUAD_OVERSIZE * MOON_APPARENT_GAIN * this.pixelsPerDegree;
+      (lunar.angularDiameter / 2) * QUAD_OVERSIZE * MOON_APPARENT_GAIN * MOON_EFFECT_DIAMETER * this.pixelsPerDegree;
 
     /* The billboard basis, which the shader's phase depends on entirely. `toward`
      * is the direction from the moon to the *viewer*, so it is the outward
@@ -423,7 +458,7 @@ export class MoonDisc extends Mesh {
     // `MOON_PHASE_POWER`. The lit *area* already scales roughly with the phase,
     // so this carries the remaining exponent. See `MOON_PHASE_POWER`.
     const surge = Math.pow(Math.max(phase, 0), MOON_PHASE_POWER - 1);
-    const base = (MOON_ALBEDO / Math.PI) * SUN_ZENITH_INTENSITY * extinction * surge;
+    const base = (MOON_ALBEDO / Math.PI) * SUN_ZENITH_INTENSITY * extinction * surge * MOON_EFFECT_RADIANCE;
     this.uRadiance.value.set(
       base,
       base * (1 - SUN_WARM_GREEN * warmth),
