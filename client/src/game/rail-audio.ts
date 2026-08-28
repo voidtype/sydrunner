@@ -188,6 +188,50 @@ export const DEPART_URL = '/audio/rail/15s_before_leave.mp3';
 export const ANNOUNCE_URLS: readonly string[] = [ARRIVE_URL, DEPART_URL];
 
 /**
+ * Inside a moving train, recorded by the owner on a Sydney train and handed
+ * over as *"sometimes when the train is moving its silent"*.
+ *
+ * `ANNOUNCE_RANGE`'s comment has been admitting this gap for a while -- *"the
+ * PA is the only train voice in this build, there is no rolling-stock sound at
+ * all"*. A carriage between stations was silent, which is the one place in this
+ * city that is never silent.
+ */
+export const RIDE_URL = '/audio/rail/trainride.m4a';
+
+/**
+ * The recording's length, seconds.
+ *
+ * Wanted for the same reason `game/rave.ts` wants a record's: the bed is
+ * positioned at `clock mod length` rather than started when a client noticed,
+ * so two people in one carriage hear the same rattle at the same instant and
+ * somebody who boards at Redfern joins it where it already is. Measured off the
+ * file rather than guessed -- 79.189333 s -- and truncated, because running a
+ * few milliseconds short of the end loops early and running past it plays
+ * silence.
+ */
+export const RIDE_SECONDS = 79.18;
+
+/**
+ * Does the carriage bed play?
+ *
+ * Stated as its own function of four booleans because the owner's rule is
+ * exactly four booleans -- *"play it when the train is MOVING/underway and when
+ * the other 2 sounds arent playing"* -- and a rule that small is worth being
+ * able to check exhaustively rather than reading out of a loop that is also
+ * doing binary searches over a timetable.
+ *
+ * The announcements win, and that is the whole of the priority: a PA sentence
+ * is the thing a player is meant to hear, and a bed under it is what makes it
+ * unintelligible. Dwell wins too -- a stopped train with its doors open is a
+ * platform, not a ride.
+ */
+export function ridePlays(
+  aboard: boolean, underway: boolean, arriving: boolean, departing: boolean,
+): boolean {
+  return aboard && underway && !arriving && !departing;
+}
+
+/**
  * Seconds before the doors open that the approach clip starts, and its length.
  *
  * The recording's own name, and its **decoded** duration after the loudness
@@ -388,6 +432,14 @@ export interface RailVoice {
   distance: number;
   /** The listener is in this train: no shell, no muffle. See section 6. */
   inside: boolean;
+  /**
+   * Play the buffer round and round rather than once.
+   *
+   * True only for the carriage bed. A sentence that looped would be a sentence
+   * said twice, which is why this is a property of the voice rather than of the
+   * channel it lands on.
+   */
+  loop?: boolean;
   /** The station it is about. The HUD must agree; see `checkRailAnnouncements`. */
   station: string;
   /** For the debug overlay. */
@@ -407,6 +459,8 @@ export interface RailVoice {
 export interface RailAnnounceMix {
   arrive: RailVoice;
   depart: RailVoice;
+  /** The carriage bed, playing whenever `ridePlays` says so. */
+  ride: RailVoice;
   /**
    * A train close enough that the clips are worth having decoded.
    *
@@ -424,7 +478,12 @@ function createVoice(url: string): RailVoice {
 }
 
 export function createRailAnnounceMix(): RailAnnounceMix {
-  return { arrive: createVoice(ARRIVE_URL), depart: createVoice(DEPART_URL), wanted: false };
+  return {
+    arrive: createVoice(ARRIVE_URL),
+    depart: createVoice(DEPART_URL),
+    ride: createVoice(RIDE_URL),
+    wanted: false,
+  };
 }
 
 /**
@@ -505,7 +564,11 @@ export function railAnnounceMix(
 ): void {
   out.arrive.active = false;
   out.depart.active = false;
+  out.ride.active = false;
   out.wanted = false;
+  /** Set by the rider's own train, below, and read after the sweep. */
+  let rideUnderway = false;
+  let rideKey = 0;
 
   const ridingDir = aboard === null ? null : dirOf(bake, aboard.line, aboard.dir);
   const reach = ANNOUNCE_FETCH_RANGE + CONSIST_M;
@@ -537,6 +600,17 @@ export function railAnnounceMix(
         }
         const age = _pose.age;
         const s = _pose.s;
+        if (mine) {
+          // **Underway is the absence of a dwell**, which is the same fact the
+          // doors are driven from rather than a second opinion about it:
+          // `dwellElapsed` answers non-zero only inside a phase with no speed
+          // and no acceleration. A train braking into a platform is still
+          // moving and still sounds like it.
+          rideUnderway = dwellElapsed(bake, dir, age) === 0;
+          // Stable for one trip, so the bed is not restarted every frame; zero
+          // is `announceRelease`'s "nothing playing", so it must not collide.
+          rideKey = (Math.imul(dir.line.id.length + 1, 0x9e3779b1) ^ (trip * 2654435761)) >>> 0 || 1;
+        }
         // Once for both kinds: in the 2.4 s they overlap they are the same train
         // standing in the same place.
         let distance = -1;
@@ -565,6 +639,22 @@ export function railAnnounceMix(
       }
     }
   }
+
+  // The bed, after the sweep, because it is defined against what the sweep
+  // found. Inside and at zero distance: there is nothing between the carriage
+  // and the ear, which is `RailVoice.inside`'s whole purpose.
+  if (ridePlays(aboard !== null, rideUnderway, out.arrive.active, out.depart.active)) {
+    out.ride.active = true;
+    out.ride.key = rideKey;
+    out.ride.offset = t % RIDE_SECONDS;
+    out.ride.distance = 0;
+    out.ride.inside = true;
+    out.ride.loop = true;
+  }
+  // Fetched on being aboard rather than on `wanted`: the bed is only ever heard
+  // from inside, so a player on a platform should not pay three megabytes for
+  // it.
+  if (aboard !== null) out.wanted = true;
 }
 
 /**
@@ -678,6 +768,49 @@ export function bannerNextStop(dir: RailDirection, s: number): number {
  *      licenses the single binary search in `announcementAt`.
  *   4. **A departure clip never runs into the next approach clip**, section 3.
  */
+/**
+ * The carriage bed's rule, over all sixteen states it can be asked about.
+ *
+ * The owner's sentence was *"play it when the train is MOVING/underway and when
+ * the other 2 sounds arent playing"*, which is four booleans and one answer --
+ * small enough that checking every case is cheaper than reasoning about any of
+ * them, and worth doing because three of the four are things a bed getting
+ * wrong would be heard as a bug in something else: a bed under a PA sentence
+ * reads as the announcement being muddy, and a bed at a platform reads as the
+ * doors being open on a moving train.
+ */
+export function verifyRideBed(): string[] {
+  const failures: string[] = [];
+  for (let mask = 0; mask < 16; mask++) {
+    const aboard = (mask & 1) !== 0;
+    const underway = (mask & 2) !== 0;
+    const arriving = (mask & 4) !== 0;
+    const departing = (mask & 8) !== 0;
+    const want = aboard && underway && !arriving && !departing;
+    const got = ridePlays(aboard, underway, arriving, departing);
+    if (got !== want) {
+      failures.push(
+        `the carriage bed ${got ? 'plays' : 'is silent'} when aboard=${aboard},` +
+          ` underway=${underway}, arriving=${arriving}, departing=${departing}`,
+      );
+    }
+  }
+  // The three that are worth naming, because each is a different complaint.
+  if (ridePlays(true, false, false, false)) {
+    failures.push('the bed plays at a dwell: a stopped train would sound like a moving one.');
+  }
+  if (ridePlays(true, true, true, false) || ridePlays(true, true, false, true)) {
+    failures.push('the bed plays under an announcement, which is heard as the announcement being muddy.');
+  }
+  if (ridePlays(false, true, false, false)) {
+    failures.push('the bed plays for somebody who is not on the train.');
+  }
+  if (RIDE_SECONDS <= 0 || !Number.isFinite(RIDE_SECONDS)) {
+    failures.push(`RIDE_SECONDS is ${RIDE_SECONDS}; the loop position is a modulo by it.`);
+  }
+  return failures;
+}
+
 export function verifyRailAudio(bake: RailBake): string[] {
   const bad: string[] = [];
   const half = bake.physics.dwell * 0.5;

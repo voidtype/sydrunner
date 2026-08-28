@@ -648,6 +648,7 @@ import {
   createRailAnnounceMix,
   railAnnounceMix,
   verifyRailAudio,
+  verifyRideBed,
 } from './game/rail-audio.ts';
 import { RailCut } from './world/rail-cut.ts';
 import { RoadDeck, verifyRoadDeck } from './world/road-deck.ts';
@@ -2300,6 +2301,8 @@ async function main(): Promise<void> {
       // and that no two of one kind overlap -- on `verifyRail`'s terms: the
       // browser is not in CI, and a self-check nothing runs is one that rots.
       const announceFailures = verifyRailAudio(railBake);
+      // The carriage bed's rule, all sixteen states of it. See `verifyRideBed`.
+      announceFailures.push(...verifyRideBed());
       if (announceFailures.length) {
         console.warn(
           '[rail] the announcement schedule failed its own self-check:\n  - ' +

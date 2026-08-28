@@ -2789,6 +2789,7 @@ export class CombatAudio {
     if (mix === null) {
       this.announceRelease(ctx, 0);
       this.announceRelease(ctx, 1);
+      this.announceRelease(ctx, 2);
       return;
     }
     // The prefetch, and the whole of the policy: nothing is fetched until a
@@ -2808,11 +2809,18 @@ export class CombatAudio {
     this.announce = chans;
     this.announceVoice(ctx, 0, mix.arrive);
     this.announceVoice(ctx, 1, mix.depart);
+    // The bed last, so a frame on which an announcement starts has already
+    // taken the two channels above it and `ridePlays` has already stood the bed
+    // down. Not prefetched with the pair: it is three megabytes and it is only
+    // ever heard from inside a carriage, so `announceVoice`'s own lazy load is
+    // the right one -- a player on a platform never pays for it.
+    this.announceVoice(ctx, 2, mix.ride);
   }
 
   private announceBuild(ctx: AudioContext, master: GainNode): AnnounceChannel[] {
     const chans: AnnounceChannel[] = [];
-    for (let i = 0; i < 2; i++) {
+    // Three: arrive, depart, and the carriage bed under them.
+    for (let i = 0; i < 3; i++) {
       const out = ctx.createGain();
       out.gain.value = 0.0001;
       out.connect(master);
@@ -2872,6 +2880,9 @@ export class CombatAudio {
         gate.gain.linearRampToValueAtTime(1, t + ANNOUNCE_EDGE_S);
         const source = ctx.createBufferSource();
         source.buffer = buffer;
+        // The carriage bed goes round; a sentence does not. `loop` is the
+        // voice's rather than the channel's because the channel is reused.
+        source.loop = voice.loop === true;
         source.connect(gate).connect(ch.lowpass);
         source.start(t, voice.offset > 0 ? voice.offset : 0);
         ch.source = source;
