@@ -2789,7 +2789,7 @@ export class CombatAudio {
     if (mix === null) {
       this.announceRelease(ctx, 0);
       this.announceRelease(ctx, 1);
-      this.announceRelease(ctx, 2);
+      this.announceRelease(ctx, RIDE_CHANNEL);
       return;
     }
     // The prefetch, and the whole of the policy: nothing is fetched until a
@@ -2814,7 +2814,7 @@ export class CombatAudio {
     // down. Not prefetched with the pair: it is three megabytes and it is only
     // ever heard from inside a carriage, so `announceVoice`'s own lazy load is
     // the right one -- a player on a platform never pays for it.
-    this.announceVoice(ctx, 2, mix.ride);
+    this.announceVoice(ctx, RIDE_CHANNEL, mix.ride);
   }
 
   private announceBuild(ctx: AudioContext, master: GainNode): AnnounceChannel[] {
@@ -2859,9 +2859,10 @@ export class CombatAudio {
 
     const t = ctx.currentTime;
     const d = voice.distance > 0 ? voice.distance : 0;
+    const base = index === RIDE_CHANNEL ? RIDE_GAIN : ANNOUNCE_GAIN;
     const gain = voice.inside
-      ? ANNOUNCE_GAIN
-      : (ANNOUNCE_GAIN * ANNOUNCE_SHELL) / (1 + d / ANNOUNCE_HALF_DISTANCE);
+      ? base
+      : (base * ANNOUNCE_SHELL) / (1 + d / ANNOUNCE_HALF_DISTANCE);
     let cutoff = 20000;
     if (!voice.inside) {
       const near = Math.max(ANNOUNCE_CUTOFF_AT, d) / ANNOUNCE_CUTOFF_AT;
@@ -3706,6 +3707,27 @@ interface AnnounceChannel {
  * rave beside a station, which is a thing the limiter exists for.
  */
 const ANNOUNCE_GAIN = 0.62;
+
+/** The channel the carriage bed lands on. See `railAnnounce`. */
+const RIDE_CHANNEL = 2;
+
+/**
+ * The carriage bed, +9 dB on the announcements, by ear and on request.
+ *
+ * The bed went out at `ANNOUNCE_GAIN` because it rides the same channel strip
+ * as the PA, and a bed is not a PA: an announcement is speech you are meant to
+ * catch over a room, and this is the room. The owner asked for nine decibels
+ * and nine decibels is what this is -- `10 ** (9 / 20)`, written as the
+ * arithmetic rather than as 1.75, so the next person to touch it can see what
+ * was asked for instead of a magic number.
+ *
+ * It lands over unity, which is fine and was checked rather than assumed: the
+ * master sits at 0.55 with a `DynamicsCompressor` after it, so this arrives at
+ * about 0.96 before the limiter and the limiter has the peaks. Levels live here
+ * with the rest of them; `game/rail-audio.ts` says *when* a voice plays and
+ * never how loud.
+ */
+const RIDE_GAIN = ANNOUNCE_GAIN * 10 ** (9 / 20);
 
 /**
  * What is left of it through a carriage shell, on the platform side.
