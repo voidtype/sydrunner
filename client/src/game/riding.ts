@@ -1620,7 +1620,31 @@ export interface StationBox {
   floorY: number;
   /** The terrain over the box: its lid. */
   ceilY: number;
+  /**
+   * Rise per metre along `ux,uz`, measured from the box's own centre. Zero for
+   * a room, non-zero for the access incline.
+   *
+   * **A box had one floor height, and that is why underground stations had no
+   * way in.** A descent is a floor that changes with where you stand on it, and
+   * expressing one as a stack of flat boxes takes forty of them per station to
+   * get a stair with treads a body does not catch on. One number does it
+   * instead: `floorAt` adds `slope * along` to both the floor and the lid, so a
+   * ramp is a room that leans and every rule about bands, headroom and
+   * replacing the terrain carries over untouched.
+   */
+  slope?: number;
 }
+
+/** How far to the side of the track the surface entrance stands. */
+export const ACCESS_FAR_M = 40;
+/** Where the incline bottoms out: just outside the room's wall at 13 m. */
+export const ACCESS_NEAR_M = 17;
+/** Half-width of the passage, and of the entrance above it. */
+export const ACCESS_HALF_W = 3.2;
+/** Standing height inside the incline and the tunnel. */
+export const ACCESS_HEIGHT_M = 4.2;
+/** How far along the platform the access meets the room, from its centre. */
+export const ACCESS_ALONG_M = 68;
 
 export class StationBoxField {
   private readonly cells = new Map<number, StationBox[]>();
@@ -1679,9 +1703,14 @@ export class StationBoxField {
       if (along < -box.halfLength || along > box.halfLength) continue;
       const across = dx * -box.uz + dz * box.ux;
       if (across < -box.halfWidth || across > box.halfWidth) continue;
-      if (feetY < box.floorY - PLATFORM_STEP_M) continue;
-      if (feetY > box.ceilY - BOX_HEADROOM_M) continue;
-      if (box.floorY > best) best = box.floorY;
+      // The lean, if it has one. Floor and lid move together, so the band is
+      // the same thickness everywhere on a ramp and a body walking down one is
+      // never briefly outside it.
+      const rise = box.slope === undefined ? 0 : box.slope * along;
+      const floorY = box.floorY + rise;
+      if (feetY < floorY - PLATFORM_STEP_M) continue;
+      if (feetY > box.ceilY + rise - BOX_HEADROOM_M) continue;
+      if (floorY > best) best = floorY;
     }
     return best;
   }
@@ -1750,6 +1779,53 @@ export function buildStationBoxes(bake: RailBake): StationBoxField {
       floorY: st.boxFloorY,
       ceilY: st.boxCeilY,
     });
+    // **The way in.** Everything above builds the room; until this, nothing
+    // built a route to it, and `rail-geo` only ever called `writeStationAccess`
+    // for stations that were *not* underground. A bore has no surface
+    // expression to carve, so the terrain stayed sealed over the concourse and
+    // the entrance on the street was a box you could walk into that did
+    // nothing -- which is exactly how the owner found it at Macquarie Park.
+    //
+    // Three boxes, laid across the track rather than along it: the entrance
+    // stands `ACCESS_FAR_M` to the side, which is off the alignment the road
+    // usually shares with the railway, and the incline runs back in under it.
+    const street = st.boxCeilY;
+    const drop = street - st.boxFloorY;
+    if (drop > BOX_MIN_HEIGHT_M) {
+      const px = -st.siteDz;
+      const pz = st.siteDx;
+      const alongX = st.siteX + st.siteDx * ACCESS_ALONG_M;
+      const alongZ = st.siteZ + st.siteDz * ACCESS_ALONG_M;
+      const mid = (ACCESS_FAR_M + ACCESS_NEAR_M) / 2;
+      const half = (ACCESS_FAR_M - ACCESS_NEAR_M) / 2;
+      // The incline. Its own axis points *outward*, so the far end is the
+      // street and the near end is the concourse: a positive `along` is uphill.
+      field.add({
+        name: `${st.name} access`,
+        x: alongX + px * mid,
+        z: alongZ + pz * mid,
+        ux: px, uz: pz,
+        halfLength: half,
+        halfWidth: ACCESS_HALF_W,
+        floorY: (street + st.boxFloorY) / 2,
+        ceilY: (street + st.boxFloorY) / 2 + ACCESS_HEIGHT_M,
+        slope: drop / (2 * half),
+      });
+      // The tunnel from the foot of it through the wall into the room. Flat,
+      // and it overlaps the room by a couple of metres so there is no seam
+      // between two boxes for a body to fall down.
+      const tunnelMid = (ACCESS_NEAR_M + 11) / 2;
+      field.add({
+        name: `${st.name} tunnel`,
+        x: alongX + px * tunnelMid,
+        z: alongZ + pz * tunnelMid,
+        ux: px, uz: pz,
+        halfLength: (ACCESS_NEAR_M - 11) / 2,
+        halfWidth: ACCESS_HALF_W,
+        floorY: st.boxFloorY,
+        ceilY: st.boxFloorY + ACCESS_HEIGHT_M,
+      });
+    }
   }
   return field;
 }
@@ -3644,6 +3720,82 @@ function riderArc(consist: Consist, a: AboardSlot, head: number): number {
  * thinks they are -- which renders as a passenger standing in the four-foot, at
  * 130 km/h, on somebody else's screen only.
  */
+/**
+ * The way into an underground station, walked end to end.
+ *
+ * **The failure this exists for is a gap you fall down**, and it is invisible
+ * from any single query: every box can answer correctly on its own while the
+ * seam between two of them answers `-Infinity`, and a body crossing that seam
+ * is handed back to a terrain surface twenty metres overhead. So this does not
+ * test boxes. It walks from the street to the platform in centimetre steps and
+ * asserts the floor never stops answering and never jumps more than a step.
+ */
+export function verifyStationAccess(): string[] {
+  const failures: string[] = [];
+  const field = new StationBoxField();
+  const street = 40;
+  const floor = 20;
+  const half = (ACCESS_FAR_M - ACCESS_NEAR_M) / 2;
+  const mid = (ACCESS_FAR_M + ACCESS_NEAR_M) / 2;
+  // A station lying along +x, so the access runs along +z and the arithmetic
+  // below is readable.
+  field.add({
+    name: 'room', x: 0, z: 0, ux: 1, uz: 0,
+    halfLength: 88, halfWidth: 13, floorY: floor, ceilY: street,
+  });
+  field.add({
+    name: 'access', x: 0, z: mid, ux: 0, uz: 1,
+    halfLength: half, halfWidth: ACCESS_HALF_W,
+    floorY: (street + floor) / 2, ceilY: (street + floor) / 2 + ACCESS_HEIGHT_M,
+    slope: (street - floor) / (2 * half),
+  });
+  const tMid = (ACCESS_NEAR_M + 11) / 2;
+  field.add({
+    name: 'tunnel', x: 0, z: tMid, ux: 0, uz: 1,
+    halfLength: (ACCESS_NEAR_M - 11) / 2, halfWidth: ACCESS_HALF_W,
+    floorY: floor, ceilY: floor + ACCESS_HEIGHT_M,
+  });
+
+  // The incline leans the right way: the street end is up, the concourse end
+  // is down. Backwards here is a staircase into the sky.
+  const atTop = field.floorAt(0, ACCESS_FAR_M - 0.5, street);
+  const atBottom = field.floorAt(0, ACCESS_NEAR_M + 0.5, floor);
+  if (!(atTop > atBottom)) {
+    failures.push(`the incline runs the wrong way: ${atTop.toFixed(1)} m at the street, ${atBottom.toFixed(1)} m at the concourse.`);
+  }
+  if (Math.abs(atTop - street) > 1.5) {
+    failures.push(`the top of the incline is ${atTop.toFixed(1)} m against a street at ${street} m; you would step into a hole.`);
+  }
+
+  // The walk. Feet follow the floor, which is what a body does.
+  let feet = street;
+  let last = street;
+  for (let across = ACCESS_FAR_M - 0.2; across > 2; across -= 0.05) {
+    const y = field.floorAt(0, across, feet);
+    if (y === -Infinity) {
+      failures.push(`the floor stopped answering ${across.toFixed(1)} m out; a body there is handed back to the terrain overhead`);
+      break;
+    }
+    if (Math.abs(y - last) > PLATFORM_STEP_M) {
+      failures.push(`the floor jumped ${(y - last).toFixed(2)} m at ${across.toFixed(1)} m out, which is a step a body catches on`);
+      break;
+    }
+    last = y;
+    feet = y;
+  }
+  if (Math.abs(feet - floor) > 0.5) {
+    failures.push(`the walk ended at ${feet.toFixed(1)} m rather than the concourse at ${floor} m.`);
+  }
+
+  // A slope of zero is the room it always was.
+  const flat = new StationBoxField();
+  flat.add({ name: 'flat', x: 0, z: 0, ux: 1, uz: 0, halfLength: 20, halfWidth: 5, floorY: 7, ceilY: 14 });
+  if (flat.floorAt(10, 0, 7) !== 7 || flat.floorAt(-10, 0, 7) !== 7) {
+    failures.push('an unsloped box no longer answers one height across its length.');
+  }
+  return failures;
+}
+
 export function verifyGangway(): string[] {
   const bad: string[] = [];
   const consist = metroConsist();

@@ -185,7 +185,7 @@ import { verifyEvents } from '../client/src/game/events.ts';
 import { verifyWallet } from './wallet-contract.ts';
 import { verifyTeleport } from '../client/src/game/teleport.ts';
 // WORKSTREAM L (trains): the Metro's open gangways. See `verifyGangway`.
-import { verifyGangway } from '../client/src/game/riding.ts';
+import { verifyGangway, verifyStationAccess } from '../client/src/game/riding.ts';
 import { sunReady, sunScreaming, verifySunButton } from '../client/src/game/sunbutton.ts';
 import { trafficTick } from '../client/src/game/traffic.ts';
 import { verifySuggestions } from '../client/src/net/suggestions.ts';
@@ -412,6 +412,7 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // into `verifyRiding`, which needs the controller's eye height and body
     // radius and has no caller here that holds either. See `game/riding.ts`.
     ['verifyGangway', verifyGangway()],
+    ['verifyStationAccess', verifyStationAccess()],
     // The button in Sydney Park and the sun it screams at. Run **here** rather
     // than only in the browser because this process is the one that keeps the
     // two instants: every failure in that file is silent in this repo's sense --

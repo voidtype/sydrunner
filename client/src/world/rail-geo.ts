@@ -108,6 +108,13 @@
  */
 
 import {
+  ACCESS_ALONG_M,
+  ACCESS_FAR_M,
+  ACCESS_HALF_W,
+  ACCESS_HEIGHT_M,
+  ACCESS_NEAR_M,
+} from '../game/riding.ts';
+import {
   BackSide,
   BufferAttribute,
   BufferGeometry,
@@ -230,7 +237,6 @@ import {
   PROVISIONAL_ATTEMPTS,
   RAIL_HALF_WIDTH,
   RAIL_HEIGHT,
-  SHAFT_HALF,
   SIGN_HEIGHT,
   SIGN_WIDTH,
   SIGN_Y,
@@ -4180,34 +4186,74 @@ function writeUndergroundStation(
     concrete.quad(...corner(-L + 6, inner, floor), ...corner(L - 6, inner, floor), ...corner(L - 6, inner, top), ...corner(-L + 6, inner, top));
   }
 
-  // The shaft, up to street level and out as a small entrance box. `groundY` is
-  // the bake's own reading of the terrain at the station node, so the entrance
-  // lands on the footpath rather than at whatever height the tunnel is.
+  // **The way in, and until this it did not exist.** `writeStationAccess` is
+  // only called for stations that are *not* underground, and a bore has no
+  // surface expression to carve -- so the terrain stayed sealed over the
+  // concourse and the entrance on the street was a box you could walk into
+  // that did nothing. The owner, at Macquarie Park: *"there is this station
+  // thing, blocking the road, but it does nothing even if i go in"*.
+  //
+  // His shape, and it is the better one: a standard entrance somewhere that
+  // makes sense, an incline down to a chamber, and a tunnel from there over to
+  // the excavation that already exists. Laid **across** the track rather than
+  // along it, which is what gets it off the road -- the road and the railway
+  // share an alignment here, and the old shaft went straight up through it.
+  //
+  // Every number below is imported from `game/riding.ts` rather than agreed
+  // with it. The geometry a player sees and the floor they stand on have to be
+  // two readings of one set of five numbers, or the seam between them is a
+  // place to fall through.
   const street = station.groundY;
-  if (!Number.isFinite(street) || street <= roof) return;
-  const sx = station.x + ux * (L - 14);
-  const sz = station.z + uz * (L - 14);
-  lining.quad(
-    sx - SHAFT_HALF, roof, sz - SHAFT_HALF, sx + SHAFT_HALF, roof, sz - SHAFT_HALF,
-    sx + SHAFT_HALF, street + 0.2, sz - SHAFT_HALF, sx - SHAFT_HALF, street + 0.2, sz - SHAFT_HALF,
+  if (!Number.isFinite(street) || street <= top + 4) return;
+  const A = ACCESS_ALONG_M;
+  const HW = ACCESS_HALF_W;
+  const H = ACCESS_HEIGHT_M;
+  const FAR = ACCESS_FAR_M;
+  const NEAR = ACCESS_NEAR_M;
+  /** The incline's floor at an offset across the track. */
+  const rampY = (o: number): number => top + (street - top) * ((o - NEAR) / (FAR - NEAR));
+
+  // The incline: floor, ceiling and two side walls, all leaning together.
+  for (const dy of [0, H]) {
+    lining.quad(
+      ...corner(A - HW, NEAR, rampY(NEAR) + dy), ...corner(A + HW, NEAR, rampY(NEAR) + dy),
+      ...corner(A + HW, FAR, rampY(FAR) + dy), ...corner(A - HW, FAR, rampY(FAR) + dy),
+    );
+  }
+  for (const sgn of [-1, 1]) {
+    lining.quad(
+      ...corner(A + HW * sgn, NEAR, rampY(NEAR)), ...corner(A + HW * sgn, FAR, rampY(FAR)),
+      ...corner(A + HW * sgn, FAR, rampY(FAR) + H), ...corner(A + HW * sgn, NEAR, rampY(NEAR) + H),
+    );
+  }
+
+  // The tunnel from the foot of it into the room, flat at platform level. It
+  // runs two metres past the wall so the two floors overlap rather than meet.
+  const IN = 11;
+  for (const dy of [0, H]) {
+    lining.quad(
+      ...corner(A - HW, IN, top + dy), ...corner(A + HW, IN, top + dy),
+      ...corner(A + HW, NEAR, top + dy), ...corner(A - HW, NEAR, top + dy),
+    );
+  }
+  for (const sgn of [-1, 1]) {
+    lining.quad(
+      ...corner(A + HW * sgn, IN, top), ...corner(A + HW * sgn, NEAR, top),
+      ...corner(A + HW * sgn, NEAR, top + H), ...corner(A + HW * sgn, IN, top + H),
+    );
+  }
+
+  // The entrance on the street: three walls and a lid over the mouth of the
+  // incline, open on the outward side so it reads as a way in from a distance.
+  const ex = station.x + ux * A + px * FAR;
+  const ez = station.z + uz * A + pz * FAR;
+  const ax = Math.abs(px) > Math.abs(pz) ? 1 : 0;
+  const w = HW + 0.6;
+  concrete.box(
+    ex - (ax ? 0.3 : w), street, ez - (ax ? w : 0.3),
+    ex + (ax ? 0.3 : w), street + 3.4, ez + (ax ? w : 0.3),
   );
-  lining.quad(
-    sx - SHAFT_HALF, roof, sz + SHAFT_HALF, sx + SHAFT_HALF, roof, sz + SHAFT_HALF,
-    sx + SHAFT_HALF, street + 0.2, sz + SHAFT_HALF, sx - SHAFT_HALF, street + 0.2, sz + SHAFT_HALF,
-  );
-  lining.quad(
-    sx - SHAFT_HALF, roof, sz - SHAFT_HALF, sx - SHAFT_HALF, roof, sz + SHAFT_HALF,
-    sx - SHAFT_HALF, street + 0.2, sz + SHAFT_HALF, sx - SHAFT_HALF, street + 0.2, sz - SHAFT_HALF,
-  );
-  lining.quad(
-    sx + SHAFT_HALF, roof, sz - SHAFT_HALF, sx + SHAFT_HALF, roof, sz + SHAFT_HALF,
-    sx + SHAFT_HALF, street + 0.2, sz + SHAFT_HALF, sx + SHAFT_HALF, street + 0.2, sz - SHAFT_HALF,
-  );
-  // The entrance at the top: a low box with an open mouth facing the street.
-  concrete.box(sx - SHAFT_HALF - 0.5, street, sz - SHAFT_HALF - 0.5, sx + SHAFT_HALF + 0.5, street + 3.2, sz - SHAFT_HALF + 0.1);
-  concrete.box(sx - SHAFT_HALF - 0.5, street, sz + SHAFT_HALF - 0.1, sx + SHAFT_HALF + 0.5, street + 3.2, sz + SHAFT_HALF + 0.5);
-  concrete.box(sx - SHAFT_HALF - 0.5, street, sz - SHAFT_HALF, sx - SHAFT_HALF + 0.1, street + 3.2, sz + SHAFT_HALF);
-  concrete.box(sx - SHAFT_HALF - 0.5, street + 3.2, sz - SHAFT_HALF - 0.5, sx + SHAFT_HALF + 0.5, street + 3.5, sz + SHAFT_HALF + 0.5);
+  concrete.box(ex - w, street + 3.4, ez - w, ex + w, street + 3.7, ez + w);
 }
 
 /** The station name on a blade, with two posts, at the platform's own end. */

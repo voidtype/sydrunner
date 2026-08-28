@@ -633,6 +633,7 @@ import {
   spanFlagsAt,
   stopPlatform,
   verifyRiding,
+  verifyStationAccess,
   worldToLocal,
   type CarriageInterior,
   type PlatformField,
@@ -2272,6 +2273,9 @@ async function main(): Promise<void> {
     // restate -- the eye height and the body radius -- are compared against the
     // controller's real ones, because that file may not import the controller.
     const rideFailures = verifyRiding(EYE_HEIGHT, PLAYER_RADIUS);
+    // The way into an underground station, walked end to end. See
+    // `verifyStationAccess`: the failure it exists for is a seam you fall down.
+    rideFailures.push(...verifyStationAccess());
     if (rideFailures.length) {
       console.warn('[rail] riding self-check:\n  - ' + rideFailures.join('\n  - '));
     }
