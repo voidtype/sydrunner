@@ -4177,6 +4177,19 @@ function writeUndergroundStation(
   lining.quad(...corner(-L, -W, floor), ...corner(-L, W, floor), ...corner(-L, W, roof), ...corner(-L, -W, roof));
   lining.quad(...corner(L, -W, floor), ...corner(L, W, floor), ...corner(L, W, roof), ...corner(L, -W, roof));
 
+  // **The lid, seen from outside, and the room had none.** Everything above is
+  // on `lining`, which is the file's one `BackSide` material -- correct for a
+  // tube you stand in, and it means the ceiling exists only when you are under
+  // it. From the street there was nothing there at all: wherever the terrain
+  // over a box is carved, you looked straight down into the station. The owner:
+  // *"metro underground has no roof?"*
+  //
+  // So the same rectangle again on `concrete`, wound the other way, which is
+  // front-facing and therefore visible from above and culled from below. The two
+  // faces do not fight: each is drawn for the side the other cannot serve, and
+  // a player inside still sees the lining ceiling they always did.
+  concrete.quad(...corner(-L, W, roof), ...corner(L, W, roof), ...corner(L, -W, roof), ...corner(-L, -W, roof));
+
   // Two platforms inside it, on the same clearances the surface ones use.
   const top = station.trackY + PLATFORM_HEIGHT;
   for (const side of [-1, 1]) {
@@ -4227,6 +4240,15 @@ function writeUndergroundStation(
     );
   }
 
+  // The same lid argument as the room's, for the passage: `lining` serves the
+  // player under it and nothing serves the street over it. Buried for most of
+  // its run and therefore usually invisible, which is exactly why it would have
+  // been found by somebody standing in the one cutting it daylights into.
+  concrete.quad(
+    ...corner(A - HW, FAR, rampY(FAR) + H), ...corner(A + HW, FAR, rampY(FAR) + H),
+    ...corner(A + HW, NEAR, rampY(NEAR) + H), ...corner(A - HW, NEAR, rampY(NEAR) + H),
+  );
+
   // The tunnel from the foot of it into the room, flat at platform level. It
   // runs two metres past the wall so the two floors overlap rather than meet.
   const IN = 11;
@@ -4242,6 +4264,11 @@ function writeUndergroundStation(
       ...corner(A + HW * sgn, NEAR, top + H), ...corner(A + HW * sgn, IN, top + H),
     );
   }
+
+  concrete.quad(
+    ...corner(A - HW, NEAR, top + H), ...corner(A + HW, NEAR, top + H),
+    ...corner(A + HW, IN, top + H), ...corner(A - HW, IN, top + H),
+  );
 
   // The entrance on the street: three walls and a lid over the mouth of the
   // incline, open on the outward side so it reads as a way in from a distance.
