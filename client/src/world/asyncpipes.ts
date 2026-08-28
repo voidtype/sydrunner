@@ -81,6 +81,33 @@ export class AsyncPipelines {
    * short line beside the frame time.
    */
   private readonly tally = new Map<string, number>();
+  /**
+   * Every pipeline this client has ever built, held so three cannot free it.
+   *
+   * **This is the fix for the whole thing.** three reference-counts a pipeline
+   * and releases it when the last render object using it goes away:
+   *
+   *     if ( previousPipeline ) previousPipeline.usedTimes --;
+   *     ...
+   *     if ( previousPipeline && previousPipeline.usedTimes === 0 )
+   *         this._releasePipeline( previousPipeline );
+   *
+   * Correct for a scene that loads once. This is a sixty-kilometre city that
+   * streams: drive a few blocks, a tile is evicted, the last user of `foliage`
+   * goes with it, the pipeline is freed -- and the next tile with a tree in it
+   * compiles the identical shader again. The owner's numbers are the signature:
+   * 2,314 compiles across **94 distinct keys**, the count climbing with
+   * distance travelled while the key count sits still, and the shadow pass
+   * worst of all because shadow-casting instanced meshes cycle with every tile.
+   * It is not a warm-up that never finishes; it is a cache being thrown away
+   * and rebuilt several hundred times between here and Parramatta.
+   *
+   * So each pipeline is pinned once, on creation: one extra reference on it and
+   * on both its programs, which makes the release test bottom out at one and
+   * never fire. The cost is ~90 pipelines resident for the session, which is
+   * nothing; the saving is every recompile after the first.
+   */
+  private readonly pinned = new Set<unknown>();
 
   get skipped(): number {
     return this.skippedDraws;
@@ -88,6 +115,38 @@ export class AsyncPipelines {
 
   get compiles(): number {
     return this.started;
+  }
+
+  /**
+   * Hold one reference to a pipeline forever, so three never frees it.
+   *
+   * Once per pipeline object, tracked in a set: the counter is decremented on
+   * every `getForRender` that had a previous pipeline, so a second pin would
+   * only raise the floor and a missing pin would let the floor reach zero. The
+   * programs are pinned too, because `_releaseProgram` runs off their own
+   * counts and a released program invalidates the stage ids the pipeline key is
+   * built from -- which puts us straight back to recompiling.
+   */
+  private pin(pipeline: unknown): void {
+    if (pipeline === null || pipeline === undefined || this.pinned.has(pipeline)) return;
+    this.pinned.add(pipeline);
+    const p = pipeline as {
+      usedTimes?: number;
+      vertexProgram?: { usedTimes?: number };
+      fragmentProgram?: { usedTimes?: number };
+    };
+    if (typeof p.usedTimes === 'number') p.usedTimes++;
+    if (p.vertexProgram !== undefined && typeof p.vertexProgram.usedTimes === 'number') {
+      p.vertexProgram.usedTimes++;
+    }
+    if (p.fragmentProgram !== undefined && typeof p.fragmentProgram.usedTimes === 'number') {
+      p.fragmentProgram.usedTimes++;
+    }
+  }
+
+  /** How many distinct pipelines are held. A streaming client plateaus here. */
+  get resident(): number {
+    return this.pinned.size;
   }
 
   /**
@@ -161,6 +220,7 @@ export class AsyncPipelines {
         this.started += sink.length;
         this.note(renderObject);
       }
+      this.pin(pipeline);
       return pipeline;
     };
 
@@ -262,6 +322,32 @@ export function verifyAsyncPipes(): string[] {
   backend.draw({ pipeline: broken }, null);
   if (drawn.length !== 2) failures.push('a failed pipeline was skipped here instead of by three.');
   if (gate.skipped !== 1) failures.push('a failed pipeline was counted as still compiling.');
+
+  // --- The pin: three must not be able to free a pipeline this client built.
+  {
+    const pipe = { usedTimes: 1, vertexProgram: { usedTimes: 1 }, fragmentProgram: { usedTimes: 1 } };
+    const g = new AsyncPipelines();
+    const inner = {
+      getForRender: (_ro: unknown, promises?: unknown) => {
+        if (Array.isArray(promises)) promises.push(Promise.resolve());
+        return pipe;
+      },
+    };
+    g.install({ _pipelines: inner, backend: { draw: () => {}, get: () => ({}) } });
+    inner.getForRender({}, null);
+    if (pipe.usedTimes !== 2) {
+      failures.push(
+        'a new pipeline was not pinned: three frees it when the last tile using it is evicted,' +
+          ' and the next tile compiles the identical shader again -- which is the whole stall',
+      );
+    }
+    inner.getForRender({}, null);
+    if (pipe.usedTimes !== 2) failures.push('the same pipeline was pinned twice; the floor would drift.');
+    if (pipe.vertexProgram.usedTimes !== 2 || pipe.fragmentProgram.usedTimes !== 2) {
+      failures.push('the programs were not pinned; a released program invalidates the pipeline key.');
+    }
+    if (g.resident !== 1) failures.push(`resident reported ${g.resident}, expected 1.`);
+  }
 
   // An object with no pipeline at all is not this gate's business either.
   backend.draw({}, null);

@@ -12229,7 +12229,7 @@ async function main(): Promise<void> {
         `[frame] ${frameMs.toFixed(0)} ms — worst sections: ${worst || '(none)'}` +
           `  |  pipelines compiled in stalled frames so far: ${pipelineWatch.pipelines}` +
           ` over ${pipelineWatch.frames} frame(s), worst ${pipelineWatch.worstMs.toFixed(0)} ms` +
-          `  |  compiles ${asyncPipes.compiles} over ${asyncPipes.distinct} keys` +
+          `  |  compiles ${asyncPipes.compiles} over ${asyncPipes.distinct} keys, ${asyncPipes.resident} resident` +
           `  |  worst: ${asyncPipes.top(3)}`,
       );
     }
