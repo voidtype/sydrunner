@@ -3044,7 +3044,10 @@ export class TileStreamer implements LampSource {
     // with `Group.visible` at its default and every primitive's
     // `frustumCulled` off, which is the whole tile rasterised whether or not the
     // camera is pointing at it.
-    this.pumpBuilds();
+    // The camera's own position, so the queue serves the tile the player is
+    // standing on rather than the fetch that happened to resolve first. See
+    // `nearestQueued`.
+    this.pumpBuilds(camera.position.x, camera.position.z);
 
     // Cheap enough to redo unconditionally -- two trig calls a frame against a
     // linear pass over a few thousand tile entries below it.
@@ -3205,7 +3208,51 @@ export class TileStreamer implements LampSource {
    * had already loaded, which reads as "the world stopped streaming" and points
    * nowhere near the cause.
    */
-  private pumpBuilds(): void {
+  /**
+   * The queued tile nearest the camera, by index.
+   *
+   * **This replaces `buildQueue[0]`, and the owner found the bug it fixes by
+   * looking at the world:** *"it seems to be loading other tiles before my
+   * tile?"*. They were right. The queue's own comment said "arrival order",
+   * which means the order four concurrent HTTP fetches happened to resolve in --
+   * so the tile a player is standing on was one of forty-four, with no more
+   * claim on the next 2.5 ms than a tile eighteen hundred metres behind them.
+   * At boot, where the frame rate is on the floor and the budget therefore
+   * drains a few milliseconds every second, that is the difference between
+   * standing on ground and standing on nothing for five seconds.
+   *
+   * A scan and not a sort, deliberately: the header's argument against
+   * re-sorting the queue every frame is untouched and still right. This is one
+   * linear pass over a queue that is a few dozen entries at its worst, run once
+   * per build rather than once per frame, and it has a property a sort does not
+   * -- **it re-prioritises for free as the player moves**, because it asks the
+   * question again each time instead of freezing an answer at insertion.
+   *
+   * The collision-priority `unshift` above still means what it meant: those
+   * tiles are usually the nearest anyway, and when they are not it is because
+   * the player is being stopped by an invisible wall somewhere they have
+   * already been, which is worth jumping for.
+   */
+  private nearestQueued(cx: number, cz: number): number {
+    let best = 0;
+    let bestD2 = Infinity;
+    for (let i = 0; i < this.buildQueue.length; i++) {
+      const b = this.buildQueue[i].entry.bounds;
+      // The tile's centre. A tile is 500 m square, so a corner test and a centre
+      // test disagree by at most a third of a tile and never about which of two
+      // tiles is the one under the player.
+      const dx = (b[0] + b[2]) * 0.5 - cx;
+      const dz = (b[1] + b[3]) * 0.5 - cz;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < bestD2) {
+        bestD2 = d2;
+        best = i;
+      }
+    }
+    return best;
+  }
+
+  private pumpBuilds(cx: number, cz: number): void {
     if (this.buildQueue.length === 0) return;
     const now = performance.now();
     // The streamer's own frame spacing: `pumpBuilds` runs once per `update`, so
@@ -3215,7 +3262,10 @@ export class TileStreamer implements LampSource {
     this.lastPumpAt = now;
     const deadline = now + buildBudgetFor(this.buildBudgetMs, frameMs);
     do {
-      const job = this.buildQueue[0];
+      // Re-asked every build, not once per frame: a player who turns around
+      // mid-drain should have the queue turn around with them.
+      const at = this.nearestQueued(cx, cz);
+      const job = this.buildQueue[at];
       let done = false;
       try {
         done = job.steps.next().done === true;
@@ -3237,7 +3287,7 @@ export class TileStreamer implements LampSource {
         }
       }
       if (done) {
-        this.buildQueue.shift();
+        this.buildQueue.splice(at, 1);
         this.building.delete(job.entry.key);
       }
     } while (this.buildQueue.length > 0 && performance.now() < deadline);
