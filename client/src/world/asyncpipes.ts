@@ -68,17 +68,19 @@ const HALF_CAP = 512;
  * a frame or two late -- and this is the same trade, held to a budget instead
  * of taken all at once.
  */
-const COMPILE_BUDGET_MS = 6;
+const COMPILE_BUDGET_MS = 24;
 
-/**
- * A draw slower than this is treated as a first build and charged to the budget.
- *
- * The separation is not close: a cached draw is microseconds of bookkeeping and
- * a `backend.draw`, while the three stall frames in the ride log cost 6.5, 3.9
- * and 11 ms *each* for their builds. Anything on the wrong side of half a
- * millisecond built something.
+/*
+ * There was a `FRESH_MS` here -- a threshold above which a call counted as
+ * having built something -- and it is gone rather than tidied away, because
+ * removing it *is* the fix. Two versions of this budget charged only calls
+ * slower than it, and a real ride answered them: `budget on, 617285 draws`
+ * beside `0 deferred`, on a frame that spent 584 ms in `render`. The gate was
+ * on the path, called six hundred thousand times, and never charged, because
+ * the cost of a first sighting does not arrive as one slow call. Three guesses
+ * about where it does arrive were all wrong, so the budget stopped guessing and
+ * counts every call.
  */
-const FRESH_MS = 0.5;
 
 /**
  * A three `RenderObject`, seen through the two methods that decide its fate.
@@ -206,6 +208,14 @@ export class AsyncPipelines {
    * that ever stops working the column goes blank and the game keeps running.
    */
   private probeDead = false;
+  /** Milliseconds spent inside the draw path this frame, all calls counted. */
+  private spentMs = 0;
+  /** Builds let through this frame; at least one always is. */
+  private buildsThisFrame = 0;
+  /** The worst frame's accumulated draw time, for the console line. */
+  private peakMs = 0;
+  /** False until a frame opens a budget; boot runs unbudgeted. */
+  private framed = false;
   /**
    * Milliseconds left in this frame's compile budget.
    *
@@ -264,8 +274,9 @@ export class AsyncPipelines {
   budgetState(): string {
     if (!this.gateHooked) return 'budget off (no hook)';
     if (this.gateCalls === 0) return 'budget idle (never called)';
-    if (this.gateBlind) return `budget blind (no _objects), ${this.gateCalls} draws`;
-    return `budget on, ${this.gateCalls} draws`;
+    const peak = Math.max(this.peakMs, this.spentMs).toFixed(0);
+    if (this.gateBlind) return `budget blind (no _objects), ${this.gateCalls} draws, peak ${peak} ms`;
+    return `budget on, ${this.gateCalls} draws, peak ${peak} ms`;
   }
 
   /**
@@ -278,7 +289,11 @@ export class AsyncPipelines {
    * springs on the frame that happened to be drawing when it did.
    */
   frame(budgetMs = COMPILE_BUDGET_MS): void {
+    if (this.spentMs > this.peakMs) this.peakMs = this.spentMs;
+    this.spentMs = 0;
+    this.buildsThisFrame = 0;
     this.budgetMs = budgetMs;
+    this.framed = true;
   }
 
   get compiles(): number {
@@ -476,43 +491,62 @@ export class AsyncPipelines {
       const innerDirect = direct.bind(host);
       host._renderObjectDirect = (...args: unknown[]): void => {
         this.gateCalls++;
-        if (this.budgetMs > 0) {
-          const t0 = performance.now();
-          innerDirect(...args);
-          const spent = performance.now() - t0;
-          if (spent > FRESH_MS) this.budgetMs -= spent;
-          this.ranOnce.add(args[0] as object);
-          return;
-        }
-        // Spent. A draw whose node state is already built costs microseconds
-        // and must still happen -- refusing those is how a settled scene goes
-        // blank. Only a genuine first build is declined.
-        // **Read at call time, not at install.** Captured at install it was
-        // `undefined` -- three fills `_objects` in during `init()` and the gate
-        // goes in immediately after -- so this whole block was skipped and the
-        // budget declined nothing, twice, in silence.
-        const objects = host._objects;
-        let built: boolean;
-        if (objects === null || objects === undefined) {
-          this.gateBlind = true;
-          built = this.ranOnce.has(args[0] as object);
-        } else {
-          try {
-            const ro = objects.get(
-              args[0], args[1], args[2], args[3], args[4], host._currentRenderContext, args[6], args[7],
-            ) as { _nodeBuilderState?: unknown } | null | undefined;
-            built = ro === null || ro === undefined || ro._nodeBuilderState !== undefined;
-          } catch {
-            // three moved the cache. Draw it: a stall is better than a hole.
-            built = true;
+        /*
+         * **Bound the observable, not a guess about where the cost is.**
+         *
+         * Two earlier versions charged only calls slower than `FRESH_MS` and a
+         * real ride answered them: `budget on, 617285 draws`, `0 deferred`, on
+         * a frame that spent 584 ms in `render`. The gate was on the path and
+         * never charged, because the cost of a first sighting does not arrive
+         * as one slow call -- and three guesses about where it does arrive have
+         * now all been wrong.
+         *
+         * So this counts *every* call's wall time into one per-frame total and
+         * stops admitting **new** objects once that total passes the budget.
+         * It does not care whether the milliseconds are node building, pipeline
+         * creation, a driver stall or something nobody has named yet: a frame
+         * that has already spent its whole budget drawing does not take on more
+         * work it has never done before. Objects it already knows keep drawing,
+         * always, which is what keeps a settled scene on screen.
+         *
+         * At least one build a frame is let through regardless, so a machine
+         * slow enough to exhaust the budget on ordinary draws still fills the
+         * world in -- slowly, rather than never.
+         */
+        if (this.framed && this.spentMs > this.budgetMs && this.buildsThisFrame > 0) {
+          const objects = host._objects;
+          let built: boolean;
+          if (objects === null || objects === undefined) {
+            this.gateBlind = true;
+            built = this.ranOnce.has(args[0] as object);
+          } else {
+            try {
+              const ro = objects.get(
+                args[0], args[1], args[2], args[3], args[4], host._currentRenderContext, args[6], args[7],
+              ) as { _nodeBuilderState?: unknown } | null | undefined;
+              built = ro === null || ro === undefined || ro._nodeBuilderState !== undefined;
+            } catch {
+              // three moved the cache. Draw it: a stall is better than a hole.
+              built = true;
+            }
+          }
+          if (!built) {
+            this.deferredDraws++;
+            return;
           }
         }
-        if (!built) {
-          this.deferredDraws++;
-          return;
-        }
-        this.ranOnce.add(args[0] as object);
+        // **New work admitted, not slow calls seen.** Gating forward progress
+        // on `dt > FRESH_MS` reintroduced the exact bug this rewrite is for: a
+        // frame whose calls are each cheap but whose total is enormous would
+        // never register a "build", so the guard below would never open and the
+        // gate would decline nothing. Whether an object is new is the question;
+        // how long it took is not.
+        const isNew = !this.ranOnce.has(args[0] as object);
+        const t0 = performance.now();
         innerDirect(...args);
+        this.spentMs += performance.now() - t0;
+        if (isNew) this.buildsThisFrame++;
+        this.ranOnce.add(args[0] as object);
       };
     }
     return true;
@@ -906,6 +940,51 @@ export function verifyAsyncPipes(): string[] {
       failures.push(`a 6 ms budget declined nothing across 20 builds of 3 ms dispatched through _handleObjectFunction.`);
     }
     if (r.ran > 3) failures.push(`${r.ran} of 20 builds ran on a 6 ms budget; the frame is not bounded.`);
+  }
+
+  // --- Many cheap calls, one enormous frame.
+  //
+  // **This is the shape that beat two versions of the budget.** A real ride
+  // reported `budget on, 617285 draws` beside `0 deferred` on a frame that
+  // spent 584 ms in `render`: the gate was on the draw path, called six hundred
+  // thousand times, and charged nothing, because no single call was slow enough
+  // to notice. Every earlier check here spun 3 ms per call and so could never
+  // have caught it. The cost of a first sighting does not have to arrive as one
+  // slow call, and a budget that only bounds slow calls bounds nothing.
+  {
+    const objs = Array.from({ length: 4000 }, (_, i) => ({ n: i }));
+    const state = new Map<unknown, { _nodeBuilderState?: unknown }>();
+    for (const o of objs) state.set(o, {});
+    let ran = 0;
+    const host = {
+      _pipelines: { getForRender: (): unknown => ({ id: 'p' }) },
+      backend: { draw: (): void => {}, get: (): Record<string, never> => ({}) },
+      _objects: { get: (o: unknown): unknown => state.get(o) ?? null },
+      _currentRenderContext: null,
+      // A few microseconds each -- far under `FRESH_MS` -- but four thousand of
+      // them is a frame nobody can play through.
+      _renderObjectDirect: (o: unknown): void => {
+        ran++;
+        let sink = 0;
+        for (let i = 0; i < 4000; i++) sink += i;
+        if (sink === -1) throw new Error('unreachable');
+        const rec = state.get(o);
+        if (rec !== undefined) rec._nodeBuilderState = {};
+      },
+    };
+    const g = new AsyncPipelines();
+    g.install(host as unknown as PipelineHost);
+    g.frame(4);
+    for (const o of objs) host._renderObjectDirect(o);
+    if (g.deferrals === 0) {
+      failures.push(
+        `4000 individually-cheap draws blew a 4 ms budget and the gate declined none of them ` +
+          `("${g.budgetState()}"). A budget that only bounds calls slower than FRESH_MS bounds nothing, ` +
+          `which is what a real ride reported as "budget on, 617285 draws, 0 deferred".`,
+      );
+    }
+    if (ran === 0) failures.push('the gate declined everything, including the first build; nothing would ever appear.');
+    if (!g.budgetState().includes('peak')) failures.push('the gate does not report the frame time it accumulated.');
   }
 
   return failures;
