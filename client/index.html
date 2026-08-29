@@ -613,11 +613,21 @@
          purpose: the `!` over the giver's head, the needle that points at the
          job he gave you and the text under it are one idea, and a second yellow
          would be a second thing to learn. */
+      /* THE SIZE AND THE HEIGHT ARE THE OWNER'S, AND BOTH ARE ONE NUMBER.
+         "2x bigger, bold, and 25% further down on the screen" -- so every length
+         in this block is doubled and the top is a quarter of the way down the
+         viewport rather than 52 px under the clock.
+
+         `vh` and not a doubled pixel offset, because "down the screen" is a
+         fraction of the screen: at 52 px this was 5% down a laptop and 3% down a
+         monitor, and the same absolute nudge would land in two different places.
+         25vh clears the clock and `#heat`'s band at 13% completely, and stops
+         well above the reticle at 50%. */
       #waypoint {
-        position: fixed; top: 52px; left: 50%;
-        transform: translate(-50%, -6px);
-        display: flex; align-items: center; gap: 8px;
-        padding: 4px 14px 4px 10px;
+        position: fixed; top: 25vh; left: 50%;
+        transform: translate(-50%, -12px);
+        display: flex; align-items: center; gap: 16px;
+        padding: 8px 28px 8px 20px;
         background: rgba(10,14,20,.55);
         -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
         border: 1px solid rgba(207,226,242, .34);
@@ -635,18 +645,24 @@
          there is deliberately **no transition on it** -- a quarter-second ease
          on a needle that follows the mouse is a needle that is always wrong. */
       #waypoint-needle {
-        width: 19px; height: 19px; flex: 0 0 auto;
-        fill: #ffd129;
-        filter: drop-shadow(0 0 1.5px rgba(6,10,16,.95)) drop-shadow(0 1px 2px rgba(0,0,0, .75));
+        width: 38px; height: 38px; flex: 0 0 auto;
+        fill: var(--quest);
+        filter: drop-shadow(0 0 3px rgba(6,10,16,.95)) drop-shadow(0 2px 4px rgba(0,0,0, .75));
       }
       #waypoint-body { display: flex; flex-direction: column; line-height: 1.15; }
+      /* 700, not the 600 it was. At 22 px the difference between a semibold and
+         a bold is visible where at 11 px it was not, and "bold" is what was
+         asked for. The tracking comes *down* as the size goes up -- .16em on
+         22 px type is a third of a character between every letter, which reads
+         as a logo rather than as a direction. */
       #waypoint-text {
-        font-size: 11px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase;
-        color: #ffd129; text-shadow: 0 1px 3px rgba(0,0,0, .9);
+        font-size: 22px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+        color: var(--quest); text-shadow: 0 2px 6px rgba(0,0,0, .9);
       }
       #waypoint-range {
-        font-size: 10px; letter-spacing: .06em;
-        color: var(--ink); opacity: .78; text-shadow: 0 1px 3px rgba(0,0,0, .9);
+        font-size: 20px; letter-spacing: .04em;
+        font-variant-numeric: tabular-nums;
+        color: var(--ink); opacity: .78; text-shadow: 0 2px 6px rgba(0,0,0, .9);
       }
       #waypoint-range:empty { display: none; }
 
@@ -806,12 +822,14 @@
            Written out rather than derived: the banner is fading its own
            `transform` and a media query that only moved `top` is the one thing
            that can be changed here without breaking that. */
-        #waypoint { top: 45px; }
-        #waypoint.shown { top: 45px; }
+        #waypoint, #waypoint.shown { top: 22vh; }
       }
       @media (max-width: 640px) {
         #clock { transform: translateX(-50%) scale(.6); transform-origin: top center; }
-        #waypoint, #waypoint.shown { top: 39px; }
+        #waypoint, #waypoint.shown { top: 20vh; }
+        #waypoint-text { font-size: 18px; }
+        #waypoint-range { font-size: 16px; }
+        #waypoint-needle { width: 30px; height: 30px; }
       }
 
       /* Taking a hit. A DOM overlay rather than a post-process pass: it is one
