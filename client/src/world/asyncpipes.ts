@@ -71,6 +71,16 @@ const HALF_CAP = 512;
 const COMPILE_BUDGET_MS = 6;
 
 /**
+ * A draw slower than this is treated as a first build and charged to the budget.
+ *
+ * The separation is not close: a cached draw is microseconds of bookkeeping and
+ * a `backend.draw`, while the three stall frames in the ride log cost 6.5, 3.9
+ * and 11 ms *each* for their builds. Anything on the wrong side of half a
+ * millisecond built something.
+ */
+const FRESH_MS = 0.5;
+
+/**
  * A three `RenderObject`, seen through the two methods that decide its fate.
  *
  * `getCacheKey()` is `getMaterialCacheKey() + getDynamicCacheKey()`, and which
@@ -97,6 +107,25 @@ export interface PipelineHost {
     draw: (renderObject: unknown, info: unknown) => void;
     get: (object: unknown) => { pipeline?: unknown; error?: boolean };
   } | null;
+  /**
+   * The per-draw entry point, and the only level at which a build can be
+   * declined safely.
+   *
+   * Everything inside it assumes the node state will be there: `_geometries`
+   * and `_bindings` both reach through `getNodeBuilderState()`, which falls
+   * back to a blocking build, so returning null from anywhere *within* the
+   * sequence takes the frame down on a property read. Skipping the call whole
+   * leaves nothing half-done -- three's own `_pipelines.isReady` gate already
+   * establishes that an object may simply not be drawn this frame.
+   *
+   * Wrappable because `render()` re-reads `this._renderObjectDirect` into
+   * `_handleObjectFunction` on every pass, so an own property on the instance
+   * shadows the prototype from the next frame on.
+   */
+  _renderObjectDirect?: (...args: unknown[]) => void;
+  /** three's render-object cache. Consulted only on an exhausted budget. */
+  _objects?: { get: (...args: unknown[]) => unknown } | null;
+  _currentRenderContext?: unknown;
 }
 
 export class AsyncPipelines {
@@ -189,26 +218,8 @@ export class AsyncPipelines {
    * called, which is after the boot it was meant to warm.
    */
   private budgetMs = Infinity;
-  /**
-   * Cache keys that have already produced a compile, so a *second* sighting is
-   * known to be free before three is asked.
-   *
-   * The budget is unenforceable without this. A miss only announces itself
-   * after `getForRender` returns a non-empty promise sink -- by which point the
-   * WGSL has been built and the frame has already paid. `initialCacheKey` is a
-   * plain field on the render object, set in its constructor, so reading it
-   * costs nothing and turns "did this cost us" into "will this cost us".
-   *
-   * A key that is not in here may still turn out to be a cache *hit* -- two
-   * render objects can share a key. Deferring one of those costs a single frame
-   * of invisibility and corrects itself the moment the first one through adds
-   * the key, which is the right way round for a guess this cheap to be wrong.
-   */
-  private readonly compiledKeys = new Set<number>();
-  /** Draws deferred because the frame's compile budget was spent. */
+  /** Draws declined because the frame's compile budget was spent. */
   private deferredDraws = 0;
-  /** Render objects this frame declined to build. Weak: three owns them. */
-  private readonly deferred = new WeakSet<object>();
 
   get skipped(): number {
     return this.skippedDraws;
@@ -365,42 +376,12 @@ export class AsyncPipelines {
       // Nothing here awaits it -- the point is not to. The pipeline object is
       // cached synchronously either way, so the next frame finds it and the
       // draw guard below decides whether it is ready to use.
-      /*
-       * --- The budget.
-       *
-       * `initialCacheKey` is read *before* three is asked, because a miss only
-       * announces itself afterwards and by then the WGSL is built and the frame
-       * has paid. A key this gate has already seen go through is known to be
-       * cached, so it is never charged and never deferred -- which is every
-       * object in a settled scene, every frame.
-       *
-       * Three's own return value is discarded by `_renderObjectDirect`, which
-       * calls this for its side effect on `renderObject.pipeline`. So declining
-       * is safe here and is caught by the draw guard below.
-       */
-      const ro = renderObject as { initialCacheKey?: number };
-      const key = ro.initialCacheKey;
-      const known = key === undefined || this.compiledKeys.has(key);
-      if (!known && this.budgetMs <= 0) {
-        this.deferredDraws++;
-        this.deferred.add(renderObject as object);
-        return undefined;
-      }
-
       const sink: unknown[] = [];
-      // The clock is only read for a possible miss. A settled frame pays
-      // nothing for this gate beyond a `Set.has`.
-      const began = known ? 0 : performance.now();
       const pipeline = innerGet(renderObject, sink);
-      if (!known) this.budgetMs -= performance.now() - began;
       if (sink.length > 0) {
         this.started += sink.length;
         this.note(renderObject);
       }
-      // Whether or not it compiled, this key has now been through three and is
-      // cached; a later sighting must not be charged for it.
-      if (key !== undefined) this.compiledKeys.add(key);
-      this.deferred.delete(renderObject as object);
       if (pipeline !== null && pipeline !== undefined) this.seen.add(pipeline);
       return pipeline;
     };
@@ -408,15 +389,6 @@ export class AsyncPipelines {
     const backend = backendEarly;
     const innerDraw = backend.draw.bind(backend);
     backend.draw = (renderObject: unknown, info: unknown): void => {
-      // **Deferred by the budget.** three was never asked to build this one, so
-      // `renderObject.pipeline` is whatever it was -- `undefined` on a first
-      // sighting, which `setPipeline` turns into a validation error that ends
-      // the frame. Exactly the hazard the still-compiling case below exists
-      // for, arrived at from the other direction.
-      if (this.deferred.has(renderObject as object)) {
-        this.skippedDraws++;
-        return;
-      }
       const ro = renderObject as { pipeline?: unknown };
       const data = ro.pipeline === undefined ? undefined : backend.get(ro.pipeline);
       // `error` is three's own business -- it returns early on that itself, and
@@ -428,6 +400,72 @@ export class AsyncPipelines {
       }
       innerDraw(renderObject, info);
     };
+
+    /*
+     * --- The budget, at the only level that can decline safely.
+     *
+     * **The first version of this wrapped `Pipelines.getForRender` and bounded
+     * almost nothing** -- 21 deferrals against 1,586 compiles, and frames still
+     * spending 248 ms in `render`. `Pipelines.getForRender` only *reads* the
+     * node state (`renderObject.getNodeBuilderState()`); the WGSL is generated
+     * one line earlier in `_nodes.updateForRender`, and by then the frame has
+     * already paid for it. Budgeting the half that was left was budgeting the
+     * cheap half.
+     *
+     * **Why the whole call and not the node build.** `getForRenderDeferred`
+     * exists in three for exactly this and is documented "use this in render()
+     * path to enable non-blocking compilation" -- but returning its null from
+     * inside the sequence is not survivable: `_geometries.updateForRender` and
+     * `_bindings.updateForRender` both reach through `getNodeBuilderState()`,
+     * which falls back to a blocking build, and a caller that gets null reads a
+     * property off it and ends the frame. Declining the whole call leaves
+     * nothing half-built, and three already treats a not-drawn object as normal
+     * -- `_pipelines.isReady` gates the draw two lines further down.
+     *
+     * **The cheap test comes first.** While budget remains the wrapper only
+     * times the call and charges anything slower than `FRESH_MS`; a settled
+     * frame pays two clock reads per draw and no lookups. Only once the budget
+     * is gone does it consult `_objects` to tell a cached draw from a build --
+     * a nested-map walk it would be wrong to run per draw on a healthy frame,
+     * and cheap against what it saves on a frame that is already in trouble.
+     *
+     * `budgetMs` is `Infinity` until a frame asks, so boot passes outside the
+     * animation loop run unbudgeted and the world comes up whole.
+     */
+    const direct = host._renderObjectDirect;
+    const objects = host._objects;
+    if (typeof direct === 'function') {
+      const innerDirect = direct.bind(host);
+      host._renderObjectDirect = (...args: unknown[]): void => {
+        if (this.budgetMs > 0) {
+          const t0 = performance.now();
+          innerDirect(...args);
+          const spent = performance.now() - t0;
+          if (spent > FRESH_MS) this.budgetMs -= spent;
+          return;
+        }
+        // Spent. A draw whose node state is already built costs microseconds
+        // and must still happen -- refusing those is how a settled scene goes
+        // blank. Only a genuine first build is declined.
+        if (objects !== null && objects !== undefined) {
+          let built = true;
+          try {
+            const ro = objects.get(
+              args[0], args[1], args[2], args[3], args[4], host._currentRenderContext, args[6], args[7],
+            ) as { _nodeBuilderState?: unknown } | null | undefined;
+            built = ro === null || ro === undefined || ro._nodeBuilderState !== undefined;
+          } catch {
+            // three moved the cache. Draw it: a stall is better than a hole.
+            built = true;
+          }
+          if (!built) {
+            this.deferredDraws++;
+            return;
+          }
+        }
+        innerDirect(...args);
+      };
+    }
     return true;
   }
 }
@@ -602,99 +640,103 @@ export function verifyAsyncPipes(): string[] {
 
   // --- The compile budget bounds one frame and starves nothing.
   //
-  // Four properties, and the gate is dangerous without any one of them: it must
-  // stop, it must not stop everything, a deferred object must not be drawn (an
-  // undefined pipeline ends the frame on a validation error), and a scene that
-  // has settled must never be throttled by its own history.
+  // Four ways this is worse than the stall it replaces, and the first version
+  // of it shipped with the first one wrong: it bounded `Pipelines.getForRender`,
+  // which only reads the node state, and a real ride deferred 21 draws out of
+  // 1,586 compiles while frames still spent 248 ms in `render`. So the first
+  // assertion is that an expensive draw is actually *stopped*.
   {
-    const g = new AsyncPipelines();
-    let built = 0;
     const spin = (ms: number): void => {
       const until = performance.now() + ms;
       let sink = 0;
       while (performance.now() < until) sink++;
       if (sink === -1) throw new Error('unreachable');
     };
-    const inner = {
-      getForRender: (_ro: unknown, promises?: unknown) => {
-        if (Array.isArray(promises)) promises.push(Promise.resolve());
-        built++;
-        spin(3);
-        return { id: built };
+    interface Rec {
+      _nodeBuilderState?: unknown;
+    }
+    const state = new Map<unknown, Rec>();
+    let ran = 0;
+    const host = {
+      _pipelines: { getForRender: () => ({ id: 'p' }) },
+      backend: { draw: () => {}, get: () => ({}) },
+      _objects: { get: (o: unknown) => state.get(o) ?? null },
+      _currentRenderContext: null,
+      // Stands in for three's per-draw path: a first sighting builds and is
+      // slow, everything after it is a draw and is not.
+      _renderObjectDirect: (o: unknown): void => {
+        ran++;
+        const rec = state.get(o);
+        if (rec !== undefined && rec._nodeBuilderState === undefined) {
+          spin(3);
+          rec._nodeBuilderState = {};
+        }
       },
     };
-    const drawnHere: unknown[] = [];
-    const back = {
-      draw: (ro: unknown, _i: unknown) => {
-        drawnHere.push(ro);
+    const g = new AsyncPipelines();
+    if (!g.install(host as unknown as PipelineHost)) failures.push('the gate did not install on a full renderer.');
+
+    const objs = Array.from({ length: 10 }, (_, i) => ({ n: i }));
+    for (const o of objs) state.set(o, {});
+
+    g.frame(6);
+    for (const o of objs) host._renderObjectDirect(o);
+    if (ran > 3) {
+      failures.push(`a 6 ms budget ran ${ran} builds at 3 ms each; the frame is not bounded and can still stall.`);
+    }
+    if (ran === 0) failures.push('a 6 ms budget built nothing; the gate is shut rather than bounded.');
+    if (g.deferrals === 0) failures.push('nothing was declined on an exhausted budget; the budget is not enforced.');
+
+    // A draw whose node state is already built must still happen. Refusing
+    // those is how a settled scene goes blank on its twentieth frame.
+    const built = ran;
+    host._renderObjectDirect(objs[0]);
+    if (ran === built) failures.push('an already-built draw was declined with no budget left; the scene would go blank.');
+
+    // The next frame reopens it, or a declined object never arrives at all.
+    const before = ran;
+    g.frame(6);
+    for (const o of objs) host._renderObjectDirect(o);
+    if (ran <= before) failures.push('`frame` did not reopen the budget; a declined object would never be built.');
+  }
+
+  // --- Before the first frame, the gate is open.
+  //
+  // Boot renders outside the animation loop -- ground-first, the shadow warm,
+  // the precompiles -- and reach the same per-draw path. A gate that starts
+  // closed declines all of them, and a declined draw does not happen: the world
+  // comes up empty and stays empty until the first `frame()` call, which is
+  // after the boot it was supposed to warm.
+  {
+    let ranAtBoot = 0;
+    // **Unbuilt render objects, not nulls.** The first version of this check
+    // handed the gate a `_objects` that returned null, which the wrapper reads
+    // as "not mine, draw it" -- so it passed against a gate closed by default
+    // and proved nothing. Boot's objects are real and unbuilt; model that.
+    const bootObjs = Array.from({ length: 40 }, (_, i) => ({ n: i }));
+    const bootState = new Map<unknown, { _nodeBuilderState?: unknown }>();
+    for (const o of bootObjs) bootState.set(o, {});
+    const host = {
+      _pipelines: { getForRender: () => ({ id: 'p' }) },
+      backend: { draw: () => {}, get: () => ({}) },
+      _objects: { get: (o: unknown) => bootState.get(o) ?? null },
+      _currentRenderContext: null,
+      _renderObjectDirect: (o: unknown): void => {
+        ranAtBoot++;
+        const rec = bootState.get(o);
+        if (rec !== undefined) rec._nodeBuilderState = {};
       },
-      get: () => ({ pipeline: { gpu: true } }),
     };
-    g.install({ _pipelines: inner, backend: back });
-
-    // Ten first sightings, 6 ms of budget, 3 ms each.
-    g.frame(6);
-    const objs = Array.from({ length: 10 }, (_, i) => ({ initialCacheKey: i, pipeline: undefined }));
-    for (const o of objs) inner.getForRender(o, null);
-    if (built > 3) {
-      failures.push(`a 6 ms budget built ${built} pipelines at 3 ms each; a frame is not bounded and can still stall.`);
+    const fresh = new AsyncPipelines();
+    fresh.install(host as unknown as PipelineHost);
+    for (const o of bootObjs) host._renderObjectDirect(o);
+    if (ranAtBoot !== 40) {
+      failures.push(
+        `before the first frame the gate ran ${ranAtBoot} of 40 draws; boot passes outside the animation ` +
+          `loop would be declined and the world would come up empty.`,
+      );
     }
-    if (built === 0) failures.push('a 6 ms budget built nothing; the gate is shut rather than bounded.');
-    if (g.deferrals === 0) failures.push('nothing was deferred on an exhausted budget; the budget is not enforced.');
-
-    // The deferred ones must not be drawn.
-    const last = objs[objs.length - 1];
-    back.draw(last, null);
-    if (drawnHere.includes(last)) {
-      failures.push('a deferred object was drawn; setPipeline(undefined) ends the frame on a validation error.');
-    }
-
-    // The next frame reopens it, or deferred work never arrives at all.
-    const before = built;
-    g.frame(6);
-    for (const o of objs) inner.getForRender(o, null);
-    if (built <= before) failures.push('`frame` did not reopen the budget; a deferred object would never be built.');
-
-    // A key already through the gate is free forever, budget or no budget.
-    // Without this a settled scene would stop drawing on its twentieth frame.
-    g.frame(0);
-    const settled = built;
-    inner.getForRender(objs[0], null);
-    if (built === settled) failures.push('a known key was refused with an empty budget; a settled scene would go blank.');
-
-    // And the warm-up is never budgeted -- it passes its own promise array.
-    g.frame(0);
-    const boot = built;
-    inner.getForRender({ initialCacheKey: 9999 }, []);
-    if (built === boot) failures.push('the warm-up was refused by the frame budget; boot would compile nothing.');
-
-    // --- Before the first frame, the gate is open.
-    //
-    // Boot renders outside the animation loop and reaches this with a null
-    // promise array, indistinguishable from a frame. A gate that starts closed
-    // defers all of them, and a deferred draw does not happen: the world comes
-    // up empty and stays empty until the first `frame()` call, which is after
-    // the boot it was supposed to warm.
-    {
-      const fresh = new AsyncPipelines();
-      let madeAtBoot = 0;
-      const bootInner = {
-        getForRender: (_ro: unknown, promises?: unknown) => {
-          if (Array.isArray(promises)) promises.push(Promise.resolve());
-          madeAtBoot++;
-          return { id: madeAtBoot };
-        },
-      };
-      fresh.install({ _pipelines: bootInner, backend: { draw: () => {}, get: () => ({}) } });
-      for (let i = 0; i < 40; i++) bootInner.getForRender({ initialCacheKey: 1000 + i }, null);
-      if (madeAtBoot !== 40) {
-        failures.push(
-          `before the first frame the gate built ${madeAtBoot} of 40; boot renders outside the animation ` +
-            `loop would be deferred and the world would come up empty.`,
-        );
-      }
-      if (fresh.deferrals !== 0) failures.push('the gate deferred boot work before any frame had opened a budget.');
-    }
+    if (fresh.deferrals !== 0) failures.push('the gate declined boot work before any frame had opened a budget.');
   }
 
   return failures;
