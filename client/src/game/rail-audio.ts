@@ -235,11 +235,19 @@ export const RIDE_SECONDS = 79.18;
  *   - and the leg out of Redfern enters the file three quarters of the way in
  *     while the leg before it entered it at nine seconds.
  *
- * The top 24 bits of the key, because the low ones carry the leg counter and
- * consecutive legs would land a few hundred milliseconds apart.
+ * **It hashes the key itself rather than trusting the caller to have.** The
+ * first draft took the top 24 bits and assumed the ride key arrived avalanched;
+ * `verifyRideBed` convicted it in a line, because keys 1 and 2 shift to the same
+ * zero and two consecutive legs entered at the same second. A function whose
+ * correctness depends on its caller's arithmetic is a function that is wrong the
+ * first time somebody calls it from somewhere else, so the finaliser is here.
  */
 export function rideEntry(key: number, t: number): number {
-  const jump = ((key >>> 8) / 0x1000000) * RIDE_SECONDS;
+  let h = key >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x7feb352d) >>> 0;
+  h = Math.imul(h ^ (h >>> 15), 0x846ca68b) >>> 0;
+  h = (h ^ (h >>> 16)) >>> 0;
+  const jump = (h / 0x100000000) * RIDE_SECONDS;
   const at = (t + jump) % RIDE_SECONDS;
   return at < 0 ? at + RIDE_SECONDS : at;
 }

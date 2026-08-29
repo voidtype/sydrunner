@@ -282,6 +282,14 @@ import { verifyDialog, verifyQuests } from '../client/src/game/questmodel.ts';
 import { verifyGiverBodies } from '../client/src/game/giverbodies.ts';
 import { verifyWaypoint } from '../client/src/game/waypoint.ts';
 import { verifyGiverMap } from '../client/src/game/givermap.ts';
+// WORKSTREAM AS. The three pure halves of the tracker and the job list. Same
+// arrangement as the two above and the same reason: what they catch -- a hub
+// that renames itself when the player walks past it, a corner that goes blank
+// exactly when a player has nothing to do, a job listed in two places at once --
+// has no screenshot that says so, and the server can read all three.
+import { verifyQuestHubs } from '../client/src/game/questhubs.ts';
+import { verifyQuestTrack } from '../client/src/game/questtrack.ts';
+import { verifyQuestLog } from '../client/src/game/questlog.ts';
 import { decodeQuest, verifyQuestWire } from '../client/src/net/quests.ts';
 import { ContentStore, ImprovCache, QuestEngine, contentResponse, type QuestWorld } from './quests.ts';
 import { TEAM } from '../client/src/game/teams.ts';
@@ -795,6 +803,9 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
      * to find it by eye is to walk down the wrong street.
      */
     ['verifyGiverMap', verifyGiverMap()],
+    ['verifyQuestHubs', verifyQuestHubs()],
+    ['verifyQuestTrack', verifyQuestTrack()],
+    ['verifyQuestLog', verifyQuestLog()],
     // WORKSTREAM N (carry): the sentence a restored session is visible as. Run
     // here as well as in the browser for `verifyLevelHud`'s reason one line up
     // -- this process decides *whether* a join was a restore and puts the bit on

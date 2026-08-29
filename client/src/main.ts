@@ -264,6 +264,17 @@ import { TalentsPanel, verifyTalentsPanel } from './teams.ts';
 // client half; the one block that uses all three is beside `TalentsPanel`'s
 // construction, well clear of the boot region. See it for why.
 import { DialogPanel, cursorsFrom, verifyDialogPanel } from './dialog.ts';
+// WORKSTREAM AS: the tracker in the corner and the job list behind `J`. Three
+// pure modules and two shells, split the way `waypoint.ts` is and for its
+// reason -- everything that decides anything is checkable on a server with no
+// screen. `game/questhubs.ts` is the piece the other four are built on: it
+// turns the giver dots the maps already draw into named places a player can be
+// told to walk to.
+import { QuestTracker, verifyQuestTracker } from './questtracker.ts';
+import { QuestLogPanel, verifyQuestLogPanel } from './questlog.ts';
+import { questHubs, verifyQuestHubs, type QuestHub } from './game/questhubs.ts';
+import { verifyQuestTrack } from './game/questtrack.ts';
+import { verifyQuestLog, type LogGiver } from './game/questlog.ts';
 import {
   EMPTY_BUNDLE,
   MAX_NPCS_PER_BUNDLE,
@@ -5088,6 +5099,23 @@ async function main(): Promise<void> {
     // return type. It needs no canvas -- see `verifyBigMap`'s own note -- so
     // there was never a reason for it to be behind a handle.
     ...verifyBigMap(),
+    /*
+     * WORKSTREAM AS: the tracker and the job list.
+     *
+     * Five checks, and the split between them is the split between the files.
+     * `verifyQuestHubs`, `verifyQuestTrack` and `verifyQuestLog` are pure and
+     * run on the server's boot list as well -- what they catch is a hub that
+     * renames itself when the player walks past it, a corner that goes blank
+     * exactly when a player has nothing to do, and a job listed in two places
+     * at once, none of which has a screenshot that says so. The two shells only
+     * assert that the markup they were written against is still in
+     * `index.html`, which is the failure that is otherwise silent forever.
+     */
+    ...verifyQuestHubs(),
+    ...verifyQuestTrack(),
+    ...verifyQuestLog(),
+    ...verifyQuestTracker(),
+    ...verifyQuestLogPanel(),
   ];
   if (dialogFailures.length > 0) {
     hud.fatal('Quest content self-checks failed:\n' + dialogFailures.map((f) => '  - ' + f).join('\n'));
@@ -5251,6 +5279,16 @@ async function main(): Promise<void> {
   const giverLamps = new GiverLampField(streamer.streetLamps);
   /** The `LampSource` the night rig reads: the resident tiles, plus these. */
   const lampSource = lampsOver(streamer, () => giverLamps.lampRecords());
+  /**
+   * The corner tracker, declared before the arrow because the arrow reads it.
+   *
+   * Assigned below, once the hubs it needs exist. The needle used to go out in
+   * exactly the situation a player most needs it -- nothing accepted, sixty
+   * kilometres of city -- and `WaypointSource.fallback` is what fixes that; it
+   * is last after the pin and the live objective, so it can never take the arrow
+   * off a job.
+   */
+  let questTracker: QuestTracker | null = null;
   const waypointSource: WaypointSource = {
     quests: () => questBundle.quests,
     cursors: () => cursorsFrom(questFrame()),
@@ -5258,6 +5296,16 @@ async function main(): Promise<void> {
     // The same bundle the panel and the markers read, so a pinned arrow and the
     // register can never disagree about where somebody is standing.
     npcs: () => questBundle.npcs,
+    fallback: () => {
+      const frame = questTracker?.frame;
+      if (frame === null || frame === undefined) return null;
+      if (frame.kind !== 'hub' || frame.x === null || frame.z === null) return null;
+      // `questId` is empty because this is not a job, and every reader of a
+      // `Waypoint` already treats that field as an identity rather than a
+      // promise. The radius is an area rather than a doorway: arriving at
+      // Redfern is being in Redfern.
+      return { questId: '', stepIndex: 0, text: frame.title, x: frame.x, z: frame.z, radius: 80 };
+    },
   };
   const waypoint = new WaypointBanner(waypointSource);
   /**
@@ -5275,6 +5323,78 @@ async function main(): Promise<void> {
    * decision clock rather than a second one beside it. See its header.
    */
   const giverDots = new GiverDots();
+  /*
+   * --- WORKSTREAM AS: a third sweep, for the question the other two cannot ask.
+   *
+   * The compass asks "who is within five hundred metres" and the big map asks
+   * "who is within four and a half kilometres". Both are the right question for
+   * a picture. Neither can answer **"where is the nearest work"**, which is what
+   * a player with nothing to do is actually asking, and which over sixty
+   * kilometres is very often further away than either radius.
+   *
+   * So: the whole city, on a slow beat, capped. The cap is what makes it cheap
+   * -- `GiverDots.insert` keeps the nearest N and never sorts the candidate list
+   * -- and 256 is far more than the fourteen hubs the job list draws or the one
+   * the tracker points at. The beat is `questMarkers.beats / 8`, so this runs
+   * about twice a second off the same clock the marks decide on rather than a
+   * second clock beside it.
+   */
+  const wideDots = new GiverDots();
+  /** The city, in metres. Bigger than the build, so nothing is out of reach. */
+  const WIDE_GIVER_RANGE_M = 80000;
+  const MAX_WIDE_GIVER_DOTS = 256;
+  /** The wide sweep flattened, because `questHubs` wants an array it can index. */
+  const hubGivers: LogGiver[] = [];
+  const hubGiverPoints: Array<{ x: number; z: number; turnin: boolean }> = [];
+  let hubs: QuestHub[] = [];
+  /**
+   * The station list the hubs borrow their names from, or empty.
+   *
+   * `rail.bin`'s three hundred and sixty-one named places -- see
+   * `game/questhubs.ts` on why the names come from here and not from the content
+   * packs. Empty when the bake did not load, which costs the hubs their names
+   * and nothing else: `questHubs` falls back to a bearing.
+   */
+  const hubPlaces = railBake === null ? [] : railBake.stations.map((st) => ({ name: st.name, x: st.x, z: st.z }));
+  const rebuildHubs = (): void => {
+    hubGivers.length = 0;
+    hubGiverPoints.length = 0;
+    for (let i = 0; i < wideDots.count; i++) {
+      const g = wideDots.at(i);
+      hubGivers.push({ id: g.id, x: g.x, z: g.z });
+      hubGiverPoints.push({ x: g.x, z: g.z, turnin: g.turnin });
+    }
+    hubs = questHubs(hubGiverPoints, hubPlaces, player.position.x, player.position.z);
+  };
+
+  /*
+   * --- The corner, and the list behind `J`.
+   *
+   * Two more readers of the same three closures the marks, the bodies, the lamp
+   * and the map dots are built from, which is the whole point of them having
+   * been hoisted: six readers, one register. A tracker that disagreed with the
+   * arrow about which job you are on would be a second copy of the rule.
+   */
+  questTracker = new QuestTracker({
+    bundle: () => questBundle,
+    cursors: () => cursorsFrom(questFrame()),
+    pose: () => ({ x: player.position.x, z: player.position.z }),
+    hubs: () => hubs,
+    pinned: () => waypoint.pinnedQuest ?? '',
+  });
+  const questLog = new QuestLogPanel({
+    bundle: () => questBundle,
+    cursors: () => cursorsFrom(questFrame()),
+    facts: () => questMarkerSource.facts(),
+    hubs: () => hubs,
+    // The array `hubs` was clustered from, so a hub's `members` index into it.
+    // Handed as the same reference rather than rebuilt, which is what keeps
+    // that contract true.
+    givers: () => hubGivers,
+    pose: () => ({ x: player.position.x, z: player.position.z }),
+    aimAt: (questId) => void waypoint.pin(questId),
+    pinned: () => waypoint.pinnedQuest ?? '',
+  });
   /** One line in the render loop, beside the plates. See `nameplates.end()`. */
   const updateQuestMarkers = (dt: number): void => {
     questMarkers.update(dt, camera, questMarkerSource);
@@ -5298,6 +5418,21 @@ async function main(): Promise<void> {
       onMap ? MAP_GIVER_RANGE_M : GIVER_RANGE_M,
       onMap ? MAX_MAP_GIVER_DOTS : MAX_GIVER_DOTS,
     );
+    // And the city-wide one, at an eighth of the rate. `refresh` answers whether
+    // it actually swept, so the clustering only runs on the beats that changed
+    // anything -- which is the expensive half and is the one worth guarding.
+    if (
+      wideDots.refresh(
+        Math.floor(questMarkers.beats / 8),
+        player.position.x,
+        player.position.z,
+        questMarkerSource,
+        WIDE_GIVER_RANGE_M,
+        MAX_WIDE_GIVER_DOTS,
+      )
+    ) {
+      rebuildHubs();
+    }
     // **After** the marks, so the body field sees the beat the marks have just
     // taken rather than the previous one. See `GiverBodyField`'s header on the
     // one beat of settle that costs.
@@ -5311,6 +5446,10 @@ async function main(): Promise<void> {
       for (const o of giverLamps.objects) scene.add(o);
     }
     waypoint.update(dt);
+    // After the arrow, on the beat it just took, so the corner and the needle
+    // are never a beat apart about which job they are pointing at.
+    questTracker?.tick(dt);
+    questLog.tick(dt);
 
     /*
      * --- The mushrooms: walk onto one and it is eaten.
@@ -6747,6 +6886,11 @@ async function main(): Promise<void> {
    * The **label** is only read by the big map; the compass drops it. A giver's
    * name beside his `!` is what turns "somebody in Redfern" into "Denise".
    */
+  // The tracker is the third thing in the right-hand column and moves with the
+  // other two: a compass that grows under a raised phone would otherwise cover
+  // it, and a compass that is off is a HUD the player has deliberately cleared.
+  minimap.follow(document.getElementById('questtrack'));
+
   minimap.addMarkerSource((sink) => {
     for (let i = 0; i < giverDots.count; i++) {
       const g = giverDots.at(i);
@@ -6915,6 +7059,28 @@ async function main(): Promise<void> {
       suggestions.close();
       talents.show();
     },
+    /*
+     * --- WORKSTREAM AS. The phone's eighth tile, and `J`, on the same terms.
+     *
+     * The third tile to become a shortcut rather than a screen, and the same
+     * housekeeping the other two run: the panel is the thing being asked for, so
+     * everything else that owns the screen gets out of its way. `Q` and the tile
+     * and `J` all land here, which is what keeps the three routes one feature.
+     */
+    openJobs: () => {
+      hud.setHelp(false);
+      hud.setLeaderboard(false);
+      bigmap.close();
+      suggestions.close();
+      questLog.setOpen(true);
+      // The rows are clickable and a browser under pointer lock has no cursor to
+      // click them with. `client/src/dialog.ts` says the same about its choices
+      // and this is the same release; the click that lands back on the canvas
+      // afterwards recaptures it.
+      if (document.pointerLockElement) document.exitPointerLock();
+    },
+    closeJobs: () => questLog.close(),
+    jobsVisible: () => questLog.visible,
     closeMap: () => bigmap.close(),
     mapVisible: () => bigmap.visible,
     setMinimapScale: (scale) => minimap.setScale(scale),
@@ -7424,6 +7590,9 @@ async function main(): Promise<void> {
         hud.helpVisible ||
         hud.leaderboardVisible ||
         suggestions.visible ||
+        // The job list joins them for the same reason again: it scrolls, and it
+        // is the longest list in this interface.
+        questLog.visible ||
         money.isPhoneVisible()
       ) {
         wheelCamera = 0;

@@ -1505,6 +1505,26 @@ export function stepTarget(step: QuestStep): number {
 }
 
 /**
+ * `2 of 3`, `$40 of $100`, or nothing at all. One place, so every screen agrees.
+ *
+ * Written here rather than in either of the two files that draw it, because
+ * there are now two and they sit at opposite ends of the frame: the register in
+ * the phone and the tracker in the corner. A player looking at both must not be
+ * shown two different numbers for one step, and the way to guarantee that is not
+ * to have two functions that round the same way today.
+ *
+ * A target of one returns `''` deliberately. "1 of 1" is a progress bar for a
+ * thing that has no progress, and a `goto` step either is or is not done.
+ */
+export function stepCounter(step: QuestStep, have: number): string {
+  const target = stepTarget(step);
+  if (target <= 1) return '';
+  const prefix = step.kind === STEP_KIND.EARN ? '$' : '';
+  const at = have < 0 ? 0 : have > target ? target : have;
+  return `${prefix}${at} of ${prefix}${target}`;
+}
+
+/**
  * Add progress to the open step and advance past it if it is now satisfied.
  *
  * Returns whether anything moved, which is what decides a write to disk and a

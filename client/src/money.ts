@@ -149,6 +149,19 @@ export interface MoneyDeps {
    */
   openTalents(): void;
   /**
+   * Open the job list. WORKSTREAM AS; `openTalents`' route and its reasons.
+   *
+   * The QuestBuddy tile stopped being a screen this pass and became a shortcut,
+   * on the Map tile's argument exactly: the register grew from a hundred and
+   * nine jobs to six hundred, grouped by where they are rather than by rung, and
+   * a 300 px handset cannot draw that. The phone is still the way in.
+   */
+  openJobs(): void;
+  /** Put it away. Escape's ladder and `J`'s toggle both need this. */
+  closeJobs(): void;
+  /** Is it up? Sampled before Escape and `J` decide what a press meant. */
+  jobsVisible(): boolean;
+  /**
    * WORKSTREAM AK: the Obligations screen's markup. Optional.
    *
    * Threaded through here rather than reached for, on `openTalents`' route one
@@ -422,6 +435,7 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
       mapFromPhone = true;
     },
     openTalents: () => deps.openTalents(),
+    openJobs: () => deps.openJobs(),
     obligations: () => deps.obligations?.() ?? '',
     aimAt: (questId: string) => deps.aimAt?.(questId),
   });
@@ -717,8 +731,29 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
        * player's hand for the look of it.
        */
       if (code === 'KeyQ') {
-        if (phone.visible) phone.close();
-        else phone.openObligations();
+        if (phone.visible) {
+          phone.close();
+          return true;
+        }
+        // The job list is what `Q` opens now -- see `openJobs` -- so it is also
+        // what `Q` has to close, or the key stops being a toggle the moment the
+        // tile behind it became a shortcut.
+        if (deps.jobsVisible()) {
+          deps.closeJobs();
+          return true;
+        }
+        phone.openObligations();
+        return true;
+      }
+      /*
+       * `J`: the job list, directly. `M`'s relationship to the Map tile, for
+       * `M`'s reason -- a thing you look at often enough deserves a letter, and
+       * the letter is the one every game with a quest log has used since
+       * `J`ournal. Consumed, so `main.ts` sees nothing.
+       */
+      if (code === 'KeyJ') {
+        if (deps.jobsVisible()) deps.closeJobs();
+        else deps.openJobs();
         return true;
       }
       /**
@@ -740,6 +775,14 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
        */
       if (code === 'Escape') {
         if (phone.goBack()) return true;
+        // The job list is above the map on the ladder for the reason the map is
+        // above the phone: it is the most recently opened of the three in every
+        // order a player can reach them in, because both other rungs can open it
+        // and it cannot open either.
+        if (deps.jobsVisible()) {
+          deps.closeJobs();
+          return true;
+        }
         if (deps.mapVisible()) {
           deps.closeMap();
           if (mapFromPhone) {

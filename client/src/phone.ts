@@ -117,6 +117,15 @@ export interface PhoneSource {
    */
   openTalents?(): void;
   /**
+   * Open the job list. WORKSTREAM AS; `openTalents`' shape and its reasons.
+   *
+   * Optional for the reason `openTalents` is: a `PhoneSource` is also built by
+   * checks and by `?offline`, and where it is absent the old Obligations screen
+   * below still draws. That fallback is not dead code -- it is the honest
+   * behaviour of a build with no panel to open.
+   */
+  openJobs?(): void;
+  /**
    * WORKSTREAM AK: the Obligations screen's markup, or undefined.
    *
    * **Markup rather than data**, which is this interface's one departure from
@@ -348,6 +357,13 @@ export class Phone {
    * on the same press.
    */
   openObligations(): void {
+    // Straight through, without opening the handset for a frame first: the tile
+    // is a shortcut now and `Q` should not flash a phone on the way to the panel
+    // it is really asking for. See `openApp`.
+    if (this.source.openJobs !== undefined) {
+      this.source.openJobs();
+      return;
+    }
     this.setOpen(true);
     this.openApp('obligations');
   }
@@ -506,6 +522,15 @@ export class Phone {
     }
     if (app === 'camera') {
       this.setCamera(true);
+      return;
+    }
+    if (app === 'obligations' && this.source.openJobs !== undefined) {
+      // The Map tile's move, for the Map tile's reason, and the third tile to
+      // make it: six hundred jobs grouped by the place they are at is not a
+      // 300 px screen. The handset goes away and Escape brings it back at its
+      // home screen, which is what makes this a step rather than a dismissal.
+      this.setOpen(false);
+      this.source.openJobs();
       return;
     }
     if (app === 'talents') {

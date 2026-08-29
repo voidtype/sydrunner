@@ -70,6 +70,19 @@ export interface WaypointSource {
   pose(): { x: number; z: number; yaw: number };
   /** The dialog pack, for `pin`: a giver's position lives on his NPC record. */
   npcs(): readonly DialogNpc[];
+  /**
+   * Somewhere to point when there is no job at all, or null.
+   *
+   * The needle used to go out in exactly the situation a player most needs it:
+   * standing in a city of sixty kilometres with nothing accepted, which is
+   * where every new player and every returning one starts. `game/questtrack.ts`
+   * answers "then where is the work" with the nearest hub, and this is the same
+   * answer handed to the arrow so the corner and the needle agree.
+   *
+   * **Last, after the pin and after the live objective**, which is the whole of
+   * its authority: it can never take the arrow off a job.
+   */
+  fallback?(): Waypoint | null;
 }
 
 /** How often the text and the distance are re-derived. The needle is every frame. */
@@ -152,7 +165,11 @@ export class WaypointBanner {
     const pose = this.source.pose();
     if (this.sinceRescan >= 1 / WAYPOINT_RESCAN_HZ) {
       this.sinceRescan = 0;
-      this.current = this.pinnedWaypoint() ?? activeWaypoint(this.source.quests(), this.source.cursors(), pose.x, pose.z);
+      this.current =
+        this.pinnedWaypoint() ??
+        activeWaypoint(this.source.quests(), this.source.cursors(), pose.x, pose.z) ??
+        this.source.fallback?.() ??
+        null;
       // Arriving is what takes the pin down. Checked here rather than in `pin`
       // for the obvious reason: the player is not standing there when they press
       // the button, and this is the beat that knows where they are now.

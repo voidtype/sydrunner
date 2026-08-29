@@ -48,6 +48,18 @@ export interface QuestArea {
   z: number;
   radiusM: number;
   count: number;
+  /**
+   * Which points fell in, as indices into the array that was handed in.
+   *
+   * The map does not want this and never asks; `game/questhubs.ts` does, because
+   * a *hub* is not a circle -- it is "four jobs and one to hand in, at Redfern",
+   * and none of those three facts survive a centroid. Carried here rather than
+   * clustered a second time next door, on the house rule the giver marks are
+   * already under: the dot on the compass, the dot on the big map and the
+   * circle round both are one sweep seen from three places, and two clusterers
+   * would eventually disagree about where Redfern is.
+   */
+  members: number[];
 }
 
 export interface AreaPoint {
@@ -123,7 +135,17 @@ export function questAreas(
       const d = Math.sqrt(dx * dx + dz * dz);
       if (d > worst) worst = d;
     }
-    out.push({ x: cx, z: cz, radiusM: Math.max(MIN_RADIUS_M, worst), count: members.length });
+    out.push({
+      x: cx,
+      z: cz,
+      radiusM: Math.max(MIN_RADIUS_M, worst),
+      count: members.length,
+      // Sorted, so the same givers in a different order produce the same hub --
+      // the stability `verifyQuestAreas` already demands of the ordering, now
+      // demanded of the contents as well, because a hub's *name* is derived
+      // from its members and a name that flickers is worse than no name.
+      members: members.slice().sort((a, b) => a - b),
+    });
   }
   out.sort((a, b) => b.count - a.count || a.x - b.x || a.z - b.z);
   return out;
@@ -197,6 +219,23 @@ export function verifyQuestAreas(): string[] {
         failures.push('The same givers in a different order produced a different first area; the labels would swap on every redraw.');
       }
     }
+  }
+
+  // --- The members come back, sorted, and are the ones that were handed in.
+  {
+    const pts = [{ x: 9000, z: 0 }, { x: 0, z: 0 }, { x: 100, z: 0 }];
+    const areas = questAreas(pts, LINK_M, 1);
+    const found = new Set<number>();
+    for (const a of areas) {
+      for (const i of a.members) {
+        if (found.has(i)) failures.push(`Point ${i} landed in two areas.`);
+        found.add(i);
+      }
+      const ordered = a.members.every((v, k) => k === 0 || a.members[k - 1] < v);
+      if (!ordered) failures.push('An area listed its members out of order; the name would flicker.');
+      if (a.members.length !== a.count) failures.push(`An area counted ${a.count} but listed ${a.members.length}.`);
+    }
+    if (found.size !== pts.length) failures.push(`${pts.length} givers, ${found.size} placed in an area at minMembers 1.`);
   }
 
   // --- A tight pair still gets something worth aiming at.

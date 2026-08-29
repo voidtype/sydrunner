@@ -100,8 +100,8 @@ import {
   questStanding,
   questView,
   rungOf,
+  stepCounter,
   stepLabel,
-  stepTarget,
   type ContentBundle,
   type DialogChoice,
   type DialogNode,
@@ -110,6 +110,7 @@ import {
   type Quest,
   type QuestCursor,
   type QuestCursors,
+  type QuestStep,
   type QuestStanding,
   type QuestView,
 } from './game/questmodel.ts';
@@ -610,12 +611,17 @@ export function registerRows(bundle: ContentBundle, state: QuestStateFrame, fact
   return rows;
 }
 
-/** `x of y` for a counted step, or nothing. One place, so the two agree. */
-function counterFor(step: { kind: string; count: number; dollars: number }, have: number): string {
-  const target = stepTarget(step as Parameters<typeof stepTarget>[0]);
-  if (target <= 1) return '';
-  const prefix = step.kind === STEP_KIND.EARN ? '$' : '';
-  return ` — ${prefix}${Math.min(have, target)} of ${prefix}${target}`;
+/**
+ * The em dash and the count, or nothing.
+ *
+ * The count itself is `questmodel.stepCounter`'s now rather than this file's:
+ * the tracker in the corner draws the same number and the two must not round
+ * differently. What stays here is the punctuation, because the register puts it
+ * on the end of a label and the tracker puts it in its own column.
+ */
+function counterFor(step: QuestStep, have: number): string {
+  const text = stepCounter(step, have);
+  return text === '' ? '' : ` \u2014 ${text}`;
 }
 
 function cursorMap(state: QuestStateFrame): Map<string, QuestCursor> {
@@ -694,9 +700,11 @@ export function verifyDialogPanel(): string[] {
   }
 
   {
-    const ko = { kind: STEP_KIND.KO, count: 3, dollars: 0 };
-    const earn = { kind: STEP_KIND.EARN, count: 1, dollars: 50 };
-    const once = { kind: STEP_KIND.GOTO, count: 1, dollars: 0 };
+    const step = (kind: string, count: number, dollars: number): QuestStep =>
+      ({ kind, count, dollars }) as unknown as QuestStep;
+    const ko = step(STEP_KIND.KO, 3, 0);
+    const earn = step(STEP_KIND.EARN, 1, 50);
+    const once = step(STEP_KIND.GOTO, 1, 0);
     if (counterFor(once, 0) !== '') failures.push('A single-shot step drew a counter; "0 of 1" is noise.');
     if (counterFor(ko, 2) !== ' — 2 of 3') failures.push(`A ko counter reads "${counterFor(ko, 2)}".`);
     if (counterFor(ko, 9) !== ' — 3 of 3') failures.push(`An over-counted step reads "${counterFor(ko, 9)}"; it must clamp at the target.`);

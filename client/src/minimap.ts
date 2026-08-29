@@ -882,6 +882,16 @@ export class Minimap implements MarkerSink {
    * same reason the marker sources are registered rather than imported.
    */
   private readonly readout: HTMLElement | null;
+  /**
+   * Anything else that moves and hides with the compass. See `follow`.
+   *
+   * A list rather than a second named field, because the right-hand column has
+   * three things in it now -- the disc, the locator and the quest tracker -- and
+   * a fourth is a matter of time. `readout` keeps its own field because this
+   * class also *writes text into it*, which is a relationship the followers do
+   * not have.
+   */
+  private readonly followers: HTMLElement[] = [];
   /** Last text written. The write is skipped when it has not changed. */
   private readoutText = '';
 
@@ -1050,6 +1060,27 @@ export class Minimap implements MarkerSink {
     this.element.classList.toggle('raised', scale > 1);
     this.readout?.classList.toggle('mapoff', off);
     this.readout?.classList.toggle('raised', scale > 1);
+    for (const el of this.followers) {
+      el.classList.toggle('mapoff', off);
+      el.classList.toggle('raised', scale > 1);
+    }
+  }
+
+  /**
+   * Move and hide `el` with the compass.
+   *
+   * What the two classes *mean* is `index.html`'s, which is the arrangement
+   * `readout` is already under and the reason this hands over a class rather
+   * than a transform: the disc's scale and the strip's compensating offset are
+   * one number in two places and both belong beside the layout they are derived
+   * from. The tracker's offset is a third expression of the same number and is
+   * written out there too.
+   */
+  follow(el: HTMLElement | null): void {
+    if (el === null || this.followers.includes(el)) return;
+    this.followers.push(el);
+    el.classList.toggle('mapoff', this.scaleFactor <= 0);
+    el.classList.toggle('raised', this.scaleFactor > 1);
   }
 
   /** Is the compass on the screen? For the console handle and the checks. */
