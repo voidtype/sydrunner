@@ -10310,7 +10310,7 @@ async function main(): Promise<void> {
   const stalls = new StallRing();
   const boundaries = new BoundaryLog(streamer.tileSize);
   /** The previous frame's facts, so a stall can be described by what caused it. */
-  const prev = { compiles: 0, tiles: 0, sheets: 0, crossed: '', speed: 0, steps: 0, worst: '' };
+  const prev = { compiles: 0, tiles: 0, sheets: 0, crossed: '', speed: 0, steps: 0 };
   /**
    * The longest `longtask` the browser has reported, and when it ended.
    *
@@ -10508,13 +10508,68 @@ async function main(): Promise<void> {
         tiles: prev.tiles,
         sheets: prev.sheets,
         crossed: prev.crossed,
-        worst: prev.worst,
+        // **Read here, not stashed in `prev`.** It used to be, and it was two
+        // frames stale: `prev.worst` was filled at the bottom of frame N from
+        // `lastWorst()`, but `stop()` does not run until *after* that line, so
+        // what it copied was frame N-1's section -- and the record it landed in
+        // describes frame N. Read at the top of the next frame instead, where
+        // `stop()` has run and `lastWorst()` is exactly the frame this row is
+        // about. Same fault, same fix, as the console line below.
+        worst: frameProfile.lastWorst(),
         // Overlapping this stall's interval, with a frame of slack for the
         // observer's own delivery. See `longtaskEndMs`.
         longtaskMs: longtaskEndMs >= now - rafDelta - 20 ? longtaskMs : 0,
       });
       longtaskMs = 0;
       longtaskEndMs = -1e9;
+    }
+
+    /*
+     * --- The console line, moved here from the bottom of the frame.
+     *
+     * **Where it was, it could not be right.** It printed
+     * `performance.now() - now` as the frame's cost and, beside it, a section
+     * breakdown from `frameProfile.report()` -- but `frameProfile.stop()` is at
+     * the very bottom of the callback, 240 lines further down. So `report()`
+     * folded a window that did not contain the frame the line was about, and it
+     * chose its worst row out of `totals[]` -- stale for the row now open --
+     * while reading that row's sections out of `ring[]`, which `begin()` has
+     * already zeroed and is refilling live. Two different frames, one line, no
+     * warning that they were two.
+     *
+     * A five-minute ride printed `[frame] 269 ms, render 29.3ms` twenty times,
+     * and the reading everybody took from it -- that 240 ms was being stolen by
+     * the browser -- came from a frame that was not the 269 ms one. The stall
+     * ring never agreed: it said 3 stalls stolen and 52 compiled, and it was
+     * right, because it reads `lastMs` at the top of the frame where the value
+     * is in phase. This line now reads from the same place.
+     *
+     * And it adds up. The gap the player felt, what our own sections spent
+     * inside it, and the remainder -- a line that accounts for 100% of the
+     * interval cannot mislead by omission. If `outside` is small the stall is
+     * ours; if it is large it is not; and nobody has to infer that from a
+     * subtraction the line declined to do.
+     *
+     * **`info`, not `warn`.** React DevTools patches `console.warn` and Chrome
+     * captures a full async stack for it -- the owner's paste carries three
+     * hundred frames of `requestAnimationFrame` under every `[frame]` line and
+     * none under `[stalls]`, which is `info`. A stall reporter that pays a deep
+     * stack capture inside the frame it is reporting on is making the thing it
+     * measures worse, which is the one thing an instrument may never do.
+     */
+    if (rafDelta > LONG_FRAME_MS && now - lastLongFrameAt > 5000) {
+      lastLongFrameAt = now;
+      const s = stalls.summarise();
+      console.info(
+        `[frame] ${rafDelta.toFixed(0)} ms gap — ${frameProfile.lastMs.toFixed(0)} ms ours, ` +
+          `${Math.max(0, outside).toFixed(0)} ms outside, heaviest ${frameProfile.lastWorst()}` +
+          `  |  pipelines compiled in stalled frames so far: ${pipelineWatch.pipelines}` +
+          ` over ${pipelineWatch.frames} frame(s), worst ${pipelineWatch.worstMs.toFixed(0)} ms` +
+          `  |  compiles ${asyncPipes.compiles} over ${asyncPipes.distinct} keys, ${asyncPipes.objects} objects` +
+          `  |  ${asyncPipes.drift()}` +
+          `  |  worst: ${asyncPipes.top(3)}` +
+          `\n[stalls] ${s.line}  |  floor ${stalls.baseline().toFixed(1)} ms  |  sydney.stalls() for the table`,
+      );
     }
 
     const frameDt = Math.min((now - last) / 1000, 0.25);
@@ -12549,37 +12604,20 @@ async function main(): Promise<void> {
       prev.compiles = asyncPipes.compiles - lastCompiles;
       prev.tiles = built.tiles - lastBuiltTiles;
       prev.sheets = built.sheets - lastBuiltSheets;
-      prev.worst = frameProfile.lastWorst();
+      // `prev.worst` used to be set here and no longer is: see the stall record
+      // at the top of the frame. The deltas above are still correct here --
+      // they span this frame and are read on the next one to describe it.
       lastCompiles = asyncPipes.compiles;
       lastBuiltTiles = built.tiles;
       lastBuiltSheets = built.sheets;
     }
     /*
-     * The console line survives, at its old five-second cooldown, and that is
-     * deliberate: the ring is the instrument, but the owner reads the console
-     * and pastes it, so the line has to carry the answer too. What is new on it
-     * is `stolen`, `crossed` and the speed -- which between them are the whole
-     * distance-versus-timer question, in a line somebody can copy into chat.
-     *
-     * A bad minute fills the ring rather than the console. `sydney.stalls()`.
+     * The console line used to be emitted here and is now at the **top of the
+     * next frame**, beside the stall record, for the reason written out there.
+     * In short: `frameProfile.stop()` is 240 lines below this point, so nothing
+     * read from the profiler at this line can describe the frame it is printed
+     * against.
      */
-    if (frameMs > LONG_FRAME_MS && now - lastLongFrameAt > 5000) {
-      lastLongFrameAt = now;
-      const r = frameProfile.report();
-      const worst = r.sections
-        .slice(0, 4)
-        .map((sec) => `${sec.name} ${sec.worstMs.toFixed(1)}ms`)
-        .join(', ');
-      const s = stalls.summarise();
-      console.warn(
-        `[frame] ${frameMs.toFixed(0)} ms — worst sections: ${worst || '(none)'}` +
-          `  |  pipelines compiled in stalled frames so far: ${pipelineWatch.pipelines}` +
-          ` over ${pipelineWatch.frames} frame(s), worst ${pipelineWatch.worstMs.toFixed(0)} ms` +
-          `  |  compiles ${asyncPipes.compiles} over ${asyncPipes.distinct} keys, ${asyncPipes.objects} objects` +
-          `  |  worst: ${asyncPipes.top(3)}` +
-          `\n[stalls] ${s.line}  |  floor ${stalls.baseline().toFixed(1)} ms  |  sydney.stalls() for the table`,
-      );
-    }
     if (frameDt < 0.2) {
       frameTimes[frameCursor] = frameMs;
       frameCursor = (frameCursor + 1) % frameTimes.length;

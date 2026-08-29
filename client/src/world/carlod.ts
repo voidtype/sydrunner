@@ -1076,10 +1076,23 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
         for (const slot of pool) {
           if (slot === null || !slot.dirty) continue;
           this.warnedNoEnd = true;
+          // **Flush it, then say so.** The warning alone shipped, and while it
+          // was true it was also useless to the player: their near-field cars
+          // stayed gone until a reload. `begin()` has already found the dirty
+          // slot and `end()` is four lines of `needsUpdate`, so upload it. The
+          // car arrives one frame late instead of never, and that holds no
+          // matter which path leaked -- the frame loop's own `update -> end`
+          // window is clean, so whatever dirties a slot outside it is doing so
+          // from a callback nobody has found yet. This turns a silent
+          // catastrophe into a diagnostic, which is the correct shape for a
+          // bug whose cause is still open.
+          this.end();
           console.error(
-            '[carlod] end() was not called last frame: claimed cars have matrices ' +
-              'that were never uploaded and are drawing as degenerate points, with ' +
-              'their boxes suppressed. Call carModels.end() after trafficMovers.update().',
+            '[carlod] end() was not called last frame: claimed cars had matrices ' +
+              'that were never uploaded and would have drawn as degenerate points ' +
+              'with their boxes suppressed. Flushed them here, one frame late. ' +
+              'Something is claiming or revoking outside the frame\'s ' +
+              'trafficMovers.update() -> carModels.end() window.',
           );
           break;
         }

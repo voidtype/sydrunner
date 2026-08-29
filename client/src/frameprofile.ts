@@ -425,25 +425,57 @@ export class FrameProfile {
         overheadUs: 0, grainUs: CLOCK_GRAIN_MS * 1000, lifetimeFrames: 0,
       };
     }
-    let worstRow = 0;
+    /*
+     * **The row that is still being written is not in the window.**
+     *
+     * It used to be, and it cost the stall investigation a week. `begin()`
+     * zeroes `ring[row]` and the frame refills it live, but `totals[row]` is
+     * only written by `stop()` -- so mid-frame that row carries a *total* from
+     * `WINDOW` frames ago and *sections* from the frame now running. A caller
+     * asking "what did this frame do" got a worst-row chosen from one frame and
+     * a breakdown read from another, with nothing on the line to say so, and
+     * the console printed `269 ms, render 29.3ms` for twenty frames whose
+     * render never took 29.3 ms.
+     *
+     * The overlay loses one frame in 120 and does not care; the single-frame
+     * question was never this method's to answer and is served by `lastMs` and
+     * `lastWorst()`, which `stop()` fills and which are exactly in phase.
+     */
+    const open = this.cursor >= 0 ? this.row : -1;
+    let worstRow = -1;
     let worstMs = -1;
     let sum = 0;
+    let counted = 0;
     for (let r = 0; r < n; r++) {
+      if (r === open) continue;
       const t = this.totals[r];
       sum += t;
+      counted++;
       if (t > worstMs) {
         worstMs = t;
         worstRow = r;
       }
     }
+    // The first frame of a session, asked mid-flight: there is no closed frame
+    // to report yet. An empty report is the honest answer; the alternative is
+    // handing back row zero's zeroes as if they were a measurement.
+    if (counted === 0 || worstRow < 0) {
+      return {
+        frames: 0, meanMs: 0, worstMs: 0, sections: [],
+        overheadUs: this.overheadUs(), grainUs: CLOCK_GRAIN_MS * 1000, lifetimeFrames: this.frames,
+      };
+    }
     const worstBase = worstRow * FRAME_SECTION_COUNT;
     const sections: SectionRow[] = [];
     for (let i = 0; i < FRAME_SECTION_COUNT; i++) {
       let colSum = 0;
-      for (let r = 0; r < n; r++) colSum += this.ring[r * FRAME_SECTION_COUNT + i];
+      for (let r = 0; r < n; r++) {
+        if (r === open) continue;
+        colSum += this.ring[r * FRAME_SECTION_COUNT + i];
+      }
       sections.push({
         name: FRAME_SECTION_NAMES[i],
-        meanMs: colSum / n,
+        meanMs: colSum / counted,
         worstMs: this.ring[worstBase + i],
       });
     }
@@ -453,8 +485,8 @@ export class FrameProfile {
     // down the second column rather than a second sort.
     sections.sort((a, b) => b.meanMs - a.meanMs);
     return {
-      frames: n,
-      meanMs: sum / n,
+      frames: counted,
+      meanMs: sum / counted,
       worstMs,
       sections,
       overheadUs: this.overheadUs(),
@@ -665,6 +697,59 @@ export function verifyFrameProfile(): string[] {
     spin(3);
     if (p.totalOf(FSEC.render) !== parked) {
       failures.push('`stop` left the cursor open; the gap between frames is being charged to a section.');
+    }
+
+    // --- A frame in flight is not in the window.
+    //
+    // **This is the bug that cost the stall investigation a week**, encoded so
+    // it cannot come back quietly. Mid-frame, `begin` has zeroed `ring[row]`
+    // but `totals[row]` still holds the frame from `WINDOW` ago -- so a scan
+    // that includes the open row can pick a worst out of a stale total and
+    // read its breakdown out of a row being refilled live. The console printed
+    // `[frame] 269 ms, render 29.3ms` for twenty frames whose render never took
+    // 29.3 ms, and the whole team read it as time stolen by the browser.
+    //
+    // **It only appears once the ring has wrapped**, which is why the first
+    // version of this check passed against the broken code: before the wrap
+    // `row` equals `filled` and is already outside the scan. So fill it.
+    //
+    // The assertion is the invariant that actually failed, not a frame count:
+    // a breakdown must add up to the total it is breaking down.
+    {
+      const q = new FrameProfile();
+      // The heavy frame goes in row 0, which is the row the wrap lands on.
+      q.begin();
+      q.at(FSEC.render);
+      spin(4);
+      q.stop();
+      for (let i = 1; i < WINDOW; i++) {
+        q.begin();
+        q.at(FSEC.sim);
+        // One honest peak inside the window, so the fixed path has a real frame
+        // to report rather than passing on a window of zeroes.
+        if (i === 5) spin(1);
+        q.stop();
+      }
+      q.begin();
+      q.at(FSEC.hud);
+      const mid = q.report();
+      const breakdown = mid.sections.reduce((a, sec) => a + sec.worstMs, 0);
+      if (Math.abs(breakdown - mid.worstMs) > 0.3) {
+        failures.push(
+          `Mid-frame, \`report\` called the worst frame ${mid.worstMs.toFixed(3)} ms and broke it down ` +
+            `into ${breakdown.toFixed(3)} ms. The frame still being written is in the window, so its ` +
+            `stale total picked a row whose sections have been zeroed -- one line, two frames, no warning.`,
+        );
+      }
+      if (mid.frames !== WINDOW - 1) {
+        failures.push(`Mid-frame, \`report\` folded ${mid.frames} frames; ${WINDOW - 1} have closed.`);
+      }
+      q.stop();
+      // And once it closes it counts. Permanently dropping the newest frame
+      // would be the opposite mistake and just as quiet.
+      if (q.report().frames !== WINDOW) {
+        failures.push(`After \`stop\`, the window holds ${q.report().frames} of ${WINDOW}; a closed frame was dropped.`);
+      }
     }
   }
 

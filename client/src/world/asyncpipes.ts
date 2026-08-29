@@ -44,6 +44,29 @@
  * Worth measuring before building it.
  */
 
+/**
+ * How many distinct values of one cache-key half to keep before giving up.
+ *
+ * The question this probe answers is "one, or many" -- nobody needs the 963rd
+ * value of a key that has already proved it moves. A cap keeps a five-minute
+ * ride from turning a diagnostic into the leak it is diagnosing.
+ */
+const HALF_CAP = 512;
+
+/**
+ * A three `RenderObject`, seen through the two methods that decide its fate.
+ *
+ * `getCacheKey()` is `getMaterialCacheKey() + getDynamicCacheKey()`, and which
+ * of the two moves is the whole question -- they fail for completely different
+ * reasons and the fixes have nothing in common. Optional because the checks
+ * stub this interface, and because a three release that renames them should
+ * cost a blank column rather than a crash.
+ */
+interface CacheKeyed {
+  getMaterialCacheKey?: () => number;
+  getDynamicCacheKey?: () => number;
+}
+
 /** The pieces of the renderer this needs, named so a check can stub them. */
 export interface PipelineHost {
   /**
@@ -107,6 +130,36 @@ export class AsyncPipelines {
    * is visible, and nothing is held.
    */
   private readonly seen = new Set<unknown>();
+  /**
+   * **The measurement this file has been asking for since its header was
+   * written**, and it is a measurement rather than a fifth hypothesis on
+   * purpose: four rounds of reasoning about which thing creates these pipelines
+   * produced four confident answers and two of them were wrong.
+   *
+   * three's key is `getMaterialCacheKey() + getDynamicCacheKey()`. Sampled at
+   * the miss, per material, as *how many distinct values each half has taken*.
+   * One and many is the answer; which one is many says where to look:
+   *
+   *   - **mat many, dyn one** -- a material property, a texture sampler or the
+   *     geometry's attribute set differs per object. Look at what builds them.
+   *   - **mat one, dyn many** -- `_nodes.getCacheKey(scene, lightsNode)`, the
+   *     camera, `receiveShadow`, or `renderer.contextNode`. Note that the
+   *     shadow pass *skips* the nodes term (`RenderObject.js`: `if
+   *     (material.isShadowPassMaterial !== true)`), so a session where
+   *     `ShadowMaterial` goes flat while `foliage` and `car_paint` keep
+   *     climbing already points here -- this says it out loud instead.
+   *   - **both one** -- the key is stable and the misses are upstream, in
+   *     `Pipelines`' own stage lookup rather than in the render object.
+   */
+  private readonly halves = new Map<string, { mat: Set<number>; dyn: Set<number> }>();
+  /**
+   * Set once if reading a half ever throws, and never cleared.
+   *
+   * A probe that can take the frame down is worse than no probe. three renames
+   * things between releases and this reaches for two of its methods by name; if
+   * that ever stops working the column goes blank and the game keeps running.
+   */
+  private probeDead = false;
 
   get skipped(): number {
     return this.skippedDraws;
@@ -150,6 +203,58 @@ export class AsyncPipelines {
     const inst = ro.object?.isInstancedMesh === true ? '[inst]' : '';
     const key = `${base}${layout}${inst}`;
     this.tally.set(key, (this.tally.get(key) ?? 0) + 1);
+    this.sampleHalves(key, renderObject as CacheKeyed);
+  }
+
+  /**
+   * Record which values the two halves of the cache key took on this miss.
+   *
+   * Called on a compile only -- a handful a second at worst -- so the property
+   * walk inside `getMaterialCacheKey` is affordable here in a way it would not
+   * be per draw. three's own scratch arrays are cleaned up at the end of each
+   * of these calls, so reading them again from outside its render loop is safe.
+   */
+  private sampleHalves(key: string, ro: CacheKeyed): void {
+    if (this.probeDead) return;
+    const mat = ro.getMaterialCacheKey;
+    const dyn = ro.getDynamicCacheKey;
+    if (typeof mat !== 'function' || typeof dyn !== 'function') return;
+    let half = this.halves.get(key);
+    if (half === undefined) {
+      half = { mat: new Set<number>(), dyn: new Set<number>() };
+      this.halves.set(key, half);
+    }
+    try {
+      if (half.mat.size < HALF_CAP) half.mat.add(mat.call(ro));
+      if (half.dyn.size < HALF_CAP) half.dyn.add(dyn.call(ro));
+    } catch {
+      this.probeDead = true;
+    }
+  }
+
+  /**
+   * The worst offender's key split, as one short phrase.
+   *
+   * One phrase because the owner pastes this line into chat and a console that
+   * is itself the problem has already been made once in this file's history.
+   * The worst offender rather than all of them for the same reason: whatever is
+   * compiling 963 pipelines under one key is the thing to fix, and the other
+   * seventy-four keys will almost certainly turn out to have the same cause.
+   */
+  drift(): string {
+    let worstKey = '';
+    let worstN = 0;
+    for (const [k, n] of this.tally) {
+      if (n > worstN) {
+        worstN = n;
+        worstKey = k;
+      }
+    }
+    const half = this.halves.get(worstKey);
+    if (half === undefined) return 'drift: unmeasured';
+    const name = worstKey.replace(/\{[^}]*\}/, '');
+    const n = (set: Set<number>): string => (set.size >= HALF_CAP ? `${HALF_CAP}+` : `${set.size}`);
+    return `drift: ${name} mat ${n(half.mat)} / dyn ${n(half.dyn)} over ${worstN}`;
   }
 
   /** The `n` worst offenders, most first, as one short line. */
@@ -325,5 +430,69 @@ export function verifyAsyncPipes(): string[] {
   // An object with no pipeline at all is not this gate's business either.
   backend.draw({}, null);
   if (drawn.length !== 3) failures.push('an object with no pipeline was swallowed.');
+
+  // --- The drift probe tells the two halves apart.
+  //
+  // This is the whole point of it. A probe that says "something moves" is the
+  // four rounds of argument this file's header records; a probe that says
+  // *which half* moves is a place to look. Both directions are asserted,
+  // because one that always blames the dynamic half would have passed a test
+  // that only ever moved the dynamic half.
+  {
+    const drifting = (mat: () => number, dyn: () => number, n: number): string => {
+      const g = new AsyncPipelines();
+      const inner = {
+        getForRender: (_ro: unknown, promises?: unknown) => {
+          if (Array.isArray(promises)) promises.push(Promise.resolve());
+          return { id: 'p' };
+        },
+      };
+      const host = { _pipelines: inner, backend: { draw: () => {}, get: () => ({}) } };
+      g.install(host);
+      for (let k = 0; k < n; k++) {
+        inner.getForRender({ material: { name: 'probe' }, getMaterialCacheKey: mat, getDynamicCacheKey: dyn }, null);
+      }
+      return g.drift();
+    };
+
+    let tick = 0;
+    const moving = drifting(() => 7, () => tick++, 10);
+    if (!moving.includes('mat 1 / dyn 10')) {
+      failures.push(`a moving dynamic half read as "${moving}"; the probe cannot name the half that drifts.`);
+    }
+    tick = 0;
+    const other = drifting(() => tick++, () => 7, 10);
+    if (!other.includes('mat 10 / dyn 1')) {
+      failures.push(`a moving material half read as "${other}"; the probe blames the dynamic half either way.`);
+    }
+    const stable = drifting(() => 7, () => 7, 10);
+    if (!stable.includes('mat 1 / dyn 1')) {
+      failures.push(`a stable key read as "${stable}"; the probe invents drift that is not there.`);
+    }
+    if (!stable.includes('over 10')) failures.push(`the compile count is missing from "${stable}".`);
+  }
+
+  // --- A three that renamed these methods costs a blank column, not a crash.
+  {
+    const g = new AsyncPipelines();
+    const inner = {
+      getForRender: (_ro: unknown, promises?: unknown) => {
+        if (Array.isArray(promises)) promises.push(Promise.resolve());
+        return { id: 'p' };
+      },
+    };
+    g.install({ _pipelines: inner, backend: { draw: () => {}, get: () => ({}) } });
+    inner.getForRender({ material: { name: 'plain' } }, null);
+    if (g.drift() !== 'drift: unmeasured') {
+      failures.push(`a render object with no cache-key methods reported "${g.drift()}" instead of standing down.`);
+    }
+    // And one that throws must not take the frame with it.
+    const boom = () => {
+      throw new Error('three moved on');
+    };
+    inner.getForRender({ material: { name: 'boom' }, getMaterialCacheKey: boom, getDynamicCacheKey: boom }, null);
+    if (g.compiles !== 2) failures.push('a throwing cache-key probe lost a compile from the count.');
+  }
+
   return failures;
 }
