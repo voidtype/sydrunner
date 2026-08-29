@@ -10566,6 +10566,7 @@ async function main(): Promise<void> {
           `  |  pipelines compiled in stalled frames so far: ${pipelineWatch.pipelines}` +
           ` over ${pipelineWatch.frames} frame(s), worst ${pipelineWatch.worstMs.toFixed(0)} ms` +
           `  |  compiles ${asyncPipes.compiles} over ${asyncPipes.distinct} keys, ${asyncPipes.objects} objects` +
+          `, ${asyncPipes.deferrals} deferred` +
           `  |  ${asyncPipes.drift()}` +
           `  |  worst: ${asyncPipes.top(3)}` +
           `\n[stalls] ${s.line}  |  floor ${stalls.baseline().toFixed(1)} ms  |  sydney.stalls() for the table`,
@@ -10580,6 +10581,18 @@ async function main(): Promise<void> {
     // section. `begin` is before the first line of real work rather than before
     // `performance.now()` above, so the clock read this loop already makes is
     // not charged twice.
+    /*
+     * The frame's compile budget. See `world/asyncpipes.COMPILE_BUDGET_MS`.
+     *
+     * A tile entering the frustum used to spring every pipeline it needed on
+     * whichever frame happened to be drawing when it did: the ride log has
+     * single frames that started 82, 104 and 58 compiles and took 533, 404 and
+     * 638 ms for it. The count cannot come down -- three keys an instanced
+     * draw on `object.uuid` because the instance matrix is baked into that
+     * mesh's own node graph, so two tiles' trees genuinely need two shaders --
+     * but nothing says they must all be built in the same frame.
+     */
+    asyncPipes.frame();
     frameProfile.begin();
     frameProfile.at(FSEC.input);
     input.forward = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);

@@ -54,6 +54,23 @@
 const HALF_CAP = 512;
 
 /**
+ * How much of a frame may be spent starting pipeline compiles, milliseconds.
+ *
+ * **Why a clock and not a count.** A five-minute ride recorded single frames
+ * that started 82, 104 and 58 compiles, costing 533, 404 and 638 ms -- 6.5, 3.9
+ * and 11 ms each. A count budget would have been three times too generous on
+ * one of those frames and three times too mean on another; a clock is right on
+ * all three without being told what a compile costs on this machine.
+ *
+ * Six milliseconds against a 24 ms median frame is a quarter of it, which is
+ * visible as a slower fade-in and is not visible as a stall. That is the trade
+ * this file already made once -- its header says a newly seen object may appear
+ * a frame or two late -- and this is the same trade, held to a budget instead
+ * of taken all at once.
+ */
+const COMPILE_BUDGET_MS = 6;
+
+/**
  * A three `RenderObject`, seen through the two methods that decide its fate.
  *
  * `getCacheKey()` is `getMaterialCacheKey() + getDynamicCacheKey()`, and which
@@ -160,9 +177,59 @@ export class AsyncPipelines {
    * that ever stops working the column goes blank and the game keeps running.
    */
   private probeDead = false;
+  /**
+   * Milliseconds left in this frame's compile budget.
+   *
+   * **Open until the first frame asks for it, and that is not a detail.** Boot
+   * renders outside the animation loop -- the ground-first pass, the shadow
+   * warm, the precompiles -- and those reach `_renderObjectDirect` with a null
+   * promise array, exactly like a frame does. Starting at zero would defer
+   * every one of them, and a deferred draw is a draw that does not happen: the
+   * world would come up empty and stay that way until `frame()` was first
+   * called, which is after the boot it was meant to warm.
+   */
+  private budgetMs = Infinity;
+  /**
+   * Cache keys that have already produced a compile, so a *second* sighting is
+   * known to be free before three is asked.
+   *
+   * The budget is unenforceable without this. A miss only announces itself
+   * after `getForRender` returns a non-empty promise sink -- by which point the
+   * WGSL has been built and the frame has already paid. `initialCacheKey` is a
+   * plain field on the render object, set in its constructor, so reading it
+   * costs nothing and turns "did this cost us" into "will this cost us".
+   *
+   * A key that is not in here may still turn out to be a cache *hit* -- two
+   * render objects can share a key. Deferring one of those costs a single frame
+   * of invisibility and corrects itself the moment the first one through adds
+   * the key, which is the right way round for a guess this cheap to be wrong.
+   */
+  private readonly compiledKeys = new Set<number>();
+  /** Draws deferred because the frame's compile budget was spent. */
+  private deferredDraws = 0;
+  /** Render objects this frame declined to build. Weak: three owns them. */
+  private readonly deferred = new WeakSet<object>();
 
   get skipped(): number {
     return this.skippedDraws;
+  }
+
+  /** Draws deferred because the frame ran out of compile budget. */
+  get deferrals(): number {
+    return this.deferredDraws;
+  }
+
+  /**
+   * Open a frame's compile budget. Called once at the top of the frame.
+   *
+   * Not called at all during boot, and it must not be: `compileAsync` passes
+   * its own promise array and is routed straight through below, so the warm-up
+   * still compiles everything it asks for as fast as it can. The budget governs
+   * only the compiles nobody asked for -- the ones a tile entering the frustum
+   * springs on the frame that happened to be drawing when it did.
+   */
+  frame(budgetMs = COMPILE_BUDGET_MS): void {
+    this.budgetMs = budgetMs;
   }
 
   get compiles(): number {
@@ -298,12 +365,42 @@ export class AsyncPipelines {
       // Nothing here awaits it -- the point is not to. The pipeline object is
       // cached synchronously either way, so the next frame finds it and the
       // draw guard below decides whether it is ready to use.
+      /*
+       * --- The budget.
+       *
+       * `initialCacheKey` is read *before* three is asked, because a miss only
+       * announces itself afterwards and by then the WGSL is built and the frame
+       * has paid. A key this gate has already seen go through is known to be
+       * cached, so it is never charged and never deferred -- which is every
+       * object in a settled scene, every frame.
+       *
+       * Three's own return value is discarded by `_renderObjectDirect`, which
+       * calls this for its side effect on `renderObject.pipeline`. So declining
+       * is safe here and is caught by the draw guard below.
+       */
+      const ro = renderObject as { initialCacheKey?: number };
+      const key = ro.initialCacheKey;
+      const known = key === undefined || this.compiledKeys.has(key);
+      if (!known && this.budgetMs <= 0) {
+        this.deferredDraws++;
+        this.deferred.add(renderObject as object);
+        return undefined;
+      }
+
       const sink: unknown[] = [];
+      // The clock is only read for a possible miss. A settled frame pays
+      // nothing for this gate beyond a `Set.has`.
+      const began = known ? 0 : performance.now();
       const pipeline = innerGet(renderObject, sink);
+      if (!known) this.budgetMs -= performance.now() - began;
       if (sink.length > 0) {
         this.started += sink.length;
         this.note(renderObject);
       }
+      // Whether or not it compiled, this key has now been through three and is
+      // cached; a later sighting must not be charged for it.
+      if (key !== undefined) this.compiledKeys.add(key);
+      this.deferred.delete(renderObject as object);
       if (pipeline !== null && pipeline !== undefined) this.seen.add(pipeline);
       return pipeline;
     };
@@ -311,6 +408,15 @@ export class AsyncPipelines {
     const backend = backendEarly;
     const innerDraw = backend.draw.bind(backend);
     backend.draw = (renderObject: unknown, info: unknown): void => {
+      // **Deferred by the budget.** three was never asked to build this one, so
+      // `renderObject.pipeline` is whatever it was -- `undefined` on a first
+      // sighting, which `setPipeline` turns into a validation error that ends
+      // the frame. Exactly the hazard the still-compiling case below exists
+      // for, arrived at from the other direction.
+      if (this.deferred.has(renderObject as object)) {
+        this.skippedDraws++;
+        return;
+      }
       const ro = renderObject as { pipeline?: unknown };
       const data = ro.pipeline === undefined ? undefined : backend.get(ro.pipeline);
       // `error` is three's own business -- it returns early on that itself, and
@@ -492,6 +598,103 @@ export function verifyAsyncPipes(): string[] {
     };
     inner.getForRender({ material: { name: 'boom' }, getMaterialCacheKey: boom, getDynamicCacheKey: boom }, null);
     if (g.compiles !== 2) failures.push('a throwing cache-key probe lost a compile from the count.');
+  }
+
+  // --- The compile budget bounds one frame and starves nothing.
+  //
+  // Four properties, and the gate is dangerous without any one of them: it must
+  // stop, it must not stop everything, a deferred object must not be drawn (an
+  // undefined pipeline ends the frame on a validation error), and a scene that
+  // has settled must never be throttled by its own history.
+  {
+    const g = new AsyncPipelines();
+    let built = 0;
+    const spin = (ms: number): void => {
+      const until = performance.now() + ms;
+      let sink = 0;
+      while (performance.now() < until) sink++;
+      if (sink === -1) throw new Error('unreachable');
+    };
+    const inner = {
+      getForRender: (_ro: unknown, promises?: unknown) => {
+        if (Array.isArray(promises)) promises.push(Promise.resolve());
+        built++;
+        spin(3);
+        return { id: built };
+      },
+    };
+    const drawnHere: unknown[] = [];
+    const back = {
+      draw: (ro: unknown, _i: unknown) => {
+        drawnHere.push(ro);
+      },
+      get: () => ({ pipeline: { gpu: true } }),
+    };
+    g.install({ _pipelines: inner, backend: back });
+
+    // Ten first sightings, 6 ms of budget, 3 ms each.
+    g.frame(6);
+    const objs = Array.from({ length: 10 }, (_, i) => ({ initialCacheKey: i, pipeline: undefined }));
+    for (const o of objs) inner.getForRender(o, null);
+    if (built > 3) {
+      failures.push(`a 6 ms budget built ${built} pipelines at 3 ms each; a frame is not bounded and can still stall.`);
+    }
+    if (built === 0) failures.push('a 6 ms budget built nothing; the gate is shut rather than bounded.');
+    if (g.deferrals === 0) failures.push('nothing was deferred on an exhausted budget; the budget is not enforced.');
+
+    // The deferred ones must not be drawn.
+    const last = objs[objs.length - 1];
+    back.draw(last, null);
+    if (drawnHere.includes(last)) {
+      failures.push('a deferred object was drawn; setPipeline(undefined) ends the frame on a validation error.');
+    }
+
+    // The next frame reopens it, or deferred work never arrives at all.
+    const before = built;
+    g.frame(6);
+    for (const o of objs) inner.getForRender(o, null);
+    if (built <= before) failures.push('`frame` did not reopen the budget; a deferred object would never be built.');
+
+    // A key already through the gate is free forever, budget or no budget.
+    // Without this a settled scene would stop drawing on its twentieth frame.
+    g.frame(0);
+    const settled = built;
+    inner.getForRender(objs[0], null);
+    if (built === settled) failures.push('a known key was refused with an empty budget; a settled scene would go blank.');
+
+    // And the warm-up is never budgeted -- it passes its own promise array.
+    g.frame(0);
+    const boot = built;
+    inner.getForRender({ initialCacheKey: 9999 }, []);
+    if (built === boot) failures.push('the warm-up was refused by the frame budget; boot would compile nothing.');
+
+    // --- Before the first frame, the gate is open.
+    //
+    // Boot renders outside the animation loop and reaches this with a null
+    // promise array, indistinguishable from a frame. A gate that starts closed
+    // defers all of them, and a deferred draw does not happen: the world comes
+    // up empty and stays empty until the first `frame()` call, which is after
+    // the boot it was supposed to warm.
+    {
+      const fresh = new AsyncPipelines();
+      let madeAtBoot = 0;
+      const bootInner = {
+        getForRender: (_ro: unknown, promises?: unknown) => {
+          if (Array.isArray(promises)) promises.push(Promise.resolve());
+          madeAtBoot++;
+          return { id: madeAtBoot };
+        },
+      };
+      fresh.install({ _pipelines: bootInner, backend: { draw: () => {}, get: () => ({}) } });
+      for (let i = 0; i < 40; i++) bootInner.getForRender({ initialCacheKey: 1000 + i }, null);
+      if (madeAtBoot !== 40) {
+        failures.push(
+          `before the first frame the gate built ${madeAtBoot} of 40; boot renders outside the animation ` +
+            `loop would be deferred and the world would come up empty.`,
+        );
+      }
+      if (fresh.deferrals !== 0) failures.push('the gate deferred boot work before any frame had opened a budget.');
+    }
   }
 
   return failures;
