@@ -212,6 +212,59 @@ export const RIDE_URL = '/audio/rail/trainride.m4a';
 export const RIDE_SECONDS = 79.18;
 
 /**
+ * Where in the recording a leg of a journey joins it.
+ *
+ * The bed used to be positioned at `t mod length` alone, which is right about
+ * the thing that matters -- two people in one carriage are on the same rattle,
+ * because both evaluated the same function at the same millisecond -- and wrong
+ * about the thing a rider notices. Phase-locked to the wall clock, the loop
+ * comes round to the same place at the same time of day forever, and a run from
+ * Central to Epping crosses the same seam in the recording at the same point of
+ * every leg. Seventy-nine seconds is short enough to learn.
+ *
+ * So the clock still drives it, and a hash of *which leg of which trip this is*
+ * displaces it. `key` is the ride key -- trip, direction and the call the train
+ * is running towards -- so:
+ *
+ *   - every client in the carriage still computes the same instant, because
+ *     nothing here is random in the sense of `Math.random`; it is random in the
+ *     sense the city's traffic and its footy crowds are, a pure function of
+ *     identity that no two legs agree on;
+ *   - somebody who boards at Redfern still joins where the carriage already is,
+ *     because the clock term is untouched;
+ *   - and the leg out of Redfern enters the file three quarters of the way in
+ *     while the leg before it entered it at nine seconds.
+ *
+ * The top 24 bits of the key, because the low ones carry the leg counter and
+ * consecutive legs would land a few hundred milliseconds apart.
+ */
+export function rideEntry(key: number, t: number): number {
+  const jump = ((key >>> 8) / 0x1000000) * RIDE_SECONDS;
+  const at = (t + jump) % RIDE_SECONDS;
+  return at < 0 ? at + RIDE_SECONDS : at;
+}
+
+/**
+ * Which call the train is running towards: the number of arrivals already past.
+ *
+ * `dir.arrivals` is sorted, so this is the same upper-bound search `dwellElapsed`
+ * does over the phases, and it changes exactly once per leg -- during the dwell,
+ * where `ridePlays` has the bed stood down anyway. That is what makes it safe to
+ * mix into the ride key: the key moves only in silence.
+ */
+function callIndexAt(dir: RailDirection, age: number): number {
+  const a = dir.arrivals;
+  let lo = 0;
+  let hi = a.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (a[mid] <= age) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+/**
  * Does the carriage bed play?
  *
  * Stated as its own function of four booleans because the owner's rule is
@@ -607,9 +660,14 @@ export function railAnnounceMix(
           // and no acceleration. A train braking into a platform is still
           // moving and still sounds like it.
           rideUnderway = dwellElapsed(bake, dir, age) === 0;
-          // Stable for one trip, so the bed is not restarted every frame; zero
+          // Stable for one leg, so the bed is not restarted every frame; zero
           // is `announceRelease`'s "nothing playing", so it must not collide.
-          rideKey = (Math.imul(dir.line.id.length + 1, 0x9e3779b1) ^ (trip * 2654435761)) >>> 0 || 1;
+          // The leg is in it because `rideEntry` wants a different entry point
+          // for every hop, and it only ever changes inside a dwell.
+          const leg = callIndexAt(dir, age);
+          let h = (Math.imul(dir.line.id.length + 1, 0x9e3779b1) ^ (trip * 2654435761)) >>> 0;
+          h = Math.imul(h ^ (leg + 1), 0x85ebca6b) >>> 0;
+          rideKey = (h ^ (h >>> 13)) >>> 0 || 1;
         }
         // Once for both kinds: in the 2.4 s they overlap they are the same train
         // standing in the same place.
@@ -646,7 +704,7 @@ export function railAnnounceMix(
   if (ridePlays(aboard !== null, rideUnderway, out.arrive.active, out.depart.active)) {
     out.ride.active = true;
     out.ride.key = rideKey;
-    out.ride.offset = t % RIDE_SECONDS;
+    out.ride.offset = rideEntry(rideKey, t);
     out.ride.distance = 0;
     out.ride.inside = true;
     out.ride.loop = true;
@@ -807,6 +865,34 @@ export function verifyRideBed(): string[] {
   }
   if (RIDE_SECONDS <= 0 || !Number.isFinite(RIDE_SECONDS)) {
     failures.push(`RIDE_SECONDS is ${RIDE_SECONDS}; the loop position is a modulo by it.`);
+  }
+
+  // The entry point. In range for every key, because `source.start` with an
+  // offset past the buffer plays silence and the rider hears a train that
+  // stopped making noise; and spread across the file, because a jump that
+  // clusters is the phase-lock this replaced.
+  const buckets = new Set<number>();
+  let spread = 0;
+  for (let i = 0; i < 512; i++) {
+    const key = (Math.imul(i + 1, 0x9e3779b1) ^ (i * 2654435761)) >>> 0 || 1;
+    const at = rideEntry(key, 1234.5);
+    if (!(at >= 0 && at < RIDE_SECONDS)) {
+      failures.push(`rideEntry(${key}) is ${at}, outside [0, ${RIDE_SECONDS}).`);
+      break;
+    }
+    if (rideEntry(key, 1234.5) !== at) {
+      failures.push('rideEntry is not a function of its arguments; a carriage would disagree with itself.');
+      break;
+    }
+    buckets.add(Math.floor((at / RIDE_SECONDS) * 8));
+    spread++;
+  }
+  if (spread === 512 && buckets.size < 8) {
+    failures.push(`512 legs entered the recording in ${buckets.size} of 8 places; the jump is not spreading.`);
+  }
+  // Two legs of one trip must not land together, which is the whole point.
+  if (rideEntry(1, 0) === rideEntry(2, 0)) {
+    failures.push('consecutive legs enter the recording at the same second.');
   }
   return failures;
 }
