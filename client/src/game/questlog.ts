@@ -55,6 +55,7 @@ import {
   stepLabel,
   type ContentBundle,
   type PlayerFacts,
+  type Quest,
   type QuestCursors,
   type QuestStanding,
 } from './questmodel.ts';
@@ -125,8 +126,19 @@ export function questLogRows(
     rows.push({ kind, label, value, questId, rangeM, standing });
   };
 
+  /*
+   * The pack, indexed once.
+   *
+   * This was `bundle.quests.find(...)` per row, which was fine at a hundred and
+   * nine quests and is a linear scan of two thousand per row now -- fifty rows
+   * three times a second, on the frame thread, while the panel is open. The map
+   * is built once per draw and thrown away with it.
+   */
+  const questById = new Map<string, Quest>();
+  for (const q of bundle.quests) questById.set(q.id, q);
+
   const rangeOf = (id: string): number => {
-    const quest = bundle.quests.find((q) => q.id === id);
+    const quest = questById.get(id);
     if (quest === undefined) return -1;
     const aim = questAim(quest, bundle.npcs, cursors[id]);
     if (aim === null) return -1;
@@ -176,7 +188,7 @@ export function questLogRows(
       if (giver === undefined) continue;
       for (const id of byGiver.get(giver.id) ?? []) {
         if (cursors[id] !== undefined) continue; // already in section 1
-        const quest = bundle.quests.find((q) => q.id === id);
+        const quest = questById.get(id);
         if (quest === undefined) continue;
         const standing = questStanding(quest, facts, cursors);
         if (standing !== 'available') continue;
