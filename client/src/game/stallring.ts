@@ -74,8 +74,31 @@
  * be wrong, so they are what `verifyStallRing` checks on both boot lists.
  */
 
-/** Frames at or over this are recorded. Four fifths of a 30 Hz frame. */
-export const STALL_MS = 25;
+/**
+ * The floor under the stall threshold, milliseconds.
+ *
+ * **An absolute threshold was wrong and the first session proved it in seven
+ * seconds.** 25 ms was chosen as "four fifths of a 30 Hz frame" on the
+ * assumption that an ordinary frame is 16. On the owner's machine the *median*
+ * frame is 29 ms, so every frame qualified, the ring filled in 7.2 seconds, and
+ * an instrument built to find a ten-second period could not span ten seconds.
+ *
+ * So the threshold is relative to the machine and this is only its floor: on a
+ * 120 Hz machine a 25 ms frame really is a stall, and no factor applied to a
+ * median of 8 ms should say otherwise.
+ */
+export const STALL_FLOOR_MS = 25;
+
+/**
+ * How much worse than this machine's ordinary frame counts as a stall.
+ *
+ * Two. Not a taste decision: a frame that takes twice as long as its neighbours
+ * is a dropped frame at any refresh rate, which is the thing a player perceives
+ * as a hitch. At the owner's 29 ms median this asks for 58 ms, which would have
+ * recorded the 535 ms freeze and ignored the ninety-five ordinary frames it was
+ * buried in.
+ */
+export const STALL_FACTOR = 2;
 
 /** How many stalls are kept. A bad minute is about sixty. */
 export const STALL_CAPACITY = 96;
@@ -120,6 +143,10 @@ export interface StallRecord {
 
 export interface StallSummary {
   stalls: number;
+  /** This machine's ordinary frame and its tail. A rate problem, not a stutter one. */
+  medianFrameMs: number;
+  p95FrameMs: number;
+  worstFrameMs: number;
   /** Seconds between the first and last stall held. */
   spanS: number;
   /** Mean seconds between consecutive stalls, or -1 with fewer than two. */
@@ -164,6 +191,10 @@ export function percentile(values: readonly number[], p: number): number {
 export class StallRing {
   private readonly gaps: number[] = [];
   private gapAt = 0;
+  /** Every frame's duration, so the threshold can be about *this* machine. */
+  private readonly frames: number[] = [];
+  private frameAt = 0;
+  private worstFrameMs = 0;
   private readonly rows: StallRecord[] = [];
   private cursor = 0;
   private seen = 0;
@@ -172,7 +203,7 @@ export class StallRing {
    * Every frame, whatever happened: the raw gap between what the clock says the
    * frame took and what our sections say they spent.
    */
-  observe(gapMs: number): void {
+  observe(gapMs: number, frameMs = 0): void {
     if (!Number.isFinite(gapMs)) return;
     const v = gapMs > 0 ? gapMs : 0;
     if (this.gaps.length < BASELINE_WINDOW) this.gaps.push(v);
@@ -180,6 +211,32 @@ export class StallRing {
       this.gaps[this.gapAt] = v;
       this.gapAt = (this.gapAt + 1) % BASELINE_WINDOW;
     }
+    if (!Number.isFinite(frameMs) || frameMs <= 0) return;
+    if (frameMs > this.worstFrameMs) this.worstFrameMs = frameMs;
+    if (this.frames.length < BASELINE_WINDOW) this.frames.push(frameMs);
+    else {
+      this.frames[this.frameAt] = frameMs;
+      this.frameAt = (this.frameAt + 1) % BASELINE_WINDOW;
+    }
+  }
+
+  /** This machine's ordinary frame, milliseconds. The threshold is built on it. */
+  medianFrameMs(): number {
+    return percentile(this.frames, 0.5);
+  }
+
+  /**
+   * Is this frame a stall *for this machine*?
+   *
+   * The floor and the factor together: see their notes. Before enough frames
+   * have been seen to have a median, only the floor applies -- which is the
+   * right behaviour for the first four seconds of a session, where a real stall
+   * is worth catching and there is nothing to compare it to.
+   */
+  isStall(frameMs: number): boolean {
+    const median = this.medianFrameMs();
+    const relative = median > 0 ? median * STALL_FACTOR : 0;
+    return frameMs >= Math.max(STALL_FLOOR_MS, relative);
   }
 
   /**
@@ -249,8 +306,20 @@ export class StallRing {
       parts.push(`${Math.round(crossedShare * 100)}% crossed a boundary`);
       parts.push(`mean speed ${meanSpeed.toFixed(1)} m/s`);
     }
+    const medianFrameMs = this.medianFrameMs();
+    // The frame picture goes first, because it is the thing that turned out to
+    // matter and it is a different problem from the stalls: a machine holding
+    // 34 fps has a rate problem, and no amount of stall-hunting fixes it.
+    const fps = medianFrameMs > 0 ? 1000 / medianFrameMs : 0;
+    parts.unshift(`frame ${medianFrameMs.toFixed(0)} ms median (${fps.toFixed(0)} fps)`);
     return {
-      stalls: rows.length, spanS, intervalS, worstMs, byKind,
+      stalls: rows.length, medianFrameMs, p95FrameMs: percentile(this.frames, 0.95),
+      // The worst of both, so the two numbers cannot disagree: a stall in the
+      // ring is by definition a frame, and a summary reporting a worst frame
+      // smaller than its own worst stall would be caught by a reader before it
+      // was caught by a test.
+      worstFrameMs: Math.max(this.worstFrameMs, worstMs),
+      spanS, intervalS, worstMs, byKind,
       stolenMeanMs, crossedShare, meanSpeed, line: parts.join(' | '),
     };
   }
@@ -379,6 +448,51 @@ export function verifyStallRing(): string[] {
     if (s.byKind.stream !== 6) failures.push(`Six streaming stalls classified as ${JSON.stringify(s.byKind)}.`);
     if (!s.line.includes('every 10.0 s')) failures.push(`The summary line does not name the interval: "${s.line}"`);
     if (!s.line.includes('83% crossed')) failures.push(`The summary line does not name the boundary share: "${s.line}"`);
+  }
+
+  /*
+   * --- THE CORRECTION THE FIRST SESSION FORCED.
+   *
+   * A machine whose ordinary frame is 29 ms must not report every frame as a
+   * stall. The first build used an absolute 25 ms and did exactly that: the ring
+   * filled with ninety-five ordinary frames in 7.2 seconds, and the one real
+   * freeze in the session -- 535 ms -- was buried in them.
+   */
+  {
+    const ring = new StallRing();
+    // A laptop holding about 34 fps, which is what the owner's session was.
+    for (let i = 0; i < BASELINE_WINDOW; i++) ring.observe(4, 29 + (i % 5));
+    if (ring.isStall(31)) failures.push('An ordinary frame on a 34 fps machine was recorded as a stall.');
+    if (ring.isStall(57)) failures.push('A frame under twice the median was recorded as a stall.');
+    if (!ring.isStall(535)) failures.push('A 535 ms freeze was not recorded as a stall.');
+    const median = ring.medianFrameMs();
+    if (Math.abs(median - 31) > 2) failures.push(`The median frame read ${median}, not about 31.`);
+  }
+
+  // --- ...and the floor still bites on a fast machine, where 25 ms really is a stall.
+  {
+    const ring = new StallRing();
+    for (let i = 0; i < BASELINE_WINDOW; i++) ring.observe(1, 8);
+    if (ring.isStall(15)) failures.push('A 15 ms frame on a 120 Hz machine was called a stall; twice 8 is 16.');
+    if (!ring.isStall(25)) failures.push('A 25 ms frame on a 120 Hz machine was not a stall; the floor did not bite.');
+  }
+
+  // --- Before there is a median, the floor is the whole rule.
+  {
+    const ring = new StallRing();
+    if (ring.isStall(24)) failures.push('A cold ring called a 24 ms frame a stall.');
+    if (!ring.isStall(26)) failures.push('A cold ring missed a 26 ms frame; the floor must apply from the first frame.');
+  }
+
+  // --- The frame picture reaches the summary, because it is its own problem.
+  {
+    const ring = new StallRing();
+    for (let i = 0; i < BASELINE_WINDOW; i++) ring.observe(4, 29);
+    ring.add(rec({ atMs: 0, frameMs: 535, stolenMs: 504 }));
+    const s = ring.summarise();
+    if (Math.abs(s.medianFrameMs - 29) > 0.01) failures.push(`The summary's median frame read ${s.medianFrameMs}.`);
+    if (s.worstFrameMs !== 535) failures.push(`The worst frame read ${s.worstFrameMs}, not 535.`);
+    if (!s.line.includes('34 fps')) failures.push(`The summary does not lead with the frame rate: "${s.line}"`);
   }
 
   // --- An empty ring says so rather than dividing by zero.

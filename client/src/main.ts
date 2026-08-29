@@ -276,7 +276,7 @@ import { DialogPanel, cursorsFrom, verifyDialogPanel } from './dialog.ts';
 // structurally unable to report time we did not spend, so a stall it blames on
 // `render` may have been a garbage collection that landed there.
 import { MAX_CATCHUP_STEPS, planSteps, verifyFrameStep } from './game/framestep.ts';
-import { STALL_MS, StallRing, verifyStallRing } from './game/stallring.ts';
+import { StallRing, verifyStallRing } from './game/stallring.ts';
 import { BoundaryLog, verifyBoundaryLog } from './world/boundarylog.ts';
 import { QuestTracker, verifyQuestTracker } from './questtracker.ts';
 import { QuestLogPanel, verifyQuestLogPanel } from './questlog.ts';
@@ -10311,8 +10311,18 @@ async function main(): Promise<void> {
   const boundaries = new BoundaryLog(streamer.tileSize);
   /** The previous frame's facts, so a stall can be described by what caused it. */
   const prev = { compiles: 0, tiles: 0, sheets: 0, crossed: '', speed: 0, steps: 0, worst: '' };
-  /** The longest `longtask` the browser has reported since the last frame. */
+  /**
+   * The longest `longtask` the browser has reported, and when it ended.
+   *
+   * **Kept with a timestamp rather than cleared every frame**, which the first
+   * session made necessary: a `PerformanceObserver` callback is itself a task,
+   * so an entry describing a 500 ms block is delivered *after* the block ends --
+   * by which time a per-frame reset has already thrown it away. That is why the
+   * `longt` column was empty beside a 535 ms freeze that was unambiguously the
+   * browser taking the thread.
+   */
   let longtaskMs = 0;
+  let longtaskEndMs = -1e9;
   /** Monotonic readings from the last frame, so the record can carry deltas. */
   let lastCompiles = 0;
   let lastBuiltTiles = 0;
@@ -10326,10 +10336,16 @@ async function main(): Promise<void> {
   try {
     const observer = new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
-        if (entry.duration > longtaskMs) longtaskMs = entry.duration;
+        const end = entry.startTime + entry.duration;
+        if (end > longtaskEndMs || entry.duration > longtaskMs) {
+          longtaskMs = entry.duration;
+          longtaskEndMs = end;
+        }
       }
     });
-    observer.observe({ entryTypes: ['longtask'] });
+    // `buffered`, so an entry the browser recorded before this line ran is not
+    // lost -- boot is exactly when the long tasks are.
+    observer.observe({ type: 'longtask', buffered: true } as PerformanceObserverInit);
   } catch {
     // No long-task support. The stolen-time subtraction still works; it is the
     // corroborating signal that is missing, not the measurement.
@@ -10470,8 +10486,13 @@ async function main(): Promise<void> {
      */
     const rafDelta = now - last;
     const outside = rafDelta - frameProfile.lastMs;
-    stalls.observe(outside);
-    if (rafDelta >= STALL_MS && frameProfile.lastMs > 0) {
+    // **The threshold is relative to this machine**, and the first session is why:
+    // on a laptop whose median frame is 29 ms an absolute 25 ms threshold made
+    // every frame a stall, filled the ring in seven seconds, and left an
+    // instrument built to find a ten-second period unable to span ten seconds.
+    const isStall = stalls.isStall(rafDelta);
+    stalls.observe(outside, rafDelta);
+    if (isStall && frameProfile.lastMs > 0) {
       stalls.add({
         atMs: now,
         frameMs: rafDelta,
@@ -10483,10 +10504,13 @@ async function main(): Promise<void> {
         sheets: prev.sheets,
         crossed: prev.crossed,
         worst: prev.worst,
-        longtaskMs,
+        // Overlapping this stall's interval, with a frame of slack for the
+        // observer's own delivery. See `longtaskEndMs`.
+        longtaskMs: longtaskEndMs >= now - rafDelta - 20 ? longtaskMs : 0,
       });
+      longtaskMs = 0;
+      longtaskEndMs = -1e9;
     }
-    longtaskMs = 0;
 
     const frameDt = Math.min((now - last) / 1000, 0.25);
     last = now;

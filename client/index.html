@@ -621,10 +621,15 @@
          `vh` and not a doubled pixel offset, because "down the screen" is a
          fraction of the screen: at 52 px this was 5% down a laptop and 3% down a
          monitor, and the same absolute nudge would land in two different places.
-         25vh clears the clock and `#heat`'s band at 13% completely, and stops
-         well above the reticle at 50%. */
+
+         **18vh, up from 25** -- "move the quest direction panel up a couple of
+         bits". It still clears the clock and `#heat`'s band at 13%, and it is
+         further from the reticle at 50%, which is the half of the frame the
+         player is actually aiming with. The two short-viewport rules moved with
+         it by the same proportion rather than by the same number of pixels, for
+         the reason above. */
       #waypoint {
-        position: fixed; top: 25vh; left: 50%;
+        position: fixed; top: 18vh; left: 50%;
         transform: translate(-50%, -12px);
         display: flex; align-items: center; gap: 16px;
         padding: 8px 28px 8px 20px;
@@ -822,11 +827,11 @@
            Written out rather than derived: the banner is fading its own
            `transform` and a media query that only moved `top` is the one thing
            that can be changed here without breaking that. */
-        #waypoint, #waypoint.shown { top: 22vh; }
+        #waypoint, #waypoint.shown { top: 16vh; }
       }
       @media (max-width: 640px) {
         #clock { transform: translateX(-50%) scale(.6); transform-origin: top center; }
-        #waypoint, #waypoint.shown { top: 20vh; }
+        #waypoint, #waypoint.shown { top: 15vh; }
         #waypoint-text { font-size: 18px; }
         #waypoint-range { font-size: 16px; }
         #waypoint-needle { width: 30px; height: 30px; }
