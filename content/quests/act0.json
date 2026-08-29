@@ -133,7 +133,7 @@
    ],
    "reward": {
     "cash": 30,
-    "xp": 150,
+    "xp": 130,
     "unlock": [
      "act0:points"
     ]
@@ -159,8 +159,8 @@
     }
    ],
    "reward": {
-    "cash": 35,
-    "xp": 175,
+    "cash": 33,
+    "xp": 140,
     "unlock": [
      "act0:evidence"
     ]
@@ -186,8 +186,8 @@
     }
    ],
    "reward": {
-    "cash": 40,
-    "xp": 210,
+    "cash": 36,
+    "xp": 150,
     "unlock": [
      "act0:travel"
     ]
@@ -218,8 +218,8 @@
     }
    ],
    "reward": {
-    "cash": 55,
-    "xp": 260,
+    "cash": 40,
+    "xp": 180,
     "unlock": [
      "act0:trained"
     ]
