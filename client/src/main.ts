@@ -270,6 +270,14 @@ import { DialogPanel, cursorsFrom, verifyDialogPanel } from './dialog.ts';
 // screen. `game/questhubs.ts` is the piece the other four are built on: it
 // turns the giver dots the maps already draw into named places a player can be
 // told to walk to.
+// WORKSTREAM AT: the stall instruments. Three pure modules on both boot lists
+// and a few lines of wiring here. `docs/instructions.md` phases 1 and 2; the
+// short version is that `FrameProfile` tiles the callback and is therefore
+// structurally unable to report time we did not spend, so a stall it blames on
+// `render` may have been a garbage collection that landed there.
+import { MAX_CATCHUP_STEPS, planSteps, verifyFrameStep } from './game/framestep.ts';
+import { STALL_MS, StallRing, verifyStallRing } from './game/stallring.ts';
+import { BoundaryLog, verifyBoundaryLog } from './world/boundarylog.ts';
 import { QuestTracker, verifyQuestTracker } from './questtracker.ts';
 import { QuestLogPanel, verifyQuestLogPanel } from './questlog.ts';
 import { questHubs, verifyQuestHubs, type QuestHub } from './game/questhubs.ts';
@@ -5116,6 +5124,17 @@ async function main(): Promise<void> {
     ...verifyQuestLog(),
     ...verifyQuestTracker(),
     ...verifyQuestLogPanel(),
+    /*
+     * WORKSTREAM AT. The three pure halves of the stall instruments, all of
+     * which also run on the server's boot list. What they catch: a carry that
+     * spills a stall into the next two frames, a stolen-time floor that reports
+     * the browser's ordinary overhead as theft, and a boundary counter that
+     * mistakes pacing a circle for crossing a ring. None of the three has a
+     * screenshot that says so, and all three are arithmetic.
+     */
+    ...verifyFrameStep(),
+    ...verifyStallRing(),
+    ...verifyBoundaryLog(),
   ];
   if (dialogFailures.length > 0) {
     hud.fatal('Quest content self-checks failed:\n' + dialogFailures.map((f) => '  - ' + f).join('\n'));
@@ -10274,6 +10293,47 @@ async function main(): Promise<void> {
    * `client/src/frameprofile.ts`.
    */
   const frameProfile = new FrameProfile();
+
+  /*
+   * --- WORKSTREAM AT: the stall ring, the boundary log, and the long-task ear.
+   *
+   * `docs/instructions.md` phases 1 and 2. The ring records every frame over
+   * `STALL_MS` with enough beside it to say *what* rather than *which section*:
+   * time stolen outside our own code, pipelines compiled, tiles built, the
+   * distance boundary crossed, and the player's speed. Read it with
+   * `sydney.stalls()`.
+   *
+   * The tile size comes off the world index rather than a constant, because a
+   * build with a different one would otherwise count the wrong boundary and be
+   * wrong in a way nothing could catch.
+   */
+  const stalls = new StallRing();
+  const boundaries = new BoundaryLog(streamer.tileSize);
+  /** The previous frame's facts, so a stall can be described by what caused it. */
+  const prev = { compiles: 0, tiles: 0, sheets: 0, crossed: '', speed: 0, steps: 0, worst: '' };
+  /** The longest `longtask` the browser has reported since the last frame. */
+  let longtaskMs = 0;
+  /** Monotonic readings from the last frame, so the record can carry deltas. */
+  let lastCompiles = 0;
+  let lastBuiltTiles = 0;
+  let lastBuiltSheets = 0;
+  /*
+   * The browser telling us it blocked, which is the one signal `FrameProfile`
+   * cannot produce. Guarded and optional on purpose: Safari does not implement
+   * it, and a client that throws on boot because a browser lacks an observer is
+   * a worse bug than the one being chased.
+   */
+  try {
+    const observer = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        if (entry.duration > longtaskMs) longtaskMs = entry.duration;
+      }
+    });
+    observer.observe({ entryTypes: ['longtask'] });
+  } catch {
+    // No long-task support. The stolen-time subtraction still works; it is the
+    // corroborating signal that is missing, not the measurement.
+  }
   const frameOverlay = new FrameOverlay(new URLSearchParams(location.search).get('perf') === '1');
 
   // --- The scene pass: the half of the warm-up that has to happen down here.
@@ -10393,6 +10453,41 @@ async function main(): Promise<void> {
     const now = performance.now();
     // Clamp the frame delta: a tab that was backgrounded must not run hundreds of
     // simulation steps on return.
+    /*
+     * --- WORKSTREAM AT: the interval that just ended, before anything overwrites it.
+     *
+     * **The stall is recorded here and describes the *previous* frame**, which
+     * is a deliberate change of subject from the reporter this replaces. That
+     * one measured our own callback and therefore could only ever find stalls we
+     * caused; what a player experiences is the gap between frames, and a 200 ms
+     * gap is a freeze whether or not our code was running during it.
+     *
+     * `frameProfile.lastMs` is the previous frame's own sections, so the
+     * difference is time nobody in this codebase spent -- the browser, the
+     * compositor, the driver, a collection. It is never zero even on a healthy
+     * machine, which is why `StallRing` subtracts a rolling floor from it before
+     * anybody is told a number. See that file's header.
+     */
+    const rafDelta = now - last;
+    const outside = rafDelta - frameProfile.lastMs;
+    stalls.observe(outside);
+    if (rafDelta >= STALL_MS && frameProfile.lastMs > 0) {
+      stalls.add({
+        atMs: now,
+        frameMs: rafDelta,
+        stolenMs: stalls.stolen(outside),
+        speed: prev.speed,
+        steps: prev.steps,
+        compiles: prev.compiles,
+        tiles: prev.tiles,
+        sheets: prev.sheets,
+        crossed: prev.crossed,
+        worst: prev.worst,
+        longtaskMs,
+      });
+    }
+    longtaskMs = 0;
+
     const frameDt = Math.min((now - last) / 1000, 0.25);
     last = now;
 
@@ -10484,12 +10579,29 @@ async function main(): Promise<void> {
     rideLean += (leanTarget - rideLean) * Math.min(1, 1 - Math.exp(-frameDt / 0.14));
 
     frameProfile.at(FSEC.sim);
-    accumulator += frameDt;
-    let steps = 0;
-    while (accumulator >= FIXED_DT && steps < 8) {
-      simulate(FIXED_DT);
-      accumulator -= FIXED_DT;
-      steps++;
+    /*
+     * **The carry is clamped now**, and `game/framestep.ts` holds the rule and
+     * the check. The cap on steps always existed and always worked; what did not
+     * exist was a bound on the *leftover*, so a 400 ms stall ran eight steps this
+     * frame, eight the next and eight the one after -- one hitch presented as a
+     * three-frame judder at eight times the simulation cost, which is a better
+     * description of what a player calls a freeze than one long frame is.
+     */
+    const plan = planSteps(accumulator, frameDt, FIXED_DT, MAX_CATCHUP_STEPS);
+    accumulator = plan.carry;
+    const steps = plan.steps;
+    for (let i = 0; i < steps; i++) simulate(FIXED_DT);
+
+    // WORKSTREAM AT: which distance boundary this frame crossed, and how fast the
+    // player is going. Read after the simulation, so the position is the one the
+    // streamer will be pumped with, and stashed for the *next* frame's stall
+    // record -- see the top of this callback for why a stall describes the frame
+    // before it.
+    {
+      const crossing = boundaries.note(player.position.x, player.position.z, frameDt);
+      prev.crossed = crossing.crossed;
+      prev.speed = crossing.speed;
+      prev.steps = steps;
     }
 
     frameProfile.at(FSEC.camera);
@@ -12394,6 +12506,34 @@ async function main(): Promise<void> {
      * five seconds, because a genuinely bad minute must not become a console
      * that is itself the problem.
      */
+    /*
+     * --- WORKSTREAM AT: what this frame did, stashed for the next one's record.
+     *
+     * Deltas rather than totals, because "3,476 pipelines have been compiled
+     * this session" says nothing about the frame that just stuttered and
+     * "2 were compiled on it" says everything. The same for tiles and sheets:
+     * `world/boundarylog.ts` explains why the streamer answers the radius
+     * questions rather than the boundary log re-deriving them.
+     */
+    {
+      const built = streamer.built;
+      prev.compiles = asyncPipes.compiles - lastCompiles;
+      prev.tiles = built.tiles - lastBuiltTiles;
+      prev.sheets = built.sheets - lastBuiltSheets;
+      prev.worst = frameProfile.lastWorst();
+      lastCompiles = asyncPipes.compiles;
+      lastBuiltTiles = built.tiles;
+      lastBuiltSheets = built.sheets;
+    }
+    /*
+     * The console line survives, at its old five-second cooldown, and that is
+     * deliberate: the ring is the instrument, but the owner reads the console
+     * and pastes it, so the line has to carry the answer too. What is new on it
+     * is `stolen`, `crossed` and the speed -- which between them are the whole
+     * distance-versus-timer question, in a line somebody can copy into chat.
+     *
+     * A bad minute fills the ring rather than the console. `sydney.stalls()`.
+     */
     if (frameMs > LONG_FRAME_MS && now - lastLongFrameAt > 5000) {
       lastLongFrameAt = now;
       const r = frameProfile.report();
@@ -12401,12 +12541,14 @@ async function main(): Promise<void> {
         .slice(0, 4)
         .map((sec) => `${sec.name} ${sec.worstMs.toFixed(1)}ms`)
         .join(', ');
+      const s = stalls.summarise();
       console.warn(
         `[frame] ${frameMs.toFixed(0)} ms — worst sections: ${worst || '(none)'}` +
           `  |  pipelines compiled in stalled frames so far: ${pipelineWatch.pipelines}` +
           ` over ${pipelineWatch.frames} frame(s), worst ${pipelineWatch.worstMs.toFixed(0)} ms` +
           `  |  compiles ${asyncPipes.compiles} over ${asyncPipes.distinct} keys, ${asyncPipes.objects} objects` +
-          `  |  worst: ${asyncPipes.top(3)}`,
+          `  |  worst: ${asyncPipes.top(3)}` +
+          `\n[stalls] ${s.line}  |  floor ${stalls.baseline().toFixed(1)} ms  |  sydney.stalls() for the table`,
       );
     }
     if (frameDt < 0.2) {
@@ -12728,6 +12870,29 @@ async function main(): Promise<void> {
      * count which says the bug is back. See `world/warmup.ts`.
      */
     warmupAudit: auditNow,
+    /**
+     * WORKSTREAM AT. Every frame over 25 ms this session, and what was
+     * happening on it.
+     *
+     * `sydney.stalls()` prints the table; `sydney.stalls(true)` returns the rows
+     * so they can be filtered on a console. The last line is the one that
+     * matters and is the deliverable of the whole investigation -- how often,
+     * how bad, what kind, and **what share of them landed on a frame that
+     * crossed a distance boundary**, which is the difference between a streaming
+     * problem and a timer.
+     *
+     * The four kinds are `game/stallring.classify`: *stolen* is the browser
+     * taking the thread, *compile* is a shader built inside a draw, *stream* is
+     * a tile arriving, and *work* is our own code being slow -- which is the
+     * only one of the four `frameProfile` was ever able to see.
+     */
+    stalls: (raw = false) => {
+      if (raw) return stalls.all();
+      console.log(stalls.table());
+      return `${stalls.total} stall(s) this session`;
+    },
+    /** The distance boundaries crossed this session. See `world/boundarylog.ts`. */
+    boundaries: () => ({ grid: boundaries.gridCrossings, ring: boundaries.ringCrossings }),
 
     /**
      * The raves, for the console.

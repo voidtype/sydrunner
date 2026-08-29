@@ -290,6 +290,14 @@ import { verifyGiverMap } from '../client/src/game/givermap.ts';
 import { verifyQuestHubs } from '../client/src/game/questhubs.ts';
 import { verifyQuestTrack } from '../client/src/game/questtrack.ts';
 import { verifyQuestLog } from '../client/src/game/questlog.ts';
+// WORKSTREAM AT. The three pure halves of the stall instruments. Same
+// arrangement and the same reason: a carry that spills a stall into the next
+// two frames, a stolen-time floor that reports the browser's ordinary overhead
+// as theft, and a boundary counter that mistakes pacing a circle for crossing a
+// ring are all arithmetic, and none of them has a screenshot that says so.
+import { verifyFrameStep } from '../client/src/game/framestep.ts';
+import { verifyStallRing } from '../client/src/game/stallring.ts';
+import { verifyBoundaryLog } from '../client/src/world/boundarylog.ts';
 import { decodeQuest, verifyQuestWire } from '../client/src/net/quests.ts';
 import { ContentStore, ImprovCache, QuestEngine, contentResponse, type QuestWorld } from './quests.ts';
 import { TEAM } from '../client/src/game/teams.ts';
@@ -806,6 +814,9 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     ['verifyQuestHubs', verifyQuestHubs()],
     ['verifyQuestTrack', verifyQuestTrack()],
     ['verifyQuestLog', verifyQuestLog()],
+    ['verifyFrameStep', verifyFrameStep()],
+    ['verifyStallRing', verifyStallRing()],
+    ['verifyBoundaryLog', verifyBoundaryLog()],
     // WORKSTREAM N (carry): the sentence a restored session is visible as. Run
     // here as well as in the browser for `verifyLevelHud`'s reason one line up
     // -- this process decides *whether* a join was a restore and puts the bit on

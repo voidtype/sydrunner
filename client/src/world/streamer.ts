@@ -2643,6 +2643,19 @@ export class TileStreamer implements LampSource {
     };
   }
 
+  /**
+   * Tiles built and ground sheets placed since boot, monotonic.
+   *
+   * Exposed for `game/stallring.ts`, which records the *delta* on a stalled
+   * frame. `world/boundarylog.ts` explains why the streamer answers this rather
+   * than the boundary log re-deriving it: whether a tile crossed 420 m of the
+   * camera this frame is a fact this class already holds, and two answers to one
+   * question is the failure mode every header in this file warns about.
+   */
+  get built(): { tiles: number; sheets: number } {
+    return { tiles: this.builtTiles, sheets: this.builtSheets };
+  }
+
   get stats() {
     let triangles = 0;
     let buildings = 0;

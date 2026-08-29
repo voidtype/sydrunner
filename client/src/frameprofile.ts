@@ -321,6 +321,17 @@ export class FrameProfile {
    * exists because it happens -- would otherwise leave a half-filled row in the
    * ring forever, and the worst-frame scan would keep finding it.
    */
+  /** The frame just closed: what our own sections spent, milliseconds. */
+  lastMs = 0;
+  /** Its heaviest section and what that section cost. */
+  lastWorstMs = 0;
+  lastWorstSection = 0;
+
+  /** `render 214.0`, for a stall record. Allocates; only called on a stall. */
+  lastWorst(): string {
+    return `${FRAME_SECTION_NAMES[this.lastWorstSection] ?? '?'} ${this.lastWorstMs.toFixed(1)}`;
+  }
+
   begin(): void {
     const base = this.row * FRAME_SECTION_COUNT;
     for (let i = 0; i < FRAME_SECTION_COUNT; i++) this.ring[base + i] = 0;
@@ -361,12 +372,26 @@ export class FrameProfile {
     this.marks++;
 
     let total = 0;
+    let worst = 0;
+    let worstAt = 0;
     for (let i = 0; i < FRAME_SECTION_COUNT; i++) {
       const v = this.ring[base + i];
       this.acc[i] += v;
       total += v;
+      if (v > worst) {
+        worst = v;
+        worstAt = i;
+      }
     }
     this.totals[this.row] = total;
+    // The frame just closed, kept for one reader: `game/stallring.ts` needs
+    // *this* frame's total to subtract from the animation-frame delta, and
+    // `report()` cannot answer that -- it folds a two-second window, which is
+    // the right shape for "what is this session costing" and the wrong one for
+    // "what did the browser take from us on the frame we just missed".
+    this.lastMs = total;
+    this.lastWorstMs = worst;
+    this.lastWorstSection = worstAt;
     this.row = (this.row + 1) % WINDOW;
     if (this.filled < WINDOW) this.filled++;
     this.frames++;
