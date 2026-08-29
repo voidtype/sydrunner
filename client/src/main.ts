@@ -10327,6 +10327,7 @@ async function main(): Promise<void> {
   let lastCompiles = 0;
   let lastBuiltTiles = 0;
   let lastBuiltSheets = 0;
+  let lastStallSummaryAt = 0;
   /*
    * The browser telling us it blocked, which is the one signal `FrameProfile`
    * cannot produce. Guarded and optional on purpose: Safari does not implement
@@ -10491,7 +10492,11 @@ async function main(): Promise<void> {
     // every frame a stall, filled the ring in seven seconds, and left an
     // instrument built to find a ten-second period unable to span ten seconds.
     const isStall = stalls.isStall(rafDelta);
-    stalls.observe(outside, rafDelta);
+    // Speed and duration go in with it, so the speed bands fill from ordinary
+    // play. `game/stallring.SPEED_BANDS` carries the argument: the distance
+    // versus time question answers itself out of a session somebody enjoyed,
+    // and nobody has to hold a throttle to a script.
+    stalls.observe(outside, rafDelta, prev.speed, rafDelta / 1000);
     if (isStall && frameProfile.lastMs > 0) {
       stalls.add({
         atMs: now,
@@ -12579,6 +12584,21 @@ async function main(): Promise<void> {
       frameTimes[frameCursor] = frameMs;
       frameCursor = (frameCursor + 1) % frameTimes.length;
       frameCount++;
+    }
+
+    /*
+     * --- The summary, once a minute, unprompted.
+     *
+     * `sydney.stalls()` is the full table and is there for anybody who wants it.
+     * This is the line for everybody who does not: the owner plays, and every
+     * minute the console gains one row that already contains the answer. It
+     * prints only once there is something to say -- a session with no stalls
+     * says nothing, forever, which is the correct amount of noise for a game
+     * that is behaving.
+     */
+    if (now - lastStallSummaryAt >= 60_000) {
+      lastStallSummaryAt = now;
+      if (stalls.total > 0) console.info(`[stalls] ${stalls.summarise().line}`);
     }
 
     if (now - hudClock >= 400) {

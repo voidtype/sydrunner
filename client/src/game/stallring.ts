@@ -115,6 +115,80 @@ export const BASELINE_WINDOW = 240;
  */
 export const BASELINE_PERCENTILE = 0.95;
 
+/**
+ * Speed bands, and they are the whole reason this file can answer the question
+ * without anybody being asked to drive to a script.
+ *
+ * ---------------------------------------------------------------------------
+ * ## The test, and why it needs no protocol
+ *
+ * The question is whether the freeze is driven by **distance** (a streaming
+ * boundary crossed at speed) or by **time** (a collection, a timer, a driver).
+ * The obvious way to find out is to hold four speeds for two minutes each and
+ * compare, and the owner's answer to being asked to do that was the correct one:
+ * *"i cant be fucked doing your script can i just play the game for a bit"*.
+ *
+ * They are right, and not only about the tedium. A protocol is a worse
+ * experiment: it samples four speeds for eight minutes, in one place, while
+ * somebody concentrates on holding a throttle. Ordinary play samples every speed
+ * for an hour, all over the city, doing what the game is actually for.
+ *
+ * So the buckets do it instead. Every frame adds its own duration and its own
+ * metres to whichever band the player was in; every stall adds one to the same
+ * band. What falls out is two rates per band, and **exactly one of them is flat
+ * if the hypothesis is true**:
+ *
+ *     distance-driven -> metres per stall is the same in every band
+ *     time-driven     -> seconds per stall is the same in every band
+ *
+ * That is a stronger discriminator than the interval alone, and it is computed
+ * from a session somebody enjoyed rather than one they endured.
+ *
+ * ## Standing still is the sharpest band and it is free
+ *
+ * Everybody stands still sometimes -- reading the map, in a menu, waiting for a
+ * train. A stall while stationary **cannot** be distance-driven, because no
+ * boundary moved. So `still` is not really a band, it is a control group, and
+ * ordinary play supplies it without anybody being asked.
+ */
+export const SPEED_BANDS: ReadonlyArray<{ name: string; max: number }> = [
+  { name: 'still', max: 0.6 },
+  { name: 'walk', max: 9 },
+  { name: 'ride', max: 21 },
+  { name: 'drive', max: 34 },
+  { name: 'fast', max: Infinity },
+];
+
+export interface BandRow {
+  name: string;
+  seconds: number;
+  metres: number;
+  stalls: number;
+  /** Seconds of play per stall, or -1 with no stalls. */
+  perStallS: number;
+  /** Metres travelled per stall, or -1 with no stalls or no movement. */
+  perStallM: number;
+}
+
+/** Which band a speed falls in. */
+export function bandOf(speed: number): number {
+  for (let i = 0; i < SPEED_BANDS.length; i++) {
+    if (speed < SPEED_BANDS[i].max) return i;
+  }
+  return SPEED_BANDS.length - 1;
+}
+
+/** Spread as a fraction of the mean. Lower is flatter. `-1` for too few. */
+export function variation(values: readonly number[]): number {
+  const good = values.filter((v) => v > 0 && Number.isFinite(v));
+  if (good.length < 2) return -1;
+  const mean = good.reduce((a, b) => a + b, 0) / good.length;
+  if (mean <= 0) return -1;
+  let sum = 0;
+  for (const v of good) sum += (v - mean) ** 2;
+  return Math.sqrt(sum / good.length) / mean;
+}
+
 /** What a stall was, in one word. See `classify`. */
 export type StallKind = 'stolen' | 'compile' | 'stream' | 'work';
 
@@ -143,6 +217,12 @@ export interface StallRecord {
 
 export interface StallSummary {
   stalls: number;
+  /** Play, per speed band. The distance-versus-time test. See `SPEED_BANDS`. */
+  bands: BandRow[];
+  /** `'distance'`, `'time'`, or `''` when the session cannot yet say. */
+  verdict: string;
+  /** What the verdict is based on, or what is still missing. */
+  because: string;
   /** This machine's ordinary frame and its tail. A rate problem, not a stutter one. */
   medianFrameMs: number;
   p95FrameMs: number;
@@ -195,6 +275,12 @@ export class StallRing {
   private readonly frames: number[] = [];
   private frameAt = 0;
   private worstFrameMs = 0;
+  /** Seconds, metres and stalls in each speed band. See `SPEED_BANDS`. */
+  private readonly bandS = SPEED_BANDS.map(() => 0);
+  private readonly bandM = SPEED_BANDS.map(() => 0);
+  private readonly bandN = SPEED_BANDS.map(() => 0);
+  /** The band the frame being recorded was in, set by `observe`, read by `add`. */
+  private lastBand = 0;
   private readonly rows: StallRecord[] = [];
   private cursor = 0;
   private seen = 0;
@@ -203,13 +289,21 @@ export class StallRing {
    * Every frame, whatever happened: the raw gap between what the clock says the
    * frame took and what our sections say they spent.
    */
-  observe(gapMs: number, frameMs = 0): void {
+  observe(gapMs: number, frameMs = 0, speed = 0, dt = 0): void {
     if (!Number.isFinite(gapMs)) return;
     const v = gapMs > 0 ? gapMs : 0;
     if (this.gaps.length < BASELINE_WINDOW) this.gaps.push(v);
     else {
       this.gaps[this.gapAt] = v;
       this.gapAt = (this.gapAt + 1) % BASELINE_WINDOW;
+    }
+    // The band, and the play that happened in it. Every frame, so the
+    // denominators are the whole session rather than the stalls' own moments.
+    if (Number.isFinite(speed) && Number.isFinite(dt) && dt > 0 && dt < 1) {
+      const band = bandOf(speed > 0 ? speed : 0);
+      this.lastBand = band;
+      this.bandS[band] += dt;
+      this.bandM[band] += Math.max(0, speed) * dt;
     }
     if (!Number.isFinite(frameMs) || frameMs <= 0) return;
     if (frameMs > this.worstFrameMs) this.worstFrameMs = frameMs;
@@ -254,6 +348,7 @@ export class StallRing {
   }
 
   add(rec: StallRecord): void {
+    this.bandN[this.lastBand]++;
     if (this.rows.length < STALL_CAPACITY) this.rows.push(rec);
     else this.rows[this.cursor] = rec;
     this.cursor = (this.cursor + 1) % STALL_CAPACITY;
@@ -306,14 +401,71 @@ export class StallRing {
       parts.push(`${Math.round(crossedShare * 100)}% crossed a boundary`);
       parts.push(`mean speed ${meanSpeed.toFixed(1)} m/s`);
     }
+    /*
+     * --- The bands, and the verdict they support.
+     *
+     * A band earns a vote when the session actually spent time in it and
+     * actually stalled there: without both, its rate is one sample dressed as a
+     * measurement. Two voting bands at genuinely different speeds are the
+     * minimum for the comparison to mean anything, which is why the answer is
+     * allowed to be "not yet" -- an instrument that always produces a verdict is
+     * an instrument that sometimes produces a wrong one.
+     */
+    const bands: BandRow[] = SPEED_BANDS.map((b, i) => ({
+      name: b.name,
+      seconds: this.bandS[i],
+      metres: this.bandM[i],
+      stalls: this.bandN[i],
+      perStallS: this.bandN[i] > 0 ? this.bandS[i] / this.bandN[i] : -1,
+      perStallM: this.bandN[i] > 0 && this.bandM[i] > 0 ? this.bandM[i] / this.bandN[i] : -1,
+    }));
+    const voting = bands.filter((b) => b.stalls >= 2 && b.seconds >= 20 && b.metres > 50);
+    const still = bands[0];
+    let verdict = '';
+    let because = '';
+    if (still.seconds >= 60 && still.stalls >= 3) {
+      /*
+       * **The control group, and it outranks the rate comparison.** A stall
+       * while stationary cannot be caused by crossing a boundary, because no
+       * boundary moved. A minute of standing still with three stalls in it
+       * settles the question on its own and does not need the bands to agree.
+       */
+      verdict = 'time';
+      because =
+        `${still.stalls} stall(s) in ${still.seconds.toFixed(0)} s of standing still ` +
+        '— nothing streamed, so nothing distance-driven could have caused them';
+    } else if (voting.length >= 2) {
+      const cvSeconds = variation(voting.map((b) => b.perStallS));
+      const cvMetres = variation(voting.map((b) => b.perStallM));
+      const flatter = (a: number, b: number): boolean => a >= 0 && b >= 0 && a < b * 0.6;
+      if (flatter(cvMetres, cvSeconds)) {
+        verdict = 'distance';
+        because = `metres per stall is flat across ${voting.length} speed bands (spread ${(cvMetres * 100).toFixed(0)}% against ${(cvSeconds * 100).toFixed(0)}% for seconds)`;
+      } else if (flatter(cvSeconds, cvMetres)) {
+        verdict = 'time';
+        because = `seconds per stall is flat across ${voting.length} speed bands (spread ${(cvSeconds * 100).toFixed(0)}% against ${(cvMetres * 100).toFixed(0)}% for metres)`;
+      } else {
+        because = `${voting.length} bands, but neither rate is clearly flatter — keep playing`;
+      }
+    } else {
+      const need = bands.filter((b) => b.seconds >= 20).length;
+      because =
+        voting.length === 1
+          ? 'one speed band has enough stalls; play at another speed for a minute'
+          : `not enough yet — ${need} band(s) have 20 s of play and ${voting.length} have two stalls`;
+    }
+
     const medianFrameMs = this.medianFrameMs();
     // The frame picture goes first, because it is the thing that turned out to
     // matter and it is a different problem from the stalls: a machine holding
     // 34 fps has a rate problem, and no amount of stall-hunting fixes it.
     const fps = medianFrameMs > 0 ? 1000 / medianFrameMs : 0;
     parts.unshift(`frame ${medianFrameMs.toFixed(0)} ms median (${fps.toFixed(0)} fps)`);
+    if (verdict !== '') parts.push(`VERDICT: ${verdict}-driven — ${because}`);
+    else if (rows.length > 0) parts.push(`verdict: ${because}`);
     return {
-      stalls: rows.length, medianFrameMs, p95FrameMs: percentile(this.frames, 0.95),
+      stalls: rows.length, bands, verdict, because,
+      medianFrameMs, p95FrameMs: percentile(this.frames, 0.95),
       // The worst of both, so the two numbers cannot disagree: a stall in the
       // ring is by definition a frame, and a summary reporting a worst frame
       // smaller than its own worst stall would be caught by a reader before it
@@ -347,8 +499,22 @@ export class StallRing {
         r.worst,
       ].join('\t'));
     }
+    const s = this.summarise();
     lines.push('');
-    lines.push(this.summarise().line);
+    lines.push('band\tplayed\tmoved\tstalls\tone every\tone every');
+    for (const b of s.bands) {
+      if (b.seconds < 1) continue;
+      lines.push([
+        b.name,
+        `${b.seconds.toFixed(0)}s`,
+        b.metres >= 1000 ? `${(b.metres / 1000).toFixed(1)}km` : `${b.metres.toFixed(0)}m`,
+        String(b.stalls),
+        b.perStallS > 0 ? `${b.perStallS.toFixed(0)}s` : '-',
+        b.perStallM > 0 ? `${b.perStallM.toFixed(0)}m` : '-',
+      ].join('\t'));
+    }
+    lines.push('');
+    lines.push(s.line);
     return lines.join('\n');
   }
 }
@@ -493,6 +659,101 @@ export function verifyStallRing(): string[] {
     if (Math.abs(s.medianFrameMs - 29) > 0.01) failures.push(`The summary's median frame read ${s.medianFrameMs}.`);
     if (s.worstFrameMs !== 535) failures.push(`The worst frame read ${s.worstFrameMs}, not 535.`);
     if (!s.line.includes('34 fps')) failures.push(`The summary does not lead with the frame rate: "${s.line}"`);
+  }
+
+  /*
+   * --- THE VERDICT, WHICH IS WHAT THE FILE IS FOR.
+   *
+   * Three synthetic sessions of ordinary play -- no protocol, just a player
+   * moving at whatever speed the game put them at -- and the summary has to
+   * reach the right conclusion about each.
+   */
+  const play = (
+    ring: StallRing,
+    speed: number,
+    seconds: number,
+    stallEvery: { s?: number; m?: number },
+  ): void => {
+    const dt = 1 / 60;
+    let sinceS = 0;
+    let sinceM = 0;
+    for (let f = 0; f < seconds / dt; f++) {
+      ring.observe(4, 29, speed, dt);
+      sinceS += dt;
+      sinceM += speed * dt;
+      const hitTime = stallEvery.s !== undefined && sinceS >= stallEvery.s;
+      const hitDist = stallEvery.m !== undefined && sinceM >= stallEvery.m;
+      if (!hitTime && !hitDist) continue;
+      sinceS = 0;
+      sinceM = 0;
+      ring.add(rec({ atMs: f * dt * 1000, frameMs: 300, stolenMs: 250, speed }));
+    }
+  };
+
+  // A session that stalls every 500 m however fast the player is going.
+  {
+    const ring = new StallRing();
+    play(ring, 5, 240, { m: 500 });
+    play(ring, 25, 240, { m: 500 });
+    play(ring, 40, 240, { m: 500 });
+    const s = ring.summarise();
+    if (s.verdict !== 'distance') {
+      failures.push(`A session stalling every 500 m at three speeds returned "${s.verdict}" — ${s.because}`);
+    }
+  }
+
+  // A session that stalls every 10 s however fast the player is going.
+  {
+    const ring = new StallRing();
+    play(ring, 5, 240, { s: 10 });
+    play(ring, 25, 240, { s: 10 });
+    play(ring, 40, 240, { s: 10 });
+    const s = ring.summarise();
+    if (s.verdict !== 'time') {
+      failures.push(`A session stalling every 10 s at three speeds returned "${s.verdict}" — ${s.because}`);
+    }
+  }
+
+  // The control group on its own: stalls while standing still can only be time.
+  {
+    const ring = new StallRing();
+    play(ring, 0, 200, { s: 20 });
+    const s = ring.summarise();
+    if (s.verdict !== 'time') failures.push(`Stalls while stationary returned "${s.verdict}" — ${s.because}`);
+    if (!s.because.includes('standing still')) failures.push(`The reason given was "${s.because}".`);
+  }
+
+  // --- And it declines to guess when the session cannot say.
+  {
+    const ring = new StallRing();
+    play(ring, 25, 120, { s: 30 });
+    const s = ring.summarise();
+    if (s.verdict !== '') {
+      failures.push(`One speed band produced a verdict of "${s.verdict}"; it cannot know from one band.`);
+    }
+    if (s.because === '') failures.push('An undecided session said nothing about what it still needs.');
+  }
+  {
+    const s = new StallRing().summarise();
+    if (s.verdict !== '') failures.push('An empty session produced a verdict.');
+  }
+
+  // --- The bands themselves add up to the session.
+  {
+    const ring = new StallRing();
+    play(ring, 10, 60, { s: 30 });
+    const s = ring.summarise();
+    const seconds = s.bands.reduce((a, b) => a + b.seconds, 0);
+    if (Math.abs(seconds - 60) > 1) failures.push(`The bands hold ${seconds.toFixed(1)} s of a 60 s session.`);
+    // 10 m/s is a bike, not a walk: `SPEED_BANDS` puts walking under 9.
+    const ride = s.bands.find((b) => b.name === 'ride');
+    if (ride === undefined || Math.abs(ride.metres - 600) > 10) {
+      failures.push(`Sixty seconds at 10 m/s recorded ${ride?.metres.toFixed(0)} m in the ride band, not 600.`);
+    }
+    if (bandOf(10) !== 2) failures.push('10 m/s did not land in the ride band.');
+    if (bandOf(0) !== 0 || bandOf(5) !== 1 || bandOf(44) !== SPEED_BANDS.length - 1) {
+      failures.push('A speed landed in the wrong band.');
+    }
   }
 
   // --- An empty ring says so rather than dividing by zero.
