@@ -220,6 +220,31 @@ export class AsyncPipelines {
   private budgetMs = Infinity;
   /** Draws declined because the frame's compile budget was spent. */
   private deferredDraws = 0;
+  /**
+   * What the budget is actually doing, and it exists because the alternative
+   * failed twice.
+   *
+   * Two rides in a row reported `0 deferred` and there was no way to tell from
+   * the console whether the gate was uninstalled, off the draw path, or blind
+   * for want of `_objects` -- three different bugs with one symptom, and the
+   * owner paid for a play session each time to not find out. A gate that
+   * silently does nothing is worse than no gate: it takes the pressure off
+   * looking. This is one short word on the frame line.
+   */
+  private gateCalls = 0;
+  private gateHooked = false;
+  private gateBlind = false;
+  /**
+   * Objects that have completed a draw, for the case where `_objects` is not
+   * reachable.
+   *
+   * A fallback rather than the main path: it cannot tell the beauty pass from
+   * the shadow pass, so an object drawn in both is charged once and gets its
+   * second build free. That is bounded and wrong in the safe direction, and it
+   * is enormously better than the alternative this replaces, which was for the
+   * gate to decline nothing at all and say nothing about it.
+   */
+  private readonly ranOnce = new WeakSet<object>();
 
   get skipped(): number {
     return this.skippedDraws;
@@ -228,6 +253,19 @@ export class AsyncPipelines {
   /** Draws deferred because the frame ran out of compile budget. */
   get deferrals(): number {
     return this.deferredDraws;
+  }
+
+  /**
+   * The gate's own state, for the frame line. `off` means it never wrapped the
+   * draw path; `idle` means it wrapped it and was never called, which is the
+   * same thing seen from the other side; `blind` means it is on the path but
+   * cannot tell a cached draw from a build, so it declines nothing.
+   */
+  budgetState(): string {
+    if (!this.gateHooked) return 'budget off (no hook)';
+    if (this.gateCalls === 0) return 'budget idle (never called)';
+    if (this.gateBlind) return `budget blind (no _objects), ${this.gateCalls} draws`;
+    return `budget on, ${this.gateCalls} draws`;
   }
 
   /**
@@ -433,22 +471,32 @@ export class AsyncPipelines {
      * animation loop run unbudgeted and the world comes up whole.
      */
     const direct = host._renderObjectDirect;
-    const objects = host._objects;
     if (typeof direct === 'function') {
+      this.gateHooked = true;
       const innerDirect = direct.bind(host);
       host._renderObjectDirect = (...args: unknown[]): void => {
+        this.gateCalls++;
         if (this.budgetMs > 0) {
           const t0 = performance.now();
           innerDirect(...args);
           const spent = performance.now() - t0;
           if (spent > FRESH_MS) this.budgetMs -= spent;
+          this.ranOnce.add(args[0] as object);
           return;
         }
         // Spent. A draw whose node state is already built costs microseconds
         // and must still happen -- refusing those is how a settled scene goes
         // blank. Only a genuine first build is declined.
-        if (objects !== null && objects !== undefined) {
-          let built = true;
+        // **Read at call time, not at install.** Captured at install it was
+        // `undefined` -- three fills `_objects` in during `init()` and the gate
+        // goes in immediately after -- so this whole block was skipped and the
+        // budget declined nothing, twice, in silence.
+        const objects = host._objects;
+        let built: boolean;
+        if (objects === null || objects === undefined) {
+          this.gateBlind = true;
+          built = this.ranOnce.has(args[0] as object);
+        } else {
           try {
             const ro = objects.get(
               args[0], args[1], args[2], args[3], args[4], host._currentRenderContext, args[6], args[7],
@@ -458,11 +506,12 @@ export class AsyncPipelines {
             // three moved the cache. Draw it: a stall is better than a hole.
             built = true;
           }
-          if (!built) {
-            this.deferredDraws++;
-            return;
-          }
         }
+        if (!built) {
+          this.deferredDraws++;
+          return;
+        }
+        this.ranOnce.add(args[0] as object);
         innerDirect(...args);
       };
     }
@@ -737,6 +786,61 @@ export function verifyAsyncPipes(): string[] {
       );
     }
     if (fresh.deferrals !== 0) failures.push('the gate declined boot work before any frame had opened a budget.');
+  }
+
+  // --- A gate that does nothing must say so.
+  //
+  // **This is the check that two play sessions bought.** The budget reported
+  // `0 deferred` twice running, and `0` is what you see whether the gate never
+  // wrapped the draw path, wrapped it and was never called, or is on the path
+  // but cannot reach `_objects` -- three different bugs, one symptom, no way to
+  // tell them apart from the console. The second of those was real: `_objects`
+  // was captured at install, before three had filled it in, so the whole
+  // deferral branch was dead. Now the state is a word on the frame line, and
+  // the blind case degrades to a weaker test instead of to nothing.
+  {
+    const noHook = new AsyncPipelines();
+    noHook.install({ _pipelines: { getForRender: () => ({}) }, backend: { draw: () => {}, get: () => ({}) } });
+    if (!noHook.budgetState().startsWith('budget off')) {
+      failures.push(`a gate with no draw hook reported "${noHook.budgetState()}" instead of saying it is off.`);
+    }
+
+    const spin = (ms: number): void => {
+      const until = performance.now() + ms;
+      let sink = 0;
+      while (performance.now() < until) sink++;
+      if (sink === -1) throw new Error('unreachable');
+    };
+    const objs = Array.from({ length: 10 }, (_, i) => ({ n: i }));
+    const seen = new WeakSet<object>();
+    // No `_objects` at all: the gate must notice, say so, and still bound the
+    // frame rather than waving everything through.
+    const host = {
+      _pipelines: { getForRender: () => ({ id: 'p' }) },
+      backend: { draw: () => {}, get: () => ({}) },
+      _renderObjectDirect: (o: unknown): void => {
+        if (!seen.has(o as object)) {
+          seen.add(o as object);
+          spin(3);
+        }
+      },
+    };
+    const blind = new AsyncPipelines();
+    blind.install(host as unknown as PipelineHost);
+    if (!blind.budgetState().startsWith('budget idle')) {
+      failures.push(`a hooked gate that has never been called reported "${blind.budgetState()}".`);
+    }
+    blind.frame(6);
+    for (const o of objs) host._renderObjectDirect(o);
+    if (blind.deferrals === 0) {
+      failures.push(
+        `with no \`_objects\` the gate declined nothing and reported "${blind.budgetState()}"; ` +
+          `it waves a whole frame of builds through and says 0 deferred, which is the bug this check exists for.`,
+      );
+    }
+    if (!blind.budgetState().includes('blind')) {
+      failures.push(`the gate could not reach \`_objects\` and reported "${blind.budgetState()}" rather than saying so.`);
+    }
   }
 
   return failures;

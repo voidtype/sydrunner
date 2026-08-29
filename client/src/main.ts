@@ -10566,7 +10566,7 @@ async function main(): Promise<void> {
           `  |  pipelines compiled in stalled frames so far: ${pipelineWatch.pipelines}` +
           ` over ${pipelineWatch.frames} frame(s), worst ${pipelineWatch.worstMs.toFixed(0)} ms` +
           `  |  compiles ${asyncPipes.compiles} over ${asyncPipes.distinct} keys, ${asyncPipes.objects} objects` +
-          `, ${asyncPipes.deferrals} deferred` +
+          `, ${asyncPipes.deferrals} deferred (${asyncPipes.budgetState()})` +
           `  |  ${asyncPipes.drift()}` +
           `  |  worst: ${asyncPipes.top(3)}` +
           `\n[stalls] ${s.line}  |  floor ${stalls.baseline().toFixed(1)} ms  |  sydney.stalls() for the table`,
