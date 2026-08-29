@@ -843,5 +843,70 @@ export function verifyAsyncPipes(): string[] {
     }
   }
 
+  // --- The gate survives three's actual dispatch, not a convenient stand-in.
+  //
+  // Every other check here calls `_renderObjectDirect` straight off an object
+  // literal. three does neither of those things: it is a prototype method, and
+  // `render()` copies it into `_handleObjectFunction` at the top of every pass
+  // and calls it through that. A gate that installs an own property and is
+  // never reached would look exactly like a gate that is reached and declines
+  // nothing -- both report `0 deferred` -- so the difference has to be a test
+  // rather than an argument.
+  {
+    const spin = (ms: number): void => {
+      const until = performance.now() + ms;
+      let sink = 0;
+      while (performance.now() < until) sink++;
+      if (sink === -1) throw new Error('unreachable');
+    };
+    class FakeRenderer {
+      _pipelines = {
+        getForRender: (_ro: unknown, p?: unknown): unknown => {
+          if (Array.isArray(p)) p.push(Promise.resolve());
+          return { id: 1 };
+        },
+      };
+      backend = { draw: (): void => {}, get: (): Record<string, never> => ({}) };
+      state = new Map<unknown, { _nodeBuilderState?: unknown }>();
+      _objects = { get: (o: unknown): unknown => this.state.get(o) ?? null };
+      _currentRenderContext = null;
+      _handleObjectFunction: ((o: unknown) => void) | null = null;
+      ran = 0;
+      _renderObjectDirect(o: unknown): void {
+        const rec = this.state.get(o);
+        if (rec !== undefined && rec._nodeBuilderState === undefined) {
+          spin(3);
+          rec._nodeBuilderState = {};
+        }
+        this.ran++;
+      }
+      render(objs: unknown[]): void {
+        // three re-reads the property here on every pass, which is the whole
+        // reason an own property installed after construction is picked up.
+        this._handleObjectFunction = (this as unknown as { _renderObjectDirect: (o: unknown) => void })
+          ._renderObjectDirect;
+        for (const o of objs) (this._handleObjectFunction as (o: unknown) => void)(o);
+      }
+    }
+
+    const r = new FakeRenderer();
+    const g = new AsyncPipelines();
+    if (!g.install(r as unknown as PipelineHost)) failures.push('the gate did not install on a class-shaped renderer.');
+    const objs = Array.from({ length: 20 }, (_, i) => ({ n: i }));
+    for (const o of objs) r.state.set(o, {});
+    g.frame(6);
+    r.render(objs);
+    if (!g.budgetState().startsWith('budget on')) {
+      failures.push(
+        `dispatched the way three dispatches, the gate reported "${g.budgetState()}" -- it is not on the ` +
+          `draw path, and every frame line would say 0 deferred without saying why.`,
+      );
+    }
+    if (g.deferrals === 0) {
+      failures.push(`a 6 ms budget declined nothing across 20 builds of 3 ms dispatched through _handleObjectFunction.`);
+    }
+    if (r.ran > 3) failures.push(`${r.ran} of 20 builds ran on a 6 ms budget; the frame is not bounded.`);
+  }
+
   return failures;
 }
