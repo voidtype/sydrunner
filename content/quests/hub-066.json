@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-cornershop-menangle-0",
+   "act": 3,
+   "title": "Short Delivery, Menangle",
+   "blurb": "It is not a police matter and I have checked. The Menangle order has been two cartons light every week since a public holiday nobody remembered and the invoice says otherwise every time. I am not after trouble. I am after an answer. I'll see you right for it.",
+   "giver": "hub-menangle-eleni",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -42437,
+     "z": 29398,
+     "radius": 25,
+     "label": "the loading bay round the side"
+    },
+    {
+     "kind": "photo",
+     "x": -42448,
+     "z": 29401,
+     "radius": 35,
+     "label": "the pallet as it actually arrives"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I have got something to send them",
+     "npc": "hub-menangle-eleni"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 367,
+    "unlock": [
+     "hub:h-cornershop-menangle-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-menangle-1",
+   "act": 3,
+   "title": "The Credit Note, Menangle",
+   "blurb": "Honestly, I am past caring how it looks. They admitted it, which I did not expect, so now there is $117 owing to Menangle and it is not going to walk in here itself. Nobody else seems to have noticed, which is its own problem. I'll put the kettle on for when you're back.",
+   "giver": "hub-menangle-eleni",
+   "level": 6,
+   "requires": [
+    "h-cornershop-menangle-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 117,
+     "label": "$117, and do not take a voucher"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "cash, on the counter, and I will believe it",
+     "npc": "hub-menangle-eleni"
+    }
+   ],
+   "reward": {
+    "cash": 171,
+    "xp": 436,
+    "unlock": [
+     "hub:h-cornershop-menangle-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-menangle-2",
+   "act": 3,
+   "title": "The Menangle Run",
+   "blurb": "I would do it myself if I could leave the counter. I do the Menangle run at first light and there is a stretch of it where the van gets followed, which I have told nobody until now. Everyone I have told has looked at me the way you are now. Just do not come back empty-handed.",
+   "giver": "hub-menangle-kwame",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Menangle",
+     "to": "Menangle Park",
+     "label": "ride it with me as far as Menangle Park"
+    },
+    {
+     "kind": "photo",
+     "x": -42511,
+     "z": 29216,
+     "radius": 35,
+     "label": "whatever is behind us when we stop"
+    }
+   ],
+   "reward": {
+    "cash": 130,
+    "xp": 366,
+    "unlock": [
+     "hub:h-cornershop-menangle-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-menangle-3",
+   "act": 3,
+   "title": "Locked Out, Menangle",
+   "blurb": "You will think I am making this up. I have got a whiteboard with last March still on it in the back of the van and the Menangle shop is shut, and the number on the door rings out. This is the third time I have had this conversation. I will know if you skipped a bit.",
+   "giver": "hub-menangle-kwame",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -42341,
+     "z": 29199,
+     "radius": 25,
+     "label": "try the flat above the shop"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "get one in you, this takes a while"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "somebody has to sign for it",
+     "npc": "hub-menangle-kwame"
+    }
+   ],
+   "reward": {
+    "cash": 124,
+    "xp": 353,
+    "unlock": [
+     "hub:h-cornershop-menangle-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-menangle-4",
+   "act": 3,
+   "title": "The Regulars, Menangle",
+   "blurb": "There is no clever way to say this. Three of the Menangle regulars have started coming in together and going out separately, and the till is $26 down on those days. It started small, the way these things do. Say nothing to anyone on the way.",
+   "giver": "hub-menangle-maia",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 3,
+     "label": "the ones who come in as a set"
+    },
+    {
+     "kind": "earn",
+     "dollars": 26,
+     "label": "$26, which is exactly what the till says"
+    }
+   ],
+   "reward": {
+    "cash": 135,
+    "xp": 352,
+    "unlock": [
+     "hub:h-cornershop-menangle-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-menangle-5",
+   "act": 3,
+   "title": "The Wholesaler, Menangle",
+   "blurb": "You look like you have twenty minutes. Everything Menangle sells comes off a floor at Douglas Park, and the woman who runs it will tell you things she will not put in writing. It is the not knowing that has got me, honestly. Do not make a scene about it.",
+   "giver": "hub-menangle-maia",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -45262,
+     "z": 35825,
+     "radius": 60,
+     "label": "go and see her before the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come and tell me what she said about us",
+     "npc": "hub-menangle-maia"
+    }
+   ],
+   "reward": {
+    "cash": 136,
+    "xp": 367,
+    "unlock": [
+     "hub:h-cornershop-menangle-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-narwee-0",
+   "act": 3,
+   "title": "Under 12s at Narwee",
+   "blurb": "It is not a police matter and I have checked. I have got eleven kids for a twelve-a-side at Narwee on school holidays and one of them has a note from his mother. I am not after trouble. I am after an answer. I'll see you right for it.",
+   "giver": "hub-narwee-behrouz",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -12660,
+     "z": 9109,
+     "radius": 25,
+     "label": "the estate behind the ground, ask around"
+    },
+    {
+     "kind": "photo",
+     "x": -12669,
+     "z": 9132,
+     "radius": 35,
+     "label": "the noticeboard where the sign-on sheet went up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "any kid with boots will do at this point",
+     "npc": "hub-narwee-behrouz"
+    }
+   ],
+   "reward": {
+    "cash": 142,
+    "xp": 409,
+    "unlock": [
+     "hub:h-oval-narwee-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-narwee-1",
+   "act": 3,
+   "title": "Registration, Narwee",
+   "blurb": "Honestly, I am past caring how it looks. We found a twelfth, which means the Narwee club now owes the association $91 it had budgeted on not owing. Nobody else seems to have noticed, which is its own problem. I'll put the kettle on for when you're back.",
+   "giver": "hub-narwee-behrouz",
+   "level": 7,
+   "requires": [
+    "h-oval-narwee-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 91,
+     "label": "$91 before the cut-off"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will drive it in myself",
+     "npc": "hub-narwee-behrouz"
+    }
+   ],
+   "reward": {
+    "cash": 182,
+    "xp": 496,
+    "unlock": [
+     "hub:h-oval-narwee-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-narwee-2",
+   "act": 3,
+   "title": "The Narwee Canteen",
+   "blurb": "I would do it myself if I could leave the counter. The canteen at Narwee does two hundred sausages on a Saturday and this week the freezer went off at the second express. Everyone I have told has looked at me the way you are now. Just do not come back empty-handed.",
+   "giver": "hub-narwee-liam",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "we are going to need the coffee"
+    },
+    {
+     "kind": "photo",
+     "x": -12777,
+     "z": 9068,
+     "radius": 35,
+     "label": "the thermometer, so the insurance believes us"
+    }
+   ],
+   "reward": {
+    "cash": 156,
+    "xp": 416,
+    "unlock": [
+     "hub:h-oval-narwee-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-narwee-3",
+   "act": 3,
+   "title": "Grand Final Float, Narwee",
+   "blurb": "You will think I am making this up. Somebody walked off with the float from the Narwee canteen at about the second express during the last home game, and I have a fair idea which somebody. This is the third time I have had this conversation. I will know if you skipped a bit.",
+   "giver": "hub-narwee-liam",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "the pair who were leaning on the roller door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 33,
+     "label": "$33, which is what was in the tin"
+    }
+   ],
+   "reward": {
+    "cash": 143,
+    "xp": 405,
+    "unlock": [
+     "hub:h-oval-narwee-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-narwee-4",
+   "act": 3,
+   "title": "Sprinkler Line, Narwee",
+   "blurb": "There is no clever way to say this. The sprinkler line under the Narwee outfield has been leaking since school holidays and the wet patch has started to move. It started small, the way these things do. Say nothing to anyone on the way.",
+   "giver": "hub-narwee-cathal",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -12732,
+     "z": 8902,
+     "radius": 25,
+     "label": "walk the line from the tap to the boundary"
+    },
+    {
+     "kind": "photo",
+     "x": -12800,
+     "z": 8910,
+     "radius": 35,
+     "label": "where the grass has gone dark"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to dig once, not five times",
+     "npc": "hub-narwee-cathal"
+    }
+   ],
+   "reward": {
+    "cash": 142,
+    "xp": 401,
+    "unlock": [
+     "hub:h-oval-narwee-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-narwee-5",
+   "act": 3,
+   "title": "The Association, Narwee",
+   "blurb": "You look like you have twenty minutes. The bloke who allocates grounds for the whole association sits at Beverly Hills, and Narwee has been at the bottom of his list for two seasons. It is the not knowing that has got me, honestly. Do not make a scene about it.",
+   "giver": "hub-narwee-cathal",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11787,
+     "z": 9083,
+     "radius": 60,
+     "label": "go and be reasonable at him"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if it is us or the paperwork",
+     "npc": "hub-narwee-cathal"
+    }
+   ],
+   "reward": {
+    "cash": 158,
+    "xp": 395,
+    "unlock": [
+     "hub:h-oval-narwee-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-hills-showground-0",
+   "act": 3,
+   "title": "The Creek Behind Hills Showground",
+   "blurb": "It is not a police matter and I have checked. Somebody has been tipping fill into the creek behind Hills Showground since a wet Monday and it is narrowing the channel a metre at a time. I am not after trouble. I am after an answer. I'll see you right for it.",
+   "giver": "hub-hills-showground-moira",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -20820,
+     "z": -15163,
+     "radius": 35,
+     "label": "the fill, with the water level in shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council reads photographs, not letters",
+     "npc": "hub-hills-showground-moira"
+    }
+   ],
+   "reward": {
+    "cash": 172,
+    "xp": 453,
+    "unlock": [
+     "hub:h-creek-hills-showground-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-hills-showground-1",
+   "act": 3,
+   "title": "Willow Removal, Hills Showground",
+   "blurb": "Honestly, I am past caring how it looks. They have agreed to a clean-up at Hills Showground, which is wonderful, except the grant is $85 short and closes on a wet Monday. Nobody else seems to have noticed, which is its own problem. I'll put the kettle on for when you're back.",
+   "giver": "hub-hills-showground-moira",
+   "level": 8,
+   "requires": [
+    "h-creek-hills-showground-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 85,
+     "label": "$85, and I do not care whose pocket"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the form needs the number today",
+     "npc": "hub-hills-showground-moira"
+    }
+   ],
+   "reward": {
+    "cash": 196,
+    "xp": 537,
+    "unlock": [
+     "hub:h-creek-hills-showground-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-hills-showground-2",
+   "act": 3,
+   "title": "Sandbags, Hills Showground",
+   "blurb": "I would do it myself if I could leave the counter. We had 75 sandbags in the Hills Showground shed on a wet Monday and this morning we have got the pallet they came on. Everyone I have told has looked at me the way you are now. Just do not come back empty-handed.",
+   "giver": "hub-hills-showground-damir",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -21014,
+     "z": -15278,
+     "radius": 25,
+     "label": "the yards backing onto the reserve"
+    },
+    {
+     "kind": "photo",
+     "x": -21022,
+     "z": -15294,
+     "radius": 35,
+     "label": "anywhere they have obviously been used"
+    }
+   ],
+   "reward": {
+    "cash": 172,
+    "xp": 444,
+    "unlock": [
+     "hub:h-creek-hills-showground-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-hills-showground-3",
+   "act": 3,
+   "title": "The Low Crossing, Hills Showground",
+   "blurb": "You will think I am making this up. People keep driving the low crossing at Hills Showground at five in the morning with the water over the sign, and one of them is going to be the one. This is the third time I have had this conversation. I will know if you skipped a bit.",
+   "giver": "hub-hills-showground-damir",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "you will be standing out there a while"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "the ones who argue with the barrier"
+    }
+   ],
+   "reward": {
+    "cash": 170,
+    "xp": 446,
+    "unlock": [
+     "hub:h-creek-hills-showground-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-hills-showground-4",
+   "act": 3,
+   "title": "Under the House, Hills Showground",
+   "blurb": "There is no clever way to say this. The water came through my place at Hills Showground on a wet Monday and the assessor wants photographs of things I have already thrown out. It started small, the way these things do. Say nothing to anyone on the way.",
+   "giver": "hub-hills-showground-josefa",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -20848,
+     "z": -15356,
+     "radius": 25,
+     "label": "round the side, where the pile is"
+    },
+    {
+     "kind": "photo",
+     "x": -20829,
+     "z": -15354,
+     "radius": 35,
+     "label": "the high-water mark on the brick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the whole claim, that mark",
+     "npc": "hub-hills-showground-josefa"
+    }
+   ],
+   "reward": {
+    "cash": 155,
+    "xp": 452,
+    "unlock": [
+     "hub:h-creek-hills-showground-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-hills-showground-5",
+   "act": 3,
+   "title": "Upstream, Hills Showground",
+   "blurb": "You look like you have twenty minutes. Whatever is happening to Hills Showground starts upstream at Castle Hill, and there are people up there who have been saying so for years. It is the not knowing that has got me, honestly. Do not make a scene about it.",
+   "giver": "hub-hills-showground-josefa",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18849,
+     "z": -14730,
+     "radius": 60,
+     "label": "go up and find them"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear it from someone who is not me",
+     "npc": "hub-hills-showground-josefa"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 454,
+    "unlock": [
+     "hub:h-creek-hills-showground-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

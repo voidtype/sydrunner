@@ -1,0 +1,651 @@
+{
+ "quests": [
+  {
+   "id": "h-bakery-yagoona-0",
+   "act": 3,
+   "title": "the back of seven at Yagoona",
+   "blurb": "You look like you have twenty minutes. I start at the back of seven and for a month the Yagoona back lane has had somebody in it who is not waiting for bread. This is the third time I have had this conversation. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-yagoona-yara",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -16968,
+     "z": 4586,
+     "radius": 35,
+     "label": "the lane, from the door, no flash"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I am not calling anyone until I am sure",
+     "npc": "hub-yagoona-yara"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 217,
+    "unlock": [
+     "hub:h-bakery-yagoona-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-yagoona-1",
+   "act": 3,
+   "title": "The Lane Light, Yagoona",
+   "blurb": "Keep it between us for now. A light on that lane costs Yagoona $67 and the landlord has said no twice, so we are doing it ourselves. It started small, the way these things do. If anyone asks, you were never here.",
+   "giver": "hub-yagoona-yara",
+   "level": 3,
+   "requires": [
+    "h-bakery-yagoona-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 67,
+     "label": "$67 and I will fit it myself"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "do not tell him where it came from",
+     "npc": "hub-yagoona-yara"
+    }
+   ],
+   "reward": {
+    "cash": 123,
+    "xp": 317,
+    "unlock": [
+     "hub:h-bakery-yagoona-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-yagoona-2",
+   "act": 3,
+   "title": "Flour Run, Yagoona",
+   "blurb": "Right. Since you asked. The flour for Yagoona comes off a truck at the back of seven and last a public holiday nobody remembered the truck came and the flour did not. It is the not knowing that has got me, honestly. There is no rush, but there is a Friday.",
+   "giver": "hub-yagoona-kiri",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Yagoona",
+     "to": "Birrong",
+     "label": "ride out to Birrong where the load is made up"
+    },
+    {
+     "kind": "photo",
+     "x": -17023,
+     "z": 4419,
+     "radius": 35,
+     "label": "the pallet with our name on it, if it exists"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 220,
+    "unlock": [
+     "hub:h-bakery-yagoona-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-yagoona-3",
+   "act": 3,
+   "title": "The Loading Zone, Yagoona",
+   "blurb": "My knees are gone, so. The Yagoona loading zone has had a car in it at the back of seven every morning this week and the driver waits in it, which makes it worse. There is probably a simple explanation and I would love to hear it. I'll see you right for it.",
+   "giver": "hub-yagoona-kiri",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 1,
+     "label": "the one who says he is only a minute"
+    },
+    {
+     "kind": "earn",
+     "dollars": 90,
+     "label": "and the ticket I got, off him"
+    }
+   ],
+   "reward": {
+    "cash": 93,
+    "xp": 212,
+    "unlock": [
+     "hub:h-bakery-yagoona-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-yagoona-4",
+   "act": 3,
+   "title": "The Sourdough Sign, Yagoona",
+   "blurb": "This is going to sound small. Somebody two doors down from Yagoona put up a sign on a public holiday nobody remembered that says the same six words as ours, in the same order. You will see what I mean the second you get there. I'll put the kettle on for when you're back.",
+   "giver": "hub-yagoona-seppo",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -16953,
+     "z": 4452,
+     "radius": 25,
+     "label": "walk down and read it properly"
+    },
+    {
+     "kind": "photo",
+     "x": -16945,
+     "z": 4449,
+     "radius": 35,
+     "label": "both signs if you can get them in one frame"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me I am not imagining it",
+     "npc": "hub-yagoona-seppo"
+    }
+   ],
+   "reward": {
+    "cash": 93,
+    "xp": 215,
+    "unlock": [
+     "hub:h-bakery-yagoona-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-yagoona-5",
+   "act": 3,
+   "title": "The Old Site, Yagoona",
+   "blurb": "I have written it down twice and lost it twice. This business was at Birrong before it was at Yagoona, and there is a woman there who still has the original book. There is a version of this where I am the unreasonable one. Just do not come back empty-handed.",
+   "giver": "hub-yagoona-seppo",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -17131,
+     "z": 2831,
+     "radius": 60,
+     "label": "she is usually about in the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring back whatever she is willing to say",
+     "npc": "hub-yagoona-seppo"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 229,
+    "unlock": [
+     "hub:h-bakery-yagoona-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-kellyville-0",
+   "act": 3,
+   "title": "The Kellyville Pool",
+   "blurb": "You look like you have twenty minutes. Council has been saying the Kellyville pool is at end of life since the long weekend and the crack they keep pointing at is not in the shell. This is the third time I have had this conversation. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-kellyville-farah",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -25717,
+     "z": -16704,
+     "radius": 35,
+     "label": "the crack, close, with something for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "an engineer can read that. A councillor cannot.",
+     "npc": "hub-kellyville-farah"
+    }
+   ],
+   "reward": {
+    "cash": 112,
+    "xp": 264,
+    "unlock": [
+     "hub:h-pool-kellyville-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-kellyville-1",
+   "act": 3,
+   "title": "The Petition Stall, Kellyville",
+   "blurb": "Keep it between us for now. We are running a stall for Kellyville on the long weekend and a stall needs $67 of gear that nobody has volunteered to pay for. It started small, the way these things do. If anyone asks, you were never here.",
+   "giver": "hub-kellyville-farah",
+   "level": 4,
+   "requires": [
+    "h-pool-kellyville-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 67,
+     "label": "$67 and a table, if you see one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will be there from eight either way",
+     "npc": "hub-kellyville-farah"
+    }
+   ],
+   "reward": {
+    "cash": 143,
+    "xp": 366,
+    "unlock": [
+     "hub:h-pool-kellyville-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-kellyville-2",
+   "act": 3,
+   "title": "Squad, Kellyville",
+   "blurb": "Right. Since you asked. I coach 70 kids at Kellyville at half six and three of them have stopped coming without anybody ringing me. It is the not knowing that has got me, honestly. There is no rush, but there is a Friday.",
+   "giver": "hub-kellyville-walid",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -25877,
+     "z": -16696,
+     "radius": 25,
+     "label": "the flats where two of them live"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "take something with you, it is a long walk up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I do not need them back. I need to know.",
+     "npc": "hub-kellyville-walid"
+    }
+   ],
+   "reward": {
+    "cash": 104,
+    "xp": 274,
+    "unlock": [
+     "hub:h-pool-kellyville-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-kellyville-3",
+   "act": 3,
+   "title": "The Deep End, Kellyville",
+   "blurb": "My knees are gone, so. A group has been coming over the Kellyville fence after close and swimming in the dark, which is how Kellyville loses its pool. There is probably a simple explanation and I would love to hear it. I'll see you right for it.",
+   "giver": "hub-kellyville-walid",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 3,
+     "label": "the ones who go over the fence"
+    },
+    {
+     "kind": "photo",
+     "x": -25801,
+     "z": -16788,
+     "radius": 35,
+     "label": "the spot in the fence they use"
+    }
+   ],
+   "reward": {
+    "cash": 95,
+    "xp": 273,
+    "unlock": [
+     "hub:h-pool-kellyville-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-kellyville-4",
+   "act": 3,
+   "title": "The Kiosk Freezer, Kellyville",
+   "blurb": "This is going to sound small. The kiosk at Kellyville has a bucket of odd keys in it and a freezer that has been running warm since the long weekend. You will see what I mean the second you get there. I'll put the kettle on for when you're back.",
+   "giver": "hub-kellyville-tara",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "get two, we are going to be here"
+    },
+    {
+     "kind": "goto",
+     "x": -25702,
+     "z": -16714,
+     "radius": 25,
+     "label": "the plant room behind the kiosk"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether it is the freezer or the power",
+     "npc": "hub-kellyville-tara"
+    }
+   ],
+   "reward": {
+    "cash": 97,
+    "xp": 278,
+    "unlock": [
+     "hub:h-pool-kellyville-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-kellyville-5",
+   "act": 3,
+   "title": "The Aquatic Centre, Kellyville",
+   "blurb": "I have written it down twice and lost it twice. They want everyone from Kellyville to drive to the new centre at Bella Vista, so somebody should go and see whether it is any good. There is a version of this where I am the unreasonable one. Just do not come back empty-handed.",
+   "giver": "hub-kellyville-tara",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -24693,
+     "z": -14800,
+     "radius": 60,
+     "label": "have a proper look, not a quick one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "be honest with me, even if it is nice",
+     "npc": "hub-kellyville-tara"
+    }
+   ],
+   "reward": {
+    "cash": 110,
+    "xp": 278,
+    "unlock": [
+     "hub:h-pool-kellyville-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-kings-cross-0",
+   "act": 3,
+   "title": "The Kings Cross Rank",
+   "blurb": "You look like you have twenty minutes. The rank outside Kings Cross used to hold nine cars and since the Sunday after payday it holds four, and nobody will say who moved the line. This is the third time I have had this conversation. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-kings-cross-oscar",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 1137,
+     "z": 654,
+     "radius": 35,
+     "label": "the painted line and the old one under it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the old paint is still there, that is the whole argument",
+     "npc": "hub-kings-cross-oscar"
+    }
+   ],
+   "reward": {
+    "cash": 110,
+    "xp": 264,
+    "unlock": [
+     "hub:h-rank-kings-cross-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-kings-cross-1",
+   "act": 3,
+   "title": "Lost Fares, Kings Cross",
+   "blurb": "Keep it between us for now. Since the rank at Kings Cross shrank I am $63 a week down, and the association wants that number from somebody who can prove it. It started small, the way these things do. If anyone asks, you were never here.",
+   "giver": "hub-kings-cross-oscar",
+   "level": 4,
+   "requires": [
+    "h-rank-kings-cross-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 63,
+     "label": "$63 in a week, to show it can be done"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the submission, right there",
+     "npc": "hub-kings-cross-oscar"
+    }
+   ],
+   "reward": {
+    "cash": 135,
+    "xp": 368,
+    "unlock": [
+     "hub:h-rank-kings-cross-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-kings-cross-2",
+   "act": 3,
+   "title": "Queue Jumpers, Kings Cross",
+   "blurb": "Right. Since you asked. Cars that have never sat in the Kings Cross queue turn up at twenty past four and take the front of it, and the drivers who waited say nothing. It is the not knowing that has got me, honestly. There is no rush, but there is a Friday.",
+   "giver": "hub-kings-cross-jaya",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "the ones who take the front"
+    },
+    {
+     "kind": "earn",
+     "dollars": 29,
+     "label": "$29, which is about one airport run"
+    }
+   ],
+   "reward": {
+    "cash": 101,
+    "xp": 260,
+    "unlock": [
+     "hub:h-rank-kings-cross-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-kings-cross-3",
+   "act": 3,
+   "title": "The Late Train, Kings Cross",
+   "blurb": "My knees are gone, so. When the last train into Kings Cross is late, 29 people come out at once and I have to have cars there before they do. There is probably a simple explanation and I would love to hear it. I'll see you right for it.",
+   "giver": "hub-kings-cross-jaya",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Kings Cross",
+     "to": "St James",
+     "label": "come in on the last one from St James and see it"
+    },
+    {
+     "kind": "photo",
+     "x": 1105,
+     "z": 618,
+     "radius": 35,
+     "label": "the rank at the moment the doors open"
+    }
+   ],
+   "reward": {
+    "cash": 98,
+    "xp": 270,
+    "unlock": [
+     "hub:h-rank-kings-cross-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-kings-cross-4",
+   "act": 3,
+   "title": "The Door, Kings Cross",
+   "blurb": "This is going to sound small. I have stood on this door near Kings Cross for 29 years and since the Sunday after payday somebody has been sending my guests to a different rank. You will see what I mean the second you get there. I'll put the kettle on for when you're back.",
+   "giver": "hub-kings-cross-tess",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 1125,
+     "z": 499,
+     "radius": 25,
+     "label": "follow one of them and see where they end up"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you will be standing about, get something"
+    }
+   ],
+   "reward": {
+    "cash": 97,
+    "xp": 275,
+    "unlock": [
+     "hub:h-rank-kings-cross-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-kings-cross-5",
+   "act": 3,
+   "title": "The Depot, Kings Cross",
+   "blurb": "I have written it down twice and lost it twice. The plates working the Kings Cross rank are dispatched from a depot at St James, and the man who runs it has never met a driver he liked. There is a version of this where I am the unreasonable one. Just do not come back empty-handed.",
+   "giver": "hub-kings-cross-tess",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 349,
+     "z": 50,
+     "radius": 60,
+     "label": "go and be pleasant at him anyway"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether he is the problem or the symptom",
+     "npc": "hub-kings-cross-tess"
+    }
+   ],
+   "reward": {
+    "cash": 113,
+    "xp": 266,
+    "unlock": [
+     "hub:h-rank-kings-cross-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

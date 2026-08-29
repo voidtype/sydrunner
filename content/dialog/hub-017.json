@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-chinatown-nell",
+   "name": "Nell, greenkeeper at Chinatown",
+   "x": -267,
+   "z": 972,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I know that look. Everyone wants something today.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is the sort of thing you notice or you do not. The number three green at Chinatown has had a bald patch the shape of Tasmania since a Tuesday, and the committee thinks I am inventing it. My wife says I should let it go. My wife is wrong. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-chinatown-0",
+       "denyFlag": "hub:h-bowlo-chinatown-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Two people have already said no. They have seen the photograph and now they want it re-laid by a Tuesday, which means finding $57 that the Chinatown club does not have. I have rung the number on the letter four times. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-chinatown-1",
+       "denyFlag": "hub:h-bowlo-chinatown-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "The Dead Patch at Chinatown — that's done.",
+       "turnin": "h-bowlo-chinatown-0"
+      },
+      {
+       "text": "Turf Money, Chinatown — that's done.",
+       "turnin": "h-bowlo-chinatown-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-chinatown-dmitri",
+   "name": "Dmitri, club president at Chinatown",
+   "x": -335,
+   "z": 1174,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Give me a second. Right. Go.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Someone has to, and it may as well be you. Our books say 85 members at Chinatown and I would bet the bar takings that half of them are dead or moved to Queensland. Half the street knows and half the street is pretending not to. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-chinatown-2",
+       "denyFlag": "hub:h-bowlo-chinatown-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You are the first person to stop all morning. Since five in the morning somebody has been going round the Chinatown greens telling the barefoot bowlers we are shutting, and we are not shutting. I am not after trouble. I am after an answer. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-chinatown-3",
+       "denyFlag": "hub:h-bowlo-chinatown-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Chinatown Membership Count — that's done.",
+       "turnin": "h-bowlo-chinatown-2"
+      },
+      {
+       "text": "Closing Time Rumour, Chinatown — that's done.",
+       "turnin": "h-bowlo-chinatown-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-chinatown-shay",
+   "name": "Shay, bar manager at Chinatown",
+   "x": -422,
+   "z": 923,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are not from around the corner, are you.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Not being dramatic about this. There is a roll of raffle tickets in the chest freezer behind the bar at Chinatown and I am not opening it on an empty stomach. Nobody else seems to have noticed, which is its own problem. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-chinatown-4",
+       "denyFlag": "hub:h-bowlo-chinatown-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I am told you do odd jobs. The man who kept these greens before me drinks at Convention now, and he owes Chinatown an explanation about the drainage. Everyone I have told has looked at me the way you are now. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-chinatown-5",
+       "denyFlag": "hub:h-bowlo-chinatown-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Behind the Bar at Chinatown — that's done.",
+       "turnin": "h-bowlo-chinatown-4"
+      },
+      {
+       "text": "The Old Greenkeeper, Chinatown — that's done.",
+       "turnin": "h-bowlo-chinatown-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-chatswood-matias",
+   "name": "Matias, night console operator at Chatswood",
+   "x": -2587.9,
+   "z": -7827.4,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Half of this suburb has walked past already. Not one stopped.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is the sort of thing you notice or you do not. Every night around two in the afternoon the same car does three laps of the Chatswood forecourt and never buys fuel. My wife says I should let it go. My wife is wrong. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-chatswood-0",
+       "denyFlag": "hub:h-servo-chatswood-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Two people have already said no. Now I know the plate, I want to know where it goes after it leaves Chatswood at two in the afternoon, because it is not going home. I have rung the number on the letter four times. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-chatswood-1",
+       "denyFlag": "hub:h-servo-chatswood-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "Nights at Chatswood — that's done.",
+       "turnin": "h-servo-chatswood-0"
+      },
+      {
+       "text": "The Third Lap, Chatswood — that's done.",
+       "turnin": "h-servo-chatswood-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-chatswood-harjit",
+   "name": "Harjit, mechanic at Chatswood",
+   "x": -2913,
+   "z": -7911,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Whatever it is, I have had worse this week.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Someone has to, and it may as well be you. Bay two at the Chatswood workshop has had the same car in it since a wet Monday and the owner has stopped answering. Half the street knows and half the street is pretending not to. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-chatswood-2",
+       "denyFlag": "hub:h-servo-chatswood-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You are the first person to stop all morning. Someone has been walking out of Chatswood with a socket set at a time since a wet Monday, and I have run out of ways to be polite about it. I am not after trouble. I am after an answer. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-chatswood-3",
+       "denyFlag": "hub:h-servo-chatswood-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Bay Two, Chatswood — that's done.",
+       "turnin": "h-servo-chatswood-2"
+      },
+      {
+       "text": "Tools Off the Bench, Chatswood — that's done.",
+       "turnin": "h-servo-chatswood-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-chatswood-jacinta",
+   "name": "Jacinta, franchisee at Chatswood",
+   "x": -2907,
+   "z": -7959,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sit down if you like. Nobody else is using it.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Not being dramatic about this. Head office says the Chatswood board has been wrong since a wet Monday and I say it has been right for eleven years, and one of us is about to be embarrassed. Nobody else seems to have noticed, which is its own problem. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-chatswood-4",
+       "denyFlag": "hub:h-servo-chatswood-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I am told you do odd jobs. The bloke who runs the site at Roseville has had the same trouble Chatswood has, and he will talk to you before he talks to me. Everyone I have told has looked at me the way you are now. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-chatswood-5",
+       "denyFlag": "hub:h-servo-chatswood-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "The Chatswood Price Board — that's done.",
+       "turnin": "h-servo-chatswood-4"
+      },
+      {
+       "text": "The Other Franchise, Chatswood — that's done.",
+       "turnin": "h-servo-chatswood-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-waterloo-nina",
+   "name": "Nina, building manager at Waterloo",
+   "x": -889,
+   "z": 3220,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You will have to speak up, the trains are in.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is the sort of thing you notice or you do not. Water has been coming through the level two ceiling of the Waterloo block since a wet Monday and the strata report says there is no water. My wife says I should let it go. My wife is wrong. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-waterloo-0",
+       "denyFlag": "hub:h-strata-waterloo-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Two people have already said no. The photo did it. I have rung the number on the letter four times. Now every owner at Waterloo owes $76 and I have to collect it from people who have avoided me for a year. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-waterloo-1",
+       "denyFlag": "hub:h-strata-waterloo-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "Level Two, Waterloo — that's done.",
+       "turnin": "h-strata-waterloo-0"
+      },
+      {
+       "text": "The Special Levy, Waterloo — that's done.",
+       "turnin": "h-strata-waterloo-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-waterloo-ruslan",
+   "name": "Ruslan, owner-occupier at Waterloo",
+   "x": -689,
+   "z": 3315,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I have got about four minutes before I am needed.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Someone has to, and it may as well be you. Somebody who does not live at Waterloo has parked in space fourteen every night since a wet Monday and the manager will not look at it. Half the street knows and half the street is pretending not to. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-waterloo-2",
+       "denyFlag": "hub:h-strata-waterloo-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You are the first person to stop all morning. The Waterloo AGM is on a wet Monday and I would like to arrive with something stronger than a grievance and a printout. I am not after trouble. I am after an answer. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-waterloo-3",
+       "denyFlag": "hub:h-strata-waterloo-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "Car Space 14, Waterloo — that's done.",
+       "turnin": "h-strata-waterloo-2"
+      },
+      {
+       "text": "The Meeting, Waterloo — that's done.",
+       "turnin": "h-strata-waterloo-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-waterloo-fern",
+   "name": "Fern, the one who does the bins at Waterloo",
+   "x": -789,
+   "z": 3302,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Ah. Someone with two working legs.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Not being dramatic about this. Three units at Waterloo have put their bins out on the wrong night since a wet Monday and I have taken it personally, which I accept is a choice I made. Nobody else seems to have noticed, which is its own problem. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-waterloo-4",
+       "denyFlag": "hub:h-strata-waterloo-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I am told you do odd jobs. There is a block at Erskineville with the same builder and the same cracks, and their manager has already been through what Waterloo is starting. Everyone I have told has looked at me the way you are now. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-waterloo-5",
+       "denyFlag": "hub:h-strata-waterloo-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "Bin Night at Waterloo — that's done.",
+       "turnin": "h-strata-waterloo-4"
+      },
+      {
+       "text": "The Other Block, Waterloo — that's done.",
+       "turnin": "h-strata-waterloo-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

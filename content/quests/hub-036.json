@@ -1,0 +1,651 @@
+{
+ "quests": [
+  {
+   "id": "h-bakery-normanhurst-0",
+   "act": 3,
+   "title": "ten past five at Normanhurst",
+   "blurb": "My knees are gone, so. I start at ten past five and for a month the Normanhurst back lane has had somebody in it who is not waiting for bread. I have rung the number on the letter four times. That's the whole job. No catch.",
+   "giver": "hub-normanhurst-satu",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -10633,
+     "z": -16163,
+     "radius": 35,
+     "label": "the lane, from the door, no flash"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I am not calling anyone until I am sure",
+     "npc": "hub-normanhurst-satu"
+    }
+   ],
+   "reward": {
+    "cash": 78,
+    "xp": 182,
+    "unlock": [
+     "hub:h-bakery-normanhurst-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-normanhurst-1",
+   "act": 3,
+   "title": "The Lane Light, Normanhurst",
+   "blurb": "This is going to sound small. A light on that lane costs Normanhurst $39 and the landlord has said no twice, so we are doing it ourselves. Half the street knows and half the street is pretending not to. Be polite about it. It costs nothing.",
+   "giver": "hub-normanhurst-satu",
+   "level": 2,
+   "requires": [
+    "h-bakery-normanhurst-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 39,
+     "label": "$39 and I will fit it myself"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "do not tell him where it came from",
+     "npc": "hub-normanhurst-satu"
+    }
+   ],
+   "reward": {
+    "cash": 107,
+    "xp": 260,
+    "unlock": [
+     "hub:h-bakery-normanhurst-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-normanhurst-2",
+   "act": 3,
+   "title": "Flour Run, Normanhurst",
+   "blurb": "I have written it down twice and lost it twice. The flour for Normanhurst comes off a truck at ten past five and last Thursdays the truck came and the flour did not. I am not after trouble. I am after an answer. Take your time. Do not take a week.",
+   "giver": "hub-normanhurst-otto",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Normanhurst",
+     "to": "Waitara",
+     "label": "ride out to Waitara where the load is made up"
+    },
+    {
+     "kind": "photo",
+     "x": -10734,
+     "z": -16267,
+     "radius": 35,
+     "label": "the pallet with our name on it, if it exists"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 186,
+    "unlock": [
+     "hub:h-bakery-normanhurst-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-normanhurst-3",
+   "act": 3,
+   "title": "The Loading Zone, Normanhurst",
+   "blurb": "Do not laugh. The Normanhurst loading zone has had a car in it at ten past five every morning this week and the driver waits in it, which makes it worse. Nobody else seems to have noticed, which is its own problem. Come and find me after, either way.",
+   "giver": "hub-normanhurst-otto",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "the one who says he is only a minute"
+    },
+    {
+     "kind": "earn",
+     "dollars": 90,
+     "label": "and the ticket I got, off him"
+    }
+   ],
+   "reward": {
+    "cash": 73,
+    "xp": 167,
+    "unlock": [
+     "hub:h-bakery-normanhurst-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-normanhurst-4",
+   "act": 3,
+   "title": "The Sourdough Sign, Normanhurst",
+   "blurb": "It is the sort of thing you notice or you do not. Somebody two doors down from Normanhurst put up a sign on Thursdays that says the same six words as ours, in the same order. Everyone I have told has looked at me the way you are now. Whatever you find, bring it to me first.",
+   "giver": "hub-normanhurst-maud",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10571,
+     "z": -16277,
+     "radius": 25,
+     "label": "walk down and read it properly"
+    },
+    {
+     "kind": "photo",
+     "x": -10563,
+     "z": -16273,
+     "radius": 35,
+     "label": "both signs if you can get them in one frame"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me I am not imagining it",
+     "npc": "hub-normanhurst-maud"
+    }
+   ],
+   "reward": {
+    "cash": 78,
+    "xp": 182,
+    "unlock": [
+     "hub:h-bakery-normanhurst-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-normanhurst-5",
+   "act": 3,
+   "title": "The Old Site, Normanhurst",
+   "blurb": "Two people have already said no. This business was at Waitara before it was at Normanhurst, and there is a woman there who still has the original book. This is the third time I have had this conversation. That's it. That's the whole ask.",
+   "giver": "hub-normanhurst-maud",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10086,
+     "z": -17248,
+     "radius": 60,
+     "label": "she is usually about in the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring back whatever she is willing to say",
+     "npc": "hub-normanhurst-maud"
+    }
+   ],
+   "reward": {
+    "cash": 76,
+    "xp": 167,
+    "unlock": [
+     "hub:h-bakery-normanhurst-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-redfern-0",
+   "act": 3,
+   "title": "The Redfern Pool",
+   "blurb": "My knees are gone, so. Council has been saying the Redfern pool is at end of life since the week of the show and the crack they keep pointing at is not in the shell. I have rung the number on the letter four times. That's the whole job. No catch.",
+   "giver": "hub-redfern-basim",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -1054,
+     "z": 2596,
+     "radius": 35,
+     "label": "the crack, close, with something for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "an engineer can read that. A councillor cannot.",
+     "npc": "hub-redfern-basim"
+    }
+   ],
+   "reward": {
+    "cash": 73,
+    "xp": 177,
+    "unlock": [
+     "hub:h-pool-redfern-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-redfern-1",
+   "act": 3,
+   "title": "The Petition Stall, Redfern",
+   "blurb": "This is going to sound small. We are running a stall for Redfern on the week of the show and a stall needs $34 of gear that nobody has volunteered to pay for. Half the street knows and half the street is pretending not to. Be polite about it. It costs nothing.",
+   "giver": "hub-redfern-basim",
+   "level": 2,
+   "requires": [
+    "h-pool-redfern-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 34,
+     "label": "$34 and a table, if you see one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will be there from eight either way",
+     "npc": "hub-redfern-basim"
+    }
+   ],
+   "reward": {
+    "cash": 118,
+    "xp": 269,
+    "unlock": [
+     "hub:h-pool-redfern-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-redfern-2",
+   "act": 3,
+   "title": "Squad, Redfern",
+   "blurb": "I have written it down twice and lost it twice. I coach 90 kids at Redfern at the back of seven and three of them have stopped coming without anybody ringing me. I am not after trouble. I am after an answer. Take your time. Do not take a week.",
+   "giver": "hub-redfern-aoife",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1125,
+     "z": 2605,
+     "radius": 25,
+     "label": "the flats where two of them live"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "take something with you, it is a long walk up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I do not need them back. I need to know.",
+     "npc": "hub-redfern-aoife"
+    }
+   ],
+   "reward": {
+    "cash": 84,
+    "xp": 169,
+    "unlock": [
+     "hub:h-pool-redfern-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-redfern-3",
+   "act": 3,
+   "title": "The Deep End, Redfern",
+   "blurb": "Do not laugh. A group has been coming over the Redfern fence after close and swimming in the dark, which is how Redfern loses its pool. Nobody else seems to have noticed, which is its own problem. Come and find me after, either way.",
+   "giver": "hub-redfern-aoife",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 3,
+     "label": "the ones who go over the fence"
+    },
+    {
+     "kind": "photo",
+     "x": -1049,
+     "z": 2513,
+     "radius": 35,
+     "label": "the spot in the fence they use"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 175,
+    "unlock": [
+     "hub:h-pool-redfern-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-redfern-4",
+   "act": 3,
+   "title": "The Kiosk Freezer, Redfern",
+   "blurb": "It is the sort of thing you notice or you do not. The kiosk at Redfern has a folding table in it and a freezer that has been running warm since the week of the show. Everyone I have told has looked at me the way you are now. Whatever you find, bring it to me first.",
+   "giver": "hub-redfern-mawusi",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "get two, we are going to be here"
+    },
+    {
+     "kind": "goto",
+     "x": -959,
+     "z": 2513,
+     "radius": 25,
+     "label": "the plant room behind the kiosk"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether it is the freezer or the power",
+     "npc": "hub-redfern-mawusi"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 172,
+    "unlock": [
+     "hub:h-pool-redfern-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-redfern-5",
+   "act": 3,
+   "title": "The Aquatic Centre, Redfern",
+   "blurb": "Two people have already said no. They want everyone from Redfern to drive to the new centre at Central, so somebody should go and see whether it is any good. This is the third time I have had this conversation. That's it. That's the whole ask.",
+   "giver": "hub-redfern-mawusi",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -182,
+     "z": 1875,
+     "radius": 60,
+     "label": "have a proper look, not a quick one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "be honest with me, even if it is nice",
+     "npc": "hub-redfern-mawusi"
+    }
+   ],
+   "reward": {
+    "cash": 80,
+    "xp": 176,
+    "unlock": [
+     "hub:h-pool-redfern-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-westmead-0",
+   "act": 3,
+   "title": "The Westmead Rank",
+   "blurb": "My knees are gone, so. The rank outside Westmead used to hold nine cars and since every second Friday it holds four, and nobody will say who moved the line. I have rung the number on the letter four times. That's the whole job. No catch.",
+   "giver": "hub-westmead-zeki",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -20724,
+     "z": -6432,
+     "radius": 35,
+     "label": "the painted line and the old one under it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the old paint is still there, that is the whole argument",
+     "npc": "hub-westmead-zeki"
+    }
+   ],
+   "reward": {
+    "cash": 94,
+    "xp": 226,
+    "unlock": [
+     "hub:h-rank-westmead-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-westmead-1",
+   "act": 3,
+   "title": "Lost Fares, Westmead",
+   "blurb": "This is going to sound small. Since the rank at Westmead shrank I am $44 a week down, and the association wants that number from somebody who can prove it. Half the street knows and half the street is pretending not to. Be polite about it. It costs nothing.",
+   "giver": "hub-westmead-zeki",
+   "level": 3,
+   "requires": [
+    "h-rank-westmead-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 44,
+     "label": "$44 in a week, to show it can be done"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the submission, right there",
+     "npc": "hub-westmead-zeki"
+    }
+   ],
+   "reward": {
+    "cash": 121,
+    "xp": 314,
+    "unlock": [
+     "hub:h-rank-westmead-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-westmead-2",
+   "act": 3,
+   "title": "Queue Jumpers, Westmead",
+   "blurb": "I have written it down twice and lost it twice. Cars that have never sat in the Westmead queue turn up at first light and take the front of it, and the drivers who waited say nothing. I am not after trouble. I am after an answer. Take your time. Do not take a week.",
+   "giver": "hub-westmead-agnes",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 2,
+     "label": "the ones who take the front"
+    },
+    {
+     "kind": "earn",
+     "dollars": 54,
+     "label": "$54, which is about one airport run"
+    }
+   ],
+   "reward": {
+    "cash": 80,
+    "xp": 215,
+    "unlock": [
+     "hub:h-rank-westmead-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-westmead-3",
+   "act": 3,
+   "title": "The Late Train, Westmead",
+   "blurb": "Do not laugh. When the last train into Westmead is late, 54 people come out at once and I have to have cars there before they do. Nobody else seems to have noticed, which is its own problem. Come and find me after, either way.",
+   "giver": "hub-westmead-agnes",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Westmead",
+     "to": "Westmead Hospital",
+     "label": "come in on the last one from Westmead Hospital and see it"
+    },
+    {
+     "kind": "photo",
+     "x": -20756,
+     "z": -6468,
+     "radius": 35,
+     "label": "the rank at the moment the doors open"
+    }
+   ],
+   "reward": {
+    "cash": 84,
+    "xp": 232,
+    "unlock": [
+     "hub:h-rank-westmead-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-westmead-4",
+   "act": 3,
+   "title": "The Door, Westmead",
+   "blurb": "It is the sort of thing you notice or you do not. I have stood on this door near Westmead for 54 years and since every second Friday somebody has been sending my guests to a different rank. Everyone I have told has looked at me the way you are now. Whatever you find, bring it to me first.",
+   "giver": "hub-westmead-zara",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -20736,
+     "z": -6587,
+     "radius": 25,
+     "label": "follow one of them and see where they end up"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you will be standing about, get something"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 229,
+    "unlock": [
+     "hub:h-rank-westmead-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-westmead-5",
+   "act": 3,
+   "title": "The Depot, Westmead",
+   "blurb": "Two people have already said no. The plates working the Westmead rank are dispatched from a depot at Wentworthville, and the man who runs it has never met a driver he liked. This is the third time I have had this conversation. That's it. That's the whole ask.",
+   "giver": "hub-westmead-zara",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -21991,
+     "z": -6508,
+     "radius": 60,
+     "label": "go and be pleasant at him anyway"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether he is the problem or the symptom",
+     "npc": "hub-westmead-zara"
+    }
+   ],
+   "reward": {
+    "cash": 85,
+    "xp": 217,
+    "unlock": [
+     "hub:h-rank-westmead-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

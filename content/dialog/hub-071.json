@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-juniors-kingsford-tuan",
+   "name": "Tuan, newsagent at Juniors Kingsford",
+   "x": 1843,
+   "z": 6095,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You will have to speak up, the trains are in.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I am told you do odd jobs. I am sending back 49 papers a day from Juniors Kingsford and paying to have them collected, which is a business model somebody invented on purpose. There is probably a simple explanation and I would love to hear it. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-juniors-kingsford-0",
+       "denyFlag": "hub:h-newsagent-juniors-kingsford-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I'll be straight with you. They will drop my Juniors Kingsford order if I can show $61 of turnover on the other side of the shop by a public holiday nobody remembered. You will see what I mean the second you get there. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-juniors-kingsford-1",
+       "denyFlag": "hub:h-newsagent-juniors-kingsford-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "Returns at Juniors Kingsford — that's done.",
+       "turnin": "h-newsagent-juniors-kingsford-0"
+      },
+      {
+       "text": "The Better Rate, Juniors Kingsford — that's done.",
+       "turnin": "h-newsagent-juniors-kingsford-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-juniors-kingsford-sadia",
+   "name": "Sadia, paper runner at Juniors Kingsford",
+   "x": 1875,
+   "z": 6178,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I have got about four minutes before I am needed.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It has been three weeks. I do the Juniors Kingsford round from the second express and for the last fortnight somebody has been taking the papers off the front steps behind me. There is a version of this where I am the unreasonable one. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-juniors-kingsford-2",
+       "denyFlag": "hub:h-newsagent-juniors-kingsford-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Nobody else has offered, so. There is a dog on the Juniors Kingsford round that has had two of my bags and a folding table that was not even mine. The paperwork says one thing and my eyes say another. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-juniors-kingsford-3",
+       "denyFlag": "hub:h-newsagent-juniors-kingsford-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "The Juniors Kingsford Round — that's done.",
+       "turnin": "h-newsagent-juniors-kingsford-2"
+      },
+      {
+       "text": "The Dog on Ash Street, Juniors Kingsford — that's done.",
+       "turnin": "h-newsagent-juniors-kingsford-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-juniors-kingsford-dinesh",
+   "name": "Dinesh, lotto regular at Juniors Kingsford",
+   "x": 2073,
+   "z": 6148,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Ah. Someone with two working legs.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "The council knows and the council does not care. Nine of us at Juniors Kingsford have gone in on the same numbers since a public holiday nobody remembered and one of us has stopped putting money in. It has been going on longer than I have admitted to anyone. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-juniors-kingsford-4",
+       "denyFlag": "hub:h-newsagent-juniors-kingsford-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have been putting it off since Easter. The agency at UNSW Anzac Parade closed six months before Juniors Kingsford started struggling, and I would very much like to know what they know. I have got no proof, which is exactly why I am asking. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-juniors-kingsford-5",
+       "denyFlag": "hub:h-newsagent-juniors-kingsford-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "The Syndicate, Juniors Kingsford — that's done.",
+       "turnin": "h-newsagent-juniors-kingsford-4"
+      },
+      {
+       "text": "The Other Agency, Juniors Kingsford — that's done.",
+       "turnin": "h-newsagent-juniors-kingsford-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-birrong-chandra",
+   "name": "Chandra, panel beater at Birrong",
+   "x": -17131,
+   "z": 2831,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are early. Or late. I have lost track.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I am told you do odd jobs. There has been a car in the Birrong yard since Thursdays with a bucket of odd keys on the passenger seat and no owner answering. There is probably a simple explanation and I would love to hear it. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-birrong-0",
+       "denyFlag": "hub:h-workshop-birrong-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I'll be straight with you. Now that it is documented, Birrong is owed $85 in storage and the only person who can pay it is the person not answering. You will see what I mean the second you get there. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-birrong-1",
+       "denyFlag": "hub:h-workshop-birrong-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "The Unclaimed Falcon, Birrong — that's done.",
+       "turnin": "h-workshop-birrong-0"
+      },
+      {
+       "text": "Storage Fees, Birrong — that's done.",
+       "turnin": "h-workshop-birrong-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-birrong-josefa",
+   "name": "Josefa, apprentice at Birrong",
+   "x": -17159,
+   "z": 3001,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Been here since before it was like this. Go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It has been three weeks. I am in my first year at Birrong and I have to log 38 hours on a job I am not allowed to touch on my own. There is a version of this where I am the unreasonable one. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-birrong-2",
+       "denyFlag": "hub:h-workshop-birrong-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Nobody else has offered, so. Somebody has been coming into the Birrong yard after half six to use the air line, and last week they used the compressor as well. The paperwork says one thing and my eyes say another. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-birrong-3",
+       "denyFlag": "hub:h-workshop-birrong-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "First Year, Birrong — that's done.",
+       "turnin": "h-workshop-birrong-2"
+      },
+      {
+       "text": "The Air Line, Birrong — that's done.",
+       "turnin": "h-workshop-birrong-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-birrong-rita",
+   "name": "Rita, the bloke whose car it is at Birrong",
+   "x": -17109,
+   "z": 2916,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Do not mind the mess. It is structural now.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "The council knows and the council does not care. My car has been at Birrong since Thursdays and every time I ring, the quote has grown by about $38. It has been going on longer than I have admitted to anyone. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-birrong-4",
+       "denyFlag": "hub:h-workshop-birrong-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have been putting it off since Easter. The insurance assessor who signs off every job at Birrong works out of Regents Park, and he has never once seen the car he is assessing. I have got no proof, which is exactly why I am asking. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-birrong-5",
+       "denyFlag": "hub:h-workshop-birrong-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "My Own Car, Birrong — that's done.",
+       "turnin": "h-workshop-birrong-4"
+      },
+      {
+       "text": "The Assessor, Birrong — that's done.",
+       "turnin": "h-workshop-birrong-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-caringbah-vasil",
+   "name": "Vasil, shop manager at Caringbah",
+   "x": -7790,
+   "z": 19174,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are selling something the answer is no.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I am told you do odd jobs. People leave things at the Caringbah roller door after twenty past four and by morning it is rained on and it is our problem and our tip fee. There is probably a simple explanation and I would love to hear it. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-caringbah-0",
+       "denyFlag": "hub:h-opshop-caringbah-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I'll be straight with you. The photos worked, which means Caringbah can claim back the $92 we have paid to throw away other people's furniture since every second Friday. You will see what I mean the second you get there. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-caringbah-1",
+       "denyFlag": "hub:h-opshop-caringbah-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "Dumped Out the Back, Caringbah — that's done.",
+       "turnin": "h-opshop-caringbah-0"
+      },
+      {
+       "text": "The Tip Fee, Caringbah — that's done.",
+       "turnin": "h-opshop-caringbah-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-caringbah-ambrose",
+   "name": "Ambrose, sorter at Caringbah",
+   "x": -7699,
+   "z": 19208,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Cash only and no, I am joking. What do you want.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It has been three weeks. Something came into Caringbah on every second Friday in a box of paperbacks that I do not think the family meant to give away. There is a version of this where I am the unreasonable one. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-caringbah-2",
+       "denyFlag": "hub:h-opshop-caringbah-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Nobody else has offered, so. Two people have been coming into the Caringbah sorting room since every second Friday and taking the good stock before it reaches the floor, and one of them volunteers here. The paperwork says one thing and my eyes say another. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-caringbah-3",
+       "denyFlag": "hub:h-opshop-caringbah-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Good Box, Caringbah — that's done.",
+       "turnin": "h-opshop-caringbah-2"
+      },
+      {
+       "text": "Sorting Room, Caringbah — that's done.",
+       "turnin": "h-opshop-caringbah-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-caringbah-kalinda",
+   "name": "Kalinda, volunteer driver at Caringbah",
+   "x": -7553.9,
+   "z": 19416.5,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You have got a face like you can keep your mouth shut.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "The council knows and the council does not care. I do the Caringbah pick-ups in a van with 55 thousand on it and a door that only opens if you know about it. It has been going on longer than I have admitted to anyone. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-caringbah-4",
+       "denyFlag": "hub:h-opshop-caringbah-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have been putting it off since Easter. Everything Caringbah cannot sell goes to a warehouse at Miranda, and nobody there has ever answered a phone in my hearing. I have got no proof, which is exactly why I am asking. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-caringbah-5",
+       "denyFlag": "hub:h-opshop-caringbah-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "The Van, Caringbah — that's done.",
+       "turnin": "h-opshop-caringbah-4"
+      },
+      {
+       "text": "Head Office, Caringbah — that's done.",
+       "turnin": "h-opshop-caringbah-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

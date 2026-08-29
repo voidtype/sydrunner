@@ -1,0 +1,651 @@
+{
+ "quests": [
+  {
+   "id": "h-bakery-guildford-0",
+   "act": 3,
+   "title": "knock-off at Guildford",
+   "blurb": "Someone has to, and it may as well be you. I start at knock-off and for a month the Guildford back lane has had somebody in it who is not waiting for bread. I have got no proof, which is exactly why I am asking. Say nothing to anyone on the way.",
+   "giver": "hub-guildford-arta",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -20718,
+     "z": -1104,
+     "radius": 35,
+     "label": "the lane, from the door, no flash"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I am not calling anyone until I am sure",
+     "npc": "hub-guildford-arta"
+    }
+   ],
+   "reward": {
+    "cash": 167,
+    "xp": 440,
+    "unlock": [
+     "hub:h-bakery-guildford-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-guildford-1",
+   "act": 3,
+   "title": "The Lane Light, Guildford",
+   "blurb": "You are the first person to stop all morning. A light on that lane costs Guildford $120 and the landlord has said no twice, so we are doing it ourselves. It might be nothing. It has not felt like nothing. Do not make a scene about it.",
+   "giver": "hub-guildford-arta",
+   "level": 8,
+   "requires": [
+    "h-bakery-guildford-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 120,
+     "label": "$120 and I will fit it myself"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "do not tell him where it came from",
+     "npc": "hub-guildford-arta"
+    }
+   ],
+   "reward": {
+    "cash": 212,
+    "xp": 528,
+    "unlock": [
+     "hub:h-bakery-guildford-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-guildford-2",
+   "act": 3,
+   "title": "Flour Run, Guildford",
+   "blurb": "Not being dramatic about this. The flour for Guildford comes off a truck at knock-off and last the week of the show the truck came and the flour did not. I would not ask if there was anyone else about. Ask for me by name at the counter.",
+   "giver": "hub-guildford-zita",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Guildford",
+     "to": "Yennora",
+     "label": "ride out to Yennora where the load is made up"
+    },
+    {
+     "kind": "photo",
+     "x": -20773,
+     "z": -1271,
+     "radius": 35,
+     "label": "the pallet with our name on it, if it exists"
+    }
+   ],
+   "reward": {
+    "cash": 173,
+    "xp": 461,
+    "unlock": [
+     "hub:h-bakery-guildford-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-guildford-3",
+   "act": 3,
+   "title": "The Loading Zone, Guildford",
+   "blurb": "I am told you do odd jobs. The Guildford loading zone has had a car in it at knock-off every morning this week and the driver waits in it, which makes it worse. You can tell me I am imagining it. Tell me after. Come back and tell me straight.",
+   "giver": "hub-guildford-zita",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "the one who says he is only a minute"
+    },
+    {
+     "kind": "earn",
+     "dollars": 90,
+     "label": "and the ticket I got, off him"
+    }
+   ],
+   "reward": {
+    "cash": 156,
+    "xp": 447,
+    "unlock": [
+     "hub:h-bakery-guildford-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-guildford-4",
+   "act": 3,
+   "title": "The Sourdough Sign, Guildford",
+   "blurb": "I'll be straight with you. Somebody two doors down from Guildford put up a sign on the week of the show that says the same six words as ours, in the same order. I would have sorted it myself a year ago. Do that and we're square.",
+   "giver": "hub-guildford-jia",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -20703,
+     "z": -1238,
+     "radius": 25,
+     "label": "walk down and read it properly"
+    },
+    {
+     "kind": "photo",
+     "x": -20695,
+     "z": -1241,
+     "radius": 35,
+     "label": "both signs if you can get them in one frame"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me I am not imagining it",
+     "npc": "hub-guildford-jia"
+    }
+   ],
+   "reward": {
+    "cash": 164,
+    "xp": 453,
+    "unlock": [
+     "hub:h-bakery-guildford-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-guildford-5",
+   "act": 3,
+   "title": "The Old Site, Guildford",
+   "blurb": "It has been three weeks. This business was at Yennora before it was at Guildford, and there is a woman there who still has the original book. It is not the money. It has stopped being the money. I will owe you one, and I pay those.",
+   "giver": "hub-guildford-jia",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -21999,
+     "z": 94,
+     "radius": 60,
+     "label": "she is usually about in the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring back whatever she is willing to say",
+     "npc": "hub-guildford-jia"
+    }
+   ],
+   "reward": {
+    "cash": 172,
+    "xp": 448,
+    "unlock": [
+     "hub:h-bakery-guildford-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-green-square-0",
+   "act": 3,
+   "title": "The Green Square Pool",
+   "blurb": "Someone has to, and it may as well be you. Council has been saying the Green Square pool is at end of life since the long weekend and the crack they keep pointing at is not in the shell. I have got no proof, which is exactly why I am asking. Say nothing to anyone on the way.",
+   "giver": "hub-green-square-soren",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -571,
+     "z": 4123,
+     "radius": 35,
+     "label": "the crack, close, with something for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "an engineer can read that. A councillor cannot.",
+     "npc": "hub-green-square-soren"
+    }
+   ],
+   "reward": {
+    "cash": 189,
+    "xp": 495,
+    "unlock": [
+     "hub:h-pool-green-square-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-green-square-1",
+   "act": 3,
+   "title": "The Petition Stall, Green Square",
+   "blurb": "You are the first person to stop all morning. We are running a stall for Green Square on the long weekend and a stall needs $103 of gear that nobody has volunteered to pay for. It might be nothing. It has not felt like nothing. Do not make a scene about it.",
+   "giver": "hub-green-square-soren",
+   "level": 9,
+   "requires": [
+    "h-pool-green-square-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 103,
+     "label": "$103 and a table, if you see one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will be there from eight either way",
+     "npc": "hub-green-square-soren"
+    }
+   ],
+   "reward": {
+    "cash": 217,
+    "xp": 580,
+    "unlock": [
+     "hub:h-pool-green-square-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-green-square-2",
+   "act": 3,
+   "title": "Squad, Green Square",
+   "blurb": "Not being dramatic about this. I coach 76 kids at Green Square at twenty past four and three of them have stopped coming without anybody ringing me. I would not ask if there was anyone else about. Ask for me by name at the counter.",
+   "giver": "hub-green-square-esteban",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -751,
+     "z": 4167,
+     "radius": 25,
+     "label": "the flats where two of them live"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "take something with you, it is a long walk up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I do not need them back. I need to know.",
+     "npc": "hub-green-square-esteban"
+    }
+   ],
+   "reward": {
+    "cash": 187,
+    "xp": 485,
+    "unlock": [
+     "hub:h-pool-green-square-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-green-square-3",
+   "act": 3,
+   "title": "The Deep End, Green Square",
+   "blurb": "I am told you do odd jobs. A group has been coming over the Green Square fence after close and swimming in the dark, which is how Green Square loses its pool. You can tell me I am imagining it. Tell me after. Come back and tell me straight.",
+   "giver": "hub-green-square-esteban",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "the ones who go over the fence"
+    },
+    {
+     "kind": "photo",
+     "x": -675,
+     "z": 4075,
+     "radius": 35,
+     "label": "the spot in the fence they use"
+    }
+   ],
+   "reward": {
+    "cash": 178,
+    "xp": 484,
+    "unlock": [
+     "hub:h-pool-green-square-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-green-square-4",
+   "act": 3,
+   "title": "The Kiosk Freezer, Green Square",
+   "blurb": "I'll be straight with you. The kiosk at Green Square has a roll of raffle tickets in it and a freezer that has been running warm since the long weekend. I would have sorted it myself a year ago. Do that and we're square.",
+   "giver": "hub-green-square-florian",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 2,
+     "label": "get two, we are going to be here"
+    },
+    {
+     "kind": "goto",
+     "x": -585,
+     "z": 4075,
+     "radius": 25,
+     "label": "the plant room behind the kiosk"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether it is the freezer or the power",
+     "npc": "hub-green-square-florian"
+    }
+   ],
+   "reward": {
+    "cash": 182,
+    "xp": 501,
+    "unlock": [
+     "hub:h-pool-green-square-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-green-square-5",
+   "act": 3,
+   "title": "The Aquatic Centre, Green Square",
+   "blurb": "It has been three weeks. They want everyone from Green Square to drive to the new centre at Erskineville, so somebody should go and see whether it is any good. It is not the money. It has stopped being the money. I will owe you one, and I pay those.",
+   "giver": "hub-green-square-florian",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2000,
+     "z": 3668,
+     "radius": 60,
+     "label": "have a proper look, not a quick one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "be honest with me, even if it is nice",
+     "npc": "hub-green-square-florian"
+    }
+   ],
+   "reward": {
+    "cash": 177,
+    "xp": 486,
+    "unlock": [
+     "hub:h-pool-green-square-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-chester-hill-0",
+   "act": 3,
+   "title": "The Chester Hill Rank",
+   "blurb": "Someone has to, and it may as well be you. The rank outside Chester Hill used to hold nine cars and since a wet Monday it holds four, and nobody will say who moved the line. I have got no proof, which is exactly why I am asking. Say nothing to anyone on the way.",
+   "giver": "hub-chester-hill-evangelos",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -19371,
+     "z": 2143,
+     "radius": 35,
+     "label": "the painted line and the old one under it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the old paint is still there, that is the whole argument",
+     "npc": "hub-chester-hill-evangelos"
+    }
+   ],
+   "reward": {
+    "cash": 186,
+    "xp": 537,
+    "unlock": [
+     "hub:h-rank-chester-hill-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-chester-hill-1",
+   "act": 3,
+   "title": "Lost Fares, Chester Hill",
+   "blurb": "You are the first person to stop all morning. Since the rank at Chester Hill shrank I am $143 a week down, and the association wants that number from somebody who can prove it. It might be nothing. It has not felt like nothing. Do not make a scene about it.",
+   "giver": "hub-chester-hill-evangelos",
+   "level": 10,
+   "requires": [
+    "h-rank-chester-hill-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 143,
+     "label": "$143 in a week, to show it can be done"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the submission, right there",
+     "npc": "hub-chester-hill-evangelos"
+    }
+   ],
+   "reward": {
+    "cash": 236,
+    "xp": 633,
+    "unlock": [
+     "hub:h-rank-chester-hill-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-chester-hill-2",
+   "act": 3,
+   "title": "Queue Jumpers, Chester Hill",
+   "blurb": "Not being dramatic about this. Cars that have never sat in the Chester Hill queue turn up at ten past five and take the front of it, and the drivers who waited say nothing. I would not ask if there was anyone else about. Ask for me by name at the counter.",
+   "giver": "hub-chester-hill-bo",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 2,
+     "label": "the ones who take the front"
+    },
+    {
+     "kind": "earn",
+     "dollars": 45,
+     "label": "$45, which is about one airport run"
+    }
+   ],
+   "reward": {
+    "cash": 196,
+    "xp": 542,
+    "unlock": [
+     "hub:h-rank-chester-hill-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-chester-hill-3",
+   "act": 3,
+   "title": "The Late Train, Chester Hill",
+   "blurb": "I am told you do odd jobs. When the last train into Chester Hill is late, 45 people come out at once and I have to have cars there before they do. You can tell me I am imagining it. Tell me after. Come back and tell me straight.",
+   "giver": "hub-chester-hill-bo",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Chester Hill",
+     "to": "Sefton",
+     "label": "come in on the last one from Sefton and see it"
+    },
+    {
+     "kind": "photo",
+     "x": -19403,
+     "z": 2107,
+     "radius": 35,
+     "label": "the rank at the moment the doors open"
+    }
+   ],
+   "reward": {
+    "cash": 203,
+    "xp": 553,
+    "unlock": [
+     "hub:h-rank-chester-hill-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-chester-hill-4",
+   "act": 3,
+   "title": "The Door, Chester Hill",
+   "blurb": "I'll be straight with you. I have stood on this door near Chester Hill for 45 years and since a wet Monday somebody has been sending my guests to a different rank. I would have sorted it myself a year ago. Do that and we're square.",
+   "giver": "hub-chester-hill-micah",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -19234,
+     "z": 2055,
+     "radius": 25,
+     "label": "follow one of them and see where they end up"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "you will be standing about, get something"
+    }
+   ],
+   "reward": {
+    "cash": 201,
+    "xp": 544,
+    "unlock": [
+     "hub:h-rank-chester-hill-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-chester-hill-5",
+   "act": 3,
+   "title": "The Depot, Chester Hill",
+   "blurb": "It has been three weeks. The plates working the Chester Hill rank are dispatched from a depot at Sefton, and the man who runs it has never met a driver he liked. It is not the money. It has stopped being the money. I will owe you one, and I pay those.",
+   "giver": "hub-chester-hill-micah",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18351,
+     "z": 2226,
+     "radius": 60,
+     "label": "go and be pleasant at him anyway"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether he is the problem or the symptom",
+     "npc": "hub-chester-hill-micah"
+    }
+   ],
+   "reward": {
+    "cash": 185,
+    "xp": 535,
+    "unlock": [
+     "hub:h-rank-chester-hill-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-ashfield-ereni",
+   "name": "Ereni, greenkeeper at Ashfield",
+   "x": -7577,
+   "z": 2373,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Ah. Someone with two working legs.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "There is no clever way to say this. The number three green at Ashfield has had a bald patch the shape of Tasmania since a public holiday nobody remembered, and the committee thinks I am inventing it. Half the street knows and half the street is pretending not to. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-ashfield-0",
+       "denyFlag": "hub:h-bowlo-ashfield-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You look like you have twenty minutes. They have seen the photograph and now they want it re-laid by a public holiday nobody remembered, which means finding $52 that the Ashfield club does not have. I am not after trouble. I am after an answer. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-ashfield-1",
+       "denyFlag": "hub:h-bowlo-ashfield-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "The Dead Patch at Ashfield — that's done.",
+       "turnin": "h-bowlo-ashfield-0"
+      },
+      {
+       "text": "Turf Money, Ashfield — that's done.",
+       "turnin": "h-bowlo-ashfield-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-ashfield-ignatius",
+   "name": "Ignatius, club president at Ashfield",
+   "x": -7763,
+   "z": 2247,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are early. Or late. I have lost track.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Keep it between us for now. Our books say 93 members at Ashfield and I would bet the bar takings that half of them are dead or moved to Queensland. Nobody else seems to have noticed, which is its own problem. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-ashfield-2",
+       "denyFlag": "hub:h-bowlo-ashfield-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Right. Since you asked. Since two in the afternoon somebody has been going round the Ashfield greens telling the barefoot bowlers we are shutting, and we are not shutting. Everyone I have told has looked at me the way you are now. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-ashfield-3",
+       "denyFlag": "hub:h-bowlo-ashfield-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Ashfield Membership Count — that's done.",
+       "turnin": "h-bowlo-ashfield-2"
+      },
+      {
+       "text": "Closing Time Rumour, Ashfield — that's done.",
+       "turnin": "h-bowlo-ashfield-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-ashfield-sabina",
+   "name": "Sabina, bar manager at Ashfield",
+   "x": -7666,
+   "z": 2310,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Been here since before it was like this. Go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "My knees are gone, so. There is a docket book in the chest freezer behind the bar at Ashfield and I am not opening it on an empty stomach. This is the third time I have had this conversation. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-ashfield-4",
+       "denyFlag": "hub:h-bowlo-ashfield-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "This is going to sound small. The man who kept these greens before me drinks at Summer Hill now, and he owes Ashfield an explanation about the drainage. It started small, the way these things do. Half now if you want it. Most people don't.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-ashfield-5",
+       "denyFlag": "hub:h-bowlo-ashfield-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Behind the Bar at Ashfield — that's done.",
+       "turnin": "h-bowlo-ashfield-4"
+      },
+      {
+       "text": "The Old Greenkeeper, Ashfield — that's done.",
+       "turnin": "h-bowlo-ashfield-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-woy-woy-cleo",
+   "name": "Cleo, night console operator at Woy Woy",
+   "x": 9772,
+   "z": -42653,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Do not mind the mess. It is structural now.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "There is no clever way to say this. Every night around the second express the same car does three laps of the Woy Woy forecourt and never buys fuel. Half the street knows and half the street is pretending not to. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-woy-woy-0",
+       "denyFlag": "hub:h-servo-woy-woy-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You look like you have twenty minutes. Now I know the plate, I want to know where it goes after it leaves Woy Woy at the second express, because it is not going home. I am not after trouble. I am after an answer. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-woy-woy-1",
+       "denyFlag": "hub:h-servo-woy-woy-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "Nights at Woy Woy — that's done.",
+       "turnin": "h-servo-woy-woy-0"
+      },
+      {
+       "text": "The Third Lap, Woy Woy — that's done.",
+       "turnin": "h-servo-woy-woy-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-woy-woy-vera",
+   "name": "Vera, mechanic at Woy Woy",
+   "x": 9912,
+   "z": -42554,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are selling something the answer is no.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Keep it between us for now. Bay two at the Woy Woy workshop has had the same car in it since a Tuesday and the owner has stopped answering. Nobody else seems to have noticed, which is its own problem. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-woy-woy-2",
+       "denyFlag": "hub:h-servo-woy-woy-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Right. Since you asked. Someone has been walking out of Woy Woy with a socket set at a time since a Tuesday, and I have run out of ways to be polite about it. Everyone I have told has looked at me the way you are now. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-woy-woy-3",
+       "denyFlag": "hub:h-servo-woy-woy-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Bay Two, Woy Woy — that's done.",
+       "turnin": "h-servo-woy-woy-2"
+      },
+      {
+       "text": "Tools Off the Bench, Woy Woy — that's done.",
+       "turnin": "h-servo-woy-woy-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-woy-woy-tomasz",
+   "name": "Tomasz, franchisee at Woy Woy",
+   "x": 9791,
+   "z": -42797,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Cash only and no, I am joking. What do you want.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "My knees are gone, so. Head office says the Woy Woy board has been wrong since a Tuesday and I say it has been right for eleven years, and one of us is about to be embarrassed. This is the third time I have had this conversation. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-woy-woy-4",
+       "denyFlag": "hub:h-servo-woy-woy-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "This is going to sound small. The bloke who runs the site at Tascott has had the same trouble Woy Woy has, and he will talk to you before he talks to me. It started small, the way these things do. Half now if you want it. Most people don't.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-woy-woy-5",
+       "denyFlag": "hub:h-servo-woy-woy-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "The Woy Woy Price Board — that's done.",
+       "turnin": "h-servo-woy-woy-4"
+      },
+      {
+       "text": "The Other Franchise, Woy Woy — that's done.",
+       "turnin": "h-servo-woy-woy-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-villawood-mae",
+   "name": "Mae, building manager at Villawood",
+   "x": -21586,
+   "z": 1812,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You have got a face like you can keep your mouth shut.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "There is no clever way to say this. Water has been coming through the level two ceiling of the Villawood block since the long weekend and the strata report says there is no water. Half the street knows and half the street is pretending not to. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-villawood-0",
+       "denyFlag": "hub:h-strata-villawood-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You look like you have twenty minutes. The photo did it. I am not after trouble. I am after an answer. Now every owner at Villawood owes $61 and I have to collect it from people who have avoided me for a year. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-villawood-1",
+       "denyFlag": "hub:h-strata-villawood-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "Level Two, Villawood — that's done.",
+       "turnin": "h-strata-villawood-0"
+      },
+      {
+       "text": "The Special Levy, Villawood — that's done.",
+       "turnin": "h-strata-villawood-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-villawood-salma",
+   "name": "Salma, owner-occupier at Villawood",
+   "x": -21625,
+   "z": 1704,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Right. Talk while I do this.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Keep it between us for now. Somebody who does not live at Villawood has parked in space fourteen every night since the long weekend and the manager will not look at it. Nobody else seems to have noticed, which is its own problem. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-villawood-2",
+       "denyFlag": "hub:h-strata-villawood-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Right. Since you asked. The Villawood AGM is on the long weekend and I would like to arrive with something stronger than a grievance and a printout. Everyone I have told has looked at me the way you are now. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-villawood-3",
+       "denyFlag": "hub:h-strata-villawood-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "Car Space 14, Villawood — that's done.",
+       "turnin": "h-strata-villawood-2"
+      },
+      {
+       "text": "The Meeting, Villawood — that's done.",
+       "turnin": "h-strata-villawood-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-villawood-hazel",
+   "name": "Hazel, the one who does the bins at Villawood",
+   "x": -21500,
+   "z": 1823,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You right there? I am mid-something but go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "My knees are gone, so. Three units at Villawood have put their bins out on the wrong night since the long weekend and I have taken it personally, which I accept is a choice I made. This is the third time I have had this conversation. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-villawood-4",
+       "denyFlag": "hub:h-strata-villawood-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "This is going to sound small. There is a block at Carramar with the same builder and the same cracks, and their manager has already been through what Villawood is starting. It started small, the way these things do. Half now if you want it. Most people don't.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-villawood-5",
+       "denyFlag": "hub:h-strata-villawood-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "Bin Night at Villawood — that's done.",
+       "turnin": "h-strata-villawood-4"
+      },
+      {
+       "text": "The Other Block, Villawood — that's done.",
+       "turnin": "h-strata-villawood-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

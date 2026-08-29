@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-st-peters-taini",
+   "name": "Taini, newsagent at St Peters",
+   "x": -2527,
+   "z": 4468,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You have got a face like you can keep your mouth shut.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Right. Since you asked. I am sending back 21 papers a day from St Peters and paying to have them collected, which is a business model somebody invented on purpose. I did try the official route, for what that was worth. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-st-peters-0",
+       "denyFlag": "hub:h-newsagent-st-peters-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "My knees are gone, so. They will drop my St Peters order if I can show $52 of turnover on the other side of the shop by the long weekend. I have got a photo on my phone but it is useless. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-st-peters-1",
+       "denyFlag": "hub:h-newsagent-st-peters-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "Returns at St Peters — that's done.",
+       "turnin": "h-newsagent-st-peters-0"
+      },
+      {
+       "text": "The Better Rate, St Peters — that's done.",
+       "turnin": "h-newsagent-st-peters-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-st-peters-indira",
+   "name": "Indira, paper runner at St Peters",
+   "x": -2584,
+   "z": 4180,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Right. Talk while I do this.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "This is going to sound small. I do the St Peters round from the back of seven and for the last fortnight somebody has been taking the papers off the front steps behind me. I am aware how that sounds. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-st-peters-2",
+       "denyFlag": "hub:h-newsagent-st-peters-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have written it down twice and lost it twice. There is a dog on the St Peters round that has had two of my bags and a laminated notice that was not even mine. My wife says I should let it go. My wife is wrong. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-st-peters-3",
+       "denyFlag": "hub:h-newsagent-st-peters-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "The St Peters Round — that's done.",
+       "turnin": "h-newsagent-st-peters-2"
+      },
+      {
+       "text": "The Dog on Ash Street, St Peters — that's done.",
+       "turnin": "h-newsagent-st-peters-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-st-peters-vaila",
+   "name": "Vaila, lotto regular at St Peters",
+   "x": -2593,
+   "z": 4218,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You right there? I am mid-something but go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Do not laugh. Nine of us at St Peters have gone in on the same numbers since the long weekend and one of us has stopped putting money in. I have rung the number on the letter four times. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-st-peters-4",
+       "denyFlag": "hub:h-newsagent-st-peters-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It is the sort of thing you notice or you do not. The agency at Erskineville closed six months before St Peters started struggling, and I would very much like to know what they know. Half the street knows and half the street is pretending not to. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-st-peters-5",
+       "denyFlag": "hub:h-newsagent-st-peters-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "The Syndicate, St Peters — that's done.",
+       "turnin": "h-newsagent-st-peters-4"
+      },
+      {
+       "text": "The Other Agency, St Peters — that's done.",
+       "turnin": "h-newsagent-st-peters-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-lakemba-zuri",
+   "name": "Zuri, panel beater at Lakemba",
+   "x": -12098.8,
+   "z": 6020,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are here about the sign, the sign is wrong.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Right. Since you asked. There has been a car in the Lakemba yard since every second Friday with a clipboard nobody signs on the passenger seat and no owner answering. I did try the official route, for what that was worth. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-lakemba-0",
+       "denyFlag": "hub:h-workshop-lakemba-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "My knees are gone, so. Now that it is documented, Lakemba is owed $60 in storage and the only person who can pay it is the person not answering. I have got a photo on my phone but it is useless. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-lakemba-1",
+       "denyFlag": "hub:h-workshop-lakemba-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "The Unclaimed Falcon, Lakemba — that's done.",
+       "turnin": "h-workshop-lakemba-0"
+      },
+      {
+       "text": "Storage Fees, Lakemba — that's done.",
+       "turnin": "h-workshop-lakemba-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-lakemba-keanu",
+   "name": "Keanu, apprentice at Lakemba",
+   "x": -12345,
+   "z": 6093,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand in the doorway, mate, come round.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "This is going to sound small. I am in my first year at Lakemba and I have to log 84 hours on a job I am not allowed to touch on my own. I am aware how that sounds. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-lakemba-2",
+       "denyFlag": "hub:h-workshop-lakemba-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have written it down twice and lost it twice. Somebody has been coming into the Lakemba yard after first light to use the air line, and last week they used the compressor as well. My wife says I should let it go. My wife is wrong. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-lakemba-3",
+       "denyFlag": "hub:h-workshop-lakemba-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "First Year, Lakemba — that's done.",
+       "turnin": "h-workshop-lakemba-2"
+      },
+      {
+       "text": "The Air Line, Lakemba — that's done.",
+       "turnin": "h-workshop-lakemba-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-lakemba-filip",
+   "name": "Filip, the bloke whose car it is at Lakemba",
+   "x": -12362,
+   "z": 5925,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Long day. Say what you came to say.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Do not laugh. My car has been at Lakemba since every second Friday and every time I ring, the quote has grown by about $84. I have rung the number on the letter four times. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-lakemba-4",
+       "denyFlag": "hub:h-workshop-lakemba-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It is the sort of thing you notice or you do not. The insurance assessor who signs off every job at Lakemba works out of Belmore, and he has never once seen the car he is assessing. Half the street knows and half the street is pretending not to. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-lakemba-5",
+       "denyFlag": "hub:h-workshop-lakemba-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "My Own Car, Lakemba — that's done.",
+       "turnin": "h-workshop-lakemba-4"
+      },
+      {
+       "text": "The Assessor, Lakemba — that's done.",
+       "turnin": "h-workshop-lakemba-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-kingswood-mareike",
+   "name": "Mareike, shop manager at Kingswood",
+   "x": -45598,
+   "z": -11454,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I know that look. Everyone wants something today.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Right. Since you asked. People leave things at the Kingswood roller door after two in the afternoon and by morning it is rained on and it is our problem and our tip fee. I did try the official route, for what that was worth. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-kingswood-0",
+       "denyFlag": "hub:h-opshop-kingswood-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "My knees are gone, so. The photos worked, which means Kingswood can claim back the $55 we have paid to throw away other people's furniture since a wet Monday. I have got a photo on my phone but it is useless. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-kingswood-1",
+       "denyFlag": "hub:h-opshop-kingswood-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "Dumped Out the Back, Kingswood — that's done.",
+       "turnin": "h-opshop-kingswood-0"
+      },
+      {
+       "text": "The Tip Fee, Kingswood — that's done.",
+       "turnin": "h-opshop-kingswood-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-kingswood-hania",
+   "name": "Hania, sorter at Kingswood",
+   "x": -45470,
+   "z": -11190,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Give me a second. Right. Go.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "This is going to sound small. Something came into Kingswood on a wet Monday in a box of paperbacks that I do not think the family meant to give away. I am aware how that sounds. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-kingswood-2",
+       "denyFlag": "hub:h-opshop-kingswood-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have written it down twice and lost it twice. Two people have been coming into the Kingswood sorting room since a wet Monday and taking the good stock before it reaches the floor, and one of them volunteers here. My wife says I should let it go. My wife is wrong. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-kingswood-3",
+       "denyFlag": "hub:h-opshop-kingswood-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Good Box, Kingswood — that's done.",
+       "turnin": "h-opshop-kingswood-2"
+      },
+      {
+       "text": "Sorting Room, Kingswood — that's done.",
+       "turnin": "h-opshop-kingswood-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-kingswood-sibel",
+   "name": "Sibel, volunteer driver at Kingswood",
+   "x": -45446,
+   "z": -11488,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are not from around the corner, are you.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Do not laugh. I do the Kingswood pick-ups in a van with 41 thousand on it and a door that only opens if you know about it. I have rung the number on the letter four times. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-kingswood-4",
+       "denyFlag": "hub:h-opshop-kingswood-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It is the sort of thing you notice or you do not. Everything Kingswood cannot sell goes to a warehouse at Penrith, and nobody there has ever answered a phone in my hearing. Half the street knows and half the street is pretending not to. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-kingswood-5",
+       "denyFlag": "hub:h-opshop-kingswood-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "The Van, Kingswood — that's done.",
+       "turnin": "h-opshop-kingswood-4"
+      },
+      {
+       "text": "Head Office, Kingswood — that's done.",
+       "turnin": "h-opshop-kingswood-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

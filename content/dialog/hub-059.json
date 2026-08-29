@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-cheltenham-sian",
+   "name": "Sian, newsagent at Cheltenham",
+   "x": -12318,
+   "z": -12447,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand in the doorway, mate, come round.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Someone has to, and it may as well be you. I am sending back 61 papers a day from Cheltenham and paying to have them collected, which is a business model somebody invented on purpose. I have got no proof, which is exactly why I am asking. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-cheltenham-0",
+       "denyFlag": "hub:h-newsagent-cheltenham-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You are the first person to stop all morning. They will drop my Cheltenham order if I can show $98 of turnover on the other side of the shop by grand final week. It might be nothing. It has not felt like nothing. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-cheltenham-1",
+       "denyFlag": "hub:h-newsagent-cheltenham-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "Returns at Cheltenham — that's done.",
+       "turnin": "h-newsagent-cheltenham-0"
+      },
+      {
+       "text": "The Better Rate, Cheltenham — that's done.",
+       "turnin": "h-newsagent-cheltenham-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-cheltenham-andreas",
+   "name": "Andreas, paper runner at Cheltenham",
+   "x": -12134,
+   "z": -12329,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Long day. Say what you came to say.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Not being dramatic about this. I do the Cheltenham round from five in the morning and for the last fortnight somebody has been taking the papers off the front steps behind me. I would not ask if there was anyone else about. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-cheltenham-2",
+       "denyFlag": "hub:h-newsagent-cheltenham-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I am told you do odd jobs. There is a dog on the Cheltenham round that has had two of my bags and a clipboard nobody signs that was not even mine. You can tell me I am imagining it. Tell me after. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-cheltenham-3",
+       "denyFlag": "hub:h-newsagent-cheltenham-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "The Cheltenham Round — that's done.",
+       "turnin": "h-newsagent-cheltenham-2"
+      },
+      {
+       "text": "The Dog on Ash Street, Cheltenham — that's done.",
+       "turnin": "h-newsagent-cheltenham-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-cheltenham-rita",
+   "name": "Rita, lotto regular at Cheltenham",
+   "x": -12411,
+   "z": -12502,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I know that look. Everyone wants something today.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I'll be straight with you. Nine of us at Cheltenham have gone in on the same numbers since grand final week and one of us has stopped putting money in. I would have sorted it myself a year ago. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-cheltenham-4",
+       "denyFlag": "hub:h-newsagent-cheltenham-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It has been three weeks. The agency at Beecroft closed six months before Cheltenham started struggling, and I would very much like to know what they know. It is not the money. It has stopped being the money. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-cheltenham-5",
+       "denyFlag": "hub:h-newsagent-cheltenham-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "The Syndicate, Cheltenham — that's done.",
+       "turnin": "h-newsagent-cheltenham-4"
+      },
+      {
+       "text": "The Other Agency, Cheltenham — that's done.",
+       "turnin": "h-newsagent-cheltenham-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-hawkesbury-river-ivo",
+   "name": "Ivo, panel beater at Hawkesbury River",
+   "x": 945,
+   "z": -35621,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Give me a second. Right. Go.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Someone has to, and it may as well be you. There has been a car in the Hawkesbury River yard since the first of the month with a esky of warm cans on the passenger seat and no owner answering. I have got no proof, which is exactly why I am asking. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-hawkesbury-river-0",
+       "denyFlag": "hub:h-workshop-hawkesbury-river-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You are the first person to stop all morning. Now that it is documented, Hawkesbury River is owed $117 in storage and the only person who can pay it is the person not answering. It might be nothing. It has not felt like nothing. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-hawkesbury-river-1",
+       "denyFlag": "hub:h-workshop-hawkesbury-river-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "The Unclaimed Falcon, Hawkesbury River — that's done.",
+       "turnin": "h-workshop-hawkesbury-river-0"
+      },
+      {
+       "text": "Storage Fees, Hawkesbury River — that's done.",
+       "turnin": "h-workshop-hawkesbury-river-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-hawkesbury-river-siobhan",
+   "name": "Siobhan, apprentice at Hawkesbury River",
+   "x": 882,
+   "z": -35526,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are not from around the corner, are you.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Not being dramatic about this. I am in my first year at Hawkesbury River and I have to log 76 hours on a job I am not allowed to touch on my own. I would not ask if there was anyone else about. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-hawkesbury-river-2",
+       "denyFlag": "hub:h-workshop-hawkesbury-river-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I am told you do odd jobs. Somebody has been coming into the Hawkesbury River yard after the back of seven to use the air line, and last week they used the compressor as well. You can tell me I am imagining it. Tell me after. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-hawkesbury-river-3",
+       "denyFlag": "hub:h-workshop-hawkesbury-river-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "First Year, Hawkesbury River — that's done.",
+       "turnin": "h-workshop-hawkesbury-river-2"
+      },
+      {
+       "text": "The Air Line, Hawkesbury River — that's done.",
+       "turnin": "h-workshop-hawkesbury-river-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-hawkesbury-river-myfanwy",
+   "name": "Myfanwy, the bloke whose car it is at Hawkesbury River",
+   "x": 1126,
+   "z": -35758,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Half of this suburb has walked past already. Not one stopped.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I'll be straight with you. My car has been at Hawkesbury River since the first of the month and every time I ring, the quote has grown by about $76. I would have sorted it myself a year ago. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-hawkesbury-river-4",
+       "denyFlag": "hub:h-workshop-hawkesbury-river-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It has been three weeks. The insurance assessor who signs off every job at Hawkesbury River works out of Cowan, and he has never once seen the car he is assessing. It is not the money. It has stopped being the money. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-hawkesbury-river-5",
+       "denyFlag": "hub:h-workshop-hawkesbury-river-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "My Own Car, Hawkesbury River — that's done.",
+       "turnin": "h-workshop-hawkesbury-river-4"
+      },
+      {
+       "text": "The Assessor, Hawkesbury River — that's done.",
+       "turnin": "h-workshop-hawkesbury-river-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-arncliffe-van",
+   "name": "Van, shop manager at Arncliffe",
+   "x": -5669,
+   "z": 7599,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Whatever it is, I have had worse this week.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Someone has to, and it may as well be you. People leave things at the Arncliffe roller door after quarter to six and by morning it is rained on and it is our problem and our tip fee. I have got no proof, which is exactly why I am asking. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-arncliffe-0",
+       "denyFlag": "hub:h-opshop-arncliffe-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You are the first person to stop all morning. The photos worked, which means Arncliffe can claim back the $86 we have paid to throw away other people's furniture since every second Friday. It might be nothing. It has not felt like nothing. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-arncliffe-1",
+       "denyFlag": "hub:h-opshop-arncliffe-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "Dumped Out the Back, Arncliffe — that's done.",
+       "turnin": "h-opshop-arncliffe-0"
+      },
+      {
+       "text": "The Tip Fee, Arncliffe — that's done.",
+       "turnin": "h-opshop-arncliffe-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-arncliffe-wafa",
+   "name": "Wafa, sorter at Arncliffe",
+   "x": -5587,
+   "z": 7751,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sit down if you like. Nobody else is using it.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Not being dramatic about this. Something came into Arncliffe on every second Friday in a box of paperbacks that I do not think the family meant to give away. I would not ask if there was anyone else about. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-arncliffe-2",
+       "denyFlag": "hub:h-opshop-arncliffe-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I am told you do odd jobs. Two people have been coming into the Arncliffe sorting room since every second Friday and taking the good stock before it reaches the floor, and one of them volunteers here. You can tell me I am imagining it. Tell me after. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-arncliffe-3",
+       "denyFlag": "hub:h-opshop-arncliffe-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Good Box, Arncliffe — that's done.",
+       "turnin": "h-opshop-arncliffe-2"
+      },
+      {
+       "text": "Sorting Room, Arncliffe — that's done.",
+       "turnin": "h-opshop-arncliffe-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-arncliffe-kwame",
+   "name": "Kwame, volunteer driver at Arncliffe",
+   "x": -5528.7,
+   "z": 7614.7,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You will have to speak up, the trains are in.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I'll be straight with you. I do the Arncliffe pick-ups in a van with 38 thousand on it and a door that only opens if you know about it. I would have sorted it myself a year ago. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-arncliffe-4",
+       "denyFlag": "hub:h-opshop-arncliffe-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It has been three weeks. Everything Arncliffe cannot sell goes to a warehouse at Turrella, and nobody there has ever answered a phone in my hearing. It is not the money. It has stopped being the money. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-arncliffe-5",
+       "denyFlag": "hub:h-opshop-arncliffe-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "The Van, Arncliffe — that's done.",
+       "turnin": "h-opshop-arncliffe-4"
+      },
+      {
+       "text": "Head Office, Arncliffe — that's done.",
+       "turnin": "h-opshop-arncliffe-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

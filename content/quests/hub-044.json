@@ -1,0 +1,651 @@
+{
+ "quests": [
+  {
+   "id": "h-bakery-turrella-0",
+   "act": 3,
+   "title": "five in the morning at Turrella",
+   "blurb": "I'll be straight with you. I start at five in the morning and for a month the Turrella back lane has had somebody in it who is not waiting for bread. It has been going on longer than I have admitted to anyone. You'll know it when you see it.",
+   "giver": "hub-turrella-nuri",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -6383,
+     "z": 7049,
+     "radius": 35,
+     "label": "the lane, from the door, no flash"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I am not calling anyone until I am sure",
+     "npc": "hub-turrella-nuri"
+    }
+   ],
+   "reward": {
+    "cash": 81,
+    "xp": 221,
+    "unlock": [
+     "hub:h-bakery-turrella-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-turrella-1",
+   "act": 3,
+   "title": "The Lane Light, Turrella",
+   "blurb": "It has been three weeks. A light on that lane costs Turrella $52 and the landlord has said no twice, so we are doing it ourselves. I have got no proof, which is exactly why I am asking. Half now if you want it. Most people don't.",
+   "giver": "hub-turrella-nuri",
+   "level": 3,
+   "requires": [
+    "h-bakery-turrella-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 52,
+     "label": "$52 and I will fit it myself"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "do not tell him where it came from",
+     "npc": "hub-turrella-nuri"
+    }
+   ],
+   "reward": {
+    "cash": 120,
+    "xp": 304,
+    "unlock": [
+     "hub:h-bakery-turrella-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-turrella-2",
+   "act": 3,
+   "title": "Flour Run, Turrella",
+   "blurb": "Nobody else has offered, so. The flour for Turrella comes off a truck at five in the morning and last Thursdays the truck came and the flour did not. It might be nothing. It has not felt like nothing. Whatever it costs you, tell me and I will cover it.",
+   "giver": "hub-turrella-apirana",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Turrella",
+     "to": "Arncliffe",
+     "label": "ride out to Arncliffe where the load is made up"
+    },
+    {
+     "kind": "photo",
+     "x": -6484,
+     "z": 6945,
+     "radius": 35,
+     "label": "the pallet with our name on it, if it exists"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 208,
+    "unlock": [
+     "hub:h-bakery-turrella-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-turrella-3",
+   "act": 3,
+   "title": "The Loading Zone, Turrella",
+   "blurb": "The council knows and the council does not care. The Turrella loading zone has had a car in it at five in the morning every morning this week and the driver waits in it, which makes it worse. I would not ask if there was anyone else about. I would rather know than wonder.",
+   "giver": "hub-turrella-apirana",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 1,
+     "label": "the one who says he is only a minute"
+    },
+    {
+     "kind": "earn",
+     "dollars": 90,
+     "label": "and the ticket I got, off him"
+    }
+   ],
+   "reward": {
+    "cash": 91,
+    "xp": 232,
+    "unlock": [
+     "hub:h-bakery-turrella-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-turrella-4",
+   "act": 3,
+   "title": "The Sourdough Sign, Turrella",
+   "blurb": "I have been putting it off since Easter. Somebody two doors down from Turrella put up a sign on Thursdays that says the same six words as ours, in the same order. You can tell me I am imagining it. Tell me after. That's the whole job. No catch.",
+   "giver": "hub-turrella-mirza",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -6321,
+     "z": 6935,
+     "radius": 25,
+     "label": "walk down and read it properly"
+    },
+    {
+     "kind": "photo",
+     "x": -6313,
+     "z": 6939,
+     "radius": 35,
+     "label": "both signs if you can get them in one frame"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me I am not imagining it",
+     "npc": "hub-turrella-mirza"
+    }
+   ],
+   "reward": {
+    "cash": 94,
+    "xp": 217,
+    "unlock": [
+     "hub:h-bakery-turrella-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-turrella-5",
+   "act": 3,
+   "title": "The Old Site, Turrella",
+   "blurb": "Before you say anything: yes, I know. This business was at Arncliffe before it was at Turrella, and there is a woman there who still has the original book. I would have sorted it myself a year ago. Be polite about it. It costs nothing.",
+   "giver": "hub-turrella-mirza",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5669,
+     "z": 7599,
+     "radius": 60,
+     "label": "she is usually about in the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring back whatever she is willing to say",
+     "npc": "hub-turrella-mirza"
+    }
+   ],
+   "reward": {
+    "cash": 87,
+    "xp": 223,
+    "unlock": [
+     "hub:h-bakery-turrella-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-royal-randwick-0",
+   "act": 3,
+   "title": "The Royal Randwick Pool",
+   "blurb": "I'll be straight with you. Council has been saying the Royal Randwick pool is at end of life since the week of the show and the crack they keep pointing at is not in the shell. It has been going on longer than I have admitted to anyone. You'll know it when you see it.",
+   "giver": "hub-royal-randwick-laszlo",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 2068,
+     "z": 4096,
+     "radius": 35,
+     "label": "the crack, close, with something for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "an engineer can read that. A councillor cannot.",
+     "npc": "hub-royal-randwick-laszlo"
+    }
+   ],
+   "reward": {
+    "cash": 100,
+    "xp": 266,
+    "unlock": [
+     "hub:h-pool-royal-randwick-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-royal-randwick-1",
+   "act": 3,
+   "title": "The Petition Stall, Royal Randwick",
+   "blurb": "It has been three weeks. We are running a stall for Royal Randwick on the week of the show and a stall needs $95 of gear that nobody has volunteered to pay for. I have got no proof, which is exactly why I am asking. Half now if you want it. Most people don't.",
+   "giver": "hub-royal-randwick-laszlo",
+   "level": 4,
+   "requires": [
+    "h-pool-royal-randwick-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 95,
+     "label": "$95 and a table, if you see one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will be there from eight either way",
+     "npc": "hub-royal-randwick-laszlo"
+    }
+   ],
+   "reward": {
+    "cash": 141,
+    "xp": 354,
+    "unlock": [
+     "hub:h-pool-royal-randwick-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-royal-randwick-2",
+   "act": 3,
+   "title": "Squad, Royal Randwick",
+   "blurb": "Nobody else has offered, so. I coach 24 kids at Royal Randwick at the middle of the news and three of them have stopped coming without anybody ringing me. It might be nothing. It has not felt like nothing. Whatever it costs you, tell me and I will cover it.",
+   "giver": "hub-royal-randwick-charlie",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 1888,
+     "z": 4140,
+     "radius": 25,
+     "label": "the flats where two of them live"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "take something with you, it is a long walk up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I do not need them back. I need to know.",
+     "npc": "hub-royal-randwick-charlie"
+    }
+   ],
+   "reward": {
+    "cash": 101,
+    "xp": 261,
+    "unlock": [
+     "hub:h-pool-royal-randwick-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-royal-randwick-3",
+   "act": 3,
+   "title": "The Deep End, Royal Randwick",
+   "blurb": "The council knows and the council does not care. A group has been coming over the Royal Randwick fence after close and swimming in the dark, which is how Royal Randwick loses its pool. I would not ask if there was anyone else about. I would rather know than wonder.",
+   "giver": "hub-royal-randwick-charlie",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 3,
+     "label": "the ones who go over the fence"
+    },
+    {
+     "kind": "photo",
+     "x": 1964,
+     "z": 4048,
+     "radius": 35,
+     "label": "the spot in the fence they use"
+    }
+   ],
+   "reward": {
+    "cash": 98,
+    "xp": 274,
+    "unlock": [
+     "hub:h-pool-royal-randwick-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-royal-randwick-4",
+   "act": 3,
+   "title": "The Kiosk Freezer, Royal Randwick",
+   "blurb": "I have been putting it off since Easter. The kiosk at Royal Randwick has a chest freezer that hums in D in it and a freezer that has been running warm since the week of the show. You can tell me I am imagining it. Tell me after. That's the whole job. No catch.",
+   "giver": "hub-royal-randwick-sigrid",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 2,
+     "label": "get two, we are going to be here"
+    },
+    {
+     "kind": "goto",
+     "x": 2054,
+     "z": 4048,
+     "radius": 25,
+     "label": "the plant room behind the kiosk"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether it is the freezer or the power",
+     "npc": "hub-royal-randwick-sigrid"
+    }
+   ],
+   "reward": {
+    "cash": 113,
+    "xp": 277,
+    "unlock": [
+     "hub:h-pool-royal-randwick-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-royal-randwick-5",
+   "act": 3,
+   "title": "The Aquatic Centre, Royal Randwick",
+   "blurb": "Before you say anything: yes, I know. They want everyone from Royal Randwick to drive to the new centre at UNSW Anzac Parade, so somebody should go and see whether it is any good. I would have sorted it myself a year ago. Be polite about it. It costs nothing.",
+   "giver": "hub-royal-randwick-sigrid",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 1623,
+     "z": 5171,
+     "radius": 60,
+     "label": "have a proper look, not a quick one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "be honest with me, even if it is nice",
+     "npc": "hub-royal-randwick-sigrid"
+    }
+   ],
+   "reward": {
+    "cash": 102,
+    "xp": 275,
+    "unlock": [
+     "hub:h-pool-royal-randwick-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-bardwell-park-0",
+   "act": 3,
+   "title": "The Bardwell Park Rank",
+   "blurb": "I'll be straight with you. The rank outside Bardwell Park used to hold nine cars and since a public holiday nobody remembered it holds four, and nobody will say who moved the line. It has been going on longer than I have admitted to anyone. You'll know it when you see it.",
+   "giver": "hub-bardwell-park-xuan",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -7648,
+     "z": 7179,
+     "radius": 35,
+     "label": "the painted line and the old one under it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the old paint is still there, that is the whole argument",
+     "npc": "hub-bardwell-park-xuan"
+    }
+   ],
+   "reward": {
+    "cash": 103,
+    "xp": 259,
+    "unlock": [
+     "hub:h-rank-bardwell-park-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-bardwell-park-1",
+   "act": 3,
+   "title": "Lost Fares, Bardwell Park",
+   "blurb": "It has been three weeks. Since the rank at Bardwell Park shrank I am $68 a week down, and the association wants that number from somebody who can prove it. I have got no proof, which is exactly why I am asking. Half now if you want it. Most people don't.",
+   "giver": "hub-bardwell-park-xuan",
+   "level": 4,
+   "requires": [
+    "h-rank-bardwell-park-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 68,
+     "label": "$68 in a week, to show it can be done"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the submission, right there",
+     "npc": "hub-bardwell-park-xuan"
+    }
+   ],
+   "reward": {
+    "cash": 143,
+    "xp": 366,
+    "unlock": [
+     "hub:h-rank-bardwell-park-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-bardwell-park-2",
+   "act": 3,
+   "title": "Queue Jumpers, Bardwell Park",
+   "blurb": "Nobody else has offered, so. Cars that have never sat in the Bardwell Park queue turn up at half six and take the front of it, and the drivers who waited say nothing. It might be nothing. It has not felt like nothing. Whatever it costs you, tell me and I will cover it.",
+   "giver": "hub-bardwell-park-sigrid",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 2,
+     "label": "the ones who take the front"
+    },
+    {
+     "kind": "earn",
+     "dollars": 88,
+     "label": "$88, which is about one airport run"
+    }
+   ],
+   "reward": {
+    "cash": 103,
+    "xp": 276,
+    "unlock": [
+     "hub:h-rank-bardwell-park-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-bardwell-park-3",
+   "act": 3,
+   "title": "The Late Train, Bardwell Park",
+   "blurb": "The council knows and the council does not care. When the last train into Bardwell Park is late, 88 people come out at once and I have to have cars there before they do. I would not ask if there was anyone else about. I would rather know than wonder.",
+   "giver": "hub-bardwell-park-sigrid",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Bardwell Park",
+     "to": "Bexley North",
+     "label": "come in on the last one from Bexley North and see it"
+    },
+    {
+     "kind": "photo",
+     "x": -7680,
+     "z": 7143,
+     "radius": 35,
+     "label": "the rank at the moment the doors open"
+    }
+   ],
+   "reward": {
+    "cash": 105,
+    "xp": 256,
+    "unlock": [
+     "hub:h-rank-bardwell-park-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-bardwell-park-4",
+   "act": 3,
+   "title": "The Door, Bardwell Park",
+   "blurb": "I have been putting it off since Easter. I have stood on this door near Bardwell Park for 88 years and since a public holiday nobody remembered somebody has been sending my guests to a different rank. You can tell me I am imagining it. Tell me after. That's the whole job. No catch.",
+   "giver": "hub-bardwell-park-sakura",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7660,
+     "z": 7024,
+     "radius": 25,
+     "label": "follow one of them and see where they end up"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "you will be standing about, get something"
+    }
+   ],
+   "reward": {
+    "cash": 101,
+    "xp": 276,
+    "unlock": [
+     "hub:h-rank-bardwell-park-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-bardwell-park-5",
+   "act": 3,
+   "title": "The Depot, Bardwell Park",
+   "blurb": "Before you say anything: yes, I know. The plates working the Bardwell Park rank are dispatched from a depot at Turrella, and the man who runs it has never met a driver he liked. I would have sorted it myself a year ago. Be polite about it. It costs nothing.",
+   "giver": "hub-bardwell-park-sakura",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -6307,
+     "z": 7096,
+     "radius": 60,
+     "label": "go and be pleasant at him anyway"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether he is the problem or the symptom",
+     "npc": "hub-bardwell-park-sakura"
+    }
+   ],
+   "reward": {
+    "cash": 114,
+    "xp": 273,
+    "unlock": [
+     "hub:h-rank-bardwell-park-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

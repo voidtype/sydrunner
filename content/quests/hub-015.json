@@ -1,0 +1,663 @@
+{
+ "quests": [
+  {
+   "id": "h-newsagent-erskineville-0",
+   "act": 3,
+   "title": "Returns at Erskineville",
+   "blurb": "It has been three weeks. I am sending back 54 papers a day from Erskineville and paying to have them collected, which is a business model somebody invented on purpose. You can tell me I am imagining it. Tell me after. I'll put the kettle on for when you're back.",
+   "giver": "hub-erskineville-monika",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2058,
+     "z": 3541,
+     "radius": 35,
+     "label": "the returns stack, at its worst"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the distributor needs to see the size of it",
+     "npc": "hub-erskineville-monika"
+    }
+   ],
+   "reward": {
+    "cash": 53,
+    "xp": 126,
+    "unlock": [
+     "hub:h-newsagent-erskineville-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-newsagent-erskineville-1",
+   "act": 3,
+   "title": "The Better Rate, Erskineville",
+   "blurb": "Nobody else has offered, so. They will drop my Erskineville order if I can show $43 of turnover on the other side of the shop by the week of the show. I would have sorted it myself a year ago. Just do not come back empty-handed.",
+   "giver": "hub-erskineville-monika",
+   "level": 1,
+   "requires": [
+    "h-newsagent-erskineville-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 43,
+     "label": "$43, and cards and stationery count"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "sell anything, I am not proud",
+     "npc": "hub-erskineville-monika"
+    }
+   ],
+   "reward": {
+    "cash": 107,
+    "xp": 227,
+    "unlock": [
+     "hub:h-newsagent-erskineville-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-newsagent-erskineville-2",
+   "act": 3,
+   "title": "The Erskineville Round",
+   "blurb": "The council knows and the council does not care. I do the Erskineville round from half six and for the last fortnight somebody has been taking the papers off the front steps behind me. It is not the money. It has stopped being the money. I will know if you skipped a bit.",
+   "giver": "hub-erskineville-claudia",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2227,
+     "z": 3609,
+     "radius": 25,
+     "label": "the end of the round, where it starts"
+    },
+    {
+     "kind": "photo",
+     "x": -2253,
+     "z": 3586,
+     "radius": 35,
+     "label": "whoever is on that street at that hour"
+    }
+   ],
+   "reward": {
+    "cash": 69,
+    "xp": 130,
+    "unlock": [
+     "hub:h-newsagent-erskineville-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-newsagent-erskineville-3",
+   "act": 3,
+   "title": "The Dog on Ash Street, Erskineville",
+   "blurb": "I have been putting it off since Easter. There is a dog on the Erskineville round that has had two of my bags and a laminated notice that was not even mine. I did try the official route, for what that was worth. Say nothing to anyone on the way.",
+   "giver": "hub-erskineville-claudia",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "you will want your wits about you"
+    },
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "the owner, not the dog, I am not a monster"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me it is sorted",
+     "npc": "hub-erskineville-claudia"
+    }
+   ],
+   "reward": {
+    "cash": 65,
+    "xp": 138,
+    "unlock": [
+     "hub:h-newsagent-erskineville-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-newsagent-erskineville-4",
+   "act": 3,
+   "title": "The Syndicate, Erskineville",
+   "blurb": "Before you say anything: yes, I know. Nine of us at Erskineville have gone in on the same numbers since the week of the show and one of us has stopped putting money in. I have got a photo on my phone but it is useless. Do not make a scene about it.",
+   "giver": "hub-erskineville-jarrah",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2009,
+     "z": 3423,
+     "radius": 25,
+     "label": "the house of the one who stopped"
+    },
+    {
+     "kind": "earn",
+     "dollars": 54,
+     "label": "$54, which is his share since he stopped"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it said out loud, not in the group chat",
+     "npc": "hub-erskineville-jarrah"
+    }
+   ],
+   "reward": {
+    "cash": 65,
+    "xp": 140,
+    "unlock": [
+     "hub:h-newsagent-erskineville-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-newsagent-erskineville-5",
+   "act": 3,
+   "title": "The Other Agency, Erskineville",
+   "blurb": "It is not a police matter and I have checked. The agency at St Peters closed six months before Erskineville started struggling, and I would very much like to know what they know. I am aware how that sounds. Ask for me by name at the counter.",
+   "giver": "hub-erskineville-jarrah",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2527,
+     "z": 4468,
+     "radius": 60,
+     "label": "the shop is shut, the family is not"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever they say, say it slowly to me",
+     "npc": "hub-erskineville-jarrah"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 118,
+    "unlock": [
+     "hub:h-newsagent-erskineville-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-workshop-bank-street-0",
+   "act": 3,
+   "title": "The Unclaimed Falcon, Bank Street",
+   "blurb": "It has been three weeks. There has been a car in the Bank Street yard since every second Friday with a bucket of odd keys on the passenger seat and no owner answering. You can tell me I am imagining it. Tell me after. I'll put the kettle on for when you're back.",
+   "giver": "hub-bank-street-emre",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -1529,
+     "z": 279,
+     "radius": 35,
+     "label": "the car and the plate together"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I have to prove I tried before I can move it",
+     "npc": "hub-bank-street-emre"
+    }
+   ],
+   "reward": {
+    "cash": 53,
+    "xp": 119,
+    "unlock": [
+     "hub:h-workshop-bank-street-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-workshop-bank-street-1",
+   "act": 3,
+   "title": "Storage Fees, Bank Street",
+   "blurb": "Nobody else has offered, so. Now that it is documented, Bank Street is owed $38 in storage and the only person who can pay it is the person not answering. I would have sorted it myself a year ago. Just do not come back empty-handed.",
+   "giver": "hub-bank-street-emre",
+   "level": 1,
+   "requires": [
+    "h-workshop-bank-street-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 38,
+     "label": "$38, from him or from the scrap"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "either way it comes off my floor",
+     "npc": "hub-bank-street-emre"
+    }
+   ],
+   "reward": {
+    "cash": 94,
+    "xp": 215,
+    "unlock": [
+     "hub:h-workshop-bank-street-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-workshop-bank-street-2",
+   "act": 3,
+   "title": "First Year, Bank Street",
+   "blurb": "The council knows and the council does not care. I am in my first year at Bank Street and I have to log 75 hours on a job I am not allowed to touch on my own. It is not the money. It has stopped being the money. I will know if you skipped a bit.",
+   "giver": "hub-bank-street-hussein",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1636,
+     "z": 244,
+     "radius": 25,
+     "label": "the supplier, two streets over"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "and get him a coffee, it helps"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "sign the book and I owe you",
+     "npc": "hub-bank-street-hussein"
+    }
+   ],
+   "reward": {
+    "cash": 60,
+    "xp": 125,
+    "unlock": [
+     "hub:h-workshop-bank-street-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-workshop-bank-street-3",
+   "act": 3,
+   "title": "The Air Line, Bank Street",
+   "blurb": "I have been putting it off since Easter. Somebody has been coming into the Bank Street yard after the middle of the news to use the air line, and last week they used the compressor as well. I did try the official route, for what that was worth. Say nothing to anyone on the way.",
+   "giver": "hub-bank-street-hussein",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 2,
+     "label": "the ones who think the yard is public"
+    },
+    {
+     "kind": "photo",
+     "x": -1583,
+     "z": 186,
+     "radius": 35,
+     "label": "the gate they are getting through"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 116,
+    "unlock": [
+     "hub:h-workshop-bank-street-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-workshop-bank-street-4",
+   "act": 3,
+   "title": "My Own Car, Bank Street",
+   "blurb": "Before you say anything: yes, I know. My car has been at Bank Street since every second Friday and every time I ring, the quote has grown by about $75. I have got a photo on my phone but it is useless. Do not make a scene about it.",
+   "giver": "hub-bank-street-seanan",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1495,
+     "z": 153,
+     "radius": 25,
+     "label": "stand in the office where they can see you"
+    },
+    {
+     "kind": "photo",
+     "x": -1485,
+     "z": 154,
+     "radius": 35,
+     "label": "the job card on the wall, all of it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I know what I am arguing about",
+     "npc": "hub-bank-street-seanan"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 127,
+    "unlock": [
+     "hub:h-workshop-bank-street-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-workshop-bank-street-5",
+   "act": 3,
+   "title": "The Assessor, Bank Street",
+   "blurb": "It is not a police matter and I have checked. The insurance assessor who signs off every job at Bank Street works out of QVB, and he has never once seen the car he is assessing. I am aware how that sounds. Ask for me by name at the counter.",
+   "giver": "hub-bank-street-seanan",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -281,
+     "z": 274,
+     "radius": 60,
+     "label": "catch him before he goes out on the road"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear how he does it",
+     "npc": "hub-bank-street-seanan"
+    }
+   ],
+   "reward": {
+    "cash": 62,
+    "xp": 125,
+    "unlock": [
+     "hub:h-workshop-bank-street-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-opshop-point-clare-0",
+   "act": 3,
+   "title": "Dumped Out the Back, Point Clare",
+   "blurb": "It has been three weeks. People leave things at the Point Clare roller door after five in the morning and by morning it is rained on and it is our problem and our tip fee. You can tell me I am imagining it. Tell me after. I'll put the kettle on for when you're back.",
+   "giver": "hub-point-clare-arun",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 10318,
+     "z": -46978,
+     "radius": 35,
+     "label": "the pile, on a bad morning"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council will not act without one of these",
+     "npc": "hub-point-clare-arun"
+    }
+   ],
+   "reward": {
+    "cash": 80,
+    "xp": 169,
+    "unlock": [
+     "hub:h-opshop-point-clare-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-point-clare-1",
+   "act": 3,
+   "title": "The Tip Fee, Point Clare",
+   "blurb": "Nobody else has offered, so. The photos worked, which means Point Clare can claim back the $55 we have paid to throw away other people's furniture since every second Friday. I would have sorted it myself a year ago. Just do not come back empty-handed.",
+   "giver": "hub-point-clare-arun",
+   "level": 2,
+   "requires": [
+    "h-opshop-point-clare-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 55,
+     "label": "$55, and every receipt counts"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will do the form if you do the walking",
+     "npc": "hub-point-clare-arun"
+    }
+   ],
+   "reward": {
+    "cash": 112,
+    "xp": 262,
+    "unlock": [
+     "hub:h-opshop-point-clare-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-point-clare-2",
+   "act": 3,
+   "title": "The Good Box, Point Clare",
+   "blurb": "The council knows and the council does not care. Something came into Point Clare on every second Friday in a box of paperbacks that I do not think the family meant to give away. It is not the money. It has stopped being the money. I will know if you skipped a bit.",
+   "giver": "hub-point-clare-elin",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 10154,
+     "z": -46977,
+     "radius": 25,
+     "label": "the address on the donation slip"
+    },
+    {
+     "kind": "photo",
+     "x": 10187,
+     "z": -46919,
+     "radius": 35,
+     "label": "the thing itself, before it goes back"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I would rather give it back than sell it",
+     "npc": "hub-point-clare-elin"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 174,
+    "unlock": [
+     "hub:h-opshop-point-clare-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-point-clare-3",
+   "act": 3,
+   "title": "Sorting Room, Point Clare",
+   "blurb": "I have been putting it off since Easter. Two people have been coming into the Point Clare sorting room since every second Friday and taking the good stock before it reaches the floor, and one of them volunteers here. I did try the official route, for what that was worth. Say nothing to anyone on the way.",
+   "giver": "hub-point-clare-elin",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 2,
+     "label": "catch them at the back door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 95,
+     "label": "$95, which is what the good stock made last month"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 167,
+    "unlock": [
+     "hub:h-opshop-point-clare-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-point-clare-4",
+   "act": 3,
+   "title": "The Van, Point Clare",
+   "blurb": "Before you say anything: yes, I know. I do the Point Clare pick-ups in a van with 95 thousand on it and a door that only opens if you know about it. I have got a photo on my phone but it is useless. Do not make a scene about it.",
+   "giver": "hub-point-clare-milena",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Point Clare",
+     "to": "Tascott",
+     "label": "come out to Tascott with me, it is a two-person lift"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "we will stop on the way, my shout"
+    }
+   ],
+   "reward": {
+    "cash": 69,
+    "xp": 169,
+    "unlock": [
+     "hub:h-opshop-point-clare-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-point-clare-5",
+   "act": 3,
+   "title": "Head Office, Point Clare",
+   "blurb": "It is not a police matter and I have checked. Everything Point Clare cannot sell goes to a warehouse at Tascott, and nobody there has ever answered a phone in my hearing. I am aware how that sounds. Ask for me by name at the counter.",
+   "giver": "hub-point-clare-milena",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 9328,
+     "z": -46426,
+     "radius": 60,
+     "label": "turn up in person, that is the trick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me there is a person in there",
+     "npc": "hub-point-clare-milena"
+    }
+   ],
+   "reward": {
+    "cash": 67,
+    "xp": 163,
+    "unlock": [
+     "hub:h-opshop-point-clare-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

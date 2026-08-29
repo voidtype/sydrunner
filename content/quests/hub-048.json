@@ -1,0 +1,651 @@
+{
+ "quests": [
+  {
+   "id": "h-bakery-harris-park-0",
+   "act": 3,
+   "title": "the second express at Harris Park",
+   "blurb": "Do not laugh. I start at the second express and for a month the Harris Park back lane has had somebody in it who is not waiting for bread. It is not the money. It has stopped being the money. Do not let them talk you into anything.",
+   "giver": "hub-harris-park-dmitri",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -18788,
+     "z": -4680,
+     "radius": 35,
+     "label": "the lane, from the door, no flash"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I am not calling anyone until I am sure",
+     "npc": "hub-harris-park-dmitri"
+    }
+   ],
+   "reward": {
+    "cash": 59,
+    "xp": 128,
+    "unlock": [
+     "hub:h-bakery-harris-park-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bakery-harris-park-1",
+   "act": 3,
+   "title": "The Lane Light, Harris Park",
+   "blurb": "It is the sort of thing you notice or you do not. A light on that lane costs Harris Park $39 and the landlord has said no twice, so we are doing it ourselves. I did try the official route, for what that was worth. There's cash in it. Not a lot.",
+   "giver": "hub-harris-park-dmitri",
+   "level": 1,
+   "requires": [
+    "h-bakery-harris-park-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 39,
+     "label": "$39 and I will fit it myself"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "do not tell him where it came from",
+     "npc": "hub-harris-park-dmitri"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 214,
+    "unlock": [
+     "hub:h-bakery-harris-park-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bakery-harris-park-2",
+   "act": 3,
+   "title": "Flour Run, Harris Park",
+   "blurb": "Two people have already said no. The flour for Harris Park comes off a truck at the second express and last a wet Monday the truck came and the flour did not. I have got a photo on my phone but it is useless. You'll know it when you see it.",
+   "giver": "hub-harris-park-marika",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Harris Park",
+     "to": "Parramatta",
+     "label": "ride out to Parramatta where the load is made up"
+    },
+    {
+     "kind": "photo",
+     "x": -18843,
+     "z": -4773,
+     "radius": 35,
+     "label": "the pallet with our name on it, if it exists"
+    }
+   ],
+   "reward": {
+    "cash": 53,
+    "xp": 118,
+    "unlock": [
+     "hub:h-bakery-harris-park-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bakery-harris-park-3",
+   "act": 3,
+   "title": "The Loading Zone, Harris Park",
+   "blurb": "Someone has to, and it may as well be you. The Harris Park loading zone has had a car in it at the second express every morning this week and the driver waits in it, which makes it worse. I am aware how that sounds. Half now if you want it. Most people don't.",
+   "giver": "hub-harris-park-marika",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "the one who says he is only a minute"
+    },
+    {
+     "kind": "earn",
+     "dollars": 90,
+     "label": "and the ticket I got, off him"
+    }
+   ],
+   "reward": {
+    "cash": 67,
+    "xp": 131,
+    "unlock": [
+     "hub:h-bakery-harris-park-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bakery-harris-park-4",
+   "act": 3,
+   "title": "The Sourdough Sign, Harris Park",
+   "blurb": "You are the first person to stop all morning. Somebody two doors down from Harris Park put up a sign on a wet Monday that says the same six words as ours, in the same order. My wife says I should let it go. My wife is wrong. Whatever it costs you, tell me and I will cover it.",
+   "giver": "hub-harris-park-susanna",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18680,
+     "z": -4783,
+     "radius": 25,
+     "label": "walk down and read it properly"
+    },
+    {
+     "kind": "photo",
+     "x": -18672,
+     "z": -4779,
+     "radius": 35,
+     "label": "both signs if you can get them in one frame"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me I am not imagining it",
+     "npc": "hub-harris-park-susanna"
+    }
+   ],
+   "reward": {
+    "cash": 53,
+    "xp": 129,
+    "unlock": [
+     "hub:h-bakery-harris-park-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bakery-harris-park-5",
+   "act": 3,
+   "title": "The Old Site, Harris Park",
+   "blurb": "Not being dramatic about this. This business was at Granville before it was at Harris Park, and there is a woman there who still has the original book. I have rung the number on the letter four times. I would rather know than wonder.",
+   "giver": "hub-harris-park-susanna",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18184,
+     "z": -3761,
+     "radius": 60,
+     "label": "she is usually about in the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring back whatever she is willing to say",
+     "npc": "hub-harris-park-susanna"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 117,
+    "unlock": [
+     "hub:h-bakery-harris-park-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-pool-sydenham-0",
+   "act": 3,
+   "title": "The Sydenham Pool",
+   "blurb": "Do not laugh. Council has been saying the Sydenham pool is at end of life since every second Friday and the crack they keep pointing at is not in the shell. It is not the money. It has stopped being the money. Do not let them talk you into anything.",
+   "giver": "hub-sydenham-thi",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -4048,
+     "z": 5219,
+     "radius": 35,
+     "label": "the crack, close, with something for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "an engineer can read that. A councillor cannot.",
+     "npc": "hub-sydenham-thi"
+    }
+   ],
+   "reward": {
+    "cash": 57,
+    "xp": 130,
+    "unlock": [
+     "hub:h-pool-sydenham-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-pool-sydenham-1",
+   "act": 3,
+   "title": "The Petition Stall, Sydenham",
+   "blurb": "It is the sort of thing you notice or you do not. We are running a stall for Sydenham on every second Friday and a stall needs $39 of gear that nobody has volunteered to pay for. I did try the official route, for what that was worth. There's cash in it. Not a lot.",
+   "giver": "hub-sydenham-thi",
+   "level": 1,
+   "requires": [
+    "h-pool-sydenham-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 39,
+     "label": "$39 and a table, if you see one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will be there from eight either way",
+     "npc": "hub-sydenham-thi"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 209,
+    "unlock": [
+     "hub:h-pool-sydenham-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-pool-sydenham-2",
+   "act": 3,
+   "title": "Squad, Sydenham",
+   "blurb": "Two people have already said no. I coach 23 kids at Sydenham at ten past five and three of them have stopped coming without anybody ringing me. I have got a photo on my phone but it is useless. You'll know it when you see it.",
+   "giver": "hub-sydenham-faisal",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -4119,
+     "z": 5228,
+     "radius": 25,
+     "label": "the flats where two of them live"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "take something with you, it is a long walk up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I do not need them back. I need to know.",
+     "npc": "hub-sydenham-faisal"
+    }
+   ],
+   "reward": {
+    "cash": 51,
+    "xp": 119,
+    "unlock": [
+     "hub:h-pool-sydenham-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-pool-sydenham-3",
+   "act": 3,
+   "title": "The Deep End, Sydenham",
+   "blurb": "Someone has to, and it may as well be you. A group has been coming over the Sydenham fence after close and swimming in the dark, which is how Sydenham loses its pool. I am aware how that sounds. Half now if you want it. Most people don't.",
+   "giver": "hub-sydenham-faisal",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 3,
+     "label": "the ones who go over the fence"
+    },
+    {
+     "kind": "photo",
+     "x": -4043,
+     "z": 5136,
+     "radius": 35,
+     "label": "the spot in the fence they use"
+    }
+   ],
+   "reward": {
+    "cash": 65,
+    "xp": 132,
+    "unlock": [
+     "hub:h-pool-sydenham-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-pool-sydenham-4",
+   "act": 3,
+   "title": "The Kiosk Freezer, Sydenham",
+   "blurb": "You are the first person to stop all morning. The kiosk at Sydenham has a folding table in it and a freezer that has been running warm since every second Friday. My wife says I should let it go. My wife is wrong. Whatever it costs you, tell me and I will cover it.",
+   "giver": "hub-sydenham-demir",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "get two, we are going to be here"
+    },
+    {
+     "kind": "goto",
+     "x": -3953,
+     "z": 5136,
+     "radius": 25,
+     "label": "the plant room behind the kiosk"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether it is the freezer or the power",
+     "npc": "hub-sydenham-demir"
+    }
+   ],
+   "reward": {
+    "cash": 55,
+    "xp": 137,
+    "unlock": [
+     "hub:h-pool-sydenham-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-pool-sydenham-5",
+   "act": 3,
+   "title": "The Aquatic Centre, Sydenham",
+   "blurb": "Not being dramatic about this. They want everyone from Sydenham to drive to the new centre at Marrickville, so somebody should go and see whether it is any good. I have rung the number on the letter four times. I would rather know than wonder.",
+   "giver": "hub-sydenham-demir",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5139,
+     "z": 5150,
+     "radius": 60,
+     "label": "have a proper look, not a quick one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "be honest with me, even if it is nice",
+     "npc": "hub-sydenham-demir"
+    }
+   ],
+   "reward": {
+    "cash": 67,
+    "xp": 116,
+    "unlock": [
+     "hub:h-pool-sydenham-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-rank-berowra-0",
+   "act": 3,
+   "title": "The Berowra Rank",
+   "blurb": "Do not laugh. The rank outside Berowra used to hold nine cars and since school holidays it holds four, and nobody will say who moved the line. It is not the money. It has stopped being the money. Do not let them talk you into anything.",
+   "giver": "hub-berowra-sasa",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -5719,
+     "z": -27040,
+     "radius": 35,
+     "label": "the painted line and the old one under it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the old paint is still there, that is the whole argument",
+     "npc": "hub-berowra-sasa"
+    }
+   ],
+   "reward": {
+    "cash": 59,
+    "xp": 134,
+    "unlock": [
+     "hub:h-rank-berowra-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-rank-berowra-1",
+   "act": 3,
+   "title": "Lost Fares, Berowra",
+   "blurb": "It is the sort of thing you notice or you do not. Since the rank at Berowra shrank I am $48 a week down, and the association wants that number from somebody who can prove it. I did try the official route, for what that was worth. There's cash in it. Not a lot.",
+   "giver": "hub-berowra-sasa",
+   "level": 1,
+   "requires": [
+    "h-rank-berowra-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 48,
+     "label": "$48 in a week, to show it can be done"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the submission, right there",
+     "npc": "hub-berowra-sasa"
+    }
+   ],
+   "reward": {
+    "cash": 109,
+    "xp": 211,
+    "unlock": [
+     "hub:h-rank-berowra-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-rank-berowra-2",
+   "act": 3,
+   "title": "Queue Jumpers, Berowra",
+   "blurb": "Two people have already said no. Cars that have never sat in the Berowra queue turn up at the second express and take the front of it, and the drivers who waited say nothing. I have got a photo on my phone but it is useless. You'll know it when you see it.",
+   "giver": "hub-berowra-mirza",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "the ones who take the front"
+    },
+    {
+     "kind": "earn",
+     "dollars": 65,
+     "label": "$65, which is about one airport run"
+    }
+   ],
+   "reward": {
+    "cash": 52,
+    "xp": 116,
+    "unlock": [
+     "hub:h-rank-berowra-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-rank-berowra-3",
+   "act": 3,
+   "title": "The Late Train, Berowra",
+   "blurb": "Someone has to, and it may as well be you. When the last train into Berowra is late, 65 people come out at once and I have to have cars there before they do. I am aware how that sounds. Half now if you want it. Most people don't.",
+   "giver": "hub-berowra-mirza",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Berowra",
+     "to": "Mount Kuring-gai",
+     "label": "come in on the last one from Mount Kuring-gai and see it"
+    },
+    {
+     "kind": "photo",
+     "x": -5751,
+     "z": -27076,
+     "radius": 35,
+     "label": "the rank at the moment the doors open"
+    }
+   ],
+   "reward": {
+    "cash": 55,
+    "xp": 122,
+    "unlock": [
+     "hub:h-rank-berowra-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-rank-berowra-4",
+   "act": 3,
+   "title": "The Door, Berowra",
+   "blurb": "You are the first person to stop all morning. I have stood on this door near Berowra for 65 years and since school holidays somebody has been sending my guests to a different rank. My wife says I should let it go. My wife is wrong. Whatever it costs you, tell me and I will cover it.",
+   "giver": "hub-berowra-talia",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5731,
+     "z": -27195,
+     "radius": 25,
+     "label": "follow one of them and see where they end up"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you will be standing about, get something"
+    }
+   ],
+   "reward": {
+    "cash": 56,
+    "xp": 140,
+    "unlock": [
+     "hub:h-rank-berowra-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-rank-berowra-5",
+   "act": 3,
+   "title": "The Depot, Berowra",
+   "blurb": "Not being dramatic about this. The plates working the Berowra rank are dispatched from a depot at Cowan, and the man who runs it has never met a driver he liked. I have rung the number on the letter four times. I would rather know than wonder.",
+   "giver": "hub-berowra-talia",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -3878,
+     "z": -30608,
+     "radius": 60,
+     "label": "go and be pleasant at him anyway"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether he is the problem or the symptom",
+     "npc": "hub-berowra-talia"
+    }
+   ],
+   "reward": {
+    "cash": 67,
+    "xp": 135,
+    "unlock": [
+     "hub:h-rank-berowra-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  }
+ ]
+}

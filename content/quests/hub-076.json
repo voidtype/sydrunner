@@ -1,0 +1,651 @@
+{
+ "quests": [
+  {
+   "id": "h-bakery-kirrawee-0",
+   "act": 3,
+   "title": "twenty past four at Kirrawee",
+   "blurb": "I have written it down twice and lost it twice. I start at twenty past four and for a month the Kirrawee back lane has had somebody in it who is not waiting for bread. It might be nothing. It has not felt like nothing. That's it. That's the whole ask.",
+   "giver": "hub-kirrawee-ozgur",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -12360,
+     "z": 18645,
+     "radius": 35,
+     "label": "the lane, from the door, no flash"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I am not calling anyone until I am sure",
+     "npc": "hub-kirrawee-ozgur"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 167,
+    "unlock": [
+     "hub:h-bakery-kirrawee-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-kirrawee-1",
+   "act": 3,
+   "title": "The Lane Light, Kirrawee",
+   "blurb": "Do not laugh. A light on that lane costs Kirrawee $58 and the landlord has said no twice, so we are doing it ourselves. I would not ask if there was anyone else about. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-kirrawee-ozgur",
+   "level": 2,
+   "requires": [
+    "h-bakery-kirrawee-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 58,
+     "label": "$58 and I will fit it myself"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "do not tell him where it came from",
+     "npc": "hub-kirrawee-ozgur"
+    }
+   ],
+   "reward": {
+    "cash": 117,
+    "xp": 265,
+    "unlock": [
+     "hub:h-bakery-kirrawee-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-kirrawee-2",
+   "act": 3,
+   "title": "Flour Run, Kirrawee",
+   "blurb": "It is the sort of thing you notice or you do not. The flour for Kirrawee comes off a truck at twenty past four and last the Sunday after payday the truck came and the flour did not. You can tell me I am imagining it. Tell me after. If anyone asks, you were never here.",
+   "giver": "hub-kirrawee-efe",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Kirrawee",
+     "to": "Gymea",
+     "label": "ride out to Gymea where the load is made up"
+    },
+    {
+     "kind": "photo",
+     "x": -12461,
+     "z": 18541,
+     "radius": 35,
+     "label": "the pallet with our name on it, if it exists"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 162,
+    "unlock": [
+     "hub:h-bakery-kirrawee-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-kirrawee-3",
+   "act": 3,
+   "title": "The Loading Zone, Kirrawee",
+   "blurb": "Two people have already said no. The Kirrawee loading zone has had a car in it at twenty past four every morning this week and the driver waits in it, which makes it worse. I would have sorted it myself a year ago. There is no rush, but there is a Friday.",
+   "giver": "hub-kirrawee-efe",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "the one who says he is only a minute"
+    },
+    {
+     "kind": "earn",
+     "dollars": 90,
+     "label": "and the ticket I got, off him"
+    }
+   ],
+   "reward": {
+    "cash": 78,
+    "xp": 184,
+    "unlock": [
+     "hub:h-bakery-kirrawee-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-kirrawee-4",
+   "act": 3,
+   "title": "The Sourdough Sign, Kirrawee",
+   "blurb": "Someone has to, and it may as well be you. Somebody two doors down from Kirrawee put up a sign on the Sunday after payday that says the same six words as ours, in the same order. It is not the money. It has stopped being the money. I'll see you right for it.",
+   "giver": "hub-kirrawee-sonja",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -12345,
+     "z": 18511,
+     "radius": 25,
+     "label": "walk down and read it properly"
+    },
+    {
+     "kind": "photo",
+     "x": -12337,
+     "z": 18508,
+     "radius": 35,
+     "label": "both signs if you can get them in one frame"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me I am not imagining it",
+     "npc": "hub-kirrawee-sonja"
+    }
+   ],
+   "reward": {
+    "cash": 76,
+    "xp": 169,
+    "unlock": [
+     "hub:h-bakery-kirrawee-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-kirrawee-5",
+   "act": 3,
+   "title": "The Old Site, Kirrawee",
+   "blurb": "You are the first person to stop all morning. This business was at Gymea before it was at Kirrawee, and there is a woman there who still has the original book. I did try the official route, for what that was worth. I'll put the kettle on for when you're back.",
+   "giver": "hub-kirrawee-sonja",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10933,
+     "z": 18570,
+     "radius": 60,
+     "label": "she is usually about in the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring back whatever she is willing to say",
+     "npc": "hub-kirrawee-sonja"
+    }
+   ],
+   "reward": {
+    "cash": 77,
+    "xp": 181,
+    "unlock": [
+     "hub:h-bakery-kirrawee-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-homebush-0",
+   "act": 3,
+   "title": "The Homebush Pool",
+   "blurb": "I have written it down twice and lost it twice. Council has been saying the Homebush pool is at end of life since school holidays and the crack they keep pointing at is not in the shell. It might be nothing. It has not felt like nothing. That's it. That's the whole ask.",
+   "giver": "hub-homebush-alistair",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -11265,
+     "z": -14,
+     "radius": 35,
+     "label": "the crack, close, with something for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "an engineer can read that. A councillor cannot.",
+     "npc": "hub-homebush-alistair"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 169,
+    "unlock": [
+     "hub:h-pool-homebush-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-homebush-1",
+   "act": 3,
+   "title": "The Petition Stall, Homebush",
+   "blurb": "Do not laugh. We are running a stall for Homebush on school holidays and a stall needs $49 of gear that nobody has volunteered to pay for. I would not ask if there was anyone else about. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-homebush-alistair",
+   "level": 2,
+   "requires": [
+    "h-pool-homebush-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 49,
+     "label": "$49 and a table, if you see one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will be there from eight either way",
+     "npc": "hub-homebush-alistair"
+    }
+   ],
+   "reward": {
+    "cash": 118,
+    "xp": 270,
+    "unlock": [
+     "hub:h-pool-homebush-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-homebush-2",
+   "act": 3,
+   "title": "Squad, Homebush",
+   "blurb": "It is the sort of thing you notice or you do not. I coach 45 kids at Homebush at twenty past four and three of them have stopped coming without anybody ringing me. You can tell me I am imagining it. Tell me after. If anyone asks, you were never here.",
+   "giver": "hub-homebush-maja",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11445,
+     "z": 30,
+     "radius": 25,
+     "label": "the flats where two of them live"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "take something with you, it is a long walk up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I do not need them back. I need to know.",
+     "npc": "hub-homebush-maja"
+    }
+   ],
+   "reward": {
+    "cash": 81,
+    "xp": 171,
+    "unlock": [
+     "hub:h-pool-homebush-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-homebush-3",
+   "act": 3,
+   "title": "The Deep End, Homebush",
+   "blurb": "Two people have already said no. A group has been coming over the Homebush fence after close and swimming in the dark, which is how Homebush loses its pool. I would have sorted it myself a year ago. There is no rush, but there is a Friday.",
+   "giver": "hub-homebush-maja",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 3,
+     "label": "the ones who go over the fence"
+    },
+    {
+     "kind": "photo",
+     "x": -11369,
+     "z": -62,
+     "radius": 35,
+     "label": "the spot in the fence they use"
+    }
+   ],
+   "reward": {
+    "cash": 81,
+    "xp": 174,
+    "unlock": [
+     "hub:h-pool-homebush-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-homebush-4",
+   "act": 3,
+   "title": "The Kiosk Freezer, Homebush",
+   "blurb": "Someone has to, and it may as well be you. The kiosk at Homebush has an esky with no lid in it and a freezer that has been running warm since school holidays. It is not the money. It has stopped being the money. I'll see you right for it.",
+   "giver": "hub-homebush-ramona",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "get two, we are going to be here"
+    },
+    {
+     "kind": "goto",
+     "x": -11279,
+     "z": -62,
+     "radius": 25,
+     "label": "the plant room behind the kiosk"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether it is the freezer or the power",
+     "npc": "hub-homebush-ramona"
+    }
+   ],
+   "reward": {
+    "cash": 71,
+    "xp": 163,
+    "unlock": [
+     "hub:h-pool-homebush-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-homebush-5",
+   "act": 3,
+   "title": "The Aquatic Centre, Homebush",
+   "blurb": "You are the first person to stop all morning. They want everyone from Homebush to drive to the new centre at Strathfield, so somebody should go and see whether it is any good. I did try the official route, for what that was worth. I'll put the kettle on for when you're back.",
+   "giver": "hub-homebush-ramona",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10493,
+     "z": 412,
+     "radius": 60,
+     "label": "have a proper look, not a quick one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "be honest with me, even if it is nice",
+     "npc": "hub-homebush-ramona"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 162,
+    "unlock": [
+     "hub:h-pool-homebush-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-north-ryde-0",
+   "act": 3,
+   "title": "The North Ryde Rank",
+   "blurb": "I have written it down twice and lost it twice. The rank outside North Ryde used to hold nine cars and since the long weekend it holds four, and nobody will say who moved the line. It might be nothing. It has not felt like nothing. That's it. That's the whole ask.",
+   "giver": "hub-north-ryde-trang",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -6733,
+     "z": -7982,
+     "radius": 35,
+     "label": "the painted line and the old one under it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the old paint is still there, that is the whole argument",
+     "npc": "hub-north-ryde-trang"
+    }
+   ],
+   "reward": {
+    "cash": 79,
+    "xp": 219,
+    "unlock": [
+     "hub:h-rank-north-ryde-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-north-ryde-1",
+   "act": 3,
+   "title": "Lost Fares, North Ryde",
+   "blurb": "Do not laugh. Since the rank at North Ryde shrank I am $79 a week down, and the association wants that number from somebody who can prove it. I would not ask if there was anyone else about. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-north-ryde-trang",
+   "level": 3,
+   "requires": [
+    "h-rank-north-ryde-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 79,
+     "label": "$79 in a week, to show it can be done"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the submission, right there",
+     "npc": "hub-north-ryde-trang"
+    }
+   ],
+   "reward": {
+    "cash": 138,
+    "xp": 317,
+    "unlock": [
+     "hub:h-rank-north-ryde-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-north-ryde-2",
+   "act": 3,
+   "title": "Queue Jumpers, North Ryde",
+   "blurb": "It is the sort of thing you notice or you do not. Cars that have never sat in the North Ryde queue turn up at ten past five and take the front of it, and the drivers who waited say nothing. You can tell me I am imagining it. Tell me after. If anyone asks, you were never here.",
+   "giver": "hub-north-ryde-kaito",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "the ones who take the front"
+    },
+    {
+     "kind": "earn",
+     "dollars": 33,
+     "label": "$33, which is about one airport run"
+    }
+   ],
+   "reward": {
+    "cash": 88,
+    "xp": 218,
+    "unlock": [
+     "hub:h-rank-north-ryde-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-north-ryde-3",
+   "act": 3,
+   "title": "The Late Train, North Ryde",
+   "blurb": "Two people have already said no. When the last train into North Ryde is late, 33 people come out at once and I have to have cars there before they do. I would have sorted it myself a year ago. There is no rush, but there is a Friday.",
+   "giver": "hub-north-ryde-kaito",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "North Ryde",
+     "to": "Macquarie Park",
+     "label": "come in on the last one from Macquarie Park and see it"
+    },
+    {
+     "kind": "photo",
+     "x": -6765,
+     "z": -8018,
+     "radius": 35,
+     "label": "the rank at the moment the doors open"
+    }
+   ],
+   "reward": {
+    "cash": 87,
+    "xp": 213,
+    "unlock": [
+     "hub:h-rank-north-ryde-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-north-ryde-4",
+   "act": 3,
+   "title": "The Door, North Ryde",
+   "blurb": "Someone has to, and it may as well be you. I have stood on this door near North Ryde for 33 years and since the long weekend somebody has been sending my guests to a different rank. It is not the money. It has stopped being the money. I'll see you right for it.",
+   "giver": "hub-north-ryde-alessia",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -6596,
+     "z": -8070,
+     "radius": 25,
+     "label": "follow one of them and see where they end up"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you will be standing about, get something"
+    }
+   ],
+   "reward": {
+    "cash": 80,
+    "xp": 232,
+    "unlock": [
+     "hub:h-rank-north-ryde-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-north-ryde-5",
+   "act": 3,
+   "title": "The Depot, North Ryde",
+   "blurb": "You are the first person to stop all morning. The plates working the North Ryde rank are dispatched from a depot at Macquarie Park, and the man who runs it has never met a driver he liked. I did try the official route, for what that was worth. I'll put the kettle on for when you're back.",
+   "giver": "hub-north-ryde-alessia",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7753,
+     "z": -9072,
+     "radius": 60,
+     "label": "go and be pleasant at him anyway"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether he is the problem or the symptom",
+     "npc": "hub-north-ryde-alessia"
+    }
+   ],
+   "reward": {
+    "cash": 98,
+    "xp": 217,
+    "unlock": [
+     "hub:h-rank-north-ryde-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

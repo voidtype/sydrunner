@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-bowlo-martin-place-0",
+   "act": 3,
+   "title": "The Dead Patch at Martin Place",
+   "blurb": "It is not a police matter and I have checked. The number three green at Martin Place has had a bald patch the shape of Tasmania since Thursdays, and the committee thinks I am inventing it. I am not after trouble. I am after an answer. I'll see you right for it.",
+   "giver": "hub-martin-place-jelena",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 189,
+     "z": -74,
+     "radius": 35,
+     "label": "the patch, with something in frame for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring it to me before the meeting",
+     "npc": "hub-martin-place-jelena"
+    }
+   ],
+   "reward": {
+    "cash": 118,
+    "xp": 318,
+    "unlock": [
+     "hub:h-bowlo-martin-place-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-martin-place-1",
+   "act": 3,
+   "title": "Turf Money, Martin Place",
+   "blurb": "Honestly, I am past caring how it looks. They have seen the photograph and now they want it re-laid by Thursdays, which means finding $85 that the Martin Place club does not have. Nobody else seems to have noticed, which is its own problem. I'll put the kettle on for when you're back.",
+   "giver": "hub-martin-place-jelena",
+   "level": 5,
+   "requires": [
+    "h-bowlo-martin-place-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 85,
+     "label": "$85, however you like, I am not asking"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "put it in my hand, not the safe",
+     "npc": "hub-martin-place-jelena"
+    }
+   ],
+   "reward": {
+    "cash": 153,
+    "xp": 393,
+    "unlock": [
+     "hub:h-bowlo-martin-place-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-martin-place-2",
+   "act": 3,
+   "title": "The Martin Place Membership Count",
+   "blurb": "I would do it myself if I could leave the counter. Our books say 15 members at Martin Place and I would bet the bar takings that half of them are dead or moved to Queensland. Everyone I have told has looked at me the way you are now. Just do not come back empty-handed.",
+   "giver": "hub-martin-place-monika",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -38,
+     "z": -163,
+     "radius": 25,
+     "label": "stand at the side door where the list is kept"
+    },
+    {
+     "kind": "photo",
+     "x": 6,
+     "z": 3,
+     "radius": 35,
+     "label": "the board with the names still on it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "read me the ones you did not recognise",
+     "npc": "hub-martin-place-monika"
+    }
+   ],
+   "reward": {
+    "cash": 118,
+    "xp": 302,
+    "unlock": [
+     "hub:h-bowlo-martin-place-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-martin-place-3",
+   "act": 3,
+   "title": "Closing Time Rumour, Martin Place",
+   "blurb": "You will think I am making this up. Since the middle of the news somebody has been going round the Martin Place greens telling the barefoot bowlers we are shutting, and we are not shutting. This is the third time I have had this conversation. I will know if you skipped a bit.",
+   "giver": "hub-martin-place-monika",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "whoever is doing the telling"
+    },
+    {
+     "kind": "earn",
+     "dollars": 55,
+     "label": "and take the bar money off them while you are there"
+    }
+   ],
+   "reward": {
+    "cash": 111,
+    "xp": 313,
+    "unlock": [
+     "hub:h-bowlo-martin-place-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-martin-place-4",
+   "act": 3,
+   "title": "Behind the Bar at Martin Place",
+   "blurb": "There is no clever way to say this. There is a laminated notice in the chest freezer behind the bar at Martin Place and I am not opening it on an empty stomach. It started small, the way these things do. Say nothing to anyone on the way.",
+   "giver": "hub-martin-place-niamh",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get one into you first, seriously"
+    },
+    {
+     "kind": "goto",
+     "x": 77,
+     "z": -161,
+     "radius": 25,
+     "label": "round the back where the cellar door is"
+    },
+    {
+     "kind": "photo",
+     "x": 84,
+     "z": -176,
+     "radius": 35,
+     "label": "whatever is in there, before I lose my nerve"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 322,
+    "unlock": [
+     "hub:h-bowlo-martin-place-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-martin-place-5",
+   "act": 3,
+   "title": "The Old Greenkeeper, Martin Place",
+   "blurb": "You look like you have twenty minutes. The man who kept these greens before me drinks at Barangaroo now, and he owes Martin Place an explanation about the drainage. It is the not knowing that has got me, honestly. Do not make a scene about it.",
+   "giver": "hub-martin-place-niamh",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -570,
+     "z": -1025,
+     "radius": 60,
+     "label": "find him and hear him out"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come back and tell me what he said",
+     "npc": "hub-martin-place-niamh"
+    }
+   ],
+   "reward": {
+    "cash": 123,
+    "xp": 308,
+    "unlock": [
+     "hub:h-bowlo-martin-place-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-punchbowl-0",
+   "act": 3,
+   "title": "Nights at Punchbowl",
+   "blurb": "It is not a police matter and I have checked. Every night around just gone midnight the same car does three laps of the Punchbowl forecourt and never buys fuel. I am not after trouble. I am after an answer. I'll see you right for it.",
+   "giver": "hub-punchbowl-usman",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -14072,
+     "z": 6620,
+     "radius": 35,
+     "label": "the car, plate if you can get it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it on record before I ring anyone",
+     "npc": "hub-punchbowl-usman"
+    }
+   ],
+   "reward": {
+    "cash": 123,
+    "xp": 315,
+    "unlock": [
+     "hub:h-servo-punchbowl-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-punchbowl-1",
+   "act": 3,
+   "title": "The Third Lap, Punchbowl",
+   "blurb": "Honestly, I am past caring how it looks. Now I know the plate, I want to know where it goes after it leaves Punchbowl at just gone midnight, because it is not going home. Nobody else seems to have noticed, which is its own problem. I'll put the kettle on for when you're back.",
+   "giver": "hub-punchbowl-usman",
+   "level": 5,
+   "requires": [
+    "h-servo-punchbowl-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Punchbowl",
+     "to": "Wiley Park",
+     "label": "follow it as far as Wiley Park"
+    },
+    {
+     "kind": "photo",
+     "x": -14223,
+     "z": 6584,
+     "radius": 35,
+     "label": "wherever it stops"
+    }
+   ],
+   "reward": {
+    "cash": 161,
+    "xp": 394,
+    "unlock": [
+     "hub:h-servo-punchbowl-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-punchbowl-2",
+   "act": 3,
+   "title": "Bay Two, Punchbowl",
+   "blurb": "I would do it myself if I could leave the counter. Bay two at the Punchbowl workshop has had the same car in it since a public holiday nobody remembered and the owner has stopped answering. Everyone I have told has looked at me the way you are now. Just do not come back empty-handed.",
+   "giver": "hub-punchbowl-dima",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -14228,
+     "z": 6486,
+     "radius": 25,
+     "label": "the address on the job card"
+    },
+    {
+     "kind": "photo",
+     "x": -14229,
+     "z": 6473,
+     "radius": 35,
+     "label": "the letterbox, so I know I have the right house"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if anybody actually lives there",
+     "npc": "hub-punchbowl-dima"
+    }
+   ],
+   "reward": {
+    "cash": 113,
+    "xp": 310,
+    "unlock": [
+     "hub:h-servo-punchbowl-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-punchbowl-3",
+   "act": 3,
+   "title": "Tools Off the Bench, Punchbowl",
+   "blurb": "You will think I am making this up. Someone has been walking out of Punchbowl with a socket set at a time since a public holiday nobody remembered, and I have run out of ways to be polite about it. This is the third time I have had this conversation. I will know if you skipped a bit.",
+   "giver": "hub-punchbowl-dima",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 3,
+     "label": "the ones hanging round the air hose"
+    },
+    {
+     "kind": "earn",
+     "dollars": 70,
+     "label": "$70 of it back, that is what the set cost"
+    }
+   ],
+   "reward": {
+    "cash": 121,
+    "xp": 318,
+    "unlock": [
+     "hub:h-servo-punchbowl-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-punchbowl-4",
+   "act": 3,
+   "title": "The Punchbowl Price Board",
+   "blurb": "There is no clever way to say this. Head office says the Punchbowl board has been wrong since a public holiday nobody remembered and I say it has been right for eleven years, and one of us is about to be embarrassed. It started small, the way these things do. Say nothing to anyone on the way.",
+   "giver": "hub-punchbowl-chau",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "buy something so it is a real transaction"
+    },
+    {
+     "kind": "photo",
+     "x": -14097,
+     "z": 6480,
+     "radius": 35,
+     "label": "the board and the pump, both in the one shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that settles it either way",
+     "npc": "hub-punchbowl-chau"
+    }
+   ],
+   "reward": {
+    "cash": 129,
+    "xp": 309,
+    "unlock": [
+     "hub:h-servo-punchbowl-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-punchbowl-5",
+   "act": 3,
+   "title": "The Other Franchise, Punchbowl",
+   "blurb": "You look like you have twenty minutes. The bloke who runs the site at Wiley Park has had the same trouble Punchbowl has, and he will talk to you before he talks to me. It is the not knowing that has got me, honestly. Do not make a scene about it.",
+   "giver": "hub-punchbowl-chau",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -12999,
+     "z": 6037,
+     "radius": 60,
+     "label": "find him on shift"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever he says, I want it word for word",
+     "npc": "hub-punchbowl-chau"
+    }
+   ],
+   "reward": {
+    "cash": 118,
+    "xp": 322,
+    "unlock": [
+     "hub:h-servo-punchbowl-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-summer-hill-0",
+   "act": 3,
+   "title": "Level Two, Summer Hill",
+   "blurb": "It is not a police matter and I have checked. Water has been coming through the level two ceiling of the Summer Hill block since the week of the show and the strata report says there is no water. I am not after trouble. I am after an answer. I'll see you right for it.",
+   "giver": "hub-summer-hill-mira",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -6520,
+     "z": 2553,
+     "radius": 35,
+     "label": "the ceiling, with the stain visible"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that goes in the file whether they like it or not",
+     "npc": "hub-summer-hill-mira"
+    }
+   ],
+   "reward": {
+    "cash": 126,
+    "xp": 350,
+    "unlock": [
+     "hub:h-strata-summer-hill-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-summer-hill-1",
+   "act": 3,
+   "title": "The Special Levy, Summer Hill",
+   "blurb": "Honestly, I am past caring how it looks. The photo did it. Nobody else seems to have noticed, which is its own problem. Now every owner at Summer Hill owes $75 and I have to collect it from people who have avoided me for a year. I'll put the kettle on for when you're back.",
+   "giver": "hub-summer-hill-mira",
+   "level": 6,
+   "requires": [
+    "h-strata-summer-hill-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 75,
+     "label": "$75 out of them, in any state"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will not ask how",
+     "npc": "hub-summer-hill-mira"
+    }
+   ],
+   "reward": {
+    "cash": 168,
+    "xp": 444,
+    "unlock": [
+     "hub:h-strata-summer-hill-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-summer-hill-2",
+   "act": 3,
+   "title": "Car Space 14, Summer Hill",
+   "blurb": "I would do it myself if I could leave the counter. Somebody who does not live at Summer Hill has parked in space fourteen every night since the week of the show and the manager will not look at it. Everyone I have told has looked at me the way you are now. Just do not come back empty-handed.",
+   "giver": "hub-summer-hill-fenella",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -6649,
+     "z": 2528,
+     "radius": 25,
+     "label": "down to the basement, the far corner"
+    },
+    {
+     "kind": "photo",
+     "x": -6656,
+     "z": 2521,
+     "radius": 35,
+     "label": "the car in the space with the number painted beside it"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 363,
+    "unlock": [
+     "hub:h-strata-summer-hill-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-summer-hill-3",
+   "act": 3,
+   "title": "The Meeting, Summer Hill",
+   "blurb": "You will think I am making this up. The Summer Hill AGM is on the week of the show and I would like to arrive with something stronger than a grievance and a printout. This is the third time I have had this conversation. I will know if you skipped a bit.",
+   "giver": "hub-summer-hill-fenella",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 2,
+     "label": "two coffees, one is for me"
+    },
+    {
+     "kind": "goto",
+     "x": -6581,
+     "z": 2349,
+     "radius": 25,
+     "label": "the community room where they hold it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "walk in with me, they behave when there is a witness",
+     "npc": "hub-summer-hill-fenella"
+    }
+   ],
+   "reward": {
+    "cash": 129,
+    "xp": 369,
+    "unlock": [
+     "hub:h-strata-summer-hill-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-summer-hill-4",
+   "act": 3,
+   "title": "Bin Night at Summer Hill",
+   "blurb": "There is no clever way to say this. Three units at Summer Hill have put their bins out on the wrong night since the week of the show and I have taken it personally, which I accept is a choice I made. It started small, the way these things do. Say nothing to anyone on the way.",
+   "giver": "hub-summer-hill-quinn",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "the ones who argue about it"
+    },
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "the fine the council gave me, off them"
+    }
+   ],
+   "reward": {
+    "cash": 136,
+    "xp": 361,
+    "unlock": [
+     "hub:h-strata-summer-hill-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-summer-hill-5",
+   "act": 3,
+   "title": "The Other Block, Summer Hill",
+   "blurb": "You look like you have twenty minutes. There is a block at Lewisham with the same builder and the same cracks, and their manager has already been through what Summer Hill is starting. It is the not knowing that has got me, honestly. Do not make a scene about it.",
+   "giver": "hub-summer-hill-quinn",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5491,
+     "z": 2800,
+     "radius": 60,
+     "label": "go and ask them how it ended"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I need to know how much worse this gets",
+     "npc": "hub-summer-hill-quinn"
+    }
+   ],
+   "reward": {
+    "cash": 127,
+    "xp": 346,
+    "unlock": [
+     "hub:h-strata-summer-hill-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

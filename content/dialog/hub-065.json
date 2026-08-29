@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-martin-place-jelena",
+   "name": "Jelena, greenkeeper at Martin Place",
+   "x": -46,
+   "z": -121,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are selling something the answer is no.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is not a police matter and I have checked. The number three green at Martin Place has had a bald patch the shape of Tasmania since Thursdays, and the committee thinks I am inventing it. I am not after trouble. I am after an answer. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-martin-place-0",
+       "denyFlag": "hub:h-bowlo-martin-place-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Honestly, I am past caring how it looks. They have seen the photograph and now they want it re-laid by Thursdays, which means finding $85 that the Martin Place club does not have. Nobody else seems to have noticed, which is its own problem. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-martin-place-1",
+       "denyFlag": "hub:h-bowlo-martin-place-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "The Dead Patch at Martin Place — that's done.",
+       "turnin": "h-bowlo-martin-place-0"
+      },
+      {
+       "text": "Turf Money, Martin Place — that's done.",
+       "turnin": "h-bowlo-martin-place-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-martin-place-monika",
+   "name": "Monika, club president at Martin Place",
+   "x": 133.7,
+   "z": 51.2,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Cash only and no, I am joking. What do you want.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I would do it myself if I could leave the counter. Our books say 15 members at Martin Place and I would bet the bar takings that half of them are dead or moved to Queensland. Everyone I have told has looked at me the way you are now. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-martin-place-2",
+       "denyFlag": "hub:h-bowlo-martin-place-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You will think I am making this up. Since the middle of the news somebody has been going round the Martin Place greens telling the barefoot bowlers we are shutting, and we are not shutting. This is the third time I have had this conversation. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-martin-place-3",
+       "denyFlag": "hub:h-bowlo-martin-place-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Martin Place Membership Count — that's done.",
+       "turnin": "h-bowlo-martin-place-2"
+      },
+      {
+       "text": "Closing Time Rumour, Martin Place — that's done.",
+       "turnin": "h-bowlo-martin-place-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-martin-place-niamh",
+   "name": "Niamh, bar manager at Martin Place",
+   "x": 231,
+   "z": -268,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You have got a face like you can keep your mouth shut.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "There is no clever way to say this. There is a laminated notice in the chest freezer behind the bar at Martin Place and I am not opening it on an empty stomach. It started small, the way these things do. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-martin-place-4",
+       "denyFlag": "hub:h-bowlo-martin-place-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You look like you have twenty minutes. The man who kept these greens before me drinks at Barangaroo now, and he owes Martin Place an explanation about the drainage. It is the not knowing that has got me, honestly. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-martin-place-5",
+       "denyFlag": "hub:h-bowlo-martin-place-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Behind the Bar at Martin Place — that's done.",
+       "turnin": "h-bowlo-martin-place-4"
+      },
+      {
+       "text": "The Old Greenkeeper, Martin Place — that's done.",
+       "turnin": "h-bowlo-martin-place-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-punchbowl-usman",
+   "name": "Usman, night console operator at Punchbowl",
+   "x": -14018,
+   "z": 6694,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Right. Talk while I do this.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is not a police matter and I have checked. Every night around just gone midnight the same car does three laps of the Punchbowl forecourt and never buys fuel. I am not after trouble. I am after an answer. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-punchbowl-0",
+       "denyFlag": "hub:h-servo-punchbowl-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Honestly, I am past caring how it looks. Now I know the plate, I want to know where it goes after it leaves Punchbowl at just gone midnight, because it is not going home. Nobody else seems to have noticed, which is its own problem. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-punchbowl-1",
+       "denyFlag": "hub:h-servo-punchbowl-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "Nights at Punchbowl — that's done.",
+       "turnin": "h-servo-punchbowl-0"
+      },
+      {
+       "text": "The Third Lap, Punchbowl — that's done.",
+       "turnin": "h-servo-punchbowl-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-punchbowl-dima",
+   "name": "Dima, mechanic at Punchbowl",
+   "x": -14158,
+   "z": 6497,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You right there? I am mid-something but go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I would do it myself if I could leave the counter. Bay two at the Punchbowl workshop has had the same car in it since a public holiday nobody remembered and the owner has stopped answering. Everyone I have told has looked at me the way you are now. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-punchbowl-2",
+       "denyFlag": "hub:h-servo-punchbowl-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You will think I am making this up. Someone has been walking out of Punchbowl with a socket set at a time since a public holiday nobody remembered, and I have run out of ways to be polite about it. This is the third time I have had this conversation. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-punchbowl-3",
+       "denyFlag": "hub:h-servo-punchbowl-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Bay Two, Punchbowl — that's done.",
+       "turnin": "h-servo-punchbowl-2"
+      },
+      {
+       "text": "Tools Off the Bench, Punchbowl — that's done.",
+       "turnin": "h-servo-punchbowl-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-punchbowl-chau",
+   "name": "Chau, franchisee at Punchbowl",
+   "x": -14161,
+   "z": 6359,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are here about the sign, the sign is wrong.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "There is no clever way to say this. Head office says the Punchbowl board has been wrong since a public holiday nobody remembered and I say it has been right for eleven years, and one of us is about to be embarrassed. It started small, the way these things do. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-punchbowl-4",
+       "denyFlag": "hub:h-servo-punchbowl-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You look like you have twenty minutes. The bloke who runs the site at Wiley Park has had the same trouble Punchbowl has, and he will talk to you before he talks to me. It is the not knowing that has got me, honestly. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-punchbowl-5",
+       "denyFlag": "hub:h-servo-punchbowl-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "The Punchbowl Price Board — that's done.",
+       "turnin": "h-servo-punchbowl-4"
+      },
+      {
+       "text": "The Other Franchise, Punchbowl — that's done.",
+       "turnin": "h-servo-punchbowl-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-summer-hill-mira",
+   "name": "Mira, building manager at Summer Hill",
+   "x": -6591,
+   "z": 2533,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand in the doorway, mate, come round.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is not a police matter and I have checked. Water has been coming through the level two ceiling of the Summer Hill block since the week of the show and the strata report says there is no water. I am not after trouble. I am after an answer. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-summer-hill-0",
+       "denyFlag": "hub:h-strata-summer-hill-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Honestly, I am past caring how it looks. The photo did it. Nobody else seems to have noticed, which is its own problem. Now every owner at Summer Hill owes $75 and I have to collect it from people who have avoided me for a year. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-summer-hill-1",
+       "denyFlag": "hub:h-strata-summer-hill-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "Level Two, Summer Hill — that's done.",
+       "turnin": "h-strata-summer-hill-0"
+      },
+      {
+       "text": "The Special Levy, Summer Hill — that's done.",
+       "turnin": "h-strata-summer-hill-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-summer-hill-fenella",
+   "name": "Fenella, owner-occupier at Summer Hill",
+   "x": -6487.7,
+   "z": 2398.1,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Long day. Say what you came to say.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I would do it myself if I could leave the counter. Somebody who does not live at Summer Hill has parked in space fourteen every night since the week of the show and the manager will not look at it. Everyone I have told has looked at me the way you are now. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-summer-hill-2",
+       "denyFlag": "hub:h-strata-summer-hill-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You will think I am making this up. The Summer Hill AGM is on the week of the show and I would like to arrive with something stronger than a grievance and a printout. This is the third time I have had this conversation. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-summer-hill-3",
+       "denyFlag": "hub:h-strata-summer-hill-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "Car Space 14, Summer Hill — that's done.",
+       "turnin": "h-strata-summer-hill-2"
+      },
+      {
+       "text": "The Meeting, Summer Hill — that's done.",
+       "turnin": "h-strata-summer-hill-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-summer-hill-quinn",
+   "name": "Quinn, the one who does the bins at Summer Hill",
+   "x": -6614,
+   "z": 2560,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I know that look. Everyone wants something today.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "There is no clever way to say this. Three units at Summer Hill have put their bins out on the wrong night since the week of the show and I have taken it personally, which I accept is a choice I made. It started small, the way these things do. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-summer-hill-4",
+       "denyFlag": "hub:h-strata-summer-hill-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You look like you have twenty minutes. There is a block at Lewisham with the same builder and the same cracks, and their manager has already been through what Summer Hill is starting. It is the not knowing that has got me, honestly. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-summer-hill-5",
+       "denyFlag": "hub:h-strata-summer-hill-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "Bin Night at Summer Hill — that's done.",
+       "turnin": "h-strata-summer-hill-4"
+      },
+      {
+       "text": "The Other Block, Summer Hill — that's done.",
+       "turnin": "h-strata-summer-hill-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

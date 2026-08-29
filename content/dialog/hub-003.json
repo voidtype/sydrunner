@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-como-milena",
+   "name": "Milena, newsagent at Como",
+   "x": -12661.6,
+   "z": 15425.4,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You have got a face like you can keep your mouth shut.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Not being dramatic about this. I am sending back 65 papers a day from Como and paying to have them collected, which is a business model somebody invented on purpose. I am aware how that sounds. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-como-0",
+       "denyFlag": "hub:h-newsagent-como-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I am told you do odd jobs. They will drop my Como order if I can show $50 of turnover on the other side of the shop by grand final week. My wife says I should let it go. My wife is wrong. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-como-1",
+       "denyFlag": "hub:h-newsagent-como-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "Returns at Como — that's done.",
+       "turnin": "h-newsagent-como-0"
+      },
+      {
+       "text": "The Better Rate, Como — that's done.",
+       "turnin": "h-newsagent-como-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-como-arno",
+   "name": "Arno, paper runner at Como",
+   "x": -12721,
+   "z": 15227,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Right. Talk while I do this.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I'll be straight with you. I do the Como round from the second express and for the last fortnight somebody has been taking the papers off the front steps behind me. I have rung the number on the letter four times. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-como-2",
+       "denyFlag": "hub:h-newsagent-como-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It has been three weeks. There is a dog on the Como round that has had two of my bags and a whiteboard with last March still on it that was not even mine. Half the street knows and half the street is pretending not to. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-como-3",
+       "denyFlag": "hub:h-newsagent-como-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "The Como Round — that's done.",
+       "turnin": "h-newsagent-como-2"
+      },
+      {
+       "text": "The Dog on Ash Street, Como — that's done.",
+       "turnin": "h-newsagent-como-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-como-nam",
+   "name": "Nam, lotto regular at Como",
+   "x": -12685,
+   "z": 15330,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You right there? I am mid-something but go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Nobody else has offered, so. Nine of us at Como have gone in on the same numbers since grand final week and one of us has stopped putting money in. I am not after trouble. I am after an answer. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-como-4",
+       "denyFlag": "hub:h-newsagent-como-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "The council knows and the council does not care. The agency at Jannali closed six months before Como started struggling, and I would very much like to know what they know. Nobody else seems to have noticed, which is its own problem. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-como-5",
+       "denyFlag": "hub:h-newsagent-como-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "The Syndicate, Como — that's done.",
+       "turnin": "h-newsagent-como-4"
+      },
+      {
+       "text": "The Other Agency, Como — that's done.",
+       "turnin": "h-newsagent-como-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-bankstown-pania",
+   "name": "Pania, panel beater at Bankstown",
+   "x": -15878.5,
+   "z": 5821.5,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are here about the sign, the sign is wrong.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Not being dramatic about this. There has been a car in the Bankstown yard since every second Friday with a chest freezer that hums in D on the passenger seat and no owner answering. I am aware how that sounds. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-bankstown-0",
+       "denyFlag": "hub:h-workshop-bankstown-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I am told you do odd jobs. Now that it is documented, Bankstown is owed $68 in storage and the only person who can pay it is the person not answering. My wife says I should let it go. My wife is wrong. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-bankstown-1",
+       "denyFlag": "hub:h-workshop-bankstown-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "The Unclaimed Falcon, Bankstown — that's done.",
+       "turnin": "h-workshop-bankstown-0"
+      },
+      {
+       "text": "Storage Fees, Bankstown — that's done.",
+       "turnin": "h-workshop-bankstown-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-bankstown-thea",
+   "name": "Thea, apprentice at Bankstown",
+   "x": -15995.2,
+   "z": 5888.3,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand in the doorway, mate, come round.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I'll be straight with you. I am in my first year at Bankstown and I have to log 26 hours on a job I am not allowed to touch on my own. I have rung the number on the letter four times. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-bankstown-2",
+       "denyFlag": "hub:h-workshop-bankstown-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It has been three weeks. Somebody has been coming into the Bankstown yard after ten past five to use the air line, and last week they used the compressor as well. Half the street knows and half the street is pretending not to. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-bankstown-3",
+       "denyFlag": "hub:h-workshop-bankstown-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "First Year, Bankstown — that's done.",
+       "turnin": "h-workshop-bankstown-2"
+      },
+      {
+       "text": "The Air Line, Bankstown — that's done.",
+       "turnin": "h-workshop-bankstown-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-bankstown-karina",
+   "name": "Karina, the bloke whose car it is at Bankstown",
+   "x": -15996.4,
+   "z": 5808.9,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Long day. Say what you came to say.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Nobody else has offered, so. My car has been at Bankstown since every second Friday and every time I ring, the quote has grown by about $26. I am not after trouble. I am after an answer. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-bankstown-4",
+       "denyFlag": "hub:h-workshop-bankstown-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "The council knows and the council does not care. The insurance assessor who signs off every job at Bankstown works out of Yagoona, and he has never once seen the car he is assessing. Nobody else seems to have noticed, which is its own problem. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-bankstown-5",
+       "denyFlag": "hub:h-workshop-bankstown-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "My Own Car, Bankstown — that's done.",
+       "turnin": "h-workshop-bankstown-4"
+      },
+      {
+       "text": "The Assessor, Bankstown — that's done.",
+       "turnin": "h-workshop-bankstown-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-clyde-grace",
+   "name": "Grace, shop manager at Clyde",
+   "x": -17731,
+   "z": -3303,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I know that look. Everyone wants something today.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Not being dramatic about this. People leave things at the Clyde roller door after first light and by morning it is rained on and it is our problem and our tip fee. I am aware how that sounds. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-clyde-0",
+       "denyFlag": "hub:h-opshop-clyde-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I am told you do odd jobs. The photos worked, which means Clyde can claim back the $65 we have paid to throw away other people's furniture since grand final week. My wife says I should let it go. My wife is wrong. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-clyde-1",
+       "denyFlag": "hub:h-opshop-clyde-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "Dumped Out the Back, Clyde — that's done.",
+       "turnin": "h-opshop-clyde-0"
+      },
+      {
+       "text": "The Tip Fee, Clyde — that's done.",
+       "turnin": "h-opshop-clyde-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-clyde-annika",
+   "name": "Annika, sorter at Clyde",
+   "x": -17778.1,
+   "z": -3327.7,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Give me a second. Right. Go.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I'll be straight with you. Something came into Clyde on grand final week in a box of paperbacks that I do not think the family meant to give away. I have rung the number on the letter four times. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-clyde-2",
+       "denyFlag": "hub:h-opshop-clyde-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It has been three weeks. Two people have been coming into the Clyde sorting room since grand final week and taking the good stock before it reaches the floor, and one of them volunteers here. Half the street knows and half the street is pretending not to. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-clyde-3",
+       "denyFlag": "hub:h-opshop-clyde-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Good Box, Clyde — that's done.",
+       "turnin": "h-opshop-clyde-2"
+      },
+      {
+       "text": "Sorting Room, Clyde — that's done.",
+       "turnin": "h-opshop-clyde-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-clyde-zuri",
+   "name": "Zuri, volunteer driver at Clyde",
+   "x": -17926.7,
+   "z": -3233.5,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are not from around the corner, are you.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Nobody else has offered, so. I do the Clyde pick-ups in a van with 30 thousand on it and a door that only opens if you know about it. I am not after trouble. I am after an answer. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-clyde-4",
+       "denyFlag": "hub:h-opshop-clyde-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "The council knows and the council does not care. Everything Clyde cannot sell goes to a warehouse at Harris Park, and nobody there has ever answered a phone in my hearing. Nobody else seems to have noticed, which is its own problem. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-clyde-5",
+       "denyFlag": "hub:h-opshop-clyde-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "The Van, Clyde — that's done.",
+       "turnin": "h-opshop-clyde-4"
+      },
+      {
+       "text": "Head Office, Clyde — that's done.",
+       "turnin": "h-opshop-clyde-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

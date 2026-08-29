@@ -1,0 +1,651 @@
+{
+ "quests": [
+  {
+   "id": "h-bakery-carlingford-0",
+   "act": 3,
+   "title": "two in the afternoon at Carlingford",
+   "blurb": "It is the sort of thing you notice or you do not. I start at two in the afternoon and for a month the Carlingford back lane has had somebody in it who is not waiting for bread. My wife says I should let it go. My wife is wrong. There is no rush, but there is a Friday.",
+   "giver": "hub-carlingford-tane",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -15184,
+     "z": -9270,
+     "radius": 35,
+     "label": "the lane, from the door, no flash"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I am not calling anyone until I am sure",
+     "npc": "hub-carlingford-tane"
+    }
+   ],
+   "reward": {
+    "cash": 171,
+    "xp": 456,
+    "unlock": [
+     "hub:h-bakery-carlingford-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-carlingford-1",
+   "act": 3,
+   "title": "The Lane Light, Carlingford",
+   "blurb": "Two people have already said no. A light on that lane costs Carlingford $78 and the landlord has said no twice, so we are doing it ourselves. I have rung the number on the letter four times. I'll see you right for it.",
+   "giver": "hub-carlingford-tane",
+   "level": 8,
+   "requires": [
+    "h-bakery-carlingford-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 78,
+     "label": "$78 and I will fit it myself"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "do not tell him where it came from",
+     "npc": "hub-carlingford-tane"
+    }
+   ],
+   "reward": {
+    "cash": 197,
+    "xp": 534,
+    "unlock": [
+     "hub:h-bakery-carlingford-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-carlingford-2",
+   "act": 3,
+   "title": "Flour Run, Carlingford",
+   "blurb": "Someone has to, and it may as well be you. The flour for Carlingford comes off a truck at two in the afternoon and last a wet Monday the truck came and the flour did not. Half the street knows and half the street is pretending not to. I'll put the kettle on for when you're back.",
+   "giver": "hub-carlingford-robbo",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Carlingford",
+     "to": "Telopea",
+     "label": "ride out to Telopea where the load is made up"
+    },
+    {
+     "kind": "photo",
+     "x": -15285,
+     "z": -9374,
+     "radius": 35,
+     "label": "the pallet with our name on it, if it exists"
+    }
+   ],
+   "reward": {
+    "cash": 169,
+    "xp": 443,
+    "unlock": [
+     "hub:h-bakery-carlingford-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-carlingford-3",
+   "act": 3,
+   "title": "The Loading Zone, Carlingford",
+   "blurb": "You are the first person to stop all morning. The Carlingford loading zone has had a car in it at two in the afternoon every morning this week and the driver waits in it, which makes it worse. I am not after trouble. I am after an answer. Just do not come back empty-handed.",
+   "giver": "hub-carlingford-robbo",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 1,
+     "label": "the one who says he is only a minute"
+    },
+    {
+     "kind": "earn",
+     "dollars": 90,
+     "label": "and the ticket I got, off him"
+    }
+   ],
+   "reward": {
+    "cash": 162,
+    "xp": 456,
+    "unlock": [
+     "hub:h-bakery-carlingford-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-carlingford-4",
+   "act": 3,
+   "title": "The Sourdough Sign, Carlingford",
+   "blurb": "Not being dramatic about this. Somebody two doors down from Carlingford put up a sign on a wet Monday that says the same six words as ours, in the same order. Nobody else seems to have noticed, which is its own problem. I will know if you skipped a bit.",
+   "giver": "hub-carlingford-tomasz",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -15169,
+     "z": -9404,
+     "radius": 25,
+     "label": "walk down and read it properly"
+    },
+    {
+     "kind": "photo",
+     "x": -15161,
+     "z": -9407,
+     "radius": 35,
+     "label": "both signs if you can get them in one frame"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me I am not imagining it",
+     "npc": "hub-carlingford-tomasz"
+    }
+   ],
+   "reward": {
+    "cash": 160,
+    "xp": 439,
+    "unlock": [
+     "hub:h-bakery-carlingford-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-carlingford-5",
+   "act": 3,
+   "title": "The Old Site, Carlingford",
+   "blurb": "I am told you do odd jobs. This business was at Telopea before it was at Carlingford, and there is a woman there who still has the original book. Everyone I have told has looked at me the way you are now. Say nothing to anyone on the way.",
+   "giver": "hub-carlingford-tomasz",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -15767,
+     "z": -7822,
+     "radius": 60,
+     "label": "she is usually about in the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring back whatever she is willing to say",
+     "npc": "hub-carlingford-tomasz"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 460,
+    "unlock": [
+     "hub:h-bakery-carlingford-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-macarthur-0",
+   "act": 3,
+   "title": "The Macarthur Pool",
+   "blurb": "It is the sort of thing you notice or you do not. Council has been saying the Macarthur pool is at end of life since every second Friday and the crack they keep pointing at is not in the shell. My wife says I should let it go. My wife is wrong. There is no rush, but there is a Friday.",
+   "giver": "hub-macarthur-arjun",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -37579,
+     "z": 23289,
+     "radius": 35,
+     "label": "the crack, close, with something for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "an engineer can read that. A councillor cannot.",
+     "npc": "hub-macarthur-arjun"
+    }
+   ],
+   "reward": {
+    "cash": 189,
+    "xp": 497,
+    "unlock": [
+     "hub:h-pool-macarthur-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-macarthur-1",
+   "act": 3,
+   "title": "The Petition Stall, Macarthur",
+   "blurb": "Two people have already said no. We are running a stall for Macarthur on every second Friday and a stall needs $89 of gear that nobody has volunteered to pay for. I have rung the number on the letter four times. I'll see you right for it.",
+   "giver": "hub-macarthur-arjun",
+   "level": 9,
+   "requires": [
+    "h-pool-macarthur-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 89,
+     "label": "$89 and a table, if you see one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will be there from eight either way",
+     "npc": "hub-macarthur-arjun"
+    }
+   ],
+   "reward": {
+    "cash": 218,
+    "xp": 590,
+    "unlock": [
+     "hub:h-pool-macarthur-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-macarthur-2",
+   "act": 3,
+   "title": "Squad, Macarthur",
+   "blurb": "Someone has to, and it may as well be you. I coach 70 kids at Macarthur at the second express and three of them have stopped coming without anybody ringing me. Half the street knows and half the street is pretending not to. I'll put the kettle on for when you're back.",
+   "giver": "hub-macarthur-liadan",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -37739,
+     "z": 23297,
+     "radius": 25,
+     "label": "the flats where two of them live"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "take something with you, it is a long walk up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I do not need them back. I need to know.",
+     "npc": "hub-macarthur-liadan"
+    }
+   ],
+   "reward": {
+    "cash": 178,
+    "xp": 498,
+    "unlock": [
+     "hub:h-pool-macarthur-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-macarthur-3",
+   "act": 3,
+   "title": "The Deep End, Macarthur",
+   "blurb": "You are the first person to stop all morning. A group has been coming over the Macarthur fence after close and swimming in the dark, which is how Macarthur loses its pool. I am not after trouble. I am after an answer. Just do not come back empty-handed.",
+   "giver": "hub-macarthur-liadan",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 3,
+     "label": "the ones who go over the fence"
+    },
+    {
+     "kind": "photo",
+     "x": -37663,
+     "z": 23205,
+     "radius": 35,
+     "label": "the spot in the fence they use"
+    }
+   ],
+   "reward": {
+    "cash": 174,
+    "xp": 487,
+    "unlock": [
+     "hub:h-pool-macarthur-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-macarthur-4",
+   "act": 3,
+   "title": "The Kiosk Freezer, Macarthur",
+   "blurb": "Not being dramatic about this. The kiosk at Macarthur has two hundred metres of orange netting in it and a freezer that has been running warm since every second Friday. Nobody else seems to have noticed, which is its own problem. I will know if you skipped a bit.",
+   "giver": "hub-macarthur-selin",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 2,
+     "label": "get two, we are going to be here"
+    },
+    {
+     "kind": "goto",
+     "x": -37573,
+     "z": 23205,
+     "radius": 25,
+     "label": "the plant room behind the kiosk"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether it is the freezer or the power",
+     "npc": "hub-macarthur-selin"
+    }
+   ],
+   "reward": {
+    "cash": 187,
+    "xp": 488,
+    "unlock": [
+     "hub:h-pool-macarthur-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-macarthur-5",
+   "act": 3,
+   "title": "The Aquatic Centre, Macarthur",
+   "blurb": "I am told you do odd jobs. They want everyone from Macarthur to drive to the new centre at Campbelltown, so somebody should go and see whether it is any good. Everyone I have told has looked at me the way you are now. Say nothing to anyone on the way.",
+   "giver": "hub-macarthur-selin",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -35937,
+     "z": 22379,
+     "radius": 60,
+     "label": "have a proper look, not a quick one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "be honest with me, even if it is nice",
+     "npc": "hub-macarthur-selin"
+    }
+   ],
+   "reward": {
+    "cash": 184,
+    "xp": 500,
+    "unlock": [
+     "hub:h-pool-macarthur-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-carramar-0",
+   "act": 3,
+   "title": "The Carramar Rank",
+   "blurb": "It is the sort of thing you notice or you do not. The rank outside Carramar used to hold nine cars and since the long weekend it holds four, and nobody will say who moved the line. My wife says I should let it go. My wife is wrong. There is no rush, but there is a Friday.",
+   "giver": "hub-carramar-gabriel",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -22923,
+     "z": 2120,
+     "radius": 35,
+     "label": "the painted line and the old one under it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the old paint is still there, that is the whole argument",
+     "npc": "hub-carramar-gabriel"
+    }
+   ],
+   "reward": {
+    "cash": 186,
+    "xp": 548,
+    "unlock": [
+     "hub:h-rank-carramar-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-carramar-1",
+   "act": 3,
+   "title": "Lost Fares, Carramar",
+   "blurb": "Two people have already said no. Since the rank at Carramar shrank I am $107 a week down, and the association wants that number from somebody who can prove it. I have rung the number on the letter four times. I'll see you right for it.",
+   "giver": "hub-carramar-gabriel",
+   "level": 10,
+   "requires": [
+    "h-rank-carramar-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 107,
+     "label": "$107 in a week, to show it can be done"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the submission, right there",
+     "npc": "hub-carramar-gabriel"
+    }
+   ],
+   "reward": {
+    "cash": 244,
+    "xp": 641,
+    "unlock": [
+     "hub:h-rank-carramar-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-carramar-2",
+   "act": 3,
+   "title": "Queue Jumpers, Carramar",
+   "blurb": "Someone has to, and it may as well be you. Cars that have never sat in the Carramar queue turn up at twenty past four and take the front of it, and the drivers who waited say nothing. Half the street knows and half the street is pretending not to. I'll put the kettle on for when you're back.",
+   "giver": "hub-carramar-rhona",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 2,
+     "label": "the ones who take the front"
+    },
+    {
+     "kind": "earn",
+     "dollars": 21,
+     "label": "$21, which is about one airport run"
+    }
+   ],
+   "reward": {
+    "cash": 193,
+    "xp": 545,
+    "unlock": [
+     "hub:h-rank-carramar-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-carramar-3",
+   "act": 3,
+   "title": "The Late Train, Carramar",
+   "blurb": "You are the first person to stop all morning. When the last train into Carramar is late, 21 people come out at once and I have to have cars there before they do. I am not after trouble. I am after an answer. Just do not come back empty-handed.",
+   "giver": "hub-carramar-rhona",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Carramar",
+     "to": "Fairfield",
+     "label": "come in on the last one from Fairfield and see it"
+    },
+    {
+     "kind": "photo",
+     "x": -22928,
+     "z": 2098,
+     "radius": 35,
+     "label": "the rank at the moment the doors open"
+    }
+   ],
+   "reward": {
+    "cash": 201,
+    "xp": 546,
+    "unlock": [
+     "hub:h-rank-carramar-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-carramar-4",
+   "act": 3,
+   "title": "The Door, Carramar",
+   "blurb": "Not being dramatic about this. I have stood on this door near Carramar for 21 years and since the long weekend somebody has been sending my guests to a different rank. Nobody else seems to have noticed, which is its own problem. I will know if you skipped a bit.",
+   "giver": "hub-carramar-toma",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -22908,
+     "z": 1979,
+     "radius": 25,
+     "label": "follow one of them and see where they end up"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "you will be standing about, get something"
+    }
+   ],
+   "reward": {
+    "cash": 188,
+    "xp": 547,
+    "unlock": [
+     "hub:h-rank-carramar-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-carramar-5",
+   "act": 3,
+   "title": "The Depot, Carramar",
+   "blurb": "I am told you do odd jobs. The plates working the Carramar rank are dispatched from a depot at Villawood, and the man who runs it has never met a driver he liked. Everyone I have told has looked at me the way you are now. Say nothing to anyone on the way.",
+   "giver": "hub-carramar-toma",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -21586,
+     "z": 1812,
+     "radius": 60,
+     "label": "go and be pleasant at him anyway"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether he is the problem or the symptom",
+     "npc": "hub-carramar-toma"
+    }
+   ],
+   "reward": {
+    "cash": 187,
+    "xp": 553,
+    "unlock": [
+     "hub:h-rank-carramar-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

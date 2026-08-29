@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-cronulla-jordi",
+   "name": "Jordi, greenkeeper at Cronulla",
+   "x": -4985,
+   "z": 20734,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are selling something the answer is no.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "This is going to sound small. The number three green at Cronulla has had a bald patch the shape of Tasmania since the Sunday after payday, and the committee thinks I am inventing it. Everyone I have told has looked at me the way you are now. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-cronulla-0",
+       "denyFlag": "hub:h-bowlo-cronulla-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have written it down twice and lost it twice. They have seen the photograph and now they want it re-laid by the Sunday after payday, which means finding $87 that the Cronulla club does not have. This is the third time I have had this conversation. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-cronulla-1",
+       "denyFlag": "hub:h-bowlo-cronulla-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "The Dead Patch at Cronulla — that's done.",
+       "turnin": "h-bowlo-cronulla-0"
+      },
+      {
+       "text": "Turf Money, Cronulla — that's done.",
+       "turnin": "h-bowlo-cronulla-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-cronulla-moira",
+   "name": "Moira, club president at Cronulla",
+   "x": -4854,
+   "z": 20831,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Cash only and no, I am joking. What do you want.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Do not laugh. Our books say 60 members at Cronulla and I would bet the bar takings that half of them are dead or moved to Queensland. It started small, the way these things do. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-cronulla-2",
+       "denyFlag": "hub:h-bowlo-cronulla-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It is the sort of thing you notice or you do not. Since the back of seven somebody has been going round the Cronulla greens telling the barefoot bowlers we are shutting, and we are not shutting. It is the not knowing that has got me, honestly. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-cronulla-3",
+       "denyFlag": "hub:h-bowlo-cronulla-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Cronulla Membership Count — that's done.",
+       "turnin": "h-bowlo-cronulla-2"
+      },
+      {
+       "text": "Closing Time Rumour, Cronulla — that's done.",
+       "turnin": "h-bowlo-cronulla-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-cronulla-ahmad",
+   "name": "Ahmad, bar manager at Cronulla",
+   "x": -4811,
+   "z": 20807,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You have got a face like you can keep your mouth shut.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Two people have already said no. There is an esky with no lid in the chest freezer behind the bar at Cronulla and I am not opening it on an empty stomach. There is probably a simple explanation and I would love to hear it. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-cronulla-4",
+       "denyFlag": "hub:h-bowlo-cronulla-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Someone has to, and it may as well be you. The man who kept these greens before me drinks at Woolooware now, and he owes Cronulla an explanation about the drainage. You will see what I mean the second you get there. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-cronulla-5",
+       "denyFlag": "hub:h-bowlo-cronulla-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Behind the Bar at Cronulla — that's done.",
+       "turnin": "h-bowlo-cronulla-4"
+      },
+      {
+       "text": "The Old Greenkeeper, Cronulla — that's done.",
+       "turnin": "h-bowlo-cronulla-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-artarmon-lise",
+   "name": "Lise, night console operator at Artarmon",
+   "x": -2483,
+   "z": -6654,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Right. Talk while I do this.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "This is going to sound small. Every night around just gone midnight the same car does three laps of the Artarmon forecourt and never buys fuel. Everyone I have told has looked at me the way you are now. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-artarmon-0",
+       "denyFlag": "hub:h-servo-artarmon-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have written it down twice and lost it twice. Now I know the plate, I want to know where it goes after it leaves Artarmon at just gone midnight, because it is not going home. This is the third time I have had this conversation. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-artarmon-1",
+       "denyFlag": "hub:h-servo-artarmon-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "Nights at Artarmon — that's done.",
+       "turnin": "h-servo-artarmon-0"
+      },
+      {
+       "text": "The Third Lap, Artarmon — that's done.",
+       "turnin": "h-servo-artarmon-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-artarmon-pip",
+   "name": "Pip, mechanic at Artarmon",
+   "x": -2298,
+   "z": -6482,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You right there? I am mid-something but go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Do not laugh. Bay two at the Artarmon workshop has had the same car in it since grand final week and the owner has stopped answering. It started small, the way these things do. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-artarmon-2",
+       "denyFlag": "hub:h-servo-artarmon-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It is the sort of thing you notice or you do not. Someone has been walking out of Artarmon with a socket set at a time since grand final week, and I have run out of ways to be polite about it. It is the not knowing that has got me, honestly. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-artarmon-3",
+       "denyFlag": "hub:h-servo-artarmon-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Bay Two, Artarmon — that's done.",
+       "turnin": "h-servo-artarmon-2"
+      },
+      {
+       "text": "Tools Off the Bench, Artarmon — that's done.",
+       "turnin": "h-servo-artarmon-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-artarmon-moira",
+   "name": "Moira, franchisee at Artarmon",
+   "x": -2184,
+   "z": -6576,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are here about the sign, the sign is wrong.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Two people have already said no. Head office says the Artarmon board has been wrong since grand final week and I say it has been right for eleven years, and one of us is about to be embarrassed. There is probably a simple explanation and I would love to hear it. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-artarmon-4",
+       "denyFlag": "hub:h-servo-artarmon-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Someone has to, and it may as well be you. The bloke who runs the site at Chatswood has had the same trouble Artarmon has, and he will talk to you before he talks to me. You will see what I mean the second you get there. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-artarmon-5",
+       "denyFlag": "hub:h-servo-artarmon-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "The Artarmon Price Board — that's done.",
+       "turnin": "h-servo-artarmon-4"
+      },
+      {
+       "text": "The Other Franchise, Artarmon — that's done.",
+       "turnin": "h-servo-artarmon-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-jannali-kieran",
+   "name": "Kieran, building manager at Jannali",
+   "x": -12979,
+   "z": 16698,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand in the doorway, mate, come round.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "This is going to sound small. Water has been coming through the level two ceiling of the Jannali block since the first of the month and the strata report says there is no water. Everyone I have told has looked at me the way you are now. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-jannali-0",
+       "denyFlag": "hub:h-strata-jannali-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have written it down twice and lost it twice. The photo did it. This is the third time I have had this conversation. Now every owner at Jannali owes $67 and I have to collect it from people who have avoided me for a year. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-jannali-1",
+       "denyFlag": "hub:h-strata-jannali-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "Level Two, Jannali — that's done.",
+       "turnin": "h-strata-jannali-0"
+      },
+      {
+       "text": "The Special Levy, Jannali — that's done.",
+       "turnin": "h-strata-jannali-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-jannali-hayley",
+   "name": "Hayley, owner-occupier at Jannali",
+   "x": -13255,
+   "z": 16472,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Long day. Say what you came to say.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Do not laugh. Somebody who does not live at Jannali has parked in space fourteen every night since the first of the month and the manager will not look at it. It started small, the way these things do. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-jannali-2",
+       "denyFlag": "hub:h-strata-jannali-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It is the sort of thing you notice or you do not. The Jannali AGM is on the first of the month and I would like to arrive with something stronger than a grievance and a printout. It is the not knowing that has got me, honestly. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-jannali-3",
+       "denyFlag": "hub:h-strata-jannali-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "Car Space 14, Jannali — that's done.",
+       "turnin": "h-strata-jannali-2"
+      },
+      {
+       "text": "The Meeting, Jannali — that's done.",
+       "turnin": "h-strata-jannali-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-jannali-hasan",
+   "name": "Hasan, the one who does the bins at Jannali",
+   "x": -12962,
+   "z": 16585,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I know that look. Everyone wants something today.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Two people have already said no. Three units at Jannali have put their bins out on the wrong night since the first of the month and I have taken it personally, which I accept is a choice I made. There is probably a simple explanation and I would love to hear it. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-jannali-4",
+       "denyFlag": "hub:h-strata-jannali-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Someone has to, and it may as well be you. There is a block at Como with the same builder and the same cracks, and their manager has already been through what Jannali is starting. You will see what I mean the second you get there. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-jannali-5",
+       "denyFlag": "hub:h-strata-jannali-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "Bin Night at Jannali — that's done.",
+       "turnin": "h-strata-jannali-4"
+      },
+      {
+       "text": "The Other Block, Jannali — that's done.",
+       "turnin": "h-strata-jannali-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

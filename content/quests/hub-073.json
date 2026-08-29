@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-bowlo-haymarket-0",
+   "act": 3,
+   "title": "The Dead Patch at Haymarket",
+   "blurb": "I have written it down twice and lost it twice. The number three green at Haymarket has had a bald patch the shape of Tasmania since every second Friday, and the committee thinks I am inventing it. It might be nothing. It has not felt like nothing. That's it. That's the whole ask.",
+   "giver": "hub-haymarket-cleo",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -273,
+     "z": 1511,
+     "radius": 35,
+     "label": "the patch, with something in frame for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring it to me before the meeting",
+     "npc": "hub-haymarket-cleo"
+    }
+   ],
+   "reward": {
+    "cash": 141,
+    "xp": 413,
+    "unlock": [
+     "hub:h-bowlo-haymarket-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-haymarket-1",
+   "act": 3,
+   "title": "Turf Money, Haymarket",
+   "blurb": "Do not laugh. They have seen the photograph and now they want it re-laid by every second Friday, which means finding $127 that the Haymarket club does not have. I would not ask if there was anyone else about. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-haymarket-cleo",
+   "level": 7,
+   "requires": [
+    "h-bowlo-haymarket-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 127,
+     "label": "$127, however you like, I am not asking"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "put it in my hand, not the safe",
+     "npc": "hub-haymarket-cleo"
+    }
+   ],
+   "reward": {
+    "cash": 185,
+    "xp": 505,
+    "unlock": [
+     "hub:h-bowlo-haymarket-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-haymarket-2",
+   "act": 3,
+   "title": "The Haymarket Membership Count",
+   "blurb": "It is the sort of thing you notice or you do not. Our books say 35 members at Haymarket and I would bet the bar takings that half of them are dead or moved to Queensland. You can tell me I am imagining it. Tell me after. If anyone asks, you were never here.",
+   "giver": "hub-haymarket-zenia",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -427,
+     "z": 1597,
+     "radius": 25,
+     "label": "stand at the side door where the list is kept"
+    },
+    {
+     "kind": "photo",
+     "x": -456,
+     "z": 1588,
+     "radius": 35,
+     "label": "the board with the names still on it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "read me the ones you did not recognise",
+     "npc": "hub-haymarket-zenia"
+    }
+   ],
+   "reward": {
+    "cash": 152,
+    "xp": 405,
+    "unlock": [
+     "hub:h-bowlo-haymarket-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-haymarket-3",
+   "act": 3,
+   "title": "Closing Time Rumour, Haymarket",
+   "blurb": "Two people have already said no. Since knock-off somebody has been going round the Haymarket greens telling the barefoot bowlers we are shutting, and we are not shutting. I would have sorted it myself a year ago. There is no rush, but there is a Friday.",
+   "giver": "hub-haymarket-zenia",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 2,
+     "label": "whoever is doing the telling"
+    },
+    {
+     "kind": "earn",
+     "dollars": 75,
+     "label": "and take the bar money off them while you are there"
+    }
+   ],
+   "reward": {
+    "cash": 157,
+    "xp": 412,
+    "unlock": [
+     "hub:h-bowlo-haymarket-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-haymarket-4",
+   "act": 3,
+   "title": "Behind the Bar at Haymarket",
+   "blurb": "Someone has to, and it may as well be you. There is a milk crate in the chest freezer behind the bar at Haymarket and I am not opening it on an empty stomach. It is not the money. It has stopped being the money. I'll see you right for it.",
+   "giver": "hub-haymarket-pania",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "get one into you first, seriously"
+    },
+    {
+     "kind": "goto",
+     "x": -385,
+     "z": 1424,
+     "radius": 25,
+     "label": "round the back where the cellar door is"
+    },
+    {
+     "kind": "photo",
+     "x": -378,
+     "z": 1409,
+     "radius": 35,
+     "label": "whatever is in there, before I lose my nerve"
+    }
+   ],
+   "reward": {
+    "cash": 145,
+    "xp": 412,
+    "unlock": [
+     "hub:h-bowlo-haymarket-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-haymarket-5",
+   "act": 3,
+   "title": "The Old Greenkeeper, Haymarket",
+   "blurb": "You are the first person to stop all morning. The man who kept these greens before me drinks at Town Hall now, and he owes Haymarket an explanation about the drainage. I did try the official route, for what that was worth. I'll put the kettle on for when you're back.",
+   "giver": "hub-haymarket-pania",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -44,
+     "z": 533,
+     "radius": 60,
+     "label": "find him and hear him out"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come back and tell me what he said",
+     "npc": "hub-haymarket-pania"
+    }
+   ],
+   "reward": {
+    "cash": 142,
+    "xp": 412,
+    "unlock": [
+     "hub:h-bowlo-haymarket-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-doonside-0",
+   "act": 3,
+   "title": "Nights at Doonside",
+   "blurb": "I have written it down twice and lost it twice. Every night around twenty past four the same car does three laps of the Doonside forecourt and never buys fuel. It might be nothing. It has not felt like nothing. That's it. That's the whole ask.",
+   "giver": "hub-doonside-nina",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -31795,
+     "z": -10947,
+     "radius": 35,
+     "label": "the car, plate if you can get it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it on record before I ring anyone",
+     "npc": "hub-doonside-nina"
+    }
+   ],
+   "reward": {
+    "cash": 169,
+    "xp": 457,
+    "unlock": [
+     "hub:h-servo-doonside-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-doonside-1",
+   "act": 3,
+   "title": "The Third Lap, Doonside",
+   "blurb": "Do not laugh. Now I know the plate, I want to know where it goes after it leaves Doonside at twenty past four, because it is not going home. I would not ask if there was anyone else about. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-doonside-nina",
+   "level": 8,
+   "requires": [
+    "h-servo-doonside-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Doonside",
+     "to": "Rooty Hill",
+     "label": "follow it as far as Rooty Hill"
+    },
+    {
+     "kind": "photo",
+     "x": -31970,
+     "z": -11072,
+     "radius": 35,
+     "label": "wherever it stops"
+    }
+   ],
+   "reward": {
+    "cash": 209,
+    "xp": 533,
+    "unlock": [
+     "hub:h-servo-doonside-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-doonside-2",
+   "act": 3,
+   "title": "Bay Two, Doonside",
+   "blurb": "It is the sort of thing you notice or you do not. Bay two at the Doonside workshop has had the same car in it since the first of the month and the owner has stopped answering. You can tell me I am imagining it. Tell me after. If anyone asks, you were never here.",
+   "giver": "hub-doonside-lottie",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -31951,
+     "z": -11081,
+     "radius": 25,
+     "label": "the address on the job card"
+    },
+    {
+     "kind": "photo",
+     "x": -31952,
+     "z": -11094,
+     "radius": 35,
+     "label": "the letterbox, so I know I have the right house"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if anybody actually lives there",
+     "npc": "hub-doonside-lottie"
+    }
+   ],
+   "reward": {
+    "cash": 161,
+    "xp": 446,
+    "unlock": [
+     "hub:h-servo-doonside-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-doonside-3",
+   "act": 3,
+   "title": "Tools Off the Bench, Doonside",
+   "blurb": "Two people have already said no. Someone has been walking out of Doonside with a socket set at a time since the first of the month, and I have run out of ways to be polite about it. I would have sorted it myself a year ago. There is no rush, but there is a Friday.",
+   "giver": "hub-doonside-lottie",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 3,
+     "label": "the ones hanging round the air hose"
+    },
+    {
+     "kind": "earn",
+     "dollars": 104,
+     "label": "$104 of it back, that is what the set cost"
+    }
+   ],
+   "reward": {
+    "cash": 173,
+    "xp": 442,
+    "unlock": [
+     "hub:h-servo-doonside-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-doonside-4",
+   "act": 3,
+   "title": "The Doonside Price Board",
+   "blurb": "Someone has to, and it may as well be you. Head office says the Doonside board has been wrong since the first of the month and I say it has been right for eleven years, and one of us is about to be embarrassed. It is not the money. It has stopped being the money. I'll see you right for it.",
+   "giver": "hub-doonside-davina",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "buy something so it is a real transaction"
+    },
+    {
+     "kind": "photo",
+     "x": -31820,
+     "z": -11087,
+     "radius": 35,
+     "label": "the board and the pump, both in the one shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that settles it either way",
+     "npc": "hub-doonside-davina"
+    }
+   ],
+   "reward": {
+    "cash": 167,
+    "xp": 449,
+    "unlock": [
+     "hub:h-servo-doonside-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-doonside-5",
+   "act": 3,
+   "title": "The Other Franchise, Doonside",
+   "blurb": "You are the first person to stop all morning. The bloke who runs the site at Rooty Hill has had the same trouble Doonside has, and he will talk to you before he talks to me. I did try the official route, for what that was worth. I'll put the kettle on for when you're back.",
+   "giver": "hub-doonside-davina",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -33954,
+     "z": -10052,
+     "radius": 60,
+     "label": "find him on shift"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever he says, I want it word for word",
+     "npc": "hub-doonside-davina"
+    }
+   ],
+   "reward": {
+    "cash": 170,
+    "xp": 439,
+    "unlock": [
+     "hub:h-servo-doonside-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-glenbrook-0",
+   "act": 3,
+   "title": "Level Two, Glenbrook",
+   "blurb": "I have written it down twice and lost it twice. Water has been coming through the level two ceiling of the Glenbrook block since the Sunday after payday and the strata report says there is no water. It might be nothing. It has not felt like nothing. That's it. That's the whole ask.",
+   "giver": "hub-glenbrook-forough",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -54583,
+     "z": -10009,
+     "radius": 35,
+     "label": "the ceiling, with the stain visible"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that goes in the file whether they like it or not",
+     "npc": "hub-glenbrook-forough"
+    }
+   ],
+   "reward": {
+    "cash": 176,
+    "xp": 500,
+    "unlock": [
+     "hub:h-strata-glenbrook-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-glenbrook-1",
+   "act": 3,
+   "title": "The Special Levy, Glenbrook",
+   "blurb": "Do not laugh. The photo did it. I would not ask if there was anyone else about. Now every owner at Glenbrook owes $75 and I have to collect it from people who have avoided me for a year. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-glenbrook-forough",
+   "level": 9,
+   "requires": [
+    "h-strata-glenbrook-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 75,
+     "label": "$75 out of them, in any state"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will not ask how",
+     "npc": "hub-glenbrook-forough"
+    }
+   ],
+   "reward": {
+    "cash": 223,
+    "xp": 581,
+    "unlock": [
+     "hub:h-strata-glenbrook-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-glenbrook-2",
+   "act": 3,
+   "title": "Car Space 14, Glenbrook",
+   "blurb": "It is the sort of thing you notice or you do not. Somebody who does not live at Glenbrook has parked in space fourteen every night since the Sunday after payday and the manager will not look at it. You can tell me I am imagining it. Tell me after. If anyone asks, you were never here.",
+   "giver": "hub-glenbrook-leila",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -54712,
+     "z": -10034,
+     "radius": 25,
+     "label": "down to the basement, the far corner"
+    },
+    {
+     "kind": "photo",
+     "x": -54719,
+     "z": -10041,
+     "radius": 35,
+     "label": "the car in the space with the number painted beside it"
+    }
+   ],
+   "reward": {
+    "cash": 170,
+    "xp": 489,
+    "unlock": [
+     "hub:h-strata-glenbrook-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-glenbrook-3",
+   "act": 3,
+   "title": "The Meeting, Glenbrook",
+   "blurb": "Two people have already said no. The Glenbrook AGM is on the Sunday after payday and I would like to arrive with something stronger than a grievance and a printout. I would have sorted it myself a year ago. There is no rush, but there is a Friday.",
+   "giver": "hub-glenbrook-leila",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 2,
+     "label": "two coffees, one is for me"
+    },
+    {
+     "kind": "goto",
+     "x": -54644,
+     "z": -10213,
+     "radius": 25,
+     "label": "the community room where they hold it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "walk in with me, they behave when there is a witness",
+     "npc": "hub-glenbrook-leila"
+    }
+   ],
+   "reward": {
+    "cash": 169,
+    "xp": 495,
+    "unlock": [
+     "hub:h-strata-glenbrook-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-glenbrook-4",
+   "act": 3,
+   "title": "Bin Night at Glenbrook",
+   "blurb": "Someone has to, and it may as well be you. Three units at Glenbrook have put their bins out on the wrong night since the Sunday after payday and I have taken it personally, which I accept is a choice I made. It is not the money. It has stopped being the money. I'll see you right for it.",
+   "giver": "hub-glenbrook-lennox",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 2,
+     "label": "the ones who argue about it"
+    },
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "the fine the council gave me, off them"
+    }
+   ],
+   "reward": {
+    "cash": 174,
+    "xp": 508,
+    "unlock": [
+     "hub:h-strata-glenbrook-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-glenbrook-5",
+   "act": 3,
+   "title": "The Other Block, Glenbrook",
+   "blurb": "You are the first person to stop all morning. There is a block at Lapstone with the same builder and the same cracks, and their manager has already been through what Glenbrook is starting. I did try the official route, for what that was worth. I'll put the kettle on for when you're back.",
+   "giver": "hub-glenbrook-lennox",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -52542,
+     "z": -9539,
+     "radius": 60,
+     "label": "go and ask them how it ended"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I need to know how much worse this gets",
+     "npc": "hub-glenbrook-lennox"
+    }
+   ],
+   "reward": {
+    "cash": 169,
+    "xp": 493,
+    "unlock": [
+     "hub:h-strata-glenbrook-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

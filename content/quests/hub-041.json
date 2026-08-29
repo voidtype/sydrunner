@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-bowlo-lewisham-0",
+   "act": 3,
+   "title": "The Dead Patch at Lewisham",
+   "blurb": "I'll be straight with you. The number three green at Lewisham has had a bald patch the shape of Tasmania since school holidays, and the committee thinks I am inventing it. It has been going on longer than I have admitted to anyone. You'll know it when you see it.",
+   "giver": "hub-lewisham-peg",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -5517,
+     "z": 2789,
+     "radius": 35,
+     "label": "the patch, with something in frame for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring it to me before the meeting",
+     "npc": "hub-lewisham-peg"
+    }
+   ],
+   "reward": {
+    "cash": 63,
+    "xp": 126,
+    "unlock": [
+     "hub:h-bowlo-lewisham-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bowlo-lewisham-1",
+   "act": 3,
+   "title": "Turf Money, Lewisham",
+   "blurb": "It has been three weeks. They have seen the photograph and now they want it re-laid by school holidays, which means finding $38 that the Lewisham club does not have. I have got no proof, which is exactly why I am asking. Half now if you want it. Most people don't.",
+   "giver": "hub-lewisham-peg",
+   "level": 1,
+   "requires": [
+    "h-bowlo-lewisham-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 38,
+     "label": "$38, however you like, I am not asking"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "put it in my hand, not the safe",
+     "npc": "hub-lewisham-peg"
+    }
+   ],
+   "reward": {
+    "cash": 102,
+    "xp": 211,
+    "unlock": [
+     "hub:h-bowlo-lewisham-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bowlo-lewisham-2",
+   "act": 3,
+   "title": "The Lewisham Membership Count",
+   "blurb": "Nobody else has offered, so. Our books say 84 members at Lewisham and I would bet the bar takings that half of them are dead or moved to Queensland. It might be nothing. It has not felt like nothing. Whatever it costs you, tell me and I will cover it.",
+   "giver": "hub-lewisham-aleks",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5671,
+     "z": 2875,
+     "radius": 25,
+     "label": "stand at the side door where the list is kept"
+    },
+    {
+     "kind": "photo",
+     "x": -5700,
+     "z": 2866,
+     "radius": 35,
+     "label": "the board with the names still on it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "read me the ones you did not recognise",
+     "npc": "hub-lewisham-aleks"
+    }
+   ],
+   "reward": {
+    "cash": 57,
+    "xp": 131,
+    "unlock": [
+     "hub:h-bowlo-lewisham-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bowlo-lewisham-3",
+   "act": 3,
+   "title": "Closing Time Rumour, Lewisham",
+   "blurb": "The council knows and the council does not care. Since the back of seven somebody has been going round the Lewisham greens telling the barefoot bowlers we are shutting, and we are not shutting. I would not ask if there was anyone else about. I would rather know than wonder.",
+   "giver": "hub-lewisham-aleks",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "whoever is doing the telling"
+    },
+    {
+     "kind": "earn",
+     "dollars": 124,
+     "label": "and take the bar money off them while you are there"
+    }
+   ],
+   "reward": {
+    "cash": 69,
+    "xp": 130,
+    "unlock": [
+     "hub:h-bowlo-lewisham-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bowlo-lewisham-4",
+   "act": 3,
+   "title": "Behind the Bar at Lewisham",
+   "blurb": "I have been putting it off since Easter. There is a bucket of odd keys in the chest freezer behind the bar at Lewisham and I am not opening it on an empty stomach. You can tell me I am imagining it. Tell me after. That's the whole job. No catch.",
+   "giver": "hub-lewisham-cecile",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "get one into you first, seriously"
+    },
+    {
+     "kind": "goto",
+     "x": -5629,
+     "z": 2702,
+     "radius": 25,
+     "label": "round the back where the cellar door is"
+    },
+    {
+     "kind": "photo",
+     "x": -5622,
+     "z": 2687,
+     "radius": 35,
+     "label": "whatever is in there, before I lose my nerve"
+    }
+   ],
+   "reward": {
+    "cash": 57,
+    "xp": 135,
+    "unlock": [
+     "hub:h-bowlo-lewisham-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bowlo-lewisham-5",
+   "act": 3,
+   "title": "The Old Greenkeeper, Lewisham",
+   "blurb": "Before you say anything: yes, I know. The man who kept these greens before me drinks at Summer Hill now, and he owes Lewisham an explanation about the drainage. I would have sorted it myself a year ago. Be polite about it. It costs nothing.",
+   "giver": "hub-lewisham-cecile",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -6591,
+     "z": 2533,
+     "radius": 60,
+     "label": "find him and hear him out"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come back and tell me what he said",
+     "npc": "hub-lewisham-cecile"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 120,
+    "unlock": [
+     "hub:h-bowlo-lewisham-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-servo-rozelle-bay-0",
+   "act": 3,
+   "title": "Nights at Rozelle Bay",
+   "blurb": "I'll be straight with you. Every night around the second express the same car does three laps of the Rozelle Bay forecourt and never buys fuel. It has been going on longer than I have admitted to anyone. You'll know it when you see it.",
+   "giver": "hub-rozelle-bay-walid",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -3392,
+     "z": 386,
+     "radius": 35,
+     "label": "the car, plate if you can get it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it on record before I ring anyone",
+     "npc": "hub-rozelle-bay-walid"
+    }
+   ],
+   "reward": {
+    "cash": 65,
+    "xp": 135,
+    "unlock": [
+     "hub:h-servo-rozelle-bay-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-servo-rozelle-bay-1",
+   "act": 3,
+   "title": "The Third Lap, Rozelle Bay",
+   "blurb": "It has been three weeks. Now I know the plate, I want to know where it goes after it leaves Rozelle Bay at the second express, because it is not going home. I have got no proof, which is exactly why I am asking. Half now if you want it. Most people don't.",
+   "giver": "hub-rozelle-bay-walid",
+   "level": 1,
+   "requires": [
+    "h-servo-rozelle-bay-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Rozelle Bay",
+     "to": "Jubilee Park",
+     "label": "follow it as far as Jubilee Park"
+    },
+    {
+     "kind": "photo",
+     "x": -3543,
+     "z": 350,
+     "radius": 35,
+     "label": "wherever it stops"
+    }
+   ],
+   "reward": {
+    "cash": 98,
+    "xp": 212,
+    "unlock": [
+     "hub:h-servo-rozelle-bay-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-servo-rozelle-bay-2",
+   "act": 3,
+   "title": "Bay Two, Rozelle Bay",
+   "blurb": "Nobody else has offered, so. Bay two at the Rozelle Bay workshop has had the same car in it since a wet Monday and the owner has stopped answering. It might be nothing. It has not felt like nothing. Whatever it costs you, tell me and I will cover it.",
+   "giver": "hub-rozelle-bay-taini",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -3548,
+     "z": 252,
+     "radius": 25,
+     "label": "the address on the job card"
+    },
+    {
+     "kind": "photo",
+     "x": -3549,
+     "z": 239,
+     "radius": 35,
+     "label": "the letterbox, so I know I have the right house"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if anybody actually lives there",
+     "npc": "hub-rozelle-bay-taini"
+    }
+   ],
+   "reward": {
+    "cash": 50,
+    "xp": 119,
+    "unlock": [
+     "hub:h-servo-rozelle-bay-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-servo-rozelle-bay-3",
+   "act": 3,
+   "title": "Tools Off the Bench, Rozelle Bay",
+   "blurb": "The council knows and the council does not care. Someone has been walking out of Rozelle Bay with a socket set at a time since a wet Monday, and I have run out of ways to be polite about it. I would not ask if there was anyone else about. I would rather know than wonder.",
+   "giver": "hub-rozelle-bay-taini",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 3,
+     "label": "the ones hanging round the air hose"
+    },
+    {
+     "kind": "earn",
+     "dollars": 34,
+     "label": "$34 of it back, that is what the set cost"
+    }
+   ],
+   "reward": {
+    "cash": 51,
+    "xp": 119,
+    "unlock": [
+     "hub:h-servo-rozelle-bay-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-servo-rozelle-bay-4",
+   "act": 3,
+   "title": "The Rozelle Bay Price Board",
+   "blurb": "I have been putting it off since Easter. Head office says the Rozelle Bay board has been wrong since a wet Monday and I say it has been right for eleven years, and one of us is about to be embarrassed. You can tell me I am imagining it. Tell me after. That's the whole job. No catch.",
+   "giver": "hub-rozelle-bay-akira",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "buy something so it is a real transaction"
+    },
+    {
+     "kind": "photo",
+     "x": -3417,
+     "z": 246,
+     "radius": 35,
+     "label": "the board and the pump, both in the one shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that settles it either way",
+     "npc": "hub-rozelle-bay-akira"
+    }
+   ],
+   "reward": {
+    "cash": 59,
+    "xp": 137,
+    "unlock": [
+     "hub:h-servo-rozelle-bay-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-servo-rozelle-bay-5",
+   "act": 3,
+   "title": "The Other Franchise, Rozelle Bay",
+   "blurb": "Before you say anything: yes, I know. The bloke who runs the site at Glebe has had the same trouble Rozelle Bay has, and he will talk to you before he talks to me. I would have sorted it myself a year ago. Be polite about it. It costs nothing.",
+   "giver": "hub-rozelle-bay-akira",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1950,
+     "z": 1020,
+     "radius": 60,
+     "label": "find him on shift"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever he says, I want it word for word",
+     "npc": "hub-rozelle-bay-akira"
+    }
+   ],
+   "reward": {
+    "cash": 67,
+    "xp": 139,
+    "unlock": [
+     "hub:h-servo-rozelle-bay-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-strata-olympic-park-0",
+   "act": 3,
+   "title": "Level Two, Olympic Park",
+   "blurb": "I'll be straight with you. Water has been coming through the level two ceiling of the Olympic Park block since Thursdays and the strata report says there is no water. It has been going on longer than I have admitted to anyone. You'll know it when you see it.",
+   "giver": "hub-olympic-park-dara",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -12860,
+     "z": -2251,
+     "radius": 35,
+     "label": "the ceiling, with the stain visible"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that goes in the file whether they like it or not",
+     "npc": "hub-olympic-park-dara"
+    }
+   ],
+   "reward": {
+    "cash": 58,
+    "xp": 124,
+    "unlock": [
+     "hub:h-strata-olympic-park-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-strata-olympic-park-1",
+   "act": 3,
+   "title": "The Special Levy, Olympic Park",
+   "blurb": "It has been three weeks. The photo did it. I have got no proof, which is exactly why I am asking. Now every owner at Olympic Park owes $44 and I have to collect it from people who have avoided me for a year. Half now if you want it. Most people don't.",
+   "giver": "hub-olympic-park-dara",
+   "level": 1,
+   "requires": [
+    "h-strata-olympic-park-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 44,
+     "label": "$44 out of them, in any state"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will not ask how",
+     "npc": "hub-olympic-park-dara"
+    }
+   ],
+   "reward": {
+    "cash": 90,
+    "xp": 223,
+    "unlock": [
+     "hub:h-strata-olympic-park-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-strata-olympic-park-2",
+   "act": 3,
+   "title": "Car Space 14, Olympic Park",
+   "blurb": "Nobody else has offered, so. Somebody who does not live at Olympic Park has parked in space fourteen every night since Thursdays and the manager will not look at it. It might be nothing. It has not felt like nothing. Whatever it costs you, tell me and I will cover it.",
+   "giver": "hub-olympic-park-lex",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -12989,
+     "z": -2276,
+     "radius": 25,
+     "label": "down to the basement, the far corner"
+    },
+    {
+     "kind": "photo",
+     "x": -12996,
+     "z": -2283,
+     "radius": 35,
+     "label": "the car in the space with the number painted beside it"
+    }
+   ],
+   "reward": {
+    "cash": 50,
+    "xp": 117,
+    "unlock": [
+     "hub:h-strata-olympic-park-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-strata-olympic-park-3",
+   "act": 3,
+   "title": "The Meeting, Olympic Park",
+   "blurb": "The council knows and the council does not care. The Olympic Park AGM is on Thursdays and I would like to arrive with something stronger than a grievance and a printout. I would not ask if there was anyone else about. I would rather know than wonder.",
+   "giver": "hub-olympic-park-lex",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 2,
+     "label": "two coffees, one is for me"
+    },
+    {
+     "kind": "goto",
+     "x": -12921,
+     "z": -2455,
+     "radius": 25,
+     "label": "the community room where they hold it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "walk in with me, they behave when there is a witness",
+     "npc": "hub-olympic-park-lex"
+    }
+   ],
+   "reward": {
+    "cash": 55,
+    "xp": 121,
+    "unlock": [
+     "hub:h-strata-olympic-park-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-strata-olympic-park-4",
+   "act": 3,
+   "title": "Bin Night at Olympic Park",
+   "blurb": "I have been putting it off since Easter. Three units at Olympic Park have put their bins out on the wrong night since Thursdays and I have taken it personally, which I accept is a choice I made. You can tell me I am imagining it. Tell me after. That's the whole job. No catch.",
+   "giver": "hub-olympic-park-savva",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 2,
+     "label": "the ones who argue about it"
+    },
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "the fine the council gave me, off them"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 133,
+    "unlock": [
+     "hub:h-strata-olympic-park-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-strata-olympic-park-5",
+   "act": 3,
+   "title": "The Other Block, Olympic Park",
+   "blurb": "Before you say anything: yes, I know. There is a block at Concord West with the same builder and the same cracks, and their manager has already been through what Olympic Park is starting. I would have sorted it myself a year ago. Be polite about it. It costs nothing.",
+   "giver": "hub-olympic-park-savva",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11437,
+     "z": -2110,
+     "radius": 60,
+     "label": "go and ask them how it ended"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I need to know how much worse this gets",
+     "npc": "hub-olympic-park-savva"
+    }
+   ],
+   "reward": {
+    "cash": 65,
+    "xp": 129,
+    "unlock": [
+     "hub:h-strata-olympic-park-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  }
+ ]
+}

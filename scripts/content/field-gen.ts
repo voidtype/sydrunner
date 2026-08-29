@@ -40,6 +40,12 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { decodeRail } from '../../client/src/game/rail.ts';
+// The three pools that carry the variation. See `voice.ts` -- this file is
+// the reason it exists: twenty archetypes crossed with three hundred and
+// sixty-one stations produced five hundred blurbs of which 421 shared more
+// than half a sentence with another one, and no amount of noun-swapping in
+// the cores below was ever going to fix that.
+import { voiceFor, weave } from './voice.ts';
 
 const REPO = join(import.meta.dir, '..', '..');
 const CONTENT = join(REPO, 'content');
@@ -747,6 +753,11 @@ const ARCH: Arch[] = [
     ],
     steps: (c) => [
       { kind: 'goto', ...c.at(40, 4.4), radius: 20, label: 'the end of the platform, at twenty to six' },
+      // A photograph rather than a second walk. Two gotos and a word is an
+      // errand, which is the one shape `quest-quality.ts` rule 1 refuses -- and
+      // it was right to: the job is "find out whose dog it is", and the thing
+      // that answers that is the collar, not the walking.
+      { kind: 'photo', ...c.at(60, 4.6), radius: 25, label: 'the collar, if it has got one' },
       { kind: 'goto', ...c.at(140, 1.9), radius: 25, label: 'the street it walks home to' },
       { kind: 'dialog', npc: '', node: 'ledger', label: 'tell me it is not a sad story' },
     ],
@@ -850,6 +861,15 @@ for (let i = order.length - 1; i > 0; i--) {
   [order[i], order[j]] = [order[j], order[i]];
 }
 
+/**
+ * How many times each archetype has been used.
+ *
+ * `voice.voiceFor` wants the *instance* number of the thing being written, not
+ * a global counter -- see its header for the seventy-two-quest bug that taught
+ * this file the difference. Two Dougs at two stations are instances 0 and 1 of
+ * `turnback`, whatever else was written between them.
+ */
+const archInstance = new Map<string, number>();
 let cursor = 0;
 for (let lvl = 1; lvl <= 10 && made < WANT; lvl++) {
   const want = Math.min(LEVELS[lvl - 1], WANT - made);
@@ -900,8 +920,35 @@ for (let lvl = 1; lvl <= 10 && made < WANT; lvl++) {
     // the station is actually in scope, rather than reconstructed from the id
     // afterwards, which is how the first version of this check managed to be
     // wrong about 370 of them.
-    const blurb = say(arch.blurb);
-    if (!blurb.includes(st.name)) vagueBlurbs.push(questId);
+    /*
+     * **The core, wrapped in the shared voice.**
+     *
+     * `arch.blurb` used to be the whole blurb, and that is what made this file's
+     * output repetitive: an archetype has two phrasings and three hundred and
+     * sixty-one stations, so its two hundred and fiftieth use of one of them is
+     * word for word its first with a suburb swapped. The archetype now writes
+     * the *middle* and `voice.ts` writes the two ends and the aside, indexed off
+     * this archetype's own instance number so no two uses draw the same three.
+     *
+     * The station test is still on the core, deliberately: an opening from a
+     * shared pool must not be able to satisfy "this job names its place".
+     */
+    /*
+     * **Chosen by instance, not sampled.**
+     *
+     * `say` draws from the seeded stream, which is right for the conversation
+     * lines and wrong here: with two phrasings and twenty-five instances, a
+     * random draw lets two quests share a phrasing *and* land far enough apart
+     * to share an opening, which is the only way left to reach 60%. Indexing
+     * makes the two choices orthogonal -- same-phrasing instances are exactly
+     * two apart, where the voice strides have moved all three pools.
+     */
+    const seenNow = archInstance.get(arch.key) ?? 0;
+    const raw = arch.blurb[seenNow % arch.blurb.length](c);
+    const core = raw.charAt(0).toUpperCase() + raw.slice(1).replace(/([.!?] )([a-z])/g, (_m, p, ch) => p + ch.toUpperCase());
+    if (!core.includes(st.name)) vagueBlurbs.push(questId);
+    archInstance.set(arch.key, seenNow + 1);
+    const blurb = weave(core, voiceFor(seenNow, arch.key.length));
     const steps = arch.steps(c).map((s) => (s.kind === 'dialog' ? { ...s, npc: giverId } : s));
     out.quests.push({
       id: questId, act: 3, title: arch.title(c), blurb, giver: giverId,

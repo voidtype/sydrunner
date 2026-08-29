@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-eastwood-kayo",
+   "name": "Kayo, shopkeeper at Eastwood",
+   "x": -12052,
+   "z": -8465,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are early. Or late. I have lost track.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Someone has to, and it may as well be you. The Eastwood order has been two cartons light every week since the long weekend and the invoice says otherwise every time. I have got no proof, which is exactly why I am asking. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-eastwood-0",
+       "denyFlag": "hub:h-cornershop-eastwood-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You are the first person to stop all morning. They admitted it, which I did not expect, so now there is $63 owing to Eastwood and it is not going to walk in here itself. It might be nothing. It has not felt like nothing. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-eastwood-1",
+       "denyFlag": "hub:h-cornershop-eastwood-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "Short Delivery, Eastwood — that's done.",
+       "turnin": "h-cornershop-eastwood-0"
+      },
+      {
+       "text": "The Credit Note, Eastwood — that's done.",
+       "turnin": "h-cornershop-eastwood-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-eastwood-verity",
+   "name": "Verity, delivery driver at Eastwood",
+   "x": -11837.3,
+   "z": -8492.1,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Been here since before it was like this. Go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Not being dramatic about this. I do the Eastwood run at twenty past four and there is a stretch of it where the van gets followed, which I have told nobody until now. I would not ask if there was anyone else about. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-eastwood-2",
+       "denyFlag": "hub:h-cornershop-eastwood-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I am told you do odd jobs. I have got a docket book in the back of the van and the Eastwood shop is shut, and the number on the door rings out. You can tell me I am imagining it. Tell me after. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-eastwood-3",
+       "denyFlag": "hub:h-cornershop-eastwood-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "The Eastwood Run — that's done.",
+       "turnin": "h-cornershop-eastwood-2"
+      },
+      {
+       "text": "Locked Out, Eastwood — that's done.",
+       "turnin": "h-cornershop-eastwood-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-eastwood-cathal",
+   "name": "Cathal, the kid on the register at Eastwood",
+   "x": -12019.7,
+   "z": -8431.7,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Do not mind the mess. It is structural now.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I'll be straight with you. Three of the Eastwood regulars have started coming in together and going out separately, and the till is $16 down on those days. I would have sorted it myself a year ago. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-eastwood-4",
+       "denyFlag": "hub:h-cornershop-eastwood-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It has been three weeks. Everything Eastwood sells comes off a floor at Denistone, and the woman who runs it will tell you things she will not put in writing. It is not the money. It has stopped being the money. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-eastwood-5",
+       "denyFlag": "hub:h-cornershop-eastwood-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "The Regulars, Eastwood — that's done.",
+       "turnin": "h-cornershop-eastwood-4"
+      },
+      {
+       "text": "The Wholesaler, Eastwood — that's done.",
+       "turnin": "h-cornershop-eastwood-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-blaxland-boris",
+   "name": "Boris, junior coach at Blaxland",
+   "x": -55754.8,
+   "z": -12667.8,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are selling something the answer is no.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Someone has to, and it may as well be you. I have got eleven kids for a twelve-a-side at Blaxland on the long weekend and one of them has a note from his mother. I have got no proof, which is exactly why I am asking. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-blaxland-0",
+       "denyFlag": "hub:h-oval-blaxland-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You are the first person to stop all morning. We found a twelfth, which means the Blaxland club now owes the association $90 it had budgeted on not owing. It might be nothing. It has not felt like nothing. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-blaxland-1",
+       "denyFlag": "hub:h-oval-blaxland-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "Under 12s at Blaxland — that's done.",
+       "turnin": "h-oval-blaxland-0"
+      },
+      {
+       "text": "Registration, Blaxland — that's done.",
+       "turnin": "h-oval-blaxland-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-blaxland-imogen",
+   "name": "Imogen, canteen manager at Blaxland",
+   "x": -55978,
+   "z": -12844,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Cash only and no, I am joking. What do you want.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Not being dramatic about this. The canteen at Blaxland does two hundred sausages on a Saturday and this week the freezer went off at twenty past four. I would not ask if there was anyone else about. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-blaxland-2",
+       "denyFlag": "hub:h-oval-blaxland-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I am told you do odd jobs. Somebody walked off with the float from the Blaxland canteen at about twenty past four during the last home game, and I have a fair idea which somebody. You can tell me I am imagining it. Tell me after. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-blaxland-3",
+       "denyFlag": "hub:h-oval-blaxland-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Blaxland Canteen — that's done.",
+       "turnin": "h-oval-blaxland-2"
+      },
+      {
+       "text": "Grand Final Float, Blaxland — that's done.",
+       "turnin": "h-oval-blaxland-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-blaxland-ekaterina",
+   "name": "Ekaterina, groundsman at Blaxland",
+   "x": -55918,
+   "z": -12779,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You have got a face like you can keep your mouth shut.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I'll be straight with you. The sprinkler line under the Blaxland outfield has been leaking since the long weekend and the wet patch has started to move. I would have sorted it myself a year ago. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-blaxland-4",
+       "denyFlag": "hub:h-oval-blaxland-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It has been three weeks. The bloke who allocates grounds for the whole association sits at Warrimoo, and Blaxland has been at the bottom of his list for two seasons. It is not the money. It has stopped being the money. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-blaxland-5",
+       "denyFlag": "hub:h-oval-blaxland-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Sprinkler Line, Blaxland — that's done.",
+       "turnin": "h-oval-blaxland-4"
+      },
+      {
+       "text": "The Association, Blaxland — that's done.",
+       "turnin": "h-oval-blaxland-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-dulwich-grove-damir",
+   "name": "Damir, bushcare volunteer at Dulwich Grove",
+   "x": -6489,
+   "z": 4040,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Right. Talk while I do this.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Someone has to, and it may as well be you. Somebody has been tipping fill into the creek behind Dulwich Grove since the first of the month and it is narrowing the channel a metre at a time. I have got no proof, which is exactly why I am asking. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-dulwich-grove-0",
+       "denyFlag": "hub:h-creek-dulwich-grove-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You are the first person to stop all morning. They have agreed to a clean-up at Dulwich Grove, which is wonderful, except the grant is $63 short and closes on the first of the month. It might be nothing. It has not felt like nothing. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-dulwich-grove-1",
+       "denyFlag": "hub:h-creek-dulwich-grove-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "The Creek Behind Dulwich Grove — that's done.",
+       "turnin": "h-creek-dulwich-grove-0"
+      },
+      {
+       "text": "Willow Removal, Dulwich Grove — that's done.",
+       "turnin": "h-creek-dulwich-grove-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-dulwich-grove-hugo",
+   "name": "Hugo, SES member at Dulwich Grove",
+   "x": -6483,
+   "z": 3957,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You right there? I am mid-something but go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Not being dramatic about this. We had 31 sandbags in the Dulwich Grove shed on the first of the month and this morning we have got the pallet they came on. I would not ask if there was anyone else about. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-dulwich-grove-2",
+       "denyFlag": "hub:h-creek-dulwich-grove-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I am told you do odd jobs. People keep driving the low crossing at Dulwich Grove at the second express with the water over the sign, and one of them is going to be the one. You can tell me I am imagining it. Tell me after. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-dulwich-grove-3",
+       "denyFlag": "hub:h-creek-dulwich-grove-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Sandbags, Dulwich Grove — that's done.",
+       "turnin": "h-creek-dulwich-grove-2"
+      },
+      {
+       "text": "The Low Crossing, Dulwich Grove — that's done.",
+       "turnin": "h-creek-dulwich-grove-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-dulwich-grove-finlay",
+   "name": "Finlay, resident who got flooded at Dulwich Grove",
+   "x": -6631,
+   "z": 4175,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are here about the sign, the sign is wrong.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I'll be straight with you. The water came through my place at Dulwich Grove on the first of the month and the assessor wants photographs of things I have already thrown out. I would have sorted it myself a year ago. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-dulwich-grove-4",
+       "denyFlag": "hub:h-creek-dulwich-grove-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It has been three weeks. Whatever is happening to Dulwich Grove starts upstream at Hurlstone Park, and there are people up there who have been saying so for years. It is not the money. It has stopped being the money. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-dulwich-grove-5",
+       "denyFlag": "hub:h-creek-dulwich-grove-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "Under the House, Dulwich Grove — that's done.",
+       "turnin": "h-creek-dulwich-grove-4"
+      },
+      {
+       "text": "Upstream, Dulwich Grove — that's done.",
+       "turnin": "h-creek-dulwich-grove-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

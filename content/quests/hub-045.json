@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-bowlo-rouse-hill-0",
+   "act": 3,
+   "title": "The Dead Patch at Rouse Hill",
+   "blurb": "Do not laugh. The number three green at Rouse Hill has had a bald patch the shape of Tasmania since the long weekend, and the committee thinks I am inventing it. It is not the money. It has stopped being the money. Do not let them talk you into anything.",
+   "giver": "hub-rouse-hill-ximena",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -26576,
+     "z": -19070,
+     "radius": 35,
+     "label": "the patch, with something in frame for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring it to me before the meeting",
+     "npc": "hub-rouse-hill-ximena"
+    }
+   ],
+   "reward": {
+    "cash": 113,
+    "xp": 321,
+    "unlock": [
+     "hub:h-bowlo-rouse-hill-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-rouse-hill-1",
+   "act": 3,
+   "title": "Turf Money, Rouse Hill",
+   "blurb": "It is the sort of thing you notice or you do not. They have seen the photograph and now they want it re-laid by the long weekend, which means finding $74 that the Rouse Hill club does not have. I did try the official route, for what that was worth. There's cash in it. Not a lot.",
+   "giver": "hub-rouse-hill-ximena",
+   "level": 5,
+   "requires": [
+    "h-bowlo-rouse-hill-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 74,
+     "label": "$74, however you like, I am not asking"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "put it in my hand, not the safe",
+     "npc": "hub-rouse-hill-ximena"
+    }
+   ],
+   "reward": {
+    "cash": 156,
+    "xp": 392,
+    "unlock": [
+     "hub:h-bowlo-rouse-hill-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-rouse-hill-2",
+   "act": 3,
+   "title": "The Rouse Hill Membership Count",
+   "blurb": "Two people have already said no. Our books say 68 members at Rouse Hill and I would bet the bar takings that half of them are dead or moved to Queensland. I have got a photo on my phone but it is useless. You'll know it when you see it.",
+   "giver": "hub-rouse-hill-zane",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -26730,
+     "z": -18984,
+     "radius": 25,
+     "label": "stand at the side door where the list is kept"
+    },
+    {
+     "kind": "photo",
+     "x": -26759,
+     "z": -18993,
+     "radius": 35,
+     "label": "the board with the names still on it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "read me the ones you did not recognise",
+     "npc": "hub-rouse-hill-zane"
+    }
+   ],
+   "reward": {
+    "cash": 122,
+    "xp": 302,
+    "unlock": [
+     "hub:h-bowlo-rouse-hill-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-rouse-hill-3",
+   "act": 3,
+   "title": "Closing Time Rumour, Rouse Hill",
+   "blurb": "Someone has to, and it may as well be you. Since the second express somebody has been going round the Rouse Hill greens telling the barefoot bowlers we are shutting, and we are not shutting. I am aware how that sounds. Half now if you want it. Most people don't.",
+   "giver": "hub-rouse-hill-zane",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "whoever is doing the telling"
+    },
+    {
+     "kind": "earn",
+     "dollars": 108,
+     "label": "and take the bar money off them while you are there"
+    }
+   ],
+   "reward": {
+    "cash": 112,
+    "xp": 318,
+    "unlock": [
+     "hub:h-bowlo-rouse-hill-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-rouse-hill-4",
+   "act": 3,
+   "title": "Behind the Bar at Rouse Hill",
+   "blurb": "You are the first person to stop all morning. There is a docket book in the chest freezer behind the bar at Rouse Hill and I am not opening it on an empty stomach. My wife says I should let it go. My wife is wrong. Whatever it costs you, tell me and I will cover it.",
+   "giver": "hub-rouse-hill-kalinda",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "get one into you first, seriously"
+    },
+    {
+     "kind": "goto",
+     "x": -26688,
+     "z": -19157,
+     "radius": 25,
+     "label": "round the back where the cellar door is"
+    },
+    {
+     "kind": "photo",
+     "x": -26681,
+     "z": -19172,
+     "radius": 35,
+     "label": "whatever is in there, before I lose my nerve"
+    }
+   ],
+   "reward": {
+    "cash": 126,
+    "xp": 318,
+    "unlock": [
+     "hub:h-bowlo-rouse-hill-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-rouse-hill-5",
+   "act": 3,
+   "title": "The Old Greenkeeper, Rouse Hill",
+   "blurb": "Not being dramatic about this. The man who kept these greens before me drinks at Tallawong now, and he owes Rouse Hill an explanation about the drainage. I have rung the number on the letter four times. I would rather know than wonder.",
+   "giver": "hub-rouse-hill-kalinda",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -28502,
+     "z": -18989,
+     "radius": 60,
+     "label": "find him and hear him out"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come back and tell me what he said",
+     "npc": "hub-rouse-hill-kalinda"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 307,
+    "unlock": [
+     "hub:h-bowlo-rouse-hill-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-glebe-0",
+   "act": 3,
+   "title": "Nights at Glebe",
+   "blurb": "Do not laugh. Every night around the middle of the news the same car does three laps of the Glebe forecourt and never buys fuel. It is not the money. It has stopped being the money. Do not let them talk you into anything.",
+   "giver": "hub-glebe-xavier",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -1889,
+     "z": 1068,
+     "radius": 35,
+     "label": "the car, plate if you can get it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it on record before I ring anyone",
+     "npc": "hub-glebe-xavier"
+    }
+   ],
+   "reward": {
+    "cash": 126,
+    "xp": 300,
+    "unlock": [
+     "hub:h-servo-glebe-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-glebe-1",
+   "act": 3,
+   "title": "The Third Lap, Glebe",
+   "blurb": "It is the sort of thing you notice or you do not. Now I know the plate, I want to know where it goes after it leaves Glebe at the middle of the news, because it is not going home. I did try the official route, for what that was worth. There's cash in it. Not a lot.",
+   "giver": "hub-glebe-xavier",
+   "level": 5,
+   "requires": [
+    "h-servo-glebe-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Glebe",
+     "to": "Wentworth Park",
+     "label": "follow it as far as Wentworth Park"
+    },
+    {
+     "kind": "photo",
+     "x": -2040,
+     "z": 1032,
+     "radius": 35,
+     "label": "wherever it stops"
+    }
+   ],
+   "reward": {
+    "cash": 152,
+    "xp": 410,
+    "unlock": [
+     "hub:h-servo-glebe-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-glebe-2",
+   "act": 3,
+   "title": "Bay Two, Glebe",
+   "blurb": "Two people have already said no. Bay two at the Glebe workshop has had the same car in it since a Tuesday and the owner has stopped answering. I have got a photo on my phone but it is useless. You'll know it when you see it.",
+   "giver": "hub-glebe-leonie",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2045,
+     "z": 934,
+     "radius": 25,
+     "label": "the address on the job card"
+    },
+    {
+     "kind": "photo",
+     "x": -2046,
+     "z": 921,
+     "radius": 35,
+     "label": "the letterbox, so I know I have the right house"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if anybody actually lives there",
+     "npc": "hub-glebe-leonie"
+    }
+   ],
+   "reward": {
+    "cash": 116,
+    "xp": 315,
+    "unlock": [
+     "hub:h-servo-glebe-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-glebe-3",
+   "act": 3,
+   "title": "Tools Off the Bench, Glebe",
+   "blurb": "Someone has to, and it may as well be you. Someone has been walking out of Glebe with a socket set at a time since a Tuesday, and I have run out of ways to be polite about it. I am aware how that sounds. Half now if you want it. Most people don't.",
+   "giver": "hub-glebe-leonie",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 3,
+     "label": "the ones hanging round the air hose"
+    },
+    {
+     "kind": "earn",
+     "dollars": 63,
+     "label": "$63 of it back, that is what the set cost"
+    }
+   ],
+   "reward": {
+    "cash": 110,
+    "xp": 310,
+    "unlock": [
+     "hub:h-servo-glebe-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-glebe-4",
+   "act": 3,
+   "title": "The Glebe Price Board",
+   "blurb": "You are the first person to stop all morning. Head office says the Glebe board has been wrong since a Tuesday and I say it has been right for eleven years, and one of us is about to be embarrassed. My wife says I should let it go. My wife is wrong. Whatever it costs you, tell me and I will cover it.",
+   "giver": "hub-glebe-jacinta",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "buy something so it is a real transaction"
+    },
+    {
+     "kind": "photo",
+     "x": -1914,
+     "z": 928,
+     "radius": 35,
+     "label": "the board and the pump, both in the one shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that settles it either way",
+     "npc": "hub-glebe-jacinta"
+    }
+   ],
+   "reward": {
+    "cash": 110,
+    "xp": 312,
+    "unlock": [
+     "hub:h-servo-glebe-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-glebe-5",
+   "act": 3,
+   "title": "The Other Franchise, Glebe",
+   "blurb": "Not being dramatic about this. The bloke who runs the site at Exhibition Centre has had the same trouble Glebe has, and he will talk to you before he talks to me. I have rung the number on the letter four times. I would rather know than wonder.",
+   "giver": "hub-glebe-jacinta",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1003,
+     "z": 789,
+     "radius": 60,
+     "label": "find him on shift"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever he says, I want it word for word",
+     "npc": "hub-glebe-jacinta"
+    }
+   ],
+   "reward": {
+    "cash": 129,
+    "xp": 300,
+    "unlock": [
+     "hub:h-servo-glebe-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-thirroul-0",
+   "act": 3,
+   "title": "Level Two, Thirroul",
+   "blurb": "Do not laugh. Water has been coming through the level two ceiling of the Thirroul block since a public holiday nobody remembered and the strata report says there is no water. It is not the money. It has stopped being the money. Do not let them talk you into anything.",
+   "giver": "hub-thirroul-piotr",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -25790,
+     "z": 50407,
+     "radius": 35,
+     "label": "the ceiling, with the stain visible"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that goes in the file whether they like it or not",
+     "npc": "hub-thirroul-piotr"
+    }
+   ],
+   "reward": {
+    "cash": 130,
+    "xp": 362,
+    "unlock": [
+     "hub:h-strata-thirroul-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-thirroul-1",
+   "act": 3,
+   "title": "The Special Levy, Thirroul",
+   "blurb": "It is the sort of thing you notice or you do not. The photo did it. I did try the official route, for what that was worth. Now every owner at Thirroul owes $116 and I have to collect it from people who have avoided me for a year. There's cash in it. Not a lot.",
+   "giver": "hub-thirroul-piotr",
+   "level": 6,
+   "requires": [
+    "h-strata-thirroul-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 116,
+     "label": "$116 out of them, in any state"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will not ask how",
+     "npc": "hub-thirroul-piotr"
+    }
+   ],
+   "reward": {
+    "cash": 172,
+    "xp": 457,
+    "unlock": [
+     "hub:h-strata-thirroul-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-thirroul-2",
+   "act": 3,
+   "title": "Car Space 14, Thirroul",
+   "blurb": "Two people have already said no. Somebody who does not live at Thirroul has parked in space fourteen every night since a public holiday nobody remembered and the manager will not look at it. I have got a photo on my phone but it is useless. You'll know it when you see it.",
+   "giver": "hub-thirroul-quinn",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -25919,
+     "z": 50382,
+     "radius": 25,
+     "label": "down to the basement, the far corner"
+    },
+    {
+     "kind": "photo",
+     "x": -25926,
+     "z": 50375,
+     "radius": 35,
+     "label": "the car in the space with the number painted beside it"
+    }
+   ],
+   "reward": {
+    "cash": 136,
+    "xp": 348,
+    "unlock": [
+     "hub:h-strata-thirroul-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-thirroul-3",
+   "act": 3,
+   "title": "The Meeting, Thirroul",
+   "blurb": "Someone has to, and it may as well be you. The Thirroul AGM is on a public holiday nobody remembered and I would like to arrive with something stronger than a grievance and a printout. I am aware how that sounds. Half now if you want it. Most people don't.",
+   "giver": "hub-thirroul-quinn",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "two coffees, one is for me"
+    },
+    {
+     "kind": "goto",
+     "x": -25851,
+     "z": 50203,
+     "radius": 25,
+     "label": "the community room where they hold it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "walk in with me, they behave when there is a witness",
+     "npc": "hub-thirroul-quinn"
+    }
+   ],
+   "reward": {
+    "cash": 135,
+    "xp": 360,
+    "unlock": [
+     "hub:h-strata-thirroul-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-thirroul-4",
+   "act": 3,
+   "title": "Bin Night at Thirroul",
+   "blurb": "You are the first person to stop all morning. Three units at Thirroul have put their bins out on the wrong night since a public holiday nobody remembered and I have taken it personally, which I accept is a choice I made. My wife says I should let it go. My wife is wrong. Whatever it costs you, tell me and I will cover it.",
+   "giver": "hub-thirroul-henrietta",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 2,
+     "label": "the ones who argue about it"
+    },
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "the fine the council gave me, off them"
+    }
+   ],
+   "reward": {
+    "cash": 134,
+    "xp": 367,
+    "unlock": [
+     "hub:h-strata-thirroul-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-thirroul-5",
+   "act": 3,
+   "title": "The Other Block, Thirroul",
+   "blurb": "Not being dramatic about this. There is a block at Austinmer with the same builder and the same cracks, and their manager has already been through what Thirroul is starting. I have rung the number on the letter four times. I would rather know than wonder.",
+   "giver": "hub-thirroul-henrietta",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -24784,
+     "z": 49116,
+     "radius": 60,
+     "label": "go and ask them how it ended"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I need to know how much worse this gets",
+     "npc": "hub-thirroul-henrietta"
+    }
+   ],
+   "reward": {
+    "cash": 141,
+    "xp": 360,
+    "unlock": [
+     "hub:h-strata-thirroul-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

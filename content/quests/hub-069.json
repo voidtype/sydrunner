@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-bowlo-exhibition-centre-0",
+   "act": 3,
+   "title": "The Dead Patch at Exhibition Centre",
+   "blurb": "I am told you do odd jobs. The number three green at Exhibition Centre has had a bald patch the shape of Tasmania since school holidays, and the committee thinks I am inventing it. There is probably a simple explanation and I would love to hear it. If anyone asks, you were never here.",
+   "giver": "hub-exhibition-centre-mamadou",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -874,
+     "z": 941,
+     "radius": 35,
+     "label": "the patch, with something in frame for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring it to me before the meeting",
+     "npc": "hub-exhibition-centre-mamadou"
+    }
+   ],
+   "reward": {
+    "cash": 78,
+    "xp": 163,
+    "unlock": [
+     "hub:h-bowlo-exhibition-centre-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-exhibition-centre-1",
+   "act": 3,
+   "title": "Turf Money, Exhibition Centre",
+   "blurb": "I'll be straight with you. They have seen the photograph and now they want it re-laid by school holidays, which means finding $44 that the Exhibition Centre club does not have. You will see what I mean the second you get there. There is no rush, but there is a Friday.",
+   "giver": "hub-exhibition-centre-mamadou",
+   "level": 2,
+   "requires": [
+    "h-bowlo-exhibition-centre-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 44,
+     "label": "$44, however you like, I am not asking"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "put it in my hand, not the safe",
+     "npc": "hub-exhibition-centre-mamadou"
+    }
+   ],
+   "reward": {
+    "cash": 124,
+    "xp": 270,
+    "unlock": [
+     "hub:h-bowlo-exhibition-centre-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-exhibition-centre-2",
+   "act": 3,
+   "title": "The Exhibition Centre Membership Count",
+   "blurb": "It has been three weeks. Our books say 55 members at Exhibition Centre and I would bet the bar takings that half of them are dead or moved to Queensland. There is a version of this where I am the unreasonable one. I'll see you right for it.",
+   "giver": "hub-exhibition-centre-wesley",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1028,
+     "z": 1027,
+     "radius": 25,
+     "label": "stand at the side door where the list is kept"
+    },
+    {
+     "kind": "photo",
+     "x": -1057,
+     "z": 1018,
+     "radius": 35,
+     "label": "the board with the names still on it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "read me the ones you did not recognise",
+     "npc": "hub-exhibition-centre-wesley"
+    }
+   ],
+   "reward": {
+    "cash": 64,
+    "xp": 171,
+    "unlock": [
+     "hub:h-bowlo-exhibition-centre-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-exhibition-centre-3",
+   "act": 3,
+   "title": "Closing Time Rumour, Exhibition Centre",
+   "blurb": "Nobody else has offered, so. Since five in the morning somebody has been going round the Exhibition Centre greens telling the barefoot bowlers we are shutting, and we are not shutting. The paperwork says one thing and my eyes say another. I'll put the kettle on for when you're back.",
+   "giver": "hub-exhibition-centre-wesley",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "whoever is doing the telling"
+    },
+    {
+     "kind": "earn",
+     "dollars": 95,
+     "label": "and take the bar money off them while you are there"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 164,
+    "unlock": [
+     "hub:h-bowlo-exhibition-centre-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-exhibition-centre-4",
+   "act": 3,
+   "title": "Behind the Bar at Exhibition Centre",
+   "blurb": "The council knows and the council does not care. There is a roll of raffle tickets in the chest freezer behind the bar at Exhibition Centre and I am not opening it on an empty stomach. It has been going on longer than I have admitted to anyone. Just do not come back empty-handed.",
+   "giver": "hub-exhibition-centre-zane",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "get one into you first, seriously"
+    },
+    {
+     "kind": "goto",
+     "x": -986,
+     "z": 854,
+     "radius": 25,
+     "label": "round the back where the cellar door is"
+    },
+    {
+     "kind": "photo",
+     "x": -979,
+     "z": 839,
+     "radius": 35,
+     "label": "whatever is in there, before I lose my nerve"
+    }
+   ],
+   "reward": {
+    "cash": 64,
+    "xp": 183,
+    "unlock": [
+     "hub:h-bowlo-exhibition-centre-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-exhibition-centre-5",
+   "act": 3,
+   "title": "The Old Greenkeeper, Exhibition Centre",
+   "blurb": "I have been putting it off since Easter. The man who kept these greens before me drinks at Glebe now, and he owes Exhibition Centre an explanation about the drainage. I have got no proof, which is exactly why I am asking. I will know if you skipped a bit.",
+   "giver": "hub-exhibition-centre-zane",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1950,
+     "z": 1020,
+     "radius": 60,
+     "label": "find him and hear him out"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come back and tell me what he said",
+     "npc": "hub-exhibition-centre-zane"
+    }
+   ],
+   "reward": {
+    "cash": 77,
+    "xp": 165,
+    "unlock": [
+     "hub:h-bowlo-exhibition-centre-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-kingsford-0",
+   "act": 3,
+   "title": "Nights at Kingsford",
+   "blurb": "I am told you do odd jobs. Every night around quarter to six the same car does three laps of the Kingsford forecourt and never buys fuel. There is probably a simple explanation and I would love to hear it. If anyone asks, you were never here.",
+   "giver": "hub-kingsford-rishi",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 1803,
+     "z": 6030,
+     "radius": 35,
+     "label": "the car, plate if you can get it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it on record before I ring anyone",
+     "npc": "hub-kingsford-rishi"
+    }
+   ],
+   "reward": {
+    "cash": 69,
+    "xp": 183,
+    "unlock": [
+     "hub:h-servo-kingsford-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-kingsford-1",
+   "act": 3,
+   "title": "The Third Lap, Kingsford",
+   "blurb": "I'll be straight with you. Now I know the plate, I want to know where it goes after it leaves Kingsford at quarter to six, because it is not going home. You will see what I mean the second you get there. There is no rush, but there is a Friday.",
+   "giver": "hub-kingsford-rishi",
+   "level": 2,
+   "requires": [
+    "h-servo-kingsford-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Kingsford",
+     "to": "Juniors Kingsford",
+     "label": "follow it as far as Juniors Kingsford"
+    },
+    {
+     "kind": "photo",
+     "x": 1652,
+     "z": 5994,
+     "radius": 35,
+     "label": "wherever it stops"
+    }
+   ],
+   "reward": {
+    "cash": 105,
+    "xp": 262,
+    "unlock": [
+     "hub:h-servo-kingsford-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-kingsford-2",
+   "act": 3,
+   "title": "Bay Two, Kingsford",
+   "blurb": "It has been three weeks. Bay two at the Kingsford workshop has had the same car in it since a Tuesday and the owner has stopped answering. There is a version of this where I am the unreasonable one. I'll see you right for it.",
+   "giver": "hub-kingsford-etienne",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 1647,
+     "z": 5896,
+     "radius": 25,
+     "label": "the address on the job card"
+    },
+    {
+     "kind": "photo",
+     "x": 1646,
+     "z": 5883,
+     "radius": 35,
+     "label": "the letterbox, so I know I have the right house"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if anybody actually lives there",
+     "npc": "hub-kingsford-etienne"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 171,
+    "unlock": [
+     "hub:h-servo-kingsford-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-kingsford-3",
+   "act": 3,
+   "title": "Tools Off the Bench, Kingsford",
+   "blurb": "Nobody else has offered, so. Someone has been walking out of Kingsford with a socket set at a time since a Tuesday, and I have run out of ways to be polite about it. The paperwork says one thing and my eyes say another. I'll put the kettle on for when you're back.",
+   "giver": "hub-kingsford-etienne",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 3,
+     "label": "the ones hanging round the air hose"
+    },
+    {
+     "kind": "earn",
+     "dollars": 46,
+     "label": "$46 of it back, that is what the set cost"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 168,
+    "unlock": [
+     "hub:h-servo-kingsford-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-kingsford-4",
+   "act": 3,
+   "title": "The Kingsford Price Board",
+   "blurb": "The council knows and the council does not care. Head office says the Kingsford board has been wrong since a Tuesday and I say it has been right for eleven years, and one of us is about to be embarrassed. It has been going on longer than I have admitted to anyone. Just do not come back empty-handed.",
+   "giver": "hub-kingsford-helios",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "buy something so it is a real transaction"
+    },
+    {
+     "kind": "photo",
+     "x": 1778,
+     "z": 5890,
+     "radius": 35,
+     "label": "the board and the pump, both in the one shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that settles it either way",
+     "npc": "hub-kingsford-helios"
+    }
+   ],
+   "reward": {
+    "cash": 73,
+    "xp": 183,
+    "unlock": [
+     "hub:h-servo-kingsford-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-kingsford-5",
+   "act": 3,
+   "title": "The Other Franchise, Kingsford",
+   "blurb": "I have been putting it off since Easter. The bloke who runs the site at UNSW High Street has had the same trouble Kingsford has, and he will talk to you before he talks to me. I have got no proof, which is exactly why I am asking. I will know if you skipped a bit.",
+   "giver": "hub-kingsford-helios",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 2601,
+     "z": 5423,
+     "radius": 60,
+     "label": "find him on shift"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever he says, I want it word for word",
+     "npc": "hub-kingsford-helios"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 180,
+    "unlock": [
+     "hub:h-servo-kingsford-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-crows-nest-0",
+   "act": 3,
+   "title": "Level Two, Crows Nest",
+   "blurb": "I am told you do odd jobs. Water has been coming through the level two ceiling of the Crows Nest block since Thursdays and the strata report says there is no water. There is probably a simple explanation and I would love to hear it. If anyone asks, you were never here.",
+   "giver": "hub-crows-nest-alina",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -925,
+     "z": -4694,
+     "radius": 35,
+     "label": "the ceiling, with the stain visible"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that goes in the file whether they like it or not",
+     "npc": "hub-crows-nest-alina"
+    }
+   ],
+   "reward": {
+    "cash": 64,
+    "xp": 168,
+    "unlock": [
+     "hub:h-strata-crows-nest-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-crows-nest-1",
+   "act": 3,
+   "title": "The Special Levy, Crows Nest",
+   "blurb": "I'll be straight with you. The photo did it. You will see what I mean the second you get there. Now every owner at Crows Nest owes $66 and I have to collect it from people who have avoided me for a year. There is no rush, but there is a Friday.",
+   "giver": "hub-crows-nest-alina",
+   "level": 2,
+   "requires": [
+    "h-strata-crows-nest-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 66,
+     "label": "$66 out of them, in any state"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will not ask how",
+     "npc": "hub-crows-nest-alina"
+    }
+   ],
+   "reward": {
+    "cash": 119,
+    "xp": 268,
+    "unlock": [
+     "hub:h-strata-crows-nest-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-crows-nest-2",
+   "act": 3,
+   "title": "Car Space 14, Crows Nest",
+   "blurb": "It has been three weeks. Somebody who does not live at Crows Nest has parked in space fourteen every night since Thursdays and the manager will not look at it. There is a version of this where I am the unreasonable one. I'll see you right for it.",
+   "giver": "hub-crows-nest-elan",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1054,
+     "z": -4719,
+     "radius": 25,
+     "label": "down to the basement, the far corner"
+    },
+    {
+     "kind": "photo",
+     "x": -1061,
+     "z": -4726,
+     "radius": 35,
+     "label": "the car in the space with the number painted beside it"
+    }
+   ],
+   "reward": {
+    "cash": 81,
+    "xp": 184,
+    "unlock": [
+     "hub:h-strata-crows-nest-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-crows-nest-3",
+   "act": 3,
+   "title": "The Meeting, Crows Nest",
+   "blurb": "Nobody else has offered, so. The Crows Nest AGM is on Thursdays and I would like to arrive with something stronger than a grievance and a printout. The paperwork says one thing and my eyes say another. I'll put the kettle on for when you're back.",
+   "giver": "hub-crows-nest-elan",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "two coffees, one is for me"
+    },
+    {
+     "kind": "goto",
+     "x": -986,
+     "z": -4898,
+     "radius": 25,
+     "label": "the community room where they hold it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "walk in with me, they behave when there is a witness",
+     "npc": "hub-crows-nest-elan"
+    }
+   ],
+   "reward": {
+    "cash": 79,
+    "xp": 177,
+    "unlock": [
+     "hub:h-strata-crows-nest-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-crows-nest-4",
+   "act": 3,
+   "title": "Bin Night at Crows Nest",
+   "blurb": "The council knows and the council does not care. Three units at Crows Nest have put their bins out on the wrong night since Thursdays and I have taken it personally, which I accept is a choice I made. It has been going on longer than I have admitted to anyone. Just do not come back empty-handed.",
+   "giver": "hub-crows-nest-sibel",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "the ones who argue about it"
+    },
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "the fine the council gave me, off them"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 177,
+    "unlock": [
+     "hub:h-strata-crows-nest-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-crows-nest-5",
+   "act": 3,
+   "title": "The Other Block, Crows Nest",
+   "blurb": "I have been putting it off since Easter. There is a block at Victoria Cross with the same builder and the same cracks, and their manager has already been through what Crows Nest is starting. I have got no proof, which is exactly why I am asking. I will know if you skipped a bit.",
+   "giver": "hub-crows-nest-sibel",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -87,
+     "z": -3670,
+     "radius": 60,
+     "label": "go and ask them how it ended"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I need to know how much worse this gets",
+     "npc": "hub-crows-nest-sibel"
+    }
+   ],
+   "reward": {
+    "cash": 84,
+    "xp": 171,
+    "unlock": [
+     "hub:h-strata-crows-nest-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

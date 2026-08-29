@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-concord-west-barnaby",
+   "name": "Barnaby, newsagent at Concord West",
+   "x": -11437,
+   "z": -2110,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You will have to speak up, the trains are in.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "There is no clever way to say this. I am sending back 40 papers a day from Concord West and paying to have them collected, which is a business model somebody invented on purpose. Half the street knows and half the street is pretending not to. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-concord-west-0",
+       "denyFlag": "hub:h-newsagent-concord-west-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You look like you have twenty minutes. They will drop my Concord West order if I can show $84 of turnover on the other side of the shop by a wet Monday. I am not after trouble. I am after an answer. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-concord-west-1",
+       "denyFlag": "hub:h-newsagent-concord-west-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "Returns at Concord West — that's done.",
+       "turnin": "h-newsagent-concord-west-0"
+      },
+      {
+       "text": "The Better Rate, Concord West — that's done.",
+       "turnin": "h-newsagent-concord-west-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-concord-west-beatrix",
+   "name": "Beatrix, paper runner at Concord West",
+   "x": -11399.9,
+   "z": -2022,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I have got about four minutes before I am needed.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Keep it between us for now. I do the Concord West round from two in the afternoon and for the last fortnight somebody has been taking the papers off the front steps behind me. Nobody else seems to have noticed, which is its own problem. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-concord-west-2",
+       "denyFlag": "hub:h-newsagent-concord-west-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Right. Since you asked. There is a dog on the Concord West round that has had two of my bags and a folding table that was not even mine. Everyone I have told has looked at me the way you are now. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-concord-west-3",
+       "denyFlag": "hub:h-newsagent-concord-west-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "The Concord West Round — that's done.",
+       "turnin": "h-newsagent-concord-west-2"
+      },
+      {
+       "text": "The Dog on Ash Street, Concord West — that's done.",
+       "turnin": "h-newsagent-concord-west-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-concord-west-nalini",
+   "name": "Nalini, lotto regular at Concord West",
+   "x": -11397,
+   "z": -1889,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Ah. Someone with two working legs.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "My knees are gone, so. Nine of us at Concord West have gone in on the same numbers since a wet Monday and one of us has stopped putting money in. This is the third time I have had this conversation. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-concord-west-4",
+       "denyFlag": "hub:h-newsagent-concord-west-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "This is going to sound small. The agency at North Strathfield closed six months before Concord West started struggling, and I would very much like to know what they know. It started small, the way these things do. Half now if you want it. Most people don't.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-concord-west-5",
+       "denyFlag": "hub:h-newsagent-concord-west-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "The Syndicate, Concord West — that's done.",
+       "turnin": "h-newsagent-concord-west-4"
+      },
+      {
+       "text": "The Other Agency, Concord West — that's done.",
+       "turnin": "h-newsagent-concord-west-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-riverstone-rukmini",
+   "name": "Rukmini, panel beater at Riverstone",
+   "x": -32848,
+   "z": -20388,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are early. Or late. I have lost track.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "There is no clever way to say this. There has been a car in the Riverstone yard since the week of the show with a folding table on the passenger seat and no owner answering. Half the street knows and half the street is pretending not to. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-riverstone-0",
+       "denyFlag": "hub:h-workshop-riverstone-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You look like you have twenty minutes. Now that it is documented, Riverstone is owed $68 in storage and the only person who can pay it is the person not answering. I am not after trouble. I am after an answer. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-riverstone-1",
+       "denyFlag": "hub:h-workshop-riverstone-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "The Unclaimed Falcon, Riverstone — that's done.",
+       "turnin": "h-workshop-riverstone-0"
+      },
+      {
+       "text": "Storage Fees, Riverstone — that's done.",
+       "turnin": "h-workshop-riverstone-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-riverstone-ava",
+   "name": "Ava, apprentice at Riverstone",
+   "x": -32646,
+   "z": -20590,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Been here since before it was like this. Go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Keep it between us for now. I am in my first year at Riverstone and I have to log 72 hours on a job I am not allowed to touch on my own. Nobody else seems to have noticed, which is its own problem. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-riverstone-2",
+       "denyFlag": "hub:h-workshop-riverstone-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Right. Since you asked. Somebody has been coming into the Riverstone yard after quarter to six to use the air line, and last week they used the compressor as well. Everyone I have told has looked at me the way you are now. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-riverstone-3",
+       "denyFlag": "hub:h-workshop-riverstone-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "First Year, Riverstone — that's done.",
+       "turnin": "h-workshop-riverstone-2"
+      },
+      {
+       "text": "The Air Line, Riverstone — that's done.",
+       "turnin": "h-workshop-riverstone-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-riverstone-cassian",
+   "name": "Cassian, the bloke whose car it is at Riverstone",
+   "x": -32591,
+   "z": -20318,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Do not mind the mess. It is structural now.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "My knees are gone, so. My car has been at Riverstone since the week of the show and every time I ring, the quote has grown by about $72. This is the third time I have had this conversation. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-riverstone-4",
+       "denyFlag": "hub:h-workshop-riverstone-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "This is going to sound small. The insurance assessor who signs off every job at Riverstone works out of Vineyard, and he has never once seen the car he is assessing. It started small, the way these things do. Half now if you want it. Most people don't.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-riverstone-5",
+       "denyFlag": "hub:h-workshop-riverstone-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "My Own Car, Riverstone — that's done.",
+       "turnin": "h-workshop-riverstone-4"
+      },
+      {
+       "text": "The Assessor, Riverstone — that's done.",
+       "turnin": "h-workshop-riverstone-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-arlington-sheela",
+   "name": "Sheela, shop manager at Arlington",
+   "x": -6587,
+   "z": 3745,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are selling something the answer is no.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "There is no clever way to say this. People leave things at the Arlington roller door after the second express and by morning it is rained on and it is our problem and our tip fee. Half the street knows and half the street is pretending not to. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-arlington-0",
+       "denyFlag": "hub:h-opshop-arlington-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You look like you have twenty minutes. The photos worked, which means Arlington can claim back the $72 we have paid to throw away other people's furniture since grand final week. I am not after trouble. I am after an answer. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-arlington-1",
+       "denyFlag": "hub:h-opshop-arlington-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "Dumped Out the Back, Arlington — that's done.",
+       "turnin": "h-opshop-arlington-0"
+      },
+      {
+       "text": "The Tip Fee, Arlington — that's done.",
+       "turnin": "h-opshop-arlington-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-arlington-rumi",
+   "name": "Rumi, sorter at Arlington",
+   "x": -6444.5,
+   "z": 3923.7,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Cash only and no, I am joking. What do you want.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Keep it between us for now. Something came into Arlington on grand final week in a box of paperbacks that I do not think the family meant to give away. Nobody else seems to have noticed, which is its own problem. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-arlington-2",
+       "denyFlag": "hub:h-opshop-arlington-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Right. Since you asked. Two people have been coming into the Arlington sorting room since grand final week and taking the good stock before it reaches the floor, and one of them volunteers here. Everyone I have told has looked at me the way you are now. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-arlington-3",
+       "denyFlag": "hub:h-opshop-arlington-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Good Box, Arlington — that's done.",
+       "turnin": "h-opshop-arlington-2"
+      },
+      {
+       "text": "Sorting Room, Arlington — that's done.",
+       "turnin": "h-opshop-arlington-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-arlington-ismail",
+   "name": "Ismail, volunteer driver at Arlington",
+   "x": -6627,
+   "z": 3710,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You have got a face like you can keep your mouth shut.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "My knees are gone, so. I do the Arlington pick-ups in a van with 25 thousand on it and a door that only opens if you know about it. This is the third time I have had this conversation. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-arlington-4",
+       "denyFlag": "hub:h-opshop-arlington-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "This is going to sound small. Everything Arlington cannot sell goes to a warehouse at Dulwich Hill, and nobody there has ever answered a phone in my hearing. It started small, the way these things do. Half now if you want it. Most people don't.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-arlington-5",
+       "denyFlag": "hub:h-opshop-arlington-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "The Van, Arlington — that's done.",
+       "turnin": "h-opshop-arlington-4"
+      },
+      {
+       "text": "Head Office, Arlington — that's done.",
+       "turnin": "h-opshop-arlington-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

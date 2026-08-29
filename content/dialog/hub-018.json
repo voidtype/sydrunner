@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-leichhardt-north-raghav",
+   "name": "Raghav, shopkeeper at Leichhardt North",
+   "x": -5158,
+   "z": 718,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are early. Or late. I have lost track.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is the sort of thing you notice or you do not. The Leichhardt North order has been two cartons light every week since the week of the show and the invoice says otherwise every time. My wife says I should let it go. My wife is wrong. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-leichhardt-north-0",
+       "denyFlag": "hub:h-cornershop-leichhardt-north-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Two people have already said no. They admitted it, which I did not expect, so now there is $73 owing to Leichhardt North and it is not going to walk in here itself. I have rung the number on the letter four times. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-leichhardt-north-1",
+       "denyFlag": "hub:h-cornershop-leichhardt-north-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "Short Delivery, Leichhardt North — that's done.",
+       "turnin": "h-cornershop-leichhardt-north-0"
+      },
+      {
+       "text": "The Credit Note, Leichhardt North — that's done.",
+       "turnin": "h-cornershop-leichhardt-north-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-leichhardt-north-ewan",
+   "name": "Ewan, delivery driver at Leichhardt North",
+   "x": -5018,
+   "z": 652,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Been here since before it was like this. Go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Someone has to, and it may as well be you. I do the Leichhardt North run at half six and there is a stretch of it where the van gets followed, which I have told nobody until now. Half the street knows and half the street is pretending not to. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-leichhardt-north-2",
+       "denyFlag": "hub:h-cornershop-leichhardt-north-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You are the first person to stop all morning. I have got a bucket of odd keys in the back of the van and the Leichhardt North shop is shut, and the number on the door rings out. I am not after trouble. I am after an answer. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-leichhardt-north-3",
+       "denyFlag": "hub:h-cornershop-leichhardt-north-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "The Leichhardt North Run — that's done.",
+       "turnin": "h-cornershop-leichhardt-north-2"
+      },
+      {
+       "text": "Locked Out, Leichhardt North — that's done.",
+       "turnin": "h-cornershop-leichhardt-north-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-leichhardt-north-jelena",
+   "name": "Jelena, the kid on the register at Leichhardt North",
+   "x": -5184,
+   "z": 592,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Do not mind the mess. It is structural now.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Not being dramatic about this. Three of the Leichhardt North regulars have started coming in together and going out separately, and the till is $39 down on those days. Nobody else seems to have noticed, which is its own problem. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-leichhardt-north-4",
+       "denyFlag": "hub:h-cornershop-leichhardt-north-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I am told you do odd jobs. Everything Leichhardt North sells comes off a floor at Lilyfield, and the woman who runs it will tell you things she will not put in writing. Everyone I have told has looked at me the way you are now. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-leichhardt-north-5",
+       "denyFlag": "hub:h-cornershop-leichhardt-north-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "The Regulars, Leichhardt North — that's done.",
+       "turnin": "h-cornershop-leichhardt-north-4"
+      },
+      {
+       "text": "The Wholesaler, Leichhardt North — that's done.",
+       "turnin": "h-cornershop-leichhardt-north-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-newtown-ivo",
+   "name": "Ivo, junior coach at Newtown",
+   "x": -2695,
+   "z": 3193,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are selling something the answer is no.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is the sort of thing you notice or you do not. I have got eleven kids for a twelve-a-side at Newtown on Thursdays and one of them has a note from his mother. My wife says I should let it go. My wife is wrong. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-newtown-0",
+       "denyFlag": "hub:h-oval-newtown-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Two people have already said no. We found a twelfth, which means the Newtown club now owes the association $66 it had budgeted on not owing. I have rung the number on the letter four times. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-newtown-1",
+       "denyFlag": "hub:h-oval-newtown-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "Under 12s at Newtown — that's done.",
+       "turnin": "h-oval-newtown-0"
+      },
+      {
+       "text": "Registration, Newtown — that's done.",
+       "turnin": "h-oval-newtown-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-newtown-tibor",
+   "name": "Tibor, canteen manager at Newtown",
+   "x": -2741,
+   "z": 3331,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Cash only and no, I am joking. What do you want.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Someone has to, and it may as well be you. The canteen at Newtown does two hundred sausages on a Saturday and this week the freezer went off at quarter to six. Half the street knows and half the street is pretending not to. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-newtown-2",
+       "denyFlag": "hub:h-oval-newtown-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You are the first person to stop all morning. Somebody walked off with the float from the Newtown canteen at about quarter to six during the last home game, and I have a fair idea which somebody. I am not after trouble. I am after an answer. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-newtown-3",
+       "denyFlag": "hub:h-oval-newtown-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Newtown Canteen — that's done.",
+       "turnin": "h-oval-newtown-2"
+      },
+      {
+       "text": "Grand Final Float, Newtown — that's done.",
+       "turnin": "h-oval-newtown-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-newtown-zuri",
+   "name": "Zuri, groundsman at Newtown",
+   "x": -2615.3,
+   "z": 3448.4,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You have got a face like you can keep your mouth shut.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Not being dramatic about this. The sprinkler line under the Newtown outfield has been leaking since Thursdays and the wet patch has started to move. Nobody else seems to have noticed, which is its own problem. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-newtown-4",
+       "denyFlag": "hub:h-oval-newtown-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I am told you do odd jobs. The bloke who allocates grounds for the whole association sits at St Peters, and Newtown has been at the bottom of his list for two seasons. Everyone I have told has looked at me the way you are now. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-newtown-5",
+       "denyFlag": "hub:h-oval-newtown-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Sprinkler Line, Newtown — that's done.",
+       "turnin": "h-oval-newtown-4"
+      },
+      {
+       "text": "The Association, Newtown — that's done.",
+       "turnin": "h-oval-newtown-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-panania-wafa",
+   "name": "Wafa, bushcare volunteer at Panania",
+   "x": -19240,
+   "z": 9760,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Right. Talk while I do this.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is the sort of thing you notice or you do not. Somebody has been tipping fill into the creek behind Panania since the long weekend and it is narrowing the channel a metre at a time. My wife says I should let it go. My wife is wrong. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-panania-0",
+       "denyFlag": "hub:h-creek-panania-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Two people have already said no. They have agreed to a clean-up at Panania, which is wonderful, except the grant is $110 short and closes on the long weekend. I have rung the number on the letter four times. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-panania-1",
+       "denyFlag": "hub:h-creek-panania-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "The Creek Behind Panania — that's done.",
+       "turnin": "h-creek-panania-0"
+      },
+      {
+       "text": "Willow Removal, Panania — that's done.",
+       "turnin": "h-creek-panania-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-panania-jocelyn",
+   "name": "Jocelyn, SES member at Panania",
+   "x": -19372,
+   "z": 9715,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You right there? I am mid-something but go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Someone has to, and it may as well be you. We had 10 sandbags in the Panania shed on the long weekend and this morning we have got the pallet they came on. Half the street knows and half the street is pretending not to. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-panania-2",
+       "denyFlag": "hub:h-creek-panania-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You are the first person to stop all morning. People keep driving the low crossing at Panania at just gone midnight with the water over the sign, and one of them is going to be the one. I am not after trouble. I am after an answer. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-panania-3",
+       "denyFlag": "hub:h-creek-panania-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Sandbags, Panania — that's done.",
+       "turnin": "h-creek-panania-2"
+      },
+      {
+       "text": "The Low Crossing, Panania — that's done.",
+       "turnin": "h-creek-panania-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-panania-ngaire",
+   "name": "Ngaire, resident who got flooded at Panania",
+   "x": -19430,
+   "z": 9958,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are here about the sign, the sign is wrong.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Not being dramatic about this. The water came through my place at Panania on the long weekend and the assessor wants photographs of things I have already thrown out. Nobody else seems to have noticed, which is its own problem. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-panania-4",
+       "denyFlag": "hub:h-creek-panania-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I am told you do odd jobs. Whatever is happening to Panania starts upstream at Revesby, and there are people up there who have been saying so for years. Everyone I have told has looked at me the way you are now. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-panania-5",
+       "denyFlag": "hub:h-creek-panania-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "Under the House, Panania — that's done.",
+       "turnin": "h-creek-panania-4"
+      },
+      {
+       "text": "Upstream, Panania — that's done.",
+       "turnin": "h-creek-panania-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

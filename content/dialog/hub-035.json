@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-asquith-pia",
+   "name": "Pia, newsagent at Asquith",
+   "x": -9679,
+   "z": -19724,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are not from around the corner, are you.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "My knees are gone, so. I am sending back 35 papers a day from Asquith and paying to have them collected, which is a business model somebody invented on purpose. I have rung the number on the letter four times. That's the whole job. No catch.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-asquith-0",
+       "denyFlag": "hub:h-newsagent-asquith-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "This is going to sound small. They will drop my Asquith order if I can show $32 of turnover on the other side of the shop by the week of the show. Half the street knows and half the street is pretending not to. Be polite about it. It costs nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-asquith-1",
+       "denyFlag": "hub:h-newsagent-asquith-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "Returns at Asquith — that's done.",
+       "turnin": "h-newsagent-asquith-0"
+      },
+      {
+       "text": "The Better Rate, Asquith — that's done.",
+       "turnin": "h-newsagent-asquith-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-asquith-hedda",
+   "name": "Hedda, paper runner at Asquith",
+   "x": -9641,
+   "z": -19894,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Half of this suburb has walked past already. Not one stopped.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I have written it down twice and lost it twice. I do the Asquith round from the back of seven and for the last fortnight somebody has been taking the papers off the front steps behind me. I am not after trouble. I am after an answer. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-asquith-2",
+       "denyFlag": "hub:h-newsagent-asquith-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Do not laugh. There is a dog on the Asquith round that has had two of my bags and a milk crate that was not even mine. Nobody else seems to have noticed, which is its own problem. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-asquith-3",
+       "denyFlag": "hub:h-newsagent-asquith-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "The Asquith Round — that's done.",
+       "turnin": "h-newsagent-asquith-2"
+      },
+      {
+       "text": "The Dog on Ash Street, Asquith — that's done.",
+       "turnin": "h-newsagent-asquith-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-asquith-beatrix",
+   "name": "Beatrix, lotto regular at Asquith",
+   "x": -9656,
+   "z": -19807,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Whatever it is, I have had worse this week.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is the sort of thing you notice or you do not. Nine of us at Asquith have gone in on the same numbers since the week of the show and one of us has stopped putting money in. Everyone I have told has looked at me the way you are now. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-asquith-4",
+       "denyFlag": "hub:h-newsagent-asquith-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Two people have already said no. The agency at Mount Colah closed six months before Asquith started struggling, and I would very much like to know what they know. This is the third time I have had this conversation. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-asquith-5",
+       "denyFlag": "hub:h-newsagent-asquith-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "The Syndicate, Asquith — that's done.",
+       "turnin": "h-newsagent-asquith-4"
+      },
+      {
+       "text": "The Other Agency, Asquith — that's done.",
+       "turnin": "h-newsagent-asquith-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-circular-quay-eloise",
+   "name": "Eloise, panel beater at Circular Quay",
+   "x": 197,
+   "z": -990,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sit down if you like. Nobody else is using it.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "My knees are gone, so. There has been a car in the Circular Quay yard since the first of the month with a roll of raffle tickets on the passenger seat and no owner answering. I have rung the number on the letter four times. That's the whole job. No catch.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-circular-quay-0",
+       "denyFlag": "hub:h-workshop-circular-quay-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "This is going to sound small. Now that it is documented, Circular Quay is owed $30 in storage and the only person who can pay it is the person not answering. Half the street knows and half the street is pretending not to. Be polite about it. It costs nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-circular-quay-1",
+       "denyFlag": "hub:h-workshop-circular-quay-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "The Unclaimed Falcon, Circular Quay — that's done.",
+       "turnin": "h-workshop-circular-quay-0"
+      },
+      {
+       "text": "Storage Fees, Circular Quay — that's done.",
+       "turnin": "h-workshop-circular-quay-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-circular-quay-maarten",
+   "name": "Maarten, apprentice at Circular Quay",
+   "x": 144,
+   "z": -750,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You will have to speak up, the trains are in.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I have written it down twice and lost it twice. I am in my first year at Circular Quay and I have to log 25 hours on a job I am not allowed to touch on my own. I am not after trouble. I am after an answer. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-circular-quay-2",
+       "denyFlag": "hub:h-workshop-circular-quay-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Do not laugh. Somebody has been coming into the Circular Quay yard after the middle of the news to use the air line, and last week they used the compressor as well. Nobody else seems to have noticed, which is its own problem. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-circular-quay-3",
+       "denyFlag": "hub:h-workshop-circular-quay-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "First Year, Circular Quay — that's done.",
+       "turnin": "h-workshop-circular-quay-2"
+      },
+      {
+       "text": "The Air Line, Circular Quay — that's done.",
+       "turnin": "h-workshop-circular-quay-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-circular-quay-zainab",
+   "name": "Zainab, the bloke whose car it is at Circular Quay",
+   "x": 230,
+   "z": -933,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I have got about four minutes before I am needed.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is the sort of thing you notice or you do not. My car has been at Circular Quay since the first of the month and every time I ring, the quote has grown by about $25. Everyone I have told has looked at me the way you are now. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-circular-quay-4",
+       "denyFlag": "hub:h-workshop-circular-quay-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Two people have already said no. The insurance assessor who signs off every job at Circular Quay works out of St James, and he has never once seen the car he is assessing. This is the third time I have had this conversation. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-circular-quay-5",
+       "denyFlag": "hub:h-workshop-circular-quay-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "My Own Car, Circular Quay — that's done.",
+       "turnin": "h-workshop-circular-quay-4"
+      },
+      {
+       "text": "The Assessor, Circular Quay — that's done.",
+       "turnin": "h-workshop-circular-quay-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-milsons-point-zita",
+   "name": "Zita, shop manager at Milsons Point",
+   "x": 74,
+   "z": -2435,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Ah. Someone with two working legs.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "My knees are gone, so. People leave things at the Milsons Point roller door after half six and by morning it is rained on and it is our problem and our tip fee. I have rung the number on the letter four times. That's the whole job. No catch.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-milsons-point-0",
+       "denyFlag": "hub:h-opshop-milsons-point-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "This is going to sound small. The photos worked, which means Milsons Point can claim back the $62 we have paid to throw away other people's furniture since a wet Monday. Half the street knows and half the street is pretending not to. Be polite about it. It costs nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-milsons-point-1",
+       "denyFlag": "hub:h-opshop-milsons-point-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "Dumped Out the Back, Milsons Point — that's done.",
+       "turnin": "h-opshop-milsons-point-0"
+      },
+      {
+       "text": "The Tip Fee, Milsons Point — that's done.",
+       "turnin": "h-opshop-milsons-point-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-milsons-point-vera",
+   "name": "Vera, sorter at Milsons Point",
+   "x": 22,
+   "z": -2655,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are early. Or late. I have lost track.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I have written it down twice and lost it twice. Something came into Milsons Point on a wet Monday in a box of paperbacks that I do not think the family meant to give away. I am not after trouble. I am after an answer. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-milsons-point-2",
+       "denyFlag": "hub:h-opshop-milsons-point-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Do not laugh. Two people have been coming into the Milsons Point sorting room since a wet Monday and taking the good stock before it reaches the floor, and one of them volunteers here. Nobody else seems to have noticed, which is its own problem. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-milsons-point-3",
+       "denyFlag": "hub:h-opshop-milsons-point-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Good Box, Milsons Point — that's done.",
+       "turnin": "h-opshop-milsons-point-2"
+      },
+      {
+       "text": "Sorting Room, Milsons Point — that's done.",
+       "turnin": "h-opshop-milsons-point-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-milsons-point-joaquin",
+   "name": "Joaquin, volunteer driver at Milsons Point",
+   "x": 13,
+   "z": -2608,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Been here since before it was like this. Go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is the sort of thing you notice or you do not. I do the Milsons Point pick-ups in a van with 12 thousand on it and a door that only opens if you know about it. Everyone I have told has looked at me the way you are now. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-milsons-point-4",
+       "denyFlag": "hub:h-opshop-milsons-point-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Two people have already said no. Everything Milsons Point cannot sell goes to a warehouse at Victoria Cross, and nobody there has ever answered a phone in my hearing. This is the third time I have had this conversation. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-milsons-point-5",
+       "denyFlag": "hub:h-opshop-milsons-point-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "The Van, Milsons Point — that's done.",
+       "turnin": "h-opshop-milsons-point-4"
+      },
+      {
+       "text": "Head Office, Milsons Point — that's done.",
+       "turnin": "h-opshop-milsons-point-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

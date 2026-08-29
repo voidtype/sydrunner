@@ -1,0 +1,663 @@
+{
+ "quests": [
+  {
+   "id": "h-newsagent-macquarie-university-0",
+   "act": 3,
+   "title": "Returns at Macquarie University",
+   "blurb": "You look like you have twenty minutes. I am sending back 72 papers a day from Macquarie University and paying to have them collected, which is a business model somebody invented on purpose. This is the third time I have had this conversation. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-macquarie-university-aurelio",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -8519,
+     "z": -10055,
+     "radius": 35,
+     "label": "the returns stack, at its worst"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the distributor needs to see the size of it",
+     "npc": "hub-macquarie-university-aurelio"
+    }
+   ],
+   "reward": {
+    "cash": 67,
+    "xp": 184,
+    "unlock": [
+     "hub:h-newsagent-macquarie-university-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-macquarie-university-1",
+   "act": 3,
+   "title": "The Better Rate, Macquarie University",
+   "blurb": "Keep it between us for now. They will drop my Macquarie University order if I can show $46 of turnover on the other side of the shop by the first of the month. It started small, the way these things do. If anyone asks, you were never here.",
+   "giver": "hub-macquarie-university-aurelio",
+   "level": 2,
+   "requires": [
+    "h-newsagent-macquarie-university-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 46,
+     "label": "$46, and cards and stationery count"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "sell anything, I am not proud",
+     "npc": "hub-macquarie-university-aurelio"
+    }
+   ],
+   "reward": {
+    "cash": 118,
+    "xp": 270,
+    "unlock": [
+     "hub:h-newsagent-macquarie-university-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-macquarie-university-2",
+   "act": 3,
+   "title": "The Macquarie University Round",
+   "blurb": "Right. Since you asked. I do the Macquarie University round from the middle of the news and for the last fortnight somebody has been taking the papers off the front steps behind me. It is the not knowing that has got me, honestly. There is no rush, but there is a Friday.",
+   "giver": "hub-macquarie-university-orla",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -8688,
+     "z": -9987,
+     "radius": 25,
+     "label": "the end of the round, where it starts"
+    },
+    {
+     "kind": "photo",
+     "x": -8714,
+     "z": -10010,
+     "radius": 35,
+     "label": "whoever is on that street at that hour"
+    }
+   ],
+   "reward": {
+    "cash": 80,
+    "xp": 164,
+    "unlock": [
+     "hub:h-newsagent-macquarie-university-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-macquarie-university-3",
+   "act": 3,
+   "title": "The Dog on Ash Street, Macquarie University",
+   "blurb": "My knees are gone, so. There is a dog on the Macquarie University round that has had two of my bags and a folding table that was not even mine. There is probably a simple explanation and I would love to hear it. I'll see you right for it.",
+   "giver": "hub-macquarie-university-orla",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you will want your wits about you"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "the owner, not the dog, I am not a monster"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me it is sorted",
+     "npc": "hub-macquarie-university-orla"
+    }
+   ],
+   "reward": {
+    "cash": 67,
+    "xp": 171,
+    "unlock": [
+     "hub:h-newsagent-macquarie-university-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-macquarie-university-4",
+   "act": 3,
+   "title": "The Syndicate, Macquarie University",
+   "blurb": "This is going to sound small. Nine of us at Macquarie University have gone in on the same numbers since the first of the month and one of us has stopped putting money in. You will see what I mean the second you get there. I'll put the kettle on for when you're back.",
+   "giver": "hub-macquarie-university-manon",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -8550,
+     "z": -10203,
+     "radius": 25,
+     "label": "the house of the one who stopped"
+    },
+    {
+     "kind": "earn",
+     "dollars": 72,
+     "label": "$72, which is his share since he stopped"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it said out loud, not in the group chat",
+     "npc": "hub-macquarie-university-manon"
+    }
+   ],
+   "reward": {
+    "cash": 73,
+    "xp": 172,
+    "unlock": [
+     "hub:h-newsagent-macquarie-university-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-macquarie-university-5",
+   "act": 3,
+   "title": "The Other Agency, Macquarie University",
+   "blurb": "I have written it down twice and lost it twice. The agency at Macquarie Park closed six months before Macquarie University started struggling, and I would very much like to know what they know. There is a version of this where I am the unreasonable one. Just do not come back empty-handed.",
+   "giver": "hub-macquarie-university-manon",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7753,
+     "z": -9072,
+     "radius": 60,
+     "label": "the shop is shut, the family is not"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever they say, say it slowly to me",
+     "npc": "hub-macquarie-university-manon"
+    }
+   ],
+   "reward": {
+    "cash": 84,
+    "xp": 164,
+    "unlock": [
+     "hub:h-newsagent-macquarie-university-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-warrawee-0",
+   "act": 3,
+   "title": "The Unclaimed Falcon, Warrawee",
+   "blurb": "You look like you have twenty minutes. There has been a car in the Warrawee yard since the long weekend with a docket book on the passenger seat and no owner answering. This is the third time I have had this conversation. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-warrawee-wilhelmina",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -8342,
+     "z": -15715,
+     "radius": 35,
+     "label": "the car and the plate together"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I have to prove I tried before I can move it",
+     "npc": "hub-warrawee-wilhelmina"
+    }
+   ],
+   "reward": {
+    "cash": 91,
+    "xp": 224,
+    "unlock": [
+     "hub:h-workshop-warrawee-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-warrawee-1",
+   "act": 3,
+   "title": "Storage Fees, Warrawee",
+   "blurb": "Keep it between us for now. Now that it is documented, Warrawee is owed $65 in storage and the only person who can pay it is the person not answering. It started small, the way these things do. If anyone asks, you were never here.",
+   "giver": "hub-warrawee-wilhelmina",
+   "level": 3,
+   "requires": [
+    "h-workshop-warrawee-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 65,
+     "label": "$65, from him or from the scrap"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "either way it comes off my floor",
+     "npc": "hub-warrawee-wilhelmina"
+    }
+   ],
+   "reward": {
+    "cash": 139,
+    "xp": 305,
+    "unlock": [
+     "hub:h-workshop-warrawee-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-warrawee-2",
+   "act": 3,
+   "title": "First Year, Warrawee",
+   "blurb": "Right. Since you asked. I am in my first year at Warrawee and I have to log 88 hours on a job I am not allowed to touch on my own. It is the not knowing that has got me, honestly. There is no rush, but there is a Friday.",
+   "giver": "hub-warrawee-albie",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -8405,
+     "z": -15749,
+     "radius": 25,
+     "label": "the supplier, two streets over"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "and get him a coffee, it helps"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "sign the book and I owe you",
+     "npc": "hub-warrawee-albie"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 213,
+    "unlock": [
+     "hub:h-workshop-warrawee-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-warrawee-3",
+   "act": 3,
+   "title": "The Air Line, Warrawee",
+   "blurb": "My knees are gone, so. Somebody has been coming into the Warrawee yard after ten past five to use the air line, and last week they used the compressor as well. There is probably a simple explanation and I would love to hear it. I'll see you right for it.",
+   "giver": "hub-warrawee-albie",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 2,
+     "label": "the ones who think the yard is public"
+    },
+    {
+     "kind": "photo",
+     "x": -8321,
+     "z": -15834,
+     "radius": 35,
+     "label": "the gate they are getting through"
+    }
+   ],
+   "reward": {
+    "cash": 95,
+    "xp": 208,
+    "unlock": [
+     "hub:h-workshop-warrawee-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-warrawee-4",
+   "act": 3,
+   "title": "My Own Car, Warrawee",
+   "blurb": "This is going to sound small. My car has been at Warrawee since the long weekend and every time I ring, the quote has grown by about $88. You will see what I mean the second you get there. I'll put the kettle on for when you're back.",
+   "giver": "hub-warrawee-ranjit",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -8264,
+     "z": -15840,
+     "radius": 25,
+     "label": "stand in the office where they can see you"
+    },
+    {
+     "kind": "photo",
+     "x": -8254,
+     "z": -15839,
+     "radius": 35,
+     "label": "the job card on the wall, all of it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I know what I am arguing about",
+     "npc": "hub-warrawee-ranjit"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 221,
+    "unlock": [
+     "hub:h-workshop-warrawee-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-warrawee-5",
+   "act": 3,
+   "title": "The Assessor, Warrawee",
+   "blurb": "I have written it down twice and lost it twice. The insurance assessor who signs off every job at Warrawee works out of Turramurra, and he has never once seen the car he is assessing. There is a version of this where I am the unreasonable one. Just do not come back empty-handed.",
+   "giver": "hub-warrawee-ranjit",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7891,
+     "z": -14869,
+     "radius": 60,
+     "label": "catch him before he goes out on the road"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear how he does it",
+     "npc": "hub-warrawee-ranjit"
+    }
+   ],
+   "reward": {
+    "cash": 98,
+    "xp": 214,
+    "unlock": [
+     "hub:h-workshop-warrawee-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-banksia-0",
+   "act": 3,
+   "title": "Dumped Out the Back, Banksia",
+   "blurb": "You look like you have twenty minutes. People leave things at the Banksia roller door after ten past five and by morning it is rained on and it is our problem and our tip fee. This is the third time I have had this conversation. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-banksia-frances",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -6184,
+     "z": 8631,
+     "radius": 35,
+     "label": "the pile, on a bad morning"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council will not act without one of these",
+     "npc": "hub-banksia-frances"
+    }
+   ],
+   "reward": {
+    "cash": 84,
+    "xp": 223,
+    "unlock": [
+     "hub:h-opshop-banksia-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-banksia-1",
+   "act": 3,
+   "title": "The Tip Fee, Banksia",
+   "blurb": "Keep it between us for now. The photos worked, which means Banksia can claim back the $63 we have paid to throw away other people's furniture since a public holiday nobody remembered. It started small, the way these things do. If anyone asks, you were never here.",
+   "giver": "hub-banksia-frances",
+   "level": 3,
+   "requires": [
+    "h-opshop-banksia-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 63,
+     "label": "$63, and every receipt counts"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will do the form if you do the walking",
+     "npc": "hub-banksia-frances"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 307,
+    "unlock": [
+     "hub:h-opshop-banksia-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-banksia-2",
+   "act": 3,
+   "title": "The Good Box, Banksia",
+   "blurb": "Right. Since you asked. Something came into Banksia on a public holiday nobody remembered in a box of paperbacks that I do not think the family meant to give away. It is the not knowing that has got me, honestly. There is no rush, but there is a Friday.",
+   "giver": "hub-banksia-vinh",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -6292,
+     "z": 8704,
+     "radius": 25,
+     "label": "the address on the donation slip"
+    },
+    {
+     "kind": "photo",
+     "x": -6315,
+     "z": 8690,
+     "radius": 35,
+     "label": "the thing itself, before it goes back"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I would rather give it back than sell it",
+     "npc": "hub-banksia-vinh"
+    }
+   ],
+   "reward": {
+    "cash": 87,
+    "xp": 217,
+    "unlock": [
+     "hub:h-opshop-banksia-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-banksia-3",
+   "act": 3,
+   "title": "Sorting Room, Banksia",
+   "blurb": "My knees are gone, so. Two people have been coming into the Banksia sorting room since a public holiday nobody remembered and taking the good stock before it reaches the floor, and one of them volunteers here. There is probably a simple explanation and I would love to hear it. I'll see you right for it.",
+   "giver": "hub-banksia-vinh",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 2,
+     "label": "catch them at the back door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 67,
+     "label": "$67, which is what the good stock made last month"
+    }
+   ],
+   "reward": {
+    "cash": 97,
+    "xp": 224,
+    "unlock": [
+     "hub:h-opshop-banksia-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-banksia-4",
+   "act": 3,
+   "title": "The Van, Banksia",
+   "blurb": "This is going to sound small. I do the Banksia pick-ups in a van with 67 thousand on it and a door that only opens if you know about it. You will see what I mean the second you get there. I'll put the kettle on for when you're back.",
+   "giver": "hub-banksia-manon",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Banksia",
+     "to": "Rockdale",
+     "label": "come out to Rockdale with me, it is a two-person lift"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "we will stop on the way, my shout"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 225,
+    "unlock": [
+     "hub:h-opshop-banksia-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-banksia-5",
+   "act": 3,
+   "title": "Head Office, Banksia",
+   "blurb": "I have written it down twice and lost it twice. Everything Banksia cannot sell goes to a warehouse at Arncliffe, and nobody there has ever answered a phone in my hearing. There is a version of this where I am the unreasonable one. Just do not come back empty-handed.",
+   "giver": "hub-banksia-manon",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5669,
+     "z": 7599,
+     "radius": 60,
+     "label": "turn up in person, that is the trick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me there is a person in there",
+     "npc": "hub-banksia-manon"
+    }
+   ],
+   "reward": {
+    "cash": 98,
+    "xp": 228,
+    "unlock": [
+     "hub:h-opshop-banksia-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

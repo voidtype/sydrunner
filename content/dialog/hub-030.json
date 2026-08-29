@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-fennell-street-ualan",
+   "name": "Ualan, shopkeeper at Fennell Street",
+   "x": -18849,
+   "z": -6597,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are here about the sign, the sign is wrong.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You are the first person to stop all morning. The Fennell Street order has been two cartons light every week since Thursdays and the invoice says otherwise every time. I would have sorted it myself a year ago. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-fennell-street-0",
+       "denyFlag": "hub:h-cornershop-fennell-street-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Not being dramatic about this. They admitted it, which I did not expect, so now there is $65 owing to Fennell Street and it is not going to walk in here itself. It is not the money. It has stopped being the money. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-fennell-street-1",
+       "denyFlag": "hub:h-cornershop-fennell-street-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "Short Delivery, Fennell Street — that's done.",
+       "turnin": "h-cornershop-fennell-street-0"
+      },
+      {
+       "text": "The Credit Note, Fennell Street — that's done.",
+       "turnin": "h-cornershop-fennell-street-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-fennell-street-ebony",
+   "name": "Ebony, delivery driver at Fennell Street",
+   "x": -19034,
+   "z": -6683,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand in the doorway, mate, come round.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I am told you do odd jobs. I do the Fennell Street run at first light and there is a stretch of it where the van gets followed, which I have told nobody until now. I did try the official route, for what that was worth. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-fennell-street-2",
+       "denyFlag": "hub:h-cornershop-fennell-street-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I'll be straight with you. I have got a esky of warm cans in the back of the van and the Fennell Street shop is shut, and the number on the door rings out. I have got a photo on my phone but it is useless. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-fennell-street-3",
+       "denyFlag": "hub:h-cornershop-fennell-street-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "The Fennell Street Run — that's done.",
+       "turnin": "h-cornershop-fennell-street-2"
+      },
+      {
+       "text": "Locked Out, Fennell Street — that's done.",
+       "turnin": "h-cornershop-fennell-street-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-fennell-street-rehan",
+   "name": "Rehan, the kid on the register at Fennell Street",
+   "x": -18842,
+   "z": -6636,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Long day. Say what you came to say.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It has been three weeks. Three of the Fennell Street regulars have started coming in together and going out separately, and the till is $91 down on those days. I am aware how that sounds. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-fennell-street-4",
+       "denyFlag": "hub:h-cornershop-fennell-street-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Nobody else has offered, so. Everything Fennell Street sells comes off a floor at Robin Thomas, and the woman who runs it will tell you things she will not put in writing. My wife says I should let it go. My wife is wrong. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-fennell-street-5",
+       "denyFlag": "hub:h-cornershop-fennell-street-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "The Regulars, Fennell Street — that's done.",
+       "turnin": "h-cornershop-fennell-street-4"
+      },
+      {
+       "text": "The Wholesaler, Fennell Street — that's done.",
+       "turnin": "h-cornershop-fennell-street-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-padstow-sina",
+   "name": "Sina, junior coach at Padstow",
+   "x": -16129,
+   "z": 9556,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I know that look. Everyone wants something today.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You are the first person to stop all morning. I have got eleven kids for a twelve-a-side at Padstow on the week of the show and one of them has a note from his mother. I would have sorted it myself a year ago. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-padstow-0",
+       "denyFlag": "hub:h-oval-padstow-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Not being dramatic about this. We found a twelfth, which means the Padstow club now owes the association $62 it had budgeted on not owing. It is not the money. It has stopped being the money. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-padstow-1",
+       "denyFlag": "hub:h-oval-padstow-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "Under 12s at Padstow — that's done.",
+       "turnin": "h-oval-padstow-0"
+      },
+      {
+       "text": "Registration, Padstow — that's done.",
+       "turnin": "h-oval-padstow-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-padstow-emeka",
+   "name": "Emeka, canteen manager at Padstow",
+   "x": -16193,
+   "z": 9342,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Give me a second. Right. Go.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I am told you do odd jobs. The canteen at Padstow does two hundred sausages on a Saturday and this week the freezer went off at the second express. I did try the official route, for what that was worth. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-padstow-2",
+       "denyFlag": "hub:h-oval-padstow-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I'll be straight with you. Somebody walked off with the float from the Padstow canteen at about the second express during the last home game, and I have a fair idea which somebody. I have got a photo on my phone but it is useless. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-padstow-3",
+       "denyFlag": "hub:h-oval-padstow-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Padstow Canteen — that's done.",
+       "turnin": "h-oval-padstow-2"
+      },
+      {
+       "text": "Grand Final Float, Padstow — that's done.",
+       "turnin": "h-oval-padstow-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-padstow-marika",
+   "name": "Marika, groundsman at Padstow",
+   "x": -16202,
+   "z": 9596,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are not from around the corner, are you.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It has been three weeks. The sprinkler line under the Padstow outfield has been leaking since the week of the show and the wet patch has started to move. I am aware how that sounds. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-padstow-4",
+       "denyFlag": "hub:h-oval-padstow-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Nobody else has offered, so. The bloke who allocates grounds for the whole association sits at Revesby, and Padstow has been at the bottom of his list for two seasons. My wife says I should let it go. My wife is wrong. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-padstow-5",
+       "denyFlag": "hub:h-oval-padstow-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Sprinkler Line, Padstow — that's done.",
+       "turnin": "h-oval-padstow-4"
+      },
+      {
+       "text": "The Association, Padstow — that's done.",
+       "turnin": "h-oval-padstow-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-seven-hills-dominika",
+   "name": "Dominika, bushcare volunteer at Seven Hills",
+   "x": -25357,
+   "z": -10029,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Half of this suburb has walked past already. Not one stopped.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You are the first person to stop all morning. Somebody has been tipping fill into the creek behind Seven Hills since the week of the show and it is narrowing the channel a metre at a time. I would have sorted it myself a year ago. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-seven-hills-0",
+       "denyFlag": "hub:h-creek-seven-hills-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Not being dramatic about this. They have agreed to a clean-up at Seven Hills, which is wonderful, except the grant is $53 short and closes on the week of the show. It is not the money. It has stopped being the money. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-seven-hills-1",
+       "denyFlag": "hub:h-creek-seven-hills-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "The Creek Behind Seven Hills — that's done.",
+       "turnin": "h-creek-seven-hills-0"
+      },
+      {
+       "text": "Willow Removal, Seven Hills — that's done.",
+       "turnin": "h-creek-seven-hills-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-seven-hills-cosima",
+   "name": "Cosima, SES member at Seven Hills",
+   "x": -25337,
+   "z": -10150,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Whatever it is, I have had worse this week.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I am told you do odd jobs. We had 34 sandbags in the Seven Hills shed on the week of the show and this morning we have got the pallet they came on. I did try the official route, for what that was worth. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-seven-hills-2",
+       "denyFlag": "hub:h-creek-seven-hills-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I'll be straight with you. People keep driving the low crossing at Seven Hills at first light with the water over the sign, and one of them is going to be the one. I have got a photo on my phone but it is useless. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-seven-hills-3",
+       "denyFlag": "hub:h-creek-seven-hills-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Sandbags, Seven Hills — that's done.",
+       "turnin": "h-creek-seven-hills-2"
+      },
+      {
+       "text": "The Low Crossing, Seven Hills — that's done.",
+       "turnin": "h-creek-seven-hills-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-seven-hills-ondine",
+   "name": "Ondine, resident who got flooded at Seven Hills",
+   "x": -25504,
+   "z": -10129,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sit down if you like. Nobody else is using it.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It has been three weeks. The water came through my place at Seven Hills on the week of the show and the assessor wants photographs of things I have already thrown out. I am aware how that sounds. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-seven-hills-4",
+       "denyFlag": "hub:h-creek-seven-hills-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Nobody else has offered, so. Whatever is happening to Seven Hills starts upstream at Toongabbie, and there are people up there who have been saying so for years. My wife says I should let it go. My wife is wrong. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-seven-hills-5",
+       "denyFlag": "hub:h-creek-seven-hills-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "Under the House, Seven Hills — that's done.",
+       "turnin": "h-creek-seven-hills-4"
+      },
+      {
+       "text": "Upstream, Seven Hills — that's done.",
+       "turnin": "h-creek-seven-hills-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

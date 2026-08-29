@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-lewisham-peg",
+   "name": "Peg, greenkeeper at Lewisham",
+   "x": -5491,
+   "z": 2800,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You right there? I am mid-something but go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I'll be straight with you. The number three green at Lewisham has had a bald patch the shape of Tasmania since school holidays, and the committee thinks I am inventing it. It has been going on longer than I have admitted to anyone. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-lewisham-0",
+       "denyFlag": "hub:h-bowlo-lewisham-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It has been three weeks. They have seen the photograph and now they want it re-laid by school holidays, which means finding $38 that the Lewisham club does not have. I have got no proof, which is exactly why I am asking. Half now if you want it. Most people don't.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-lewisham-1",
+       "denyFlag": "hub:h-bowlo-lewisham-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "The Dead Patch at Lewisham — that's done.",
+       "turnin": "h-bowlo-lewisham-0"
+      },
+      {
+       "text": "Turf Money, Lewisham — that's done.",
+       "turnin": "h-bowlo-lewisham-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-lewisham-aleks",
+   "name": "Aleks, club president at Lewisham",
+   "x": -5544,
+   "z": 2795,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are here about the sign, the sign is wrong.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Nobody else has offered, so. Our books say 84 members at Lewisham and I would bet the bar takings that half of them are dead or moved to Queensland. It might be nothing. It has not felt like nothing. Whatever it costs you, tell me and I will cover it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-lewisham-2",
+       "denyFlag": "hub:h-bowlo-lewisham-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "The council knows and the council does not care. Since the back of seven somebody has been going round the Lewisham greens telling the barefoot bowlers we are shutting, and we are not shutting. I would not ask if there was anyone else about. I would rather know than wonder.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-lewisham-3",
+       "denyFlag": "hub:h-bowlo-lewisham-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Lewisham Membership Count — that's done.",
+       "turnin": "h-bowlo-lewisham-2"
+      },
+      {
+       "text": "Closing Time Rumour, Lewisham — that's done.",
+       "turnin": "h-bowlo-lewisham-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-lewisham-cecile",
+   "name": "Cecile, bar manager at Lewisham",
+   "x": -5765,
+   "z": 2668,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand in the doorway, mate, come round.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I have been putting it off since Easter. There is a bucket of odd keys in the chest freezer behind the bar at Lewisham and I am not opening it on an empty stomach. You can tell me I am imagining it. Tell me after. That's the whole job. No catch.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-lewisham-4",
+       "denyFlag": "hub:h-bowlo-lewisham-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Before you say anything: yes, I know. The man who kept these greens before me drinks at Summer Hill now, and he owes Lewisham an explanation about the drainage. I would have sorted it myself a year ago. Be polite about it. It costs nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-lewisham-5",
+       "denyFlag": "hub:h-bowlo-lewisham-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Behind the Bar at Lewisham — that's done.",
+       "turnin": "h-bowlo-lewisham-4"
+      },
+      {
+       "text": "The Old Greenkeeper, Lewisham — that's done.",
+       "turnin": "h-bowlo-lewisham-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-rozelle-bay-walid",
+   "name": "Walid, night console operator at Rozelle Bay",
+   "x": -3440,
+   "z": 273,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Long day. Say what you came to say.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I'll be straight with you. Every night around the second express the same car does three laps of the Rozelle Bay forecourt and never buys fuel. It has been going on longer than I have admitted to anyone. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-rozelle-bay-0",
+       "denyFlag": "hub:h-servo-rozelle-bay-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It has been three weeks. Now I know the plate, I want to know where it goes after it leaves Rozelle Bay at the second express, because it is not going home. I have got no proof, which is exactly why I am asking. Half now if you want it. Most people don't.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-rozelle-bay-1",
+       "denyFlag": "hub:h-servo-rozelle-bay-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "Nights at Rozelle Bay — that's done.",
+       "turnin": "h-servo-rozelle-bay-0"
+      },
+      {
+       "text": "The Third Lap, Rozelle Bay — that's done.",
+       "turnin": "h-servo-rozelle-bay-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-rozelle-bay-taini",
+   "name": "Taini, mechanic at Rozelle Bay",
+   "x": -3318,
+   "z": 282,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I know that look. Everyone wants something today.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Nobody else has offered, so. Bay two at the Rozelle Bay workshop has had the same car in it since a wet Monday and the owner has stopped answering. It might be nothing. It has not felt like nothing. Whatever it costs you, tell me and I will cover it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-rozelle-bay-2",
+       "denyFlag": "hub:h-servo-rozelle-bay-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "The council knows and the council does not care. Someone has been walking out of Rozelle Bay with a socket set at a time since a wet Monday, and I have run out of ways to be polite about it. I would not ask if there was anyone else about. I would rather know than wonder.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-rozelle-bay-3",
+       "denyFlag": "hub:h-servo-rozelle-bay-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Bay Two, Rozelle Bay — that's done.",
+       "turnin": "h-servo-rozelle-bay-2"
+      },
+      {
+       "text": "Tools Off the Bench, Rozelle Bay — that's done.",
+       "turnin": "h-servo-rozelle-bay-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-rozelle-bay-akira",
+   "name": "Akira, franchisee at Rozelle Bay",
+   "x": -3538,
+   "z": 293,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Give me a second. Right. Go.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I have been putting it off since Easter. Head office says the Rozelle Bay board has been wrong since a wet Monday and I say it has been right for eleven years, and one of us is about to be embarrassed. You can tell me I am imagining it. Tell me after. That's the whole job. No catch.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-rozelle-bay-4",
+       "denyFlag": "hub:h-servo-rozelle-bay-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Before you say anything: yes, I know. The bloke who runs the site at Glebe has had the same trouble Rozelle Bay has, and he will talk to you before he talks to me. I would have sorted it myself a year ago. Be polite about it. It costs nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-rozelle-bay-5",
+       "denyFlag": "hub:h-servo-rozelle-bay-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "The Rozelle Bay Price Board — that's done.",
+       "turnin": "h-servo-rozelle-bay-4"
+      },
+      {
+       "text": "The Other Franchise, Rozelle Bay — that's done.",
+       "turnin": "h-servo-rozelle-bay-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-olympic-park-dara",
+   "name": "Dara, building manager at Olympic Park",
+   "x": -12802.3,
+   "z": -2217.3,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are not from around the corner, are you.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I'll be straight with you. Water has been coming through the level two ceiling of the Olympic Park block since Thursdays and the strata report says there is no water. It has been going on longer than I have admitted to anyone. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-olympic-park-0",
+       "denyFlag": "hub:h-strata-olympic-park-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It has been three weeks. The photo did it. I have got no proof, which is exactly why I am asking. Now every owner at Olympic Park owes $44 and I have to collect it from people who have avoided me for a year. Half now if you want it. Most people don't.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-olympic-park-1",
+       "denyFlag": "hub:h-strata-olympic-park-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "Level Two, Olympic Park — that's done.",
+       "turnin": "h-strata-olympic-park-0"
+      },
+      {
+       "text": "The Special Levy, Olympic Park — that's done.",
+       "turnin": "h-strata-olympic-park-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-olympic-park-lex",
+   "name": "Lex, owner-occupier at Olympic Park",
+   "x": -12897,
+   "z": -2365,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Half of this suburb has walked past already. Not one stopped.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Nobody else has offered, so. Somebody who does not live at Olympic Park has parked in space fourteen every night since Thursdays and the manager will not look at it. It might be nothing. It has not felt like nothing. Whatever it costs you, tell me and I will cover it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-olympic-park-2",
+       "denyFlag": "hub:h-strata-olympic-park-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "The council knows and the council does not care. The Olympic Park AGM is on Thursdays and I would like to arrive with something stronger than a grievance and a printout. I would not ask if there was anyone else about. I would rather know than wonder.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-olympic-park-3",
+       "denyFlag": "hub:h-strata-olympic-park-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "Car Space 14, Olympic Park — that's done.",
+       "turnin": "h-strata-olympic-park-2"
+      },
+      {
+       "text": "The Meeting, Olympic Park — that's done.",
+       "turnin": "h-strata-olympic-park-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-olympic-park-savva",
+   "name": "Savva, the one who does the bins at Olympic Park",
+   "x": -12999,
+   "z": -2326.4,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Whatever it is, I have had worse this week.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I have been putting it off since Easter. Three units at Olympic Park have put their bins out on the wrong night since Thursdays and I have taken it personally, which I accept is a choice I made. You can tell me I am imagining it. Tell me after. That's the whole job. No catch.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-olympic-park-4",
+       "denyFlag": "hub:h-strata-olympic-park-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Before you say anything: yes, I know. There is a block at Concord West with the same builder and the same cracks, and their manager has already been through what Olympic Park is starting. I would have sorted it myself a year ago. Be polite about it. It costs nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-olympic-park-5",
+       "denyFlag": "hub:h-strata-olympic-park-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "Bin Night at Olympic Park — that's done.",
+       "turnin": "h-strata-olympic-park-4"
+      },
+      {
+       "text": "The Other Block, Olympic Park — that's done.",
+       "turnin": "h-strata-olympic-park-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

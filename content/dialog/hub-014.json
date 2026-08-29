@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-yallamundi-rhona",
+   "name": "Rhona, shopkeeper at Yallamundi",
+   "x": -16642,
+   "z": -6090,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Cash only and no, I am joking. What do you want.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It has been three weeks. The Yallamundi order has been two cartons light every week since grand final week and the invoice says otherwise every time. You can tell me I am imagining it. Tell me after. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-yallamundi-0",
+       "denyFlag": "hub:h-cornershop-yallamundi-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Nobody else has offered, so. They admitted it, which I did not expect, so now there is $166 owing to Yallamundi and it is not going to walk in here itself. I would have sorted it myself a year ago. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-yallamundi-1",
+       "denyFlag": "hub:h-cornershop-yallamundi-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "Short Delivery, Yallamundi — that's done.",
+       "turnin": "h-cornershop-yallamundi-0"
+      },
+      {
+       "text": "The Credit Note, Yallamundi — that's done.",
+       "turnin": "h-cornershop-yallamundi-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-yallamundi-bilal",
+   "name": "Bilal, delivery driver at Yallamundi",
+   "x": -16735,
+   "z": -6275,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You have got a face like you can keep your mouth shut.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "The council knows and the council does not care. I do the Yallamundi run at just gone midnight and there is a stretch of it where the van gets followed, which I have told nobody until now. It is not the money. It has stopped being the money. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-yallamundi-2",
+       "denyFlag": "hub:h-cornershop-yallamundi-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have been putting it off since Easter. I have got a bucket of odd keys in the back of the van and the Yallamundi shop is shut, and the number on the door rings out. I did try the official route, for what that was worth. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-yallamundi-3",
+       "denyFlag": "hub:h-cornershop-yallamundi-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "The Yallamundi Run — that's done.",
+       "turnin": "h-cornershop-yallamundi-2"
+      },
+      {
+       "text": "Locked Out, Yallamundi — that's done.",
+       "turnin": "h-cornershop-yallamundi-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-yallamundi-anton",
+   "name": "Anton, the kid on the register at Yallamundi",
+   "x": -16738.6,
+   "z": -6093.7,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Right. Talk while I do this.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Before you say anything: yes, I know. Three of the Yallamundi regulars have started coming in together and going out separately, and the till is $93 down on those days. I have got a photo on my phone but it is useless. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-yallamundi-4",
+       "denyFlag": "hub:h-cornershop-yallamundi-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It is not a police matter and I have checked. Everything Yallamundi sells comes off a floor at Rosehill Gardens, and the woman who runs it will tell you things she will not put in writing. I am aware how that sounds. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-yallamundi-5",
+       "denyFlag": "hub:h-cornershop-yallamundi-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "The Regulars, Yallamundi — that's done.",
+       "turnin": "h-cornershop-yallamundi-4"
+      },
+      {
+       "text": "The Wholesaler, Yallamundi — that's done.",
+       "turnin": "h-cornershop-yallamundi-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-wombarra-ashwin",
+   "name": "Ashwin, junior coach at Wombarra",
+   "x": -22726,
+   "z": 45647,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You right there? I am mid-something but go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It has been three weeks. I have got eleven kids for a twelve-a-side at Wombarra on the week of the show and one of them has a note from his mother. You can tell me I am imagining it. Tell me after. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-wombarra-0",
+       "denyFlag": "hub:h-oval-wombarra-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Nobody else has offered, so. We found a twelfth, which means the Wombarra club now owes the association $40 it had budgeted on not owing. I would have sorted it myself a year ago. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-wombarra-1",
+       "denyFlag": "hub:h-oval-wombarra-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "Under 12s at Wombarra — that's done.",
+       "turnin": "h-oval-wombarra-0"
+      },
+      {
+       "text": "Registration, Wombarra — that's done.",
+       "turnin": "h-oval-wombarra-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-wombarra-odile",
+   "name": "Odile, canteen manager at Wombarra",
+   "x": -22677,
+   "z": 45520,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are here about the sign, the sign is wrong.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "The council knows and the council does not care. The canteen at Wombarra does two hundred sausages on a Saturday and this week the freezer went off at the middle of the news. It is not the money. It has stopped being the money. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-wombarra-2",
+       "denyFlag": "hub:h-oval-wombarra-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have been putting it off since Easter. Somebody walked off with the float from the Wombarra canteen at about the middle of the news during the last home game, and I have a fair idea which somebody. I did try the official route, for what that was worth. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-wombarra-3",
+       "denyFlag": "hub:h-oval-wombarra-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Wombarra Canteen — that's done.",
+       "turnin": "h-oval-wombarra-2"
+      },
+      {
+       "text": "Grand Final Float, Wombarra — that's done.",
+       "turnin": "h-oval-wombarra-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-wombarra-danh",
+   "name": "Danh, groundsman at Wombarra",
+   "x": -22766,
+   "z": 45463,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand in the doorway, mate, come round.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Before you say anything: yes, I know. The sprinkler line under the Wombarra outfield has been leaking since the week of the show and the wet patch has started to move. I have got a photo on my phone but it is useless. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-wombarra-4",
+       "denyFlag": "hub:h-oval-wombarra-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It is not a police matter and I have checked. The bloke who allocates grounds for the whole association sits at Coledale, and Wombarra has been at the bottom of his list for two seasons. I am aware how that sounds. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-wombarra-5",
+       "denyFlag": "hub:h-oval-wombarra-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Sprinkler Line, Wombarra — that's done.",
+       "turnin": "h-oval-wombarra-4"
+      },
+      {
+       "text": "The Association, Wombarra — that's done.",
+       "turnin": "h-oval-wombarra-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-vineyard-oona",
+   "name": "Oona, bushcare volunteer at Vineyard",
+   "x": -33564,
+   "z": -23589,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Long day. Say what you came to say.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It has been three weeks. Somebody has been tipping fill into the creek behind Vineyard since school holidays and it is narrowing the channel a metre at a time. You can tell me I am imagining it. Tell me after. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-vineyard-0",
+       "denyFlag": "hub:h-creek-vineyard-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Nobody else has offered, so. They have agreed to a clean-up at Vineyard, which is wonderful, except the grant is $37 short and closes on school holidays. I would have sorted it myself a year ago. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-vineyard-1",
+       "denyFlag": "hub:h-creek-vineyard-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "The Creek Behind Vineyard — that's done.",
+       "turnin": "h-creek-vineyard-0"
+      },
+      {
+       "text": "Willow Removal, Vineyard — that's done.",
+       "turnin": "h-creek-vineyard-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-vineyard-tomasz",
+   "name": "Tomasz, SES member at Vineyard",
+   "x": -33471,
+   "z": -23665,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I know that look. Everyone wants something today.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "The council knows and the council does not care. We had 71 sandbags in the Vineyard shed on school holidays and this morning we have got the pallet they came on. It is not the money. It has stopped being the money. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-vineyard-2",
+       "denyFlag": "hub:h-creek-vineyard-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have been putting it off since Easter. People keep driving the low crossing at Vineyard at five in the morning with the water over the sign, and one of them is going to be the one. I did try the official route, for what that was worth. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-vineyard-3",
+       "denyFlag": "hub:h-creek-vineyard-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Sandbags, Vineyard — that's done.",
+       "turnin": "h-creek-vineyard-2"
+      },
+      {
+       "text": "The Low Crossing, Vineyard — that's done.",
+       "turnin": "h-creek-vineyard-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-vineyard-cormac",
+   "name": "Cormac, resident who got flooded at Vineyard",
+   "x": -33709,
+   "z": -23535,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Give me a second. Right. Go.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Before you say anything: yes, I know. The water came through my place at Vineyard on school holidays and the assessor wants photographs of things I have already thrown out. I have got a photo on my phone but it is useless. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-vineyard-4",
+       "denyFlag": "hub:h-creek-vineyard-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It is not a police matter and I have checked. Whatever is happening to Vineyard starts upstream at Mulgrave, and there are people up there who have been saying so for years. I am aware how that sounds. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-vineyard-5",
+       "denyFlag": "hub:h-creek-vineyard-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "Under the House, Vineyard — that's done.",
+       "turnin": "h-creek-vineyard-4"
+      },
+      {
+       "text": "Upstream, Vineyard — that's done.",
+       "turnin": "h-creek-vineyard-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

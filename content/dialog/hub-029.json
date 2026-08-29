@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-roseville-ariana",
+   "name": "Ariana, greenkeeper at Roseville",
+   "x": -3005,
+   "z": -9298,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Ah. Someone with two working legs.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You are the first person to stop all morning. The number three green at Roseville has had a bald patch the shape of Tasmania since Thursdays, and the committee thinks I am inventing it. I would have sorted it myself a year ago. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-roseville-0",
+       "denyFlag": "hub:h-bowlo-roseville-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Not being dramatic about this. They have seen the photograph and now they want it re-laid by Thursdays, which means finding $62 that the Roseville club does not have. It is not the money. It has stopped being the money. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-roseville-1",
+       "denyFlag": "hub:h-bowlo-roseville-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "The Dead Patch at Roseville — that's done.",
+       "turnin": "h-bowlo-roseville-0"
+      },
+      {
+       "text": "Turf Money, Roseville — that's done.",
+       "turnin": "h-bowlo-roseville-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-roseville-satu",
+   "name": "Satu, club president at Roseville",
+   "x": -3046,
+   "z": -9124,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are early. Or late. I have lost track.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I am told you do odd jobs. Our books say 17 members at Roseville and I would bet the bar takings that half of them are dead or moved to Queensland. I did try the official route, for what that was worth. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-roseville-2",
+       "denyFlag": "hub:h-bowlo-roseville-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I'll be straight with you. Since the middle of the news somebody has been going round the Roseville greens telling the barefoot bowlers we are shutting, and we are not shutting. I have got a photo on my phone but it is useless. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-roseville-3",
+       "denyFlag": "hub:h-bowlo-roseville-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Roseville Membership Count — that's done.",
+       "turnin": "h-bowlo-roseville-2"
+      },
+      {
+       "text": "Closing Time Rumour, Roseville — that's done.",
+       "turnin": "h-bowlo-roseville-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-roseville-manu",
+   "name": "Manu, bar manager at Roseville",
+   "x": -3017,
+   "z": -9340,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Been here since before it was like this. Go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It has been three weeks. There is a whiteboard with last March still on it in the chest freezer behind the bar at Roseville and I am not opening it on an empty stomach. I am aware how that sounds. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-roseville-4",
+       "denyFlag": "hub:h-bowlo-roseville-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Nobody else has offered, so. The man who kept these greens before me drinks at Lindfield now, and he owes Roseville an explanation about the drainage. My wife says I should let it go. My wife is wrong. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-roseville-5",
+       "denyFlag": "hub:h-bowlo-roseville-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Behind the Bar at Roseville — that's done.",
+       "turnin": "h-bowlo-roseville-4"
+      },
+      {
+       "text": "The Old Greenkeeper, Roseville — that's done.",
+       "turnin": "h-bowlo-roseville-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-jubilee-park-alia",
+   "name": "Alia, night console operator at Jubilee Park",
+   "x": -2617,
+   "z": 788,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Do not mind the mess. It is structural now.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You are the first person to stop all morning. Every night around knock-off the same car does three laps of the Jubilee Park forecourt and never buys fuel. I would have sorted it myself a year ago. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-jubilee-park-0",
+       "denyFlag": "hub:h-servo-jubilee-park-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Not being dramatic about this. Now I know the plate, I want to know where it goes after it leaves Jubilee Park at knock-off, because it is not going home. It is not the money. It has stopped being the money. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-jubilee-park-1",
+       "denyFlag": "hub:h-servo-jubilee-park-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "Nights at Jubilee Park — that's done.",
+       "turnin": "h-servo-jubilee-park-0"
+      },
+      {
+       "text": "The Third Lap, Jubilee Park — that's done.",
+       "turnin": "h-servo-jubilee-park-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-jubilee-park-alana",
+   "name": "Alana, mechanic at Jubilee Park",
+   "x": -2893,
+   "z": 940,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are selling something the answer is no.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I am told you do odd jobs. Bay two at the Jubilee Park workshop has had the same car in it since every second Friday and the owner has stopped answering. I did try the official route, for what that was worth. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-jubilee-park-2",
+       "denyFlag": "hub:h-servo-jubilee-park-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I'll be straight with you. Someone has been walking out of Jubilee Park with a socket set at a time since every second Friday, and I have run out of ways to be polite about it. I have got a photo on my phone but it is useless. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-jubilee-park-3",
+       "denyFlag": "hub:h-servo-jubilee-park-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Bay Two, Jubilee Park — that's done.",
+       "turnin": "h-servo-jubilee-park-2"
+      },
+      {
+       "text": "Tools Off the Bench, Jubilee Park — that's done.",
+       "turnin": "h-servo-jubilee-park-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-jubilee-park-ziva",
+   "name": "Ziva, franchisee at Jubilee Park",
+   "x": -2922,
+   "z": 645,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Cash only and no, I am joking. What do you want.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It has been three weeks. Head office says the Jubilee Park board has been wrong since every second Friday and I say it has been right for eleven years, and one of us is about to be embarrassed. I am aware how that sounds. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-jubilee-park-4",
+       "denyFlag": "hub:h-servo-jubilee-park-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Nobody else has offered, so. The bloke who runs the site at Lilyfield has had the same trouble Jubilee Park has, and he will talk to you before he talks to me. My wife says I should let it go. My wife is wrong. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-jubilee-park-5",
+       "denyFlag": "hub:h-servo-jubilee-park-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "The Jubilee Park Price Board — that's done.",
+       "turnin": "h-servo-jubilee-park-4"
+      },
+      {
+       "text": "The Other Franchise, Jubilee Park — that's done.",
+       "turnin": "h-servo-jubilee-park-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-wolli-creek-rehan",
+   "name": "Rehan, building manager at Wolli Creek",
+   "x": -4903,
+   "z": 6889,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You have got a face like you can keep your mouth shut.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You are the first person to stop all morning. Water has been coming through the level two ceiling of the Wolli Creek block since the week of the show and the strata report says there is no water. I would have sorted it myself a year ago. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-wolli-creek-0",
+       "denyFlag": "hub:h-strata-wolli-creek-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Not being dramatic about this. The photo did it. It is not the money. It has stopped being the money. Now every owner at Wolli Creek owes $58 and I have to collect it from people who have avoided me for a year. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-wolli-creek-1",
+       "denyFlag": "hub:h-strata-wolli-creek-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "Level Two, Wolli Creek — that's done.",
+       "turnin": "h-strata-wolli-creek-0"
+      },
+      {
+       "text": "The Special Levy, Wolli Creek — that's done.",
+       "turnin": "h-strata-wolli-creek-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-wolli-creek-aleks",
+   "name": "Aleks, owner-occupier at Wolli Creek",
+   "x": -5038,
+   "z": 6594,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Right. Talk while I do this.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I am told you do odd jobs. Somebody who does not live at Wolli Creek has parked in space fourteen every night since the week of the show and the manager will not look at it. I did try the official route, for what that was worth. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-wolli-creek-2",
+       "denyFlag": "hub:h-strata-wolli-creek-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I'll be straight with you. The Wolli Creek AGM is on the week of the show and I would like to arrive with something stronger than a grievance and a printout. I have got a photo on my phone but it is useless. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-wolli-creek-3",
+       "denyFlag": "hub:h-strata-wolli-creek-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "Car Space 14, Wolli Creek — that's done.",
+       "turnin": "h-strata-wolli-creek-2"
+      },
+      {
+       "text": "The Meeting, Wolli Creek — that's done.",
+       "turnin": "h-strata-wolli-creek-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-wolli-creek-ishaan",
+   "name": "Ishaan, the one who does the bins at Wolli Creek",
+   "x": -4846,
+   "z": 6658,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You right there? I am mid-something but go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It has been three weeks. Three units at Wolli Creek have put their bins out on the wrong night since the week of the show and I have taken it personally, which I accept is a choice I made. I am aware how that sounds. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-wolli-creek-4",
+       "denyFlag": "hub:h-strata-wolli-creek-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Nobody else has offered, so. There is a block at Arncliffe with the same builder and the same cracks, and their manager has already been through what Wolli Creek is starting. My wife says I should let it go. My wife is wrong. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-wolli-creek-5",
+       "denyFlag": "hub:h-strata-wolli-creek-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "Bin Night at Wolli Creek — that's done.",
+       "turnin": "h-strata-wolli-creek-4"
+      },
+      {
+       "text": "The Other Block, Wolli Creek — that's done.",
+       "turnin": "h-strata-wolli-creek-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

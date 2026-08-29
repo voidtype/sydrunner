@@ -1,0 +1,663 @@
+{
+ "quests": [
+  {
+   "id": "h-newsagent-cheltenham-0",
+   "act": 3,
+   "title": "Returns at Cheltenham",
+   "blurb": "Someone has to, and it may as well be you. I am sending back 61 papers a day from Cheltenham and paying to have them collected, which is a business model somebody invented on purpose. I have got no proof, which is exactly why I am asking. Say nothing to anyone on the way.",
+   "giver": "hub-cheltenham-sian",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -12247,
+     "z": -12398,
+     "radius": 35,
+     "label": "the returns stack, at its worst"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the distributor needs to see the size of it",
+     "npc": "hub-cheltenham-sian"
+    }
+   ],
+   "reward": {
+    "cash": 126,
+    "xp": 348,
+    "unlock": [
+     "hub:h-newsagent-cheltenham-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-cheltenham-1",
+   "act": 3,
+   "title": "The Better Rate, Cheltenham",
+   "blurb": "You are the first person to stop all morning. They will drop my Cheltenham order if I can show $98 of turnover on the other side of the shop by grand final week. It might be nothing. It has not felt like nothing. Do not make a scene about it.",
+   "giver": "hub-cheltenham-sian",
+   "level": 6,
+   "requires": [
+    "h-newsagent-cheltenham-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 98,
+     "label": "$98, and cards and stationery count"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "sell anything, I am not proud",
+     "npc": "hub-cheltenham-sian"
+    }
+   ],
+   "reward": {
+    "cash": 167,
+    "xp": 446,
+    "unlock": [
+     "hub:h-newsagent-cheltenham-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-cheltenham-2",
+   "act": 3,
+   "title": "The Cheltenham Round",
+   "blurb": "Not being dramatic about this. I do the Cheltenham round from five in the morning and for the last fortnight somebody has been taking the papers off the front steps behind me. I would not ask if there was anyone else about. Ask for me by name at the counter.",
+   "giver": "hub-cheltenham-andreas",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -12416,
+     "z": -12330,
+     "radius": 25,
+     "label": "the end of the round, where it starts"
+    },
+    {
+     "kind": "photo",
+     "x": -12442,
+     "z": -12353,
+     "radius": 35,
+     "label": "whoever is on that street at that hour"
+    }
+   ],
+   "reward": {
+    "cash": 140,
+    "xp": 347,
+    "unlock": [
+     "hub:h-newsagent-cheltenham-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-cheltenham-3",
+   "act": 3,
+   "title": "The Dog on Ash Street, Cheltenham",
+   "blurb": "I am told you do odd jobs. There is a dog on the Cheltenham round that has had two of my bags and a clipboard nobody signs that was not even mine. You can tell me I am imagining it. Tell me after. Come back and tell me straight.",
+   "giver": "hub-cheltenham-andreas",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "you will want your wits about you"
+    },
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "the owner, not the dog, I am not a monster"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me it is sorted",
+     "npc": "hub-cheltenham-andreas"
+    }
+   ],
+   "reward": {
+    "cash": 124,
+    "xp": 370,
+    "unlock": [
+     "hub:h-newsagent-cheltenham-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-cheltenham-4",
+   "act": 3,
+   "title": "The Syndicate, Cheltenham",
+   "blurb": "I'll be straight with you. Nine of us at Cheltenham have gone in on the same numbers since grand final week and one of us has stopped putting money in. I would have sorted it myself a year ago. Do that and we're square.",
+   "giver": "hub-cheltenham-rita",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -12278,
+     "z": -12546,
+     "radius": 25,
+     "label": "the house of the one who stopped"
+    },
+    {
+     "kind": "earn",
+     "dollars": 61,
+     "label": "$61, which is his share since he stopped"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it said out loud, not in the group chat",
+     "npc": "hub-cheltenham-rita"
+    }
+   ],
+   "reward": {
+    "cash": 138,
+    "xp": 362,
+    "unlock": [
+     "hub:h-newsagent-cheltenham-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-cheltenham-5",
+   "act": 3,
+   "title": "The Other Agency, Cheltenham",
+   "blurb": "It has been three weeks. The agency at Beecroft closed six months before Cheltenham started struggling, and I would very much like to know what they know. It is not the money. It has stopped being the money. I will owe you one, and I pay those.",
+   "giver": "hub-cheltenham-rita",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -13338,
+     "z": -12906,
+     "radius": 60,
+     "label": "the shop is shut, the family is not"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever they say, say it slowly to me",
+     "npc": "hub-cheltenham-rita"
+    }
+   ],
+   "reward": {
+    "cash": 129,
+    "xp": 346,
+    "unlock": [
+     "hub:h-newsagent-cheltenham-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-hawkesbury-river-0",
+   "act": 3,
+   "title": "The Unclaimed Falcon, Hawkesbury River",
+   "blurb": "Someone has to, and it may as well be you. There has been a car in the Hawkesbury River yard since the first of the month with a esky of warm cans on the passenger seat and no owner answering. I have got no proof, which is exactly why I am asking. Say nothing to anyone on the way.",
+   "giver": "hub-hawkesbury-river-ivo",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 994,
+     "z": -35576,
+     "radius": 35,
+     "label": "the car and the plate together"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I have to prove I tried before I can move it",
+     "npc": "hub-hawkesbury-river-ivo"
+    }
+   ],
+   "reward": {
+    "cash": 129,
+    "xp": 362,
+    "unlock": [
+     "hub:h-workshop-hawkesbury-river-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-hawkesbury-river-1",
+   "act": 3,
+   "title": "Storage Fees, Hawkesbury River",
+   "blurb": "You are the first person to stop all morning. Now that it is documented, Hawkesbury River is owed $117 in storage and the only person who can pay it is the person not answering. It might be nothing. It has not felt like nothing. Do not make a scene about it.",
+   "giver": "hub-hawkesbury-river-ivo",
+   "level": 6,
+   "requires": [
+    "h-workshop-hawkesbury-river-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 117,
+     "label": "$117, from him or from the scrap"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "either way it comes off my floor",
+     "npc": "hub-hawkesbury-river-ivo"
+    }
+   ],
+   "reward": {
+    "cash": 176,
+    "xp": 447,
+    "unlock": [
+     "hub:h-workshop-hawkesbury-river-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-hawkesbury-river-2",
+   "act": 3,
+   "title": "First Year, Hawkesbury River",
+   "blurb": "Not being dramatic about this. I am in my first year at Hawkesbury River and I have to log 76 hours on a job I am not allowed to touch on my own. I would not ask if there was anyone else about. Ask for me by name at the counter.",
+   "giver": "hub-hawkesbury-river-siobhan",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 887,
+     "z": -35611,
+     "radius": 25,
+     "label": "the supplier, two streets over"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "and get him a coffee, it helps"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "sign the book and I owe you",
+     "npc": "hub-hawkesbury-river-siobhan"
+    }
+   ],
+   "reward": {
+    "cash": 144,
+    "xp": 357,
+    "unlock": [
+     "hub:h-workshop-hawkesbury-river-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-hawkesbury-river-3",
+   "act": 3,
+   "title": "The Air Line, Hawkesbury River",
+   "blurb": "I am told you do odd jobs. Somebody has been coming into the Hawkesbury River yard after the back of seven to use the air line, and last week they used the compressor as well. You can tell me I am imagining it. Tell me after. Come back and tell me straight.",
+   "giver": "hub-hawkesbury-river-siobhan",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "the ones who think the yard is public"
+    },
+    {
+     "kind": "photo",
+     "x": 1016,
+     "z": -35696,
+     "radius": 35,
+     "label": "the gate they are getting through"
+    }
+   ],
+   "reward": {
+    "cash": 135,
+    "xp": 366,
+    "unlock": [
+     "hub:h-workshop-hawkesbury-river-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-hawkesbury-river-4",
+   "act": 3,
+   "title": "My Own Car, Hawkesbury River",
+   "blurb": "I'll be straight with you. My car has been at Hawkesbury River since the first of the month and every time I ring, the quote has grown by about $76. I would have sorted it myself a year ago. Do that and we're square.",
+   "giver": "hub-hawkesbury-river-myfanwy",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 1028,
+     "z": -35702,
+     "radius": 25,
+     "label": "stand in the office where they can see you"
+    },
+    {
+     "kind": "photo",
+     "x": 1038,
+     "z": -35701,
+     "radius": 35,
+     "label": "the job card on the wall, all of it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I know what I am arguing about",
+     "npc": "hub-hawkesbury-river-myfanwy"
+    }
+   ],
+   "reward": {
+    "cash": 137,
+    "xp": 367,
+    "unlock": [
+     "hub:h-workshop-hawkesbury-river-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-hawkesbury-river-5",
+   "act": 3,
+   "title": "The Assessor, Hawkesbury River",
+   "blurb": "It has been three weeks. The insurance assessor who signs off every job at Hawkesbury River works out of Cowan, and he has never once seen the car he is assessing. It is not the money. It has stopped being the money. I will owe you one, and I pay those.",
+   "giver": "hub-hawkesbury-river-myfanwy",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -3878,
+     "z": -30608,
+     "radius": 60,
+     "label": "catch him before he goes out on the road"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear how he does it",
+     "npc": "hub-hawkesbury-river-myfanwy"
+    }
+   ],
+   "reward": {
+    "cash": 138,
+    "xp": 348,
+    "unlock": [
+     "hub:h-workshop-hawkesbury-river-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-arncliffe-0",
+   "act": 3,
+   "title": "Dumped Out the Back, Arncliffe",
+   "blurb": "Someone has to, and it may as well be you. People leave things at the Arncliffe roller door after quarter to six and by morning it is rained on and it is our problem and our tip fee. I have got no proof, which is exactly why I am asking. Say nothing to anyone on the way.",
+   "giver": "hub-arncliffe-van",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -5562,
+     "z": 7686,
+     "radius": 35,
+     "label": "the pile, on a bad morning"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council will not act without one of these",
+     "npc": "hub-arncliffe-van"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 409,
+    "unlock": [
+     "hub:h-opshop-arncliffe-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-arncliffe-1",
+   "act": 3,
+   "title": "The Tip Fee, Arncliffe",
+   "blurb": "You are the first person to stop all morning. The photos worked, which means Arncliffe can claim back the $86 we have paid to throw away other people's furniture since every second Friday. It might be nothing. It has not felt like nothing. Do not make a scene about it.",
+   "giver": "hub-arncliffe-van",
+   "level": 7,
+   "requires": [
+    "h-opshop-arncliffe-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 86,
+     "label": "$86, and every receipt counts"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will do the form if you do the walking",
+     "npc": "hub-arncliffe-van"
+    }
+   ],
+   "reward": {
+    "cash": 181,
+    "xp": 496,
+    "unlock": [
+     "hub:h-opshop-arncliffe-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-arncliffe-2",
+   "act": 3,
+   "title": "The Good Box, Arncliffe",
+   "blurb": "Not being dramatic about this. Something came into Arncliffe on every second Friday in a box of paperbacks that I do not think the family meant to give away. I would not ask if there was anyone else about. Ask for me by name at the counter.",
+   "giver": "hub-arncliffe-wafa",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5726,
+     "z": 7687,
+     "radius": 25,
+     "label": "the address on the donation slip"
+    },
+    {
+     "kind": "photo",
+     "x": -5693,
+     "z": 7745,
+     "radius": 35,
+     "label": "the thing itself, before it goes back"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I would rather give it back than sell it",
+     "npc": "hub-arncliffe-wafa"
+    }
+   ],
+   "reward": {
+    "cash": 151,
+    "xp": 403,
+    "unlock": [
+     "hub:h-opshop-arncliffe-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-arncliffe-3",
+   "act": 3,
+   "title": "Sorting Room, Arncliffe",
+   "blurb": "I am told you do odd jobs. Two people have been coming into the Arncliffe sorting room since every second Friday and taking the good stock before it reaches the floor, and one of them volunteers here. You can tell me I am imagining it. Tell me after. Come back and tell me straight.",
+   "giver": "hub-arncliffe-wafa",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "catch them at the back door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 38,
+     "label": "$38, which is what the good stock made last month"
+    }
+   ],
+   "reward": {
+    "cash": 156,
+    "xp": 406,
+    "unlock": [
+     "hub:h-opshop-arncliffe-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-arncliffe-4",
+   "act": 3,
+   "title": "The Van, Arncliffe",
+   "blurb": "I'll be straight with you. I do the Arncliffe pick-ups in a van with 38 thousand on it and a door that only opens if you know about it. I would have sorted it myself a year ago. Do that and we're square.",
+   "giver": "hub-arncliffe-kwame",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Arncliffe",
+     "to": "Turrella",
+     "label": "come out to Turrella with me, it is a two-person lift"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "we will stop on the way, my shout"
+    }
+   ],
+   "reward": {
+    "cash": 143,
+    "xp": 400,
+    "unlock": [
+     "hub:h-opshop-arncliffe-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-arncliffe-5",
+   "act": 3,
+   "title": "Head Office, Arncliffe",
+   "blurb": "It has been three weeks. Everything Arncliffe cannot sell goes to a warehouse at Turrella, and nobody there has ever answered a phone in my hearing. It is not the money. It has stopped being the money. I will owe you one, and I pay those.",
+   "giver": "hub-arncliffe-kwame",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -6307,
+     "z": 7096,
+     "radius": 60,
+     "label": "turn up in person, that is the trick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me there is a person in there",
+     "npc": "hub-arncliffe-kwame"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 411,
+    "unlock": [
+     "hub:h-opshop-arncliffe-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-bowlo-east-richmond-0",
+   "act": 3,
+   "title": "The Dead Patch at East Richmond",
+   "blurb": "My knees are gone, so. The number three green at East Richmond has had a bald patch the shape of Tasmania since a Tuesday, and the committee thinks I am inventing it. I have rung the number on the letter four times. That's the whole job. No catch.",
+   "giver": "hub-east-richmond-valeria",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -42280,
+     "z": -28729,
+     "radius": 35,
+     "label": "the patch, with something in frame for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring it to me before the meeting",
+     "npc": "hub-east-richmond-valeria"
+    }
+   ],
+   "reward": {
+    "cash": 145,
+    "xp": 409,
+    "unlock": [
+     "hub:h-bowlo-east-richmond-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-east-richmond-1",
+   "act": 3,
+   "title": "Turf Money, East Richmond",
+   "blurb": "This is going to sound small. They have seen the photograph and now they want it re-laid by a Tuesday, which means finding $78 that the East Richmond club does not have. Half the street knows and half the street is pretending not to. Be polite about it. It costs nothing.",
+   "giver": "hub-east-richmond-valeria",
+   "level": 7,
+   "requires": [
+    "h-bowlo-east-richmond-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 78,
+     "label": "$78, however you like, I am not asking"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "put it in my hand, not the safe",
+     "npc": "hub-east-richmond-valeria"
+    }
+   ],
+   "reward": {
+    "cash": 192,
+    "xp": 483,
+    "unlock": [
+     "hub:h-bowlo-east-richmond-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-east-richmond-2",
+   "act": 3,
+   "title": "The East Richmond Membership Count",
+   "blurb": "I have written it down twice and lost it twice. Our books say 41 members at East Richmond and I would bet the bar takings that half of them are dead or moved to Queensland. I am not after trouble. I am after an answer. Take your time. Do not take a week.",
+   "giver": "hub-east-richmond-abbie",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -42395,
+     "z": -28694,
+     "radius": 25,
+     "label": "stand at the side door where the list is kept"
+    },
+    {
+     "kind": "photo",
+     "x": -42424,
+     "z": -28703,
+     "radius": 35,
+     "label": "the board with the names still on it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "read me the ones you did not recognise",
+     "npc": "hub-east-richmond-abbie"
+    }
+   ],
+   "reward": {
+    "cash": 149,
+    "xp": 411,
+    "unlock": [
+     "hub:h-bowlo-east-richmond-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-east-richmond-3",
+   "act": 3,
+   "title": "Closing Time Rumour, East Richmond",
+   "blurb": "Do not laugh. Since first light somebody has been going round the East Richmond greens telling the barefoot bowlers we are shutting, and we are not shutting. Nobody else seems to have noticed, which is its own problem. Come and find me after, either way.",
+   "giver": "hub-east-richmond-abbie",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "whoever is doing the telling"
+    },
+    {
+     "kind": "earn",
+     "dollars": 81,
+     "label": "and take the bar money off them while you are there"
+    }
+   ],
+   "reward": {
+    "cash": 139,
+    "xp": 402,
+    "unlock": [
+     "hub:h-bowlo-east-richmond-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-east-richmond-4",
+   "act": 3,
+   "title": "Behind the Bar at East Richmond",
+   "blurb": "It is the sort of thing you notice or you do not. There is a whiteboard with last March still on it in the chest freezer behind the bar at East Richmond and I am not opening it on an empty stomach. Everyone I have told has looked at me the way you are now. Whatever you find, bring it to me first.",
+   "giver": "hub-east-richmond-vito",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "get one into you first, seriously"
+    },
+    {
+     "kind": "goto",
+     "x": -42353,
+     "z": -28867,
+     "radius": 25,
+     "label": "round the back where the cellar door is"
+    },
+    {
+     "kind": "photo",
+     "x": -42346,
+     "z": -28882,
+     "radius": 35,
+     "label": "whatever is in there, before I lose my nerve"
+    }
+   ],
+   "reward": {
+    "cash": 157,
+    "xp": 405,
+    "unlock": [
+     "hub:h-bowlo-east-richmond-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-east-richmond-5",
+   "act": 3,
+   "title": "The Old Greenkeeper, East Richmond",
+   "blurb": "Two people have already said no. The man who kept these greens before me drinks at Clarendon now, and he owes East Richmond an explanation about the drainage. This is the third time I have had this conversation. That's it. That's the whole ask.",
+   "giver": "hub-east-richmond-vito",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -39630,
+     "z": -28005,
+     "radius": 60,
+     "label": "find him and hear him out"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come back and tell me what he said",
+     "npc": "hub-east-richmond-vito"
+    }
+   ],
+   "reward": {
+    "cash": 151,
+    "xp": 407,
+    "unlock": [
+     "hub:h-bowlo-east-richmond-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-convention-0",
+   "act": 3,
+   "title": "Nights at Convention",
+   "blurb": "My knees are gone, so. Every night around knock-off the same car does three laps of the Convention forecourt and never buys fuel. I have rung the number on the letter four times. That's the whole job. No catch.",
+   "giver": "hub-convention-maud",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -1035,
+     "z": 473,
+     "radius": 35,
+     "label": "the car, plate if you can get it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it on record before I ring anyone",
+     "npc": "hub-convention-maud"
+    }
+   ],
+   "reward": {
+    "cash": 171,
+    "xp": 458,
+    "unlock": [
+     "hub:h-servo-convention-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-convention-1",
+   "act": 3,
+   "title": "The Third Lap, Convention",
+   "blurb": "This is going to sound small. Now I know the plate, I want to know where it goes after it leaves Convention at knock-off, because it is not going home. Half the street knows and half the street is pretending not to. Be polite about it. It costs nothing.",
+   "giver": "hub-convention-maud",
+   "level": 8,
+   "requires": [
+    "h-servo-convention-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Convention",
+     "to": "Pyrmont Bay",
+     "label": "follow it as far as Pyrmont Bay"
+    },
+    {
+     "kind": "photo",
+     "x": -1186,
+     "z": 437,
+     "radius": 35,
+     "label": "wherever it stops"
+    }
+   ],
+   "reward": {
+    "cash": 214,
+    "xp": 545,
+    "unlock": [
+     "hub:h-servo-convention-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-convention-2",
+   "act": 3,
+   "title": "Bay Two, Convention",
+   "blurb": "I have written it down twice and lost it twice. Bay two at the Convention workshop has had the same car in it since the first of the month and the owner has stopped answering. I am not after trouble. I am after an answer. Take your time. Do not take a week.",
+   "giver": "hub-convention-kaito",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1191,
+     "z": 339,
+     "radius": 25,
+     "label": "the address on the job card"
+    },
+    {
+     "kind": "photo",
+     "x": -1192,
+     "z": 326,
+     "radius": 35,
+     "label": "the letterbox, so I know I have the right house"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if anybody actually lives there",
+     "npc": "hub-convention-kaito"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 455,
+    "unlock": [
+     "hub:h-servo-convention-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-convention-3",
+   "act": 3,
+   "title": "Tools Off the Bench, Convention",
+   "blurb": "Do not laugh. Someone has been walking out of Convention with a socket set at a time since the first of the month, and I have run out of ways to be polite about it. Nobody else seems to have noticed, which is its own problem. Come and find me after, either way.",
+   "giver": "hub-convention-kaito",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 3,
+     "label": "the ones hanging round the air hose"
+    },
+    {
+     "kind": "earn",
+     "dollars": 112,
+     "label": "$112 of it back, that is what the set cost"
+    }
+   ],
+   "reward": {
+    "cash": 167,
+    "xp": 457,
+    "unlock": [
+     "hub:h-servo-convention-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-convention-4",
+   "act": 3,
+   "title": "The Convention Price Board",
+   "blurb": "It is the sort of thing you notice or you do not. Head office says the Convention board has been wrong since the first of the month and I say it has been right for eleven years, and one of us is about to be embarrassed. Everyone I have told has looked at me the way you are now. Whatever you find, bring it to me first.",
+   "giver": "hub-convention-priya",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "buy something so it is a real transaction"
+    },
+    {
+     "kind": "photo",
+     "x": -1060,
+     "z": 333,
+     "radius": 35,
+     "label": "the board and the pump, both in the one shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that settles it either way",
+     "npc": "hub-convention-priya"
+    }
+   ],
+   "reward": {
+    "cash": 165,
+    "xp": 454,
+    "unlock": [
+     "hub:h-servo-convention-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-convention-5",
+   "act": 3,
+   "title": "The Other Franchise, Convention",
+   "blurb": "Two people have already said no. The bloke who runs the site at Chinatown has had the same trouble Convention has, and he will talk to you before he talks to me. This is the third time I have had this conversation. That's it. That's the whole ask.",
+   "giver": "hub-convention-priya",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -267,
+     "z": 972,
+     "radius": 60,
+     "label": "find him on shift"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever he says, I want it word for word",
+     "npc": "hub-convention-priya"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 448,
+    "unlock": [
+     "hub:h-servo-convention-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-ngara-0",
+   "act": 3,
+   "title": "Level Two, Ngara",
+   "blurb": "My knees are gone, so. Water has been coming through the level two ceiling of the Ngara block since a wet Monday and the strata report says there is no water. I have rung the number on the letter four times. That's the whole job. No catch.",
+   "giver": "hub-ngara-hina",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -19287,
+     "z": -7049,
+     "radius": 35,
+     "label": "the ceiling, with the stain visible"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that goes in the file whether they like it or not",
+     "npc": "hub-ngara-hina"
+    }
+   ],
+   "reward": {
+    "cash": 174,
+    "xp": 498,
+    "unlock": [
+     "hub:h-strata-ngara-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-ngara-1",
+   "act": 3,
+   "title": "The Special Levy, Ngara",
+   "blurb": "This is going to sound small. The photo did it. Half the street knows and half the street is pretending not to. Now every owner at Ngara owes $132 and I have to collect it from people who have avoided me for a year. Be polite about it. It costs nothing.",
+   "giver": "hub-ngara-hina",
+   "level": 9,
+   "requires": [
+    "h-strata-ngara-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 132,
+     "label": "$132 out of them, in any state"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will not ask how",
+     "npc": "hub-ngara-hina"
+    }
+   ],
+   "reward": {
+    "cash": 211,
+    "xp": 598,
+    "unlock": [
+     "hub:h-strata-ngara-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-ngara-2",
+   "act": 3,
+   "title": "Car Space 14, Ngara",
+   "blurb": "I have written it down twice and lost it twice. Somebody who does not live at Ngara has parked in space fourteen every night since a wet Monday and the manager will not look at it. I am not after trouble. I am after an answer. Take your time. Do not take a week.",
+   "giver": "hub-ngara-eryk",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -19416,
+     "z": -7074,
+     "radius": 25,
+     "label": "down to the basement, the far corner"
+    },
+    {
+     "kind": "photo",
+     "x": -19423,
+     "z": -7081,
+     "radius": 35,
+     "label": "the car in the space with the number painted beside it"
+    }
+   ],
+   "reward": {
+    "cash": 184,
+    "xp": 489,
+    "unlock": [
+     "hub:h-strata-ngara-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-ngara-3",
+   "act": 3,
+   "title": "The Meeting, Ngara",
+   "blurb": "Do not laugh. The Ngara AGM is on a wet Monday and I would like to arrive with something stronger than a grievance and a printout. Nobody else seems to have noticed, which is its own problem. Come and find me after, either way.",
+   "giver": "hub-ngara-eryk",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 2,
+     "label": "two coffees, one is for me"
+    },
+    {
+     "kind": "goto",
+     "x": -19348,
+     "z": -7253,
+     "radius": 25,
+     "label": "the community room where they hold it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "walk in with me, they behave when there is a witness",
+     "npc": "hub-ngara-eryk"
+    }
+   ],
+   "reward": {
+    "cash": 182,
+    "xp": 485,
+    "unlock": [
+     "hub:h-strata-ngara-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-ngara-4",
+   "act": 3,
+   "title": "Bin Night at Ngara",
+   "blurb": "It is the sort of thing you notice or you do not. Three units at Ngara have put their bins out on the wrong night since a wet Monday and I have taken it personally, which I accept is a choice I made. Everyone I have told has looked at me the way you are now. Whatever you find, bring it to me first.",
+   "giver": "hub-ngara-khalil",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "the ones who argue about it"
+    },
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "the fine the council gave me, off them"
+    }
+   ],
+   "reward": {
+    "cash": 181,
+    "xp": 501,
+    "unlock": [
+     "hub:h-strata-ngara-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-ngara-5",
+   "act": 3,
+   "title": "The Other Block, Ngara",
+   "blurb": "Two people have already said no. There is a block at Westmead Hospital with the same builder and the same cracks, and their manager has already been through what Ngara is starting. This is the third time I have had this conversation. That's it. That's the whole ask.",
+   "giver": "hub-ngara-khalil",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -20391,
+     "z": -6609,
+     "radius": 60,
+     "label": "go and ask them how it ended"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I need to know how much worse this gets",
+     "npc": "hub-ngara-khalil"
+    }
+   ],
+   "reward": {
+    "cash": 174,
+    "xp": 496,
+    "unlock": [
+     "hub:h-strata-ngara-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

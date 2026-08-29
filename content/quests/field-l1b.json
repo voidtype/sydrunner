@@ -5,7 +5,7 @@
    "id": "f1-the-dog-quakers-hill",
    "act": 3,
    "title": "The Dog at Quakers Hill",
-   "blurb": "A dog meets the 5:40 at Quakers Hill every weekday and nobody gets off for it. Four months of this. I have decided it is not going to be a sad story. Find out whose it is.",
+   "blurb": "Not being dramatic about this. Sits at the yellow line at Quakers Hill at quarter to six, waits, then walks off on its own. The paperwork says one thing and my eyes say another. Half the platform knows and nobody has done anything, including me, and I am past being reasonable about it. You'll know it when you see it.",
    "giver": "field-quakers-hill-anisa",
    "level": 1,
    "requires": [],
@@ -13,15 +13,22 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -30276,
-     "z": -15085,
+     "x": -30237,
+     "z": -14997,
      "radius": 20,
      "label": "the end of the platform, at twenty to six"
     },
     {
+     "kind": "photo",
+     "x": -30232,
+     "z": -15019,
+     "radius": 25,
+     "label": "the collar, if it has got one"
+    },
+    {
      "kind": "goto",
-     "x": -30309,
-     "z": -14915,
+     "x": -30270,
+     "z": -14827,
      "radius": 25,
      "label": "the street it walks home to"
     },
@@ -33,8 +40,8 @@
     }
    ],
    "reward": {
-    "cash": 57,
-    "xp": 111,
+    "cash": 58,
+    "xp": 121,
     "unlock": [
      "field:f1-the-dog-quakers-hill"
     ]
@@ -47,7 +54,7 @@
    "id": "f1-the-numbers-toongabbie",
    "act": 3,
    "title": "The Book at Toongabbie",
-   "blurb": "I run a small book on things that are not races — weather, delays, whether the just gone midnight out of Toongabbie runs on time. Somebody is beating it by information, not luck. Ride the run they ride.",
+   "blurb": "Nobody else has offered, so. Up four hundred over eleven weeks on the Toongabbie delay market. I would not ask if there was anyone else about. You cannot beat a delay book unless you can see the roster, and they keep sending a different bloke. Think about who can see the roster. That's the whole job. No catch.",
    "giver": "field-toongabbie-annika",
    "level": 1,
    "requires": [],
@@ -68,13 +75,13 @@
     },
     {
      "kind": "earn",
-     "dollars": 25,
-     "label": "$25 back off the book"
+     "dollars": 28,
+     "label": "$28 back off the book"
     }
    ],
    "reward": {
-    "cash": 53,
-    "xp": 115,
+    "cash": 60,
+    "xp": 117,
     "unlock": [
      "field:f1-the-numbers-toongabbie"
     ]
@@ -87,7 +94,7 @@
    "id": "f1-last-service-ourimbah",
    "act": 3,
    "title": "Last Service out of Ourimbah",
-   "blurb": "The last one through Ourimbah carries four people and one of them is always asleep. Ride it to Lisarow, photograph the platform with nobody on it, and come back and tell me the place still exists when there is no one in it.",
+   "blurb": "The council knows and the council does not care. Nothing runs out of Ourimbah after the back of seven. You can tell me I am imagining it. Tell me after. I lock this end and the cleaner who does the whole line locks the other and in between there is a kilometre of lit platform for nobody. Ride the last one to Lisarow and bring me a photograph of that. Be polite about it. It costs nothing.",
    "giver": "field-ourimbah-anton",
    "level": 1,
    "requires": [],
@@ -102,8 +109,8 @@
     },
     {
      "kind": "photo",
-     "x": 14100,
-     "z": -56674,
+     "x": 14145,
+     "z": -56770,
      "radius": 30,
      "label": "the empty platform, lit and pointless"
     },
@@ -115,8 +122,8 @@
     }
    ],
    "reward": {
-    "cash": 54,
-    "xp": 124,
+    "cash": 67,
+    "xp": 128,
     "unlock": [
      "field:f1-last-service-ourimbah"
     ]
@@ -129,7 +136,7 @@
    "id": "f1-opal-ghost-kensington",
    "act": 3,
    "title": "The Kensington Tap-Off",
-   "blurb": "A card ending 56 boards at Kensington on Thursdays and vanishes. Not a fare thing — ninety cents. I want to know *how*, and nobody will put it in writing.",
+   "blurb": "It has been three weeks. A card ending 40 boards at Kensington on the long weekend and vanishes. It might be nothing. It has not felt like nothing. Not a fare thing — ninety cents. I want to know *how*, and nobody upstairs wants to hear it. I would rather know than wonder.",
    "giver": "field-kensington-anwar",
    "level": 1,
    "requires": [],
@@ -144,22 +151,22 @@
     },
     {
      "kind": "goto",
-     "x": 1482,
-     "z": 4616,
+     "x": 1334,
+     "z": 4646,
      "radius": 20,
      "label": "the gap in the fence everyone knows about"
     },
     {
      "kind": "photo",
-     "x": 1482,
-     "z": 4616,
+     "x": 1334,
+     "z": 4646,
      "radius": 25,
      "label": "photograph it before somebody welds it"
     }
    ],
    "reward": {
-    "cash": 64,
-    "xp": 126,
+    "cash": 61,
+    "xp": 131,
     "unlock": [
      "field:f1-opal-ghost-kensington"
     ]
@@ -172,7 +179,7 @@
    "id": "f1-coffee-run-chester-hill",
    "act": 3,
    "title": "The Chester Hill Order",
-   "blurb": "Two hundred coffees out of Chester Hill before quarter to six and I know every one of them by the walk. A kid who should be at school stopped coming three weeks back. Take one over to where they work and find out whether I lost them to the chain up the road.",
+   "blurb": "It has been three weeks. I have made the same order for the same person every morning since I opened at Chester Hill. It might be nothing. It has not felt like nothing. Since the week of the show they have not turned up, and I am past being reasonable about it. Go and knock. I would rather know than wonder.",
    "giver": "field-chester-hill-aoife",
    "level": 1,
    "requires": [],
@@ -180,14 +187,14 @@
    "steps": [
     {
      "kind": "buy",
-     "powerup": "FLAT WHITE",
+     "powerup": "TRAINING",
      "count": 1,
      "label": "order one at the Chester Hill kiosk"
     },
     {
      "kind": "goto",
-     "x": -19158,
-     "z": 1998,
+     "x": -19432,
+     "z": 2173,
      "radius": 25,
      "label": "the office they walk to, or used to"
     },
@@ -198,8 +205,8 @@
     }
    ],
    "reward": {
-    "cash": 52,
-    "xp": 132,
+    "cash": 62,
+    "xp": 119,
     "unlock": [
      "field:f1-coffee-run-chester-hill"
     ]
@@ -212,7 +219,7 @@
    "id": "f1-timetable-lie-leumeah",
    "act": 3,
    "title": "Four Minutes at Leumeah",
-   "blurb": "Nobody upstairs believes me about Leumeah because I have 6 years and no data. Go and stand on that platform on school holidays and get me the data, and it has been like that since the merge.",
+   "blurb": "I have been putting it off since Easter. Nobody upstairs believes me about Leumeah because I have 10 years and no data. I would have sorted it myself a year ago. Go and stand on that platform on a wet Monday and get me the data, and they keep sending a different bloke. Take your time. Do not take a week.",
    "giver": "field-leumeah-apirana",
    "level": 1,
    "requires": [],
@@ -220,15 +227,15 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -34492,
-     "z": 20865,
+     "x": -34635,
+     "z": 20935,
      "radius": 18,
      "label": "stand under the board and wait like everyone else"
     },
     {
      "kind": "photo",
-     "x": -34492,
-     "z": 20865,
+     "x": -34635,
+     "z": 20935,
      "radius": 25,
      "label": "photograph the board saying four minutes"
     },
@@ -247,8 +254,8 @@
     }
    ],
    "reward": {
-    "cash": 57,
-    "xp": 111,
+    "cash": 45,
+    "xp": 131,
     "unlock": [
      "field:f1-timetable-lie-leumeah"
     ]
@@ -261,7 +268,7 @@
    "id": "f1-lost-property-roseville",
    "act": 3,
    "title": "Unclaimed at Roseville",
-   "blurb": "Somebody lost something off the Roseville line on the long weekend and has not come for it, which never happens. Find out why not.",
+   "blurb": "I have been putting it off since Easter. Somebody lost something off the Roseville line on the first of the month and has not come for it, which never happens. I would have sorted it myself a year ago. Find out why not. Take your time. Do not take a week.",
    "giver": "field-roseville-ari",
    "level": 1,
    "requires": [],
@@ -269,26 +276,26 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -3066,
-     "z": -9406,
+     "x": -3159,
+     "z": -9539,
      "radius": 20,
      "label": "the address on the tag"
     },
     {
      "kind": "ko",
-     "npc": "tradie",
+     "npc": "karen",
      "count": 2,
      "label": "the two who got there before you"
     },
     {
      "kind": "earn",
-     "dollars": 26,
-     "label": "$26 — whatever it is, it is worth that to somebody"
+     "dollars": 25,
+     "label": "$25 — whatever it is, it is worth that to somebody"
     }
    ],
    "reward": {
-    "cash": 64,
-    "xp": 121,
+    "cash": 46,
+    "xp": 123,
     "unlock": [
      "field:f1-lost-property-roseville"
     ]
@@ -301,7 +308,7 @@
    "id": "f1-quiet-carriage-seven-hills",
    "act": 3,
    "title": "The Quiet Carriage, Seven Hills",
-   "blurb": "The quiet carriage runs on shame and somebody on the five in the morning out of Seven Hills has stopped feeling it. Ride it, see the crime, and apply the shame manually.",
+   "blurb": "Before you say anything: yes, I know. Speakerphone. It is not the money. It has stopped being the money. A Tuesday, Seven Hills to town, speakerphone. I have made eye contact eleven times and it has achieved nothing. Come and find me after, either way.",
    "giver": "field-seven-hills-ariana",
    "level": 1,
    "requires": [],
@@ -316,21 +323,21 @@
     },
     {
      "kind": "ko",
-     "npc": "eshay",
+     "npc": "police",
      "count": 1,
      "label": "apply the shame manually"
     },
     {
      "kind": "photo",
-     "x": -25297,
-     "z": -10152,
+     "x": -25445,
+     "z": -10112,
      "radius": 30,
      "label": "photograph the sign, for the record"
     }
    ],
    "reward": {
-    "cash": 59,
-    "xp": 119,
+    "cash": 48,
+    "xp": 111,
     "unlock": [
      "field:f1-quiet-carriage-seven-hills"
     ]
@@ -343,7 +350,7 @@
    "id": "f1-the-shortcut-woonona",
    "act": 3,
    "title": "The Woonona Shortcut",
-   "blurb": "Every courier has a route that is not on a map and mine goes through Woonona. They have started locking one end. Go and find out whether it is locked forever or just locked today.",
+   "blurb": "The council knows and the council does not care. Nine minutes between the shortcut at Woonona and the long way, and nine minutes is four drops. You can tell me I am imagining it. Tell me after. Since the long weekend there has been a padlock on it, and nobody upstairs wants to hear it. Be polite about it. It costs nothing.",
    "giver": "field-woonona-arjun",
    "level": 1,
    "requires": [],
@@ -351,27 +358,27 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -26263,
-     "z": 54040,
+     "x": -26066,
+     "z": 53878,
      "radius": 22,
      "label": "the end they lock"
     },
     {
      "kind": "goto",
-     "x": -26386,
-     "z": 53885,
+     "x": -26189,
+     "z": 53723,
      "radius": 25,
      "label": "the long way round, so you understand what it costs"
     },
     {
      "kind": "earn",
-     "dollars": 24,
-     "label": "$24, which is what the long way costs me a week"
+     "dollars": 26,
+     "label": "$26, which is what the long way costs me a week"
     }
    ],
    "reward": {
-    "cash": 51,
-    "xp": 114,
+    "cash": 64,
+    "xp": 119,
     "unlock": [
      "field:f1-the-shortcut-woonona"
     ]
@@ -384,7 +391,7 @@
    "id": "f1-night-works-penshurst",
    "act": 3,
    "title": "Possession at Penshurst",
-   "blurb": "Third time at Penshurst on a Tuesday. Not kids — kids run. This one walks, and I have run out of ways to say it politely. I need it stopped before somebody writes a very long report about me.",
+   "blurb": "Nobody else has offered, so. Third time at Penshurst on every second Friday. I would not ask if there was anyone else about. Not kids — kids run. This one walks, and I am past being reasonable about it. I need it stopped before somebody writes a very long report about me. That's the whole job. No catch.",
    "giver": "field-penshurst-arno",
    "level": 1,
    "requires": [],
@@ -392,28 +399,28 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -11041,
-     "z": 11185,
+     "x": -10851,
+     "z": 10948,
      "radius": 20,
      "label": "where they come through the fence"
     },
     {
      "kind": "ko",
      "npc": "eshay",
-     "count": 1,
+     "count": 3,
      "label": "the ones who think a hard hat is a costume"
     },
     {
      "kind": "photo",
-     "x": -11041,
-     "z": 11185,
+     "x": -10851,
+     "z": 10948,
      "radius": 30,
      "label": "photograph the gap so I can put a number on the form"
     }
    ],
    "reward": {
-    "cash": 62,
-    "xp": 134,
+    "cash": 53,
+    "xp": 132,
     "unlock": [
      "field:f1-night-works-penshurst"
     ]
@@ -426,7 +433,7 @@
    "id": "f1-the-regular-arncliffe",
    "act": 3,
    "title": "The Arncliffe Regular",
-   "blurb": "Same stool since before I bought the place off Arncliffe road. Gone since the week of the show, and they keep sending a different bloke. I would like to know whether to keep the stool.",
+   "blurb": "Two people have already said no. A man drank in my front bar by Arncliffe for 26 years and then stopped, and every regular in here has gone vague on me at once, which means they know. I am aware how that sounds. You are not from here. Go and knock. Whatever it costs you, tell me and I will cover it.",
    "giver": "field-arncliffe-arta",
    "level": 1,
    "requires": [],
@@ -434,8 +441,8 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -5506,
-     "z": 7439,
+     "x": -5623,
+     "z": 7750,
      "radius": 25,
      "label": "the house they say he moved to"
     },
@@ -453,8 +460,8 @@
     }
    ],
    "reward": {
-    "cash": 57,
-    "xp": 112,
+    "cash": 51,
+    "xp": 115,
     "unlock": [
      "field:f1-the-regular-arncliffe"
     ]
@@ -467,7 +474,7 @@
    "id": "f1-car-park-turramurra",
    "act": 3,
    "title": "Bay 14, Turramurra",
-   "blurb": "People have started parking on the grass at Turramurra because of one abandoned car, and nobody will put it in writing. Photograph it, and the date on the ticket, so somebody can be embarrassed by it.",
+   "blurb": "I have written it down twice and lost it twice. Two hundred bays at Turramurra and I have counted two hundred and forty cars in here on a Tuesday. It is not the money. It has stopped being the money. One of them has not moved since March and it has a ticket on it from March. There's cash in it. Not a lot.",
    "giver": "field-turramurra-arun",
    "level": 1,
    "requires": [],
@@ -475,26 +482,26 @@
    "steps": [
     {
      "kind": "photo",
-     "x": -7682,
-     "z": -14940,
+     "x": -7666,
+     "z": -15140,
      "radius": 25,
      "label": "the car, and the ticket, and the date on it"
     },
     {
      "kind": "ko",
-     "npc": "eshay",
+     "npc": "rbt",
      "count": 2,
      "label": "the two arguing over the grass"
     },
     {
      "kind": "earn",
-     "dollars": 30,
-     "label": "$30 in fines nobody is going to collect"
+     "dollars": 22,
+     "label": "$22 in fines nobody is going to collect"
     }
    ],
    "reward": {
-    "cash": 53,
-    "xp": 120,
+    "cash": 49,
+    "xp": 108,
     "unlock": [
      "field:f1-car-park-turramurra"
     ]
@@ -507,7 +514,7 @@
    "id": "f1-the-mural-caringbah",
    "act": 3,
    "title": "Whatever Is Under the Grey at Caringbah",
-   "blurb": "Council pays me to paint over things and last week I painted over something good. There is another one near Caringbah that I am scheduled to kill on grand final week. Photograph it first.",
+   "blurb": "Do not laugh. Council pays me to paint over things and last week I painted over something good. I did try the official route, for what that was worth. There is another one near Caringbah that I am scheduled to kill on every second Friday. Photograph it first. You'll know it when you see it.",
    "giver": "field-caringbah-asha",
    "level": 1,
    "requires": [],
@@ -515,15 +522,15 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -7752,
-     "z": 19336,
+     "x": -7703,
+     "z": 19264,
      "radius": 25,
      "label": "the wall, before they get to it"
     },
     {
      "kind": "photo",
-     "x": -7752,
-     "z": 19336,
+     "x": -7703,
+     "z": 19264,
      "radius": 30,
      "label": "photograph it properly, not a phone-in-a-hurry job"
     },
@@ -535,8 +542,8 @@
     }
    ],
    "reward": {
-    "cash": 47,
-    "xp": 111,
+    "cash": 62,
+    "xp": 128,
     "unlock": [
      "field:f1-the-mural-caringbah"
     ]
@@ -549,7 +556,7 @@
    "id": "f1-the-hill-menangle",
    "act": 3,
    "title": "The Hill Above Menangle",
-   "blurb": "There is a bench on the hill above Menangle I have watched from a moving bus about fourteen thousand times. I am not going to stop — that is not the kind of person I turned out to be. So you go, at two in the afternoon, when the light is worth it.",
+   "blurb": "I have written it down twice and lost it twice. I drive past the same view above Menangle eleven times a shift and I have never once stopped at it. It is not the money. It has stopped being the money. You have got legs and no timetable. Go up and photograph what I have been driving past for 14 years. There's cash in it. Not a lot.",
    "giver": "field-menangle-ashwin",
    "level": 1,
    "requires": [],
@@ -557,27 +564,27 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -42172,
-     "z": 29335,
+     "x": -42345,
+     "z": 29111,
      "radius": 30,
      "label": "up the hill, the way the road does not go"
     },
     {
      "kind": "photo",
-     "x": -42172,
-     "z": 29335,
+     "x": -42345,
+     "z": 29111,
      "radius": 40,
      "label": "the view I have never stopped for"
     },
     {
      "kind": "earn",
-     "dollars": 30,
-     "label": "$30, because I am paying you for it"
+     "dollars": 29,
+     "label": "$29, because I am paying you for it"
     }
    ],
    "reward": {
-    "cash": 55,
-    "xp": 132,
+    "cash": 53,
+    "xp": 122,
     "unlock": [
      "field:f1-the-hill-menangle"
     ]
@@ -590,7 +597,7 @@
    "id": "f1-the-fine-st-marys",
    "act": 3,
    "title": "Contesting It at St Marys",
-   "blurb": "Done at St Marys on Thursdays for something that is only an offence if a sign says so, and it has been like that since the merge. How do you photograph a thing not being somewhere? That is your problem now.",
+   "blurb": "I have written it down twice and lost it twice. Two hundred and eighty-five dollars at St Marys for a thing the sign did not say, because the sign is not there. It is not the money. It has stopped being the money. The form wants evidence. Go and photograph the absence. There's cash in it. Not a lot.",
    "giver": "field-st-marys-asma",
    "level": 1,
    "requires": [],
@@ -598,28 +605,28 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -40484,
-     "z": -10986,
+     "x": -40521,
+     "z": -11160,
      "radius": 20,
      "label": "where the sign is supposed to be"
     },
     {
      "kind": "photo",
-     "x": -40484,
-     "z": -10986,
+     "x": -40521,
+     "z": -11160,
      "radius": 25,
      "label": "photograph the absence, which is harder than it sounds"
     },
     {
      "kind": "ko",
-     "npc": "eshay",
+     "npc": "drunk",
      "count": 1,
      "label": "the one who tells you photography is not allowed here"
     }
    ],
    "reward": {
-    "cash": 55,
-    "xp": 130,
+    "cash": 45,
+    "xp": 127,
     "unlock": [
      "field:f1-the-fine-st-marys"
     ]
@@ -632,7 +639,7 @@
    "id": "f1-the-garden-petersham",
    "act": 3,
    "title": "The Strip Outside Petersham",
-   "blurb": "Nobody planted the strip at Petersham. I did, on a wet Monday, at the back of seven, so nobody would ask. I would like the fifteenth to go badly for council.",
+   "blurb": "It is the sort of thing you notice or you do not. A metre of dirt between the fence and the footpath at Petersham, dead for 22 years and not dead now. I have got a photo on my phone but it is useless. Council mows on the fifteenth and does not know what is in it. Stand near it and stop the man with the whipper snipper. Half now if you want it. Most people don't.",
    "giver": "field-petersham-astrid",
    "level": 1,
    "requires": [],
@@ -640,8 +647,8 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -4782,
-     "z": 2942,
+     "x": -4891,
+     "z": 3050,
      "radius": 18,
      "label": "the strip, which is a garden now"
     },
@@ -653,15 +660,15 @@
     },
     {
      "kind": "photo",
-     "x": -4782,
-     "z": 2942,
+     "x": -4891,
+     "z": 3050,
      "radius": 25,
      "label": "photograph it while it still exists"
     }
    ],
    "reward": {
-    "cash": 53,
-    "xp": 121,
+    "cash": 66,
+    "xp": 116,
     "unlock": [
      "field:f1-the-garden-petersham"
     ]
@@ -674,7 +681,7 @@
    "id": "f1-the-shift-holsworthy",
    "act": 3,
    "title": "Night Fill, Holsworthy",
-   "blurb": "Started on a wet Monday. In off the Holsworthy late train, gone before the first delivery, every time, and I am past being reasonable about it. Come in on the late one and watch the loading door.",
+   "blurb": "Do not laugh. Ten to six, nobody in the building but us and a radio that gets one station. I did try the official route, for what that was worth. Somebody has been taking things and they know our roster, which means they come in off the late train at Holsworthy. You'll know it when you see it.",
    "giver": "field-holsworthy-atticus",
    "level": 1,
    "requires": [],
@@ -689,26 +696,26 @@
     },
     {
      "kind": "goto",
-     "x": -23239,
-     "z": 10939,
+     "x": -23217,
+     "z": 10763,
      "radius": 20,
      "label": "the loading door nobody watches"
     },
     {
      "kind": "ko",
-     "npc": "rbt",
+     "npc": "eshay",
      "count": 2,
      "label": "whoever is standing in it at two in the morning"
     },
     {
      "kind": "earn",
-     "dollars": 33,
-     "label": "$33 of what they took, back"
+     "dollars": 21,
+     "label": "$21 of what they took, back"
     }
    ],
    "reward": {
-    "cash": 68,
-    "xp": 132,
+    "cash": 51,
+    "xp": 107,
     "unlock": [
      "field:f1-the-shift-holsworthy"
     ]
@@ -721,7 +728,7 @@
    "id": "f1-the-window-doonside",
    "act": 3,
    "title": "The Window Above Doonside",
-   "blurb": "6 years above Doonside. I do not hear the trains any more, which means I hear it instantly when one of them is wrong. Since every second Friday the joins sound different.",
+   "blurb": "It is the sort of thing you notice or you do not. I live above the platform at Doonside and I know this line by sound. I have got a photo on my phone but it is useless. Something in the rhythm changed about a month ago and everyone I tell thinks I am mad. Ride it and tell me whether I am mad. Half now if you want it. Most people don't.",
    "giver": "field-doonside-aurelio",
    "level": 1,
    "requires": [],
@@ -736,8 +743,8 @@
     },
     {
      "kind": "photo",
-     "x": -31850,
-     "z": -10823,
+     "x": -31812,
+     "z": -10813,
      "radius": 25,
      "label": "photograph the stretch that sounds wrong"
     },
@@ -749,8 +756,8 @@
     }
    ],
    "reward": {
-    "cash": 50,
-    "xp": 105,
+    "cash": 60,
+    "xp": 117,
     "unlock": [
      "field:f1-the-window-doonside"
     ]
@@ -763,7 +770,7 @@
    "id": "f1-the-market-scarborough",
    "act": 3,
    "title": "Setting Up at Scarborough",
-   "blurb": "25 years in the Scarborough market. The bays are not allocated, they are *known*, and since Thursdays somebody has decided that knowing does not count, and I have stopped filling in the form.",
+   "blurb": "It is the sort of thing you notice or you do not. Five in the morning at Scarborough, in the dark, unloading a van by feel. I have got a photo on my phone but it is useless. The bloke in the next bay has started arriving at four to take half my frontage. I need a witness and I need them at four. Half now if you want it. Most people don't.",
    "giver": "field-scarborough-ava",
    "level": 1,
    "requires": [],
@@ -771,14 +778,14 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -21581,
-     "z": 44326,
+     "x": -21759,
+     "z": 44338,
      "radius": 22,
      "label": "the bays, at the hour it happens"
     },
     {
      "kind": "ko",
-     "npc": "police",
+     "npc": "drunk",
      "count": 1,
      "label": "the bloke with the extra trestle"
     },
@@ -790,13 +797,13 @@
     },
     {
      "kind": "earn",
-     "dollars": 25,
-     "label": "$25 of frontage, recovered"
+     "dollars": 34,
+     "label": "$34 of frontage, recovered"
     }
    ],
    "reward": {
-    "cash": 66,
-    "xp": 124,
+    "cash": 57,
+    "xp": 115,
     "unlock": [
      "field:f1-the-market-scarborough"
     ]
@@ -809,7 +816,7 @@
    "id": "f1-the-clock-helensburgh",
    "act": 3,
    "title": "The Clock at Helensburgh",
-   "blurb": "Somebody set the Helensburgh clock that way on purpose and everyone who knows why is nearly gone. The old crew drink near Otford on Thursdays. Go and ask, and I am the only one who seems to have noticed.",
+   "blurb": "Do not laugh. The clock on the Helensburgh platform has been four minutes fast since I got here and every relief who comes through wants to fix it. I did try the official route, for what that was worth. Do not fix it. Find out who set it that way, before they retire. You'll know it when you see it.",
    "giver": "field-helensburgh-avi",
    "level": 1,
    "requires": [],
@@ -817,8 +824,8 @@
    "steps": [
     {
      "kind": "photo",
-     "x": -19295,
-     "z": 34639,
+     "x": -19078,
+     "z": 34467,
      "radius": 20,
      "label": "the clock, four minutes fast, for the file"
     },
@@ -837,8 +844,8 @@
     }
    ],
    "reward": {
-    "cash": 61,
-    "xp": 120,
+    "cash": 45,
+    "xp": 107,
     "unlock": [
      "field:f1-the-clock-helensburgh"
     ]
@@ -851,7 +858,7 @@
    "id": "f1-the-dog-lapstone",
    "act": 3,
    "title": "The Dog at Lapstone",
-   "blurb": "A dog meets the 5:40 at Lapstone every weekday and nobody gets off for it. Four months of this. I have decided it is not going to be a sad story. Find out whose it is.",
+   "blurb": "This is going to sound small. A dog meets the 5:40 at Lapstone every weekday and nobody gets off for it. I would have sorted it myself a year ago. Four months of this. I have decided it is not going to be a sad story. Find out whose it is. Do not let them talk you into anything.",
    "giver": "field-lapstone-ayaan",
    "level": 1,
    "requires": [],
@@ -859,15 +866,22 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -52512,
-     "z": -9482,
+     "x": -52564,
+     "z": -9479,
      "radius": 20,
      "label": "the end of the platform, at twenty to six"
     },
     {
+     "kind": "photo",
+     "x": -52559,
+     "z": -9501,
+     "radius": 25,
+     "label": "the collar, if it has got one"
+    },
+    {
      "kind": "goto",
-     "x": -52545,
-     "z": -9312,
+     "x": -52597,
+     "z": -9309,
      "radius": 25,
      "label": "the street it walks home to"
     },
@@ -879,8 +893,8 @@
     }
    ],
    "reward": {
-    "cash": 54,
-    "xp": 125,
+    "cash": 46,
+    "xp": 133,
     "unlock": [
      "field:f1-the-dog-lapstone"
     ]
@@ -893,7 +907,7 @@
    "id": "f1-the-numbers-waitara",
    "act": 3,
    "title": "The Book at Waitara",
-   "blurb": "I run a small book on things that are not races — weather, delays, whether the the back of seven out of Waitara runs on time. Somebody is beating it by information, not luck. Ride the run they ride.",
+   "blurb": "Two people have already said no. I run a small book on things that are not races — weather, delays, whether the the second express out of Waitara runs on time. I am aware how that sounds. Somebody is beating it by information, not luck. Ride the run they ride. Whatever it costs you, tell me and I will cover it.",
    "giver": "field-waitara-ayla",
    "level": 1,
    "requires": [],
@@ -908,19 +922,19 @@
     },
     {
      "kind": "ko",
-     "npc": "drunk",
+     "npc": "police",
      "count": 2,
      "label": "the two who follow you off it"
     },
     {
      "kind": "earn",
-     "dollars": 30,
-     "label": "$30 back off the book"
+     "dollars": 28,
+     "label": "$28 back off the book"
     }
    ],
    "reward": {
-    "cash": 66,
-    "xp": 129,
+    "cash": 60,
+    "xp": 124,
     "unlock": [
      "field:f1-the-numbers-waitara"
     ]
@@ -933,7 +947,7 @@
    "id": "f1-last-service-bardwell-park",
    "act": 3,
    "title": "Last Service out of Bardwell Park",
-   "blurb": "Nothing runs out of Bardwell Park after quarter to six. I lock this end and the woman who runs the newsagent locks the other and in between there is a kilometre of lit platform for nobody. Ride the last one to Bexley North and bring me a photograph of that.",
+   "blurb": "Someone has to, and it may as well be you. The last one through Bardwell Park carries four people and one of them is always asleep. My wife says I should let it go. My wife is wrong. Ride it to Bexley North, photograph the platform with nobody on it, and come back and tell me the place still exists when there is no one in it. I would rather know than wonder.",
    "giver": "field-bardwell-park-azim",
    "level": 1,
    "requires": [],
@@ -948,8 +962,8 @@
     },
     {
      "kind": "photo",
-     "x": -7677,
-     "z": 7068,
+     "x": -7547,
+     "z": 7127,
      "radius": 30,
      "label": "the empty platform, lit and pointless"
     },
@@ -961,8 +975,8 @@
     }
    ],
    "reward": {
-    "cash": 60,
-    "xp": 128,
+    "cash": 57,
+    "xp": 121,
     "unlock": [
      "field:f1-last-service-bardwell-park"
     ]
@@ -975,7 +989,7 @@
    "id": "f1-opal-ghost-ingleburn",
    "act": 3,
    "title": "The Ingleburn Tap-Off",
-   "blurb": "Somebody taps on at Ingleburn at the back of seven and never taps off. Same card, 20 months running. Ride the run they ride and find where a person gets off this network without a gate seeing them.",
+   "blurb": "It is the sort of thing you notice or you do not. Somebody taps on at Ingleburn at the back of seven and never taps off. I have got a photo on my phone but it is useless. Same card, 17 months running. Ride the run they ride and find where a person gets off this network without a gate seeing them. Half now if you want it. Most people don't.",
    "giver": "field-ingleburn-bao",
    "level": 1,
    "requires": [],
@@ -990,22 +1004,22 @@
     },
     {
      "kind": "goto",
-     "x": -31576,
-     "z": 14722,
+     "x": -31545,
+     "z": 14867,
      "radius": 20,
      "label": "the gap in the fence everyone knows about"
     },
     {
      "kind": "photo",
-     "x": -31576,
-     "z": 14722,
+     "x": -31545,
+     "z": 14867,
      "radius": 25,
      "label": "photograph it before somebody welds it"
     }
    ],
    "reward": {
-    "cash": 58,
-    "xp": 131,
+    "cash": 53,
+    "xp": 134,
     "unlock": [
      "field:f1-opal-ghost-ingleburn"
     ]
@@ -1018,7 +1032,7 @@
    "id": "f1-coffee-run-rosehill-gardens",
    "act": 3,
    "title": "The Rosehill Gardens Order",
-   "blurb": "I have made the same order for the same person every morning since I opened at Rosehill Gardens. Since grand final week they have not turned up, and I have run out of ways to say it politely. Go and knock.",
+   "blurb": "It is the sort of thing you notice or you do not. Two hundred coffees out of Rosehill Gardens before five in the morning and I know every one of them by the walk. I have got a photo on my phone but it is useless. The cleaner who does the whole line stopped coming three weeks back. Take one over to where they work and find out whether I lost them to the chain up the road. Half now if you want it. Most people don't.",
    "giver": "field-rosehill-gardens-barnaby",
    "level": 1,
    "requires": [],
@@ -1026,14 +1040,14 @@
    "steps": [
     {
      "kind": "buy",
-     "powerup": "FLAT WHITE",
+     "powerup": "TRAINING",
      "count": 1,
      "label": "order one at the Rosehill Gardens kiosk"
     },
     {
      "kind": "goto",
-     "x": -17061,
-     "z": -5352,
+     "x": -17070,
+     "z": -5361,
      "radius": 25,
      "label": "the office they walk to, or used to"
     },
@@ -1044,8 +1058,8 @@
     }
    ],
    "reward": {
-    "cash": 51,
-    "xp": 114,
+    "cash": 60,
+    "xp": 108,
     "unlock": [
      "field:f1-coffee-run-rosehill-gardens"
     ]
@@ -1058,7 +1072,7 @@
    "id": "f1-timetable-lie-asquith",
    "act": 3,
    "title": "Four Minutes at Asquith",
-   "blurb": "The board at Asquith says four minutes. It has said four minutes since before the merge and it is a lie about a third of the time. Stand under it, time it, and bring me numbers instead of feelings.",
+   "blurb": "You are the first person to stop all morning. The board at Asquith says four minutes. I have rung the number on the letter four times. It has said four minutes since before the merge and it is a lie about a third of the time. Stand under it, time it, and bring me numbers instead of feelings. That's the whole job. No catch.",
    "giver": "field-asquith-basim",
    "level": 1,
    "requires": [],
@@ -1066,15 +1080,15 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -9722,
-     "z": -19624,
+     "x": -9621,
+     "z": -19684,
      "radius": 18,
      "label": "stand under the board and wait like everyone else"
     },
     {
      "kind": "photo",
-     "x": -9722,
-     "z": -19624,
+     "x": -9621,
+     "z": -19684,
      "radius": 25,
      "label": "photograph the board saying four minutes"
     },
@@ -1093,8 +1107,8 @@
     }
    ],
    "reward": {
-    "cash": 62,
-    "xp": 106,
+    "cash": 67,
+    "xp": 128,
     "unlock": [
      "field:f1-timetable-lie-asquith"
     ]
@@ -1107,7 +1121,7 @@
    "id": "f1-lost-property-granville",
    "act": 3,
    "title": "Unclaimed at Granville",
-   "blurb": "Everything anyone leaves on the Granville line ends up in a room and the room is full. Nine hundred umbrellas and one a tallboy of something warm with a name on it and a number that rings out. Go to the address on the tag.",
+   "blurb": "You are the first person to stop all morning. Everything anyone leaves on the Granville line ends up in a room and the room is full. I have rung the number on the letter four times. Nine hundred umbrellas and one a milk crate with a name on it and a number that rings out. Go to the address on the tag. That's the whole job. No catch.",
    "giver": "field-granville-beatrix",
    "level": 1,
    "requires": [],
@@ -1115,26 +1129,26 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -18474,
-     "z": -3623,
+     "x": -18393,
+     "z": -3820,
      "radius": 20,
      "label": "the address on the tag"
     },
     {
      "kind": "ko",
-     "npc": "rbt",
+     "npc": "drunk",
      "count": 2,
      "label": "the two who got there before you"
     },
     {
      "kind": "earn",
-     "dollars": 29,
-     "label": "$29 — whatever it is, it is worth that to somebody"
+     "dollars": 27,
+     "label": "$27 — whatever it is, it is worth that to somebody"
     }
    ],
    "reward": {
-    "cash": 51,
-    "xp": 104,
+    "cash": 47,
+    "xp": 116,
     "unlock": [
      "field:f1-lost-property-granville"
     ]
@@ -1147,7 +1161,7 @@
    "id": "f1-quiet-carriage-pymble",
    "act": 3,
    "title": "The Quiet Carriage, Pymble",
-   "blurb": "Speakerphone. The first of the month, Pymble to town, speakerphone. I have made eye contact eleven times and it has achieved nothing.",
+   "blurb": "Not being dramatic about this. The quiet carriage runs on shame and somebody on the ten past five out of Pymble has stopped feeling it. Half the street knows and half the street is pretending not to. Ride it, see the crime, and apply the shame manually. Be polite about it. It costs nothing.",
    "giver": "field-pymble-bede",
    "level": 1,
    "requires": [],
@@ -1162,21 +1176,21 @@
     },
     {
      "kind": "ko",
-     "npc": "tradie",
+     "npc": "rbt",
      "count": 1,
      "label": "apply the shame manually"
     },
     {
      "kind": "photo",
-     "x": -6279,
-     "z": -13776,
+     "x": -6506,
+     "z": -13789,
      "radius": 30,
      "label": "photograph the sign, for the record"
     }
    ],
    "reward": {
-    "cash": 64,
-    "xp": 114,
+    "cash": 50,
+    "xp": 117,
     "unlock": [
      "field:f1-quiet-carriage-pymble"
     ]
@@ -1189,7 +1203,7 @@
    "id": "f1-the-shortcut-dulwich-grove",
    "act": 3,
    "title": "The Dulwich Grove Shortcut",
-   "blurb": "Every courier has a route that is not on a map and mine goes through Dulwich Grove. They have started locking one end. Go and find out whether it is locked forever or just locked today.",
+   "blurb": "Someone has to, and it may as well be you. Every courier has a route that is not on a map and mine goes through Dulwich Grove. My wife says I should let it go. My wife is wrong. They have started locking one end. Go and find out whether it is locked forever or just locked today. I would rather know than wonder.",
    "giver": "field-dulwich-grove-belinda",
    "level": 1,
    "requires": [],
@@ -1197,27 +1211,27 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -6371,
-     "z": 4096,
+     "x": -6449,
+     "z": 4151,
      "radius": 22,
      "label": "the end they lock"
     },
     {
      "kind": "goto",
-     "x": -6494,
-     "z": 3941,
+     "x": -6572,
+     "z": 3996,
      "radius": 25,
      "label": "the long way round, so you understand what it costs"
     },
     {
      "kind": "earn",
-     "dollars": 30,
-     "label": "$30, which is what the long way costs me a week"
+     "dollars": 31,
+     "label": "$31, which is what the long way costs me a week"
     }
    ],
    "reward": {
-    "cash": 51,
-    "xp": 124,
+    "cash": 67,
+    "xp": 118,
     "unlock": [
      "field:f1-the-shortcut-dulwich-grove"
     ]
@@ -1230,7 +1244,7 @@
    "id": "f1-night-works-gadigal",
    "act": 3,
    "title": "Possession at Gadigal",
-   "blurb": "Third time at Gadigal on a wet Monday. Not kids — kids run. This one walks, and nobody will put it in writing. I need it stopped before somebody writes a very long report about me.",
+   "blurb": "Two people have already said no. We own the track between midnight and four and in that window we are the only people in this city doing anything real. I am aware how that sounds. Somebody keeps walking through my possession at Gadigal. Find them before a grinder does. Whatever it costs you, tell me and I will cover it.",
    "giver": "field-gadigal-benedetta",
    "level": 1,
    "requires": [],
@@ -1238,28 +1252,28 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -133,
-     "z": 414,
+     "x": -23,
+     "z": 554,
      "radius": 20,
      "label": "where they come through the fence"
     },
     {
      "kind": "ko",
-     "npc": "eshay",
-     "count": 1,
+     "npc": "drunk",
+     "count": 2,
      "label": "the ones who think a hard hat is a costume"
     },
     {
      "kind": "photo",
-     "x": -133,
-     "z": 414,
+     "x": -23,
+     "z": 554,
      "radius": 30,
      "label": "photograph the gap so I can put a number on the form"
     }
    ],
    "reward": {
-    "cash": 65,
-    "xp": 114,
+    "cash": 67,
+    "xp": 132,
     "unlock": [
      "field:f1-night-works-gadigal"
     ]

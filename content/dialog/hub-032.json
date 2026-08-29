@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-yennora-lien",
+   "name": "Lien, baker at Yennora",
+   "x": -21999,
+   "z": 94,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Right. Talk while I do this.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You are the first person to stop all morning. I start at two in the afternoon and for a month the Yennora back lane has had somebody in it who is not waiting for bread. I would have sorted it myself a year ago. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-yennora-0",
+       "denyFlag": "hub:h-bakery-yennora-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Not being dramatic about this. A light on that lane costs Yennora $71 and the landlord has said no twice, so we are doing it ourselves. It is not the money. It has stopped being the money. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-yennora-1",
+       "denyFlag": "hub:h-bakery-yennora-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "two in the afternoon at Yennora — that's done.",
+       "turnin": "h-bakery-yennora-0"
+      },
+      {
+       "text": "The Lane Light, Yennora — that's done.",
+       "turnin": "h-bakery-yennora-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-yennora-suha",
+   "name": "Suha, night delivery at Yennora",
+   "x": -22169,
+   "z": -113,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You right there? I am mid-something but go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I am told you do odd jobs. The flour for Yennora comes off a truck at two in the afternoon and last Thursdays the truck came and the flour did not. I did try the official route, for what that was worth. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-yennora-2",
+       "denyFlag": "hub:h-bakery-yennora-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I'll be straight with you. The Yennora loading zone has had a car in it at two in the afternoon every morning this week and the driver waits in it, which makes it worse. I have got a photo on my phone but it is useless. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-yennora-3",
+       "denyFlag": "hub:h-bakery-yennora-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Flour Run, Yennora — that's done.",
+       "turnin": "h-bakery-yennora-2"
+      },
+      {
+       "text": "The Loading Zone, Yennora — that's done.",
+       "turnin": "h-bakery-yennora-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-yennora-suleiman",
+   "name": "Suleiman, front of house at Yennora",
+   "x": -22033,
+   "z": -251,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are here about the sign, the sign is wrong.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It has been three weeks. Somebody two doors down from Yennora put up a sign on Thursdays that says the same six words as ours, in the same order. I am aware how that sounds. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-yennora-4",
+       "denyFlag": "hub:h-bakery-yennora-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Nobody else has offered, so. This business was at Fairfield before it was at Yennora, and there is a woman there who still has the original book. My wife says I should let it go. My wife is wrong. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-yennora-5",
+       "denyFlag": "hub:h-bakery-yennora-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "The Sourdough Sign, Yennora — that's done.",
+       "turnin": "h-bakery-yennora-4"
+      },
+      {
+       "text": "The Old Site, Yennora — that's done.",
+       "turnin": "h-bakery-yennora-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-engadine-talia",
+   "name": "Talia, lifeguard at Engadine",
+   "x": -17419,
+   "z": 22539,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand in the doorway, mate, come round.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You are the first person to stop all morning. Council has been saying the Engadine pool is at end of life since the first of the month and the crack they keep pointing at is not in the shell. I would have sorted it myself a year ago. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-engadine-0",
+       "denyFlag": "hub:h-pool-engadine-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Not being dramatic about this. We are running a stall for Engadine on the first of the month and a stall needs $109 of gear that nobody has volunteered to pay for. It is not the money. It has stopped being the money. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-engadine-1",
+       "denyFlag": "hub:h-pool-engadine-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "The Engadine Pool — that's done.",
+       "turnin": "h-pool-engadine-0"
+      },
+      {
+       "text": "The Petition Stall, Engadine — that's done.",
+       "turnin": "h-pool-engadine-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-engadine-mahi",
+   "name": "Mahi, swim coach at Engadine",
+   "x": -17549,
+   "z": 22562,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Long day. Say what you came to say.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I am told you do odd jobs. I coach 51 kids at Engadine at the back of seven and three of them have stopped coming without anybody ringing me. I did try the official route, for what that was worth. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-engadine-2",
+       "denyFlag": "hub:h-pool-engadine-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I'll be straight with you. A group has been coming over the Engadine fence after close and swimming in the dark, which is how Engadine loses its pool. I have got a photo on my phone but it is useless. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-engadine-3",
+       "denyFlag": "hub:h-pool-engadine-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "Squad, Engadine — that's done.",
+       "turnin": "h-pool-engadine-2"
+      },
+      {
+       "text": "The Deep End, Engadine — that's done.",
+       "turnin": "h-pool-engadine-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-engadine-alessia",
+   "name": "Alessia, kiosk operator at Engadine",
+   "x": -17744,
+   "z": 22501,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I know that look. Everyone wants something today.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It has been three weeks. The kiosk at Engadine has a milk crate in it and a freezer that has been running warm since the first of the month. I am aware how that sounds. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-engadine-4",
+       "denyFlag": "hub:h-pool-engadine-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Nobody else has offered, so. They want everyone from Engadine to drive to the new centre at Heathcote, so somebody should go and see whether it is any good. My wife says I should let it go. My wife is wrong. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-engadine-5",
+       "denyFlag": "hub:h-pool-engadine-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "The Kiosk Freezer, Engadine — that's done.",
+       "turnin": "h-pool-engadine-4"
+      },
+      {
+       "text": "The Aquatic Centre, Engadine — that's done.",
+       "turnin": "h-pool-engadine-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-north-strathfield-hedda",
+   "name": "Hedda, taxi driver at North Strathfield",
+   "x": -11089.4,
+   "z": -1031.5,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Give me a second. Right. Go.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You are the first person to stop all morning. The rank outside North Strathfield used to hold nine cars and since Thursdays it holds four, and nobody will say who moved the line. I would have sorted it myself a year ago. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-north-strathfield-0",
+       "denyFlag": "hub:h-rank-north-strathfield-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Not being dramatic about this. Since the rank at North Strathfield shrank I am $72 a week down, and the association wants that number from somebody who can prove it. It is not the money. It has stopped being the money. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-north-strathfield-1",
+       "denyFlag": "hub:h-rank-north-strathfield-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "The North Strathfield Rank — that's done.",
+       "turnin": "h-rank-north-strathfield-0"
+      },
+      {
+       "text": "Lost Fares, North Strathfield — that's done.",
+       "turnin": "h-rank-north-strathfield-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-north-strathfield-dalia",
+   "name": "Dalia, rank marshal at North Strathfield",
+   "x": -11135,
+   "z": -774,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are not from around the corner, are you.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I am told you do odd jobs. Cars that have never sat in the North Strathfield queue turn up at ten past five and take the front of it, and the drivers who waited say nothing. I did try the official route, for what that was worth. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-north-strathfield-2",
+       "denyFlag": "hub:h-rank-north-strathfield-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I'll be straight with you. When the last train into North Strathfield is late, 45 people come out at once and I have to have cars there before they do. I have got a photo on my phone but it is useless. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-north-strathfield-3",
+       "denyFlag": "hub:h-rank-north-strathfield-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "Queue Jumpers, North Strathfield — that's done.",
+       "turnin": "h-rank-north-strathfield-2"
+      },
+      {
+       "text": "The Late Train, North Strathfield — that's done.",
+       "turnin": "h-rank-north-strathfield-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-north-strathfield-elodie",
+   "name": "Elodie, hotel doorman at North Strathfield",
+   "x": -11387,
+   "z": -810,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Half of this suburb has walked past already. Not one stopped.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It has been three weeks. I have stood on this door near North Strathfield for 45 years and since Thursdays somebody has been sending my guests to a different rank. I am aware how that sounds. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-north-strathfield-4",
+       "denyFlag": "hub:h-rank-north-strathfield-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Nobody else has offered, so. The plates working the North Strathfield rank are dispatched from a depot at Concord West, and the man who runs it has never met a driver he liked. My wife says I should let it go. My wife is wrong. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-north-strathfield-5",
+       "denyFlag": "hub:h-rank-north-strathfield-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "The Door, North Strathfield — that's done.",
+       "turnin": "h-rank-north-strathfield-4"
+      },
+      {
+       "text": "The Depot, North Strathfield — that's done.",
+       "turnin": "h-rank-north-strathfield-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

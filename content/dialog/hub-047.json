@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-douglas-park-jeong",
+   "name": "Jeong, newsagent at Douglas Park",
+   "x": -45262,
+   "z": 35825,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Been here since before it was like this. Go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Do not laugh. I am sending back 49 papers a day from Douglas Park and paying to have them collected, which is a business model somebody invented on purpose. It is not the money. It has stopped being the money. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-douglas-park-0",
+       "denyFlag": "hub:h-newsagent-douglas-park-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It is the sort of thing you notice or you do not. They will drop my Douglas Park order if I can show $153 of turnover on the other side of the shop by the Sunday after payday. I did try the official route, for what that was worth. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-douglas-park-1",
+       "denyFlag": "hub:h-newsagent-douglas-park-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "Returns at Douglas Park — that's done.",
+       "turnin": "h-newsagent-douglas-park-0"
+      },
+      {
+       "text": "The Better Rate, Douglas Park — that's done.",
+       "turnin": "h-newsagent-douglas-park-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-douglas-park-zofia",
+   "name": "Zofia, paper runner at Douglas Park",
+   "x": -45460,
+   "z": 35819,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Do not mind the mess. It is structural now.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Two people have already said no. I do the Douglas Park round from first light and for the last fortnight somebody has been taking the papers off the front steps behind me. I have got a photo on my phone but it is useless. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-douglas-park-2",
+       "denyFlag": "hub:h-newsagent-douglas-park-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Someone has to, and it may as well be you. There is a dog on the Douglas Park round that has had two of my bags and a docket book that was not even mine. I am aware how that sounds. Half now if you want it. Most people don't.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-douglas-park-3",
+       "denyFlag": "hub:h-newsagent-douglas-park-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "The Douglas Park Round — that's done.",
+       "turnin": "h-newsagent-douglas-park-2"
+      },
+      {
+       "text": "The Dog on Ash Street, Douglas Park — that's done.",
+       "turnin": "h-newsagent-douglas-park-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-douglas-park-larissa",
+   "name": "Larissa, lotto regular at Douglas Park",
+   "x": -45461,
+   "z": 35917,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are selling something the answer is no.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You are the first person to stop all morning. Nine of us at Douglas Park have gone in on the same numbers since the Sunday after payday and one of us has stopped putting money in. My wife says I should let it go. My wife is wrong. Whatever it costs you, tell me and I will cover it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-douglas-park-4",
+       "denyFlag": "hub:h-newsagent-douglas-park-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Not being dramatic about this. The agency at Menangle closed six months before Douglas Park started struggling, and I would very much like to know what they know. I have rung the number on the letter four times. I would rather know than wonder.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-douglas-park-5",
+       "denyFlag": "hub:h-newsagent-douglas-park-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "The Syndicate, Douglas Park — that's done.",
+       "turnin": "h-newsagent-douglas-park-4"
+      },
+      {
+       "text": "The Other Agency, Douglas Park — that's done.",
+       "turnin": "h-newsagent-douglas-park-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-tempe-rada",
+   "name": "Rada, panel beater at Tempe",
+   "x": -4851,
+   "z": 6260,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Cash only and no, I am joking. What do you want.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Do not laugh. There has been a car in the Tempe yard since the Sunday after payday with a chest freezer that hums in D on the passenger seat and no owner answering. It is not the money. It has stopped being the money. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-tempe-0",
+       "denyFlag": "hub:h-workshop-tempe-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It is the sort of thing you notice or you do not. Now that it is documented, Tempe is owed $170 in storage and the only person who can pay it is the person not answering. I did try the official route, for what that was worth. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-tempe-1",
+       "denyFlag": "hub:h-workshop-tempe-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "The Unclaimed Falcon, Tempe — that's done.",
+       "turnin": "h-workshop-tempe-0"
+      },
+      {
+       "text": "Storage Fees, Tempe — that's done.",
+       "turnin": "h-workshop-tempe-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-tempe-ngaire",
+   "name": "Ngaire, apprentice at Tempe",
+   "x": -4790,
+   "z": 6071,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You have got a face like you can keep your mouth shut.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Two people have already said no. I am in my first year at Tempe and I have to log 50 hours on a job I am not allowed to touch on my own. I have got a photo on my phone but it is useless. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-tempe-2",
+       "denyFlag": "hub:h-workshop-tempe-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Someone has to, and it may as well be you. Somebody has been coming into the Tempe yard after knock-off to use the air line, and last week they used the compressor as well. I am aware how that sounds. Half now if you want it. Most people don't.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-tempe-3",
+       "denyFlag": "hub:h-workshop-tempe-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "First Year, Tempe — that's done.",
+       "turnin": "h-workshop-tempe-2"
+      },
+      {
+       "text": "The Air Line, Tempe — that's done.",
+       "turnin": "h-workshop-tempe-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-tempe-kareem",
+   "name": "Kareem, the bloke whose car it is at Tempe",
+   "x": -4606,
+   "z": 6271,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Right. Talk while I do this.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You are the first person to stop all morning. My car has been at Tempe since the Sunday after payday and every time I ring, the quote has grown by about $50. My wife says I should let it go. My wife is wrong. Whatever it costs you, tell me and I will cover it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-tempe-4",
+       "denyFlag": "hub:h-workshop-tempe-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Not being dramatic about this. The insurance assessor who signs off every job at Tempe works out of Marrickville, and he has never once seen the car he is assessing. I have rung the number on the letter four times. I would rather know than wonder.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-tempe-5",
+       "denyFlag": "hub:h-workshop-tempe-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "My Own Car, Tempe — that's done.",
+       "turnin": "h-workshop-tempe-4"
+      },
+      {
+       "text": "The Assessor, Tempe — that's done.",
+       "turnin": "h-workshop-tempe-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-stanwell-park-avi",
+   "name": "Avi, shop manager at Stanwell Park",
+   "x": -20505,
+   "z": 40073,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You right there? I am mid-something but go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Do not laugh. People leave things at the Stanwell Park roller door after half six and by morning it is rained on and it is our problem and our tip fee. It is not the money. It has stopped being the money. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-stanwell-park-0",
+       "denyFlag": "hub:h-opshop-stanwell-park-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It is the sort of thing you notice or you do not. The photos worked, which means Stanwell Park can claim back the $40 we have paid to throw away other people's furniture since grand final week. I did try the official route, for what that was worth. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-stanwell-park-1",
+       "denyFlag": "hub:h-opshop-stanwell-park-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "Dumped Out the Back, Stanwell Park — that's done.",
+       "turnin": "h-opshop-stanwell-park-0"
+      },
+      {
+       "text": "The Tip Fee, Stanwell Park — that's done.",
+       "turnin": "h-opshop-stanwell-park-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-stanwell-park-ruslan",
+   "name": "Ruslan, sorter at Stanwell Park",
+   "x": -20361,
+   "z": 40184,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are here about the sign, the sign is wrong.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Two people have already said no. Something came into Stanwell Park on grand final week in a box of paperbacks that I do not think the family meant to give away. I have got a photo on my phone but it is useless. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-stanwell-park-2",
+       "denyFlag": "hub:h-opshop-stanwell-park-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Someone has to, and it may as well be you. Two people have been coming into the Stanwell Park sorting room since grand final week and taking the good stock before it reaches the floor, and one of them volunteers here. I am aware how that sounds. Half now if you want it. Most people don't.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-stanwell-park-3",
+       "denyFlag": "hub:h-opshop-stanwell-park-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Good Box, Stanwell Park — that's done.",
+       "turnin": "h-opshop-stanwell-park-2"
+      },
+      {
+       "text": "Sorting Room, Stanwell Park — that's done.",
+       "turnin": "h-opshop-stanwell-park-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-stanwell-park-vera",
+   "name": "Vera, volunteer driver at Stanwell Park",
+   "x": -20243,
+   "z": 40030,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand in the doorway, mate, come round.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You are the first person to stop all morning. I do the Stanwell Park pick-ups in a van with 37 thousand on it and a door that only opens if you know about it. My wife says I should let it go. My wife is wrong. Whatever it costs you, tell me and I will cover it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-stanwell-park-4",
+       "denyFlag": "hub:h-opshop-stanwell-park-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Not being dramatic about this. Everything Stanwell Park cannot sell goes to a warehouse at Coalcliff, and nobody there has ever answered a phone in my hearing. I have rung the number on the letter four times. I would rather know than wonder.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-stanwell-park-5",
+       "denyFlag": "hub:h-opshop-stanwell-park-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "The Van, Stanwell Park — that's done.",
+       "turnin": "h-opshop-stanwell-park-4"
+      },
+      {
+       "text": "Head Office, Stanwell Park — that's done.",
+       "turnin": "h-opshop-stanwell-park-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

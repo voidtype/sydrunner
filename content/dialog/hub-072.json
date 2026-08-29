@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-capitol-square-cillian",
+   "name": "Cillian, baker at Capitol Square",
+   "x": -407.1,
+   "z": 1057,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Right. Talk while I do this.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I am told you do odd jobs. I start at ten past five and for a month the Capitol Square back lane has had somebody in it who is not waiting for bread. There is probably a simple explanation and I would love to hear it. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-capitol-square-0",
+       "denyFlag": "hub:h-bakery-capitol-square-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I'll be straight with you. A light on that lane costs Capitol Square $52 and the landlord has said no twice, so we are doing it ourselves. You will see what I mean the second you get there. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-capitol-square-1",
+       "denyFlag": "hub:h-bakery-capitol-square-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "ten past five at Capitol Square — that's done.",
+       "turnin": "h-bakery-capitol-square-0"
+      },
+      {
+       "text": "The Lane Light, Capitol Square — that's done.",
+       "turnin": "h-bakery-capitol-square-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-capitol-square-sigrid",
+   "name": "Sigrid, night delivery at Capitol Square",
+   "x": -265,
+   "z": 1069,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You right there? I am mid-something but go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It has been three weeks. The flour for Capitol Square comes off a truck at ten past five and last a wet Monday the truck came and the flour did not. There is a version of this where I am the unreasonable one. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-capitol-square-2",
+       "denyFlag": "hub:h-bakery-capitol-square-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Nobody else has offered, so. The Capitol Square loading zone has had a car in it at ten past five every morning this week and the driver waits in it, which makes it worse. The paperwork says one thing and my eyes say another. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-capitol-square-3",
+       "denyFlag": "hub:h-bakery-capitol-square-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Flour Run, Capitol Square — that's done.",
+       "turnin": "h-bakery-capitol-square-2"
+      },
+      {
+       "text": "The Loading Zone, Capitol Square — that's done.",
+       "turnin": "h-bakery-capitol-square-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-capitol-square-sinead",
+   "name": "Sinead, front of house at Capitol Square",
+   "x": -219.3,
+   "z": 1281,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are here about the sign, the sign is wrong.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "The council knows and the council does not care. Somebody two doors down from Capitol Square put up a sign on a wet Monday that says the same six words as ours, in the same order. It has been going on longer than I have admitted to anyone. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-capitol-square-4",
+       "denyFlag": "hub:h-bakery-capitol-square-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have been putting it off since Easter. This business was at Convention before it was at Capitol Square, and there is a woman there who still has the original book. I have got no proof, which is exactly why I am asking. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-capitol-square-5",
+       "denyFlag": "hub:h-bakery-capitol-square-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "The Sourdough Sign, Capitol Square — that's done.",
+       "turnin": "h-bakery-capitol-square-4"
+      },
+      {
+       "text": "The Old Site, Capitol Square — that's done.",
+       "turnin": "h-bakery-capitol-square-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-kingsgrove-lucia",
+   "name": "Lucia, lifeguard at Kingsgrove",
+   "x": -9914,
+   "z": 8053,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand in the doorway, mate, come round.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I am told you do odd jobs. Council has been saying the Kingsgrove pool is at end of life since a wet Monday and the crack they keep pointing at is not in the shell. There is probably a simple explanation and I would love to hear it. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-kingsgrove-0",
+       "denyFlag": "hub:h-pool-kingsgrove-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I'll be straight with you. We are running a stall for Kingsgrove on a wet Monday and a stall needs $108 of gear that nobody has volunteered to pay for. You will see what I mean the second you get there. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-kingsgrove-1",
+       "denyFlag": "hub:h-pool-kingsgrove-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "The Kingsgrove Pool — that's done.",
+       "turnin": "h-pool-kingsgrove-0"
+      },
+      {
+       "text": "The Petition Stall, Kingsgrove — that's done.",
+       "turnin": "h-pool-kingsgrove-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-kingsgrove-kiara",
+   "name": "Kiara, swim coach at Kingsgrove",
+   "x": -9958,
+   "z": 7993,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Long day. Say what you came to say.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It has been three weeks. I coach 52 kids at Kingsgrove at five in the morning and three of them have stopped coming without anybody ringing me. There is a version of this where I am the unreasonable one. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-kingsgrove-2",
+       "denyFlag": "hub:h-pool-kingsgrove-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Nobody else has offered, so. A group has been coming over the Kingsgrove fence after close and swimming in the dark, which is how Kingsgrove loses its pool. The paperwork says one thing and my eyes say another. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-kingsgrove-3",
+       "denyFlag": "hub:h-pool-kingsgrove-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "Squad, Kingsgrove — that's done.",
+       "turnin": "h-pool-kingsgrove-2"
+      },
+      {
+       "text": "The Deep End, Kingsgrove — that's done.",
+       "turnin": "h-pool-kingsgrove-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-kingsgrove-denzil",
+   "name": "Denzil, kiosk operator at Kingsgrove",
+   "x": -9806,
+   "z": 7966,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I know that look. Everyone wants something today.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "The council knows and the council does not care. The kiosk at Kingsgrove has a chest freezer that hums in D in it and a freezer that has been running warm since a wet Monday. It has been going on longer than I have admitted to anyone. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-kingsgrove-4",
+       "denyFlag": "hub:h-pool-kingsgrove-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have been putting it off since Easter. They want everyone from Kingsgrove to drive to the new centre at Bexley North, so somebody should go and see whether it is any good. I have got no proof, which is exactly why I am asking. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-kingsgrove-5",
+       "denyFlag": "hub:h-pool-kingsgrove-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "The Kiosk Freezer, Kingsgrove — that's done.",
+       "turnin": "h-pool-kingsgrove-4"
+      },
+      {
+       "text": "The Aquatic Centre, Kingsgrove — that's done.",
+       "turnin": "h-pool-kingsgrove-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-penrith-zara",
+   "name": "Zara, taxi driver at Penrith",
+   "x": -47881,
+   "z": -12411,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Give me a second. Right. Go.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I am told you do odd jobs. The rank outside Penrith used to hold nine cars and since a Tuesday it holds four, and nobody will say who moved the line. There is probably a simple explanation and I would love to hear it. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-penrith-0",
+       "denyFlag": "hub:h-rank-penrith-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I'll be straight with you. Since the rank at Penrith shrank I am $98 a week down, and the association wants that number from somebody who can prove it. You will see what I mean the second you get there. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-penrith-1",
+       "denyFlag": "hub:h-rank-penrith-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "The Penrith Rank — that's done.",
+       "turnin": "h-rank-penrith-0"
+      },
+      {
+       "text": "Lost Fares, Penrith — that's done.",
+       "turnin": "h-rank-penrith-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-penrith-cecile",
+   "name": "Cecile, rank marshal at Penrith",
+   "x": -47660,
+   "z": -12255,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are not from around the corner, are you.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It has been three weeks. Cars that have never sat in the Penrith queue turn up at the second express and take the front of it, and the drivers who waited say nothing. There is a version of this where I am the unreasonable one. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-penrith-2",
+       "denyFlag": "hub:h-rank-penrith-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Nobody else has offered, so. When the last train into Penrith is late, 67 people come out at once and I have to have cars there before they do. The paperwork says one thing and my eyes say another. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-penrith-3",
+       "denyFlag": "hub:h-rank-penrith-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "Queue Jumpers, Penrith — that's done.",
+       "turnin": "h-rank-penrith-2"
+      },
+      {
+       "text": "The Late Train, Penrith — that's done.",
+       "turnin": "h-rank-penrith-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-penrith-ekaterina",
+   "name": "Ekaterina, hotel doorman at Penrith",
+   "x": -47698,
+   "z": -12132,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Half of this suburb has walked past already. Not one stopped.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "The council knows and the council does not care. I have stood on this door near Penrith for 67 years and since a Tuesday somebody has been sending my guests to a different rank. It has been going on longer than I have admitted to anyone. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-penrith-4",
+       "denyFlag": "hub:h-rank-penrith-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have been putting it off since Easter. The plates working the Penrith rank are dispatched from a depot at Emu Plains, and the man who runs it has never met a driver he liked. I have got no proof, which is exactly why I am asking. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-penrith-5",
+       "denyFlag": "hub:h-rank-penrith-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "The Door, Penrith — that's done.",
+       "turnin": "h-rank-penrith-4"
+      },
+      {
+       "text": "The Depot, Penrith — that's done.",
+       "turnin": "h-rank-penrith-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

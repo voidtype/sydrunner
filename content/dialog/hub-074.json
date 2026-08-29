@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-coledale-holly",
+   "name": "Holly, shopkeeper at Coledale",
+   "x": -23503,
+   "z": 47089,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Cash only and no, I am joking. What do you want.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I have written it down twice and lost it twice. The Coledale order has been two cartons light every week since the week of the show and the invoice says otherwise every time. It might be nothing. It has not felt like nothing. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-coledale-0",
+       "denyFlag": "hub:h-cornershop-coledale-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Do not laugh. They admitted it, which I did not expect, so now there is $107 owing to Coledale and it is not going to walk in here itself. I would not ask if there was anyone else about. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-coledale-1",
+       "denyFlag": "hub:h-cornershop-coledale-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "Short Delivery, Coledale — that's done.",
+       "turnin": "h-cornershop-coledale-0"
+      },
+      {
+       "text": "The Credit Note, Coledale — that's done.",
+       "turnin": "h-cornershop-coledale-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-coledale-dilan",
+   "name": "Dilan, delivery driver at Coledale",
+   "x": -23749,
+   "z": 47062,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You have got a face like you can keep your mouth shut.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is the sort of thing you notice or you do not. I do the Coledale run at twenty past four and there is a stretch of it where the van gets followed, which I have told nobody until now. You can tell me I am imagining it. Tell me after. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-coledale-2",
+       "denyFlag": "hub:h-cornershop-coledale-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Two people have already said no. I have got a esky of warm cans in the back of the van and the Coledale shop is shut, and the number on the door rings out. I would have sorted it myself a year ago. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-coledale-3",
+       "denyFlag": "hub:h-cornershop-coledale-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "The Coledale Run — that's done.",
+       "turnin": "h-cornershop-coledale-2"
+      },
+      {
+       "text": "Locked Out, Coledale — that's done.",
+       "turnin": "h-cornershop-coledale-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-coledale-luka",
+   "name": "Luka, the kid on the register at Coledale",
+   "x": -23623,
+   "z": 47316,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Right. Talk while I do this.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Someone has to, and it may as well be you. Three of the Coledale regulars have started coming in together and going out separately, and the till is $63 down on those days. It is not the money. It has stopped being the money. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-coledale-4",
+       "denyFlag": "hub:h-cornershop-coledale-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You are the first person to stop all morning. Everything Coledale sells comes off a floor at Wombarra, and the woman who runs it will tell you things she will not put in writing. I did try the official route, for what that was worth. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-coledale-5",
+       "denyFlag": "hub:h-cornershop-coledale-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "The Regulars, Coledale — that's done.",
+       "turnin": "h-cornershop-coledale-4"
+      },
+      {
+       "text": "The Wholesaler, Coledale — that's done.",
+       "turnin": "h-cornershop-coledale-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-quakers-hill-turi",
+   "name": "Turi, junior coach at Quakers Hill",
+   "x": -30290,
+   "z": -15141.3,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You right there? I am mid-something but go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I have written it down twice and lost it twice. I have got eleven kids for a twelve-a-side at Quakers Hill on a wet Monday and one of them has a note from his mother. It might be nothing. It has not felt like nothing. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-quakers-hill-0",
+       "denyFlag": "hub:h-oval-quakers-hill-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Do not laugh. We found a twelfth, which means the Quakers Hill club now owes the association $29 it had budgeted on not owing. I would not ask if there was anyone else about. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-quakers-hill-1",
+       "denyFlag": "hub:h-oval-quakers-hill-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "Under 12s at Quakers Hill — that's done.",
+       "turnin": "h-oval-quakers-hill-0"
+      },
+      {
+       "text": "Registration, Quakers Hill — that's done.",
+       "turnin": "h-oval-quakers-hill-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-quakers-hill-demir",
+   "name": "Demir, canteen manager at Quakers Hill",
+   "x": -30208,
+   "z": -15254,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are here about the sign, the sign is wrong.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is the sort of thing you notice or you do not. The canteen at Quakers Hill does two hundred sausages on a Saturday and this week the freezer went off at first light. You can tell me I am imagining it. Tell me after. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-quakers-hill-2",
+       "denyFlag": "hub:h-oval-quakers-hill-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Two people have already said no. Somebody walked off with the float from the Quakers Hill canteen at about first light during the last home game, and I have a fair idea which somebody. I would have sorted it myself a year ago. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-quakers-hill-3",
+       "denyFlag": "hub:h-oval-quakers-hill-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Quakers Hill Canteen — that's done.",
+       "turnin": "h-oval-quakers-hill-2"
+      },
+      {
+       "text": "Grand Final Float, Quakers Hill — that's done.",
+       "turnin": "h-oval-quakers-hill-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-quakers-hill-oscar",
+   "name": "Oscar, groundsman at Quakers Hill",
+   "x": -30137,
+   "z": -15193,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand in the doorway, mate, come round.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Someone has to, and it may as well be you. The sprinkler line under the Quakers Hill outfield has been leaking since a wet Monday and the wet patch has started to move. It is not the money. It has stopped being the money. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-quakers-hill-4",
+       "denyFlag": "hub:h-oval-quakers-hill-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You are the first person to stop all morning. The bloke who allocates grounds for the whole association sits at Marayong, and Quakers Hill has been at the bottom of his list for two seasons. I did try the official route, for what that was worth. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-quakers-hill-5",
+       "denyFlag": "hub:h-oval-quakers-hill-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Sprinkler Line, Quakers Hill — that's done.",
+       "turnin": "h-oval-quakers-hill-4"
+      },
+      {
+       "text": "The Association, Quakers Hill — that's done.",
+       "turnin": "h-oval-quakers-hill-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-otford-keziah",
+   "name": "Keziah, bushcare volunteer at Otford",
+   "x": -18223,
+   "z": 38274,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Long day. Say what you came to say.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I have written it down twice and lost it twice. Somebody has been tipping fill into the creek behind Otford since the long weekend and it is narrowing the channel a metre at a time. It might be nothing. It has not felt like nothing. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-otford-0",
+       "denyFlag": "hub:h-creek-otford-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Do not laugh. They have agreed to a clean-up at Otford, which is wonderful, except the grant is $47 short and closes on the long weekend. I would not ask if there was anyone else about. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-otford-1",
+       "denyFlag": "hub:h-creek-otford-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "The Creek Behind Otford — that's done.",
+       "turnin": "h-creek-otford-0"
+      },
+      {
+       "text": "Willow Removal, Otford — that's done.",
+       "turnin": "h-creek-otford-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-otford-emiko",
+   "name": "Emiko, SES member at Otford",
+   "x": -18076,
+   "z": 38167,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I know that look. Everyone wants something today.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is the sort of thing you notice or you do not. We had 41 sandbags in the Otford shed on the long weekend and this morning we have got the pallet they came on. You can tell me I am imagining it. Tell me after. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-otford-2",
+       "denyFlag": "hub:h-creek-otford-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Two people have already said no. People keep driving the low crossing at Otford at ten past five with the water over the sign, and one of them is going to be the one. I would have sorted it myself a year ago. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-otford-3",
+       "denyFlag": "hub:h-creek-otford-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Sandbags, Otford — that's done.",
+       "turnin": "h-creek-otford-2"
+      },
+      {
+       "text": "The Low Crossing, Otford — that's done.",
+       "turnin": "h-creek-otford-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-otford-holly",
+   "name": "Holly, resident who got flooded at Otford",
+   "x": -17989,
+   "z": 38233,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Give me a second. Right. Go.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Someone has to, and it may as well be you. The water came through my place at Otford on the long weekend and the assessor wants photographs of things I have already thrown out. It is not the money. It has stopped being the money. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-otford-4",
+       "denyFlag": "hub:h-creek-otford-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You are the first person to stop all morning. Whatever is happening to Otford starts upstream at Stanwell Park, and there are people up there who have been saying so for years. I did try the official route, for what that was worth. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-otford-5",
+       "denyFlag": "hub:h-creek-otford-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "Under the House, Otford — that's done.",
+       "turnin": "h-creek-otford-4"
+      },
+      {
+       "text": "Upstream, Otford — that's done.",
+       "turnin": "h-creek-otford-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

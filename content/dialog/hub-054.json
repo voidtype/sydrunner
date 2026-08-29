@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-unsw-high-street-hazel",
+   "name": "Hazel, shopkeeper at UNSW High Street",
+   "x": 2601,
+   "z": 5423,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Cash only and no, I am joking. What do you want.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "The council knows and the council does not care. The UNSW High Street order has been two cartons light every week since a Tuesday and the invoice says otherwise every time. It is the not knowing that has got me, honestly. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-unsw-high-street-0",
+       "denyFlag": "hub:h-cornershop-unsw-high-street-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have been putting it off since Easter. They admitted it, which I did not expect, so now there is $148 owing to UNSW High Street and it is not going to walk in here itself. There is probably a simple explanation and I would love to hear it. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-unsw-high-street-1",
+       "denyFlag": "hub:h-cornershop-unsw-high-street-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "Short Delivery, UNSW High Street — that's done.",
+       "turnin": "h-cornershop-unsw-high-street-0"
+      },
+      {
+       "text": "The Credit Note, UNSW High Street — that's done.",
+       "turnin": "h-cornershop-unsw-high-street-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-unsw-high-street-tess",
+   "name": "Tess, delivery driver at UNSW High Street",
+   "x": 2349,
+   "z": 5286,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You have got a face like you can keep your mouth shut.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Before you say anything: yes, I know. I do the UNSW High Street run at the back of seven and there is a stretch of it where the van gets followed, which I have told nobody until now. You will see what I mean the second you get there. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-unsw-high-street-2",
+       "denyFlag": "hub:h-cornershop-unsw-high-street-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It is not a police matter and I have checked. I have got a whiteboard with last March still on it in the back of the van and the UNSW High Street shop is shut, and the number on the door rings out. There is a version of this where I am the unreasonable one. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-unsw-high-street-3",
+       "denyFlag": "hub:h-cornershop-unsw-high-street-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "The UNSW High Street Run — that's done.",
+       "turnin": "h-cornershop-unsw-high-street-2"
+      },
+      {
+       "text": "Locked Out, UNSW High Street — that's done.",
+       "turnin": "h-cornershop-unsw-high-street-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-unsw-high-street-gopal",
+   "name": "Gopal, the kid on the register at UNSW High Street",
+   "x": 2615,
+   "z": 5122,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Right. Talk while I do this.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Honestly, I am past caring how it looks. Three of the UNSW High Street regulars have started coming in together and going out separately, and the till is $57 down on those days. The paperwork says one thing and my eyes say another. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-unsw-high-street-4",
+       "denyFlag": "hub:h-cornershop-unsw-high-street-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I would do it myself if I could leave the counter. Everything UNSW High Street sells comes off a floor at Kingsford, and the woman who runs it will tell you things she will not put in writing. It has been going on longer than I have admitted to anyone. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-unsw-high-street-5",
+       "denyFlag": "hub:h-cornershop-unsw-high-street-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "The Regulars, UNSW High Street — that's done.",
+       "turnin": "h-cornershop-unsw-high-street-4"
+      },
+      {
+       "text": "The Wholesaler, UNSW High Street — that's done.",
+       "turnin": "h-cornershop-unsw-high-street-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-lisarow-gia",
+   "name": "Gia, junior coach at Lisarow",
+   "x": 13890.5,
+   "z": -54247.8,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You right there? I am mid-something but go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "The council knows and the council does not care. I have got eleven kids for a twelve-a-side at Lisarow on school holidays and one of them has a note from his mother. It is the not knowing that has got me, honestly. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-lisarow-0",
+       "denyFlag": "hub:h-oval-lisarow-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have been putting it off since Easter. We found a twelfth, which means the Lisarow club now owes the association $32 it had budgeted on not owing. There is probably a simple explanation and I would love to hear it. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-lisarow-1",
+       "denyFlag": "hub:h-oval-lisarow-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "Under 12s at Lisarow — that's done.",
+       "turnin": "h-oval-lisarow-0"
+      },
+      {
+       "text": "Registration, Lisarow — that's done.",
+       "turnin": "h-oval-lisarow-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-lisarow-usman",
+   "name": "Usman, canteen manager at Lisarow",
+   "x": 14074,
+   "z": -54076,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are here about the sign, the sign is wrong.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Before you say anything: yes, I know. The canteen at Lisarow does two hundred sausages on a Saturday and this week the freezer went off at knock-off. You will see what I mean the second you get there. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-lisarow-2",
+       "denyFlag": "hub:h-oval-lisarow-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It is not a police matter and I have checked. Somebody walked off with the float from the Lisarow canteen at about knock-off during the last home game, and I have a fair idea which somebody. There is a version of this where I am the unreasonable one. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-lisarow-3",
+       "denyFlag": "hub:h-oval-lisarow-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Lisarow Canteen — that's done.",
+       "turnin": "h-oval-lisarow-2"
+      },
+      {
+       "text": "Grand Final Float, Lisarow — that's done.",
+       "turnin": "h-oval-lisarow-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-lisarow-sanjay",
+   "name": "Sanjay, groundsman at Lisarow",
+   "x": 13937,
+   "z": -54346,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand in the doorway, mate, come round.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Honestly, I am past caring how it looks. The sprinkler line under the Lisarow outfield has been leaking since school holidays and the wet patch has started to move. The paperwork says one thing and my eyes say another. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-lisarow-4",
+       "denyFlag": "hub:h-oval-lisarow-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I would do it myself if I could leave the counter. The bloke who allocates grounds for the whole association sits at Ourimbah, and Lisarow has been at the bottom of his list for two seasons. It has been going on longer than I have admitted to anyone. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-lisarow-5",
+       "denyFlag": "hub:h-oval-lisarow-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Sprinkler Line, Lisarow — that's done.",
+       "turnin": "h-oval-lisarow-4"
+      },
+      {
+       "text": "The Association, Lisarow — that's done.",
+       "turnin": "h-oval-lisarow-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-leumeah-henrietta",
+   "name": "Henrietta, bushcare volunteer at Leumeah",
+   "x": -34584,
+   "z": 20710,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Long day. Say what you came to say.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "The council knows and the council does not care. Somebody has been tipping fill into the creek behind Leumeah since the long weekend and it is narrowing the channel a metre at a time. It is the not knowing that has got me, honestly. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-leumeah-0",
+       "denyFlag": "hub:h-creek-leumeah-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have been putting it off since Easter. They have agreed to a clean-up at Leumeah, which is wonderful, except the grant is $36 short and closes on the long weekend. There is probably a simple explanation and I would love to hear it. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-leumeah-1",
+       "denyFlag": "hub:h-creek-leumeah-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "The Creek Behind Leumeah — that's done.",
+       "turnin": "h-creek-leumeah-0"
+      },
+      {
+       "text": "Willow Removal, Leumeah — that's done.",
+       "turnin": "h-creek-leumeah-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-leumeah-raisa",
+   "name": "Raisa, SES member at Leumeah",
+   "x": -34805,
+   "z": 20916,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I know that look. Everyone wants something today.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Before you say anything: yes, I know. We had 60 sandbags in the Leumeah shed on the long weekend and this morning we have got the pallet they came on. You will see what I mean the second you get there. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-leumeah-2",
+       "denyFlag": "hub:h-creek-leumeah-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It is not a police matter and I have checked. People keep driving the low crossing at Leumeah at two in the afternoon with the water over the sign, and one of them is going to be the one. There is a version of this where I am the unreasonable one. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-leumeah-3",
+       "denyFlag": "hub:h-creek-leumeah-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Sandbags, Leumeah — that's done.",
+       "turnin": "h-creek-leumeah-2"
+      },
+      {
+       "text": "The Low Crossing, Leumeah — that's done.",
+       "turnin": "h-creek-leumeah-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-leumeah-kaia",
+   "name": "Kaia, resident who got flooded at Leumeah",
+   "x": -34520,
+   "z": 20855,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Give me a second. Right. Go.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Honestly, I am past caring how it looks. The water came through my place at Leumeah on the long weekend and the assessor wants photographs of things I have already thrown out. The paperwork says one thing and my eyes say another. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-leumeah-4",
+       "denyFlag": "hub:h-creek-leumeah-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I would do it myself if I could leave the counter. Whatever is happening to Leumeah starts upstream at Campbelltown, and there are people up there who have been saying so for years. It has been going on longer than I have admitted to anyone. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-leumeah-5",
+       "denyFlag": "hub:h-creek-leumeah-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "Under the House, Leumeah — that's done.",
+       "turnin": "h-creek-leumeah-4"
+      },
+      {
+       "text": "Upstream, Leumeah — that's done.",
+       "turnin": "h-creek-leumeah-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

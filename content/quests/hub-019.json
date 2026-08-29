@@ -1,0 +1,663 @@
+{
+ "quests": [
+  {
+   "id": "h-newsagent-sefton-0",
+   "act": 3,
+   "title": "Returns at Sefton",
+   "blurb": "It is the sort of thing you notice or you do not. I am sending back 74 papers a day from Sefton and paying to have them collected, which is a business model somebody invented on purpose. My wife says I should let it go. My wife is wrong. There is no rush, but there is a Friday.",
+   "giver": "hub-sefton-yoko",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -18274,
+     "z": 2210,
+     "radius": 35,
+     "label": "the returns stack, at its worst"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the distributor needs to see the size of it",
+     "npc": "hub-sefton-yoko"
+    }
+   ],
+   "reward": {
+    "cash": 126,
+    "xp": 363,
+    "unlock": [
+     "hub:h-newsagent-sefton-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-sefton-1",
+   "act": 3,
+   "title": "The Better Rate, Sefton",
+   "blurb": "Two people have already said no. They will drop my Sefton order if I can show $109 of turnover on the other side of the shop by Thursdays. I have rung the number on the letter four times. I'll see you right for it.",
+   "giver": "hub-sefton-yoko",
+   "level": 6,
+   "requires": [
+    "h-newsagent-sefton-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 109,
+     "label": "$109, and cards and stationery count"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "sell anything, I am not proud",
+     "npc": "hub-sefton-yoko"
+    }
+   ],
+   "reward": {
+    "cash": 175,
+    "xp": 451,
+    "unlock": [
+     "hub:h-newsagent-sefton-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-sefton-2",
+   "act": 3,
+   "title": "The Sefton Round",
+   "blurb": "Someone has to, and it may as well be you. I do the Sefton round from the back of seven and for the last fortnight somebody has been taking the papers off the front steps behind me. Half the street knows and half the street is pretending not to. I'll put the kettle on for when you're back.",
+   "giver": "hub-sefton-delphine",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18443,
+     "z": 2278,
+     "radius": 25,
+     "label": "the end of the round, where it starts"
+    },
+    {
+     "kind": "photo",
+     "x": -18469,
+     "z": 2255,
+     "radius": 35,
+     "label": "whoever is on that street at that hour"
+    }
+   ],
+   "reward": {
+    "cash": 129,
+    "xp": 352,
+    "unlock": [
+     "hub:h-newsagent-sefton-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-sefton-3",
+   "act": 3,
+   "title": "The Dog on Ash Street, Sefton",
+   "blurb": "You are the first person to stop all morning. There is a dog on the Sefton round that has had two of my bags and a bucket of odd keys that was not even mine. I am not after trouble. I am after an answer. Just do not come back empty-handed.",
+   "giver": "hub-sefton-delphine",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "you will want your wits about you"
+    },
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 1,
+     "label": "the owner, not the dog, I am not a monster"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me it is sorted",
+     "npc": "hub-sefton-delphine"
+    }
+   ],
+   "reward": {
+    "cash": 132,
+    "xp": 354,
+    "unlock": [
+     "hub:h-newsagent-sefton-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-sefton-4",
+   "act": 3,
+   "title": "The Syndicate, Sefton",
+   "blurb": "Not being dramatic about this. Nine of us at Sefton have gone in on the same numbers since Thursdays and one of us has stopped putting money in. Nobody else seems to have noticed, which is its own problem. I will know if you skipped a bit.",
+   "giver": "hub-sefton-maud",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18305,
+     "z": 2062,
+     "radius": 25,
+     "label": "the house of the one who stopped"
+    },
+    {
+     "kind": "earn",
+     "dollars": 74,
+     "label": "$74, which is his share since he stopped"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it said out loud, not in the group chat",
+     "npc": "hub-sefton-maud"
+    }
+   ],
+   "reward": {
+    "cash": 135,
+    "xp": 351,
+    "unlock": [
+     "hub:h-newsagent-sefton-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-sefton-5",
+   "act": 3,
+   "title": "The Other Agency, Sefton",
+   "blurb": "I am told you do odd jobs. The agency at Chester Hill closed six months before Sefton started struggling, and I would very much like to know what they know. Everyone I have told has looked at me the way you are now. Say nothing to anyone on the way.",
+   "giver": "hub-sefton-maud",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -19443,
+     "z": 2106,
+     "radius": 60,
+     "label": "the shop is shut, the family is not"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever they say, say it slowly to me",
+     "npc": "hub-sefton-maud"
+    }
+   ],
+   "reward": {
+    "cash": 144,
+    "xp": 359,
+    "unlock": [
+     "hub:h-newsagent-sefton-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-central-0",
+   "act": 3,
+   "title": "The Unclaimed Falcon, Central",
+   "blurb": "It is the sort of thing you notice or you do not. There has been a car in the Central yard since a Tuesday with a laminated notice on the passenger seat and no owner answering. My wife says I should let it go. My wife is wrong. There is no rush, but there is a Friday.",
+   "giver": "hub-central-ishaan",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -264,
+     "z": 1692,
+     "radius": 35,
+     "label": "the car and the plate together"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I have to prove I tried before I can move it",
+     "npc": "hub-central-ishaan"
+    }
+   ],
+   "reward": {
+    "cash": 130,
+    "xp": 357,
+    "unlock": [
+     "hub:h-workshop-central-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-central-1",
+   "act": 3,
+   "title": "Storage Fees, Central",
+   "blurb": "Two people have already said no. Now that it is documented, Central is owed $77 in storage and the only person who can pay it is the person not answering. I have rung the number on the letter four times. I'll see you right for it.",
+   "giver": "hub-central-ishaan",
+   "level": 6,
+   "requires": [
+    "h-workshop-central-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 77,
+     "label": "$77, from him or from the scrap"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "either way it comes off my floor",
+     "npc": "hub-central-ishaan"
+    }
+   ],
+   "reward": {
+    "cash": 168,
+    "xp": 459,
+    "unlock": [
+     "hub:h-workshop-central-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-central-2",
+   "act": 3,
+   "title": "First Year, Central",
+   "blurb": "Someone has to, and it may as well be you. I am in my first year at Central and I have to log 96 hours on a job I am not allowed to touch on my own. Half the street knows and half the street is pretending not to. I'll put the kettle on for when you're back.",
+   "giver": "hub-central-mareike",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -267,
+     "z": 1665,
+     "radius": 25,
+     "label": "the supplier, two streets over"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "and get him a coffee, it helps"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "sign the book and I owe you",
+     "npc": "hub-central-mareike"
+    }
+   ],
+   "reward": {
+    "cash": 127,
+    "xp": 347,
+    "unlock": [
+     "hub:h-workshop-central-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-central-3",
+   "act": 3,
+   "title": "The Air Line, Central",
+   "blurb": "You are the first person to stop all morning. Somebody has been coming into the Central yard after the back of seven to use the air line, and last week they used the compressor as well. I am not after trouble. I am after an answer. Just do not come back empty-handed.",
+   "giver": "hub-central-mareike",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "the ones who think the yard is public"
+    },
+    {
+     "kind": "photo",
+     "x": -142,
+     "z": 1795,
+     "radius": 35,
+     "label": "the gate they are getting through"
+    }
+   ],
+   "reward": {
+    "cash": 127,
+    "xp": 361,
+    "unlock": [
+     "hub:h-workshop-central-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-central-4",
+   "act": 3,
+   "title": "My Own Car, Central",
+   "blurb": "Not being dramatic about this. My car has been at Central since a Tuesday and every time I ring, the quote has grown by about $96. Nobody else seems to have noticed, which is its own problem. I will know if you skipped a bit.",
+   "giver": "hub-central-emeka",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -135,
+     "z": 1807,
+     "radius": 25,
+     "label": "stand in the office where they can see you"
+    },
+    {
+     "kind": "photo",
+     "x": -135,
+     "z": 1818,
+     "radius": 35,
+     "label": "the job card on the wall, all of it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I know what I am arguing about",
+     "npc": "hub-central-emeka"
+    }
+   ],
+   "reward": {
+    "cash": 131,
+    "xp": 352,
+    "unlock": [
+     "hub:h-workshop-central-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-central-5",
+   "act": 3,
+   "title": "The Assessor, Central",
+   "blurb": "I am told you do odd jobs. The insurance assessor who signs off every job at Central works out of Museum, and he has never once seen the car he is assessing. Everyone I have told has looked at me the way you are now. Say nothing to anyone on the way.",
+   "giver": "hub-central-emeka",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -70,
+     "z": 824,
+     "radius": 60,
+     "label": "catch him before he goes out on the road"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear how he does it",
+     "npc": "hub-central-emeka"
+    }
+   ],
+   "reward": {
+    "cash": 136,
+    "xp": 368,
+    "unlock": [
+     "hub:h-workshop-central-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-belmore-0",
+   "act": 3,
+   "title": "Dumped Out the Back, Belmore",
+   "blurb": "It is the sort of thing you notice or you do not. People leave things at the Belmore roller door after first light and by morning it is rained on and it is our problem and our tip fee. My wife says I should let it go. My wife is wrong. There is no rush, but there is a Friday.",
+   "giver": "hub-belmore-jocelyn",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -10948,
+     "z": 5712,
+     "radius": 35,
+     "label": "the pile, on a bad morning"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council will not act without one of these",
+     "npc": "hub-belmore-jocelyn"
+    }
+   ],
+   "reward": {
+    "cash": 140,
+    "xp": 399,
+    "unlock": [
+     "hub:h-opshop-belmore-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-belmore-1",
+   "act": 3,
+   "title": "The Tip Fee, Belmore",
+   "blurb": "Two people have already said no. The photos worked, which means Belmore can claim back the $84 we have paid to throw away other people's furniture since the first of the month. I have rung the number on the letter four times. I'll see you right for it.",
+   "giver": "hub-belmore-jocelyn",
+   "level": 7,
+   "requires": [
+    "h-opshop-belmore-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 84,
+     "label": "$84, and every receipt counts"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will do the form if you do the walking",
+     "npc": "hub-belmore-jocelyn"
+    }
+   ],
+   "reward": {
+    "cash": 199,
+    "xp": 483,
+    "unlock": [
+     "hub:h-opshop-belmore-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-belmore-2",
+   "act": 3,
+   "title": "The Good Box, Belmore",
+   "blurb": "Someone has to, and it may as well be you. Something came into Belmore on the first of the month in a box of paperbacks that I do not think the family meant to give away. Half the street knows and half the street is pretending not to. I'll put the kettle on for when you're back.",
+   "giver": "hub-belmore-zane",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11056,
+     "z": 5785,
+     "radius": 25,
+     "label": "the address on the donation slip"
+    },
+    {
+     "kind": "photo",
+     "x": -11079,
+     "z": 5771,
+     "radius": 35,
+     "label": "the thing itself, before it goes back"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I would rather give it back than sell it",
+     "npc": "hub-belmore-zane"
+    }
+   ],
+   "reward": {
+    "cash": 148,
+    "xp": 397,
+    "unlock": [
+     "hub:h-opshop-belmore-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-belmore-3",
+   "act": 3,
+   "title": "Sorting Room, Belmore",
+   "blurb": "You are the first person to stop all morning. Two people have been coming into the Belmore sorting room since the first of the month and taking the good stock before it reaches the floor, and one of them volunteers here. I am not after trouble. I am after an answer. Just do not come back empty-handed.",
+   "giver": "hub-belmore-zane",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 2,
+     "label": "catch them at the back door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 10,
+     "label": "$10, which is what the good stock made last month"
+    }
+   ],
+   "reward": {
+    "cash": 158,
+    "xp": 411,
+    "unlock": [
+     "hub:h-opshop-belmore-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-belmore-4",
+   "act": 3,
+   "title": "The Van, Belmore",
+   "blurb": "Not being dramatic about this. I do the Belmore pick-ups in a van with 10 thousand on it and a door that only opens if you know about it. Nobody else seems to have noticed, which is its own problem. I will know if you skipped a bit.",
+   "giver": "hub-belmore-idris",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Belmore",
+     "to": "Lakemba",
+     "label": "come out to Lakemba with me, it is a two-person lift"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "we will stop on the way, my shout"
+    }
+   ],
+   "reward": {
+    "cash": 147,
+    "xp": 396,
+    "unlock": [
+     "hub:h-opshop-belmore-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-belmore-5",
+   "act": 3,
+   "title": "Head Office, Belmore",
+   "blurb": "I am told you do odd jobs. Everything Belmore cannot sell goes to a warehouse at Lakemba, and nobody there has ever answered a phone in my hearing. Everyone I have told has looked at me the way you are now. Say nothing to anyone on the way.",
+   "giver": "hub-belmore-idris",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -12086,
+     "z": 6018,
+     "radius": 60,
+     "label": "turn up in person, that is the trick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me there is a person in there",
+     "npc": "hub-belmore-idris"
+    }
+   ],
+   "reward": {
+    "cash": 149,
+    "xp": 392,
+    "unlock": [
+     "hub:h-opshop-belmore-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

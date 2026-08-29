@@ -1,0 +1,663 @@
+{
+ "quests": [
+  {
+   "id": "h-newsagent-juniors-kingsford-0",
+   "act": 3,
+   "title": "Returns at Juniors Kingsford",
+   "blurb": "I am told you do odd jobs. I am sending back 49 papers a day from Juniors Kingsford and paying to have them collected, which is a business model somebody invented on purpose. There is probably a simple explanation and I would love to hear it. If anyone asks, you were never here.",
+   "giver": "hub-juniors-kingsford-tuan",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 1971,
+     "z": 6168,
+     "radius": 35,
+     "label": "the returns stack, at its worst"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the distributor needs to see the size of it",
+     "npc": "hub-juniors-kingsford-tuan"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 272,
+    "unlock": [
+     "hub:h-newsagent-juniors-kingsford-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-juniors-kingsford-1",
+   "act": 3,
+   "title": "The Better Rate, Juniors Kingsford",
+   "blurb": "I'll be straight with you. They will drop my Juniors Kingsford order if I can show $61 of turnover on the other side of the shop by a public holiday nobody remembered. You will see what I mean the second you get there. There is no rush, but there is a Friday.",
+   "giver": "hub-juniors-kingsford-tuan",
+   "level": 4,
+   "requires": [
+    "h-newsagent-juniors-kingsford-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 61,
+     "label": "$61, and cards and stationery count"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "sell anything, I am not proud",
+     "npc": "hub-juniors-kingsford-tuan"
+    }
+   ],
+   "reward": {
+    "cash": 144,
+    "xp": 352,
+    "unlock": [
+     "hub:h-newsagent-juniors-kingsford-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-juniors-kingsford-2",
+   "act": 3,
+   "title": "The Juniors Kingsford Round",
+   "blurb": "It has been three weeks. I do the Juniors Kingsford round from the second express and for the last fortnight somebody has been taking the papers off the front steps behind me. There is a version of this where I am the unreasonable one. I'll see you right for it.",
+   "giver": "hub-juniors-kingsford-sadia",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 1802,
+     "z": 6236,
+     "radius": 25,
+     "label": "the end of the round, where it starts"
+    },
+    {
+     "kind": "photo",
+     "x": 1776,
+     "z": 6213,
+     "radius": 35,
+     "label": "whoever is on that street at that hour"
+    }
+   ],
+   "reward": {
+    "cash": 94,
+    "xp": 256,
+    "unlock": [
+     "hub:h-newsagent-juniors-kingsford-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-juniors-kingsford-3",
+   "act": 3,
+   "title": "The Dog on Ash Street, Juniors Kingsford",
+   "blurb": "Nobody else has offered, so. There is a dog on the Juniors Kingsford round that has had two of my bags and a folding table that was not even mine. The paperwork says one thing and my eyes say another. I'll put the kettle on for when you're back.",
+   "giver": "hub-juniors-kingsford-sadia",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you will want your wits about you"
+    },
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "the owner, not the dog, I am not a monster"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me it is sorted",
+     "npc": "hub-juniors-kingsford-sadia"
+    }
+   ],
+   "reward": {
+    "cash": 109,
+    "xp": 259,
+    "unlock": [
+     "hub:h-newsagent-juniors-kingsford-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-juniors-kingsford-4",
+   "act": 3,
+   "title": "The Syndicate, Juniors Kingsford",
+   "blurb": "The council knows and the council does not care. Nine of us at Juniors Kingsford have gone in on the same numbers since a public holiday nobody remembered and one of us has stopped putting money in. It has been going on longer than I have admitted to anyone. Just do not come back empty-handed.",
+   "giver": "hub-juniors-kingsford-dinesh",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 1940,
+     "z": 6020,
+     "radius": 25,
+     "label": "the house of the one who stopped"
+    },
+    {
+     "kind": "earn",
+     "dollars": 49,
+     "label": "$49, which is his share since he stopped"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it said out loud, not in the group chat",
+     "npc": "hub-juniors-kingsford-dinesh"
+    }
+   ],
+   "reward": {
+    "cash": 104,
+    "xp": 263,
+    "unlock": [
+     "hub:h-newsagent-juniors-kingsford-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-juniors-kingsford-5",
+   "act": 3,
+   "title": "The Other Agency, Juniors Kingsford",
+   "blurb": "I have been putting it off since Easter. The agency at UNSW Anzac Parade closed six months before Juniors Kingsford started struggling, and I would very much like to know what they know. I have got no proof, which is exactly why I am asking. I will know if you skipped a bit.",
+   "giver": "hub-juniors-kingsford-dinesh",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 1623,
+     "z": 5171,
+     "radius": 60,
+     "label": "the shop is shut, the family is not"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever they say, say it slowly to me",
+     "npc": "hub-juniors-kingsford-dinesh"
+    }
+   ],
+   "reward": {
+    "cash": 112,
+    "xp": 259,
+    "unlock": [
+     "hub:h-newsagent-juniors-kingsford-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-birrong-0",
+   "act": 3,
+   "title": "The Unclaimed Falcon, Birrong",
+   "blurb": "I am told you do odd jobs. There has been a car in the Birrong yard since Thursdays with a bucket of odd keys on the passenger seat and no owner answering. There is probably a simple explanation and I would love to hear it. If anyone asks, you were never here.",
+   "giver": "hub-birrong-chandra",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -17124,
+     "z": 2975,
+     "radius": 35,
+     "label": "the car and the plate together"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I have to prove I tried before I can move it",
+     "npc": "hub-birrong-chandra"
+    }
+   ],
+   "reward": {
+    "cash": 101,
+    "xp": 260,
+    "unlock": [
+     "hub:h-workshop-birrong-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-birrong-1",
+   "act": 3,
+   "title": "Storage Fees, Birrong",
+   "blurb": "I'll be straight with you. Now that it is documented, Birrong is owed $85 in storage and the only person who can pay it is the person not answering. You will see what I mean the second you get there. There is no rush, but there is a Friday.",
+   "giver": "hub-birrong-chandra",
+   "level": 4,
+   "requires": [
+    "h-workshop-birrong-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 85,
+     "label": "$85, from him or from the scrap"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "either way it comes off my floor",
+     "npc": "hub-birrong-chandra"
+    }
+   ],
+   "reward": {
+    "cash": 138,
+    "xp": 344,
+    "unlock": [
+     "hub:h-workshop-birrong-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-birrong-2",
+   "act": 3,
+   "title": "First Year, Birrong",
+   "blurb": "It has been three weeks. I am in my first year at Birrong and I have to log 38 hours on a job I am not allowed to touch on my own. There is a version of this where I am the unreasonable one. I'll see you right for it.",
+   "giver": "hub-birrong-josefa",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -17231,
+     "z": 2940,
+     "radius": 25,
+     "label": "the supplier, two streets over"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "and get him a coffee, it helps"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "sign the book and I owe you",
+     "npc": "hub-birrong-josefa"
+    }
+   ],
+   "reward": {
+    "cash": 103,
+    "xp": 254,
+    "unlock": [
+     "hub:h-workshop-birrong-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-birrong-3",
+   "act": 3,
+   "title": "The Air Line, Birrong",
+   "blurb": "Nobody else has offered, so. Somebody has been coming into the Birrong yard after half six to use the air line, and last week they used the compressor as well. The paperwork says one thing and my eyes say another. I'll put the kettle on for when you're back.",
+   "giver": "hub-birrong-josefa",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 2,
+     "label": "the ones who think the yard is public"
+    },
+    {
+     "kind": "photo",
+     "x": -17178,
+     "z": 2882,
+     "radius": 35,
+     "label": "the gate they are getting through"
+    }
+   ],
+   "reward": {
+    "cash": 111,
+    "xp": 255,
+    "unlock": [
+     "hub:h-workshop-birrong-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-birrong-4",
+   "act": 3,
+   "title": "My Own Car, Birrong",
+   "blurb": "The council knows and the council does not care. My car has been at Birrong since Thursdays and every time I ring, the quote has grown by about $38. It has been going on longer than I have admitted to anyone. Just do not come back empty-handed.",
+   "giver": "hub-birrong-rita",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -17090,
+     "z": 2849,
+     "radius": 25,
+     "label": "stand in the office where they can see you"
+    },
+    {
+     "kind": "photo",
+     "x": -17080,
+     "z": 2850,
+     "radius": 35,
+     "label": "the job card on the wall, all of it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I know what I am arguing about",
+     "npc": "hub-birrong-rita"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 258,
+    "unlock": [
+     "hub:h-workshop-birrong-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-birrong-5",
+   "act": 3,
+   "title": "The Assessor, Birrong",
+   "blurb": "I have been putting it off since Easter. The insurance assessor who signs off every job at Birrong works out of Regents Park, and he has never once seen the car he is assessing. I have got no proof, which is exactly why I am asking. I will know if you skipped a bit.",
+   "giver": "hub-birrong-rita",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -17210,
+     "z": 1794,
+     "radius": 60,
+     "label": "catch him before he goes out on the road"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear how he does it",
+     "npc": "hub-birrong-rita"
+    }
+   ],
+   "reward": {
+    "cash": 106,
+    "xp": 266,
+    "unlock": [
+     "hub:h-workshop-birrong-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-caringbah-0",
+   "act": 3,
+   "title": "Dumped Out the Back, Caringbah",
+   "blurb": "I am told you do odd jobs. People leave things at the Caringbah roller door after twenty past four and by morning it is rained on and it is our problem and our tip fee. There is probably a simple explanation and I would love to hear it. If anyone asks, you were never here.",
+   "giver": "hub-caringbah-vasil",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -7649,
+     "z": 19298,
+     "radius": 35,
+     "label": "the pile, on a bad morning"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council will not act without one of these",
+     "npc": "hub-caringbah-vasil"
+    }
+   ],
+   "reward": {
+    "cash": 112,
+    "xp": 317,
+    "unlock": [
+     "hub:h-opshop-caringbah-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-caringbah-1",
+   "act": 3,
+   "title": "The Tip Fee, Caringbah",
+   "blurb": "I'll be straight with you. The photos worked, which means Caringbah can claim back the $92 we have paid to throw away other people's furniture since every second Friday. You will see what I mean the second you get there. There is no rush, but there is a Friday.",
+   "giver": "hub-caringbah-vasil",
+   "level": 5,
+   "requires": [
+    "h-opshop-caringbah-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 92,
+     "label": "$92, and every receipt counts"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will do the form if you do the walking",
+     "npc": "hub-caringbah-vasil"
+    }
+   ],
+   "reward": {
+    "cash": 154,
+    "xp": 410,
+    "unlock": [
+     "hub:h-opshop-caringbah-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-caringbah-2",
+   "act": 3,
+   "title": "The Good Box, Caringbah",
+   "blurb": "It has been three weeks. Something came into Caringbah on every second Friday in a box of paperbacks that I do not think the family meant to give away. There is a version of this where I am the unreasonable one. I'll see you right for it.",
+   "giver": "hub-caringbah-ambrose",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7757,
+     "z": 19371,
+     "radius": 25,
+     "label": "the address on the donation slip"
+    },
+    {
+     "kind": "photo",
+     "x": -7780,
+     "z": 19357,
+     "radius": 35,
+     "label": "the thing itself, before it goes back"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I would rather give it back than sell it",
+     "npc": "hub-caringbah-ambrose"
+    }
+   ],
+   "reward": {
+    "cash": 116,
+    "xp": 316,
+    "unlock": [
+     "hub:h-opshop-caringbah-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-caringbah-3",
+   "act": 3,
+   "title": "Sorting Room, Caringbah",
+   "blurb": "Nobody else has offered, so. Two people have been coming into the Caringbah sorting room since every second Friday and taking the good stock before it reaches the floor, and one of them volunteers here. The paperwork says one thing and my eyes say another. I'll put the kettle on for when you're back.",
+   "giver": "hub-caringbah-ambrose",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "catch them at the back door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 55,
+     "label": "$55, which is what the good stock made last month"
+    }
+   ],
+   "reward": {
+    "cash": 124,
+    "xp": 322,
+    "unlock": [
+     "hub:h-opshop-caringbah-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-caringbah-4",
+   "act": 3,
+   "title": "The Van, Caringbah",
+   "blurb": "The council knows and the council does not care. I do the Caringbah pick-ups in a van with 55 thousand on it and a door that only opens if you know about it. It has been going on longer than I have admitted to anyone. Just do not come back empty-handed.",
+   "giver": "hub-caringbah-kalinda",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Caringbah",
+     "to": "Miranda",
+     "label": "come out to Miranda with me, it is a two-person lift"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "we will stop on the way, my shout"
+    }
+   ],
+   "reward": {
+    "cash": 110,
+    "xp": 324,
+    "unlock": [
+     "hub:h-opshop-caringbah-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-caringbah-5",
+   "act": 3,
+   "title": "Head Office, Caringbah",
+   "blurb": "I have been putting it off since Easter. Everything Caringbah cannot sell goes to a warehouse at Miranda, and nobody there has ever answered a phone in my hearing. I have got no proof, which is exactly why I am asking. I will know if you skipped a bit.",
+   "giver": "hub-caringbah-kalinda",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -9424,
+     "z": 18737,
+     "radius": 60,
+     "label": "turn up in person, that is the trick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me there is a person in there",
+     "npc": "hub-caringbah-kalinda"
+    }
+   ],
+   "reward": {
+    "cash": 112,
+    "xp": 302,
+    "unlock": [
+     "hub:h-opshop-caringbah-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

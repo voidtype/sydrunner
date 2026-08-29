@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-oatley-sibel",
+   "name": "Sibel, shopkeeper at Oatley",
+   "x": -11764,
+   "z": 12698,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Cash only and no, I am joking. What do you want.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "My knees are gone, so. The Oatley order has been two cartons light every week since every second Friday and the invoice says otherwise every time. I have rung the number on the letter four times. That's the whole job. No catch.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-oatley-0",
+       "denyFlag": "hub:h-cornershop-oatley-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "This is going to sound small. They admitted it, which I did not expect, so now there is $128 owing to Oatley and it is not going to walk in here itself. Half the street knows and half the street is pretending not to. Be polite about it. It costs nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-oatley-1",
+       "denyFlag": "hub:h-cornershop-oatley-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "Short Delivery, Oatley — that's done.",
+       "turnin": "h-cornershop-oatley-0"
+      },
+      {
+       "text": "The Credit Note, Oatley — that's done.",
+       "turnin": "h-cornershop-oatley-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-oatley-rosita",
+   "name": "Rosita, delivery driver at Oatley",
+   "x": -11671,
+   "z": 12670,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You have got a face like you can keep your mouth shut.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I have written it down twice and lost it twice. I do the Oatley run at knock-off and there is a stretch of it where the van gets followed, which I have told nobody until now. I am not after trouble. I am after an answer. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-oatley-2",
+       "denyFlag": "hub:h-cornershop-oatley-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Do not laugh. I have got a esky of warm cans in the back of the van and the Oatley shop is shut, and the number on the door rings out. Nobody else seems to have noticed, which is its own problem. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-oatley-3",
+       "denyFlag": "hub:h-cornershop-oatley-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "The Oatley Run — that's done.",
+       "turnin": "h-cornershop-oatley-2"
+      },
+      {
+       "text": "Locked Out, Oatley — that's done.",
+       "turnin": "h-cornershop-oatley-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-oatley-fiona",
+   "name": "Fiona, the kid on the register at Oatley",
+   "x": -11963,
+   "z": 12458,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Right. Talk while I do this.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is the sort of thing you notice or you do not. Three of the Oatley regulars have started coming in together and going out separately, and the till is $36 down on those days. Everyone I have told has looked at me the way you are now. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-oatley-4",
+       "denyFlag": "hub:h-cornershop-oatley-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Two people have already said no. Everything Oatley sells comes off a floor at Mortdale, and the woman who runs it will tell you things she will not put in writing. This is the third time I have had this conversation. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-oatley-5",
+       "denyFlag": "hub:h-cornershop-oatley-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "The Regulars, Oatley — that's done.",
+       "turnin": "h-cornershop-oatley-4"
+      },
+      {
+       "text": "The Wholesaler, Oatley — that's done.",
+       "turnin": "h-cornershop-oatley-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-werrington-roma",
+   "name": "Roma, junior coach at Werrington",
+   "x": -42054,
+   "z": -11155,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You right there? I am mid-something but go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "My knees are gone, so. I have got eleven kids for a twelve-a-side at Werrington on a Tuesday and one of them has a note from his mother. I have rung the number on the letter four times. That's the whole job. No catch.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-werrington-0",
+       "denyFlag": "hub:h-oval-werrington-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "This is going to sound small. We found a twelfth, which means the Werrington club now owes the association $42 it had budgeted on not owing. Half the street knows and half the street is pretending not to. Be polite about it. It costs nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-werrington-1",
+       "denyFlag": "hub:h-oval-werrington-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "Under 12s at Werrington — that's done.",
+       "turnin": "h-oval-werrington-0"
+      },
+      {
+       "text": "Registration, Werrington — that's done.",
+       "turnin": "h-oval-werrington-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-werrington-aurelio",
+   "name": "Aurelio, canteen manager at Werrington",
+   "x": -42049,
+   "z": -11427,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are here about the sign, the sign is wrong.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I have written it down twice and lost it twice. The canteen at Werrington does two hundred sausages on a Saturday and this week the freezer went off at quarter to six. I am not after trouble. I am after an answer. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-werrington-2",
+       "denyFlag": "hub:h-oval-werrington-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Do not laugh. Somebody walked off with the float from the Werrington canteen at about quarter to six during the last home game, and I have a fair idea which somebody. Nobody else seems to have noticed, which is its own problem. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-werrington-3",
+       "denyFlag": "hub:h-oval-werrington-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Werrington Canteen — that's done.",
+       "turnin": "h-oval-werrington-2"
+      },
+      {
+       "text": "Grand Final Float, Werrington — that's done.",
+       "turnin": "h-oval-werrington-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-werrington-genevieve",
+   "name": "Genevieve, groundsman at Werrington",
+   "x": -41970.7,
+   "z": -11462.1,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand in the doorway, mate, come round.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is the sort of thing you notice or you do not. The sprinkler line under the Werrington outfield has been leaking since a Tuesday and the wet patch has started to move. Everyone I have told has looked at me the way you are now. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-werrington-4",
+       "denyFlag": "hub:h-oval-werrington-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Two people have already said no. The bloke who allocates grounds for the whole association sits at St Marys, and Werrington has been at the bottom of his list for two seasons. This is the third time I have had this conversation. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-werrington-5",
+       "denyFlag": "hub:h-oval-werrington-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Sprinkler Line, Werrington — that's done.",
+       "turnin": "h-oval-werrington-4"
+      },
+      {
+       "text": "The Association, Werrington — that's done.",
+       "turnin": "h-oval-werrington-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-hurlstone-park-trang",
+   "name": "Trang, bushcare volunteer at Hurlstone Park",
+   "x": -7192.8,
+   "z": 4882,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Long day. Say what you came to say.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "My knees are gone, so. Somebody has been tipping fill into the creek behind Hurlstone Park since a public holiday nobody remembered and it is narrowing the channel a metre at a time. I have rung the number on the letter four times. That's the whole job. No catch.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-hurlstone-park-0",
+       "denyFlag": "hub:h-creek-hurlstone-park-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "This is going to sound small. They have agreed to a clean-up at Hurlstone Park, which is wonderful, except the grant is $29 short and closes on a public holiday nobody remembered. Half the street knows and half the street is pretending not to. Be polite about it. It costs nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-hurlstone-park-1",
+       "denyFlag": "hub:h-creek-hurlstone-park-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "The Creek Behind Hurlstone Park — that's done.",
+       "turnin": "h-creek-hurlstone-park-0"
+      },
+      {
+       "text": "Willow Removal, Hurlstone Park — that's done.",
+       "turnin": "h-creek-hurlstone-park-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-hurlstone-park-nina",
+   "name": "Nina, SES member at Hurlstone Park",
+   "x": -7062.4,
+   "z": 4692.5,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I know that look. Everyone wants something today.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I have written it down twice and lost it twice. We had 72 sandbags in the Hurlstone Park shed on a public holiday nobody remembered and this morning we have got the pallet they came on. I am not after trouble. I am after an answer. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-hurlstone-park-2",
+       "denyFlag": "hub:h-creek-hurlstone-park-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Do not laugh. People keep driving the low crossing at Hurlstone Park at the second express with the water over the sign, and one of them is going to be the one. Nobody else seems to have noticed, which is its own problem. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-hurlstone-park-3",
+       "denyFlag": "hub:h-creek-hurlstone-park-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Sandbags, Hurlstone Park — that's done.",
+       "turnin": "h-creek-hurlstone-park-2"
+      },
+      {
+       "text": "The Low Crossing, Hurlstone Park — that's done.",
+       "turnin": "h-creek-hurlstone-park-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-hurlstone-park-eryk",
+   "name": "Eryk, resident who got flooded at Hurlstone Park",
+   "x": -7145,
+   "z": 4713,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Give me a second. Right. Go.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is the sort of thing you notice or you do not. The water came through my place at Hurlstone Park on a public holiday nobody remembered and the assessor wants photographs of things I have already thrown out. Everyone I have told has looked at me the way you are now. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-hurlstone-park-4",
+       "denyFlag": "hub:h-creek-hurlstone-park-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Two people have already said no. Whatever is happening to Hurlstone Park starts upstream at Dulwich Grove, and there are people up there who have been saying so for years. This is the third time I have had this conversation. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-hurlstone-park-5",
+       "denyFlag": "hub:h-creek-hurlstone-park-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "Under the House, Hurlstone Park — that's done.",
+       "turnin": "h-creek-hurlstone-park-4"
+      },
+      {
+       "text": "Upstream, Hurlstone Park — that's done.",
+       "turnin": "h-creek-hurlstone-park-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-cornershop-gosford-0",
+   "act": 3,
+   "title": "Short Delivery, Gosford",
+   "blurb": "I'll be straight with you. The Gosford order has been two cartons light every week since a public holiday nobody remembered and the invoice says otherwise every time. It has been going on longer than I have admitted to anyone. You'll know it when you see it.",
+   "giver": "hub-gosford-charlie",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 11518,
+     "z": -49447,
+     "radius": 25,
+     "label": "the loading bay round the side"
+    },
+    {
+     "kind": "photo",
+     "x": 11507,
+     "z": -49444,
+     "radius": 35,
+     "label": "the pallet as it actually arrives"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I have got something to send them",
+     "npc": "hub-gosford-charlie"
+    }
+   ],
+   "reward": {
+    "cash": 56,
+    "xp": 136,
+    "unlock": [
+     "hub:h-cornershop-gosford-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-cornershop-gosford-1",
+   "act": 3,
+   "title": "The Credit Note, Gosford",
+   "blurb": "It has been three weeks. They admitted it, which I did not expect, so now there is $32 owing to Gosford and it is not going to walk in here itself. I have got no proof, which is exactly why I am asking. Half now if you want it. Most people don't.",
+   "giver": "hub-gosford-charlie",
+   "level": 1,
+   "requires": [
+    "h-cornershop-gosford-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 32,
+     "label": "$32, and do not take a voucher"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "cash, on the counter, and I will believe it",
+     "npc": "hub-gosford-charlie"
+    }
+   ],
+   "reward": {
+    "cash": 106,
+    "xp": 223,
+    "unlock": [
+     "hub:h-cornershop-gosford-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-cornershop-gosford-2",
+   "act": 3,
+   "title": "The Gosford Run",
+   "blurb": "Nobody else has offered, so. I do the Gosford run at just gone midnight and there is a stretch of it where the van gets followed, which I have told nobody until now. It might be nothing. It has not felt like nothing. Whatever it costs you, tell me and I will cover it.",
+   "giver": "hub-gosford-callum",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Gosford",
+     "to": "Point Clare",
+     "label": "ride it with me as far as Point Clare"
+    },
+    {
+     "kind": "photo",
+     "x": 11517,
+     "z": -49672,
+     "radius": 35,
+     "label": "whatever is behind us when we stop"
+    }
+   ],
+   "reward": {
+    "cash": 58,
+    "xp": 137,
+    "unlock": [
+     "hub:h-cornershop-gosford-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-cornershop-gosford-3",
+   "act": 3,
+   "title": "Locked Out, Gosford",
+   "blurb": "The council knows and the council does not care. I have got an esky with no lid in the back of the van and the Gosford shop is shut, and the number on the door rings out. I would not ask if there was anyone else about. I would rather know than wonder.",
+   "giver": "hub-gosford-callum",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 11614,
+     "z": -49646,
+     "radius": 25,
+     "label": "try the flat above the shop"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get one in you, this takes a while"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "somebody has to sign for it",
+     "npc": "hub-gosford-callum"
+    }
+   ],
+   "reward": {
+    "cash": 67,
+    "xp": 121,
+    "unlock": [
+     "hub:h-cornershop-gosford-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-cornershop-gosford-4",
+   "act": 3,
+   "title": "The Regulars, Gosford",
+   "blurb": "I have been putting it off since Easter. Three of the Gosford regulars have started coming in together and going out separately, and the till is $18 down on those days. You can tell me I am imagining it. Tell me after. That's the whole job. No catch.",
+   "giver": "hub-gosford-ava",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 3,
+     "label": "the ones who come in as a set"
+    },
+    {
+     "kind": "earn",
+     "dollars": 18,
+     "label": "$18, which is exactly what the till says"
+    }
+   ],
+   "reward": {
+    "cash": 52,
+    "xp": 120,
+    "unlock": [
+     "hub:h-cornershop-gosford-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-cornershop-gosford-5",
+   "act": 3,
+   "title": "The Wholesaler, Gosford",
+   "blurb": "Before you say anything: yes, I know. Everything Gosford sells comes off a floor at Point Clare, and the woman who runs it will tell you things she will not put in writing. I would have sorted it myself a year ago. Be polite about it. It costs nothing.",
+   "giver": "hub-gosford-ava",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 10178,
+     "z": -47027,
+     "radius": 60,
+     "label": "go and see her before the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come and tell me what she said about us",
+     "npc": "hub-gosford-ava"
+    }
+   ],
+   "reward": {
+    "cash": 54,
+    "xp": 117,
+    "unlock": [
+     "hub:h-cornershop-gosford-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-oval-beverly-hills-0",
+   "act": 3,
+   "title": "Under 12s at Beverly Hills",
+   "blurb": "I'll be straight with you. I have got eleven kids for a twelve-a-side at Beverly Hills on Thursdays and one of them has a note from his mother. It has been going on longer than I have admitted to anyone. You'll know it when you see it.",
+   "giver": "hub-beverly-hills-tayla",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11550,
+     "z": 9234,
+     "radius": 25,
+     "label": "the estate behind the ground, ask around"
+    },
+    {
+     "kind": "photo",
+     "x": -11559,
+     "z": 9257,
+     "radius": 35,
+     "label": "the noticeboard where the sign-on sheet went up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "any kid with boots will do at this point",
+     "npc": "hub-beverly-hills-tayla"
+    }
+   ],
+   "reward": {
+    "cash": 84,
+    "xp": 176,
+    "unlock": [
+     "hub:h-oval-beverly-hills-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-beverly-hills-1",
+   "act": 3,
+   "title": "Registration, Beverly Hills",
+   "blurb": "It has been three weeks. We found a twelfth, which means the Beverly Hills club now owes the association $49 it had budgeted on not owing. I have got no proof, which is exactly why I am asking. Half now if you want it. Most people don't.",
+   "giver": "hub-beverly-hills-tayla",
+   "level": 2,
+   "requires": [
+    "h-oval-beverly-hills-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 49,
+     "label": "$49 before the cut-off"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will drive it in myself",
+     "npc": "hub-beverly-hills-tayla"
+    }
+   ],
+   "reward": {
+    "cash": 105,
+    "xp": 274,
+    "unlock": [
+     "hub:h-oval-beverly-hills-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-beverly-hills-2",
+   "act": 3,
+   "title": "The Beverly Hills Canteen",
+   "blurb": "Nobody else has offered, so. The canteen at Beverly Hills does two hundred sausages on a Saturday and this week the freezer went off at two in the afternoon. It might be nothing. It has not felt like nothing. Whatever it costs you, tell me and I will cover it.",
+   "giver": "hub-beverly-hills-raul",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 2,
+     "label": "we are going to need the coffee"
+    },
+    {
+     "kind": "photo",
+     "x": -11667,
+     "z": 9193,
+     "radius": 35,
+     "label": "the thermometer, so the insurance believes us"
+    }
+   ],
+   "reward": {
+    "cash": 84,
+    "xp": 176,
+    "unlock": [
+     "hub:h-oval-beverly-hills-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-beverly-hills-3",
+   "act": 3,
+   "title": "Grand Final Float, Beverly Hills",
+   "blurb": "The council knows and the council does not care. Somebody walked off with the float from the Beverly Hills canteen at about two in the afternoon during the last home game, and I have a fair idea which somebody. I would not ask if there was anyone else about. I would rather know than wonder.",
+   "giver": "hub-beverly-hills-raul",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "the pair who were leaning on the roller door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 48,
+     "label": "$48, which is what was in the tin"
+    }
+   ],
+   "reward": {
+    "cash": 75,
+    "xp": 182,
+    "unlock": [
+     "hub:h-oval-beverly-hills-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-beverly-hills-4",
+   "act": 3,
+   "title": "Sprinkler Line, Beverly Hills",
+   "blurb": "I have been putting it off since Easter. The sprinkler line under the Beverly Hills outfield has been leaking since Thursdays and the wet patch has started to move. You can tell me I am imagining it. Tell me after. That's the whole job. No catch.",
+   "giver": "hub-beverly-hills-sisay",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11709,
+     "z": 9057,
+     "radius": 25,
+     "label": "walk the line from the tap to the boundary"
+    },
+    {
+     "kind": "photo",
+     "x": -11690,
+     "z": 9035,
+     "radius": 35,
+     "label": "where the grass has gone dark"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to dig once, not five times",
+     "npc": "hub-beverly-hills-sisay"
+    }
+   ],
+   "reward": {
+    "cash": 69,
+    "xp": 169,
+    "unlock": [
+     "hub:h-oval-beverly-hills-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-beverly-hills-5",
+   "act": 3,
+   "title": "The Association, Beverly Hills",
+   "blurb": "Before you say anything: yes, I know. The bloke who allocates grounds for the whole association sits at Narwee, and Beverly Hills has been at the bottom of his list for two seasons. I would have sorted it myself a year ago. Be polite about it. It costs nothing.",
+   "giver": "hub-beverly-hills-sisay",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -12822,
+     "z": 9030,
+     "radius": 60,
+     "label": "go and be reasonable at him"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if it is us or the paperwork",
+     "npc": "hub-beverly-hills-sisay"
+    }
+   ],
+   "reward": {
+    "cash": 78,
+    "xp": 170,
+    "unlock": [
+     "hub:h-oval-beverly-hills-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-turramurra-0",
+   "act": 3,
+   "title": "The Creek Behind Turramurra",
+   "blurb": "I'll be straight with you. Somebody has been tipping fill into the creek behind Turramurra since the first of the month and it is narrowing the channel a metre at a time. It has been going on longer than I have admitted to anyone. You'll know it when you see it.",
+   "giver": "hub-turramurra-vaila",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -7739,
+     "z": -14797,
+     "radius": 35,
+     "label": "the fill, with the water level in shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council reads photographs, not letters",
+     "npc": "hub-turramurra-vaila"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 175,
+    "unlock": [
+     "hub:h-creek-turramurra-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-turramurra-1",
+   "act": 3,
+   "title": "Willow Removal, Turramurra",
+   "blurb": "It has been three weeks. They have agreed to a clean-up at Turramurra, which is wonderful, except the grant is $59 short and closes on the first of the month. I have got no proof, which is exactly why I am asking. Half now if you want it. Most people don't.",
+   "giver": "hub-turramurra-vaila",
+   "level": 2,
+   "requires": [
+    "h-creek-turramurra-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 59,
+     "label": "$59, and I do not care whose pocket"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the form needs the number today",
+     "npc": "hub-turramurra-vaila"
+    }
+   ],
+   "reward": {
+    "cash": 109,
+    "xp": 265,
+    "unlock": [
+     "hub:h-creek-turramurra-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-turramurra-2",
+   "act": 3,
+   "title": "Sandbags, Turramurra",
+   "blurb": "Nobody else has offered, so. We had 26 sandbags in the Turramurra shed on the first of the month and this morning we have got the pallet they came on. It might be nothing. It has not felt like nothing. Whatever it costs you, tell me and I will cover it.",
+   "giver": "hub-turramurra-ajay",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7933,
+     "z": -14912,
+     "radius": 25,
+     "label": "the yards backing onto the reserve"
+    },
+    {
+     "kind": "photo",
+     "x": -7941,
+     "z": -14928,
+     "radius": 35,
+     "label": "anywhere they have obviously been used"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 168,
+    "unlock": [
+     "hub:h-creek-turramurra-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-turramurra-3",
+   "act": 3,
+   "title": "The Low Crossing, Turramurra",
+   "blurb": "The council knows and the council does not care. People keep driving the low crossing at Turramurra at first light with the water over the sign, and one of them is going to be the one. I would not ask if there was anyone else about. I would rather know than wonder.",
+   "giver": "hub-turramurra-ajay",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "you will be standing out there a while"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "the ones who argue with the barrier"
+    }
+   ],
+   "reward": {
+    "cash": 84,
+    "xp": 169,
+    "unlock": [
+     "hub:h-creek-turramurra-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-turramurra-4",
+   "act": 3,
+   "title": "Under the House, Turramurra",
+   "blurb": "I have been putting it off since Easter. The water came through my place at Turramurra on the first of the month and the assessor wants photographs of things I have already thrown out. You can tell me I am imagining it. Tell me after. That's the whole job. No catch.",
+   "giver": "hub-turramurra-isla",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7690,
+     "z": -14892,
+     "radius": 25,
+     "label": "round the side, where the pile is"
+    },
+    {
+     "kind": "photo",
+     "x": -7689,
+     "z": -14870,
+     "radius": 35,
+     "label": "the high-water mark on the brick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the whole claim, that mark",
+     "npc": "hub-turramurra-isla"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 172,
+    "unlock": [
+     "hub:h-creek-turramurra-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-turramurra-5",
+   "act": 3,
+   "title": "Upstream, Turramurra",
+   "blurb": "Before you say anything: yes, I know. Whatever is happening to Turramurra starts upstream at Warrawee, and there are people up there who have been saying so for years. I would have sorted it myself a year ago. Be polite about it. It costs nothing.",
+   "giver": "hub-turramurra-isla",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -8384,
+     "z": -15699,
+     "radius": 60,
+     "label": "go up and find them"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear it from someone who is not me",
+     "npc": "hub-turramurra-isla"
+    }
+   ],
+   "reward": {
+    "cash": 65,
+    "xp": 167,
+    "unlock": [
+     "hub:h-creek-turramurra-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

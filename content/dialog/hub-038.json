@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-waitara-mercer",
+   "name": "Mercer, shopkeeper at Waitara",
+   "x": -10086,
+   "z": -17248,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are early. Or late. I have lost track.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Honestly, I am past caring how it looks. The Waitara order has been two cartons light every week since Thursdays and the invoice says otherwise every time. It started small, the way these things do. Whatever it costs you, tell me and I will cover it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-waitara-0",
+       "denyFlag": "hub:h-cornershop-waitara-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I would do it myself if I could leave the counter. They admitted it, which I did not expect, so now there is $70 owing to Waitara and it is not going to walk in here itself. It is the not knowing that has got me, honestly. I would rather know than wonder.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-waitara-1",
+       "denyFlag": "hub:h-cornershop-waitara-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "Short Delivery, Waitara — that's done.",
+       "turnin": "h-cornershop-waitara-0"
+      },
+      {
+       "text": "The Credit Note, Waitara — that's done.",
+       "turnin": "h-cornershop-waitara-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-waitara-vikram",
+   "name": "Vikram, delivery driver at Waitara",
+   "x": -9891.1,
+   "z": -17546.9,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Been here since before it was like this. Go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You will think I am making this up. I do the Waitara run at first light and there is a stretch of it where the van gets followed, which I have told nobody until now. There is probably a simple explanation and I would love to hear it. That's the whole job. No catch.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-waitara-2",
+       "denyFlag": "hub:h-cornershop-waitara-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "There is no clever way to say this. I have got a roll of raffle tickets in the back of the van and the Waitara shop is shut, and the number on the door rings out. You will see what I mean the second you get there. Be polite about it. It costs nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-waitara-3",
+       "denyFlag": "hub:h-cornershop-waitara-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "The Waitara Run — that's done.",
+       "turnin": "h-cornershop-waitara-2"
+      },
+      {
+       "text": "Locked Out, Waitara — that's done.",
+       "turnin": "h-cornershop-waitara-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-waitara-aiden",
+   "name": "Aiden, the kid on the register at Waitara",
+   "x": -10076,
+   "z": -17512,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Do not mind the mess. It is structural now.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You look like you have twenty minutes. Three of the Waitara regulars have started coming in together and going out separately, and the till is $87 down on those days. There is a version of this where I am the unreasonable one. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-waitara-4",
+       "denyFlag": "hub:h-cornershop-waitara-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Keep it between us for now. Everything Waitara sells comes off a floor at Hornsby, and the woman who runs it will tell you things she will not put in writing. The paperwork says one thing and my eyes say another. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-waitara-5",
+       "denyFlag": "hub:h-cornershop-waitara-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "The Regulars, Waitara — that's done.",
+       "turnin": "h-cornershop-waitara-4"
+      },
+      {
+       "text": "The Wholesaler, Waitara — that's done.",
+       "turnin": "h-cornershop-waitara-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-macdonaldtown-amara",
+   "name": "Amara, junior coach at Macdonaldtown",
+   "x": -2189,
+   "z": 3285,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are selling something the answer is no.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Honestly, I am past caring how it looks. I have got eleven kids for a twelve-a-side at Macdonaldtown on the first of the month and one of them has a note from his mother. It started small, the way these things do. Whatever it costs you, tell me and I will cover it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-macdonaldtown-0",
+       "denyFlag": "hub:h-oval-macdonaldtown-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I would do it myself if I could leave the counter. We found a twelfth, which means the Macdonaldtown club now owes the association $78 it had budgeted on not owing. It is the not knowing that has got me, honestly. I would rather know than wonder.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-macdonaldtown-1",
+       "denyFlag": "hub:h-oval-macdonaldtown-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "Under 12s at Macdonaldtown — that's done.",
+       "turnin": "h-oval-macdonaldtown-0"
+      },
+      {
+       "text": "Registration, Macdonaldtown — that's done.",
+       "turnin": "h-oval-macdonaldtown-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-macdonaldtown-ereni",
+   "name": "Ereni, canteen manager at Macdonaldtown",
+   "x": -2064,
+   "z": 3214,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Cash only and no, I am joking. What do you want.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You will think I am making this up. The canteen at Macdonaldtown does two hundred sausages on a Saturday and this week the freezer went off at the middle of the news. There is probably a simple explanation and I would love to hear it. That's the whole job. No catch.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-macdonaldtown-2",
+       "denyFlag": "hub:h-oval-macdonaldtown-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "There is no clever way to say this. Somebody walked off with the float from the Macdonaldtown canteen at about the middle of the news during the last home game, and I have a fair idea which somebody. You will see what I mean the second you get there. Be polite about it. It costs nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-macdonaldtown-3",
+       "denyFlag": "hub:h-oval-macdonaldtown-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Macdonaldtown Canteen — that's done.",
+       "turnin": "h-oval-macdonaldtown-2"
+      },
+      {
+       "text": "Grand Final Float, Macdonaldtown — that's done.",
+       "turnin": "h-oval-macdonaldtown-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-macdonaldtown-dilan",
+   "name": "Dilan, groundsman at Macdonaldtown",
+   "x": -2101,
+   "z": 3018,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You have got a face like you can keep your mouth shut.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You look like you have twenty minutes. The sprinkler line under the Macdonaldtown outfield has been leaking since the first of the month and the wet patch has started to move. There is a version of this where I am the unreasonable one. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-macdonaldtown-4",
+       "denyFlag": "hub:h-oval-macdonaldtown-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Keep it between us for now. The bloke who allocates grounds for the whole association sits at St Peters, and Macdonaldtown has been at the bottom of his list for two seasons. The paperwork says one thing and my eyes say another. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-macdonaldtown-5",
+       "denyFlag": "hub:h-oval-macdonaldtown-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Sprinkler Line, Macdonaldtown — that's done.",
+       "turnin": "h-oval-macdonaldtown-4"
+      },
+      {
+       "text": "The Association, Macdonaldtown — that's done.",
+       "turnin": "h-oval-macdonaldtown-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-minto-sana",
+   "name": "Sana, bushcare volunteer at Minto",
+   "x": -33642.3,
+   "z": 18188.7,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Right. Talk while I do this.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Honestly, I am past caring how it looks. Somebody has been tipping fill into the creek behind Minto since grand final week and it is narrowing the channel a metre at a time. It started small, the way these things do. Whatever it costs you, tell me and I will cover it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-minto-0",
+       "denyFlag": "hub:h-creek-minto-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I would do it myself if I could leave the counter. They have agreed to a clean-up at Minto, which is wonderful, except the grant is $81 short and closes on grand final week. It is the not knowing that has got me, honestly. I would rather know than wonder.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-minto-1",
+       "denyFlag": "hub:h-creek-minto-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "The Creek Behind Minto — that's done.",
+       "turnin": "h-creek-minto-0"
+      },
+      {
+       "text": "Willow Removal, Minto — that's done.",
+       "turnin": "h-creek-minto-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-minto-sanjay",
+   "name": "Sanjay, SES member at Minto",
+   "x": -33682,
+   "z": 18056,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You right there? I am mid-something but go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You will think I am making this up. We had 93 sandbags in the Minto shed on grand final week and this morning we have got the pallet they came on. There is probably a simple explanation and I would love to hear it. That's the whole job. No catch.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-minto-2",
+       "denyFlag": "hub:h-creek-minto-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "There is no clever way to say this. People keep driving the low crossing at Minto at the middle of the news with the water over the sign, and one of them is going to be the one. You will see what I mean the second you get there. Be polite about it. It costs nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-minto-3",
+       "denyFlag": "hub:h-creek-minto-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Sandbags, Minto — that's done.",
+       "turnin": "h-creek-minto-2"
+      },
+      {
+       "text": "The Low Crossing, Minto — that's done.",
+       "turnin": "h-creek-minto-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-minto-hasan",
+   "name": "Hasan, resident who got flooded at Minto",
+   "x": -33734,
+   "z": 18232,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are here about the sign, the sign is wrong.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You look like you have twenty minutes. The water came through my place at Minto on grand final week and the assessor wants photographs of things I have already thrown out. There is a version of this where I am the unreasonable one. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-minto-4",
+       "denyFlag": "hub:h-creek-minto-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Keep it between us for now. Whatever is happening to Minto starts upstream at Leumeah, and there are people up there who have been saying so for years. The paperwork says one thing and my eyes say another. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-minto-5",
+       "denyFlag": "hub:h-creek-minto-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "Under the House, Minto — that's done.",
+       "turnin": "h-creek-minto-4"
+      },
+      {
+       "text": "Upstream, Minto — that's done.",
+       "turnin": "h-creek-minto-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

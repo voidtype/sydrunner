@@ -1,0 +1,651 @@
+{
+ "quests": [
+  {
+   "id": "h-bakery-heathcote-0",
+   "act": 3,
+   "title": "knock-off at Heathcote",
+   "blurb": "It has been three weeks. I start at knock-off and for a month the Heathcote back lane has had somebody in it who is not waiting for bread. You can tell me I am imagining it. Tell me after. I'll put the kettle on for when you're back.",
+   "giver": "hub-heathcote-luka",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -17985,
+     "z": 24805,
+     "radius": 35,
+     "label": "the lane, from the door, no flash"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I am not calling anyone until I am sure",
+     "npc": "hub-heathcote-luka"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 176,
+    "unlock": [
+     "hub:h-bakery-heathcote-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-heathcote-1",
+   "act": 3,
+   "title": "The Lane Light, Heathcote",
+   "blurb": "Nobody else has offered, so. A light on that lane costs Heathcote $37 and the landlord has said no twice, so we are doing it ourselves. I would have sorted it myself a year ago. Just do not come back empty-handed.",
+   "giver": "hub-heathcote-luka",
+   "level": 2,
+   "requires": [
+    "h-bakery-heathcote-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 37,
+     "label": "$37 and I will fit it myself"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "do not tell him where it came from",
+     "npc": "hub-heathcote-luka"
+    }
+   ],
+   "reward": {
+    "cash": 118,
+    "xp": 270,
+    "unlock": [
+     "hub:h-bakery-heathcote-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-heathcote-2",
+   "act": 3,
+   "title": "Flour Run, Heathcote",
+   "blurb": "The council knows and the council does not care. The flour for Heathcote comes off a truck at knock-off and last grand final week the truck came and the flour did not. It is not the money. It has stopped being the money. I will know if you skipped a bit.",
+   "giver": "hub-heathcote-enzo",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Heathcote",
+     "to": "Engadine",
+     "label": "ride out to Engadine where the load is made up"
+    },
+    {
+     "kind": "photo",
+     "x": -18086,
+     "z": 24701,
+     "radius": 35,
+     "label": "the pallet with our name on it, if it exists"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 181,
+    "unlock": [
+     "hub:h-bakery-heathcote-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-heathcote-3",
+   "act": 3,
+   "title": "The Loading Zone, Heathcote",
+   "blurb": "I have been putting it off since Easter. The Heathcote loading zone has had a car in it at knock-off every morning this week and the driver waits in it, which makes it worse. I did try the official route, for what that was worth. Say nothing to anyone on the way.",
+   "giver": "hub-heathcote-enzo",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "the one who says he is only a minute"
+    },
+    {
+     "kind": "earn",
+     "dollars": 90,
+     "label": "and the ticket I got, off him"
+    }
+   ],
+   "reward": {
+    "cash": 67,
+    "xp": 175,
+    "unlock": [
+     "hub:h-bakery-heathcote-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-heathcote-4",
+   "act": 3,
+   "title": "The Sourdough Sign, Heathcote",
+   "blurb": "Before you say anything: yes, I know. Somebody two doors down from Heathcote put up a sign on grand final week that says the same six words as ours, in the same order. I have got a photo on my phone but it is useless. Do not make a scene about it.",
+   "giver": "hub-heathcote-kasia",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -17970,
+     "z": 24671,
+     "radius": 25,
+     "label": "walk down and read it properly"
+    },
+    {
+     "kind": "photo",
+     "x": -17962,
+     "z": 24668,
+     "radius": 35,
+     "label": "both signs if you can get them in one frame"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me I am not imagining it",
+     "npc": "hub-heathcote-kasia"
+    }
+   ],
+   "reward": {
+    "cash": 74,
+    "xp": 172,
+    "unlock": [
+     "hub:h-bakery-heathcote-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-heathcote-5",
+   "act": 3,
+   "title": "The Old Site, Heathcote",
+   "blurb": "It is not a police matter and I have checked. This business was at Engadine before it was at Heathcote, and there is a woman there who still has the original book. I am aware how that sounds. Ask for me by name at the counter.",
+   "giver": "hub-heathcote-kasia",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -17419,
+     "z": 22539,
+     "radius": 60,
+     "label": "she is usually about in the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring back whatever she is willing to say",
+     "npc": "hub-heathcote-kasia"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 180,
+    "unlock": [
+     "hub:h-bakery-heathcote-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-macquarie-park-0",
+   "act": 3,
+   "title": "The Macquarie Park Pool",
+   "blurb": "It has been three weeks. Council has been saying the Macquarie Park pool is at end of life since the long weekend and the crack they keep pointing at is not in the shell. You can tell me I am imagining it. Tell me after. I'll put the kettle on for when you're back.",
+   "giver": "hub-macquarie-park-eryk",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -7728,
+     "z": -9112,
+     "radius": 35,
+     "label": "the crack, close, with something for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "an engineer can read that. A councillor cannot.",
+     "npc": "hub-macquarie-park-eryk"
+    }
+   ],
+   "reward": {
+    "cash": 73,
+    "xp": 185,
+    "unlock": [
+     "hub:h-pool-macquarie-park-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-macquarie-park-1",
+   "act": 3,
+   "title": "The Petition Stall, Macquarie Park",
+   "blurb": "Nobody else has offered, so. We are running a stall for Macquarie Park on the long weekend and a stall needs $43 of gear that nobody has volunteered to pay for. I would have sorted it myself a year ago. Just do not come back empty-handed.",
+   "giver": "hub-macquarie-park-eryk",
+   "level": 2,
+   "requires": [
+    "h-pool-macquarie-park-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 43,
+     "label": "$43 and a table, if you see one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will be there from eight either way",
+     "npc": "hub-macquarie-park-eryk"
+    }
+   ],
+   "reward": {
+    "cash": 119,
+    "xp": 257,
+    "unlock": [
+     "hub:h-pool-macquarie-park-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-macquarie-park-2",
+   "act": 3,
+   "title": "Squad, Macquarie Park",
+   "blurb": "The council knows and the council does not care. I coach 60 kids at Macquarie Park at first light and three of them have stopped coming without anybody ringing me. It is not the money. It has stopped being the money. I will know if you skipped a bit.",
+   "giver": "hub-macquarie-park-rukmini",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7908,
+     "z": -9068,
+     "radius": 25,
+     "label": "the flats where two of them live"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "take something with you, it is a long walk up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I do not need them back. I need to know.",
+     "npc": "hub-macquarie-park-rukmini"
+    }
+   ],
+   "reward": {
+    "cash": 72,
+    "xp": 170,
+    "unlock": [
+     "hub:h-pool-macquarie-park-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-macquarie-park-3",
+   "act": 3,
+   "title": "The Deep End, Macquarie Park",
+   "blurb": "I have been putting it off since Easter. A group has been coming over the Macquarie Park fence after close and swimming in the dark, which is how Macquarie Park loses its pool. I did try the official route, for what that was worth. Say nothing to anyone on the way.",
+   "giver": "hub-macquarie-park-rukmini",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "the ones who go over the fence"
+    },
+    {
+     "kind": "photo",
+     "x": -7832,
+     "z": -9160,
+     "radius": 35,
+     "label": "the spot in the fence they use"
+    }
+   ],
+   "reward": {
+    "cash": 73,
+    "xp": 184,
+    "unlock": [
+     "hub:h-pool-macquarie-park-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-macquarie-park-4",
+   "act": 3,
+   "title": "The Kiosk Freezer, Macquarie Park",
+   "blurb": "Before you say anything: yes, I know. The kiosk at Macquarie Park has a milk crate in it and a freezer that has been running warm since the long weekend. I have got a photo on my phone but it is useless. Do not make a scene about it.",
+   "giver": "hub-macquarie-park-soren",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 2,
+     "label": "get two, we are going to be here"
+    },
+    {
+     "kind": "goto",
+     "x": -7742,
+     "z": -9160,
+     "radius": 25,
+     "label": "the plant room behind the kiosk"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether it is the freezer or the power",
+     "npc": "hub-macquarie-park-soren"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 169,
+    "unlock": [
+     "hub:h-pool-macquarie-park-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-macquarie-park-5",
+   "act": 3,
+   "title": "The Aquatic Centre, Macquarie Park",
+   "blurb": "It is not a police matter and I have checked. They want everyone from Macquarie Park to drive to the new centre at Macquarie University, so somebody should go and see whether it is any good. I am aware how that sounds. Ask for me by name at the counter.",
+   "giver": "hub-macquarie-park-soren",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -8495,
+     "z": -9968,
+     "radius": 60,
+     "label": "have a proper look, not a quick one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "be honest with me, even if it is nice",
+     "npc": "hub-macquarie-park-soren"
+    }
+   ],
+   "reward": {
+    "cash": 73,
+    "xp": 184,
+    "unlock": [
+     "hub:h-pool-macquarie-park-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-tallawong-0",
+   "act": 3,
+   "title": "The Tallawong Rank",
+   "blurb": "It has been three weeks. The rank outside Tallawong used to hold nine cars and since a wet Monday it holds four, and nobody will say who moved the line. You can tell me I am imagining it. Tell me after. I'll put the kettle on for when you're back.",
+   "giver": "hub-tallawong-nuri",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -28512,
+     "z": -19008,
+     "radius": 35,
+     "label": "the painted line and the old one under it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the old paint is still there, that is the whole argument",
+     "npc": "hub-tallawong-nuri"
+    }
+   ],
+   "reward": {
+    "cash": 80,
+    "xp": 227,
+    "unlock": [
+     "hub:h-rank-tallawong-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-tallawong-1",
+   "act": 3,
+   "title": "Lost Fares, Tallawong",
+   "blurb": "Nobody else has offered, so. Since the rank at Tallawong shrank I am $58 a week down, and the association wants that number from somebody who can prove it. I would have sorted it myself a year ago. Just do not come back empty-handed.",
+   "giver": "hub-tallawong-nuri",
+   "level": 3,
+   "requires": [
+    "h-rank-tallawong-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 58,
+     "label": "$58 in a week, to show it can be done"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the submission, right there",
+     "npc": "hub-tallawong-nuri"
+    }
+   ],
+   "reward": {
+    "cash": 120,
+    "xp": 303,
+    "unlock": [
+     "hub:h-rank-tallawong-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-tallawong-2",
+   "act": 3,
+   "title": "Queue Jumpers, Tallawong",
+   "blurb": "The council knows and the council does not care. Cars that have never sat in the Tallawong queue turn up at two in the afternoon and take the front of it, and the drivers who waited say nothing. It is not the money. It has stopped being the money. I will know if you skipped a bit.",
+   "giver": "hub-tallawong-imani",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "the ones who take the front"
+    },
+    {
+     "kind": "earn",
+     "dollars": 75,
+     "label": "$75, which is about one airport run"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 212,
+    "unlock": [
+     "hub:h-rank-tallawong-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-tallawong-3",
+   "act": 3,
+   "title": "The Late Train, Tallawong",
+   "blurb": "I have been putting it off since Easter. When the last train into Tallawong is late, 75 people come out at once and I have to have cars there before they do. I did try the official route, for what that was worth. Say nothing to anyone on the way.",
+   "giver": "hub-tallawong-imani",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Tallawong",
+     "to": "Rouse Hill",
+     "label": "come in on the last one from Rouse Hill and see it"
+    },
+    {
+     "kind": "photo",
+     "x": -28544,
+     "z": -19044,
+     "radius": 35,
+     "label": "the rank at the moment the doors open"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 229,
+    "unlock": [
+     "hub:h-rank-tallawong-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-tallawong-4",
+   "act": 3,
+   "title": "The Door, Tallawong",
+   "blurb": "Before you say anything: yes, I know. I have stood on this door near Tallawong for 75 years and since a wet Monday somebody has been sending my guests to a different rank. I have got a photo on my phone but it is useless. Do not make a scene about it.",
+   "giver": "hub-tallawong-robbo",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -28524,
+     "z": -19163,
+     "radius": 25,
+     "label": "follow one of them and see where they end up"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "you will be standing about, get something"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 222,
+    "unlock": [
+     "hub:h-rank-tallawong-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-tallawong-5",
+   "act": 3,
+   "title": "The Depot, Tallawong",
+   "blurb": "It is not a police matter and I have checked. The plates working the Tallawong rank are dispatched from a depot at Rouse Hill, and the man who runs it has never met a driver he liked. I am aware how that sounds. Ask for me by name at the counter.",
+   "giver": "hub-tallawong-robbo",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -26678,
+     "z": -19218,
+     "radius": 60,
+     "label": "go and be pleasant at him anyway"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether he is the problem or the symptom",
+     "npc": "hub-tallawong-robbo"
+    }
+   ],
+   "reward": {
+    "cash": 97,
+    "xp": 221,
+    "unlock": [
+     "hub:h-rank-tallawong-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

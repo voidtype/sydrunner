@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-cornershop-macquarie-fields-0",
+   "act": 3,
+   "title": "Short Delivery, Macquarie Fields",
+   "blurb": "I am told you do odd jobs. The Macquarie Fields order has been two cartons light every week since the week of the show and the invoice says otherwise every time. There is probably a simple explanation and I would love to hear it. If anyone asks, you were never here.",
+   "giver": "hub-macquarie-fields-xavier",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -30314,
+     "z": 13618,
+     "radius": 25,
+     "label": "the loading bay round the side"
+    },
+    {
+     "kind": "photo",
+     "x": -30325,
+     "z": 13621,
+     "radius": 35,
+     "label": "the pallet as it actually arrives"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I have got something to send them",
+     "npc": "hub-macquarie-fields-xavier"
+    }
+   ],
+   "reward": {
+    "cash": 93,
+    "xp": 219,
+    "unlock": [
+     "hub:h-cornershop-macquarie-fields-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-macquarie-fields-1",
+   "act": 3,
+   "title": "The Credit Note, Macquarie Fields",
+   "blurb": "I'll be straight with you. They admitted it, which I did not expect, so now there is $69 owing to Macquarie Fields and it is not going to walk in here itself. You will see what I mean the second you get there. There is no rush, but there is a Friday.",
+   "giver": "hub-macquarie-fields-xavier",
+   "level": 3,
+   "requires": [
+    "h-cornershop-macquarie-fields-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 69,
+     "label": "$69, and do not take a voucher"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "cash, on the counter, and I will believe it",
+     "npc": "hub-macquarie-fields-xavier"
+    }
+   ],
+   "reward": {
+    "cash": 130,
+    "xp": 318,
+    "unlock": [
+     "hub:h-cornershop-macquarie-fields-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-macquarie-fields-2",
+   "act": 3,
+   "title": "The Macquarie Fields Run",
+   "blurb": "It has been three weeks. I do the Macquarie Fields run at the second express and there is a stretch of it where the van gets followed, which I have told nobody until now. There is a version of this where I am the unreasonable one. I'll see you right for it.",
+   "giver": "hub-macquarie-fields-aleks",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Macquarie Fields",
+     "to": "Ingleburn",
+     "label": "ride it with me as far as Ingleburn"
+    },
+    {
+     "kind": "photo",
+     "x": -30388,
+     "z": 13436,
+     "radius": 35,
+     "label": "whatever is behind us when we stop"
+    }
+   ],
+   "reward": {
+    "cash": 92,
+    "xp": 231,
+    "unlock": [
+     "hub:h-cornershop-macquarie-fields-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-macquarie-fields-3",
+   "act": 3,
+   "title": "Locked Out, Macquarie Fields",
+   "blurb": "Nobody else has offered, so. I have got a folding table in the back of the van and the Macquarie Fields shop is shut, and the number on the door rings out. The paperwork says one thing and my eyes say another. I'll put the kettle on for when you're back.",
+   "giver": "hub-macquarie-fields-aleks",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -30218,
+     "z": 13419,
+     "radius": 25,
+     "label": "try the flat above the shop"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get one in you, this takes a while"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "somebody has to sign for it",
+     "npc": "hub-macquarie-fields-aleks"
+    }
+   ],
+   "reward": {
+    "cash": 85,
+    "xp": 214,
+    "unlock": [
+     "hub:h-cornershop-macquarie-fields-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-macquarie-fields-4",
+   "act": 3,
+   "title": "The Regulars, Macquarie Fields",
+   "blurb": "The council knows and the council does not care. Three of the Macquarie Fields regulars have started coming in together and going out separately, and the till is $67 down on those days. It has been going on longer than I have admitted to anyone. Just do not come back empty-handed.",
+   "giver": "hub-macquarie-fields-giulia",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 3,
+     "label": "the ones who come in as a set"
+    },
+    {
+     "kind": "earn",
+     "dollars": 67,
+     "label": "$67, which is exactly what the till says"
+    }
+   ],
+   "reward": {
+    "cash": 91,
+    "xp": 216,
+    "unlock": [
+     "hub:h-cornershop-macquarie-fields-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-macquarie-fields-5",
+   "act": 3,
+   "title": "The Wholesaler, Macquarie Fields",
+   "blurb": "I have been putting it off since Easter. Everything Macquarie Fields sells comes off a floor at Ingleburn, and the woman who runs it will tell you things she will not put in writing. I have got no proof, which is exactly why I am asking. I will know if you skipped a bit.",
+   "giver": "hub-macquarie-fields-giulia",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -31637,
+     "z": 14752,
+     "radius": 60,
+     "label": "go and see her before the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come and tell me what she said about us",
+     "npc": "hub-macquarie-fields-giulia"
+    }
+   ],
+   "reward": {
+    "cash": 94,
+    "xp": 219,
+    "unlock": [
+     "hub:h-cornershop-macquarie-fields-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-hornsby-0",
+   "act": 3,
+   "title": "Under 12s at Hornsby",
+   "blurb": "I am told you do odd jobs. I have got eleven kids for a twelve-a-side at Hornsby on school holidays and one of them has a note from his mother. There is probably a simple explanation and I would love to hear it. If anyone asks, you were never here.",
+   "giver": "hub-hornsby-dilan",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10649,
+     "z": -18091,
+     "radius": 25,
+     "label": "the estate behind the ground, ask around"
+    },
+    {
+     "kind": "photo",
+     "x": -10658,
+     "z": -18068,
+     "radius": 35,
+     "label": "the noticeboard where the sign-on sheet went up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "any kid with boots will do at this point",
+     "npc": "hub-hornsby-dilan"
+    }
+   ],
+   "reward": {
+    "cash": 87,
+    "xp": 231,
+    "unlock": [
+     "hub:h-oval-hornsby-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-hornsby-1",
+   "act": 3,
+   "title": "Registration, Hornsby",
+   "blurb": "I'll be straight with you. We found a twelfth, which means the Hornsby club now owes the association $67 it had budgeted on not owing. You will see what I mean the second you get there. There is no rush, but there is a Friday.",
+   "giver": "hub-hornsby-dilan",
+   "level": 3,
+   "requires": [
+    "h-oval-hornsby-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 67,
+     "label": "$67 before the cut-off"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will drive it in myself",
+     "npc": "hub-hornsby-dilan"
+    }
+   ],
+   "reward": {
+    "cash": 136,
+    "xp": 300,
+    "unlock": [
+     "hub:h-oval-hornsby-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-hornsby-2",
+   "act": 3,
+   "title": "The Hornsby Canteen",
+   "blurb": "It has been three weeks. The canteen at Hornsby does two hundred sausages on a Saturday and this week the freezer went off at five in the morning. There is a version of this where I am the unreasonable one. I'll see you right for it.",
+   "giver": "hub-hornsby-lien",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "we are going to need the coffee"
+    },
+    {
+     "kind": "photo",
+     "x": -10766,
+     "z": -18132,
+     "radius": 35,
+     "label": "the thermometer, so the insurance believes us"
+    }
+   ],
+   "reward": {
+    "cash": 98,
+    "xp": 215,
+    "unlock": [
+     "hub:h-oval-hornsby-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-hornsby-3",
+   "act": 3,
+   "title": "Grand Final Float, Hornsby",
+   "blurb": "Nobody else has offered, so. Somebody walked off with the float from the Hornsby canteen at about five in the morning during the last home game, and I have a fair idea which somebody. The paperwork says one thing and my eyes say another. I'll put the kettle on for when you're back.",
+   "giver": "hub-hornsby-lien",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "the pair who were leaning on the roller door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 81,
+     "label": "$81, which is what was in the tin"
+    }
+   ],
+   "reward": {
+    "cash": 91,
+    "xp": 213,
+    "unlock": [
+     "hub:h-oval-hornsby-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-hornsby-4",
+   "act": 3,
+   "title": "Sprinkler Line, Hornsby",
+   "blurb": "The council knows and the council does not care. The sprinkler line under the Hornsby outfield has been leaking since school holidays and the wet patch has started to move. It has been going on longer than I have admitted to anyone. Just do not come back empty-handed.",
+   "giver": "hub-hornsby-caetano",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10808,
+     "z": -18268,
+     "radius": 25,
+     "label": "walk the line from the tap to the boundary"
+    },
+    {
+     "kind": "photo",
+     "x": -10789,
+     "z": -18290,
+     "radius": 35,
+     "label": "where the grass has gone dark"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to dig once, not five times",
+     "npc": "hub-hornsby-caetano"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 217,
+    "unlock": [
+     "hub:h-oval-hornsby-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-hornsby-5",
+   "act": 3,
+   "title": "The Association, Hornsby",
+   "blurb": "I have been putting it off since Easter. The bloke who allocates grounds for the whole association sits at Waitara, and Hornsby has been at the bottom of his list for two seasons. I have got no proof, which is exactly why I am asking. I will know if you skipped a bit.",
+   "giver": "hub-hornsby-caetano",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10086,
+     "z": -17248,
+     "radius": 60,
+     "label": "go and be reasonable at him"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if it is us or the paperwork",
+     "npc": "hub-hornsby-caetano"
+    }
+   ],
+   "reward": {
+    "cash": 92,
+    "xp": 212,
+    "unlock": [
+     "hub:h-oval-hornsby-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-woonona-0",
+   "act": 3,
+   "title": "The Creek Behind Woonona",
+   "blurb": "I am told you do odd jobs. Somebody has been tipping fill into the creek behind Woonona since a public holiday nobody remembered and it is narrowing the channel a metre at a time. There is probably a simple explanation and I would love to hear it. If anyone asks, you were never here.",
+   "giver": "hub-woonona-etienne",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -26117,
+     "z": 53997,
+     "radius": 35,
+     "label": "the fill, with the water level in shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council reads photographs, not letters",
+     "npc": "hub-woonona-etienne"
+    }
+   ],
+   "reward": {
+    "cash": 91,
+    "xp": 210,
+    "unlock": [
+     "hub:h-creek-woonona-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-woonona-1",
+   "act": 3,
+   "title": "Willow Removal, Woonona",
+   "blurb": "I'll be straight with you. They have agreed to a clean-up at Woonona, which is wonderful, except the grant is $55 short and closes on a public holiday nobody remembered. You will see what I mean the second you get there. There is no rush, but there is a Friday.",
+   "giver": "hub-woonona-etienne",
+   "level": 3,
+   "requires": [
+    "h-creek-woonona-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 55,
+     "label": "$55, and I do not care whose pocket"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the form needs the number today",
+     "npc": "hub-woonona-etienne"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 303,
+    "unlock": [
+     "hub:h-creek-woonona-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-woonona-2",
+   "act": 3,
+   "title": "Sandbags, Woonona",
+   "blurb": "It has been three weeks. We had 68 sandbags in the Woonona shed on a public holiday nobody remembered and this morning we have got the pallet they came on. There is a version of this where I am the unreasonable one. I'll see you right for it.",
+   "giver": "hub-woonona-rafferty",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -26311,
+     "z": 53882,
+     "radius": 25,
+     "label": "the yards backing onto the reserve"
+    },
+    {
+     "kind": "photo",
+     "x": -26319,
+     "z": 53866,
+     "radius": 35,
+     "label": "anywhere they have obviously been used"
+    }
+   ],
+   "reward": {
+    "cash": 85,
+    "xp": 230,
+    "unlock": [
+     "hub:h-creek-woonona-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-woonona-3",
+   "act": 3,
+   "title": "The Low Crossing, Woonona",
+   "blurb": "Nobody else has offered, so. People keep driving the low crossing at Woonona at knock-off with the water over the sign, and one of them is going to be the one. The paperwork says one thing and my eyes say another. I'll put the kettle on for when you're back.",
+   "giver": "hub-woonona-rafferty",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you will be standing out there a while"
+    },
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 2,
+     "label": "the ones who argue with the barrier"
+    }
+   ],
+   "reward": {
+    "cash": 81,
+    "xp": 225,
+    "unlock": [
+     "hub:h-creek-woonona-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-woonona-4",
+   "act": 3,
+   "title": "Under the House, Woonona",
+   "blurb": "The council knows and the council does not care. The water came through my place at Woonona on a public holiday nobody remembered and the assessor wants photographs of things I have already thrown out. It has been going on longer than I have admitted to anyone. Just do not come back empty-handed.",
+   "giver": "hub-woonona-thanh",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -26145,
+     "z": 53804,
+     "radius": 25,
+     "label": "round the side, where the pile is"
+    },
+    {
+     "kind": "photo",
+     "x": -26126,
+     "z": 53806,
+     "radius": 35,
+     "label": "the high-water mark on the brick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the whole claim, that mark",
+     "npc": "hub-woonona-thanh"
+    }
+   ],
+   "reward": {
+    "cash": 94,
+    "xp": 217,
+    "unlock": [
+     "hub:h-creek-woonona-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-woonona-5",
+   "act": 3,
+   "title": "Upstream, Woonona",
+   "blurb": "I have been putting it off since Easter. Whatever is happening to Woonona starts upstream at Thirroul, and there are people up there who have been saying so for years. I have got no proof, which is exactly why I am asking. I will know if you skipped a bit.",
+   "giver": "hub-woonona-thanh",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -25865,
+     "z": 50422,
+     "radius": 60,
+     "label": "go up and find them"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear it from someone who is not me",
+     "npc": "hub-woonona-thanh"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 230,
+    "unlock": [
+     "hub:h-creek-woonona-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

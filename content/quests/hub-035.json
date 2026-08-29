@@ -1,0 +1,663 @@
+{
+ "quests": [
+  {
+   "id": "h-newsagent-asquith-0",
+   "act": 3,
+   "title": "Returns at Asquith",
+   "blurb": "My knees are gone, so. I am sending back 35 papers a day from Asquith and paying to have them collected, which is a business model somebody invented on purpose. I have rung the number on the letter four times. That's the whole job. No catch.",
+   "giver": "hub-asquith-pia",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -9618,
+     "z": -19780,
+     "radius": 35,
+     "label": "the returns stack, at its worst"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the distributor needs to see the size of it",
+     "npc": "hub-asquith-pia"
+    }
+   ],
+   "reward": {
+    "cash": 62,
+    "xp": 123,
+    "unlock": [
+     "hub:h-newsagent-asquith-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-newsagent-asquith-1",
+   "act": 3,
+   "title": "The Better Rate, Asquith",
+   "blurb": "This is going to sound small. They will drop my Asquith order if I can show $32 of turnover on the other side of the shop by the week of the show. Half the street knows and half the street is pretending not to. Be polite about it. It costs nothing.",
+   "giver": "hub-asquith-pia",
+   "level": 1,
+   "requires": [
+    "h-newsagent-asquith-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 32,
+     "label": "$32, and cards and stationery count"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "sell anything, I am not proud",
+     "npc": "hub-asquith-pia"
+    }
+   ],
+   "reward": {
+    "cash": 93,
+    "xp": 214,
+    "unlock": [
+     "hub:h-newsagent-asquith-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-newsagent-asquith-2",
+   "act": 3,
+   "title": "The Asquith Round",
+   "blurb": "I have written it down twice and lost it twice. I do the Asquith round from the back of seven and for the last fortnight somebody has been taking the papers off the front steps behind me. I am not after trouble. I am after an answer. Take your time. Do not take a week.",
+   "giver": "hub-asquith-hedda",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -9826,
+     "z": -19818,
+     "radius": 25,
+     "label": "the end of the round, where it starts"
+    },
+    {
+     "kind": "photo",
+     "x": -9813,
+     "z": -19735,
+     "radius": 35,
+     "label": "whoever is on that street at that hour"
+    }
+   ],
+   "reward": {
+    "cash": 58,
+    "xp": 123,
+    "unlock": [
+     "hub:h-newsagent-asquith-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-newsagent-asquith-3",
+   "act": 3,
+   "title": "The Dog on Ash Street, Asquith",
+   "blurb": "Do not laugh. There is a dog on the Asquith round that has had two of my bags and a milk crate that was not even mine. Nobody else seems to have noticed, which is its own problem. Come and find me after, either way.",
+   "giver": "hub-asquith-hedda",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "you will want your wits about you"
+    },
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "the owner, not the dog, I am not a monster"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me it is sorted",
+     "npc": "hub-asquith-hedda"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 124,
+    "unlock": [
+     "hub:h-newsagent-asquith-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-newsagent-asquith-4",
+   "act": 3,
+   "title": "The Syndicate, Asquith",
+   "blurb": "It is the sort of thing you notice or you do not. Nine of us at Asquith have gone in on the same numbers since the week of the show and one of us has stopped putting money in. Everyone I have told has looked at me the way you are now. Whatever you find, bring it to me first.",
+   "giver": "hub-asquith-beatrix",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -9569,
+     "z": -19898,
+     "radius": 25,
+     "label": "the house of the one who stopped"
+    },
+    {
+     "kind": "earn",
+     "dollars": 35,
+     "label": "$35, which is his share since he stopped"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it said out loud, not in the group chat",
+     "npc": "hub-asquith-beatrix"
+    }
+   ],
+   "reward": {
+    "cash": 53,
+    "xp": 127,
+    "unlock": [
+     "hub:h-newsagent-asquith-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-newsagent-asquith-5",
+   "act": 3,
+   "title": "The Other Agency, Asquith",
+   "blurb": "Two people have already said no. The agency at Mount Colah closed six months before Asquith started struggling, and I would very much like to know what they know. This is the third time I have had this conversation. That's it. That's the whole ask.",
+   "giver": "hub-asquith-beatrix",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -9067,
+     "z": -21543,
+     "radius": 60,
+     "label": "the shop is shut, the family is not"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever they say, say it slowly to me",
+     "npc": "hub-asquith-beatrix"
+    }
+   ],
+   "reward": {
+    "cash": 52,
+    "xp": 116,
+    "unlock": [
+     "hub:h-newsagent-asquith-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-workshop-circular-quay-0",
+   "act": 3,
+   "title": "The Unclaimed Falcon, Circular Quay",
+   "blurb": "My knees are gone, so. There has been a car in the Circular Quay yard since the first of the month with a roll of raffle tickets on the passenger seat and no owner answering. I have rung the number on the letter four times. That's the whole job. No catch.",
+   "giver": "hub-circular-quay-eloise",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 120,
+     "z": -866,
+     "radius": 35,
+     "label": "the car and the plate together"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I have to prove I tried before I can move it",
+     "npc": "hub-circular-quay-eloise"
+    }
+   ],
+   "reward": {
+    "cash": 69,
+    "xp": 126,
+    "unlock": [
+     "hub:h-workshop-circular-quay-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-workshop-circular-quay-1",
+   "act": 3,
+   "title": "Storage Fees, Circular Quay",
+   "blurb": "This is going to sound small. Now that it is documented, Circular Quay is owed $30 in storage and the only person who can pay it is the person not answering. Half the street knows and half the street is pretending not to. Be polite about it. It costs nothing.",
+   "giver": "hub-circular-quay-eloise",
+   "level": 1,
+   "requires": [
+    "h-workshop-circular-quay-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 30,
+     "label": "$30, from him or from the scrap"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "either way it comes off my floor",
+     "npc": "hub-circular-quay-eloise"
+    }
+   ],
+   "reward": {
+    "cash": 90,
+    "xp": 218,
+    "unlock": [
+     "hub:h-workshop-circular-quay-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-workshop-circular-quay-2",
+   "act": 3,
+   "title": "First Year, Circular Quay",
+   "blurb": "I have written it down twice and lost it twice. I am in my first year at Circular Quay and I have to log 25 hours on a job I am not allowed to touch on my own. I am not after trouble. I am after an answer. Take your time. Do not take a week.",
+   "giver": "hub-circular-quay-maarten",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 93,
+     "z": -867,
+     "radius": 25,
+     "label": "the supplier, two streets over"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "and get him a coffee, it helps"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "sign the book and I owe you",
+     "npc": "hub-circular-quay-maarten"
+    }
+   ],
+   "reward": {
+    "cash": 57,
+    "xp": 126,
+    "unlock": [
+     "hub:h-workshop-circular-quay-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-workshop-circular-quay-3",
+   "act": 3,
+   "title": "The Air Line, Circular Quay",
+   "blurb": "Do not laugh. Somebody has been coming into the Circular Quay yard after the middle of the news to use the air line, and last week they used the compressor as well. Nobody else seems to have noticed, which is its own problem. Come and find me after, either way.",
+   "giver": "hub-circular-quay-maarten",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 2,
+     "label": "the ones who think the yard is public"
+    },
+    {
+     "kind": "photo",
+     "x": 146,
+     "z": -925,
+     "radius": 35,
+     "label": "the gate they are getting through"
+    }
+   ],
+   "reward": {
+    "cash": 61,
+    "xp": 136,
+    "unlock": [
+     "hub:h-workshop-circular-quay-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-workshop-circular-quay-4",
+   "act": 3,
+   "title": "My Own Car, Circular Quay",
+   "blurb": "It is the sort of thing you notice or you do not. My car has been at Circular Quay since the first of the month and every time I ring, the quote has grown by about $25. Everyone I have told has looked at me the way you are now. Whatever you find, bring it to me first.",
+   "giver": "hub-circular-quay-zainab",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 234,
+     "z": -958,
+     "radius": 25,
+     "label": "stand in the office where they can see you"
+    },
+    {
+     "kind": "photo",
+     "x": 244,
+     "z": -957,
+     "radius": 35,
+     "label": "the job card on the wall, all of it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I know what I am arguing about",
+     "npc": "hub-circular-quay-zainab"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 128,
+    "unlock": [
+     "hub:h-workshop-circular-quay-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-workshop-circular-quay-5",
+   "act": 3,
+   "title": "The Assessor, Circular Quay",
+   "blurb": "Two people have already said no. The insurance assessor who signs off every job at Circular Quay works out of St James, and he has never once seen the car he is assessing. This is the third time I have had this conversation. That's it. That's the whole ask.",
+   "giver": "hub-circular-quay-zainab",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 349,
+     "z": 50,
+     "radius": 60,
+     "label": "catch him before he goes out on the road"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear how he does it",
+     "npc": "hub-circular-quay-zainab"
+    }
+   ],
+   "reward": {
+    "cash": 52,
+    "xp": 123,
+    "unlock": [
+     "hub:h-workshop-circular-quay-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-opshop-milsons-point-0",
+   "act": 3,
+   "title": "Dumped Out the Back, Milsons Point",
+   "blurb": "My knees are gone, so. People leave things at the Milsons Point roller door after half six and by morning it is rained on and it is our problem and our tip fee. I have rung the number on the letter four times. That's the whole job. No catch.",
+   "giver": "hub-milsons-point-zita",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 67,
+     "z": -2534,
+     "radius": 35,
+     "label": "the pile, on a bad morning"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council will not act without one of these",
+     "npc": "hub-milsons-point-zita"
+    }
+   ],
+   "reward": {
+    "cash": 67,
+    "xp": 174,
+    "unlock": [
+     "hub:h-opshop-milsons-point-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-milsons-point-1",
+   "act": 3,
+   "title": "The Tip Fee, Milsons Point",
+   "blurb": "This is going to sound small. The photos worked, which means Milsons Point can claim back the $62 we have paid to throw away other people's furniture since a wet Monday. Half the street knows and half the street is pretending not to. Be polite about it. It costs nothing.",
+   "giver": "hub-milsons-point-zita",
+   "level": 2,
+   "requires": [
+    "h-opshop-milsons-point-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 62,
+     "label": "$62, and every receipt counts"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will do the form if you do the walking",
+     "npc": "hub-milsons-point-zita"
+    }
+   ],
+   "reward": {
+    "cash": 117,
+    "xp": 253,
+    "unlock": [
+     "hub:h-opshop-milsons-point-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-milsons-point-2",
+   "act": 3,
+   "title": "The Good Box, Milsons Point",
+   "blurb": "I have written it down twice and lost it twice. Something came into Milsons Point on a wet Monday in a box of paperbacks that I do not think the family meant to give away. I am not after trouble. I am after an answer. Take your time. Do not take a week.",
+   "giver": "hub-milsons-point-vera",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -41,
+     "z": -2461,
+     "radius": 25,
+     "label": "the address on the donation slip"
+    },
+    {
+     "kind": "photo",
+     "x": -64,
+     "z": -2475,
+     "radius": 35,
+     "label": "the thing itself, before it goes back"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I would rather give it back than sell it",
+     "npc": "hub-milsons-point-vera"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 183,
+    "unlock": [
+     "hub:h-opshop-milsons-point-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-milsons-point-3",
+   "act": 3,
+   "title": "Sorting Room, Milsons Point",
+   "blurb": "Do not laugh. Two people have been coming into the Milsons Point sorting room since a wet Monday and taking the good stock before it reaches the floor, and one of them volunteers here. Nobody else seems to have noticed, which is its own problem. Come and find me after, either way.",
+   "giver": "hub-milsons-point-vera",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "catch them at the back door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 12,
+     "label": "$12, which is what the good stock made last month"
+    }
+   ],
+   "reward": {
+    "cash": 65,
+    "xp": 171,
+    "unlock": [
+     "hub:h-opshop-milsons-point-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-milsons-point-4",
+   "act": 3,
+   "title": "The Van, Milsons Point",
+   "blurb": "It is the sort of thing you notice or you do not. I do the Milsons Point pick-ups in a van with 12 thousand on it and a door that only opens if you know about it. Everyone I have told has looked at me the way you are now. Whatever you find, bring it to me first.",
+   "giver": "hub-milsons-point-joaquin",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Milsons Point",
+     "to": "North Sydney",
+     "label": "come out to North Sydney with me, it is a two-person lift"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "we will stop on the way, my shout"
+    }
+   ],
+   "reward": {
+    "cash": 74,
+    "xp": 182,
+    "unlock": [
+     "hub:h-opshop-milsons-point-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-milsons-point-5",
+   "act": 3,
+   "title": "Head Office, Milsons Point",
+   "blurb": "Two people have already said no. Everything Milsons Point cannot sell goes to a warehouse at Victoria Cross, and nobody there has ever answered a phone in my hearing. This is the third time I have had this conversation. That's it. That's the whole ask.",
+   "giver": "hub-milsons-point-joaquin",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -87,
+     "z": -3670,
+     "radius": 60,
+     "label": "turn up in person, that is the trick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me there is a person in there",
+     "npc": "hub-milsons-point-joaquin"
+    }
+   ],
+   "reward": {
+    "cash": 79,
+    "xp": 171,
+    "unlock": [
+     "hub:h-opshop-milsons-point-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

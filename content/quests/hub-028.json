@@ -1,0 +1,651 @@
+{
+ "quests": [
+  {
+   "id": "h-bakery-hawthorne-0",
+   "act": 3,
+   "title": "half six at Hawthorne",
+   "blurb": "I have been putting it off since Easter. I start at half six and for a month the Hawthorne back lane has had somebody in it who is not waiting for bread. The paperwork says one thing and my eyes say another. Whatever you find, bring it to me first.",
+   "giver": "hub-hawthorne-azim",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -5684,
+     "z": 1303,
+     "radius": 35,
+     "label": "the lane, from the door, no flash"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I am not calling anyone until I am sure",
+     "npc": "hub-hawthorne-azim"
+    }
+   ],
+   "reward": {
+    "cash": 65,
+    "xp": 124,
+    "unlock": [
+     "hub:h-bakery-hawthorne-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bakery-hawthorne-1",
+   "act": 3,
+   "title": "The Lane Light, Hawthorne",
+   "blurb": "Before you say anything: yes, I know. A light on that lane costs Hawthorne $49 and the landlord has said no twice, so we are doing it ourselves. It has been going on longer than I have admitted to anyone. That's it. That's the whole ask.",
+   "giver": "hub-hawthorne-azim",
+   "level": 1,
+   "requires": [
+    "h-bakery-hawthorne-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 49,
+     "label": "$49 and I will fit it myself"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "do not tell him where it came from",
+     "npc": "hub-hawthorne-azim"
+    }
+   ],
+   "reward": {
+    "cash": 90,
+    "xp": 210,
+    "unlock": [
+     "hub:h-bakery-hawthorne-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bakery-hawthorne-2",
+   "act": 3,
+   "title": "Flour Run, Hawthorne",
+   "blurb": "It is not a police matter and I have checked. The flour for Hawthorne comes off a truck at half six and last a public holiday nobody remembered the truck came and the flour did not. I have got no proof, which is exactly why I am asking. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-hawthorne-fola",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Hawthorne",
+     "to": "Marion",
+     "label": "ride out to Marion where the load is made up"
+    },
+    {
+     "kind": "photo",
+     "x": -5785,
+     "z": 1199,
+     "radius": 35,
+     "label": "the pallet with our name on it, if it exists"
+    }
+   ],
+   "reward": {
+    "cash": 61,
+    "xp": 125,
+    "unlock": [
+     "hub:h-bakery-hawthorne-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bakery-hawthorne-3",
+   "act": 3,
+   "title": "The Loading Zone, Hawthorne",
+   "blurb": "Honestly, I am past caring how it looks. The Hawthorne loading zone has had a car in it at half six every morning this week and the driver waits in it, which makes it worse. It might be nothing. It has not felt like nothing. If anyone asks, you were never here.",
+   "giver": "hub-hawthorne-fola",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "the one who says he is only a minute"
+    },
+    {
+     "kind": "earn",
+     "dollars": 90,
+     "label": "and the ticket I got, off him"
+    }
+   ],
+   "reward": {
+    "cash": 50,
+    "xp": 127,
+    "unlock": [
+     "hub:h-bakery-hawthorne-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bakery-hawthorne-4",
+   "act": 3,
+   "title": "The Sourdough Sign, Hawthorne",
+   "blurb": "I would do it myself if I could leave the counter. Somebody two doors down from Hawthorne put up a sign on a public holiday nobody remembered that says the same six words as ours, in the same order. I would not ask if there was anyone else about. There is no rush, but there is a Friday.",
+   "giver": "hub-hawthorne-kwame",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5669,
+     "z": 1169,
+     "radius": 25,
+     "label": "walk down and read it properly"
+    },
+    {
+     "kind": "photo",
+     "x": -5661,
+     "z": 1166,
+     "radius": 35,
+     "label": "both signs if you can get them in one frame"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me I am not imagining it",
+     "npc": "hub-hawthorne-kwame"
+    }
+   ],
+   "reward": {
+    "cash": 53,
+    "xp": 121,
+    "unlock": [
+     "hub:h-bakery-hawthorne-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bakery-hawthorne-5",
+   "act": 3,
+   "title": "The Old Site, Hawthorne",
+   "blurb": "You will think I am making this up. This business was at Taverners Hill before it was at Hawthorne, and there is a woman there who still has the original book. You can tell me I am imagining it. Tell me after. I'll see you right for it.",
+   "giver": "hub-hawthorne-kwame",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5899,
+     "z": 2283,
+     "radius": 60,
+     "label": "she is usually about in the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring back whatever she is willing to say",
+     "npc": "hub-hawthorne-kwame"
+    }
+   ],
+   "reward": {
+    "cash": 54,
+    "xp": 116,
+    "unlock": [
+     "hub:h-bakery-hawthorne-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-pool-international-airport-0",
+   "act": 3,
+   "title": "The International Airport Pool",
+   "blurb": "I have been putting it off since Easter. Council has been saying the International Airport pool is at end of life since Thursdays and the crack they keep pointing at is not in the shell. The paperwork says one thing and my eyes say another. Whatever you find, bring it to me first.",
+   "giver": "hub-international-airport-charlie",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -3818,
+     "z": 7463,
+     "radius": 35,
+     "label": "the crack, close, with something for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "an engineer can read that. A councillor cannot.",
+     "npc": "hub-international-airport-charlie"
+    }
+   ],
+   "reward": {
+    "cash": 60,
+    "xp": 136,
+    "unlock": [
+     "hub:h-pool-international-airport-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-pool-international-airport-1",
+   "act": 3,
+   "title": "The Petition Stall, International Airport",
+   "blurb": "Before you say anything: yes, I know. We are running a stall for International Airport on Thursdays and a stall needs $36 of gear that nobody has volunteered to pay for. It has been going on longer than I have admitted to anyone. That's it. That's the whole ask.",
+   "giver": "hub-international-airport-charlie",
+   "level": 1,
+   "requires": [
+    "h-pool-international-airport-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 36,
+     "label": "$36 and a table, if you see one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will be there from eight either way",
+     "npc": "hub-international-airport-charlie"
+    }
+   ],
+   "reward": {
+    "cash": 95,
+    "xp": 220,
+    "unlock": [
+     "hub:h-pool-international-airport-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-pool-international-airport-2",
+   "act": 3,
+   "title": "Squad, International Airport",
+   "blurb": "It is not a police matter and I have checked. I coach 94 kids at International Airport at just gone midnight and three of them have stopped coming without anybody ringing me. I have got no proof, which is exactly why I am asking. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-international-airport-raul",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -3998,
+     "z": 7507,
+     "radius": 25,
+     "label": "the flats where two of them live"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "take something with you, it is a long walk up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I do not need them back. I need to know.",
+     "npc": "hub-international-airport-raul"
+    }
+   ],
+   "reward": {
+    "cash": 60,
+    "xp": 134,
+    "unlock": [
+     "hub:h-pool-international-airport-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-pool-international-airport-3",
+   "act": 3,
+   "title": "The Deep End, International Airport",
+   "blurb": "Honestly, I am past caring how it looks. A group has been coming over the International Airport fence after close and swimming in the dark, which is how International Airport loses its pool. It might be nothing. It has not felt like nothing. If anyone asks, you were never here.",
+   "giver": "hub-international-airport-raul",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 3,
+     "label": "the ones who go over the fence"
+    },
+    {
+     "kind": "photo",
+     "x": -3922,
+     "z": 7415,
+     "radius": 35,
+     "label": "the spot in the fence they use"
+    }
+   ],
+   "reward": {
+    "cash": 59,
+    "xp": 135,
+    "unlock": [
+     "hub:h-pool-international-airport-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-pool-international-airport-4",
+   "act": 3,
+   "title": "The Kiosk Freezer, International Airport",
+   "blurb": "I would do it myself if I could leave the counter. The kiosk at International Airport has a milk crate in it and a freezer that has been running warm since Thursdays. I would not ask if there was anyone else about. There is no rush, but there is a Friday.",
+   "giver": "hub-international-airport-mia",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "get two, we are going to be here"
+    },
+    {
+     "kind": "goto",
+     "x": -3823,
+     "z": 7489,
+     "radius": 25,
+     "label": "the plant room behind the kiosk"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether it is the freezer or the power",
+     "npc": "hub-international-airport-mia"
+    }
+   ],
+   "reward": {
+    "cash": 49,
+    "xp": 129,
+    "unlock": [
+     "hub:h-pool-international-airport-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-pool-international-airport-5",
+   "act": 3,
+   "title": "The Aquatic Centre, International Airport",
+   "blurb": "You will think I am making this up. They want everyone from International Airport to drive to the new centre at Wolli Creek, so somebody should go and see whether it is any good. You can tell me I am imagining it. Tell me after. I'll see you right for it.",
+   "giver": "hub-international-airport-mia",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -4903,
+     "z": 6889,
+     "radius": 60,
+     "label": "have a proper look, not a quick one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "be honest with me, even if it is nice",
+     "npc": "hub-international-airport-mia"
+    }
+   ],
+   "reward": {
+    "cash": 52,
+    "xp": 131,
+    "unlock": [
+     "hub:h-pool-international-airport-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-rank-barangaroo-0",
+   "act": 3,
+   "title": "The Barangaroo Rank",
+   "blurb": "I have been putting it off since Easter. The rank outside Barangaroo used to hold nine cars and since the week of the show it holds four, and nobody will say who moved the line. The paperwork says one thing and my eyes say another. Whatever you find, bring it to me first.",
+   "giver": "hub-barangaroo-robbo",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -590,
+     "z": -964,
+     "radius": 35,
+     "label": "the painted line and the old one under it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the old paint is still there, that is the whole argument",
+     "npc": "hub-barangaroo-robbo"
+    }
+   ],
+   "reward": {
+    "cash": 57,
+    "xp": 126,
+    "unlock": [
+     "hub:h-rank-barangaroo-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-rank-barangaroo-1",
+   "act": 3,
+   "title": "Lost Fares, Barangaroo",
+   "blurb": "Before you say anything: yes, I know. Since the rank at Barangaroo shrank I am $43 a week down, and the association wants that number from somebody who can prove it. It has been going on longer than I have admitted to anyone. That's it. That's the whole ask.",
+   "giver": "hub-barangaroo-robbo",
+   "level": 1,
+   "requires": [
+    "h-rank-barangaroo-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 43,
+     "label": "$43 in a week, to show it can be done"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the submission, right there",
+     "npc": "hub-barangaroo-robbo"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 225,
+    "unlock": [
+     "hub:h-rank-barangaroo-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-rank-barangaroo-2",
+   "act": 3,
+   "title": "Queue Jumpers, Barangaroo",
+   "blurb": "It is not a police matter and I have checked. Cars that have never sat in the Barangaroo queue turn up at just gone midnight and take the front of it, and the drivers who waited say nothing. I have got no proof, which is exactly why I am asking. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-barangaroo-marika",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "the ones who take the front"
+    },
+    {
+     "kind": "earn",
+     "dollars": 23,
+     "label": "$23, which is about one airport run"
+    }
+   ],
+   "reward": {
+    "cash": 61,
+    "xp": 123,
+    "unlock": [
+     "hub:h-rank-barangaroo-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-rank-barangaroo-3",
+   "act": 3,
+   "title": "The Late Train, Barangaroo",
+   "blurb": "Honestly, I am past caring how it looks. When the last train into Barangaroo is late, 23 people come out at once and I have to have cars there before they do. It might be nothing. It has not felt like nothing. If anyone asks, you were never here.",
+   "giver": "hub-barangaroo-marika",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Barangaroo",
+     "to": "Bridge Street",
+     "label": "come in on the last one from Bridge Street and see it"
+    },
+    {
+     "kind": "photo",
+     "x": -589,
+     "z": -1060,
+     "radius": 35,
+     "label": "the rank at the moment the doors open"
+    }
+   ],
+   "reward": {
+    "cash": 50,
+    "xp": 130,
+    "unlock": [
+     "hub:h-rank-barangaroo-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-rank-barangaroo-4",
+   "act": 3,
+   "title": "The Door, Barangaroo",
+   "blurb": "I would do it myself if I could leave the counter. I have stood on this door near Barangaroo for 23 years and since the week of the show somebody has been sending my guests to a different rank. I would not ask if there was anyone else about. There is no rush, but there is a Friday.",
+   "giver": "hub-barangaroo-alana",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -602,
+     "z": -1119,
+     "radius": 25,
+     "label": "follow one of them and see where they end up"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you will be standing about, get something"
+    }
+   ],
+   "reward": {
+    "cash": 58,
+    "xp": 136,
+    "unlock": [
+     "hub:h-rank-barangaroo-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-rank-barangaroo-5",
+   "act": 3,
+   "title": "The Depot, Barangaroo",
+   "blurb": "You will think I am making this up. The plates working the Barangaroo rank are dispatched from a depot at Martin Place, and the man who runs it has never met a driver he liked. You can tell me I am imagining it. Tell me after. I'll see you right for it.",
+   "giver": "hub-barangaroo-alana",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -46,
+     "z": -121,
+     "radius": 60,
+     "label": "go and be pleasant at him anyway"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether he is the problem or the symptom",
+     "npc": "hub-barangaroo-alana"
+    }
+   ],
+   "reward": {
+    "cash": 61,
+    "xp": 129,
+    "unlock": [
+     "hub:h-rank-barangaroo-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  }
+ ]
+}

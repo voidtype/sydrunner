@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-bowlo-rosehill-gardens-0",
+   "act": 3,
+   "title": "The Dead Patch at Rosehill Gardens",
+   "blurb": "Not being dramatic about this. The number three green at Rosehill Gardens has had a bald patch the shape of Tasmania since the Sunday after payday, and the committee thinks I am inventing it. I am aware how that sounds. Come back and tell me straight.",
+   "giver": "hub-rosehill-gardens-zoltan",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -17177,
+     "z": -5203,
+     "radius": 35,
+     "label": "the patch, with something in frame for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring it to me before the meeting",
+     "npc": "hub-rosehill-gardens-zoltan"
+    }
+   ],
+   "reward": {
+    "cash": 57,
+    "xp": 128,
+    "unlock": [
+     "hub:h-bowlo-rosehill-gardens-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bowlo-rosehill-gardens-1",
+   "act": 3,
+   "title": "Turf Money, Rosehill Gardens",
+   "blurb": "I am told you do odd jobs. They have seen the photograph and now they want it re-laid by the Sunday after payday, which means finding $29 that the Rosehill Gardens club does not have. My wife says I should let it go. My wife is wrong. Do that and we're square.",
+   "giver": "hub-rosehill-gardens-zoltan",
+   "level": 1,
+   "requires": [
+    "h-bowlo-rosehill-gardens-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 29,
+     "label": "$29, however you like, I am not asking"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "put it in my hand, not the safe",
+     "npc": "hub-rosehill-gardens-zoltan"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 229,
+    "unlock": [
+     "hub:h-bowlo-rosehill-gardens-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bowlo-rosehill-gardens-2",
+   "act": 3,
+   "title": "The Rosehill Gardens Membership Count",
+   "blurb": "I'll be straight with you. Our books say 27 members at Rosehill Gardens and I would bet the bar takings that half of them are dead or moved to Queensland. I have rung the number on the letter four times. I will owe you one, and I pay those.",
+   "giver": "hub-rosehill-gardens-rada",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -17331,
+     "z": -5117,
+     "radius": 25,
+     "label": "stand at the side door where the list is kept"
+    },
+    {
+     "kind": "photo",
+     "x": -17360,
+     "z": -5126,
+     "radius": 35,
+     "label": "the board with the names still on it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "read me the ones you did not recognise",
+     "npc": "hub-rosehill-gardens-rada"
+    }
+   ],
+   "reward": {
+    "cash": 64,
+    "xp": 137,
+    "unlock": [
+     "hub:h-bowlo-rosehill-gardens-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bowlo-rosehill-gardens-3",
+   "act": 3,
+   "title": "Closing Time Rumour, Rosehill Gardens",
+   "blurb": "It has been three weeks. Since ten past five somebody has been going round the Rosehill Gardens greens telling the barefoot bowlers we are shutting, and we are not shutting. Half the street knows and half the street is pretending not to. Do not let them talk you into anything.",
+   "giver": "hub-rosehill-gardens-rada",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "whoever is doing the telling"
+    },
+    {
+     "kind": "earn",
+     "dollars": 67,
+     "label": "and take the bar money off them while you are there"
+    }
+   ],
+   "reward": {
+    "cash": 52,
+    "xp": 122,
+    "unlock": [
+     "hub:h-bowlo-rosehill-gardens-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bowlo-rosehill-gardens-4",
+   "act": 3,
+   "title": "Behind the Bar at Rosehill Gardens",
+   "blurb": "Nobody else has offered, so. There is two hundred metres of orange netting in the chest freezer behind the bar at Rosehill Gardens and I am not opening it on an empty stomach. I am not after trouble. I am after an answer. There's cash in it. Not a lot.",
+   "giver": "hub-rosehill-gardens-gail",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "get one into you first, seriously"
+    },
+    {
+     "kind": "goto",
+     "x": -17289,
+     "z": -5290,
+     "radius": 25,
+     "label": "round the back where the cellar door is"
+    },
+    {
+     "kind": "photo",
+     "x": -17282,
+     "z": -5305,
+     "radius": 35,
+     "label": "whatever is in there, before I lose my nerve"
+    }
+   ],
+   "reward": {
+    "cash": 53,
+    "xp": 131,
+    "unlock": [
+     "hub:h-bowlo-rosehill-gardens-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bowlo-rosehill-gardens-5",
+   "act": 3,
+   "title": "The Old Greenkeeper, Rosehill Gardens",
+   "blurb": "The council knows and the council does not care. The man who kept these greens before me drinks at Yallamundi now, and he owes Rosehill Gardens an explanation about the drainage. Nobody else seems to have noticed, which is its own problem. You'll know it when you see it.",
+   "giver": "hub-rosehill-gardens-gail",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -16642,
+     "z": -6090,
+     "radius": 60,
+     "label": "find him and hear him out"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come back and tell me what he said",
+     "npc": "hub-rosehill-gardens-gail"
+    }
+   ],
+   "reward": {
+    "cash": 55,
+    "xp": 137,
+    "unlock": [
+     "hub:h-bowlo-rosehill-gardens-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-servo-mount-druitt-0",
+   "act": 3,
+   "title": "Nights at Mount Druitt",
+   "blurb": "Not being dramatic about this. Every night around the back of seven the same car does three laps of the Mount Druitt forecourt and never buys fuel. I am aware how that sounds. Come back and tell me straight.",
+   "giver": "hub-mount-druitt-shani",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -36246,
+     "z": -10275,
+     "radius": 35,
+     "label": "the car, plate if you can get it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it on record before I ring anyone",
+     "npc": "hub-mount-druitt-shani"
+    }
+   ],
+   "reward": {
+    "cash": 50,
+    "xp": 133,
+    "unlock": [
+     "hub:h-servo-mount-druitt-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-servo-mount-druitt-1",
+   "act": 3,
+   "title": "The Third Lap, Mount Druitt",
+   "blurb": "I am told you do odd jobs. Now I know the plate, I want to know where it goes after it leaves Mount Druitt at the back of seven, because it is not going home. My wife says I should let it go. My wife is wrong. Do that and we're square.",
+   "giver": "hub-mount-druitt-shani",
+   "level": 1,
+   "requires": [
+    "h-servo-mount-druitt-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Mount Druitt",
+     "to": "Rooty Hill",
+     "label": "follow it as far as Rooty Hill"
+    },
+    {
+     "kind": "photo",
+     "x": -36397,
+     "z": -10311,
+     "radius": 35,
+     "label": "wherever it stops"
+    }
+   ],
+   "reward": {
+    "cash": 108,
+    "xp": 229,
+    "unlock": [
+     "hub:h-servo-mount-druitt-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-servo-mount-druitt-2",
+   "act": 3,
+   "title": "Bay Two, Mount Druitt",
+   "blurb": "I'll be straight with you. Bay two at the Mount Druitt workshop has had the same car in it since grand final week and the owner has stopped answering. I have rung the number on the letter four times. I will owe you one, and I pay those.",
+   "giver": "hub-mount-druitt-efrain",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -36402,
+     "z": -10409,
+     "radius": 25,
+     "label": "the address on the job card"
+    },
+    {
+     "kind": "photo",
+     "x": -36403,
+     "z": -10422,
+     "radius": 35,
+     "label": "the letterbox, so I know I have the right house"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if anybody actually lives there",
+     "npc": "hub-mount-druitt-efrain"
+    }
+   ],
+   "reward": {
+    "cash": 55,
+    "xp": 128,
+    "unlock": [
+     "hub:h-servo-mount-druitt-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-servo-mount-druitt-3",
+   "act": 3,
+   "title": "Tools Off the Bench, Mount Druitt",
+   "blurb": "It has been three weeks. Someone has been walking out of Mount Druitt with a socket set at a time since grand final week, and I have run out of ways to be polite about it. Half the street knows and half the street is pretending not to. Do not let them talk you into anything.",
+   "giver": "hub-mount-druitt-efrain",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 3,
+     "label": "the ones hanging round the air hose"
+    },
+    {
+     "kind": "earn",
+     "dollars": 50,
+     "label": "$50 of it back, that is what the set cost"
+    }
+   ],
+   "reward": {
+    "cash": 63,
+    "xp": 119,
+    "unlock": [
+     "hub:h-servo-mount-druitt-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-servo-mount-druitt-4",
+   "act": 3,
+   "title": "The Mount Druitt Price Board",
+   "blurb": "Nobody else has offered, so. Head office says the Mount Druitt board has been wrong since grand final week and I say it has been right for eleven years, and one of us is about to be embarrassed. I am not after trouble. I am after an answer. There's cash in it. Not a lot.",
+   "giver": "hub-mount-druitt-ismail",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "buy something so it is a real transaction"
+    },
+    {
+     "kind": "photo",
+     "x": -36271,
+     "z": -10415,
+     "radius": 35,
+     "label": "the board and the pump, both in the one shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that settles it either way",
+     "npc": "hub-mount-druitt-ismail"
+    }
+   ],
+   "reward": {
+    "cash": 50,
+    "xp": 137,
+    "unlock": [
+     "hub:h-servo-mount-druitt-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-servo-mount-druitt-5",
+   "act": 3,
+   "title": "The Other Franchise, Mount Druitt",
+   "blurb": "The council knows and the council does not care. The bloke who runs the site at Rooty Hill has had the same trouble Mount Druitt has, and he will talk to you before he talks to me. Nobody else seems to have noticed, which is its own problem. You'll know it when you see it.",
+   "giver": "hub-mount-druitt-ismail",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -33954,
+     "z": -10052,
+     "radius": 60,
+     "label": "find him on shift"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever he says, I want it word for word",
+     "npc": "hub-mount-druitt-ismail"
+    }
+   ],
+   "reward": {
+    "cash": 53,
+    "xp": 131,
+    "unlock": [
+     "hub:h-servo-mount-druitt-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-strata-unsw-anzac-parade-0",
+   "act": 3,
+   "title": "Level Two, UNSW Anzac Parade",
+   "blurb": "Not being dramatic about this. Water has been coming through the level two ceiling of the UNSW Anzac Parade block since a Tuesday and the strata report says there is no water. I am aware how that sounds. Come back and tell me straight.",
+   "giver": "hub-unsw-anzac-parade-dragan",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 1709,
+     "z": 5309,
+     "radius": 35,
+     "label": "the ceiling, with the stain visible"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that goes in the file whether they like it or not",
+     "npc": "hub-unsw-anzac-parade-dragan"
+    }
+   ],
+   "reward": {
+    "cash": 53,
+    "xp": 131,
+    "unlock": [
+     "hub:h-strata-unsw-anzac-parade-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-strata-unsw-anzac-parade-1",
+   "act": 3,
+   "title": "The Special Levy, UNSW Anzac Parade",
+   "blurb": "I am told you do odd jobs. The photo did it. My wife says I should let it go. My wife is wrong. Now every owner at UNSW Anzac Parade owes $31 and I have to collect it from people who have avoided me for a year. Do that and we're square.",
+   "giver": "hub-unsw-anzac-parade-dragan",
+   "level": 1,
+   "requires": [
+    "h-strata-unsw-anzac-parade-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 31,
+     "label": "$31 out of them, in any state"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will not ask how",
+     "npc": "hub-unsw-anzac-parade-dragan"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 221,
+    "unlock": [
+     "hub:h-strata-unsw-anzac-parade-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-strata-unsw-anzac-parade-2",
+   "act": 3,
+   "title": "Car Space 14, UNSW Anzac Parade",
+   "blurb": "I'll be straight with you. Somebody who does not live at UNSW Anzac Parade has parked in space fourteen every night since a Tuesday and the manager will not look at it. I have rung the number on the letter four times. I will owe you one, and I pay those.",
+   "giver": "hub-unsw-anzac-parade-kyra",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 1580,
+     "z": 5284,
+     "radius": 25,
+     "label": "down to the basement, the far corner"
+    },
+    {
+     "kind": "photo",
+     "x": 1573,
+     "z": 5277,
+     "radius": 35,
+     "label": "the car in the space with the number painted beside it"
+    }
+   ],
+   "reward": {
+    "cash": 61,
+    "xp": 120,
+    "unlock": [
+     "hub:h-strata-unsw-anzac-parade-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-strata-unsw-anzac-parade-3",
+   "act": 3,
+   "title": "The Meeting, UNSW Anzac Parade",
+   "blurb": "It has been three weeks. The UNSW Anzac Parade AGM is on a Tuesday and I would like to arrive with something stronger than a grievance and a printout. Half the street knows and half the street is pretending not to. Do not let them talk you into anything.",
+   "giver": "hub-unsw-anzac-parade-kyra",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "two coffees, one is for me"
+    },
+    {
+     "kind": "goto",
+     "x": 1648,
+     "z": 5105,
+     "radius": 25,
+     "label": "the community room where they hold it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "walk in with me, they behave when there is a witness",
+     "npc": "hub-unsw-anzac-parade-kyra"
+    }
+   ],
+   "reward": {
+    "cash": 54,
+    "xp": 118,
+    "unlock": [
+     "hub:h-strata-unsw-anzac-parade-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-strata-unsw-anzac-parade-4",
+   "act": 3,
+   "title": "Bin Night at UNSW Anzac Parade",
+   "blurb": "Nobody else has offered, so. Three units at UNSW Anzac Parade have put their bins out on the wrong night since a Tuesday and I have taken it personally, which I accept is a choice I made. I am not after trouble. I am after an answer. There's cash in it. Not a lot.",
+   "giver": "hub-unsw-anzac-parade-bourke",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 2,
+     "label": "the ones who argue about it"
+    },
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "the fine the council gave me, off them"
+    }
+   ],
+   "reward": {
+    "cash": 55,
+    "xp": 120,
+    "unlock": [
+     "hub:h-strata-unsw-anzac-parade-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-strata-unsw-anzac-parade-5",
+   "act": 3,
+   "title": "The Other Block, UNSW Anzac Parade",
+   "blurb": "The council knows and the council does not care. There is a block at Juniors Kingsford with the same builder and the same cracks, and their manager has already been through what UNSW Anzac Parade is starting. Nobody else seems to have noticed, which is its own problem. You'll know it when you see it.",
+   "giver": "hub-unsw-anzac-parade-bourke",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 1843,
+     "z": 6095,
+     "radius": 60,
+     "label": "go and ask them how it ended"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I need to know how much worse this gets",
+     "npc": "hub-unsw-anzac-parade-bourke"
+    }
+   ],
+   "reward": {
+    "cash": 57,
+    "xp": 136,
+    "unlock": [
+     "hub:h-strata-unsw-anzac-parade-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  }
+ ]
+}

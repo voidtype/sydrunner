@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-bowlo-ashfield-0",
+   "act": 3,
+   "title": "The Dead Patch at Ashfield",
+   "blurb": "There is no clever way to say this. The number three green at Ashfield has had a bald patch the shape of Tasmania since a public holiday nobody remembered, and the committee thinks I am inventing it. Half the street knows and half the street is pretending not to. Do that and we're square.",
+   "giver": "hub-ashfield-ereni",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -7586,
+     "z": 2345,
+     "radius": 35,
+     "label": "the patch, with something in frame for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring it to me before the meeting",
+     "npc": "hub-ashfield-ereni"
+    }
+   ],
+   "reward": {
+    "cash": 78,
+    "xp": 169,
+    "unlock": [
+     "hub:h-bowlo-ashfield-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-ashfield-1",
+   "act": 3,
+   "title": "Turf Money, Ashfield",
+   "blurb": "You look like you have twenty minutes. They have seen the photograph and now they want it re-laid by a public holiday nobody remembered, which means finding $52 that the Ashfield club does not have. I am not after trouble. I am after an answer. I will owe you one, and I pay those.",
+   "giver": "hub-ashfield-ereni",
+   "level": 2,
+   "requires": [
+    "h-bowlo-ashfield-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 52,
+     "label": "$52, however you like, I am not asking"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "put it in my hand, not the safe",
+     "npc": "hub-ashfield-ereni"
+    }
+   ],
+   "reward": {
+    "cash": 124,
+    "xp": 267,
+    "unlock": [
+     "hub:h-bowlo-ashfield-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-ashfield-2",
+   "act": 3,
+   "title": "The Ashfield Membership Count",
+   "blurb": "Keep it between us for now. Our books say 93 members at Ashfield and I would bet the bar takings that half of them are dead or moved to Queensland. Nobody else seems to have noticed, which is its own problem. Do not let them talk you into anything.",
+   "giver": "hub-ashfield-ignatius",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7740,
+     "z": 2431,
+     "radius": 25,
+     "label": "stand at the side door where the list is kept"
+    },
+    {
+     "kind": "photo",
+     "x": -7769,
+     "z": 2422,
+     "radius": 35,
+     "label": "the board with the names still on it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "read me the ones you did not recognise",
+     "npc": "hub-ashfield-ignatius"
+    }
+   ],
+   "reward": {
+    "cash": 69,
+    "xp": 179,
+    "unlock": [
+     "hub:h-bowlo-ashfield-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-ashfield-3",
+   "act": 3,
+   "title": "Closing Time Rumour, Ashfield",
+   "blurb": "Right. Since you asked. Since two in the afternoon somebody has been going round the Ashfield greens telling the barefoot bowlers we are shutting, and we are not shutting. Everyone I have told has looked at me the way you are now. There's cash in it. Not a lot.",
+   "giver": "hub-ashfield-ignatius",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "whoever is doing the telling"
+    },
+    {
+     "kind": "earn",
+     "dollars": 133,
+     "label": "and take the bar money off them while you are there"
+    }
+   ],
+   "reward": {
+    "cash": 64,
+    "xp": 166,
+    "unlock": [
+     "hub:h-bowlo-ashfield-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-ashfield-4",
+   "act": 3,
+   "title": "Behind the Bar at Ashfield",
+   "blurb": "My knees are gone, so. There is a docket book in the chest freezer behind the bar at Ashfield and I am not opening it on an empty stomach. This is the third time I have had this conversation. You'll know it when you see it.",
+   "giver": "hub-ashfield-sabina",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "get one into you first, seriously"
+    },
+    {
+     "kind": "goto",
+     "x": -7698,
+     "z": 2258,
+     "radius": 25,
+     "label": "round the back where the cellar door is"
+    },
+    {
+     "kind": "photo",
+     "x": -7580,
+     "z": 2330,
+     "radius": 35,
+     "label": "whatever is in there, before I lose my nerve"
+    }
+   ],
+   "reward": {
+    "cash": 84,
+    "xp": 162,
+    "unlock": [
+     "hub:h-bowlo-ashfield-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-ashfield-5",
+   "act": 3,
+   "title": "The Old Greenkeeper, Ashfield",
+   "blurb": "This is going to sound small. The man who kept these greens before me drinks at Summer Hill now, and he owes Ashfield an explanation about the drainage. It started small, the way these things do. Half now if you want it. Most people don't.",
+   "giver": "hub-ashfield-sabina",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -6591,
+     "z": 2533,
+     "radius": 60,
+     "label": "find him and hear him out"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come back and tell me what he said",
+     "npc": "hub-ashfield-sabina"
+    }
+   ],
+   "reward": {
+    "cash": 69,
+    "xp": 165,
+    "unlock": [
+     "hub:h-bowlo-ashfield-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-woy-woy-0",
+   "act": 3,
+   "title": "Nights at Woy Woy",
+   "blurb": "There is no clever way to say this. Every night around the second express the same car does three laps of the Woy Woy forecourt and never buys fuel. Half the street knows and half the street is pretending not to. Do that and we're square.",
+   "giver": "hub-woy-woy-cleo",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 9865,
+     "z": -42565,
+     "radius": 35,
+     "label": "the car, plate if you can get it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it on record before I ring anyone",
+     "npc": "hub-woy-woy-cleo"
+    }
+   ],
+   "reward": {
+    "cash": 73,
+    "xp": 169,
+    "unlock": [
+     "hub:h-servo-woy-woy-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-woy-woy-1",
+   "act": 3,
+   "title": "The Third Lap, Woy Woy",
+   "blurb": "You look like you have twenty minutes. Now I know the plate, I want to know where it goes after it leaves Woy Woy at the second express, because it is not going home. I am not after trouble. I am after an answer. I will owe you one, and I pay those.",
+   "giver": "hub-woy-woy-cleo",
+   "level": 2,
+   "requires": [
+    "h-servo-woy-woy-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Woy Woy",
+     "to": "Koolewong",
+     "label": "follow it as far as Koolewong"
+    },
+    {
+     "kind": "photo",
+     "x": 9714,
+     "z": -42601,
+     "radius": 35,
+     "label": "wherever it stops"
+    }
+   ],
+   "reward": {
+    "cash": 107,
+    "xp": 266,
+    "unlock": [
+     "hub:h-servo-woy-woy-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-woy-woy-2",
+   "act": 3,
+   "title": "Bay Two, Woy Woy",
+   "blurb": "Keep it between us for now. Bay two at the Woy Woy workshop has had the same car in it since a Tuesday and the owner has stopped answering. Nobody else seems to have noticed, which is its own problem. Do not let them talk you into anything.",
+   "giver": "hub-woy-woy-vera",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 9709,
+     "z": -42699,
+     "radius": 25,
+     "label": "the address on the job card"
+    },
+    {
+     "kind": "photo",
+     "x": 9708,
+     "z": -42712,
+     "radius": 35,
+     "label": "the letterbox, so I know I have the right house"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if anybody actually lives there",
+     "npc": "hub-woy-woy-vera"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 179,
+    "unlock": [
+     "hub:h-servo-woy-woy-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-woy-woy-3",
+   "act": 3,
+   "title": "Tools Off the Bench, Woy Woy",
+   "blurb": "Right. Since you asked. Someone has been walking out of Woy Woy with a socket set at a time since a Tuesday, and I have run out of ways to be polite about it. Everyone I have told has looked at me the way you are now. There's cash in it. Not a lot.",
+   "giver": "hub-woy-woy-vera",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 3,
+     "label": "the ones hanging round the air hose"
+    },
+    {
+     "kind": "earn",
+     "dollars": 51,
+     "label": "$51 of it back, that is what the set cost"
+    }
+   ],
+   "reward": {
+    "cash": 81,
+    "xp": 166,
+    "unlock": [
+     "hub:h-servo-woy-woy-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-woy-woy-4",
+   "act": 3,
+   "title": "The Woy Woy Price Board",
+   "blurb": "My knees are gone, so. Head office says the Woy Woy board has been wrong since a Tuesday and I say it has been right for eleven years, and one of us is about to be embarrassed. This is the third time I have had this conversation. You'll know it when you see it.",
+   "giver": "hub-woy-woy-tomasz",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "buy something so it is a real transaction"
+    },
+    {
+     "kind": "photo",
+     "x": 9840,
+     "z": -42705,
+     "radius": 35,
+     "label": "the board and the pump, both in the one shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that settles it either way",
+     "npc": "hub-woy-woy-tomasz"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 170,
+    "unlock": [
+     "hub:h-servo-woy-woy-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-woy-woy-5",
+   "act": 3,
+   "title": "The Other Franchise, Woy Woy",
+   "blurb": "This is going to sound small. The bloke who runs the site at Tascott has had the same trouble Woy Woy has, and he will talk to you before he talks to me. It started small, the way these things do. Half now if you want it. Most people don't.",
+   "giver": "hub-woy-woy-tomasz",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 9328,
+     "z": -46426,
+     "radius": 60,
+     "label": "find him on shift"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever he says, I want it word for word",
+     "npc": "hub-woy-woy-tomasz"
+    }
+   ],
+   "reward": {
+    "cash": 79,
+    "xp": 175,
+    "unlock": [
+     "hub:h-servo-woy-woy-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-villawood-0",
+   "act": 3,
+   "title": "Level Two, Villawood",
+   "blurb": "There is no clever way to say this. Water has been coming through the level two ceiling of the Villawood block since the long weekend and the strata report says there is no water. Half the street knows and half the street is pretending not to. Do that and we're square.",
+   "giver": "hub-villawood-mae",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -21526,
+     "z": 1835,
+     "radius": 35,
+     "label": "the ceiling, with the stain visible"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that goes in the file whether they like it or not",
+     "npc": "hub-villawood-mae"
+    }
+   ],
+   "reward": {
+    "cash": 67,
+    "xp": 183,
+    "unlock": [
+     "hub:h-strata-villawood-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-villawood-1",
+   "act": 3,
+   "title": "The Special Levy, Villawood",
+   "blurb": "You look like you have twenty minutes. The photo did it. I am not after trouble. I am after an answer. Now every owner at Villawood owes $61 and I have to collect it from people who have avoided me for a year. I will owe you one, and I pay those.",
+   "giver": "hub-villawood-mae",
+   "level": 2,
+   "requires": [
+    "h-strata-villawood-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 61,
+     "label": "$61 out of them, in any state"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will not ask how",
+     "npc": "hub-villawood-mae"
+    }
+   ],
+   "reward": {
+    "cash": 114,
+    "xp": 261,
+    "unlock": [
+     "hub:h-strata-villawood-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-villawood-2",
+   "act": 3,
+   "title": "Car Space 14, Villawood",
+   "blurb": "Keep it between us for now. Somebody who does not live at Villawood has parked in space fourteen every night since the long weekend and the manager will not look at it. Nobody else seems to have noticed, which is its own problem. Do not let them talk you into anything.",
+   "giver": "hub-villawood-salma",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -21655,
+     "z": 1810,
+     "radius": 25,
+     "label": "down to the basement, the far corner"
+    },
+    {
+     "kind": "photo",
+     "x": -21662,
+     "z": 1803,
+     "radius": 35,
+     "label": "the car in the space with the number painted beside it"
+    }
+   ],
+   "reward": {
+    "cash": 71,
+    "xp": 173,
+    "unlock": [
+     "hub:h-strata-villawood-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-villawood-3",
+   "act": 3,
+   "title": "The Meeting, Villawood",
+   "blurb": "Right. Since you asked. The Villawood AGM is on the long weekend and I would like to arrive with something stronger than a grievance and a printout. Everyone I have told has looked at me the way you are now. There's cash in it. Not a lot.",
+   "giver": "hub-villawood-salma",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "two coffees, one is for me"
+    },
+    {
+     "kind": "goto",
+     "x": -21587,
+     "z": 1631,
+     "radius": 25,
+     "label": "the community room where they hold it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "walk in with me, they behave when there is a witness",
+     "npc": "hub-villawood-salma"
+    }
+   ],
+   "reward": {
+    "cash": 72,
+    "xp": 180,
+    "unlock": [
+     "hub:h-strata-villawood-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-villawood-4",
+   "act": 3,
+   "title": "Bin Night at Villawood",
+   "blurb": "My knees are gone, so. Three units at Villawood have put their bins out on the wrong night since the long weekend and I have taken it personally, which I accept is a choice I made. This is the third time I have had this conversation. You'll know it when you see it.",
+   "giver": "hub-villawood-hazel",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "the ones who argue about it"
+    },
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "the fine the council gave me, off them"
+    }
+   ],
+   "reward": {
+    "cash": 71,
+    "xp": 174,
+    "unlock": [
+     "hub:h-strata-villawood-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-villawood-5",
+   "act": 3,
+   "title": "The Other Block, Villawood",
+   "blurb": "This is going to sound small. There is a block at Carramar with the same builder and the same cracks, and their manager has already been through what Villawood is starting. It started small, the way these things do. Half now if you want it. Most people don't.",
+   "giver": "hub-villawood-hazel",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -22877,
+     "z": 2035,
+     "radius": 60,
+     "label": "go and ask them how it ended"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I need to know how much worse this gets",
+     "npc": "hub-villawood-hazel"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 162,
+    "unlock": [
+     "hub:h-strata-villawood-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

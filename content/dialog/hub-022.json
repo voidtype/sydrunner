@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-rooty-hill-talia",
+   "name": "Talia, shopkeeper at Rooty Hill",
+   "x": -33951.1,
+   "z": -10054.7,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sit down if you like. Nobody else is using it.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You look like you have twenty minutes. The Rooty Hill order has been two cartons light every week since the long weekend and the invoice says otherwise every time. This is the third time I have had this conversation. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-rooty-hill-0",
+       "denyFlag": "hub:h-cornershop-rooty-hill-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Keep it between us for now. They admitted it, which I did not expect, so now there is $37 owing to Rooty Hill and it is not going to walk in here itself. It started small, the way these things do. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-rooty-hill-1",
+       "denyFlag": "hub:h-cornershop-rooty-hill-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "Short Delivery, Rooty Hill — that's done.",
+       "turnin": "h-cornershop-rooty-hill-0"
+      },
+      {
+       "text": "The Credit Note, Rooty Hill — that's done.",
+       "turnin": "h-cornershop-rooty-hill-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-rooty-hill-lara",
+   "name": "Lara, delivery driver at Rooty Hill",
+   "x": -34041,
+   "z": -10316,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You will have to speak up, the trains are in.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Right. Since you asked. I do the Rooty Hill run at half six and there is a stretch of it where the van gets followed, which I have told nobody until now. It is the not knowing that has got me, honestly. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-rooty-hill-2",
+       "denyFlag": "hub:h-cornershop-rooty-hill-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "My knees are gone, so. I have got a milk crate in the back of the van and the Rooty Hill shop is shut, and the number on the door rings out. There is probably a simple explanation and I would love to hear it. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-rooty-hill-3",
+       "denyFlag": "hub:h-cornershop-rooty-hill-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "The Rooty Hill Run — that's done.",
+       "turnin": "h-cornershop-rooty-hill-2"
+      },
+      {
+       "text": "Locked Out, Rooty Hill — that's done.",
+       "turnin": "h-cornershop-rooty-hill-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-rooty-hill-ameera",
+   "name": "Ameera, the kid on the register at Rooty Hill",
+   "x": -34050.2,
+   "z": -10261,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I have got about four minutes before I am needed.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "This is going to sound small. Three of the Rooty Hill regulars have started coming in together and going out separately, and the till is $14 down on those days. You will see what I mean the second you get there. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-rooty-hill-4",
+       "denyFlag": "hub:h-cornershop-rooty-hill-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have written it down twice and lost it twice. Everything Rooty Hill sells comes off a floor at Mount Druitt, and the woman who runs it will tell you things she will not put in writing. There is a version of this where I am the unreasonable one. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-rooty-hill-5",
+       "denyFlag": "hub:h-cornershop-rooty-hill-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "The Regulars, Rooty Hill — that's done.",
+       "turnin": "h-cornershop-rooty-hill-4"
+      },
+      {
+       "text": "The Wholesaler, Rooty Hill — that's done.",
+       "turnin": "h-cornershop-rooty-hill-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-lidcombe-ashwin",
+   "name": "Ashwin, junior coach at Lidcombe",
+   "x": -15227.3,
+   "z": -335,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Ah. Someone with two working legs.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You look like you have twenty minutes. I have got eleven kids for a twelve-a-side at Lidcombe on school holidays and one of them has a note from his mother. This is the third time I have had this conversation. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-lidcombe-0",
+       "denyFlag": "hub:h-oval-lidcombe-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Keep it between us for now. We found a twelfth, which means the Lidcombe club now owes the association $55 it had budgeted on not owing. It started small, the way these things do. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-lidcombe-1",
+       "denyFlag": "hub:h-oval-lidcombe-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "Under 12s at Lidcombe — that's done.",
+       "turnin": "h-oval-lidcombe-0"
+      },
+      {
+       "text": "Registration, Lidcombe — that's done.",
+       "turnin": "h-oval-lidcombe-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-lidcombe-charlie",
+   "name": "Charlie, canteen manager at Lidcombe",
+   "x": -15026,
+   "z": -380,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are early. Or late. I have lost track.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Right. Since you asked. The canteen at Lidcombe does two hundred sausages on a Saturday and this week the freezer went off at ten past five. It is the not knowing that has got me, honestly. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-lidcombe-2",
+       "denyFlag": "hub:h-oval-lidcombe-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "My knees are gone, so. Somebody walked off with the float from the Lidcombe canteen at about ten past five during the last home game, and I have a fair idea which somebody. There is probably a simple explanation and I would love to hear it. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-lidcombe-3",
+       "denyFlag": "hub:h-oval-lidcombe-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Lidcombe Canteen — that's done.",
+       "turnin": "h-oval-lidcombe-2"
+      },
+      {
+       "text": "Grand Final Float, Lidcombe — that's done.",
+       "turnin": "h-oval-lidcombe-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-lidcombe-kyra",
+   "name": "Kyra, groundsman at Lidcombe",
+   "x": -15098.8,
+   "z": -329,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Been here since before it was like this. Go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "This is going to sound small. The sprinkler line under the Lidcombe outfield has been leaking since school holidays and the wet patch has started to move. You will see what I mean the second you get there. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-lidcombe-4",
+       "denyFlag": "hub:h-oval-lidcombe-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have written it down twice and lost it twice. The bloke who allocates grounds for the whole association sits at Auburn, and Lidcombe has been at the bottom of his list for two seasons. There is a version of this where I am the unreasonable one. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-lidcombe-5",
+       "denyFlag": "hub:h-oval-lidcombe-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Sprinkler Line, Lidcombe — that's done.",
+       "turnin": "h-oval-lidcombe-4"
+      },
+      {
+       "text": "The Association, Lidcombe — that's done.",
+       "turnin": "h-oval-lidcombe-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-richmond-jenna",
+   "name": "Jenna, bushcare volunteer at Richmond",
+   "x": -42818,
+   "z": -29105,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Do not mind the mess. It is structural now.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You look like you have twenty minutes. Somebody has been tipping fill into the creek behind Richmond since the week of the show and it is narrowing the channel a metre at a time. This is the third time I have had this conversation. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-richmond-0",
+       "denyFlag": "hub:h-creek-richmond-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Keep it between us for now. They have agreed to a clean-up at Richmond, which is wonderful, except the grant is $41 short and closes on the week of the show. It started small, the way these things do. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-richmond-1",
+       "denyFlag": "hub:h-creek-richmond-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "The Creek Behind Richmond — that's done.",
+       "turnin": "h-creek-richmond-0"
+      },
+      {
+       "text": "Willow Removal, Richmond — that's done.",
+       "turnin": "h-creek-richmond-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-richmond-verity",
+   "name": "Verity, SES member at Richmond",
+   "x": -42758,
+   "z": -29235,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are selling something the answer is no.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Right. Since you asked. We had 94 sandbags in the Richmond shed on the week of the show and this morning we have got the pallet they came on. It is the not knowing that has got me, honestly. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-richmond-2",
+       "denyFlag": "hub:h-creek-richmond-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "My knees are gone, so. People keep driving the low crossing at Richmond at first light with the water over the sign, and one of them is going to be the one. There is probably a simple explanation and I would love to hear it. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-richmond-3",
+       "denyFlag": "hub:h-creek-richmond-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Sandbags, Richmond — that's done.",
+       "turnin": "h-creek-richmond-2"
+      },
+      {
+       "text": "The Low Crossing, Richmond — that's done.",
+       "turnin": "h-creek-richmond-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-richmond-yosef",
+   "name": "Yosef, resident who got flooded at Richmond",
+   "x": -42922.4,
+   "z": -29268.9,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Cash only and no, I am joking. What do you want.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "This is going to sound small. The water came through my place at Richmond on the week of the show and the assessor wants photographs of things I have already thrown out. You will see what I mean the second you get there. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-richmond-4",
+       "denyFlag": "hub:h-creek-richmond-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have written it down twice and lost it twice. Whatever is happening to Richmond starts upstream at Clarendon, and there are people up there who have been saying so for years. There is a version of this where I am the unreasonable one. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-richmond-5",
+       "denyFlag": "hub:h-creek-richmond-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "Under the House, Richmond — that's done.",
+       "turnin": "h-creek-richmond-4"
+      },
+      {
+       "text": "Upstream, Richmond — that's done.",
+       "turnin": "h-creek-richmond-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

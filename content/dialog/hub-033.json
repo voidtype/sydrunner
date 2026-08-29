@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-east-richmond-valeria",
+   "name": "Valeria, greenkeeper at East Richmond",
+   "x": -42214,
+   "z": -28907,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Whatever it is, I have had worse this week.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "My knees are gone, so. The number three green at East Richmond has had a bald patch the shape of Tasmania since a Tuesday, and the committee thinks I am inventing it. I have rung the number on the letter four times. That's the whole job. No catch.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-east-richmond-0",
+       "denyFlag": "hub:h-bowlo-east-richmond-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "This is going to sound small. They have seen the photograph and now they want it re-laid by a Tuesday, which means finding $78 that the East Richmond club does not have. Half the street knows and half the street is pretending not to. Be polite about it. It costs nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-east-richmond-1",
+       "denyFlag": "hub:h-bowlo-east-richmond-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "The Dead Patch at East Richmond — that's done.",
+       "turnin": "h-bowlo-east-richmond-0"
+      },
+      {
+       "text": "Turf Money, East Richmond — that's done.",
+       "turnin": "h-bowlo-east-richmond-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-east-richmond-abbie",
+   "name": "Abbie, club president at East Richmond",
+   "x": -42345,
+   "z": -28604,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sit down if you like. Nobody else is using it.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I have written it down twice and lost it twice. Our books say 41 members at East Richmond and I would bet the bar takings that half of them are dead or moved to Queensland. I am not after trouble. I am after an answer. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-east-richmond-2",
+       "denyFlag": "hub:h-bowlo-east-richmond-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Do not laugh. Since first light somebody has been going round the East Richmond greens telling the barefoot bowlers we are shutting, and we are not shutting. Nobody else seems to have noticed, which is its own problem. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-east-richmond-3",
+       "denyFlag": "hub:h-bowlo-east-richmond-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The East Richmond Membership Count — that's done.",
+       "turnin": "h-bowlo-east-richmond-2"
+      },
+      {
+       "text": "Closing Time Rumour, East Richmond — that's done.",
+       "turnin": "h-bowlo-east-richmond-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-east-richmond-vito",
+   "name": "Vito, bar manager at East Richmond",
+   "x": -42413,
+   "z": -28935,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You will have to speak up, the trains are in.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is the sort of thing you notice or you do not. There is a whiteboard with last March still on it in the chest freezer behind the bar at East Richmond and I am not opening it on an empty stomach. Everyone I have told has looked at me the way you are now. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-east-richmond-4",
+       "denyFlag": "hub:h-bowlo-east-richmond-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Two people have already said no. The man who kept these greens before me drinks at Clarendon now, and he owes East Richmond an explanation about the drainage. This is the third time I have had this conversation. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-east-richmond-5",
+       "denyFlag": "hub:h-bowlo-east-richmond-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Behind the Bar at East Richmond — that's done.",
+       "turnin": "h-bowlo-east-richmond-4"
+      },
+      {
+       "text": "The Old Greenkeeper, East Richmond — that's done.",
+       "turnin": "h-bowlo-east-richmond-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-convention-maud",
+   "name": "Maud, night console operator at Convention",
+   "x": -1106,
+   "z": 314,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I have got about four minutes before I am needed.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "My knees are gone, so. Every night around knock-off the same car does three laps of the Convention forecourt and never buys fuel. I have rung the number on the letter four times. That's the whole job. No catch.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-convention-0",
+       "denyFlag": "hub:h-servo-convention-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "This is going to sound small. Now I know the plate, I want to know where it goes after it leaves Convention at knock-off, because it is not going home. Half the street knows and half the street is pretending not to. Be polite about it. It costs nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-convention-1",
+       "denyFlag": "hub:h-servo-convention-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "Nights at Convention — that's done.",
+       "turnin": "h-servo-convention-0"
+      },
+      {
+       "text": "The Third Lap, Convention — that's done.",
+       "turnin": "h-servo-convention-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-convention-kaito",
+   "name": "Kaito, mechanic at Convention",
+   "x": -1004,
+   "z": 289,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Ah. Someone with two working legs.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I have written it down twice and lost it twice. Bay two at the Convention workshop has had the same car in it since the first of the month and the owner has stopped answering. I am not after trouble. I am after an answer. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-convention-2",
+       "denyFlag": "hub:h-servo-convention-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Do not laugh. Someone has been walking out of Convention with a socket set at a time since the first of the month, and I have run out of ways to be polite about it. Nobody else seems to have noticed, which is its own problem. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-convention-3",
+       "denyFlag": "hub:h-servo-convention-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Bay Two, Convention — that's done.",
+       "turnin": "h-servo-convention-2"
+      },
+      {
+       "text": "Tools Off the Bench, Convention — that's done.",
+       "turnin": "h-servo-convention-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-convention-priya",
+   "name": "Priya, franchisee at Convention",
+   "x": -1114,
+   "z": 508,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are early. Or late. I have lost track.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is the sort of thing you notice or you do not. Head office says the Convention board has been wrong since the first of the month and I say it has been right for eleven years, and one of us is about to be embarrassed. Everyone I have told has looked at me the way you are now. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-convention-4",
+       "denyFlag": "hub:h-servo-convention-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Two people have already said no. The bloke who runs the site at Chinatown has had the same trouble Convention has, and he will talk to you before he talks to me. This is the third time I have had this conversation. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-convention-5",
+       "denyFlag": "hub:h-servo-convention-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "The Convention Price Board — that's done.",
+       "turnin": "h-servo-convention-4"
+      },
+      {
+       "text": "The Other Franchise, Convention — that's done.",
+       "turnin": "h-servo-convention-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-ngara-hina",
+   "name": "Hina, building manager at Ngara",
+   "x": -19263,
+   "z": -7063,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Been here since before it was like this. Go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "My knees are gone, so. Water has been coming through the level two ceiling of the Ngara block since a wet Monday and the strata report says there is no water. I have rung the number on the letter four times. That's the whole job. No catch.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-ngara-0",
+       "denyFlag": "hub:h-strata-ngara-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "This is going to sound small. The photo did it. Half the street knows and half the street is pretending not to. Now every owner at Ngara owes $132 and I have to collect it from people who have avoided me for a year. Be polite about it. It costs nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-ngara-1",
+       "denyFlag": "hub:h-strata-ngara-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "Level Two, Ngara — that's done.",
+       "turnin": "h-strata-ngara-0"
+      },
+      {
+       "text": "The Special Levy, Ngara — that's done.",
+       "turnin": "h-strata-ngara-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-ngara-eryk",
+   "name": "Eryk, owner-occupier at Ngara",
+   "x": -19416,
+   "z": -7207,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Do not mind the mess. It is structural now.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I have written it down twice and lost it twice. Somebody who does not live at Ngara has parked in space fourteen every night since a wet Monday and the manager will not look at it. I am not after trouble. I am after an answer. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-ngara-2",
+       "denyFlag": "hub:h-strata-ngara-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Do not laugh. The Ngara AGM is on a wet Monday and I would like to arrive with something stronger than a grievance and a printout. Nobody else seems to have noticed, which is its own problem. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-ngara-3",
+       "denyFlag": "hub:h-strata-ngara-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "Car Space 14, Ngara — that's done.",
+       "turnin": "h-strata-ngara-2"
+      },
+      {
+       "text": "The Meeting, Ngara — that's done.",
+       "turnin": "h-strata-ngara-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-ngara-khalil",
+   "name": "Khalil, the one who does the bins at Ngara",
+   "x": -19313.7,
+   "z": -7046.9,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are selling something the answer is no.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is the sort of thing you notice or you do not. Three units at Ngara have put their bins out on the wrong night since a wet Monday and I have taken it personally, which I accept is a choice I made. Everyone I have told has looked at me the way you are now. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-ngara-4",
+       "denyFlag": "hub:h-strata-ngara-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Two people have already said no. There is a block at Westmead Hospital with the same builder and the same cracks, and their manager has already been through what Ngara is starting. This is the third time I have had this conversation. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-ngara-5",
+       "denyFlag": "hub:h-strata-ngara-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "Bin Night at Ngara — that's done.",
+       "turnin": "h-strata-ngara-4"
+      },
+      {
+       "text": "The Other Block, Ngara — that's done.",
+       "turnin": "h-strata-ngara-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

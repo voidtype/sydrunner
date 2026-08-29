@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-wiley-park-zaid",
+   "name": "Zaid, newsagent at Wiley Park",
+   "x": -13001.5,
+   "z": 6040.1,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are not from around the corner, are you.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "The council knows and the council does not care. I am sending back 84 papers a day from Wiley Park and paying to have them collected, which is a business model somebody invented on purpose. It is the not knowing that has got me, honestly. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-wiley-park-0",
+       "denyFlag": "hub:h-newsagent-wiley-park-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have been putting it off since Easter. They will drop my Wiley Park order if I can show $45 of turnover on the other side of the shop by grand final week. There is probably a simple explanation and I would love to hear it. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-wiley-park-1",
+       "denyFlag": "hub:h-newsagent-wiley-park-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "Returns at Wiley Park — that's done.",
+       "turnin": "h-newsagent-wiley-park-0"
+      },
+      {
+       "text": "The Better Rate, Wiley Park — that's done.",
+       "turnin": "h-newsagent-wiley-park-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-wiley-park-mardi",
+   "name": "Mardi, paper runner at Wiley Park",
+   "x": -13036,
+   "z": 6357,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Half of this suburb has walked past already. Not one stopped.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Before you say anything: yes, I know. I do the Wiley Park round from half six and for the last fortnight somebody has been taking the papers off the front steps behind me. You will see what I mean the second you get there. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-wiley-park-2",
+       "denyFlag": "hub:h-newsagent-wiley-park-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It is not a police matter and I have checked. There is a dog on the Wiley Park round that has had two of my bags and two hundred metres of orange netting that was not even mine. There is a version of this where I am the unreasonable one. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-wiley-park-3",
+       "denyFlag": "hub:h-newsagent-wiley-park-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "The Wiley Park Round — that's done.",
+       "turnin": "h-newsagent-wiley-park-2"
+      },
+      {
+       "text": "The Dog on Ash Street, Wiley Park — that's done.",
+       "turnin": "h-newsagent-wiley-park-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-wiley-park-fatima",
+   "name": "Fatima, lotto regular at Wiley Park",
+   "x": -12884,
+   "z": 6153,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Whatever it is, I have had worse this week.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Honestly, I am past caring how it looks. Nine of us at Wiley Park have gone in on the same numbers since grand final week and one of us has stopped putting money in. The paperwork says one thing and my eyes say another. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-wiley-park-4",
+       "denyFlag": "hub:h-newsagent-wiley-park-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I would do it myself if I could leave the counter. The agency at Punchbowl closed six months before Wiley Park started struggling, and I would very much like to know what they know. It has been going on longer than I have admitted to anyone. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-wiley-park-5",
+       "denyFlag": "hub:h-newsagent-wiley-park-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "The Syndicate, Wiley Park — that's done.",
+       "turnin": "h-newsagent-wiley-park-4"
+      },
+      {
+       "text": "The Other Agency, Wiley Park — that's done.",
+       "turnin": "h-newsagent-wiley-park-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-fairfield-mehmet",
+   "name": "Mehmet, panel beater at Fairfield",
+   "x": -23357,
+   "z": 768,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sit down if you like. Nobody else is using it.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "The council knows and the council does not care. There has been a car in the Fairfield yard since every second Friday with a folding table on the passenger seat and no owner answering. It is the not knowing that has got me, honestly. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-fairfield-0",
+       "denyFlag": "hub:h-workshop-fairfield-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have been putting it off since Easter. Now that it is documented, Fairfield is owed $32 in storage and the only person who can pay it is the person not answering. There is probably a simple explanation and I would love to hear it. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-fairfield-1",
+       "denyFlag": "hub:h-workshop-fairfield-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "The Unclaimed Falcon, Fairfield — that's done.",
+       "turnin": "h-workshop-fairfield-0"
+      },
+      {
+       "text": "Storage Fees, Fairfield — that's done.",
+       "turnin": "h-workshop-fairfield-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-fairfield-ebony",
+   "name": "Ebony, apprentice at Fairfield",
+   "x": -23369,
+   "z": 707,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You will have to speak up, the trains are in.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Before you say anything: yes, I know. I am in my first year at Fairfield and I have to log 39 hours on a job I am not allowed to touch on my own. You will see what I mean the second you get there. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-fairfield-2",
+       "denyFlag": "hub:h-workshop-fairfield-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It is not a police matter and I have checked. Somebody has been coming into the Fairfield yard after half six to use the air line, and last week they used the compressor as well. There is a version of this where I am the unreasonable one. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-fairfield-3",
+       "denyFlag": "hub:h-workshop-fairfield-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "First Year, Fairfield — that's done.",
+       "turnin": "h-workshop-fairfield-2"
+      },
+      {
+       "text": "The Air Line, Fairfield — that's done.",
+       "turnin": "h-workshop-fairfield-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-fairfield-ezra",
+   "name": "Ezra, the bloke whose car it is at Fairfield",
+   "x": -23356,
+   "z": 902,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I have got about four minutes before I am needed.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Honestly, I am past caring how it looks. My car has been at Fairfield since every second Friday and every time I ring, the quote has grown by about $39. The paperwork says one thing and my eyes say another. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-fairfield-4",
+       "denyFlag": "hub:h-workshop-fairfield-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I would do it myself if I could leave the counter. The insurance assessor who signs off every job at Fairfield works out of Carramar, and he has never once seen the car he is assessing. It has been going on longer than I have admitted to anyone. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-fairfield-5",
+       "denyFlag": "hub:h-workshop-fairfield-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "My Own Car, Fairfield — that's done.",
+       "turnin": "h-workshop-fairfield-4"
+      },
+      {
+       "text": "The Assessor, Fairfield — that's done.",
+       "turnin": "h-workshop-fairfield-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-warrimoo-eileen",
+   "name": "Eileen, shop manager at Warrimoo",
+   "x": -56333,
+   "z": -15235,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Ah. Someone with two working legs.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "The council knows and the council does not care. People leave things at the Warrimoo roller door after knock-off and by morning it is rained on and it is our problem and our tip fee. It is the not knowing that has got me, honestly. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-warrimoo-0",
+       "denyFlag": "hub:h-opshop-warrimoo-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have been putting it off since Easter. The photos worked, which means Warrimoo can claim back the $52 we have paid to throw away other people's furniture since a public holiday nobody remembered. There is probably a simple explanation and I would love to hear it. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-warrimoo-1",
+       "denyFlag": "hub:h-opshop-warrimoo-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "Dumped Out the Back, Warrimoo — that's done.",
+       "turnin": "h-opshop-warrimoo-0"
+      },
+      {
+       "text": "The Tip Fee, Warrimoo — that's done.",
+       "turnin": "h-opshop-warrimoo-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-warrimoo-johanna",
+   "name": "Johanna, sorter at Warrimoo",
+   "x": -56465,
+   "z": -15047,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are early. Or late. I have lost track.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Before you say anything: yes, I know. Something came into Warrimoo on a public holiday nobody remembered in a box of paperbacks that I do not think the family meant to give away. You will see what I mean the second you get there. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-warrimoo-2",
+       "denyFlag": "hub:h-opshop-warrimoo-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It is not a police matter and I have checked. Two people have been coming into the Warrimoo sorting room since a public holiday nobody remembered and taking the good stock before it reaches the floor, and one of them volunteers here. There is a version of this where I am the unreasonable one. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-warrimoo-3",
+       "denyFlag": "hub:h-opshop-warrimoo-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Good Box, Warrimoo — that's done.",
+       "turnin": "h-opshop-warrimoo-2"
+      },
+      {
+       "text": "Sorting Room, Warrimoo — that's done.",
+       "turnin": "h-opshop-warrimoo-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-warrimoo-mikko",
+   "name": "Mikko, volunteer driver at Warrimoo",
+   "x": -56731,
+   "z": -15269,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Been here since before it was like this. Go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Honestly, I am past caring how it looks. I do the Warrimoo pick-ups in a van with 37 thousand on it and a door that only opens if you know about it. The paperwork says one thing and my eyes say another. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-warrimoo-4",
+       "denyFlag": "hub:h-opshop-warrimoo-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I would do it myself if I could leave the counter. Everything Warrimoo cannot sell goes to a warehouse at Blaxland, and nobody there has ever answered a phone in my hearing. It has been going on longer than I have admitted to anyone. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-warrimoo-5",
+       "denyFlag": "hub:h-opshop-warrimoo-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "The Van, Warrimoo — that's done.",
+       "turnin": "h-opshop-warrimoo-4"
+      },
+      {
+       "text": "Head Office, Warrimoo — that's done.",
+       "turnin": "h-opshop-warrimoo-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

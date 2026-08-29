@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-tramway-avenue-stefanos",
+   "name": "Stefanos, greenkeeper at Tramway Avenue",
+   "x": -17565,
+   "z": -5381,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I know that look. Everyone wants something today.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Honestly, I am past caring how it looks. The number three green at Tramway Avenue has had a bald patch the shape of Tasmania since a Tuesday, and the committee thinks I am inventing it. It started small, the way these things do. Whatever it costs you, tell me and I will cover it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-tramway-avenue-0",
+       "denyFlag": "hub:h-bowlo-tramway-avenue-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I would do it myself if I could leave the counter. They have seen the photograph and now they want it re-laid by a Tuesday, which means finding $51 that the Tramway Avenue club does not have. It is the not knowing that has got me, honestly. I would rather know than wonder.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-tramway-avenue-1",
+       "denyFlag": "hub:h-bowlo-tramway-avenue-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "The Dead Patch at Tramway Avenue — that's done.",
+       "turnin": "h-bowlo-tramway-avenue-0"
+      },
+      {
+       "text": "Turf Money, Tramway Avenue — that's done.",
+       "turnin": "h-bowlo-tramway-avenue-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-tramway-avenue-keziah",
+   "name": "Keziah, club president at Tramway Avenue",
+   "x": -17780,
+   "z": -5273,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Give me a second. Right. Go.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You will think I am making this up. Our books say 77 members at Tramway Avenue and I would bet the bar takings that half of them are dead or moved to Queensland. There is probably a simple explanation and I would love to hear it. That's the whole job. No catch.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-tramway-avenue-2",
+       "denyFlag": "hub:h-bowlo-tramway-avenue-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "There is no clever way to say this. Since first light somebody has been going round the Tramway Avenue greens telling the barefoot bowlers we are shutting, and we are not shutting. You will see what I mean the second you get there. Be polite about it. It costs nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-tramway-avenue-3",
+       "denyFlag": "hub:h-bowlo-tramway-avenue-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Tramway Avenue Membership Count — that's done.",
+       "turnin": "h-bowlo-tramway-avenue-2"
+      },
+      {
+       "text": "Closing Time Rumour, Tramway Avenue — that's done.",
+       "turnin": "h-bowlo-tramway-avenue-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-tramway-avenue-lorcan",
+   "name": "Lorcan, bar manager at Tramway Avenue",
+   "x": -17836,
+   "z": -5444,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are not from around the corner, are you.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You look like you have twenty minutes. There is a milk crate in the chest freezer behind the bar at Tramway Avenue and I am not opening it on an empty stomach. There is a version of this where I am the unreasonable one. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-tramway-avenue-4",
+       "denyFlag": "hub:h-bowlo-tramway-avenue-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Keep it between us for now. The man who kept these greens before me drinks at Harris Park now, and he owes Tramway Avenue an explanation about the drainage. The paperwork says one thing and my eyes say another. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-tramway-avenue-5",
+       "denyFlag": "hub:h-bowlo-tramway-avenue-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Behind the Bar at Tramway Avenue — that's done.",
+       "turnin": "h-bowlo-tramway-avenue-4"
+      },
+      {
+       "text": "The Old Greenkeeper, Tramway Avenue — that's done.",
+       "turnin": "h-bowlo-tramway-avenue-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-cowan-kiara",
+   "name": "Kiara, night console operator at Cowan",
+   "x": -3878,
+   "z": -30608,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Half of this suburb has walked past already. Not one stopped.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Honestly, I am past caring how it looks. Every night around knock-off the same car does three laps of the Cowan forecourt and never buys fuel. It started small, the way these things do. Whatever it costs you, tell me and I will cover it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-cowan-0",
+       "denyFlag": "hub:h-servo-cowan-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I would do it myself if I could leave the counter. Now I know the plate, I want to know where it goes after it leaves Cowan at knock-off, because it is not going home. It is the not knowing that has got me, honestly. I would rather know than wonder.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-cowan-1",
+       "denyFlag": "hub:h-servo-cowan-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "Nights at Cowan — that's done.",
+       "turnin": "h-servo-cowan-0"
+      },
+      {
+       "text": "The Third Lap, Cowan — that's done.",
+       "turnin": "h-servo-cowan-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-cowan-apirana",
+   "name": "Apirana, mechanic at Cowan",
+   "x": -4066,
+   "z": -30371,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Whatever it is, I have had worse this week.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You will think I am making this up. Bay two at the Cowan workshop has had the same car in it since Thursdays and the owner has stopped answering. There is probably a simple explanation and I would love to hear it. That's the whole job. No catch.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-cowan-2",
+       "denyFlag": "hub:h-servo-cowan-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "There is no clever way to say this. Someone has been walking out of Cowan with a socket set at a time since Thursdays, and I have run out of ways to be polite about it. You will see what I mean the second you get there. Be polite about it. It costs nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-cowan-3",
+       "denyFlag": "hub:h-servo-cowan-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Bay Two, Cowan — that's done.",
+       "turnin": "h-servo-cowan-2"
+      },
+      {
+       "text": "Tools Off the Bench, Cowan — that's done.",
+       "turnin": "h-servo-cowan-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-cowan-samir",
+   "name": "Samir, franchisee at Cowan",
+   "x": -3918,
+   "z": -30497,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sit down if you like. Nobody else is using it.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You look like you have twenty minutes. Head office says the Cowan board has been wrong since Thursdays and I say it has been right for eleven years, and one of us is about to be embarrassed. There is a version of this where I am the unreasonable one. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-cowan-4",
+       "denyFlag": "hub:h-servo-cowan-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Keep it between us for now. The bloke who runs the site at Berowra has had the same trouble Cowan has, and he will talk to you before he talks to me. The paperwork says one thing and my eyes say another. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-cowan-5",
+       "denyFlag": "hub:h-servo-cowan-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "The Cowan Price Board — that's done.",
+       "turnin": "h-servo-cowan-4"
+      },
+      {
+       "text": "The Other Franchise, Cowan — that's done.",
+       "turnin": "h-servo-cowan-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-john-street-square-marcelo",
+   "name": "Marcelo, building manager at John Street Square",
+   "x": -1451.1,
+   "z": -137.7,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You will have to speak up, the trains are in.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Honestly, I am past caring how it looks. Water has been coming through the level two ceiling of the John Street Square block since the first of the month and the strata report says there is no water. It started small, the way these things do. Whatever it costs you, tell me and I will cover it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-john-street-square-0",
+       "denyFlag": "hub:h-strata-john-street-square-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I would do it myself if I could leave the counter. The photo did it. It is the not knowing that has got me, honestly. Now every owner at John Street Square owes $62 and I have to collect it from people who have avoided me for a year. I would rather know than wonder.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-john-street-square-1",
+       "denyFlag": "hub:h-strata-john-street-square-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "Level Two, John Street Square — that's done.",
+       "turnin": "h-strata-john-street-square-0"
+      },
+      {
+       "text": "The Special Levy, John Street Square — that's done.",
+       "turnin": "h-strata-john-street-square-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-john-street-square-reeta",
+   "name": "Reeta, owner-occupier at John Street Square",
+   "x": -1634,
+   "z": 47,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I have got about four minutes before I am needed.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You will think I am making this up. Somebody who does not live at John Street Square has parked in space fourteen every night since the first of the month and the manager will not look at it. There is probably a simple explanation and I would love to hear it. That's the whole job. No catch.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-john-street-square-2",
+       "denyFlag": "hub:h-strata-john-street-square-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "There is no clever way to say this. The John Street Square AGM is on the first of the month and I would like to arrive with something stronger than a grievance and a printout. You will see what I mean the second you get there. Be polite about it. It costs nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-john-street-square-3",
+       "denyFlag": "hub:h-strata-john-street-square-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "Car Space 14, John Street Square — that's done.",
+       "turnin": "h-strata-john-street-square-2"
+      },
+      {
+       "text": "The Meeting, John Street Square — that's done.",
+       "turnin": "h-strata-john-street-square-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-john-street-square-cosima",
+   "name": "Cosima, the one who does the bins at John Street Square",
+   "x": -1514.6,
+   "z": -184.8,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Ah. Someone with two working legs.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You look like you have twenty minutes. Three units at John Street Square have put their bins out on the wrong night since the first of the month and I have taken it personally, which I accept is a choice I made. There is a version of this where I am the unreasonable one. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-john-street-square-4",
+       "denyFlag": "hub:h-strata-john-street-square-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Keep it between us for now. There is a block at Glebe with the same builder and the same cracks, and their manager has already been through what John Street Square is starting. The paperwork says one thing and my eyes say another. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-john-street-square-5",
+       "denyFlag": "hub:h-strata-john-street-square-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "Bin Night at John Street Square — that's done.",
+       "turnin": "h-strata-john-street-square-4"
+      },
+      {
+       "text": "The Other Block, John Street Square — that's done.",
+       "turnin": "h-strata-john-street-square-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

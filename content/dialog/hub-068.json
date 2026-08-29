@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-st-marys-reg",
+   "name": "Reg, baker at St Marys",
+   "x": -40263,
+   "z": -10971,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Long day. Say what you came to say.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is not a police matter and I have checked. I start at quarter to six and for a month the St Marys back lane has had somebody in it who is not waiting for bread. I am not after trouble. I am after an answer. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-st-marys-0",
+       "denyFlag": "hub:h-bakery-st-marys-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Honestly, I am past caring how it looks. A light on that lane costs St Marys $34 and the landlord has said no twice, so we are doing it ourselves. Nobody else seems to have noticed, which is its own problem. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-st-marys-1",
+       "denyFlag": "hub:h-bakery-st-marys-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "quarter to six at St Marys — that's done.",
+       "turnin": "h-bakery-st-marys-0"
+      },
+      {
+       "text": "The Lane Light, St Marys — that's done.",
+       "turnin": "h-bakery-st-marys-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-st-marys-wiremu",
+   "name": "Wiremu, night delivery at St Marys",
+   "x": -40557,
+   "z": -11019,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I know that look. Everyone wants something today.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I would do it myself if I could leave the counter. The flour for St Marys comes off a truck at quarter to six and last grand final week the truck came and the flour did not. Everyone I have told has looked at me the way you are now. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-st-marys-2",
+       "denyFlag": "hub:h-bakery-st-marys-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You will think I am making this up. The St Marys loading zone has had a car in it at quarter to six every morning this week and the driver waits in it, which makes it worse. This is the third time I have had this conversation. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-st-marys-3",
+       "denyFlag": "hub:h-bakery-st-marys-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Flour Run, St Marys — that's done.",
+       "turnin": "h-bakery-st-marys-2"
+      },
+      {
+       "text": "The Loading Zone, St Marys — that's done.",
+       "turnin": "h-bakery-st-marys-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-st-marys-sefa",
+   "name": "Sefa, front of house at St Marys",
+   "x": -40410,
+   "z": -11183,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Give me a second. Right. Go.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "There is no clever way to say this. Somebody two doors down from St Marys put up a sign on grand final week that says the same six words as ours, in the same order. It started small, the way these things do. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-st-marys-4",
+       "denyFlag": "hub:h-bakery-st-marys-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You look like you have twenty minutes. This business was at Werrington before it was at St Marys, and there is a woman there who still has the original book. It is the not knowing that has got me, honestly. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-st-marys-5",
+       "denyFlag": "hub:h-bakery-st-marys-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "The Sourdough Sign, St Marys — that's done.",
+       "turnin": "h-bakery-st-marys-4"
+      },
+      {
+       "text": "The Old Site, St Marys — that's done.",
+       "turnin": "h-bakery-st-marys-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-beecroft-behrouz",
+   "name": "Behrouz, lifeguard at Beecroft",
+   "x": -13338,
+   "z": -12906,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are not from around the corner, are you.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is not a police matter and I have checked. Council has been saying the Beecroft pool is at end of life since the long weekend and the crack they keep pointing at is not in the shell. I am not after trouble. I am after an answer. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-beecroft-0",
+       "denyFlag": "hub:h-pool-beecroft-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Honestly, I am past caring how it looks. We are running a stall for Beecroft on the long weekend and a stall needs $42 of gear that nobody has volunteered to pay for. Nobody else seems to have noticed, which is its own problem. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-beecroft-1",
+       "denyFlag": "hub:h-pool-beecroft-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "The Beecroft Pool — that's done.",
+       "turnin": "h-pool-beecroft-0"
+      },
+      {
+       "text": "The Petition Stall, Beecroft — that's done.",
+       "turnin": "h-pool-beecroft-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-beecroft-zelda",
+   "name": "Zelda, swim coach at Beecroft",
+   "x": -13617,
+   "z": -13014,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Half of this suburb has walked past already. Not one stopped.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I would do it myself if I could leave the counter. I coach 89 kids at Beecroft at ten past five and three of them have stopped coming without anybody ringing me. Everyone I have told has looked at me the way you are now. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-beecroft-2",
+       "denyFlag": "hub:h-pool-beecroft-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You will think I am making this up. A group has been coming over the Beecroft fence after close and swimming in the dark, which is how Beecroft loses its pool. This is the third time I have had this conversation. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-beecroft-3",
+       "denyFlag": "hub:h-pool-beecroft-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "Squad, Beecroft — that's done.",
+       "turnin": "h-pool-beecroft-2"
+      },
+      {
+       "text": "The Deep End, Beecroft — that's done.",
+       "turnin": "h-pool-beecroft-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-beecroft-dilan",
+   "name": "Dilan, kiosk operator at Beecroft",
+   "x": -13384,
+   "z": -12989,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Whatever it is, I have had worse this week.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "There is no clever way to say this. The kiosk at Beecroft has a milk crate in it and a freezer that has been running warm since the long weekend. It started small, the way these things do. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-beecroft-4",
+       "denyFlag": "hub:h-pool-beecroft-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You look like you have twenty minutes. They want everyone from Beecroft to drive to the new centre at Cheltenham, so somebody should go and see whether it is any good. It is the not knowing that has got me, honestly. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-beecroft-5",
+       "denyFlag": "hub:h-pool-beecroft-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "The Kiosk Freezer, Beecroft — that's done.",
+       "turnin": "h-pool-beecroft-4"
+      },
+      {
+       "text": "The Aquatic Centre, Beecroft — that's done.",
+       "turnin": "h-pool-beecroft-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-allawah-moira",
+   "name": "Moira, taxi driver at Allawah",
+   "x": -8581,
+   "z": 11520,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sit down if you like. Nobody else is using it.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is not a police matter and I have checked. The rank outside Allawah used to hold nine cars and since grand final week it holds four, and nobody will say who moved the line. I am not after trouble. I am after an answer. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-allawah-0",
+       "denyFlag": "hub:h-rank-allawah-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Honestly, I am past caring how it looks. Since the rank at Allawah shrank I am $50 a week down, and the association wants that number from somebody who can prove it. Nobody else seems to have noticed, which is its own problem. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-allawah-1",
+       "denyFlag": "hub:h-rank-allawah-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "The Allawah Rank — that's done.",
+       "turnin": "h-rank-allawah-0"
+      },
+      {
+       "text": "Lost Fares, Allawah — that's done.",
+       "turnin": "h-rank-allawah-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-allawah-elin",
+   "name": "Elin, rank marshal at Allawah",
+   "x": -8491,
+   "z": 11291,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You will have to speak up, the trains are in.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I would do it myself if I could leave the counter. Cars that have never sat in the Allawah queue turn up at five in the morning and take the front of it, and the drivers who waited say nothing. Everyone I have told has looked at me the way you are now. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-allawah-2",
+       "denyFlag": "hub:h-rank-allawah-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You will think I am making this up. When the last train into Allawah is late, 33 people come out at once and I have to have cars there before they do. This is the third time I have had this conversation. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-allawah-3",
+       "denyFlag": "hub:h-rank-allawah-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "Queue Jumpers, Allawah — that's done.",
+       "turnin": "h-rank-allawah-2"
+      },
+      {
+       "text": "The Late Train, Allawah — that's done.",
+       "turnin": "h-rank-allawah-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-allawah-jonty",
+   "name": "Jonty, hotel doorman at Allawah",
+   "x": -8491,
+   "z": 11450,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I have got about four minutes before I am needed.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "There is no clever way to say this. I have stood on this door near Allawah for 33 years and since grand final week somebody has been sending my guests to a different rank. It started small, the way these things do. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-allawah-4",
+       "denyFlag": "hub:h-rank-allawah-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You look like you have twenty minutes. The plates working the Allawah rank are dispatched from a depot at Hurstville, and the man who runs it has never met a driver he liked. It is the not knowing that has got me, honestly. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-allawah-5",
+       "denyFlag": "hub:h-rank-allawah-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "The Door, Allawah — that's done.",
+       "turnin": "h-rank-allawah-4"
+      },
+      {
+       "text": "The Depot, Allawah — that's done.",
+       "turnin": "h-rank-allawah-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

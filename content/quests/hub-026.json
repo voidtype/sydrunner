@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-cornershop-marayong-0",
+   "act": 3,
+   "title": "Short Delivery, Marayong",
+   "blurb": "I have been putting it off since Easter. The Marayong order has been two cartons light every week since the long weekend and the invoice says otherwise every time. The paperwork says one thing and my eyes say another. Whatever you find, bring it to me first.",
+   "giver": "hub-marayong-thea",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -29015,
+     "z": -12910,
+     "radius": 25,
+     "label": "the loading bay round the side"
+    },
+    {
+     "kind": "photo",
+     "x": -29026,
+     "z": -12907,
+     "radius": 35,
+     "label": "the pallet as it actually arrives"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I have got something to send them",
+     "npc": "hub-marayong-thea"
+    }
+   ],
+   "reward": {
+    "cash": 142,
+    "xp": 364,
+    "unlock": [
+     "hub:h-cornershop-marayong-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-marayong-1",
+   "act": 3,
+   "title": "The Credit Note, Marayong",
+   "blurb": "Before you say anything: yes, I know. They admitted it, which I did not expect, so now there is $98 owing to Marayong and it is not going to walk in here itself. It has been going on longer than I have admitted to anyone. That's it. That's the whole ask.",
+   "giver": "hub-marayong-thea",
+   "level": 6,
+   "requires": [
+    "h-cornershop-marayong-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 98,
+     "label": "$98, and do not take a voucher"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "cash, on the counter, and I will believe it",
+     "npc": "hub-marayong-thea"
+    }
+   ],
+   "reward": {
+    "cash": 169,
+    "xp": 446,
+    "unlock": [
+     "hub:h-cornershop-marayong-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-marayong-2",
+   "act": 3,
+   "title": "The Marayong Run",
+   "blurb": "It is not a police matter and I have checked. I do the Marayong run at twenty past four and there is a stretch of it where the van gets followed, which I have told nobody until now. I have got no proof, which is exactly why I am asking. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-marayong-quinn",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Marayong",
+     "to": "Quakers Hill",
+     "label": "ride it with me as far as Quakers Hill"
+    },
+    {
+     "kind": "photo",
+     "x": -29089,
+     "z": -13092,
+     "radius": 35,
+     "label": "whatever is behind us when we stop"
+    }
+   ],
+   "reward": {
+    "cash": 125,
+    "xp": 366,
+    "unlock": [
+     "hub:h-cornershop-marayong-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-marayong-3",
+   "act": 3,
+   "title": "Locked Out, Marayong",
+   "blurb": "Honestly, I am past caring how it looks. I have got a whiteboard with last March still on it in the back of the van and the Marayong shop is shut, and the number on the door rings out. It might be nothing. It has not felt like nothing. If anyone asks, you were never here.",
+   "giver": "hub-marayong-quinn",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -28919,
+     "z": -13109,
+     "radius": 25,
+     "label": "try the flat above the shop"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get one in you, this takes a while"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "somebody has to sign for it",
+     "npc": "hub-marayong-quinn"
+    }
+   ],
+   "reward": {
+    "cash": 127,
+    "xp": 361,
+    "unlock": [
+     "hub:h-cornershop-marayong-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-marayong-4",
+   "act": 3,
+   "title": "The Regulars, Marayong",
+   "blurb": "I would do it myself if I could leave the counter. Three of the Marayong regulars have started coming in together and going out separately, and the till is $14 down on those days. I would not ask if there was anyone else about. There is no rush, but there is a Friday.",
+   "giver": "hub-marayong-iolanda",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "the ones who come in as a set"
+    },
+    {
+     "kind": "earn",
+     "dollars": 14,
+     "label": "$14, which is exactly what the till says"
+    }
+   ],
+   "reward": {
+    "cash": 139,
+    "xp": 358,
+    "unlock": [
+     "hub:h-cornershop-marayong-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-marayong-5",
+   "act": 3,
+   "title": "The Wholesaler, Marayong",
+   "blurb": "You will think I am making this up. Everything Marayong sells comes off a floor at Quakers Hill, and the woman who runs it will tell you things she will not put in writing. You can tell me I am imagining it. Tell me after. I'll see you right for it.",
+   "giver": "hub-marayong-iolanda",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -30288,
+     "z": -15148,
+     "radius": 60,
+     "label": "go and see her before the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come and tell me what she said about us",
+     "npc": "hub-marayong-iolanda"
+    }
+   ],
+   "reward": {
+    "cash": 133,
+    "xp": 355,
+    "unlock": [
+     "hub:h-cornershop-marayong-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-marrickville-0",
+   "act": 3,
+   "title": "Under 12s at Marrickville",
+   "blurb": "I have been putting it off since Easter. I have got eleven kids for a twelve-a-side at Marrickville on school holidays and one of them has a note from his mother. The paperwork says one thing and my eyes say another. Whatever you find, bring it to me first.",
+   "giver": "hub-marrickville-kaveh",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5043,
+     "z": 5269,
+     "radius": 25,
+     "label": "the estate behind the ground, ask around"
+    },
+    {
+     "kind": "photo",
+     "x": -5052,
+     "z": 5292,
+     "radius": 35,
+     "label": "the noticeboard where the sign-on sheet went up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "any kid with boots will do at this point",
+     "npc": "hub-marrickville-kaveh"
+    }
+   ],
+   "reward": {
+    "cash": 155,
+    "xp": 409,
+    "unlock": [
+     "hub:h-oval-marrickville-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-marrickville-1",
+   "act": 3,
+   "title": "Registration, Marrickville",
+   "blurb": "Before you say anything: yes, I know. We found a twelfth, which means the Marrickville club now owes the association $123 it had budgeted on not owing. It has been going on longer than I have admitted to anyone. That's it. That's the whole ask.",
+   "giver": "hub-marrickville-kaveh",
+   "level": 7,
+   "requires": [
+    "h-oval-marrickville-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 123,
+     "label": "$123 before the cut-off"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will drive it in myself",
+     "npc": "hub-marrickville-kaveh"
+    }
+   ],
+   "reward": {
+    "cash": 186,
+    "xp": 486,
+    "unlock": [
+     "hub:h-oval-marrickville-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-marrickville-2",
+   "act": 3,
+   "title": "The Marrickville Canteen",
+   "blurb": "It is not a police matter and I have checked. The canteen at Marrickville does two hundred sausages on a Saturday and this week the freezer went off at knock-off. I have got no proof, which is exactly why I am asking. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-marrickville-cecile",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 2,
+     "label": "we are going to need the coffee"
+    },
+    {
+     "kind": "photo",
+     "x": -5160,
+     "z": 5228,
+     "radius": 35,
+     "label": "the thermometer, so the insurance believes us"
+    }
+   ],
+   "reward": {
+    "cash": 144,
+    "xp": 416,
+    "unlock": [
+     "hub:h-oval-marrickville-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-marrickville-3",
+   "act": 3,
+   "title": "Grand Final Float, Marrickville",
+   "blurb": "Honestly, I am past caring how it looks. Somebody walked off with the float from the Marrickville canteen at about knock-off during the last home game, and I have a fair idea which somebody. It might be nothing. It has not felt like nothing. If anyone asks, you were never here.",
+   "giver": "hub-marrickville-cecile",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "the pair who were leaning on the roller door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 48,
+     "label": "$48, which is what was in the tin"
+    }
+   ],
+   "reward": {
+    "cash": 149,
+    "xp": 392,
+    "unlock": [
+     "hub:h-oval-marrickville-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-marrickville-4",
+   "act": 3,
+   "title": "Sprinkler Line, Marrickville",
+   "blurb": "I would do it myself if I could leave the counter. The sprinkler line under the Marrickville outfield has been leaking since school holidays and the wet patch has started to move. I would not ask if there was anyone else about. There is no rush, but there is a Friday.",
+   "giver": "hub-marrickville-shani",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5202,
+     "z": 5092,
+     "radius": 25,
+     "label": "walk the line from the tap to the boundary"
+    },
+    {
+     "kind": "photo",
+     "x": -5183,
+     "z": 5070,
+     "radius": 35,
+     "label": "where the grass has gone dark"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to dig once, not five times",
+     "npc": "hub-marrickville-shani"
+    }
+   ],
+   "reward": {
+    "cash": 141,
+    "xp": 409,
+    "unlock": [
+     "hub:h-oval-marrickville-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-marrickville-5",
+   "act": 3,
+   "title": "The Association, Marrickville",
+   "blurb": "You will think I am making this up. The bloke who allocates grounds for the whole association sits at Tempe, and Marrickville has been at the bottom of his list for two seasons. You can tell me I am imagining it. Tell me after. I'll see you right for it.",
+   "giver": "hub-marrickville-shani",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -4851,
+     "z": 6260,
+     "radius": 60,
+     "label": "go and be reasonable at him"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if it is us or the paperwork",
+     "npc": "hub-marrickville-shani"
+    }
+   ],
+   "reward": {
+    "cash": 140,
+    "xp": 398,
+    "unlock": [
+     "hub:h-oval-marrickville-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-central-chalmers-street-0",
+   "act": 3,
+   "title": "The Creek Behind Central Chalmers Street",
+   "blurb": "I have been putting it off since Easter. Somebody has been tipping fill into the creek behind Central Chalmers Street since the first of the month and it is narrowing the channel a metre at a time. The paperwork says one thing and my eyes say another. Whatever you find, bring it to me first.",
+   "giver": "hub-central-chalmers-street-dragan",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -7,
+     "z": 1910,
+     "radius": 35,
+     "label": "the fill, with the water level in shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council reads photographs, not letters",
+     "npc": "hub-central-chalmers-street-dragan"
+    }
+   ],
+   "reward": {
+    "cash": 168,
+    "xp": 444,
+    "unlock": [
+     "hub:h-creek-central-chalmers-street-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-central-chalmers-street-1",
+   "act": 3,
+   "title": "Willow Removal, Central Chalmers Street",
+   "blurb": "Before you say anything: yes, I know. They have agreed to a clean-up at Central Chalmers Street, which is wonderful, except the grant is $95 short and closes on the first of the month. It has been going on longer than I have admitted to anyone. That's it. That's the whole ask.",
+   "giver": "hub-central-chalmers-street-dragan",
+   "level": 8,
+   "requires": [
+    "h-creek-central-chalmers-street-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 95,
+     "label": "$95, and I do not care whose pocket"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the form needs the number today",
+     "npc": "hub-central-chalmers-street-dragan"
+    }
+   ],
+   "reward": {
+    "cash": 202,
+    "xp": 552,
+    "unlock": [
+     "hub:h-creek-central-chalmers-street-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-central-chalmers-street-2",
+   "act": 3,
+   "title": "Sandbags, Central Chalmers Street",
+   "blurb": "It is not a police matter and I have checked. We had 94 sandbags in the Central Chalmers Street shed on the first of the month and this morning we have got the pallet they came on. I have got no proof, which is exactly why I am asking. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-central-chalmers-street-zelda",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 28,
+     "z": 1669,
+     "radius": 25,
+     "label": "the yards backing onto the reserve"
+    },
+    {
+     "kind": "photo",
+     "x": 48,
+     "z": 1671,
+     "radius": 35,
+     "label": "anywhere they have obviously been used"
+    }
+   ],
+   "reward": {
+    "cash": 171,
+    "xp": 460,
+    "unlock": [
+     "hub:h-creek-central-chalmers-street-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-central-chalmers-street-3",
+   "act": 3,
+   "title": "The Low Crossing, Central Chalmers Street",
+   "blurb": "Honestly, I am past caring how it looks. People keep driving the low crossing at Central Chalmers Street at half six with the water over the sign, and one of them is going to be the one. It might be nothing. It has not felt like nothing. If anyone asks, you were never here.",
+   "giver": "hub-central-chalmers-street-zelda",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you will be standing out there a while"
+    },
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 2,
+     "label": "the ones who argue with the barrier"
+    }
+   ],
+   "reward": {
+    "cash": 171,
+    "xp": 442,
+    "unlock": [
+     "hub:h-creek-central-chalmers-street-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-central-chalmers-street-4",
+   "act": 3,
+   "title": "Under the House, Central Chalmers Street",
+   "blurb": "I would do it myself if I could leave the counter. The water came through my place at Central Chalmers Street on the first of the month and the assessor wants photographs of things I have already thrown out. I would not ask if there was anyone else about. There is no rush, but there is a Friday.",
+   "giver": "hub-central-chalmers-street-pilar",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -35,
+     "z": 1717,
+     "radius": 25,
+     "label": "round the side, where the pile is"
+    },
+    {
+     "kind": "photo",
+     "x": -16,
+     "z": 1719,
+     "radius": 35,
+     "label": "the high-water mark on the brick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the whole claim, that mark",
+     "npc": "hub-central-chalmers-street-pilar"
+    }
+   ],
+   "reward": {
+    "cash": 174,
+    "xp": 440,
+    "unlock": [
+     "hub:h-creek-central-chalmers-street-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-central-chalmers-street-5",
+   "act": 3,
+   "title": "Upstream, Central Chalmers Street",
+   "blurb": "You will think I am making this up. Whatever is happening to Central Chalmers Street starts upstream at Museum, and there are people up there who have been saying so for years. You can tell me I am imagining it. Tell me after. I'll see you right for it.",
+   "giver": "hub-central-chalmers-street-pilar",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -70,
+     "z": 824,
+     "radius": 60,
+     "label": "go up and find them"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear it from someone who is not me",
+     "npc": "hub-central-chalmers-street-pilar"
+    }
+   ],
+   "reward": {
+    "cash": 172,
+    "xp": 462,
+    "unlock": [
+     "hub:h-creek-central-chalmers-street-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

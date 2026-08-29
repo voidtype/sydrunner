@@ -1,0 +1,651 @@
+{
+ "quests": [
+  {
+   "id": "h-bakery-childrens-hospital-0",
+   "act": 3,
+   "title": "first light at Childrens Hospital",
+   "blurb": "I would do it myself if I could leave the counter. I start at first light and for a month the Childrens Hospital back lane has had somebody in it who is not waiting for bread. There is a version of this where I am the unreasonable one. I will know if you skipped a bit.",
+   "giver": "hub-childrens-hospital-davina",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -20122,
+     "z": -6965,
+     "radius": 35,
+     "label": "the lane, from the door, no flash"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I am not calling anyone until I am sure",
+     "npc": "hub-childrens-hospital-davina"
+    }
+   ],
+   "reward": {
+    "cash": 126,
+    "xp": 305,
+    "unlock": [
+     "hub:h-bakery-childrens-hospital-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-childrens-hospital-1",
+   "act": 3,
+   "title": "The Lane Light, Childrens Hospital",
+   "blurb": "You will think I am making this up. A light on that lane costs Childrens Hospital $77 and the landlord has said no twice, so we are doing it ourselves. The paperwork says one thing and my eyes say another. Say nothing to anyone on the way.",
+   "giver": "hub-childrens-hospital-davina",
+   "level": 5,
+   "requires": [
+    "h-bakery-childrens-hospital-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 77,
+     "label": "$77 and I will fit it myself"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "do not tell him where it came from",
+     "npc": "hub-childrens-hospital-davina"
+    }
+   ],
+   "reward": {
+    "cash": 156,
+    "xp": 413,
+    "unlock": [
+     "hub:h-bakery-childrens-hospital-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-childrens-hospital-2",
+   "act": 3,
+   "title": "Flour Run, Childrens Hospital",
+   "blurb": "There is no clever way to say this. The flour for Childrens Hospital comes off a truck at first light and last grand final week the truck came and the flour did not. It has been going on longer than I have admitted to anyone. Do not make a scene about it.",
+   "giver": "hub-childrens-hospital-wren",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Childrens Hospital",
+     "to": "Westmead Hospital",
+     "label": "ride out to Westmead Hospital where the load is made up"
+    },
+    {
+     "kind": "photo",
+     "x": -20223,
+     "z": -7069,
+     "radius": 35,
+     "label": "the pallet with our name on it, if it exists"
+    }
+   ],
+   "reward": {
+    "cash": 122,
+    "xp": 302,
+    "unlock": [
+     "hub:h-bakery-childrens-hospital-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-childrens-hospital-3",
+   "act": 3,
+   "title": "The Loading Zone, Childrens Hospital",
+   "blurb": "You look like you have twenty minutes. The Childrens Hospital loading zone has had a car in it at first light every morning this week and the driver waits in it, which makes it worse. I have got no proof, which is exactly why I am asking. Ask for me by name at the counter.",
+   "giver": "hub-childrens-hospital-wren",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "the one who says he is only a minute"
+    },
+    {
+     "kind": "earn",
+     "dollars": 90,
+     "label": "and the ticket I got, off him"
+    }
+   ],
+   "reward": {
+    "cash": 120,
+    "xp": 315,
+    "unlock": [
+     "hub:h-bakery-childrens-hospital-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-childrens-hospital-4",
+   "act": 3,
+   "title": "The Sourdough Sign, Childrens Hospital",
+   "blurb": "Keep it between us for now. Somebody two doors down from Childrens Hospital put up a sign on grand final week that says the same six words as ours, in the same order. It might be nothing. It has not felt like nothing. Come back and tell me straight.",
+   "giver": "hub-childrens-hospital-anika",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -20107,
+     "z": -7099,
+     "radius": 25,
+     "label": "walk down and read it properly"
+    },
+    {
+     "kind": "photo",
+     "x": -20099,
+     "z": -7102,
+     "radius": 35,
+     "label": "both signs if you can get them in one frame"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me I am not imagining it",
+     "npc": "hub-childrens-hospital-anika"
+    }
+   ],
+   "reward": {
+    "cash": 125,
+    "xp": 301,
+    "unlock": [
+     "hub:h-bakery-childrens-hospital-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-childrens-hospital-5",
+   "act": 3,
+   "title": "The Old Site, Childrens Hospital",
+   "blurb": "Right. Since you asked. This business was at Benaud Oval before it was at Childrens Hospital, and there is a woman there who still has the original book. I would not ask if there was anyone else about. Do that and we're square.",
+   "giver": "hub-childrens-hospital-anika",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -19041,
+     "z": -7394,
+     "radius": 60,
+     "label": "she is usually about in the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring back whatever she is willing to say",
+     "npc": "hub-childrens-hospital-anika"
+    }
+   ],
+   "reward": {
+    "cash": 123,
+    "xp": 323,
+    "unlock": [
+     "hub:h-bakery-childrens-hospital-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-museum-0",
+   "act": 3,
+   "title": "The Museum Pool",
+   "blurb": "I would do it myself if I could leave the counter. Council has been saying the Museum pool is at end of life since the week of the show and the crack they keep pointing at is not in the shell. There is a version of this where I am the unreasonable one. I will know if you skipped a bit.",
+   "giver": "hub-museum-trine",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 118,
+     "z": 733,
+     "radius": 35,
+     "label": "the crack, close, with something for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "an engineer can read that. A councillor cannot.",
+     "npc": "hub-museum-trine"
+    }
+   ],
+   "reward": {
+    "cash": 133,
+    "xp": 355,
+    "unlock": [
+     "hub:h-pool-museum-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-museum-1",
+   "act": 3,
+   "title": "The Petition Stall, Museum",
+   "blurb": "You will think I am making this up. We are running a stall for Museum on the week of the show and a stall needs $98 of gear that nobody has volunteered to pay for. The paperwork says one thing and my eyes say another. Say nothing to anyone on the way.",
+   "giver": "hub-museum-trine",
+   "level": 6,
+   "requires": [
+    "h-pool-museum-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 98,
+     "label": "$98 and a table, if you see one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will be there from eight either way",
+     "npc": "hub-museum-trine"
+    }
+   ],
+   "reward": {
+    "cash": 165,
+    "xp": 458,
+    "unlock": [
+     "hub:h-pool-museum-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-museum-2",
+   "act": 3,
+   "title": "Squad, Museum",
+   "blurb": "There is no clever way to say this. I coach 82 kids at Museum at first light and three of them have stopped coming without anybody ringing me. It has been going on longer than I have admitted to anyone. Do not make a scene about it.",
+   "giver": "hub-museum-sarai",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -62,
+     "z": 777,
+     "radius": 25,
+     "label": "the flats where two of them live"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "take something with you, it is a long walk up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I do not need them back. I need to know.",
+     "npc": "hub-museum-sarai"
+    }
+   ],
+   "reward": {
+    "cash": 129,
+    "xp": 367,
+    "unlock": [
+     "hub:h-pool-museum-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-museum-3",
+   "act": 3,
+   "title": "The Deep End, Museum",
+   "blurb": "You look like you have twenty minutes. A group has been coming over the Museum fence after close and swimming in the dark, which is how Museum loses its pool. I have got no proof, which is exactly why I am asking. Ask for me by name at the counter.",
+   "giver": "hub-museum-sarai",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 3,
+     "label": "the ones who go over the fence"
+    },
+    {
+     "kind": "photo",
+     "x": 14,
+     "z": 685,
+     "radius": 35,
+     "label": "the spot in the fence they use"
+    }
+   ],
+   "reward": {
+    "cash": 124,
+    "xp": 366,
+    "unlock": [
+     "hub:h-pool-museum-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-museum-4",
+   "act": 3,
+   "title": "The Kiosk Freezer, Museum",
+   "blurb": "Keep it between us for now. The kiosk at Museum has a bucket of odd keys in it and a freezer that has been running warm since the week of the show. It might be nothing. It has not felt like nothing. Come back and tell me straight.",
+   "giver": "hub-museum-sanjay",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 2,
+     "label": "get two, we are going to be here"
+    },
+    {
+     "kind": "goto",
+     "x": 122,
+     "z": 718,
+     "radius": 25,
+     "label": "the plant room behind the kiosk"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether it is the freezer or the power",
+     "npc": "hub-museum-sanjay"
+    }
+   ],
+   "reward": {
+    "cash": 130,
+    "xp": 352,
+    "unlock": [
+     "hub:h-pool-museum-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-museum-5",
+   "act": 3,
+   "title": "The Aquatic Centre, Museum",
+   "blurb": "Right. Since you asked. They want everyone from Museum to drive to the new centre at Exhibition Centre, so somebody should go and see whether it is any good. I would not ask if there was anyone else about. Do that and we're square.",
+   "giver": "hub-museum-sanjay",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1003,
+     "z": 789,
+     "radius": 60,
+     "label": "have a proper look, not a quick one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "be honest with me, even if it is nice",
+     "npc": "hub-museum-sanjay"
+    }
+   ],
+   "reward": {
+    "cash": 142,
+    "xp": 347,
+    "unlock": [
+     "hub:h-pool-museum-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-lilyfield-0",
+   "act": 3,
+   "title": "The Lilyfield Rank",
+   "blurb": "I would do it myself if I could leave the counter. The rank outside Lilyfield used to hold nine cars and since the week of the show it holds four, and nobody will say who moved the line. There is a version of this where I am the unreasonable one. I will know if you skipped a bit.",
+   "giver": "hub-lilyfield-arun",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -3965,
+     "z": 713,
+     "radius": 35,
+     "label": "the painted line and the old one under it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the old paint is still there, that is the whole argument",
+     "npc": "hub-lilyfield-arun"
+    }
+   ],
+   "reward": {
+    "cash": 135,
+    "xp": 366,
+    "unlock": [
+     "hub:h-rank-lilyfield-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-lilyfield-1",
+   "act": 3,
+   "title": "Lost Fares, Lilyfield",
+   "blurb": "You will think I am making this up. Since the rank at Lilyfield shrank I am $104 a week down, and the association wants that number from somebody who can prove it. The paperwork says one thing and my eyes say another. Say nothing to anyone on the way.",
+   "giver": "hub-lilyfield-arun",
+   "level": 6,
+   "requires": [
+    "h-rank-lilyfield-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 104,
+     "label": "$104 in a week, to show it can be done"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the submission, right there",
+     "npc": "hub-lilyfield-arun"
+    }
+   ],
+   "reward": {
+    "cash": 171,
+    "xp": 454,
+    "unlock": [
+     "hub:h-rank-lilyfield-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-lilyfield-2",
+   "act": 3,
+   "title": "Queue Jumpers, Lilyfield",
+   "blurb": "There is no clever way to say this. Cars that have never sat in the Lilyfield queue turn up at twenty past four and take the front of it, and the drivers who waited say nothing. It has been going on longer than I have admitted to anyone. Do not make a scene about it.",
+   "giver": "hub-lilyfield-imani",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "the ones who take the front"
+    },
+    {
+     "kind": "earn",
+     "dollars": 51,
+     "label": "$51, which is about one airport run"
+    }
+   ],
+   "reward": {
+    "cash": 142,
+    "xp": 349,
+    "unlock": [
+     "hub:h-rank-lilyfield-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-lilyfield-3",
+   "act": 3,
+   "title": "The Late Train, Lilyfield",
+   "blurb": "You look like you have twenty minutes. When the last train into Lilyfield is late, 51 people come out at once and I have to have cars there before they do. I have got no proof, which is exactly why I am asking. Ask for me by name at the counter.",
+   "giver": "hub-lilyfield-imani",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Lilyfield",
+     "to": "Rozelle Bay",
+     "label": "come in on the last one from Rozelle Bay and see it"
+    },
+    {
+     "kind": "photo",
+     "x": -3997,
+     "z": 677,
+     "radius": 35,
+     "label": "the rank at the moment the doors open"
+    }
+   ],
+   "reward": {
+    "cash": 125,
+    "xp": 350,
+    "unlock": [
+     "hub:h-rank-lilyfield-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-lilyfield-4",
+   "act": 3,
+   "title": "The Door, Lilyfield",
+   "blurb": "Keep it between us for now. I have stood on this door near Lilyfield for 51 years and since the week of the show somebody has been sending my guests to a different rank. It might be nothing. It has not felt like nothing. Come back and tell me straight.",
+   "giver": "hub-lilyfield-savva",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -3977,
+     "z": 558,
+     "radius": 25,
+     "label": "follow one of them and see where they end up"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you will be standing about, get something"
+    }
+   ],
+   "reward": {
+    "cash": 136,
+    "xp": 364,
+    "unlock": [
+     "hub:h-rank-lilyfield-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-lilyfield-5",
+   "act": 3,
+   "title": "The Depot, Lilyfield",
+   "blurb": "Right. Since you asked. The plates working the Lilyfield rank are dispatched from a depot at Jubilee Park, and the man who runs it has never met a driver he liked. I would not ask if there was anyone else about. Do that and we're square.",
+   "giver": "hub-lilyfield-savva",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2617,
+     "z": 788,
+     "radius": 60,
+     "label": "go and be pleasant at him anyway"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether he is the problem or the symptom",
+     "npc": "hub-lilyfield-savva"
+    }
+   ],
+   "reward": {
+    "cash": 144,
+    "xp": 368,
+    "unlock": [
+     "hub:h-rank-lilyfield-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

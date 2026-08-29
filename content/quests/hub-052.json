@@ -1,0 +1,651 @@
+{
+ "quests": [
+  {
+   "id": "h-bakery-pendle-hill-0",
+   "act": 3,
+   "title": "two in the afternoon at Pendle Hill",
+   "blurb": "There is no clever way to say this. I start at two in the afternoon and for a month the Pendle Hill back lane has had somebody in it who is not waiting for bread. Half the street knows and half the street is pretending not to. Do that and we're square.",
+   "giver": "hub-pendle-hill-haruka",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -23507,
+     "z": -6954,
+     "radius": 35,
+     "label": "the lane, from the door, no flash"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I am not calling anyone until I am sure",
+     "npc": "hub-pendle-hill-haruka"
+    }
+   ],
+   "reward": {
+    "cash": 111,
+    "xp": 317,
+    "unlock": [
+     "hub:h-bakery-pendle-hill-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-pendle-hill-1",
+   "act": 3,
+   "title": "The Lane Light, Pendle Hill",
+   "blurb": "You look like you have twenty minutes. A light on that lane costs Pendle Hill $59 and the landlord has said no twice, so we are doing it ourselves. I am not after trouble. I am after an answer. I will owe you one, and I pay those.",
+   "giver": "hub-pendle-hill-haruka",
+   "level": 5,
+   "requires": [
+    "h-bakery-pendle-hill-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 59,
+     "label": "$59 and I will fit it myself"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "do not tell him where it came from",
+     "npc": "hub-pendle-hill-haruka"
+    }
+   ],
+   "reward": {
+    "cash": 152,
+    "xp": 409,
+    "unlock": [
+     "hub:h-bakery-pendle-hill-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-pendle-hill-2",
+   "act": 3,
+   "title": "Flour Run, Pendle Hill",
+   "blurb": "Keep it between us for now. The flour for Pendle Hill comes off a truck at two in the afternoon and last grand final week the truck came and the flour did not. Nobody else seems to have noticed, which is its own problem. Do not let them talk you into anything.",
+   "giver": "hub-pendle-hill-dev",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Pendle Hill",
+     "to": "Toongabbie",
+     "label": "ride out to Toongabbie where the load is made up"
+    },
+    {
+     "kind": "photo",
+     "x": -23516,
+     "z": -7110,
+     "radius": 35,
+     "label": "the pallet with our name on it, if it exists"
+    }
+   ],
+   "reward": {
+    "cash": 129,
+    "xp": 300,
+    "unlock": [
+     "hub:h-bakery-pendle-hill-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-pendle-hill-3",
+   "act": 3,
+   "title": "The Loading Zone, Pendle Hill",
+   "blurb": "Right. Since you asked. The Pendle Hill loading zone has had a car in it at two in the afternoon every morning this week and the driver waits in it, which makes it worse. Everyone I have told has looked at me the way you are now. There's cash in it. Not a lot.",
+   "giver": "hub-pendle-hill-dev",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "the one who says he is only a minute"
+    },
+    {
+     "kind": "earn",
+     "dollars": 90,
+     "label": "and the ticket I got, off him"
+    }
+   ],
+   "reward": {
+    "cash": 109,
+    "xp": 314,
+    "unlock": [
+     "hub:h-bakery-pendle-hill-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-pendle-hill-4",
+   "act": 3,
+   "title": "The Sourdough Sign, Pendle Hill",
+   "blurb": "My knees are gone, so. Somebody two doors down from Pendle Hill put up a sign on grand final week that says the same six words as ours, in the same order. This is the third time I have had this conversation. You'll know it when you see it.",
+   "giver": "hub-pendle-hill-ola",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -23446,
+     "z": -7077,
+     "radius": 25,
+     "label": "walk down and read it properly"
+    },
+    {
+     "kind": "photo",
+     "x": -23438,
+     "z": -7080,
+     "radius": 35,
+     "label": "both signs if you can get them in one frame"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me I am not imagining it",
+     "npc": "hub-pendle-hill-ola"
+    }
+   ],
+   "reward": {
+    "cash": 127,
+    "xp": 304,
+    "unlock": [
+     "hub:h-bakery-pendle-hill-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-pendle-hill-5",
+   "act": 3,
+   "title": "The Old Site, Pendle Hill",
+   "blurb": "This is going to sound small. This business was at Wentworthville before it was at Pendle Hill, and there is a woman there who still has the original book. It started small, the way these things do. Half now if you want it. Most people don't.",
+   "giver": "hub-pendle-hill-ola",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -21991,
+     "z": -6508,
+     "radius": 60,
+     "label": "she is usually about in the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring back whatever she is willing to say",
+     "npc": "hub-pendle-hill-ola"
+    }
+   ],
+   "reward": {
+    "cash": 110,
+    "xp": 320,
+    "unlock": [
+     "hub:h-bakery-pendle-hill-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-town-hall-0",
+   "act": 3,
+   "title": "The Town Hall Pool",
+   "blurb": "There is no clever way to say this. Council has been saying the Town Hall pool is at end of life since a wet Monday and the crack they keep pointing at is not in the shell. Half the street knows and half the street is pretending not to. Do that and we're square.",
+   "giver": "hub-town-hall-agnes",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -188,
+     "z": 572,
+     "radius": 35,
+     "label": "the crack, close, with something for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "an engineer can read that. A councillor cannot.",
+     "npc": "hub-town-hall-agnes"
+    }
+   ],
+   "reward": {
+    "cash": 141,
+    "xp": 368,
+    "unlock": [
+     "hub:h-pool-town-hall-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-town-hall-1",
+   "act": 3,
+   "title": "The Petition Stall, Town Hall",
+   "blurb": "You look like you have twenty minutes. We are running a stall for Town Hall on a wet Monday and a stall needs $108 of gear that nobody has volunteered to pay for. I am not after trouble. I am after an answer. I will owe you one, and I pay those.",
+   "giver": "hub-town-hall-agnes",
+   "level": 6,
+   "requires": [
+    "h-pool-town-hall-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 108,
+     "label": "$108 and a table, if you see one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will be there from eight either way",
+     "npc": "hub-town-hall-agnes"
+    }
+   ],
+   "reward": {
+    "cash": 165,
+    "xp": 454,
+    "unlock": [
+     "hub:h-pool-town-hall-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-town-hall-2",
+   "act": 3,
+   "title": "Squad, Town Hall",
+   "blurb": "Keep it between us for now. I coach 24 kids at Town Hall at quarter to six and three of them have stopped coming without anybody ringing me. Nobody else seems to have noticed, which is its own problem. Do not let them talk you into anything.",
+   "giver": "hub-town-hall-dominika",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -368,
+     "z": 616,
+     "radius": 25,
+     "label": "the flats where two of them live"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "take something with you, it is a long walk up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I do not need them back. I need to know.",
+     "npc": "hub-town-hall-dominika"
+    }
+   ],
+   "reward": {
+    "cash": 127,
+    "xp": 355,
+    "unlock": [
+     "hub:h-pool-town-hall-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-town-hall-3",
+   "act": 3,
+   "title": "The Deep End, Town Hall",
+   "blurb": "Right. Since you asked. A group has been coming over the Town Hall fence after close and swimming in the dark, which is how Town Hall loses its pool. Everyone I have told has looked at me the way you are now. There's cash in it. Not a lot.",
+   "giver": "hub-town-hall-dominika",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "the ones who go over the fence"
+    },
+    {
+     "kind": "photo",
+     "x": -292,
+     "z": 524,
+     "radius": 35,
+     "label": "the spot in the fence they use"
+    }
+   ],
+   "reward": {
+    "cash": 130,
+    "xp": 365,
+    "unlock": [
+     "hub:h-pool-town-hall-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-town-hall-4",
+   "act": 3,
+   "title": "The Kiosk Freezer, Town Hall",
+   "blurb": "My knees are gone, so. The kiosk at Town Hall has a chest freezer that hums in D in it and a freezer that has been running warm since a wet Monday. This is the third time I have had this conversation. You'll know it when you see it.",
+   "giver": "hub-town-hall-vinh",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "get two, we are going to be here"
+    },
+    {
+     "kind": "goto",
+     "x": -184,
+     "z": 557,
+     "radius": 25,
+     "label": "the plant room behind the kiosk"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether it is the freezer or the power",
+     "npc": "hub-town-hall-vinh"
+    }
+   ],
+   "reward": {
+    "cash": 144,
+    "xp": 349,
+    "unlock": [
+     "hub:h-pool-town-hall-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-town-hall-5",
+   "act": 3,
+   "title": "The Aquatic Centre, Town Hall",
+   "blurb": "This is going to sound small. They want everyone from Town Hall to drive to the new centre at Haymarket, so somebody should go and see whether it is any good. It started small, the way these things do. Half now if you want it. Most people don't.",
+   "giver": "hub-town-hall-vinh",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -305,
+     "z": 1552,
+     "radius": 60,
+     "label": "have a proper look, not a quick one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "be honest with me, even if it is nice",
+     "npc": "hub-town-hall-vinh"
+    }
+   ],
+   "reward": {
+    "cash": 129,
+    "xp": 368,
+    "unlock": [
+     "hub:h-pool-town-hall-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-kogarah-0",
+   "act": 3,
+   "title": "The Kogarah Rank",
+   "blurb": "There is no clever way to say this. The rank outside Kogarah used to hold nine cars and since the long weekend it holds four, and nobody will say who moved the line. Half the street knows and half the street is pretending not to. Do that and we're square.",
+   "giver": "hub-kogarah-gopal",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -6865,
+     "z": 10469,
+     "radius": 35,
+     "label": "the painted line and the old one under it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the old paint is still there, that is the whole argument",
+     "npc": "hub-kogarah-gopal"
+    }
+   ],
+   "reward": {
+    "cash": 134,
+    "xp": 356,
+    "unlock": [
+     "hub:h-rank-kogarah-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-kogarah-1",
+   "act": 3,
+   "title": "Lost Fares, Kogarah",
+   "blurb": "You look like you have twenty minutes. Since the rank at Kogarah shrank I am $78 a week down, and the association wants that number from somebody who can prove it. I am not after trouble. I am after an answer. I will owe you one, and I pay those.",
+   "giver": "hub-kogarah-gopal",
+   "level": 6,
+   "requires": [
+    "h-rank-kogarah-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 78,
+     "label": "$78 in a week, to show it can be done"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the submission, right there",
+     "npc": "hub-kogarah-gopal"
+    }
+   ],
+   "reward": {
+    "cash": 180,
+    "xp": 448,
+    "unlock": [
+     "hub:h-rank-kogarah-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-kogarah-2",
+   "act": 3,
+   "title": "Queue Jumpers, Kogarah",
+   "blurb": "Keep it between us for now. Cars that have never sat in the Kogarah queue turn up at just gone midnight and take the front of it, and the drivers who waited say nothing. Nobody else seems to have noticed, which is its own problem. Do not let them talk you into anything.",
+   "giver": "hub-kogarah-ira",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "the ones who take the front"
+    },
+    {
+     "kind": "earn",
+     "dollars": 67,
+     "label": "$67, which is about one airport run"
+    }
+   ],
+   "reward": {
+    "cash": 144,
+    "xp": 363,
+    "unlock": [
+     "hub:h-rank-kogarah-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-kogarah-3",
+   "act": 3,
+   "title": "The Late Train, Kogarah",
+   "blurb": "Right. Since you asked. When the last train into Kogarah is late, 67 people come out at once and I have to have cars there before they do. Everyone I have told has looked at me the way you are now. There's cash in it. Not a lot.",
+   "giver": "hub-kogarah-ira",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Kogarah",
+     "to": "Carlton",
+     "label": "come in on the last one from Carlton and see it"
+    },
+    {
+     "kind": "photo",
+     "x": -6821,
+     "z": 10373,
+     "radius": 35,
+     "label": "the rank at the moment the doors open"
+    }
+   ],
+   "reward": {
+    "cash": 139,
+    "xp": 357,
+    "unlock": [
+     "hub:h-rank-kogarah-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-kogarah-4",
+   "act": 3,
+   "title": "The Door, Kogarah",
+   "blurb": "My knees are gone, so. I have stood on this door near Kogarah for 67 years and since the long weekend somebody has been sending my guests to a different rank. This is the third time I have had this conversation. You'll know it when you see it.",
+   "giver": "hub-kogarah-larissa",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -6792,
+     "z": 10319,
+     "radius": 25,
+     "label": "follow one of them and see where they end up"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "you will be standing about, get something"
+    }
+   ],
+   "reward": {
+    "cash": 139,
+    "xp": 367,
+    "unlock": [
+     "hub:h-rank-kogarah-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-kogarah-5",
+   "act": 3,
+   "title": "The Depot, Kogarah",
+   "blurb": "This is going to sound small. The plates working the Kogarah rank are dispatched from a depot at Carlton, and the man who runs it has never met a driver he liked. It started small, the way these things do. Half now if you want it. Most people don't.",
+   "giver": "hub-kogarah-larissa",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7671,
+     "z": 10978,
+     "radius": 60,
+     "label": "go and be pleasant at him anyway"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether he is the problem or the symptom",
+     "npc": "hub-kogarah-larissa"
+    }
+   ],
+   "reward": {
+    "cash": 139,
+    "xp": 363,
+    "unlock": [
+     "hub:h-rank-kogarah-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

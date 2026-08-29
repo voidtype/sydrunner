@@ -1,0 +1,592 @@
+{
+ "npcs": [
+  {
+   "id": "hub-qvb-bruna",
+   "name": "Bruna, greenkeeper at QVB",
+   "x": -281,
+   "z": 274,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I know that look. Everyone wants something today.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You will think I am making this up. The number three green at QVB has had a bald patch the shape of Tasmania since the Sunday after payday, and the committee thinks I am inventing it. I have got a photo on my phone but it is useless. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-qvb-0",
+       "denyFlag": "hub:h-bowlo-qvb-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "There is no clever way to say this. They have seen the photograph and now they want it re-laid by the Sunday after payday, which means finding $66 that the QVB club does not have. I am aware how that sounds. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-qvb-1",
+       "denyFlag": "hub:h-bowlo-qvb-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "The Dead Patch at QVB — that's done.",
+       "turnin": "h-bowlo-qvb-0"
+      },
+      {
+       "text": "Turf Money, QVB — that's done.",
+       "turnin": "h-bowlo-qvb-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-qvb-vanni",
+   "name": "Vanni, club president at QVB",
+   "x": -399,
+   "z": 301,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Give me a second. Right. Go.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You look like you have twenty minutes. Our books say 63 members at QVB and I would bet the bar takings that half of them are dead or moved to Queensland. My wife says I should let it go. My wife is wrong. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-qvb-2",
+       "denyFlag": "hub:h-bowlo-qvb-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Keep it between us for now. Since just gone midnight somebody has been going round the QVB greens telling the barefoot bowlers we are shutting, and we are not shutting. I have rung the number on the letter four times. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-qvb-3",
+       "denyFlag": "hub:h-bowlo-qvb-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The QVB Membership Count — that's done.",
+       "turnin": "h-bowlo-qvb-2"
+      },
+      {
+       "text": "Closing Time Rumour, QVB — that's done.",
+       "turnin": "h-bowlo-qvb-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-qvb-gideon",
+   "name": "Gideon, bar manager at QVB",
+   "x": -343,
+   "z": 325,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are not from around the corner, are you.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Right. Since you asked. There is a docket book in the chest freezer behind the bar at QVB and I am not opening it on an empty stomach. Half the street knows and half the street is pretending not to. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-qvb-4",
+       "denyFlag": "hub:h-bowlo-qvb-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "My knees are gone, so. The man who kept these greens before me drinks at Haymarket now, and he owes QVB an explanation about the drainage. I am not after trouble. I am after an answer. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-qvb-5",
+       "denyFlag": "hub:h-bowlo-qvb-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Behind the Bar at QVB — that's done.",
+       "turnin": "h-bowlo-qvb-4"
+      },
+      {
+       "text": "The Old Greenkeeper, QVB — that's done.",
+       "turnin": "h-bowlo-qvb-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-bridge-street-irina",
+   "name": "Irina, night console operator at Bridge Street",
+   "x": -306,
+   "z": -559,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Half of this suburb has walked past already. Not one stopped.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You will think I am making this up. Every night around quarter to six the same car does three laps of the Bridge Street forecourt and never buys fuel. I have got a photo on my phone but it is useless. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-bridge-street-0",
+       "denyFlag": "hub:h-servo-bridge-street-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "There is no clever way to say this. Now I know the plate, I want to know where it goes after it leaves Bridge Street at quarter to six, because it is not going home. I am aware how that sounds. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-bridge-street-1",
+       "denyFlag": "hub:h-servo-bridge-street-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "Nights at Bridge Street — that's done.",
+       "turnin": "h-servo-bridge-street-0"
+      },
+      {
+       "text": "The Third Lap, Bridge Street — that's done.",
+       "turnin": "h-servo-bridge-street-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-bridge-street-cruz",
+   "name": "Cruz, mechanic at Bridge Street",
+   "x": -334,
+   "z": -584,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Whatever it is, I have had worse this week.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You look like you have twenty minutes. Bay two at the Bridge Street workshop has had the same car in it since the week of the show and the owner has stopped answering. My wife says I should let it go. My wife is wrong. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-bridge-street-2",
+       "denyFlag": "hub:h-servo-bridge-street-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Keep it between us for now. Someone has been walking out of Bridge Street with a socket set at a time since the week of the show, and I have run out of ways to be polite about it. I have rung the number on the letter four times. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-bridge-street-3",
+       "denyFlag": "hub:h-servo-bridge-street-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Bay Two, Bridge Street — that's done.",
+       "turnin": "h-servo-bridge-street-2"
+      },
+      {
+       "text": "Tools Off the Bench, Bridge Street — that's done.",
+       "turnin": "h-servo-bridge-street-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-bridge-street-jenna",
+   "name": "Jenna, franchisee at Bridge Street",
+   "x": -248,
+   "z": -496,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sit down if you like. Nobody else is using it.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Right. Since you asked. Head office says the Bridge Street board has been wrong since the week of the show and I say it has been right for eleven years, and one of us is about to be embarrassed. Half the street knows and half the street is pretending not to. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-bridge-street-4",
+       "denyFlag": "hub:h-servo-bridge-street-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "My knees are gone, so. The bloke who runs the site at Town Hall has had the same trouble Bridge Street has, and he will talk to you before he talks to me. I am not after trouble. I am after an answer. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-bridge-street-5",
+       "denyFlag": "hub:h-servo-bridge-street-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "The Bridge Street Price Board — that's done.",
+       "turnin": "h-servo-bridge-street-4"
+      },
+      {
+       "text": "The Other Franchise, Bridge Street — that's done.",
+       "turnin": "h-servo-bridge-street-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

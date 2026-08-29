@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-rouse-hill-ximena",
+   "name": "Ximena, greenkeeper at Rouse Hill",
+   "x": -26678,
+   "z": -19218,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are selling something the answer is no.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Do not laugh. The number three green at Rouse Hill has had a bald patch the shape of Tasmania since the long weekend, and the committee thinks I am inventing it. It is not the money. It has stopped being the money. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-rouse-hill-0",
+       "denyFlag": "hub:h-bowlo-rouse-hill-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It is the sort of thing you notice or you do not. They have seen the photograph and now they want it re-laid by the long weekend, which means finding $74 that the Rouse Hill club does not have. I did try the official route, for what that was worth. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-rouse-hill-1",
+       "denyFlag": "hub:h-bowlo-rouse-hill-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "The Dead Patch at Rouse Hill — that's done.",
+       "turnin": "h-bowlo-rouse-hill-0"
+      },
+      {
+       "text": "Turf Money, Rouse Hill — that's done.",
+       "turnin": "h-bowlo-rouse-hill-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-rouse-hill-zane",
+   "name": "Zane, club president at Rouse Hill",
+   "x": -26595,
+   "z": -19149,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Cash only and no, I am joking. What do you want.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Two people have already said no. Our books say 68 members at Rouse Hill and I would bet the bar takings that half of them are dead or moved to Queensland. I have got a photo on my phone but it is useless. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-rouse-hill-2",
+       "denyFlag": "hub:h-bowlo-rouse-hill-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Someone has to, and it may as well be you. Since the second express somebody has been going round the Rouse Hill greens telling the barefoot bowlers we are shutting, and we are not shutting. I am aware how that sounds. Half now if you want it. Most people don't.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-rouse-hill-3",
+       "denyFlag": "hub:h-bowlo-rouse-hill-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Rouse Hill Membership Count — that's done.",
+       "turnin": "h-bowlo-rouse-hill-2"
+      },
+      {
+       "text": "Closing Time Rumour, Rouse Hill — that's done.",
+       "turnin": "h-bowlo-rouse-hill-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-rouse-hill-kalinda",
+   "name": "Kalinda, bar manager at Rouse Hill",
+   "x": -26703,
+   "z": -18948,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You have got a face like you can keep your mouth shut.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You are the first person to stop all morning. There is a docket book in the chest freezer behind the bar at Rouse Hill and I am not opening it on an empty stomach. My wife says I should let it go. My wife is wrong. Whatever it costs you, tell me and I will cover it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-rouse-hill-4",
+       "denyFlag": "hub:h-bowlo-rouse-hill-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Not being dramatic about this. The man who kept these greens before me drinks at Tallawong now, and he owes Rouse Hill an explanation about the drainage. I have rung the number on the letter four times. I would rather know than wonder.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-rouse-hill-5",
+       "denyFlag": "hub:h-bowlo-rouse-hill-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Behind the Bar at Rouse Hill — that's done.",
+       "turnin": "h-bowlo-rouse-hill-4"
+      },
+      {
+       "text": "The Old Greenkeeper, Rouse Hill — that's done.",
+       "turnin": "h-bowlo-rouse-hill-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-glebe-xavier",
+   "name": "Xavier, night console operator at Glebe",
+   "x": -1950,
+   "z": 1020,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Right. Talk while I do this.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Do not laugh. Every night around the middle of the news the same car does three laps of the Glebe forecourt and never buys fuel. It is not the money. It has stopped being the money. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-glebe-0",
+       "denyFlag": "hub:h-servo-glebe-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It is the sort of thing you notice or you do not. Now I know the plate, I want to know where it goes after it leaves Glebe at the middle of the news, because it is not going home. I did try the official route, for what that was worth. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-glebe-1",
+       "denyFlag": "hub:h-servo-glebe-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "Nights at Glebe — that's done.",
+       "turnin": "h-servo-glebe-0"
+      },
+      {
+       "text": "The Third Lap, Glebe — that's done.",
+       "turnin": "h-servo-glebe-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-glebe-leonie",
+   "name": "Leonie, mechanic at Glebe",
+   "x": -1896,
+   "z": 1018,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You right there? I am mid-something but go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Two people have already said no. Bay two at the Glebe workshop has had the same car in it since a Tuesday and the owner has stopped answering. I have got a photo on my phone but it is useless. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-glebe-2",
+       "denyFlag": "hub:h-servo-glebe-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Someone has to, and it may as well be you. Someone has been walking out of Glebe with a socket set at a time since a Tuesday, and I have run out of ways to be polite about it. I am aware how that sounds. Half now if you want it. Most people don't.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-glebe-3",
+       "denyFlag": "hub:h-servo-glebe-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Bay Two, Glebe — that's done.",
+       "turnin": "h-servo-glebe-2"
+      },
+      {
+       "text": "Tools Off the Bench, Glebe — that's done.",
+       "turnin": "h-servo-glebe-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-glebe-jacinta",
+   "name": "Jacinta, franchisee at Glebe",
+   "x": -1940,
+   "z": 858,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are here about the sign, the sign is wrong.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You are the first person to stop all morning. Head office says the Glebe board has been wrong since a Tuesday and I say it has been right for eleven years, and one of us is about to be embarrassed. My wife says I should let it go. My wife is wrong. Whatever it costs you, tell me and I will cover it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-glebe-4",
+       "denyFlag": "hub:h-servo-glebe-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Not being dramatic about this. The bloke who runs the site at Exhibition Centre has had the same trouble Glebe has, and he will talk to you before he talks to me. I have rung the number on the letter four times. I would rather know than wonder.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-glebe-5",
+       "denyFlag": "hub:h-servo-glebe-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "The Glebe Price Board — that's done.",
+       "turnin": "h-servo-glebe-4"
+      },
+      {
+       "text": "The Other Franchise, Glebe — that's done.",
+       "turnin": "h-servo-glebe-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-thirroul-piotr",
+   "name": "Piotr, building manager at Thirroul",
+   "x": -25865,
+   "z": 50422,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand in the doorway, mate, come round.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Do not laugh. Water has been coming through the level two ceiling of the Thirroul block since a public holiday nobody remembered and the strata report says there is no water. It is not the money. It has stopped being the money. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-thirroul-0",
+       "denyFlag": "hub:h-strata-thirroul-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It is the sort of thing you notice or you do not. The photo did it. I did try the official route, for what that was worth. Now every owner at Thirroul owes $116 and I have to collect it from people who have avoided me for a year. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-thirroul-1",
+       "denyFlag": "hub:h-strata-thirroul-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "Level Two, Thirroul — that's done.",
+       "turnin": "h-strata-thirroul-0"
+      },
+      {
+       "text": "The Special Levy, Thirroul — that's done.",
+       "turnin": "h-strata-thirroul-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-thirroul-quinn",
+   "name": "Quinn, owner-occupier at Thirroul",
+   "x": -25728,
+   "z": 50180,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Long day. Say what you came to say.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Two people have already said no. Somebody who does not live at Thirroul has parked in space fourteen every night since a public holiday nobody remembered and the manager will not look at it. I have got a photo on my phone but it is useless. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-thirroul-2",
+       "denyFlag": "hub:h-strata-thirroul-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Someone has to, and it may as well be you. The Thirroul AGM is on a public holiday nobody remembered and I would like to arrive with something stronger than a grievance and a printout. I am aware how that sounds. Half now if you want it. Most people don't.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-thirroul-3",
+       "denyFlag": "hub:h-strata-thirroul-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "Car Space 14, Thirroul — that's done.",
+       "turnin": "h-strata-thirroul-2"
+      },
+      {
+       "text": "The Meeting, Thirroul — that's done.",
+       "turnin": "h-strata-thirroul-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-thirroul-henrietta",
+   "name": "Henrietta, the one who does the bins at Thirroul",
+   "x": -25909,
+   "z": 50455,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I know that look. Everyone wants something today.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You are the first person to stop all morning. Three units at Thirroul have put their bins out on the wrong night since a public holiday nobody remembered and I have taken it personally, which I accept is a choice I made. My wife says I should let it go. My wife is wrong. Whatever it costs you, tell me and I will cover it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-thirroul-4",
+       "denyFlag": "hub:h-strata-thirroul-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Not being dramatic about this. There is a block at Austinmer with the same builder and the same cracks, and their manager has already been through what Thirroul is starting. I have rung the number on the letter four times. I would rather know than wonder.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-thirroul-5",
+       "denyFlag": "hub:h-strata-thirroul-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "Bin Night at Thirroul — that's done.",
+       "turnin": "h-strata-thirroul-4"
+      },
+      {
+       "text": "The Other Block, Thirroul — that's done.",
+       "turnin": "h-strata-thirroul-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

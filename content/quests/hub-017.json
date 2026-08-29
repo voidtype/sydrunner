@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-bowlo-chinatown-0",
+   "act": 3,
+   "title": "The Dead Patch at Chinatown",
+   "blurb": "It is the sort of thing you notice or you do not. The number three green at Chinatown has had a bald patch the shape of Tasmania since a Tuesday, and the committee thinks I am inventing it. My wife says I should let it go. My wife is wrong. There is no rush, but there is a Friday.",
+   "giver": "hub-chinatown-nell",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -258,
+     "z": 1058,
+     "radius": 35,
+     "label": "the patch, with something in frame for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring it to me before the meeting",
+     "npc": "hub-chinatown-nell"
+    }
+   ],
+   "reward": {
+    "cash": 79,
+    "xp": 214,
+    "unlock": [
+     "hub:h-bowlo-chinatown-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-chinatown-1",
+   "act": 3,
+   "title": "Turf Money, Chinatown",
+   "blurb": "Two people have already said no. They have seen the photograph and now they want it re-laid by a Tuesday, which means finding $57 that the Chinatown club does not have. I have rung the number on the letter four times. I'll see you right for it.",
+   "giver": "hub-chinatown-nell",
+   "level": 3,
+   "requires": [
+    "h-bowlo-chinatown-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 57,
+     "label": "$57, however you like, I am not asking"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "put it in my hand, not the safe",
+     "npc": "hub-chinatown-nell"
+    }
+   ],
+   "reward": {
+    "cash": 133,
+    "xp": 298,
+    "unlock": [
+     "hub:h-bowlo-chinatown-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-chinatown-2",
+   "act": 3,
+   "title": "The Chinatown Membership Count",
+   "blurb": "Someone has to, and it may as well be you. Our books say 85 members at Chinatown and I would bet the bar takings that half of them are dead or moved to Queensland. Half the street knows and half the street is pretending not to. I'll put the kettle on for when you're back.",
+   "giver": "hub-chinatown-dmitri",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -412,
+     "z": 1144,
+     "radius": 25,
+     "label": "stand at the side door where the list is kept"
+    },
+    {
+     "kind": "photo",
+     "x": -441,
+     "z": 1135,
+     "radius": 35,
+     "label": "the board with the names still on it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "read me the ones you did not recognise",
+     "npc": "hub-chinatown-dmitri"
+    }
+   ],
+   "reward": {
+    "cash": 79,
+    "xp": 214,
+    "unlock": [
+     "hub:h-bowlo-chinatown-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-chinatown-3",
+   "act": 3,
+   "title": "Closing Time Rumour, Chinatown",
+   "blurb": "You are the first person to stop all morning. Since five in the morning somebody has been going round the Chinatown greens telling the barefoot bowlers we are shutting, and we are not shutting. I am not after trouble. I am after an answer. Just do not come back empty-handed.",
+   "giver": "hub-chinatown-dmitri",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 2,
+     "label": "whoever is doing the telling"
+    },
+    {
+     "kind": "earn",
+     "dollars": 125,
+     "label": "and take the bar money off them while you are there"
+    }
+   ],
+   "reward": {
+    "cash": 91,
+    "xp": 211,
+    "unlock": [
+     "hub:h-bowlo-chinatown-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-chinatown-4",
+   "act": 3,
+   "title": "Behind the Bar at Chinatown",
+   "blurb": "Not being dramatic about this. There is a roll of raffle tickets in the chest freezer behind the bar at Chinatown and I am not opening it on an empty stomach. Nobody else seems to have noticed, which is its own problem. I will know if you skipped a bit.",
+   "giver": "hub-chinatown-shay",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get one into you first, seriously"
+    },
+    {
+     "kind": "goto",
+     "x": -370,
+     "z": 971,
+     "radius": 25,
+     "label": "round the back where the cellar door is"
+    },
+    {
+     "kind": "photo",
+     "x": -363,
+     "z": 956,
+     "radius": 35,
+     "label": "whatever is in there, before I lose my nerve"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 211,
+    "unlock": [
+     "hub:h-bowlo-chinatown-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-chinatown-5",
+   "act": 3,
+   "title": "The Old Greenkeeper, Chinatown",
+   "blurb": "I am told you do odd jobs. The man who kept these greens before me drinks at Convention now, and he owes Chinatown an explanation about the drainage. Everyone I have told has looked at me the way you are now. Say nothing to anyone on the way.",
+   "giver": "hub-chinatown-shay",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1106,
+     "z": 314,
+     "radius": 60,
+     "label": "find him and hear him out"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come back and tell me what he said",
+     "npc": "hub-chinatown-shay"
+    }
+   ],
+   "reward": {
+    "cash": 93,
+    "xp": 225,
+    "unlock": [
+     "hub:h-bowlo-chinatown-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-chatswood-0",
+   "act": 3,
+   "title": "Nights at Chatswood",
+   "blurb": "It is the sort of thing you notice or you do not. Every night around two in the afternoon the same car does three laps of the Chatswood forecourt and never buys fuel. My wife says I should let it go. My wife is wrong. There is no rush, but there is a Friday.",
+   "giver": "hub-chatswood-matias",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2836,
+     "z": -7791,
+     "radius": 35,
+     "label": "the car, plate if you can get it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it on record before I ring anyone",
+     "npc": "hub-chatswood-matias"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 223,
+    "unlock": [
+     "hub:h-servo-chatswood-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-chatswood-1",
+   "act": 3,
+   "title": "The Third Lap, Chatswood",
+   "blurb": "Two people have already said no. Now I know the plate, I want to know where it goes after it leaves Chatswood at two in the afternoon, because it is not going home. I have rung the number on the letter four times. I'll see you right for it.",
+   "giver": "hub-chatswood-matias",
+   "level": 3,
+   "requires": [
+    "h-servo-chatswood-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Chatswood",
+     "to": "Artarmon",
+     "label": "follow it as far as Artarmon"
+    },
+    {
+     "kind": "photo",
+     "x": -2909,
+     "z": -7835,
+     "radius": 35,
+     "label": "wherever it stops"
+    }
+   ],
+   "reward": {
+    "cash": 136,
+    "xp": 303,
+    "unlock": [
+     "hub:h-servo-chatswood-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-chatswood-2",
+   "act": 3,
+   "title": "Bay Two, Chatswood",
+   "blurb": "Someone has to, and it may as well be you. Bay two at the Chatswood workshop has had the same car in it since a wet Monday and the owner has stopped answering. Half the street knows and half the street is pretending not to. I'll put the kettle on for when you're back.",
+   "giver": "hub-chatswood-harjit",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2914,
+     "z": -7933,
+     "radius": 25,
+     "label": "the address on the job card"
+    },
+    {
+     "kind": "photo",
+     "x": -2915,
+     "z": -7946,
+     "radius": 35,
+     "label": "the letterbox, so I know I have the right house"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if anybody actually lives there",
+     "npc": "hub-chatswood-harjit"
+    }
+   ],
+   "reward": {
+    "cash": 88,
+    "xp": 210,
+    "unlock": [
+     "hub:h-servo-chatswood-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-chatswood-3",
+   "act": 3,
+   "title": "Tools Off the Bench, Chatswood",
+   "blurb": "You are the first person to stop all morning. Someone has been walking out of Chatswood with a socket set at a time since a wet Monday, and I have run out of ways to be polite about it. I am not after trouble. I am after an answer. Just do not come back empty-handed.",
+   "giver": "hub-chatswood-harjit",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 3,
+     "label": "the ones hanging round the air hose"
+    },
+    {
+     "kind": "earn",
+     "dollars": 59,
+     "label": "$59 of it back, that is what the set cost"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 211,
+    "unlock": [
+     "hub:h-servo-chatswood-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-chatswood-4",
+   "act": 3,
+   "title": "The Chatswood Price Board",
+   "blurb": "Not being dramatic about this. Head office says the Chatswood board has been wrong since a wet Monday and I say it has been right for eleven years, and one of us is about to be embarrassed. Nobody else seems to have noticed, which is its own problem. I will know if you skipped a bit.",
+   "giver": "hub-chatswood-jacinta",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "buy something so it is a real transaction"
+    },
+    {
+     "kind": "photo",
+     "x": -2801,
+     "z": -7834,
+     "radius": 35,
+     "label": "the board and the pump, both in the one shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that settles it either way",
+     "npc": "hub-chatswood-jacinta"
+    }
+   ],
+   "reward": {
+    "cash": 93,
+    "xp": 218,
+    "unlock": [
+     "hub:h-servo-chatswood-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-chatswood-5",
+   "act": 3,
+   "title": "The Other Franchise, Chatswood",
+   "blurb": "I am told you do odd jobs. The bloke who runs the site at Roseville has had the same trouble Chatswood has, and he will talk to you before he talks to me. Everyone I have told has looked at me the way you are now. Say nothing to anyone on the way.",
+   "giver": "hub-chatswood-jacinta",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -3005,
+     "z": -9298,
+     "radius": 60,
+     "label": "find him on shift"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever he says, I want it word for word",
+     "npc": "hub-chatswood-jacinta"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 228,
+    "unlock": [
+     "hub:h-servo-chatswood-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-waterloo-0",
+   "act": 3,
+   "title": "Level Two, Waterloo",
+   "blurb": "It is the sort of thing you notice or you do not. Water has been coming through the level two ceiling of the Waterloo block since a wet Monday and the strata report says there is no water. My wife says I should let it go. My wife is wrong. There is no rush, but there is a Friday.",
+   "giver": "hub-waterloo-nina",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -791,
+     "z": 3356,
+     "radius": 35,
+     "label": "the ceiling, with the stain visible"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that goes in the file whether they like it or not",
+     "npc": "hub-waterloo-nina"
+    }
+   ],
+   "reward": {
+    "cash": 98,
+    "xp": 254,
+    "unlock": [
+     "hub:h-strata-waterloo-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-waterloo-1",
+   "act": 3,
+   "title": "The Special Levy, Waterloo",
+   "blurb": "Two people have already said no. The photo did it. I have rung the number on the letter four times. Now every owner at Waterloo owes $76 and I have to collect it from people who have avoided me for a year. I'll see you right for it.",
+   "giver": "hub-waterloo-nina",
+   "level": 4,
+   "requires": [
+    "h-strata-waterloo-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 76,
+     "label": "$76 out of them, in any state"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will not ask how",
+     "npc": "hub-waterloo-nina"
+    }
+   ],
+   "reward": {
+    "cash": 149,
+    "xp": 366,
+    "unlock": [
+     "hub:h-strata-waterloo-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-waterloo-2",
+   "act": 3,
+   "title": "Car Space 14, Waterloo",
+   "blurb": "Someone has to, and it may as well be you. Somebody who does not live at Waterloo has parked in space fourteen every night since a wet Monday and the manager will not look at it. Half the street knows and half the street is pretending not to. I'll put the kettle on for when you're back.",
+   "giver": "hub-waterloo-ruslan",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -874,
+     "z": 3309,
+     "radius": 25,
+     "label": "down to the basement, the far corner"
+    },
+    {
+     "kind": "photo",
+     "x": -881,
+     "z": 3302,
+     "radius": 35,
+     "label": "the car in the space with the number painted beside it"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 270,
+    "unlock": [
+     "hub:h-strata-waterloo-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-waterloo-3",
+   "act": 3,
+   "title": "The Meeting, Waterloo",
+   "blurb": "You are the first person to stop all morning. The Waterloo AGM is on a wet Monday and I would like to arrive with something stronger than a grievance and a printout. I am not after trouble. I am after an answer. Just do not come back empty-handed.",
+   "giver": "hub-waterloo-ruslan",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "two coffees, one is for me"
+    },
+    {
+     "kind": "goto",
+     "x": -702,
+     "z": 3148,
+     "radius": 25,
+     "label": "the community room where they hold it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "walk in with me, they behave when there is a witness",
+     "npc": "hub-waterloo-ruslan"
+    }
+   ],
+   "reward": {
+    "cash": 110,
+    "xp": 256,
+    "unlock": [
+     "hub:h-strata-waterloo-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-waterloo-4",
+   "act": 3,
+   "title": "Bin Night at Waterloo",
+   "blurb": "Not being dramatic about this. Three units at Waterloo have put their bins out on the wrong night since a wet Monday and I have taken it personally, which I accept is a choice I made. Nobody else seems to have noticed, which is its own problem. I will know if you skipped a bit.",
+   "giver": "hub-waterloo-fern",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "the ones who argue about it"
+    },
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "the fine the council gave me, off them"
+    }
+   ],
+   "reward": {
+    "cash": 95,
+    "xp": 268,
+    "unlock": [
+     "hub:h-strata-waterloo-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-waterloo-5",
+   "act": 3,
+   "title": "The Other Block, Waterloo",
+   "blurb": "I am told you do odd jobs. There is a block at Erskineville with the same builder and the same cracks, and their manager has already been through what Waterloo is starting. Everyone I have told has looked at me the way you are now. Say nothing to anyone on the way.",
+   "giver": "hub-waterloo-fern",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2000,
+     "z": 3668,
+     "radius": 60,
+     "label": "go and ask them how it ended"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I need to know how much worse this gets",
+     "npc": "hub-waterloo-fern"
+    }
+   ],
+   "reward": {
+    "cash": 106,
+    "xp": 273,
+    "unlock": [
+     "hub:h-strata-waterloo-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

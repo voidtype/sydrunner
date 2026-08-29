@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-revesby-teodora",
+   "name": "Teodora, shopkeeper at Revesby",
+   "x": -17702,
+   "z": 9526,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are here about the sign, the sign is wrong.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "There is no clever way to say this. The Revesby order has been two cartons light every week since a wet Monday and the invoice says otherwise every time. Half the street knows and half the street is pretending not to. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-revesby-0",
+       "denyFlag": "hub:h-cornershop-revesby-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You look like you have twenty minutes. They admitted it, which I did not expect, so now there is $65 owing to Revesby and it is not going to walk in here itself. I am not after trouble. I am after an answer. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-revesby-1",
+       "denyFlag": "hub:h-cornershop-revesby-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "Short Delivery, Revesby — that's done.",
+       "turnin": "h-cornershop-revesby-0"
+      },
+      {
+       "text": "The Credit Note, Revesby — that's done.",
+       "turnin": "h-cornershop-revesby-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-revesby-adnan",
+   "name": "Adnan, delivery driver at Revesby",
+   "x": -17931.2,
+   "z": 9768.8,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand in the doorway, mate, come round.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Keep it between us for now. I do the Revesby run at two in the afternoon and there is a stretch of it where the van gets followed, which I have told nobody until now. Nobody else seems to have noticed, which is its own problem. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-revesby-2",
+       "denyFlag": "hub:h-cornershop-revesby-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Right. Since you asked. I have got a folding table in the back of the van and the Revesby shop is shut, and the number on the door rings out. Everyone I have told has looked at me the way you are now. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-revesby-3",
+       "denyFlag": "hub:h-cornershop-revesby-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "The Revesby Run — that's done.",
+       "turnin": "h-cornershop-revesby-2"
+      },
+      {
+       "text": "Locked Out, Revesby — that's done.",
+       "turnin": "h-cornershop-revesby-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-revesby-divya",
+   "name": "Divya, the kid on the register at Revesby",
+   "x": -17920,
+   "z": 9662,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Long day. Say what you came to say.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "My knees are gone, so. Three of the Revesby regulars have started coming in together and going out separately, and the till is $10 down on those days. This is the third time I have had this conversation. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-revesby-4",
+       "denyFlag": "hub:h-cornershop-revesby-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "This is going to sound small. Everything Revesby sells comes off a floor at Panania, and the woman who runs it will tell you things she will not put in writing. It started small, the way these things do. Half now if you want it. Most people don't.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-revesby-5",
+       "denyFlag": "hub:h-cornershop-revesby-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "The Regulars, Revesby — that's done.",
+       "turnin": "h-cornershop-revesby-4"
+      },
+      {
+       "text": "The Wholesaler, Revesby — that's done.",
+       "turnin": "h-cornershop-revesby-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-coalcliff-gia",
+   "name": "Gia, junior coach at Coalcliff",
+   "x": -20642,
+   "z": 41891,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I know that look. Everyone wants something today.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "There is no clever way to say this. I have got eleven kids for a twelve-a-side at Coalcliff on a public holiday nobody remembered and one of them has a note from his mother. Half the street knows and half the street is pretending not to. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-coalcliff-0",
+       "denyFlag": "hub:h-oval-coalcliff-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You look like you have twenty minutes. We found a twelfth, which means the Coalcliff club now owes the association $65 it had budgeted on not owing. I am not after trouble. I am after an answer. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-coalcliff-1",
+       "denyFlag": "hub:h-oval-coalcliff-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "Under 12s at Coalcliff — that's done.",
+       "turnin": "h-oval-coalcliff-0"
+      },
+      {
+       "text": "Registration, Coalcliff — that's done.",
+       "turnin": "h-oval-coalcliff-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-coalcliff-tara",
+   "name": "Tara, canteen manager at Coalcliff",
+   "x": -20535,
+   "z": 41920,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Give me a second. Right. Go.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Keep it between us for now. The canteen at Coalcliff does two hundred sausages on a Saturday and this week the freezer went off at ten past five. Nobody else seems to have noticed, which is its own problem. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-coalcliff-2",
+       "denyFlag": "hub:h-oval-coalcliff-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Right. Since you asked. Somebody walked off with the float from the Coalcliff canteen at about ten past five during the last home game, and I have a fair idea which somebody. Everyone I have told has looked at me the way you are now. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-coalcliff-3",
+       "denyFlag": "hub:h-oval-coalcliff-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Coalcliff Canteen — that's done.",
+       "turnin": "h-oval-coalcliff-2"
+      },
+      {
+       "text": "Grand Final Float, Coalcliff — that's done.",
+       "turnin": "h-oval-coalcliff-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-coalcliff-mehmet",
+   "name": "Mehmet, groundsman at Coalcliff",
+   "x": -20746,
+   "z": 41879,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are not from around the corner, are you.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "My knees are gone, so. The sprinkler line under the Coalcliff outfield has been leaking since a public holiday nobody remembered and the wet patch has started to move. This is the third time I have had this conversation. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-coalcliff-4",
+       "denyFlag": "hub:h-oval-coalcliff-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "This is going to sound small. The bloke who allocates grounds for the whole association sits at Stanwell Park, and Coalcliff has been at the bottom of his list for two seasons. It started small, the way these things do. Half now if you want it. Most people don't.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-coalcliff-5",
+       "denyFlag": "hub:h-oval-coalcliff-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Sprinkler Line, Coalcliff — that's done.",
+       "turnin": "h-oval-coalcliff-4"
+      },
+      {
+       "text": "The Association, Coalcliff — that's done.",
+       "turnin": "h-oval-coalcliff-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-meadowbank-charlie",
+   "name": "Charlie, bushcare volunteer at Meadowbank",
+   "x": -11194.1,
+   "z": -5787.7,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Half of this suburb has walked past already. Not one stopped.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "There is no clever way to say this. Somebody has been tipping fill into the creek behind Meadowbank since a Tuesday and it is narrowing the channel a metre at a time. Half the street knows and half the street is pretending not to. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-meadowbank-0",
+       "denyFlag": "hub:h-creek-meadowbank-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You look like you have twenty minutes. They have agreed to a clean-up at Meadowbank, which is wonderful, except the grant is $47 short and closes on a Tuesday. I am not after trouble. I am after an answer. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-meadowbank-1",
+       "denyFlag": "hub:h-creek-meadowbank-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "The Creek Behind Meadowbank — that's done.",
+       "turnin": "h-creek-meadowbank-0"
+      },
+      {
+       "text": "Willow Removal, Meadowbank — that's done.",
+       "turnin": "h-creek-meadowbank-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-meadowbank-dragan",
+   "name": "Dragan, SES member at Meadowbank",
+   "x": -11344,
+   "z": -5664,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Whatever it is, I have had worse this week.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Keep it between us for now. We had 34 sandbags in the Meadowbank shed on a Tuesday and this morning we have got the pallet they came on. Nobody else seems to have noticed, which is its own problem. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-meadowbank-2",
+       "denyFlag": "hub:h-creek-meadowbank-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Right. Since you asked. People keep driving the low crossing at Meadowbank at the second express with the water over the sign, and one of them is going to be the one. Everyone I have told has looked at me the way you are now. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-meadowbank-3",
+       "denyFlag": "hub:h-creek-meadowbank-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Sandbags, Meadowbank — that's done.",
+       "turnin": "h-creek-meadowbank-2"
+      },
+      {
+       "text": "The Low Crossing, Meadowbank — that's done.",
+       "turnin": "h-creek-meadowbank-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-meadowbank-gabriel",
+   "name": "Gabriel, resident who got flooded at Meadowbank",
+   "x": -11221,
+   "z": -5656,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sit down if you like. Nobody else is using it.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "My knees are gone, so. The water came through my place at Meadowbank on a Tuesday and the assessor wants photographs of things I have already thrown out. This is the third time I have had this conversation. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-meadowbank-4",
+       "denyFlag": "hub:h-creek-meadowbank-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "This is going to sound small. Whatever is happening to Meadowbank starts upstream at West Ryde, and there are people up there who have been saying so for years. It started small, the way these things do. Half now if you want it. Most people don't.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-meadowbank-5",
+       "denyFlag": "hub:h-creek-meadowbank-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "Under the House, Meadowbank — that's done.",
+       "turnin": "h-creek-meadowbank-4"
+      },
+      {
+       "text": "Upstream, Meadowbank — that's done.",
+       "turnin": "h-creek-meadowbank-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

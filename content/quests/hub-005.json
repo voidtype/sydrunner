@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-bowlo-cronulla-0",
+   "act": 3,
+   "title": "The Dead Patch at Cronulla",
+   "blurb": "This is going to sound small. The number three green at Cronulla has had a bald patch the shape of Tasmania since the Sunday after payday, and the committee thinks I am inventing it. Everyone I have told has looked at me the way you are now. Do not make a scene about it.",
+   "giver": "hub-cronulla-jordi",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -4800,
+     "z": 20826,
+     "radius": 35,
+     "label": "the patch, with something in frame for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring it to me before the meeting",
+     "npc": "hub-cronulla-jordi"
+    }
+   ],
+   "reward": {
+    "cash": 111,
+    "xp": 302,
+    "unlock": [
+     "hub:h-bowlo-cronulla-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-cronulla-1",
+   "act": 3,
+   "title": "Turf Money, Cronulla",
+   "blurb": "I have written it down twice and lost it twice. They have seen the photograph and now they want it re-laid by the Sunday after payday, which means finding $87 that the Cronulla club does not have. This is the third time I have had this conversation. Ask for me by name at the counter.",
+   "giver": "hub-cronulla-jordi",
+   "level": 5,
+   "requires": [
+    "h-bowlo-cronulla-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 87,
+     "label": "$87, however you like, I am not asking"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "put it in my hand, not the safe",
+     "npc": "hub-cronulla-jordi"
+    }
+   ],
+   "reward": {
+    "cash": 151,
+    "xp": 413,
+    "unlock": [
+     "hub:h-bowlo-cronulla-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-cronulla-2",
+   "act": 3,
+   "title": "The Cronulla Membership Count",
+   "blurb": "Do not laugh. Our books say 60 members at Cronulla and I would bet the bar takings that half of them are dead or moved to Queensland. It started small, the way these things do. Come back and tell me straight.",
+   "giver": "hub-cronulla-moira",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -4954,
+     "z": 20912,
+     "radius": 25,
+     "label": "stand at the side door where the list is kept"
+    },
+    {
+     "kind": "photo",
+     "x": -4983,
+     "z": 20903,
+     "radius": 35,
+     "label": "the board with the names still on it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "read me the ones you did not recognise",
+     "npc": "hub-cronulla-moira"
+    }
+   ],
+   "reward": {
+    "cash": 125,
+    "xp": 302,
+    "unlock": [
+     "hub:h-bowlo-cronulla-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-cronulla-3",
+   "act": 3,
+   "title": "Closing Time Rumour, Cronulla",
+   "blurb": "It is the sort of thing you notice or you do not. Since the back of seven somebody has been going round the Cronulla greens telling the barefoot bowlers we are shutting, and we are not shutting. It is the not knowing that has got me, honestly. Do that and we're square.",
+   "giver": "hub-cronulla-moira",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "whoever is doing the telling"
+    },
+    {
+     "kind": "earn",
+     "dollars": 100,
+     "label": "and take the bar money off them while you are there"
+    }
+   ],
+   "reward": {
+    "cash": 109,
+    "xp": 310,
+    "unlock": [
+     "hub:h-bowlo-cronulla-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-cronulla-4",
+   "act": 3,
+   "title": "Behind the Bar at Cronulla",
+   "blurb": "Two people have already said no. There is an esky with no lid in the chest freezer behind the bar at Cronulla and I am not opening it on an empty stomach. There is probably a simple explanation and I would love to hear it. I will owe you one, and I pay those.",
+   "giver": "hub-cronulla-ahmad",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get one into you first, seriously"
+    },
+    {
+     "kind": "goto",
+     "x": -4912,
+     "z": 20739,
+     "radius": 25,
+     "label": "round the back where the cellar door is"
+    },
+    {
+     "kind": "photo",
+     "x": -4905,
+     "z": 20724,
+     "radius": 35,
+     "label": "whatever is in there, before I lose my nerve"
+    }
+   ],
+   "reward": {
+    "cash": 117,
+    "xp": 321,
+    "unlock": [
+     "hub:h-bowlo-cronulla-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-cronulla-5",
+   "act": 3,
+   "title": "The Old Greenkeeper, Cronulla",
+   "blurb": "Someone has to, and it may as well be you. The man who kept these greens before me drinks at Woolooware now, and he owes Cronulla an explanation about the drainage. You will see what I mean the second you get there. Do not let them talk you into anything.",
+   "giver": "hub-cronulla-ahmad",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5656,
+     "z": 20024,
+     "radius": 60,
+     "label": "find him and hear him out"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come back and tell me what he said",
+     "npc": "hub-cronulla-ahmad"
+    }
+   ],
+   "reward": {
+    "cash": 116,
+    "xp": 320,
+    "unlock": [
+     "hub:h-bowlo-cronulla-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-artarmon-0",
+   "act": 3,
+   "title": "Nights at Artarmon",
+   "blurb": "This is going to sound small. Every night around just gone midnight the same car does three laps of the Artarmon forecourt and never buys fuel. Everyone I have told has looked at me the way you are now. Do not make a scene about it.",
+   "giver": "hub-artarmon-lise",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2282,
+     "z": -6468,
+     "radius": 35,
+     "label": "the car, plate if you can get it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it on record before I ring anyone",
+     "npc": "hub-artarmon-lise"
+    }
+   ],
+   "reward": {
+    "cash": 116,
+    "xp": 315,
+    "unlock": [
+     "hub:h-servo-artarmon-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-artarmon-1",
+   "act": 3,
+   "title": "The Third Lap, Artarmon",
+   "blurb": "I have written it down twice and lost it twice. Now I know the plate, I want to know where it goes after it leaves Artarmon at just gone midnight, because it is not going home. This is the third time I have had this conversation. Ask for me by name at the counter.",
+   "giver": "hub-artarmon-lise",
+   "level": 5,
+   "requires": [
+    "h-servo-artarmon-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Artarmon",
+     "to": "Chatswood",
+     "label": "follow it as far as Chatswood"
+    },
+    {
+     "kind": "photo",
+     "x": -2433,
+     "z": -6504,
+     "radius": 35,
+     "label": "wherever it stops"
+    }
+   ],
+   "reward": {
+    "cash": 166,
+    "xp": 411,
+    "unlock": [
+     "hub:h-servo-artarmon-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-artarmon-2",
+   "act": 3,
+   "title": "Bay Two, Artarmon",
+   "blurb": "Do not laugh. Bay two at the Artarmon workshop has had the same car in it since grand final week and the owner has stopped answering. It started small, the way these things do. Come back and tell me straight.",
+   "giver": "hub-artarmon-pip",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2438,
+     "z": -6602,
+     "radius": 25,
+     "label": "the address on the job card"
+    },
+    {
+     "kind": "photo",
+     "x": -2439,
+     "z": -6615,
+     "radius": 35,
+     "label": "the letterbox, so I know I have the right house"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if anybody actually lives there",
+     "npc": "hub-artarmon-pip"
+    }
+   ],
+   "reward": {
+    "cash": 115,
+    "xp": 302,
+    "unlock": [
+     "hub:h-servo-artarmon-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-artarmon-3",
+   "act": 3,
+   "title": "Tools Off the Bench, Artarmon",
+   "blurb": "It is the sort of thing you notice or you do not. Someone has been walking out of Artarmon with a socket set at a time since grand final week, and I have run out of ways to be polite about it. It is the not knowing that has got me, honestly. Do that and we're square.",
+   "giver": "hub-artarmon-pip",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 3,
+     "label": "the ones hanging round the air hose"
+    },
+    {
+     "kind": "earn",
+     "dollars": 91,
+     "label": "$91 of it back, that is what the set cost"
+    }
+   ],
+   "reward": {
+    "cash": 109,
+    "xp": 312,
+    "unlock": [
+     "hub:h-servo-artarmon-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-artarmon-4",
+   "act": 3,
+   "title": "The Artarmon Price Board",
+   "blurb": "Two people have already said no. Head office says the Artarmon board has been wrong since grand final week and I say it has been right for eleven years, and one of us is about to be embarrassed. There is probably a simple explanation and I would love to hear it. I will owe you one, and I pay those.",
+   "giver": "hub-artarmon-moira",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "buy something so it is a real transaction"
+    },
+    {
+     "kind": "photo",
+     "x": -2307,
+     "z": -6608,
+     "radius": 35,
+     "label": "the board and the pump, both in the one shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that settles it either way",
+     "npc": "hub-artarmon-moira"
+    }
+   ],
+   "reward": {
+    "cash": 109,
+    "xp": 303,
+    "unlock": [
+     "hub:h-servo-artarmon-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-artarmon-5",
+   "act": 3,
+   "title": "The Other Franchise, Artarmon",
+   "blurb": "Someone has to, and it may as well be you. The bloke who runs the site at Chatswood has had the same trouble Artarmon has, and he will talk to you before he talks to me. You will see what I mean the second you get there. Do not let them talk you into anything.",
+   "giver": "hub-artarmon-moira",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2575,
+     "z": -7835,
+     "radius": 60,
+     "label": "find him on shift"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever he says, I want it word for word",
+     "npc": "hub-artarmon-moira"
+    }
+   ],
+   "reward": {
+    "cash": 121,
+    "xp": 323,
+    "unlock": [
+     "hub:h-servo-artarmon-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-jannali-0",
+   "act": 3,
+   "title": "Level Two, Jannali",
+   "blurb": "This is going to sound small. Water has been coming through the level two ceiling of the Jannali block since the first of the month and the strata report says there is no water. Everyone I have told has looked at me the way you are now. Do not make a scene about it.",
+   "giver": "hub-jannali-kieran",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -13021,
+     "z": 16640,
+     "radius": 35,
+     "label": "the ceiling, with the stain visible"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that goes in the file whether they like it or not",
+     "npc": "hub-jannali-kieran"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 368,
+    "unlock": [
+     "hub:h-strata-jannali-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-jannali-1",
+   "act": 3,
+   "title": "The Special Levy, Jannali",
+   "blurb": "I have written it down twice and lost it twice. The photo did it. This is the third time I have had this conversation. Now every owner at Jannali owes $67 and I have to collect it from people who have avoided me for a year. Ask for me by name at the counter.",
+   "giver": "hub-jannali-kieran",
+   "level": 6,
+   "requires": [
+    "h-strata-jannali-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 67,
+     "label": "$67 out of them, in any state"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will not ask how",
+     "npc": "hub-jannali-kieran"
+    }
+   ],
+   "reward": {
+    "cash": 174,
+    "xp": 450,
+    "unlock": [
+     "hub:h-strata-jannali-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-jannali-2",
+   "act": 3,
+   "title": "Car Space 14, Jannali",
+   "blurb": "Do not laugh. Somebody who does not live at Jannali has parked in space fourteen every night since the first of the month and the manager will not look at it. It started small, the way these things do. Come back and tell me straight.",
+   "giver": "hub-jannali-hayley",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -13150,
+     "z": 16615,
+     "radius": 25,
+     "label": "down to the basement, the far corner"
+    },
+    {
+     "kind": "photo",
+     "x": -13157,
+     "z": 16608,
+     "radius": 35,
+     "label": "the car in the space with the number painted beside it"
+    }
+   ],
+   "reward": {
+    "cash": 135,
+    "xp": 354,
+    "unlock": [
+     "hub:h-strata-jannali-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-jannali-3",
+   "act": 3,
+   "title": "The Meeting, Jannali",
+   "blurb": "It is the sort of thing you notice or you do not. The Jannali AGM is on the first of the month and I would like to arrive with something stronger than a grievance and a printout. It is the not knowing that has got me, honestly. Do that and we're square.",
+   "giver": "hub-jannali-hayley",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "two coffees, one is for me"
+    },
+    {
+     "kind": "goto",
+     "x": -12978,
+     "z": 16454,
+     "radius": 25,
+     "label": "the community room where they hold it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "walk in with me, they behave when there is a witness",
+     "npc": "hub-jannali-hayley"
+    }
+   ],
+   "reward": {
+    "cash": 133,
+    "xp": 354,
+    "unlock": [
+     "hub:h-strata-jannali-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-jannali-4",
+   "act": 3,
+   "title": "Bin Night at Jannali",
+   "blurb": "Two people have already said no. Three units at Jannali have put their bins out on the wrong night since the first of the month and I have taken it personally, which I accept is a choice I made. There is probably a simple explanation and I would love to hear it. I will owe you one, and I pay those.",
+   "giver": "hub-jannali-hasan",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "the ones who argue about it"
+    },
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "the fine the council gave me, off them"
+    }
+   ],
+   "reward": {
+    "cash": 135,
+    "xp": 357,
+    "unlock": [
+     "hub:h-strata-jannali-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-jannali-5",
+   "act": 3,
+   "title": "The Other Block, Jannali",
+   "blurb": "Someone has to, and it may as well be you. There is a block at Como with the same builder and the same cracks, and their manager has already been through what Jannali is starting. You will see what I mean the second you get there. Do not let them talk you into anything.",
+   "giver": "hub-jannali-hasan",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -12659,
+     "z": 15424,
+     "radius": 60,
+     "label": "go and ask them how it ended"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I need to know how much worse this gets",
+     "npc": "hub-jannali-hasan"
+    }
+   ],
+   "reward": {
+    "cash": 134,
+    "xp": 348,
+    "unlock": [
+     "hub:h-strata-jannali-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

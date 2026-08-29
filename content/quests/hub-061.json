@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-bowlo-wynyard-0",
+   "act": 3,
+   "title": "The Dead Patch at Wynyard",
+   "blurb": "Right. Since you asked. The number three green at Wynyard has had a bald patch the shape of Tasmania since the long weekend, and the committee thinks I am inventing it. I did try the official route, for what that was worth. Just do not come back empty-handed.",
+   "giver": "hub-wynyard-freya",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -116,
+     "z": -263,
+     "radius": 35,
+     "label": "the patch, with something in frame for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring it to me before the meeting",
+     "npc": "hub-wynyard-freya"
+    }
+   ],
+   "reward": {
+    "cash": 53,
+    "xp": 139,
+    "unlock": [
+     "hub:h-bowlo-wynyard-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bowlo-wynyard-1",
+   "act": 3,
+   "title": "Turf Money, Wynyard",
+   "blurb": "My knees are gone, so. They have seen the photograph and now they want it re-laid by the long weekend, which means finding $35 that the Wynyard club does not have. I have got a photo on my phone but it is useless. I will know if you skipped a bit.",
+   "giver": "hub-wynyard-freya",
+   "level": 1,
+   "requires": [
+    "h-bowlo-wynyard-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 35,
+     "label": "$35, however you like, I am not asking"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "put it in my hand, not the safe",
+     "npc": "hub-wynyard-freya"
+    }
+   ],
+   "reward": {
+    "cash": 105,
+    "xp": 210,
+    "unlock": [
+     "hub:h-bowlo-wynyard-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bowlo-wynyard-2",
+   "act": 3,
+   "title": "The Wynyard Membership Count",
+   "blurb": "This is going to sound small. Our books say 43 members at Wynyard and I would bet the bar takings that half of them are dead or moved to Queensland. I am aware how that sounds. Say nothing to anyone on the way.",
+   "giver": "hub-wynyard-hoang",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -270,
+     "z": -177,
+     "radius": 25,
+     "label": "stand at the side door where the list is kept"
+    },
+    {
+     "kind": "photo",
+     "x": -252,
+     "z": -461,
+     "radius": 35,
+     "label": "the board with the names still on it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "read me the ones you did not recognise",
+     "npc": "hub-wynyard-hoang"
+    }
+   ],
+   "reward": {
+    "cash": 60,
+    "xp": 140,
+    "unlock": [
+     "hub:h-bowlo-wynyard-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bowlo-wynyard-3",
+   "act": 3,
+   "title": "Closing Time Rumour, Wynyard",
+   "blurb": "I have written it down twice and lost it twice. Since knock-off somebody has been going round the Wynyard greens telling the barefoot bowlers we are shutting, and we are not shutting. My wife says I should let it go. My wife is wrong. Do not make a scene about it.",
+   "giver": "hub-wynyard-hoang",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "whoever is doing the telling"
+    },
+    {
+     "kind": "earn",
+     "dollars": 83,
+     "label": "and take the bar money off them while you are there"
+    }
+   ],
+   "reward": {
+    "cash": 59,
+    "xp": 124,
+    "unlock": [
+     "hub:h-bowlo-wynyard-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bowlo-wynyard-4",
+   "act": 3,
+   "title": "Behind the Bar at Wynyard",
+   "blurb": "Do not laugh. There is a milk crate in the chest freezer behind the bar at Wynyard and I am not opening it on an empty stomach. I have rung the number on the letter four times. Ask for me by name at the counter.",
+   "giver": "hub-wynyard-theo",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "get one into you first, seriously"
+    },
+    {
+     "kind": "goto",
+     "x": -228,
+     "z": -350,
+     "radius": 25,
+     "label": "round the back where the cellar door is"
+    },
+    {
+     "kind": "photo",
+     "x": -221,
+     "z": -365,
+     "radius": 35,
+     "label": "whatever is in there, before I lose my nerve"
+    }
+   ],
+   "reward": {
+    "cash": 57,
+    "xp": 130,
+    "unlock": [
+     "hub:h-bowlo-wynyard-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bowlo-wynyard-5",
+   "act": 3,
+   "title": "The Old Greenkeeper, Wynyard",
+   "blurb": "It is the sort of thing you notice or you do not. The man who kept these greens before me drinks at Museum now, and he owes Wynyard an explanation about the drainage. Half the street knows and half the street is pretending not to. Come back and tell me straight.",
+   "giver": "hub-wynyard-theo",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -70,
+     "z": 824,
+     "radius": 60,
+     "label": "find him and hear him out"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come back and tell me what he said",
+     "npc": "hub-wynyard-theo"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 129,
+    "unlock": [
+     "hub:h-bowlo-wynyard-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-servo-epping-0",
+   "act": 3,
+   "title": "Nights at Epping",
+   "blurb": "Right. Since you asked. Every night around ten past five the same car does three laps of the Epping forecourt and never buys fuel. I did try the official route, for what that was worth. Just do not come back empty-handed.",
+   "giver": "hub-epping-tia",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -11817,
+     "z": -10272,
+     "radius": 35,
+     "label": "the car, plate if you can get it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it on record before I ring anyone",
+     "npc": "hub-epping-tia"
+    }
+   ],
+   "reward": {
+    "cash": 69,
+    "xp": 135,
+    "unlock": [
+     "hub:h-servo-epping-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-servo-epping-1",
+   "act": 3,
+   "title": "The Third Lap, Epping",
+   "blurb": "My knees are gone, so. Now I know the plate, I want to know where it goes after it leaves Epping at ten past five, because it is not going home. I have got a photo on my phone but it is useless. I will know if you skipped a bit.",
+   "giver": "hub-epping-tia",
+   "level": 1,
+   "requires": [
+    "h-servo-epping-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Epping",
+     "to": "Eastwood",
+     "label": "follow it as far as Eastwood"
+    },
+    {
+     "kind": "photo",
+     "x": -11968,
+     "z": -10308,
+     "radius": 35,
+     "label": "wherever it stops"
+    }
+   ],
+   "reward": {
+    "cash": 101,
+    "xp": 209,
+    "unlock": [
+     "hub:h-servo-epping-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-servo-epping-2",
+   "act": 3,
+   "title": "Bay Two, Epping",
+   "blurb": "This is going to sound small. Bay two at the Epping workshop has had the same car in it since the week of the show and the owner has stopped answering. I am aware how that sounds. Say nothing to anyone on the way.",
+   "giver": "hub-epping-yenna",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11930,
+     "z": -10479,
+     "radius": 25,
+     "label": "the address on the job card"
+    },
+    {
+     "kind": "photo",
+     "x": -11922,
+     "z": -10490,
+     "radius": 35,
+     "label": "the letterbox, so I know I have the right house"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if anybody actually lives there",
+     "npc": "hub-epping-yenna"
+    }
+   ],
+   "reward": {
+    "cash": 49,
+    "xp": 129,
+    "unlock": [
+     "hub:h-servo-epping-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-servo-epping-3",
+   "act": 3,
+   "title": "Tools Off the Bench, Epping",
+   "blurb": "I have written it down twice and lost it twice. Someone has been walking out of Epping with a socket set at a time since the week of the show, and I have run out of ways to be polite about it. My wife says I should let it go. My wife is wrong. Do not make a scene about it.",
+   "giver": "hub-epping-yenna",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 3,
+     "label": "the ones hanging round the air hose"
+    },
+    {
+     "kind": "earn",
+     "dollars": 40,
+     "label": "$40 of it back, that is what the set cost"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 121,
+    "unlock": [
+     "hub:h-servo-epping-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-servo-epping-4",
+   "act": 3,
+   "title": "The Epping Price Board",
+   "blurb": "Do not laugh. Head office says the Epping board has been wrong since the week of the show and I say it has been right for eleven years, and one of us is about to be embarrassed. I have rung the number on the letter four times. Ask for me by name at the counter.",
+   "giver": "hub-epping-wiremu",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "buy something so it is a real transaction"
+    },
+    {
+     "kind": "photo",
+     "x": -11842,
+     "z": -10412,
+     "radius": 35,
+     "label": "the board and the pump, both in the one shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that settles it either way",
+     "npc": "hub-epping-wiremu"
+    }
+   ],
+   "reward": {
+    "cash": 62,
+    "xp": 132,
+    "unlock": [
+     "hub:h-servo-epping-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-servo-epping-5",
+   "act": 3,
+   "title": "The Other Franchise, Epping",
+   "blurb": "It is the sort of thing you notice or you do not. The bloke who runs the site at Eastwood has had the same trouble Epping has, and he will talk to you before he talks to me. Half the street knows and half the street is pretending not to. Come back and tell me straight.",
+   "giver": "hub-epping-wiremu",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -12052,
+     "z": -8465,
+     "radius": 60,
+     "label": "find him on shift"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever he says, I want it word for word",
+     "npc": "hub-epping-wiremu"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 123,
+    "unlock": [
+     "hub:h-servo-epping-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-strata-loftus-0",
+   "act": 3,
+   "title": "Level Two, Loftus",
+   "blurb": "Right. Since you asked. Water has been coming through the level two ceiling of the Loftus block since the first of the month and the strata report says there is no water. I did try the official route, for what that was worth. Just do not come back empty-handed.",
+   "giver": "hub-loftus-laurie",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -14288,
+     "z": 19836,
+     "radius": 35,
+     "label": "the ceiling, with the stain visible"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that goes in the file whether they like it or not",
+     "npc": "hub-loftus-laurie"
+    }
+   ],
+   "reward": {
+    "cash": 54,
+    "xp": 136,
+    "unlock": [
+     "hub:h-strata-loftus-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-strata-loftus-1",
+   "act": 3,
+   "title": "The Special Levy, Loftus",
+   "blurb": "My knees are gone, so. The photo did it. I have got a photo on my phone but it is useless. Now every owner at Loftus owes $44 and I have to collect it from people who have avoided me for a year. I will know if you skipped a bit.",
+   "giver": "hub-loftus-laurie",
+   "level": 1,
+   "requires": [
+    "h-strata-loftus-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 44,
+     "label": "$44 out of them, in any state"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will not ask how",
+     "npc": "hub-loftus-laurie"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 217,
+    "unlock": [
+     "hub:h-strata-loftus-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-strata-loftus-2",
+   "act": 3,
+   "title": "Car Space 14, Loftus",
+   "blurb": "This is going to sound small. Somebody who does not live at Loftus has parked in space fourteen every night since the first of the month and the manager will not look at it. I am aware how that sounds. Say nothing to anyone on the way.",
+   "giver": "hub-loftus-jemima",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -14417,
+     "z": 19811,
+     "radius": 25,
+     "label": "down to the basement, the far corner"
+    },
+    {
+     "kind": "photo",
+     "x": -14424,
+     "z": 19804,
+     "radius": 35,
+     "label": "the car in the space with the number painted beside it"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 139,
+    "unlock": [
+     "hub:h-strata-loftus-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-strata-loftus-3",
+   "act": 3,
+   "title": "The Meeting, Loftus",
+   "blurb": "I have written it down twice and lost it twice. The Loftus AGM is on the first of the month and I would like to arrive with something stronger than a grievance and a printout. My wife says I should let it go. My wife is wrong. Do not make a scene about it.",
+   "giver": "hub-loftus-jemima",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "two coffees, one is for me"
+    },
+    {
+     "kind": "goto",
+     "x": -14349,
+     "z": 19632,
+     "radius": 25,
+     "label": "the community room where they hold it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "walk in with me, they behave when there is a witness",
+     "npc": "hub-loftus-jemima"
+    }
+   ],
+   "reward": {
+    "cash": 50,
+    "xp": 134,
+    "unlock": [
+     "hub:h-strata-loftus-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-strata-loftus-4",
+   "act": 3,
+   "title": "Bin Night at Loftus",
+   "blurb": "Do not laugh. Three units at Loftus have put their bins out on the wrong night since the first of the month and I have taken it personally, which I accept is a choice I made. I have rung the number on the letter four times. Ask for me by name at the counter.",
+   "giver": "hub-loftus-paz",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "the ones who argue about it"
+    },
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "the fine the council gave me, off them"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 122,
+    "unlock": [
+     "hub:h-strata-loftus-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-strata-loftus-5",
+   "act": 3,
+   "title": "The Other Block, Loftus",
+   "blurb": "It is the sort of thing you notice or you do not. There is a block at Sutherland with the same builder and the same cracks, and their manager has already been through what Loftus is starting. Half the street knows and half the street is pretending not to. Come back and tell me straight.",
+   "giver": "hub-loftus-paz",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -13686,
+     "z": 18444,
+     "radius": 60,
+     "label": "go and ask them how it ended"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I need to know how much worse this gets",
+     "npc": "hub-loftus-paz"
+    }
+   ],
+   "reward": {
+    "cash": 67,
+    "xp": 140,
+    "unlock": [
+     "hub:h-strata-loftus-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  }
+ ]
+}

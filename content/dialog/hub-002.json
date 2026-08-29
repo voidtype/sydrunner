@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-gadigal-deepa",
+   "name": "Deepa, shopkeeper at Gadigal",
+   "x": 99,
+   "z": 560,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sit down if you like. Nobody else is using it.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Not being dramatic about this. The Gadigal order has been two cartons light every week since grand final week and the invoice says otherwise every time. I am aware how that sounds. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-gadigal-0",
+       "denyFlag": "hub:h-cornershop-gadigal-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I am told you do odd jobs. They admitted it, which I did not expect, so now there is $31 owing to Gadigal and it is not going to walk in here itself. My wife says I should let it go. My wife is wrong. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-gadigal-1",
+       "denyFlag": "hub:h-cornershop-gadigal-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "Short Delivery, Gadigal — that's done.",
+       "turnin": "h-cornershop-gadigal-0"
+      },
+      {
+       "text": "The Credit Note, Gadigal — that's done.",
+       "turnin": "h-cornershop-gadigal-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-gadigal-bonnie",
+   "name": "Bonnie, delivery driver at Gadigal",
+   "x": 53,
+   "z": 493,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You will have to speak up, the trains are in.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I'll be straight with you. I do the Gadigal run at knock-off and there is a stretch of it where the van gets followed, which I have told nobody until now. I have rung the number on the letter four times. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-gadigal-2",
+       "denyFlag": "hub:h-cornershop-gadigal-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It has been three weeks. I have got a chest freezer that hums in D in the back of the van and the Gadigal shop is shut, and the number on the door rings out. Half the street knows and half the street is pretending not to. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-gadigal-3",
+       "denyFlag": "hub:h-cornershop-gadigal-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "The Gadigal Run — that's done.",
+       "turnin": "h-cornershop-gadigal-2"
+      },
+      {
+       "text": "Locked Out, Gadigal — that's done.",
+       "turnin": "h-cornershop-gadigal-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-gadigal-paolo",
+   "name": "Paolo, the kid on the register at Gadigal",
+   "x": 95,
+   "z": 488,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I have got about four minutes before I am needed.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Nobody else has offered, so. Three of the Gadigal regulars have started coming in together and going out separately, and the till is $29 down on those days. I am not after trouble. I am after an answer. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-gadigal-4",
+       "denyFlag": "hub:h-cornershop-gadigal-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "The council knows and the council does not care. Everything Gadigal sells comes off a floor at Haymarket, and the woman who runs it will tell you things she will not put in writing. Nobody else seems to have noticed, which is its own problem. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-gadigal-5",
+       "denyFlag": "hub:h-cornershop-gadigal-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "The Regulars, Gadigal — that's done.",
+       "turnin": "h-cornershop-gadigal-4"
+      },
+      {
+       "text": "The Wholesaler, Gadigal — that's done.",
+       "turnin": "h-cornershop-gadigal-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-cherrybrook-vinh",
+   "name": "Vinh, junior coach at Cherrybrook",
+   "x": -16520,
+   "z": -14327,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Ah. Someone with two working legs.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Not being dramatic about this. I have got eleven kids for a twelve-a-side at Cherrybrook on the Sunday after payday and one of them has a note from his mother. I am aware how that sounds. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-cherrybrook-0",
+       "denyFlag": "hub:h-oval-cherrybrook-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I am told you do odd jobs. We found a twelfth, which means the Cherrybrook club now owes the association $59 it had budgeted on not owing. My wife says I should let it go. My wife is wrong. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-cherrybrook-1",
+       "denyFlag": "hub:h-oval-cherrybrook-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "Under 12s at Cherrybrook — that's done.",
+       "turnin": "h-oval-cherrybrook-0"
+      },
+      {
+       "text": "Registration, Cherrybrook — that's done.",
+       "turnin": "h-oval-cherrybrook-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-cherrybrook-soren",
+   "name": "Soren, canteen manager at Cherrybrook",
+   "x": -16874,
+   "z": -14250,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are early. Or late. I have lost track.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I'll be straight with you. The canteen at Cherrybrook does two hundred sausages on a Saturday and this week the freezer went off at first light. I have rung the number on the letter four times. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-cherrybrook-2",
+       "denyFlag": "hub:h-oval-cherrybrook-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It has been three weeks. Somebody walked off with the float from the Cherrybrook canteen at about first light during the last home game, and I have a fair idea which somebody. Half the street knows and half the street is pretending not to. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-cherrybrook-3",
+       "denyFlag": "hub:h-oval-cherrybrook-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Cherrybrook Canteen — that's done.",
+       "turnin": "h-oval-cherrybrook-2"
+      },
+      {
+       "text": "Grand Final Float, Cherrybrook — that's done.",
+       "turnin": "h-oval-cherrybrook-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-cherrybrook-vanni",
+   "name": "Vanni, groundsman at Cherrybrook",
+   "x": -16768,
+   "z": -14291,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Been here since before it was like this. Go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Nobody else has offered, so. The sprinkler line under the Cherrybrook outfield has been leaking since the Sunday after payday and the wet patch has started to move. I am not after trouble. I am after an answer. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-cherrybrook-4",
+       "denyFlag": "hub:h-oval-cherrybrook-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "The council knows and the council does not care. The bloke who allocates grounds for the whole association sits at Castle Hill, and Cherrybrook has been at the bottom of his list for two seasons. Nobody else seems to have noticed, which is its own problem. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-cherrybrook-5",
+       "denyFlag": "hub:h-oval-cherrybrook-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Sprinkler Line, Cherrybrook — that's done.",
+       "turnin": "h-oval-cherrybrook-4"
+      },
+      {
+       "text": "The Association, Cherrybrook — that's done.",
+       "turnin": "h-oval-cherrybrook-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-clarendon-donal",
+   "name": "Donal, bushcare volunteer at Clarendon",
+   "x": -39630,
+   "z": -28005,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Do not mind the mess. It is structural now.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Not being dramatic about this. Somebody has been tipping fill into the creek behind Clarendon since Thursdays and it is narrowing the channel a metre at a time. I am aware how that sounds. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-clarendon-0",
+       "denyFlag": "hub:h-creek-clarendon-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I am told you do odd jobs. They have agreed to a clean-up at Clarendon, which is wonderful, except the grant is $38 short and closes on Thursdays. My wife says I should let it go. My wife is wrong. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-clarendon-1",
+       "denyFlag": "hub:h-creek-clarendon-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "The Creek Behind Clarendon — that's done.",
+       "turnin": "h-creek-clarendon-0"
+      },
+      {
+       "text": "Willow Removal, Clarendon — that's done.",
+       "turnin": "h-creek-clarendon-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-clarendon-fadi",
+   "name": "Fadi, SES member at Clarendon",
+   "x": -39662,
+   "z": -28015,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are selling something the answer is no.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I'll be straight with you. We had 61 sandbags in the Clarendon shed on Thursdays and this morning we have got the pallet they came on. I have rung the number on the letter four times. I will owe you one, and I pay those.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-clarendon-2",
+       "denyFlag": "hub:h-creek-clarendon-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It has been three weeks. People keep driving the low crossing at Clarendon at half six with the water over the sign, and one of them is going to be the one. Half the street knows and half the street is pretending not to. Do not let them talk you into anything.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-clarendon-3",
+       "denyFlag": "hub:h-creek-clarendon-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Sandbags, Clarendon — that's done.",
+       "turnin": "h-creek-clarendon-2"
+      },
+      {
+       "text": "The Low Crossing, Clarendon — that's done.",
+       "turnin": "h-creek-clarendon-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-clarendon-cruz",
+   "name": "Cruz, resident who got flooded at Clarendon",
+   "x": -39594,
+   "z": -28253,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Cash only and no, I am joking. What do you want.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Nobody else has offered, so. The water came through my place at Clarendon on Thursdays and the assessor wants photographs of things I have already thrown out. I am not after trouble. I am after an answer. There's cash in it. Not a lot.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-clarendon-4",
+       "denyFlag": "hub:h-creek-clarendon-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "The council knows and the council does not care. Whatever is happening to Clarendon starts upstream at East Richmond, and there are people up there who have been saying so for years. Nobody else seems to have noticed, which is its own problem. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-clarendon-5",
+       "denyFlag": "hub:h-creek-clarendon-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "Under the House, Clarendon — that's done.",
+       "turnin": "h-creek-clarendon-4"
+      },
+      {
+       "text": "Upstream, Clarendon — that's done.",
+       "turnin": "h-creek-clarendon-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

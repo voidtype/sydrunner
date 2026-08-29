@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-emu-plains-sibel",
+   "name": "Sibel, shopkeeper at Emu Plains",
+   "x": -49860,
+   "z": -12639,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sit down if you like. Nobody else is using it.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Right. Since you asked. The Emu Plains order has been two cartons light every week since every second Friday and the invoice says otherwise every time. I did try the official route, for what that was worth. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-emu-plains-0",
+       "denyFlag": "hub:h-cornershop-emu-plains-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "My knees are gone, so. They admitted it, which I did not expect, so now there is $51 owing to Emu Plains and it is not going to walk in here itself. I have got a photo on my phone but it is useless. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-emu-plains-1",
+       "denyFlag": "hub:h-cornershop-emu-plains-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "Short Delivery, Emu Plains — that's done.",
+       "turnin": "h-cornershop-emu-plains-0"
+      },
+      {
+       "text": "The Credit Note, Emu Plains — that's done.",
+       "turnin": "h-cornershop-emu-plains-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-emu-plains-liam",
+   "name": "Liam, delivery driver at Emu Plains",
+   "x": -50025,
+   "z": -12546,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You will have to speak up, the trains are in.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "This is going to sound small. I do the Emu Plains run at the back of seven and there is a stretch of it where the van gets followed, which I have told nobody until now. I am aware how that sounds. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-emu-plains-2",
+       "denyFlag": "hub:h-cornershop-emu-plains-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have written it down twice and lost it twice. I have got a laminated notice in the back of the van and the Emu Plains shop is shut, and the number on the door rings out. My wife says I should let it go. My wife is wrong. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-emu-plains-3",
+       "denyFlag": "hub:h-cornershop-emu-plains-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "The Emu Plains Run — that's done.",
+       "turnin": "h-cornershop-emu-plains-2"
+      },
+      {
+       "text": "Locked Out, Emu Plains — that's done.",
+       "turnin": "h-cornershop-emu-plains-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-emu-plains-isha",
+   "name": "Isha, the kid on the register at Emu Plains",
+   "x": -50159,
+   "z": -12764,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I have got about four minutes before I am needed.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Do not laugh. Three of the Emu Plains regulars have started coming in together and going out separately, and the till is $76 down on those days. I have rung the number on the letter four times. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-emu-plains-4",
+       "denyFlag": "hub:h-cornershop-emu-plains-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It is the sort of thing you notice or you do not. Everything Emu Plains sells comes off a floor at Penrith, and the woman who runs it will tell you things she will not put in writing. Half the street knows and half the street is pretending not to. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-emu-plains-5",
+       "denyFlag": "hub:h-cornershop-emu-plains-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "The Regulars, Emu Plains — that's done.",
+       "turnin": "h-cornershop-emu-plains-4"
+      },
+      {
+       "text": "The Wholesaler, Emu Plains — that's done.",
+       "turnin": "h-cornershop-emu-plains-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-marion-jacinta",
+   "name": "Jacinta, junior coach at Marion",
+   "x": -5965,
+   "z": 1872,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Ah. Someone with two working legs.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Right. Since you asked. I have got eleven kids for a twelve-a-side at Marion on school holidays and one of them has a note from his mother. I did try the official route, for what that was worth. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-marion-0",
+       "denyFlag": "hub:h-oval-marion-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "My knees are gone, so. We found a twelfth, which means the Marion club now owes the association $36 it had budgeted on not owing. I have got a photo on my phone but it is useless. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-marion-1",
+       "denyFlag": "hub:h-oval-marion-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "Under 12s at Marion — that's done.",
+       "turnin": "h-oval-marion-0"
+      },
+      {
+       "text": "Registration, Marion — that's done.",
+       "turnin": "h-oval-marion-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-marion-zuri",
+   "name": "Zuri, canteen manager at Marion",
+   "x": -5926,
+   "z": 1601,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are early. Or late. I have lost track.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "This is going to sound small. The canteen at Marion does two hundred sausages on a Saturday and this week the freezer went off at twenty past four. I am aware how that sounds. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-marion-2",
+       "denyFlag": "hub:h-oval-marion-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have written it down twice and lost it twice. Somebody walked off with the float from the Marion canteen at about twenty past four during the last home game, and I have a fair idea which somebody. My wife says I should let it go. My wife is wrong. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-marion-3",
+       "denyFlag": "hub:h-oval-marion-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Marion Canteen — that's done.",
+       "turnin": "h-oval-marion-2"
+      },
+      {
+       "text": "Grand Final Float, Marion — that's done.",
+       "turnin": "h-oval-marion-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-marion-eamon",
+   "name": "Eamon, groundsman at Marion",
+   "x": -5805,
+   "z": 1730,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Been here since before it was like this. Go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Do not laugh. The sprinkler line under the Marion outfield has been leaking since school holidays and the wet patch has started to move. I have rung the number on the letter four times. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-marion-4",
+       "denyFlag": "hub:h-oval-marion-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It is the sort of thing you notice or you do not. The bloke who allocates grounds for the whole association sits at Summer Hill, and Marion has been at the bottom of his list for two seasons. Half the street knows and half the street is pretending not to. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-marion-5",
+       "denyFlag": "hub:h-oval-marion-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Sprinkler Line, Marion — that's done.",
+       "turnin": "h-oval-marion-4"
+      },
+      {
+       "text": "The Association, Marion — that's done.",
+       "turnin": "h-oval-marion-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-victoria-cross-roma",
+   "name": "Roma, bushcare volunteer at Victoria Cross",
+   "x": -92.9,
+   "z": -3671,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Do not mind the mess. It is structural now.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Right. Since you asked. Somebody has been tipping fill into the creek behind Victoria Cross since grand final week and it is narrowing the channel a metre at a time. I did try the official route, for what that was worth. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-victoria-cross-0",
+       "denyFlag": "hub:h-creek-victoria-cross-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "My knees are gone, so. They have agreed to a clean-up at Victoria Cross, which is wonderful, except the grant is $52 short and closes on grand final week. I have got a photo on my phone but it is useless. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-victoria-cross-1",
+       "denyFlag": "hub:h-creek-victoria-cross-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "The Creek Behind Victoria Cross — that's done.",
+       "turnin": "h-creek-victoria-cross-0"
+      },
+      {
+       "text": "Willow Removal, Victoria Cross — that's done.",
+       "turnin": "h-creek-victoria-cross-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-victoria-cross-gabriel",
+   "name": "Gabriel, SES member at Victoria Cross",
+   "x": -385,
+   "z": -3551,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are selling something the answer is no.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "This is going to sound small. We had 48 sandbags in the Victoria Cross shed on grand final week and this morning we have got the pallet they came on. I am aware how that sounds. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-victoria-cross-2",
+       "denyFlag": "hub:h-creek-victoria-cross-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have written it down twice and lost it twice. People keep driving the low crossing at Victoria Cross at ten past five with the water over the sign, and one of them is going to be the one. My wife says I should let it go. My wife is wrong. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-victoria-cross-3",
+       "denyFlag": "hub:h-creek-victoria-cross-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Sandbags, Victoria Cross — that's done.",
+       "turnin": "h-creek-victoria-cross-2"
+      },
+      {
+       "text": "The Low Crossing, Victoria Cross — that's done.",
+       "turnin": "h-creek-victoria-cross-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-victoria-cross-mikko",
+   "name": "Mikko, resident who got flooded at Victoria Cross",
+   "x": -128.9,
+   "z": -3606.5,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Cash only and no, I am joking. What do you want.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Do not laugh. The water came through my place at Victoria Cross on grand final week and the assessor wants photographs of things I have already thrown out. I have rung the number on the letter four times. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-victoria-cross-4",
+       "denyFlag": "hub:h-creek-victoria-cross-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It is the sort of thing you notice or you do not. Whatever is happening to Victoria Cross starts upstream at Milsons Point, and there are people up there who have been saying so for years. Half the street knows and half the street is pretending not to. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-victoria-cross-5",
+       "denyFlag": "hub:h-creek-victoria-cross-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "Under the House, Victoria Cross — that's done.",
+       "turnin": "h-creek-victoria-cross-4"
+      },
+      {
+       "text": "Upstream, Victoria Cross — that's done.",
+       "turnin": "h-creek-victoria-cross-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

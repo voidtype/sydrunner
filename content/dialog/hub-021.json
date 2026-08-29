@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-st-james-dev",
+   "name": "Dev, greenkeeper at St James",
+   "x": 349,
+   "z": 50,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You right there? I am mid-something but go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You look like you have twenty minutes. The number three green at St James has had a bald patch the shape of Tasmania since a wet Monday, and the committee thinks I am inventing it. This is the third time I have had this conversation. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-st-james-0",
+       "denyFlag": "hub:h-bowlo-st-james-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Keep it between us for now. They have seen the photograph and now they want it re-laid by a wet Monday, which means finding $43 that the St James club does not have. It started small, the way these things do. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-st-james-1",
+       "denyFlag": "hub:h-bowlo-st-james-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "The Dead Patch at St James — that's done.",
+       "turnin": "h-bowlo-st-james-0"
+      },
+      {
+       "text": "Turf Money, St James — that's done.",
+       "turnin": "h-bowlo-st-james-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-st-james-bridie",
+   "name": "Bridie, club president at St James",
+   "x": 365,
+   "z": 172,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are here about the sign, the sign is wrong.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Right. Since you asked. Our books say 60 members at St James and I would bet the bar takings that half of them are dead or moved to Queensland. It is the not knowing that has got me, honestly. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-st-james-2",
+       "denyFlag": "hub:h-bowlo-st-james-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "My knees are gone, so. Since the back of seven somebody has been going round the St James greens telling the barefoot bowlers we are shutting, and we are not shutting. There is probably a simple explanation and I would love to hear it. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-st-james-3",
+       "denyFlag": "hub:h-bowlo-st-james-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The St James Membership Count — that's done.",
+       "turnin": "h-bowlo-st-james-2"
+      },
+      {
+       "text": "Closing Time Rumour, St James — that's done.",
+       "turnin": "h-bowlo-st-james-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-st-james-duc",
+   "name": "Duc, bar manager at St James",
+   "x": 180,
+   "z": 64,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand in the doorway, mate, come round.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "This is going to sound small. There is a chest freezer that hums in D in the chest freezer behind the bar at St James and I am not opening it on an empty stomach. You will see what I mean the second you get there. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-st-james-4",
+       "denyFlag": "hub:h-bowlo-st-james-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have written it down twice and lost it twice. The man who kept these greens before me drinks at Circular Quay now, and he owes St James an explanation about the drainage. There is a version of this where I am the unreasonable one. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-st-james-5",
+       "denyFlag": "hub:h-bowlo-st-james-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Behind the Bar at St James — that's done.",
+       "turnin": "h-bowlo-st-james-4"
+      },
+      {
+       "text": "The Old Greenkeeper, St James — that's done.",
+       "turnin": "h-bowlo-st-james-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-tascott-tinashe",
+   "name": "Tinashe, night console operator at Tascott",
+   "x": 9328,
+   "z": -46426,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Long day. Say what you came to say.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You look like you have twenty minutes. Every night around twenty past four the same car does three laps of the Tascott forecourt and never buys fuel. This is the third time I have had this conversation. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-tascott-0",
+       "denyFlag": "hub:h-servo-tascott-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Keep it between us for now. Now I know the plate, I want to know where it goes after it leaves Tascott at twenty past four, because it is not going home. It started small, the way these things do. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-tascott-1",
+       "denyFlag": "hub:h-servo-tascott-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "Nights at Tascott — that's done.",
+       "turnin": "h-servo-tascott-0"
+      },
+      {
+       "text": "The Third Lap, Tascott — that's done.",
+       "turnin": "h-servo-tascott-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-tascott-ola",
+   "name": "Ola, mechanic at Tascott",
+   "x": 9339,
+   "z": -46690,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I know that look. Everyone wants something today.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Right. Since you asked. Bay two at the Tascott workshop has had the same car in it since Thursdays and the owner has stopped answering. It is the not knowing that has got me, honestly. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-tascott-2",
+       "denyFlag": "hub:h-servo-tascott-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "My knees are gone, so. Someone has been walking out of Tascott with a socket set at a time since Thursdays, and I have run out of ways to be polite about it. There is probably a simple explanation and I would love to hear it. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-tascott-3",
+       "denyFlag": "hub:h-servo-tascott-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Bay Two, Tascott — that's done.",
+       "turnin": "h-servo-tascott-2"
+      },
+      {
+       "text": "Tools Off the Bench, Tascott — that's done.",
+       "turnin": "h-servo-tascott-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-tascott-shahid",
+   "name": "Shahid, franchisee at Tascott",
+   "x": 9533,
+   "z": -46406,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Give me a second. Right. Go.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "This is going to sound small. Head office says the Tascott board has been wrong since Thursdays and I say it has been right for eleven years, and one of us is about to be embarrassed. You will see what I mean the second you get there. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-tascott-4",
+       "denyFlag": "hub:h-servo-tascott-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have written it down twice and lost it twice. The bloke who runs the site at Point Clare has had the same trouble Tascott has, and he will talk to you before he talks to me. There is a version of this where I am the unreasonable one. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-tascott-5",
+       "denyFlag": "hub:h-servo-tascott-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "The Tascott Price Board — that's done.",
+       "turnin": "h-servo-tascott-4"
+      },
+      {
+       "text": "The Other Franchise, Tascott — that's done.",
+       "turnin": "h-servo-tascott-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-regents-park-kirra",
+   "name": "Kirra, building manager at Regents Park",
+   "x": -17207.3,
+   "z": 1770.2,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are not from around the corner, are you.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You look like you have twenty minutes. Water has been coming through the level two ceiling of the Regents Park block since the week of the show and the strata report says there is no water. This is the third time I have had this conversation. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-regents-park-0",
+       "denyFlag": "hub:h-strata-regents-park-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Keep it between us for now. The photo did it. It started small, the way these things do. Now every owner at Regents Park owes $43 and I have to collect it from people who have avoided me for a year. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-regents-park-1",
+       "denyFlag": "hub:h-strata-regents-park-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "Level Two, Regents Park — that's done.",
+       "turnin": "h-strata-regents-park-0"
+      },
+      {
+       "text": "The Special Levy, Regents Park — that's done.",
+       "turnin": "h-strata-regents-park-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-regents-park-tamar",
+   "name": "Tamar, owner-occupier at Regents Park",
+   "x": -17169.7,
+   "z": 1728.9,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Half of this suburb has walked past already. Not one stopped.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Right. Since you asked. Somebody who does not live at Regents Park has parked in space fourteen every night since the week of the show and the manager will not look at it. It is the not knowing that has got me, honestly. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-regents-park-2",
+       "denyFlag": "hub:h-strata-regents-park-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "My knees are gone, so. The Regents Park AGM is on the week of the show and I would like to arrive with something stronger than a grievance and a printout. There is probably a simple explanation and I would love to hear it. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-regents-park-3",
+       "denyFlag": "hub:h-strata-regents-park-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "Car Space 14, Regents Park — that's done.",
+       "turnin": "h-strata-regents-park-2"
+      },
+      {
+       "text": "The Meeting, Regents Park — that's done.",
+       "turnin": "h-strata-regents-park-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-regents-park-fenella",
+   "name": "Fenella, the one who does the bins at Regents Park",
+   "x": -17071,
+   "z": 1705,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Whatever it is, I have had worse this week.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "This is going to sound small. Three units at Regents Park have put their bins out on the wrong night since the week of the show and I have taken it personally, which I accept is a choice I made. You will see what I mean the second you get there. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-regents-park-4",
+       "denyFlag": "hub:h-strata-regents-park-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have written it down twice and lost it twice. There is a block at Birrong with the same builder and the same cracks, and their manager has already been through what Regents Park is starting. There is a version of this where I am the unreasonable one. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-regents-park-5",
+       "denyFlag": "hub:h-strata-regents-park-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "Bin Night at Regents Park — that's done.",
+       "turnin": "h-strata-regents-park-4"
+      },
+      {
+       "text": "The Other Block, Regents Park — that's done.",
+       "turnin": "h-strata-regents-park-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

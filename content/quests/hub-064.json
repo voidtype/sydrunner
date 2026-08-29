@@ -1,0 +1,651 @@
+{
+ "quests": [
+  {
+   "id": "h-bakery-narara-0",
+   "act": 3,
+   "title": "first light at Narara",
+   "blurb": "Right. Since you asked. I start at first light and for a month the Narara back lane has had somebody in it who is not waiting for bread. I did try the official route, for what that was worth. Just do not come back empty-handed.",
+   "giver": "hub-narara-monika",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 11745,
+     "z": -52736,
+     "radius": 35,
+     "label": "the lane, from the door, no flash"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I am not calling anyone until I am sure",
+     "npc": "hub-narara-monika"
+    }
+   ],
+   "reward": {
+    "cash": 94,
+    "xp": 225,
+    "unlock": [
+     "hub:h-bakery-narara-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-narara-1",
+   "act": 3,
+   "title": "The Lane Light, Narara",
+   "blurb": "My knees are gone, so. A light on that lane costs Narara $51 and the landlord has said no twice, so we are doing it ourselves. I have got a photo on my phone but it is useless. I will know if you skipped a bit.",
+   "giver": "hub-narara-monika",
+   "level": 3,
+   "requires": [
+    "h-bakery-narara-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 51,
+     "label": "$51 and I will fit it myself"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "do not tell him where it came from",
+     "npc": "hub-narara-monika"
+    }
+   ],
+   "reward": {
+    "cash": 123,
+    "xp": 321,
+    "unlock": [
+     "hub:h-bakery-narara-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-narara-2",
+   "act": 3,
+   "title": "Flour Run, Narara",
+   "blurb": "This is going to sound small. The flour for Narara comes off a truck at first light and last the Sunday after payday the truck came and the flour did not. I am aware how that sounds. Say nothing to anyone on the way.",
+   "giver": "hub-narara-pip",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Narara",
+     "to": "Niagara Park",
+     "label": "ride out to Niagara Park where the load is made up"
+    },
+    {
+     "kind": "photo",
+     "x": 11644,
+     "z": -52840,
+     "radius": 35,
+     "label": "the pallet with our name on it, if it exists"
+    }
+   ],
+   "reward": {
+    "cash": 80,
+    "xp": 213,
+    "unlock": [
+     "hub:h-bakery-narara-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-narara-3",
+   "act": 3,
+   "title": "The Loading Zone, Narara",
+   "blurb": "I have written it down twice and lost it twice. The Narara loading zone has had a car in it at first light every morning this week and the driver waits in it, which makes it worse. My wife says I should let it go. My wife is wrong. Do not make a scene about it.",
+   "giver": "hub-narara-pip",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "the one who says he is only a minute"
+    },
+    {
+     "kind": "earn",
+     "dollars": 90,
+     "label": "and the ticket I got, off him"
+    }
+   ],
+   "reward": {
+    "cash": 91,
+    "xp": 222,
+    "unlock": [
+     "hub:h-bakery-narara-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-narara-4",
+   "act": 3,
+   "title": "The Sourdough Sign, Narara",
+   "blurb": "Do not laugh. Somebody two doors down from Narara put up a sign on the Sunday after payday that says the same six words as ours, in the same order. I have rung the number on the letter four times. Ask for me by name at the counter.",
+   "giver": "hub-narara-suleiman",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 11807,
+     "z": -52850,
+     "radius": 25,
+     "label": "walk down and read it properly"
+    },
+    {
+     "kind": "photo",
+     "x": 11815,
+     "z": -52846,
+     "radius": 35,
+     "label": "both signs if you can get them in one frame"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me I am not imagining it",
+     "npc": "hub-narara-suleiman"
+    }
+   ],
+   "reward": {
+    "cash": 91,
+    "xp": 228,
+    "unlock": [
+     "hub:h-bakery-narara-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-narara-5",
+   "act": 3,
+   "title": "The Old Site, Narara",
+   "blurb": "It is the sort of thing you notice or you do not. This business was at Lisarow before it was at Narara, and there is a woman there who still has the original book. Half the street knows and half the street is pretending not to. Come back and tell me straight.",
+   "giver": "hub-narara-suleiman",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 13892,
+     "z": -54242,
+     "radius": 60,
+     "label": "she is usually about in the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring back whatever she is willing to say",
+     "npc": "hub-narara-suleiman"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 228,
+    "unlock": [
+     "hub:h-bakery-narara-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-es-marks-0",
+   "act": 3,
+   "title": "The ES Marks Pool",
+   "blurb": "Right. Since you asked. Council has been saying the ES Marks pool is at end of life since school holidays and the crack they keep pointing at is not in the shell. I did try the official route, for what that was worth. Just do not come back empty-handed.",
+   "giver": "hub-es-marks-anh",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 1601,
+     "z": 3987,
+     "radius": 35,
+     "label": "the crack, close, with something for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "an engineer can read that. A councillor cannot.",
+     "npc": "hub-es-marks-anh"
+    }
+   ],
+   "reward": {
+    "cash": 100,
+    "xp": 262,
+    "unlock": [
+     "hub:h-pool-es-marks-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-es-marks-1",
+   "act": 3,
+   "title": "The Petition Stall, ES Marks",
+   "blurb": "My knees are gone, so. We are running a stall for ES Marks on school holidays and a stall needs $67 of gear that nobody has volunteered to pay for. I have got a photo on my phone but it is useless. I will know if you skipped a bit.",
+   "giver": "hub-es-marks-anh",
+   "level": 4,
+   "requires": [
+    "h-pool-es-marks-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 67,
+     "label": "$67 and a table, if you see one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will be there from eight either way",
+     "npc": "hub-es-marks-anh"
+    }
+   ],
+   "reward": {
+    "cash": 146,
+    "xp": 347,
+    "unlock": [
+     "hub:h-pool-es-marks-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-es-marks-2",
+   "act": 3,
+   "title": "Squad, ES Marks",
+   "blurb": "This is going to sound small. I coach 51 kids at ES Marks at half six and three of them have stopped coming without anybody ringing me. I am aware how that sounds. Say nothing to anyone on the way.",
+   "giver": "hub-es-marks-anahera",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 1421,
+     "z": 4031,
+     "radius": 25,
+     "label": "the flats where two of them live"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "take something with you, it is a long walk up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I do not need them back. I need to know.",
+     "npc": "hub-es-marks-anahera"
+    }
+   ],
+   "reward": {
+    "cash": 112,
+    "xp": 265,
+    "unlock": [
+     "hub:h-pool-es-marks-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-es-marks-3",
+   "act": 3,
+   "title": "The Deep End, ES Marks",
+   "blurb": "I have written it down twice and lost it twice. A group has been coming over the ES Marks fence after close and swimming in the dark, which is how ES Marks loses its pool. My wife says I should let it go. My wife is wrong. Do not make a scene about it.",
+   "giver": "hub-es-marks-anahera",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 3,
+     "label": "the ones who go over the fence"
+    },
+    {
+     "kind": "photo",
+     "x": 1497,
+     "z": 3939,
+     "radius": 35,
+     "label": "the spot in the fence they use"
+    }
+   ],
+   "reward": {
+    "cash": 111,
+    "xp": 267,
+    "unlock": [
+     "hub:h-pool-es-marks-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-es-marks-4",
+   "act": 3,
+   "title": "The Kiosk Freezer, ES Marks",
+   "blurb": "Do not laugh. The kiosk at ES Marks has a clipboard nobody signs in it and a freezer that has been running warm since school holidays. I have rung the number on the letter four times. Ask for me by name at the counter.",
+   "giver": "hub-es-marks-cillian",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "get two, we are going to be here"
+    },
+    {
+     "kind": "goto",
+     "x": 1587,
+     "z": 3939,
+     "radius": 25,
+     "label": "the plant room behind the kiosk"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether it is the freezer or the power",
+     "npc": "hub-es-marks-cillian"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 255,
+    "unlock": [
+     "hub:h-pool-es-marks-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-es-marks-5",
+   "act": 3,
+   "title": "The Aquatic Centre, ES Marks",
+   "blurb": "It is the sort of thing you notice or you do not. They want everyone from ES Marks to drive to the new centre at UNSW Anzac Parade, so somebody should go and see whether it is any good. Half the street knows and half the street is pretending not to. Come back and tell me straight.",
+   "giver": "hub-es-marks-cillian",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 1623,
+     "z": 5171,
+     "radius": 60,
+     "label": "have a proper look, not a quick one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "be honest with me, even if it is nice",
+     "npc": "hub-es-marks-cillian"
+    }
+   ],
+   "reward": {
+    "cash": 114,
+    "xp": 261,
+    "unlock": [
+     "hub:h-pool-es-marks-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-church-street-0",
+   "act": 3,
+   "title": "The Church Street Rank",
+   "blurb": "Right. Since you asked. The rank outside Church Street used to hold nine cars and since every second Friday it holds four, and nobody will say who moved the line. I did try the official route, for what that was worth. Just do not come back empty-handed.",
+   "giver": "hub-church-street-dawit",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -19135,
+     "z": -5810,
+     "radius": 35,
+     "label": "the painted line and the old one under it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the old paint is still there, that is the whole argument",
+     "npc": "hub-church-street-dawit"
+    }
+   ],
+   "reward": {
+    "cash": 95,
+    "xp": 260,
+    "unlock": [
+     "hub:h-rank-church-street-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-church-street-1",
+   "act": 3,
+   "title": "Lost Fares, Church Street",
+   "blurb": "My knees are gone, so. Since the rank at Church Street shrank I am $49 a week down, and the association wants that number from somebody who can prove it. I have got a photo on my phone but it is useless. I will know if you skipped a bit.",
+   "giver": "hub-church-street-dawit",
+   "level": 4,
+   "requires": [
+    "h-rank-church-street-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 49,
+     "label": "$49 in a week, to show it can be done"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the submission, right there",
+     "npc": "hub-church-street-dawit"
+    }
+   ],
+   "reward": {
+    "cash": 152,
+    "xp": 346,
+    "unlock": [
+     "hub:h-rank-church-street-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-church-street-2",
+   "act": 3,
+   "title": "Queue Jumpers, Church Street",
+   "blurb": "This is going to sound small. Cars that have never sat in the Church Street queue turn up at just gone midnight and take the front of it, and the drivers who waited say nothing. I am aware how that sounds. Say nothing to anyone on the way.",
+   "giver": "hub-church-street-naila",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "the ones who take the front"
+    },
+    {
+     "kind": "earn",
+     "dollars": 89,
+     "label": "$89, which is about one airport run"
+    }
+   ],
+   "reward": {
+    "cash": 97,
+    "xp": 272,
+    "unlock": [
+     "hub:h-rank-church-street-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-church-street-3",
+   "act": 3,
+   "title": "The Late Train, Church Street",
+   "blurb": "I have written it down twice and lost it twice. When the last train into Church Street is late, 89 people come out at once and I have to have cars there before they do. My wife says I should let it go. My wife is wrong. Do not make a scene about it.",
+   "giver": "hub-church-street-naila",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Church Street",
+     "to": "Parramatta Square",
+     "label": "come in on the last one from Parramatta Square and see it"
+    },
+    {
+     "kind": "photo",
+     "x": -19167,
+     "z": -5846,
+     "radius": 35,
+     "label": "the rank at the moment the doors open"
+    }
+   ],
+   "reward": {
+    "cash": 103,
+    "xp": 256,
+    "unlock": [
+     "hub:h-rank-church-street-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-church-street-4",
+   "act": 3,
+   "title": "The Door, Church Street",
+   "blurb": "Do not laugh. I have stood on this door near Church Street for 89 years and since every second Friday somebody has been sending my guests to a different rank. I have rung the number on the letter four times. Ask for me by name at the counter.",
+   "giver": "hub-church-street-toma",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -19147,
+     "z": -5965,
+     "radius": 25,
+     "label": "follow one of them and see where they end up"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "you will be standing about, get something"
+    }
+   ],
+   "reward": {
+    "cash": 114,
+    "xp": 278,
+    "unlock": [
+     "hub:h-rank-church-street-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-church-street-5",
+   "act": 3,
+   "title": "The Depot, Church Street",
+   "blurb": "It is the sort of thing you notice or you do not. The plates working the Church Street rank are dispatched from a depot at Harris Park, and the man who runs it has never met a driver he liked. Half the street knows and half the street is pretending not to. Come back and tell me straight.",
+   "giver": "hub-church-street-toma",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18680,
+     "z": -4727,
+     "radius": 60,
+     "label": "go and be pleasant at him anyway"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether he is the problem or the symptom",
+     "npc": "hub-church-street-toma"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 273,
+    "unlock": [
+     "hub:h-rank-church-street-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

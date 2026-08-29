@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-turrella-nuri",
+   "name": "Nuri, baker at Turrella",
+   "x": -6307,
+   "z": 7096,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Half of this suburb has walked past already. Not one stopped.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I'll be straight with you. I start at five in the morning and for a month the Turrella back lane has had somebody in it who is not waiting for bread. It has been going on longer than I have admitted to anyone. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-turrella-0",
+       "denyFlag": "hub:h-bakery-turrella-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It has been three weeks. A light on that lane costs Turrella $52 and the landlord has said no twice, so we are doing it ourselves. I have got no proof, which is exactly why I am asking. Half now if you want it. Most people don't.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-turrella-1",
+       "denyFlag": "hub:h-bakery-turrella-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "five in the morning at Turrella — that's done.",
+       "turnin": "h-bakery-turrella-0"
+      },
+      {
+       "text": "The Lane Light, Turrella — that's done.",
+       "turnin": "h-bakery-turrella-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-turrella-apirana",
+   "name": "Apirana, night delivery at Turrella",
+   "x": -6416,
+   "z": 7034,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Whatever it is, I have had worse this week.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Nobody else has offered, so. The flour for Turrella comes off a truck at five in the morning and last Thursdays the truck came and the flour did not. It might be nothing. It has not felt like nothing. Whatever it costs you, tell me and I will cover it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-turrella-2",
+       "denyFlag": "hub:h-bakery-turrella-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "The council knows and the council does not care. The Turrella loading zone has had a car in it at five in the morning every morning this week and the driver waits in it, which makes it worse. I would not ask if there was anyone else about. I would rather know than wonder.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-turrella-3",
+       "denyFlag": "hub:h-bakery-turrella-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Flour Run, Turrella — that's done.",
+       "turnin": "h-bakery-turrella-2"
+      },
+      {
+       "text": "The Loading Zone, Turrella — that's done.",
+       "turnin": "h-bakery-turrella-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-turrella-mirza",
+   "name": "Mirza, front of house at Turrella",
+   "x": -6419,
+   "z": 6821,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sit down if you like. Nobody else is using it.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I have been putting it off since Easter. Somebody two doors down from Turrella put up a sign on Thursdays that says the same six words as ours, in the same order. You can tell me I am imagining it. Tell me after. That's the whole job. No catch.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-turrella-4",
+       "denyFlag": "hub:h-bakery-turrella-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Before you say anything: yes, I know. This business was at Arncliffe before it was at Turrella, and there is a woman there who still has the original book. I would have sorted it myself a year ago. Be polite about it. It costs nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-turrella-5",
+       "denyFlag": "hub:h-bakery-turrella-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "The Sourdough Sign, Turrella — that's done.",
+       "turnin": "h-bakery-turrella-4"
+      },
+      {
+       "text": "The Old Site, Turrella — that's done.",
+       "turnin": "h-bakery-turrella-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-royal-randwick-laszlo",
+   "name": "Laszlo, lifeguard at Royal Randwick",
+   "x": 2034,
+   "z": 4014,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You will have to speak up, the trains are in.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I'll be straight with you. Council has been saying the Royal Randwick pool is at end of life since the week of the show and the crack they keep pointing at is not in the shell. It has been going on longer than I have admitted to anyone. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-royal-randwick-0",
+       "denyFlag": "hub:h-pool-royal-randwick-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It has been three weeks. We are running a stall for Royal Randwick on the week of the show and a stall needs $95 of gear that nobody has volunteered to pay for. I have got no proof, which is exactly why I am asking. Half now if you want it. Most people don't.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-royal-randwick-1",
+       "denyFlag": "hub:h-pool-royal-randwick-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "The Royal Randwick Pool — that's done.",
+       "turnin": "h-pool-royal-randwick-0"
+      },
+      {
+       "text": "The Petition Stall, Royal Randwick — that's done.",
+       "turnin": "h-pool-royal-randwick-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-royal-randwick-charlie",
+   "name": "Charlie, swim coach at Royal Randwick",
+   "x": 1987,
+   "z": 4080,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I have got about four minutes before I am needed.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Nobody else has offered, so. I coach 24 kids at Royal Randwick at the middle of the news and three of them have stopped coming without anybody ringing me. It might be nothing. It has not felt like nothing. Whatever it costs you, tell me and I will cover it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-royal-randwick-2",
+       "denyFlag": "hub:h-pool-royal-randwick-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "The council knows and the council does not care. A group has been coming over the Royal Randwick fence after close and swimming in the dark, which is how Royal Randwick loses its pool. I would not ask if there was anyone else about. I would rather know than wonder.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-royal-randwick-3",
+       "denyFlag": "hub:h-pool-royal-randwick-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "Squad, Royal Randwick — that's done.",
+       "turnin": "h-pool-royal-randwick-2"
+      },
+      {
+       "text": "The Deep End, Royal Randwick — that's done.",
+       "turnin": "h-pool-royal-randwick-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-royal-randwick-sigrid",
+   "name": "Sigrid, kiosk operator at Royal Randwick",
+   "x": 2023,
+   "z": 4145,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Ah. Someone with two working legs.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I have been putting it off since Easter. The kiosk at Royal Randwick has a chest freezer that hums in D in it and a freezer that has been running warm since the week of the show. You can tell me I am imagining it. Tell me after. That's the whole job. No catch.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-royal-randwick-4",
+       "denyFlag": "hub:h-pool-royal-randwick-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Before you say anything: yes, I know. They want everyone from Royal Randwick to drive to the new centre at UNSW Anzac Parade, so somebody should go and see whether it is any good. I would have sorted it myself a year ago. Be polite about it. It costs nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-royal-randwick-5",
+       "denyFlag": "hub:h-pool-royal-randwick-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "The Kiosk Freezer, Royal Randwick — that's done.",
+       "turnin": "h-pool-royal-randwick-4"
+      },
+      {
+       "text": "The Aquatic Centre, Royal Randwick — that's done.",
+       "turnin": "h-pool-royal-randwick-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-bardwell-park-xuan",
+   "name": "Xuan, taxi driver at Bardwell Park",
+   "x": -7627.9,
+   "z": 7199.6,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are early. Or late. I have lost track.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I'll be straight with you. The rank outside Bardwell Park used to hold nine cars and since a public holiday nobody remembered it holds four, and nobody will say who moved the line. It has been going on longer than I have admitted to anyone. You'll know it when you see it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-bardwell-park-0",
+       "denyFlag": "hub:h-rank-bardwell-park-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "It has been three weeks. Since the rank at Bardwell Park shrank I am $68 a week down, and the association wants that number from somebody who can prove it. I have got no proof, which is exactly why I am asking. Half now if you want it. Most people don't.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-bardwell-park-1",
+       "denyFlag": "hub:h-rank-bardwell-park-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "The Bardwell Park Rank — that's done.",
+       "turnin": "h-rank-bardwell-park-0"
+      },
+      {
+       "text": "Lost Fares, Bardwell Park — that's done.",
+       "turnin": "h-rank-bardwell-park-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-bardwell-park-sigrid",
+   "name": "Sigrid, rank marshal at Bardwell Park",
+   "x": -7530,
+   "z": 6992,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Been here since before it was like this. Go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Nobody else has offered, so. Cars that have never sat in the Bardwell Park queue turn up at half six and take the front of it, and the drivers who waited say nothing. It might be nothing. It has not felt like nothing. Whatever it costs you, tell me and I will cover it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-bardwell-park-2",
+       "denyFlag": "hub:h-rank-bardwell-park-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "The council knows and the council does not care. When the last train into Bardwell Park is late, 88 people come out at once and I have to have cars there before they do. I would not ask if there was anyone else about. I would rather know than wonder.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-bardwell-park-3",
+       "denyFlag": "hub:h-rank-bardwell-park-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "Queue Jumpers, Bardwell Park — that's done.",
+       "turnin": "h-rank-bardwell-park-2"
+      },
+      {
+       "text": "The Late Train, Bardwell Park — that's done.",
+       "turnin": "h-rank-bardwell-park-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-bardwell-park-sakura",
+   "name": "Sakura, hotel doorman at Bardwell Park",
+   "x": -7746,
+   "z": 7234,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Do not mind the mess. It is structural now.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I have been putting it off since Easter. I have stood on this door near Bardwell Park for 88 years and since a public holiday nobody remembered somebody has been sending my guests to a different rank. You can tell me I am imagining it. Tell me after. That's the whole job. No catch.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-bardwell-park-4",
+       "denyFlag": "hub:h-rank-bardwell-park-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Before you say anything: yes, I know. The plates working the Bardwell Park rank are dispatched from a depot at Turrella, and the man who runs it has never met a driver he liked. I would have sorted it myself a year ago. Be polite about it. It costs nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-bardwell-park-5",
+       "denyFlag": "hub:h-rank-bardwell-park-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "The Door, Bardwell Park — that's done.",
+       "turnin": "h-rank-bardwell-park-4"
+      },
+      {
+       "text": "The Depot, Bardwell Park — that's done.",
+       "turnin": "h-rank-bardwell-park-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

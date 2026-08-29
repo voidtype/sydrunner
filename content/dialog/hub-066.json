@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-menangle-eleni",
+   "name": "Eleni, shopkeeper at Menangle",
+   "x": -42320,
+   "z": 29187,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Give me a second. Right. Go.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is not a police matter and I have checked. The Menangle order has been two cartons light every week since a public holiday nobody remembered and the invoice says otherwise every time. I am not after trouble. I am after an answer. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-menangle-0",
+       "denyFlag": "hub:h-cornershop-menangle-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Honestly, I am past caring how it looks. They admitted it, which I did not expect, so now there is $117 owing to Menangle and it is not going to walk in here itself. Nobody else seems to have noticed, which is its own problem. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-menangle-1",
+       "denyFlag": "hub:h-cornershop-menangle-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "Short Delivery, Menangle — that's done.",
+       "turnin": "h-cornershop-menangle-0"
+      },
+      {
+       "text": "The Credit Note, Menangle — that's done.",
+       "turnin": "h-cornershop-menangle-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-menangle-kwame",
+   "name": "Kwame, delivery driver at Menangle",
+   "x": -42437,
+   "z": 29433,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are not from around the corner, are you.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I would do it myself if I could leave the counter. I do the Menangle run at first light and there is a stretch of it where the van gets followed, which I have told nobody until now. Everyone I have told has looked at me the way you are now. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-menangle-2",
+       "denyFlag": "hub:h-cornershop-menangle-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You will think I am making this up. I have got a whiteboard with last March still on it in the back of the van and the Menangle shop is shut, and the number on the door rings out. This is the third time I have had this conversation. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-menangle-3",
+       "denyFlag": "hub:h-cornershop-menangle-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "The Menangle Run — that's done.",
+       "turnin": "h-cornershop-menangle-2"
+      },
+      {
+       "text": "Locked Out, Menangle — that's done.",
+       "turnin": "h-cornershop-menangle-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-menangle-maia",
+   "name": "Maia, the kid on the register at Menangle",
+   "x": -42515,
+   "z": 29276,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Half of this suburb has walked past already. Not one stopped.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "There is no clever way to say this. Three of the Menangle regulars have started coming in together and going out separately, and the till is $26 down on those days. It started small, the way these things do. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-menangle-4",
+       "denyFlag": "hub:h-cornershop-menangle-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You look like you have twenty minutes. Everything Menangle sells comes off a floor at Douglas Park, and the woman who runs it will tell you things she will not put in writing. It is the not knowing that has got me, honestly. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-cornershop-menangle-5",
+       "denyFlag": "hub:h-cornershop-menangle-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "The Regulars, Menangle — that's done.",
+       "turnin": "h-cornershop-menangle-4"
+      },
+      {
+       "text": "The Wholesaler, Menangle — that's done.",
+       "turnin": "h-cornershop-menangle-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-narwee-behrouz",
+   "name": "Behrouz, junior coach at Narwee",
+   "x": -12822,
+   "z": 9030,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Whatever it is, I have had worse this week.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is not a police matter and I have checked. I have got eleven kids for a twelve-a-side at Narwee on school holidays and one of them has a note from his mother. I am not after trouble. I am after an answer. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-narwee-0",
+       "denyFlag": "hub:h-oval-narwee-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Honestly, I am past caring how it looks. We found a twelfth, which means the Narwee club now owes the association $91 it had budgeted on not owing. Nobody else seems to have noticed, which is its own problem. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-narwee-1",
+       "denyFlag": "hub:h-oval-narwee-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "Under 12s at Narwee — that's done.",
+       "turnin": "h-oval-narwee-0"
+      },
+      {
+       "text": "Registration, Narwee — that's done.",
+       "turnin": "h-oval-narwee-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-narwee-liam",
+   "name": "Liam, canteen manager at Narwee",
+   "x": -12616,
+   "z": 8956,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sit down if you like. Nobody else is using it.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I would do it myself if I could leave the counter. The canteen at Narwee does two hundred sausages on a Saturday and this week the freezer went off at the second express. Everyone I have told has looked at me the way you are now. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-narwee-2",
+       "denyFlag": "hub:h-oval-narwee-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You will think I am making this up. Somebody walked off with the float from the Narwee canteen at about the second express during the last home game, and I have a fair idea which somebody. This is the third time I have had this conversation. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-narwee-3",
+       "denyFlag": "hub:h-oval-narwee-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Narwee Canteen — that's done.",
+       "turnin": "h-oval-narwee-2"
+      },
+      {
+       "text": "Grand Final Float, Narwee — that's done.",
+       "turnin": "h-oval-narwee-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-narwee-cathal",
+   "name": "Cathal, groundsman at Narwee",
+   "x": -12795,
+   "z": 9127,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You will have to speak up, the trains are in.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "There is no clever way to say this. The sprinkler line under the Narwee outfield has been leaking since school holidays and the wet patch has started to move. It started small, the way these things do. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-narwee-4",
+       "denyFlag": "hub:h-oval-narwee-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You look like you have twenty minutes. The bloke who allocates grounds for the whole association sits at Beverly Hills, and Narwee has been at the bottom of his list for two seasons. It is the not knowing that has got me, honestly. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-oval-narwee-5",
+       "denyFlag": "hub:h-oval-narwee-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Sprinkler Line, Narwee — that's done.",
+       "turnin": "h-oval-narwee-4"
+      },
+      {
+       "text": "The Association, Narwee — that's done.",
+       "turnin": "h-oval-narwee-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-hills-showground-moira",
+   "name": "Moira, bushcare volunteer at Hills Showground",
+   "x": -20806,
+   "z": -15395,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I have got about four minutes before I am needed.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is not a police matter and I have checked. Somebody has been tipping fill into the creek behind Hills Showground since a wet Monday and it is narrowing the channel a metre at a time. I am not after trouble. I am after an answer. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-hills-showground-0",
+       "denyFlag": "hub:h-creek-hills-showground-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Honestly, I am past caring how it looks. They have agreed to a clean-up at Hills Showground, which is wonderful, except the grant is $85 short and closes on a wet Monday. Nobody else seems to have noticed, which is its own problem. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-hills-showground-1",
+       "denyFlag": "hub:h-creek-hills-showground-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "The Creek Behind Hills Showground — that's done.",
+       "turnin": "h-creek-hills-showground-0"
+      },
+      {
+       "text": "Willow Removal, Hills Showground — that's done.",
+       "turnin": "h-creek-hills-showground-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-hills-showground-damir",
+   "name": "Damir, SES member at Hills Showground",
+   "x": -20936,
+   "z": -15087,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Ah. Someone with two working legs.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I would do it myself if I could leave the counter. We had 75 sandbags in the Hills Showground shed on a wet Monday and this morning we have got the pallet they came on. Everyone I have told has looked at me the way you are now. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-hills-showground-2",
+       "denyFlag": "hub:h-creek-hills-showground-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You will think I am making this up. People keep driving the low crossing at Hills Showground at five in the morning with the water over the sign, and one of them is going to be the one. This is the third time I have had this conversation. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-hills-showground-3",
+       "denyFlag": "hub:h-creek-hills-showground-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Sandbags, Hills Showground — that's done.",
+       "turnin": "h-creek-hills-showground-2"
+      },
+      {
+       "text": "The Low Crossing, Hills Showground — that's done.",
+       "turnin": "h-creek-hills-showground-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-hills-showground-josefa",
+   "name": "Josefa, resident who got flooded at Hills Showground",
+   "x": -20881,
+   "z": -15328,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are early. Or late. I have lost track.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "There is no clever way to say this. The water came through my place at Hills Showground on a wet Monday and the assessor wants photographs of things I have already thrown out. It started small, the way these things do. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-hills-showground-4",
+       "denyFlag": "hub:h-creek-hills-showground-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You look like you have twenty minutes. Whatever is happening to Hills Showground starts upstream at Castle Hill, and there are people up there who have been saying so for years. It is the not knowing that has got me, honestly. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-creek-hills-showground-5",
+       "denyFlag": "hub:h-creek-hills-showground-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "Under the House, Hills Showground — that's done.",
+       "turnin": "h-creek-hills-showground-4"
+      },
+      {
+       "text": "Upstream, Hills Showground — that's done.",
+       "turnin": "h-creek-hills-showground-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

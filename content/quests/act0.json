@@ -1,156 +1,263 @@
 {
-  "pack": "act0",
-  "_comment": [
-    "ACT 0 — CENTRELINK MUTUAL OBLIGATIONS.",
-    "",
-    "Edit this file on github.com and it is live within five minutes. There is no",
-    "deploy. See server/quests.ts for the publish path and what happens when this",
-    "file is wrong (nothing: the whole pack is refused and the last good one keeps",
-    "serving, with the reasons in the server log).",
-    "",
-    "Every id is lower case, alphanumeric with - _ and :. Every reward is bounded",
-    "($500, 2000 xp, 4 flags) and a quest that asks for more is refused. The",
-    "capitalisation of Marita and DeFAULT is law in any string a player reads.",
-    "",
-    "`level` IS A FLOOR, NOT A WINDOW. A job is offered once your level reaches",
-    "its rung and stays offered above it -- see game/questmodel.ts. It was an",
-    "exact rung once, and the five below all sit on rung 1, so a player who",
-    "batted a few eshays on the ride down from Sydney Park arrived at Denise on",
-    "rung 2 and every one of them answered `level 1 only`. Act 0 was over before",
-    "it began, and with it Act 1, which opens off `act0-review`.",
-    "",
-    "THE ARITHMETIC BELOW ONLY EVER COUNTED QUEST XP, which is why the sum in it",
-    "looked safe and was not: the five pay 700 between them and a level is 1000,",
-    "so nothing in this file can level you off its own rung -- true, and",
-    "irrelevant, because a knockout pays xp too. `server/register-check.ts` now",
-    "asks the question of every shipped job at every level instead of trusting a",
-    "sum, and the ordering here is carried where it always really was: `requires`",
-    "and `needFlags` run the five in sequence and the review waits on",
-    "`act0:trained`.",
-    "",
-    "THE TUTORIAL IS ON RUNG 1 TOO AND IS NOT ONE OF THE FIVE OBLIGATIONS.",
-    "`act0-ladmaster` is the first thing in the game: no requires, no needFlags,",
-    "nothing gates it. It pays 2 xp, which is deliberately nothing -- it is a",
-    "handshake, not a job -- so the rung-1 sum below is 702 against the 1000",
-    "that would level you off the rung. Whoever edits these numbers owns that",
-    "sum; server/quests-check.ts asserts it and names the five obligations by",
-    "id so a sixth job on rung 1 cannot quietly join them.",
-    "",
-    "It carries `\"bike\": true`, which is the only quest in content/ that does:",
-    "accepting it puts a lime bike on clear ground within five metres of you.",
-    "See client/src/game/bikes.ts (placeLoanBike) -- the id is outside the",
-    "planned range, so it is a loan rather than one of the city's own.",
-    "",
-    "The last 300 xp are knockouts, which is the point: Denise cannot sign you",
-    "off for a participation review until you have participated in something.",
-    "The review is the rung-2 door and its final conversation is where a handler",
-    "walks in.",
-    "",
-    "Coordinates are world metres: +X east, +Z south, origin at Town Hall. The",
-    "Centrelink is the real Redfern office out of game/centrelink-data.ts."
-  ],
-  "quests": [
+ "pack": "act0",
+ "_comment": [
+  "ACT 0 \u2014 CENTRELINK MUTUAL OBLIGATIONS.",
+  "",
+  "Edit this file on github.com and it is live within five minutes. There is no",
+  "deploy. See server/quests.ts for the publish path and what happens when this",
+  "file is wrong (nothing: the whole pack is refused and the last good one keeps",
+  "serving, with the reasons in the server log).",
+  "",
+  "Every id is lower case, alphanumeric with - _ and :. Every reward is bounded",
+  "($500, 2000 xp, 4 flags) and a quest that asks for more is refused. The",
+  "capitalisation of Marita and DeFAULT is law in any string a player reads.",
+  "",
+  "`level` IS A FLOOR, NOT A WINDOW. A job is offered once your level reaches",
+  "its rung and stays offered above it -- see game/questmodel.ts. It was an",
+  "exact rung once, and the five below all sit on rung 1, so a player who",
+  "batted a few eshays on the ride down from Sydney Park arrived at Denise on",
+  "rung 2 and every one of them answered `level 1 only`. Act 0 was over before",
+  "it began, and with it Act 1, which opens off `act0-review`.",
+  "",
+  "THE ARITHMETIC BELOW ONLY EVER COUNTED QUEST XP, which is why the sum in it",
+  "looked safe and was not: the five pay 700 between them and a level is 1000,",
+  "so nothing in this file can level you off its own rung -- true, and",
+  "irrelevant, because a knockout pays xp too. `server/register-check.ts` now",
+  "asks the question of every shipped job at every level instead of trusting a",
+  "sum, and the ordering here is carried where it always really was: `requires`",
+  "and `needFlags` run the five in sequence and the review waits on",
+  "`act0:trained`.",
+  "",
+  "THE TUTORIAL IS ON RUNG 1 TOO AND IS NOT ONE OF THE FIVE OBLIGATIONS.",
+  "`act0-ladmaster` is the first thing in the game: no requires, no needFlags,",
+  "nothing gates it. It pays 2 xp, which is deliberately nothing -- it is a",
+  "handshake, not a job -- so the rung-1 sum below is 702 against the 1000",
+  "that would level you off the rung. Whoever edits these numbers owns that",
+  "sum; server/quests-check.ts asserts it and names the five obligations by",
+  "id so a sixth job on rung 1 cannot quietly join them.",
+  "",
+  "It carries `\"bike\": true`, which is the only quest in content/ that does:",
+  "accepting it puts a lime bike on clear ground within five metres of you.",
+  "See client/src/game/bikes.ts (placeLoanBike) -- the id is outside the",
+  "planned range, so it is a loan rather than one of the city's own.",
+  "",
+  "The last 300 xp are knockouts, which is the point: Denise cannot sign you",
+  "off for a participation review until you have participated in something.",
+  "The review is the rung-2 door and its final conversation is where a handler",
+  "walks in.",
+  "",
+  "Coordinates are world metres: +X east, +Z south, origin at Town Hall. The",
+  "Centrelink is the real Redfern office out of game/centrelink-data.ts."
+ ],
+ "quests": [
+  {
+   "id": "act0-ladmaster",
+   "act": 0,
+   "title": "Down to Cenno",
+   "blurb": "Some bloke in the park reckons Cenno owes you money and has a bike you can borrow. He may be right about one of those.",
+   "giver": "ladmaster",
+   "level": 1,
+   "anyRung": true,
+   "bike": true,
+   "steps": [
     {
-      "id": "act0-ladmaster",
-      "act": 0,
-      "title": "Down to Cenno",
-      "blurb": "Some bloke in the park reckons Cenno owes you money and has a bike you can borrow. He may be right about one of those.",
-      "giver": "ladmaster",
-      "level": 1,
-      "anyRung": true,
-      "bike": true,
-      "steps": [
-        {
-          "kind": "goto",
-          "x": -3316.9,
-          "z": 4211.1,
-          "radius": 30,
-          "label": "ride down to Cenno and find Ray",
-          "objective": "GET TO CENNO"
-        }
-      ],
-      "reward": { "cash": 10, "xp": 2, "unlock": ["act0:shown"] }
-    },
-    {
-      "id": "act0-report",
-      "act": 0,
-      "title": "Initial Participation Appointment",
-      "blurb": "You have been asked to attend the Redfern service centre. Attendance is compulsory. The appointment time was in a letter.",
-      "giver": "centrelink-clerk",
-      "level": 1,
-      "steps": [
-        { "kind": "goto", "x": -3344.9, "z": 4208.3, "radius": 30, "label": "get to the St Peters service centre" }
-      ],
-      "reward": { "cash": 20, "xp": 100, "unlock": ["act0:reported"] }
-    },
-    {
-      "id": "act0-jobsearch",
-      "act": 0,
-      "title": "Twenty Points of Job Search",
-      "blurb": "Twenty points a fortnight. Networking counts. Nobody has ever been able to tell you what a point is.",
-      "giver": "centrelink-clerk",
-      "level": 1,
-      "requires": ["act0-report"],
-      "steps": [
-        { "kind": "goto", "x": 416.6, "z": 1204.6, "radius": 60, "label": "get to Surry Hills, where the jobs are" },
-        { "kind": "ko", "npc": "eshay", "count": 3, "label": "network with three locals" },
-        { "kind": "earn", "dollars": 40, "label": "demonstrate $40 of labour market attachment" }
-      ],
-      "reward": { "cash": 30, "xp": 150, "unlock": ["act0:points"] }
-    },
-    {
-      "id": "act0-evidence",
-      "act": 0,
-      "title": "Evidence of Attendance",
-      "blurb": "The system did not record your attendance. Bring a photograph. Of the town hall. That will be fine.",
-      "giver": "centrelink-clerk",
-      "level": 1,
-      "requires": ["act0-jobsearch"],
-      "steps": [
-        { "kind": "photo", "x": 0, "z": 0, "radius": 90, "label": "photograph the town hall as proof you exist" }
-      ],
-      "reward": { "cash": 25, "xp": 100, "unlock": ["act0:evidence"] }
-    },
-    {
-      "id": "act0-travel",
-      "act": 0,
-      "title": "Approved Travel",
-      "blurb": "You are eligible for assistance with transport to an appointment you have already attended. Take a train. Any train.",
-      "giver": "centrelink-clerk",
-      "level": 1,
-      "requires": ["act0-evidence"],
-      "steps": [
-        { "kind": "ride", "line": -1, "from": "", "to": "", "label": "catch a train to a station, any station" }
-      ],
-      "reward": { "cash": 25, "xp": 150, "unlock": ["act0:travel"] }
-    },
-    {
-      "id": "act0-training",
-      "act": 0,
-      "title": "Mandatory Upskilling",
-      "blurb": "A short course. Six hours. It is about resilience. Your provider is paid either way.",
-      "giver": "centrelink-clerk",
-      "level": 1,
-      "requires": ["act0-travel"],
-      "steps": [
-        { "kind": "buy", "powerup": "training", "count": 1, "label": "complete the training module" },
-        { "kind": "dialog", "npc": "centrelink-clerk", "node": "upskilled", "label": "have the course marked off at the desk" }
-      ],
-      "reward": { "cash": 40, "xp": 200, "unlock": ["act0:trained"] }
-    },
-    {
-      "id": "act0-review",
-      "act": 0,
-      "title": "Participation Review",
-      "blurb": "Denise would like to see you. It is not a breach. It is a review. There is a difference and she will explain it.",
-      "giver": "centrelink-clerk",
-      "level": 2,
-      "requires": ["act0-training"],
-      "steps": [
-        { "kind": "goto", "x": -3344.9, "z": 4208.3, "radius": 30, "label": "get back to the service centre" },
-        { "kind": "dialog", "npc": "centrelink-clerk", "node": "review", "label": "sit through the review" }
-      ],
-      "reward": { "cash": 80, "xp": 400, "unlock": ["act0:done", "act1:open"] }
+     "kind": "goto",
+     "x": -3316.9,
+     "z": 4211.1,
+     "radius": 30,
+     "label": "ride down to Cenno and find Ray",
+     "objective": "GET TO CENNO"
     }
-  ]
+   ],
+   "reward": {
+    "cash": 10,
+    "xp": 2,
+    "unlock": [
+     "act0:shown"
+    ]
+   }
+  },
+  {
+   "id": "act0-report",
+   "act": 0,
+   "title": "Initial Participation Appointment",
+   "blurb": "You have been asked to attend the Redfern service centre. Attendance is compulsory. The appointment time was in a letter.",
+   "giver": "centrelink-clerk",
+   "level": 1,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -3344.9,
+     "z": 4208.3,
+     "radius": 30,
+     "label": "get to the St Peters service centre"
+    }
+   ],
+   "reward": {
+    "cash": 20,
+    "xp": 100,
+    "unlock": [
+     "act0:reported"
+    ]
+   }
+  },
+  {
+   "id": "act0-jobsearch",
+   "act": 0,
+   "title": "Twenty Points of Job Search",
+   "blurb": "Twenty points a fortnight. Networking counts. Nobody has ever been able to tell you what a point is.",
+   "giver": "centrelink-clerk",
+   "level": 1,
+   "requires": [
+    "act0-report"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 416.6,
+     "z": 1204.6,
+     "radius": 60,
+     "label": "get to Surry Hills, where the jobs are"
+    },
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "network with three locals"
+    },
+    {
+     "kind": "earn",
+     "dollars": 40,
+     "label": "demonstrate $40 of labour market attachment"
+    }
+   ],
+   "reward": {
+    "cash": 30,
+    "xp": 150,
+    "unlock": [
+     "act0:points"
+    ]
+   }
+  },
+  {
+   "id": "act0-evidence",
+   "act": 0,
+   "title": "Evidence of Attendance",
+   "blurb": "The system did not record your attendance. Bring a photograph. Of the town hall. That will be fine.",
+   "giver": "centrelink-clerk",
+   "level": 1,
+   "requires": [
+    "act0-jobsearch"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 0,
+     "z": 0,
+     "radius": 90,
+     "label": "photograph the town hall as proof you exist"
+    }
+   ],
+   "reward": {
+    "cash": 35,
+    "xp": 175,
+    "unlock": [
+     "act0:evidence"
+    ]
+   }
+  },
+  {
+   "id": "act0-travel",
+   "act": 0,
+   "title": "Approved Travel",
+   "blurb": "You are eligible for assistance with transport to an appointment you have already attended. Take a train. Any train.",
+   "giver": "centrelink-clerk",
+   "level": 1,
+   "requires": [
+    "act0-evidence"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "",
+     "to": "",
+     "label": "catch a train to a station, any station"
+    }
+   ],
+   "reward": {
+    "cash": 40,
+    "xp": 210,
+    "unlock": [
+     "act0:travel"
+    ]
+   }
+  },
+  {
+   "id": "act0-training",
+   "act": 0,
+   "title": "Mandatory Upskilling",
+   "blurb": "A short course. Six hours. It is about resilience. Your provider is paid either way.",
+   "giver": "centrelink-clerk",
+   "level": 1,
+   "requires": [
+    "act0-travel"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "training",
+     "count": 1,
+     "label": "complete the training module"
+    },
+    {
+     "kind": "dialog",
+     "npc": "centrelink-clerk",
+     "node": "upskilled",
+     "label": "have the course marked off at the desk"
+    }
+   ],
+   "reward": {
+    "cash": 55,
+    "xp": 260,
+    "unlock": [
+     "act0:trained"
+    ]
+   }
+  },
+  {
+   "id": "act0-review",
+   "act": 0,
+   "title": "Participation Review",
+   "blurb": "Denise would like to see you. It is not a breach. It is a review. There is a difference and she will explain it.",
+   "giver": "centrelink-clerk",
+   "level": 2,
+   "requires": [
+    "act0-training"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -3344.9,
+     "z": 4208.3,
+     "radius": 30,
+     "label": "get back to the service centre"
+    },
+    {
+     "kind": "dialog",
+     "npc": "centrelink-clerk",
+     "node": "review",
+     "label": "sit through the review"
+    }
+   ],
+   "reward": {
+    "cash": 80,
+    "xp": 400,
+    "unlock": [
+     "act0:done",
+     "act1:open"
+    ]
+   }
+  }
+ ]
 }

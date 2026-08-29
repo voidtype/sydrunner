@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-cornershop-gadigal-0",
+   "act": 3,
+   "title": "Short Delivery, Gadigal",
+   "blurb": "Not being dramatic about this. The Gadigal order has been two cartons light every week since grand final week and the invoice says otherwise every time. I am aware how that sounds. Come back and tell me straight.",
+   "giver": "hub-gadigal-deepa",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 69,
+     "z": 613,
+     "radius": 25,
+     "label": "the loading bay round the side"
+    },
+    {
+     "kind": "photo",
+     "x": 58,
+     "z": 616,
+     "radius": 35,
+     "label": "the pallet as it actually arrives"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I have got something to send them",
+     "npc": "hub-gadigal-deepa"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 138,
+    "unlock": [
+     "hub:h-cornershop-gadigal-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-cornershop-gadigal-1",
+   "act": 3,
+   "title": "The Credit Note, Gadigal",
+   "blurb": "I am told you do odd jobs. They admitted it, which I did not expect, so now there is $31 owing to Gadigal and it is not going to walk in here itself. My wife says I should let it go. My wife is wrong. Do that and we're square.",
+   "giver": "hub-gadigal-deepa",
+   "level": 1,
+   "requires": [
+    "h-cornershop-gadigal-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 31,
+     "label": "$31, and do not take a voucher"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "cash, on the counter, and I will believe it",
+     "npc": "hub-gadigal-deepa"
+    }
+   ],
+   "reward": {
+    "cash": 97,
+    "xp": 225,
+    "unlock": [
+     "hub:h-cornershop-gadigal-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-cornershop-gadigal-2",
+   "act": 3,
+   "title": "The Gadigal Run",
+   "blurb": "I'll be straight with you. I do the Gadigal run at knock-off and there is a stretch of it where the van gets followed, which I have told nobody until now. I have rung the number on the letter four times. I will owe you one, and I pay those.",
+   "giver": "hub-gadigal-bonnie",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Gadigal",
+     "to": "Town Hall",
+     "label": "ride it with me as far as Town Hall"
+    },
+    {
+     "kind": "photo",
+     "x": 68,
+     "z": 388,
+     "radius": 35,
+     "label": "whatever is behind us when we stop"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 134,
+    "unlock": [
+     "hub:h-cornershop-gadigal-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-cornershop-gadigal-3",
+   "act": 3,
+   "title": "Locked Out, Gadigal",
+   "blurb": "It has been three weeks. I have got a chest freezer that hums in D in the back of the van and the Gadigal shop is shut, and the number on the door rings out. Half the street knows and half the street is pretending not to. Do not let them talk you into anything.",
+   "giver": "hub-gadigal-bonnie",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 165,
+     "z": 414,
+     "radius": 25,
+     "label": "try the flat above the shop"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get one in you, this takes a while"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "somebody has to sign for it",
+     "npc": "hub-gadigal-bonnie"
+    }
+   ],
+   "reward": {
+    "cash": 49,
+    "xp": 139,
+    "unlock": [
+     "hub:h-cornershop-gadigal-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-cornershop-gadigal-4",
+   "act": 3,
+   "title": "The Regulars, Gadigal",
+   "blurb": "Nobody else has offered, so. Three of the Gadigal regulars have started coming in together and going out separately, and the till is $29 down on those days. I am not after trouble. I am after an answer. There's cash in it. Not a lot.",
+   "giver": "hub-gadigal-paolo",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 3,
+     "label": "the ones who come in as a set"
+    },
+    {
+     "kind": "earn",
+     "dollars": 29,
+     "label": "$29, which is exactly what the till says"
+    }
+   ],
+   "reward": {
+    "cash": 56,
+    "xp": 121,
+    "unlock": [
+     "hub:h-cornershop-gadigal-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-cornershop-gadigal-5",
+   "act": 3,
+   "title": "The Wholesaler, Gadigal",
+   "blurb": "The council knows and the council does not care. Everything Gadigal sells comes off a floor at Haymarket, and the woman who runs it will tell you things she will not put in writing. Nobody else seems to have noticed, which is its own problem. You'll know it when you see it.",
+   "giver": "hub-gadigal-paolo",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -305,
+     "z": 1552,
+     "radius": 60,
+     "label": "go and see her before the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come and tell me what she said about us",
+     "npc": "hub-gadigal-paolo"
+    }
+   ],
+   "reward": {
+    "cash": 57,
+    "xp": 130,
+    "unlock": [
+     "hub:h-cornershop-gadigal-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-oval-cherrybrook-0",
+   "act": 3,
+   "title": "Under 12s at Cherrybrook",
+   "blurb": "Not being dramatic about this. I have got eleven kids for a twelve-a-side at Cherrybrook on the Sunday after payday and one of them has a note from his mother. I am aware how that sounds. Come back and tell me straight.",
+   "giver": "hub-cherrybrook-vinh",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -16637,
+     "z": -14218,
+     "radius": 25,
+     "label": "the estate behind the ground, ask around"
+    },
+    {
+     "kind": "photo",
+     "x": -16646,
+     "z": -14195,
+     "radius": 35,
+     "label": "the noticeboard where the sign-on sheet went up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "any kid with boots will do at this point",
+     "npc": "hub-cherrybrook-vinh"
+    }
+   ],
+   "reward": {
+    "cash": 72,
+    "xp": 186,
+    "unlock": [
+     "hub:h-oval-cherrybrook-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-cherrybrook-1",
+   "act": 3,
+   "title": "Registration, Cherrybrook",
+   "blurb": "I am told you do odd jobs. We found a twelfth, which means the Cherrybrook club now owes the association $59 it had budgeted on not owing. My wife says I should let it go. My wife is wrong. Do that and we're square.",
+   "giver": "hub-cherrybrook-vinh",
+   "level": 2,
+   "requires": [
+    "h-oval-cherrybrook-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 59,
+     "label": "$59 before the cut-off"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will drive it in myself",
+     "npc": "hub-cherrybrook-vinh"
+    }
+   ],
+   "reward": {
+    "cash": 110,
+    "xp": 267,
+    "unlock": [
+     "hub:h-oval-cherrybrook-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-cherrybrook-2",
+   "act": 3,
+   "title": "The Cherrybrook Canteen",
+   "blurb": "I'll be straight with you. The canteen at Cherrybrook does two hundred sausages on a Saturday and this week the freezer went off at first light. I have rung the number on the letter four times. I will owe you one, and I pay those.",
+   "giver": "hub-cherrybrook-soren",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 2,
+     "label": "we are going to need the coffee"
+    },
+    {
+     "kind": "photo",
+     "x": -16754,
+     "z": -14259,
+     "radius": 35,
+     "label": "the thermometer, so the insurance believes us"
+    }
+   ],
+   "reward": {
+    "cash": 69,
+    "xp": 162,
+    "unlock": [
+     "hub:h-oval-cherrybrook-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-cherrybrook-3",
+   "act": 3,
+   "title": "Grand Final Float, Cherrybrook",
+   "blurb": "It has been three weeks. Somebody walked off with the float from the Cherrybrook canteen at about first light during the last home game, and I have a fair idea which somebody. Half the street knows and half the street is pretending not to. Do not let them talk you into anything.",
+   "giver": "hub-cherrybrook-soren",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "the pair who were leaning on the roller door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 86,
+     "label": "$86, which is what was in the tin"
+    }
+   ],
+   "reward": {
+    "cash": 71,
+    "xp": 185,
+    "unlock": [
+     "hub:h-oval-cherrybrook-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-cherrybrook-4",
+   "act": 3,
+   "title": "Sprinkler Line, Cherrybrook",
+   "blurb": "Nobody else has offered, so. The sprinkler line under the Cherrybrook outfield has been leaking since the Sunday after payday and the wet patch has started to move. I am not after trouble. I am after an answer. There's cash in it. Not a lot.",
+   "giver": "hub-cherrybrook-vanni",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -16796,
+     "z": -14395,
+     "radius": 25,
+     "label": "walk the line from the tap to the boundary"
+    },
+    {
+     "kind": "photo",
+     "x": -16679,
+     "z": -14430,
+     "radius": 35,
+     "label": "where the grass has gone dark"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to dig once, not five times",
+     "npc": "hub-cherrybrook-vanni"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 178,
+    "unlock": [
+     "hub:h-oval-cherrybrook-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-cherrybrook-5",
+   "act": 3,
+   "title": "The Association, Cherrybrook",
+   "blurb": "The council knows and the council does not care. The bloke who allocates grounds for the whole association sits at Castle Hill, and Cherrybrook has been at the bottom of his list for two seasons. Nobody else seems to have noticed, which is its own problem. You'll know it when you see it.",
+   "giver": "hub-cherrybrook-vanni",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18849,
+     "z": -14730,
+     "radius": 60,
+     "label": "go and be reasonable at him"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if it is us or the paperwork",
+     "npc": "hub-cherrybrook-vanni"
+    }
+   ],
+   "reward": {
+    "cash": 81,
+    "xp": 175,
+    "unlock": [
+     "hub:h-oval-cherrybrook-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-clarendon-0",
+   "act": 3,
+   "title": "The Creek Behind Clarendon",
+   "blurb": "Not being dramatic about this. Somebody has been tipping fill into the creek behind Clarendon since Thursdays and it is narrowing the channel a metre at a time. I am aware how that sounds. Come back and tell me straight.",
+   "giver": "hub-clarendon-donal",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -39575,
+     "z": -27984,
+     "radius": 35,
+     "label": "the fill, with the water level in shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council reads photographs, not letters",
+     "npc": "hub-clarendon-donal"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 185,
+    "unlock": [
+     "hub:h-creek-clarendon-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-clarendon-1",
+   "act": 3,
+   "title": "Willow Removal, Clarendon",
+   "blurb": "I am told you do odd jobs. They have agreed to a clean-up at Clarendon, which is wonderful, except the grant is $38 short and closes on Thursdays. My wife says I should let it go. My wife is wrong. Do that and we're square.",
+   "giver": "hub-clarendon-donal",
+   "level": 2,
+   "requires": [
+    "h-creek-clarendon-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 38,
+     "label": "$38, and I do not care whose pocket"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the form needs the number today",
+     "npc": "hub-clarendon-donal"
+    }
+   ],
+   "reward": {
+    "cash": 120,
+    "xp": 267,
+    "unlock": [
+     "hub:h-creek-clarendon-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-clarendon-2",
+   "act": 3,
+   "title": "Sandbags, Clarendon",
+   "blurb": "I'll be straight with you. We had 61 sandbags in the Clarendon shed on Thursdays and this morning we have got the pallet they came on. I have rung the number on the letter four times. I will owe you one, and I pay those.",
+   "giver": "hub-clarendon-fadi",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -39769,
+     "z": -28099,
+     "radius": 25,
+     "label": "the yards backing onto the reserve"
+    },
+    {
+     "kind": "photo",
+     "x": -39777,
+     "z": -28115,
+     "radius": 35,
+     "label": "anywhere they have obviously been used"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 182,
+    "unlock": [
+     "hub:h-creek-clarendon-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-clarendon-3",
+   "act": 3,
+   "title": "The Low Crossing, Clarendon",
+   "blurb": "It has been three weeks. People keep driving the low crossing at Clarendon at half six with the water over the sign, and one of them is going to be the one. Half the street knows and half the street is pretending not to. Do not let them talk you into anything.",
+   "giver": "hub-clarendon-fadi",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "you will be standing out there a while"
+    },
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "the ones who argue with the barrier"
+    }
+   ],
+   "reward": {
+    "cash": 77,
+    "xp": 183,
+    "unlock": [
+     "hub:h-creek-clarendon-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-clarendon-4",
+   "act": 3,
+   "title": "Under the House, Clarendon",
+   "blurb": "Nobody else has offered, so. The water came through my place at Clarendon on Thursdays and the assessor wants photographs of things I have already thrown out. I am not after trouble. I am after an answer. There's cash in it. Not a lot.",
+   "giver": "hub-clarendon-cruz",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -39603,
+     "z": -28177,
+     "radius": 25,
+     "label": "round the side, where the pile is"
+    },
+    {
+     "kind": "photo",
+     "x": -39584,
+     "z": -28175,
+     "radius": 35,
+     "label": "the high-water mark on the brick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the whole claim, that mark",
+     "npc": "hub-clarendon-cruz"
+    }
+   ],
+   "reward": {
+    "cash": 79,
+    "xp": 168,
+    "unlock": [
+     "hub:h-creek-clarendon-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-clarendon-5",
+   "act": 3,
+   "title": "Upstream, Clarendon",
+   "blurb": "The council knows and the council does not care. Whatever is happening to Clarendon starts upstream at East Richmond, and there are people up there who have been saying so for years. Nobody else seems to have noticed, which is its own problem. You'll know it when you see it.",
+   "giver": "hub-clarendon-cruz",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -42214,
+     "z": -28907,
+     "radius": 60,
+     "label": "go up and find them"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear it from someone who is not me",
+     "npc": "hub-clarendon-cruz"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 165,
+    "unlock": [
+     "hub:h-creek-clarendon-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

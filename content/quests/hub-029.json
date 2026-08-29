@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-bowlo-roseville-0",
+   "act": 3,
+   "title": "The Dead Patch at Roseville",
+   "blurb": "You are the first person to stop all morning. The number three green at Roseville has had a bald patch the shape of Tasmania since Thursdays, and the committee thinks I am inventing it. I would have sorted it myself a year ago. Take your time. Do not take a week.",
+   "giver": "hub-roseville-ariana",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2940,
+     "z": -9219,
+     "radius": 35,
+     "label": "the patch, with something in frame for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring it to me before the meeting",
+     "npc": "hub-roseville-ariana"
+    }
+   ],
+   "reward": {
+    "cash": 67,
+    "xp": 163,
+    "unlock": [
+     "hub:h-bowlo-roseville-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-roseville-1",
+   "act": 3,
+   "title": "Turf Money, Roseville",
+   "blurb": "Not being dramatic about this. They have seen the photograph and now they want it re-laid by Thursdays, which means finding $62 that the Roseville club does not have. It is not the money. It has stopped being the money. Come and find me after, either way.",
+   "giver": "hub-roseville-ariana",
+   "level": 2,
+   "requires": [
+    "h-bowlo-roseville-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 62,
+     "label": "$62, however you like, I am not asking"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "put it in my hand, not the safe",
+     "npc": "hub-roseville-ariana"
+    }
+   ],
+   "reward": {
+    "cash": 104,
+    "xp": 263,
+    "unlock": [
+     "hub:h-bowlo-roseville-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-roseville-2",
+   "act": 3,
+   "title": "The Roseville Membership Count",
+   "blurb": "I am told you do odd jobs. Our books say 17 members at Roseville and I would bet the bar takings that half of them are dead or moved to Queensland. I did try the official route, for what that was worth. Whatever you find, bring it to me first.",
+   "giver": "hub-roseville-satu",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -3094,
+     "z": -9133,
+     "radius": 25,
+     "label": "stand at the side door where the list is kept"
+    },
+    {
+     "kind": "photo",
+     "x": -3123,
+     "z": -9142,
+     "radius": 35,
+     "label": "the board with the names still on it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "read me the ones you did not recognise",
+     "npc": "hub-roseville-satu"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 169,
+    "unlock": [
+     "hub:h-bowlo-roseville-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-roseville-3",
+   "act": 3,
+   "title": "Closing Time Rumour, Roseville",
+   "blurb": "I'll be straight with you. Since the middle of the news somebody has been going round the Roseville greens telling the barefoot bowlers we are shutting, and we are not shutting. I have got a photo on my phone but it is useless. That's it. That's the whole ask.",
+   "giver": "hub-roseville-satu",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "whoever is doing the telling"
+    },
+    {
+     "kind": "earn",
+     "dollars": 57,
+     "label": "and take the bar money off them while you are there"
+    }
+   ],
+   "reward": {
+    "cash": 72,
+    "xp": 176,
+    "unlock": [
+     "hub:h-bowlo-roseville-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-roseville-4",
+   "act": 3,
+   "title": "Behind the Bar at Roseville",
+   "blurb": "It has been three weeks. There is a whiteboard with last March still on it in the chest freezer behind the bar at Roseville and I am not opening it on an empty stomach. I am aware how that sounds. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-roseville-manu",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "get one into you first, seriously"
+    },
+    {
+     "kind": "goto",
+     "x": -3052,
+     "z": -9306,
+     "radius": 25,
+     "label": "round the back where the cellar door is"
+    },
+    {
+     "kind": "photo",
+     "x": -3045,
+     "z": -9321,
+     "radius": 35,
+     "label": "whatever is in there, before I lose my nerve"
+    }
+   ],
+   "reward": {
+    "cash": 77,
+    "xp": 186,
+    "unlock": [
+     "hub:h-bowlo-roseville-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-roseville-5",
+   "act": 3,
+   "title": "The Old Greenkeeper, Roseville",
+   "blurb": "Nobody else has offered, so. The man who kept these greens before me drinks at Lindfield now, and he owes Roseville an explanation about the drainage. My wife says I should let it go. My wife is wrong. If anyone asks, you were never here.",
+   "giver": "hub-roseville-manu",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -3802,
+     "z": -10371,
+     "radius": 60,
+     "label": "find him and hear him out"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come back and tell me what he said",
+     "npc": "hub-roseville-manu"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 164,
+    "unlock": [
+     "hub:h-bowlo-roseville-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-jubilee-park-0",
+   "act": 3,
+   "title": "Nights at Jubilee Park",
+   "blurb": "You are the first person to stop all morning. Every night around knock-off the same car does three laps of the Jubilee Park forecourt and never buys fuel. I would have sorted it myself a year ago. Take your time. Do not take a week.",
+   "giver": "hub-jubilee-park-alia",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2771,
+     "z": 894,
+     "radius": 35,
+     "label": "the car, plate if you can get it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it on record before I ring anyone",
+     "npc": "hub-jubilee-park-alia"
+    }
+   ],
+   "reward": {
+    "cash": 80,
+    "xp": 163,
+    "unlock": [
+     "hub:h-servo-jubilee-park-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-jubilee-park-1",
+   "act": 3,
+   "title": "The Third Lap, Jubilee Park",
+   "blurb": "Not being dramatic about this. Now I know the plate, I want to know where it goes after it leaves Jubilee Park at knock-off, because it is not going home. It is not the money. It has stopped being the money. Come and find me after, either way.",
+   "giver": "hub-jubilee-park-alia",
+   "level": 2,
+   "requires": [
+    "h-servo-jubilee-park-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Jubilee Park",
+     "to": "Rozelle Bay",
+     "label": "follow it as far as Rozelle Bay"
+    },
+    {
+     "kind": "photo",
+     "x": -2922,
+     "z": 858,
+     "radius": 35,
+     "label": "wherever it stops"
+    }
+   ],
+   "reward": {
+    "cash": 104,
+    "xp": 256,
+    "unlock": [
+     "hub:h-servo-jubilee-park-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-jubilee-park-2",
+   "act": 3,
+   "title": "Bay Two, Jubilee Park",
+   "blurb": "I am told you do odd jobs. Bay two at the Jubilee Park workshop has had the same car in it since every second Friday and the owner has stopped answering. I did try the official route, for what that was worth. Whatever you find, bring it to me first.",
+   "giver": "hub-jubilee-park-alana",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2927,
+     "z": 760,
+     "radius": 25,
+     "label": "the address on the job card"
+    },
+    {
+     "kind": "photo",
+     "x": -2928,
+     "z": 747,
+     "radius": 35,
+     "label": "the letterbox, so I know I have the right house"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if anybody actually lives there",
+     "npc": "hub-jubilee-park-alana"
+    }
+   ],
+   "reward": {
+    "cash": 69,
+    "xp": 162,
+    "unlock": [
+     "hub:h-servo-jubilee-park-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-jubilee-park-3",
+   "act": 3,
+   "title": "Tools Off the Bench, Jubilee Park",
+   "blurb": "I'll be straight with you. Someone has been walking out of Jubilee Park with a socket set at a time since every second Friday, and I have run out of ways to be polite about it. I have got a photo on my phone but it is useless. That's it. That's the whole ask.",
+   "giver": "hub-jubilee-park-alana",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 3,
+     "label": "the ones hanging round the air hose"
+    },
+    {
+     "kind": "earn",
+     "dollars": 64,
+     "label": "$64 of it back, that is what the set cost"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 182,
+    "unlock": [
+     "hub:h-servo-jubilee-park-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-jubilee-park-4",
+   "act": 3,
+   "title": "The Jubilee Park Price Board",
+   "blurb": "It has been three weeks. Head office says the Jubilee Park board has been wrong since every second Friday and I say it has been right for eleven years, and one of us is about to be embarrassed. I am aware how that sounds. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-jubilee-park-ziva",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "buy something so it is a real transaction"
+    },
+    {
+     "kind": "photo",
+     "x": -2796,
+     "z": 754,
+     "radius": 35,
+     "label": "the board and the pump, both in the one shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that settles it either way",
+     "npc": "hub-jubilee-park-ziva"
+    }
+   ],
+   "reward": {
+    "cash": 67,
+    "xp": 177,
+    "unlock": [
+     "hub:h-servo-jubilee-park-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-jubilee-park-5",
+   "act": 3,
+   "title": "The Other Franchise, Jubilee Park",
+   "blurb": "Nobody else has offered, so. The bloke who runs the site at Lilyfield has had the same trouble Jubilee Park has, and he will talk to you before he talks to me. My wife says I should let it go. My wife is wrong. If anyone asks, you were never here.",
+   "giver": "hub-jubilee-park-ziva",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -3978,
+     "z": 560,
+     "radius": 60,
+     "label": "find him on shift"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever he says, I want it word for word",
+     "npc": "hub-jubilee-park-ziva"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 176,
+    "unlock": [
+     "hub:h-servo-jubilee-park-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-wolli-creek-0",
+   "act": 3,
+   "title": "Level Two, Wolli Creek",
+   "blurb": "You are the first person to stop all morning. Water has been coming through the level two ceiling of the Wolli Creek block since the week of the show and the strata report says there is no water. I would have sorted it myself a year ago. Take your time. Do not take a week.",
+   "giver": "hub-wolli-creek-rehan",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -4885,
+     "z": 6769,
+     "radius": 35,
+     "label": "the ceiling, with the stain visible"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that goes in the file whether they like it or not",
+     "npc": "hub-wolli-creek-rehan"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 169,
+    "unlock": [
+     "hub:h-strata-wolli-creek-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-wolli-creek-1",
+   "act": 3,
+   "title": "The Special Levy, Wolli Creek",
+   "blurb": "Not being dramatic about this. The photo did it. It is not the money. It has stopped being the money. Now every owner at Wolli Creek owes $58 and I have to collect it from people who have avoided me for a year. Come and find me after, either way.",
+   "giver": "hub-wolli-creek-rehan",
+   "level": 2,
+   "requires": [
+    "h-strata-wolli-creek-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 58,
+     "label": "$58 out of them, in any state"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will not ask how",
+     "npc": "hub-wolli-creek-rehan"
+    }
+   ],
+   "reward": {
+    "cash": 106,
+    "xp": 267,
+    "unlock": [
+     "hub:h-strata-wolli-creek-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-wolli-creek-2",
+   "act": 3,
+   "title": "Car Space 14, Wolli Creek",
+   "blurb": "I am told you do odd jobs. Somebody who does not live at Wolli Creek has parked in space fourteen every night since the week of the show and the manager will not look at it. I did try the official route, for what that was worth. Whatever you find, bring it to me first.",
+   "giver": "hub-wolli-creek-aleks",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5014,
+     "z": 6744,
+     "radius": 25,
+     "label": "down to the basement, the far corner"
+    },
+    {
+     "kind": "photo",
+     "x": -5021,
+     "z": 6737,
+     "radius": 35,
+     "label": "the car in the space with the number painted beside it"
+    }
+   ],
+   "reward": {
+    "cash": 67,
+    "xp": 179,
+    "unlock": [
+     "hub:h-strata-wolli-creek-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-wolli-creek-3",
+   "act": 3,
+   "title": "The Meeting, Wolli Creek",
+   "blurb": "I'll be straight with you. The Wolli Creek AGM is on the week of the show and I would like to arrive with something stronger than a grievance and a printout. I have got a photo on my phone but it is useless. That's it. That's the whole ask.",
+   "giver": "hub-wolli-creek-aleks",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "two coffees, one is for me"
+    },
+    {
+     "kind": "goto",
+     "x": -4842,
+     "z": 6583,
+     "radius": 25,
+     "label": "the community room where they hold it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "walk in with me, they behave when there is a witness",
+     "npc": "hub-wolli-creek-aleks"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 177,
+    "unlock": [
+     "hub:h-strata-wolli-creek-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-wolli-creek-4",
+   "act": 3,
+   "title": "Bin Night at Wolli Creek",
+   "blurb": "It has been three weeks. Three units at Wolli Creek have put their bins out on the wrong night since the week of the show and I have taken it personally, which I accept is a choice I made. I am aware how that sounds. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-wolli-creek-ishaan",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "the ones who argue about it"
+    },
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "the fine the council gave me, off them"
+    }
+   ],
+   "reward": {
+    "cash": 77,
+    "xp": 164,
+    "unlock": [
+     "hub:h-strata-wolli-creek-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-wolli-creek-5",
+   "act": 3,
+   "title": "The Other Block, Wolli Creek",
+   "blurb": "Nobody else has offered, so. There is a block at Arncliffe with the same builder and the same cracks, and their manager has already been through what Wolli Creek is starting. My wife says I should let it go. My wife is wrong. If anyone asks, you were never here.",
+   "giver": "hub-wolli-creek-ishaan",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5669,
+     "z": 7599,
+     "radius": 60,
+     "label": "go and ask them how it ended"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I need to know how much worse this gets",
+     "npc": "hub-wolli-creek-ishaan"
+    }
+   ],
+   "reward": {
+    "cash": 65,
+    "xp": 186,
+    "unlock": [
+     "hub:h-strata-wolli-creek-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

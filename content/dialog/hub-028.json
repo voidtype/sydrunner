@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-hawthorne-azim",
+   "name": "Azim, baker at Hawthorne",
+   "x": -5679,
+   "z": 1465,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Long day. Say what you came to say.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I have been putting it off since Easter. I start at half six and for a month the Hawthorne back lane has had somebody in it who is not waiting for bread. The paperwork says one thing and my eyes say another. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-hawthorne-0",
+       "denyFlag": "hub:h-bakery-hawthorne-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Before you say anything: yes, I know. A light on that lane costs Hawthorne $49 and the landlord has said no twice, so we are doing it ourselves. It has been going on longer than I have admitted to anyone. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-hawthorne-1",
+       "denyFlag": "hub:h-bakery-hawthorne-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "half six at Hawthorne — that's done.",
+       "turnin": "h-bakery-hawthorne-0"
+      },
+      {
+       "text": "The Lane Light, Hawthorne — that's done.",
+       "turnin": "h-bakery-hawthorne-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-hawthorne-fola",
+   "name": "Fola, night delivery at Hawthorne",
+   "x": -5741,
+   "z": 1098,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I know that look. Everyone wants something today.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is not a police matter and I have checked. The flour for Hawthorne comes off a truck at half six and last a public holiday nobody remembered the truck came and the flour did not. I have got no proof, which is exactly why I am asking. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-hawthorne-2",
+       "denyFlag": "hub:h-bakery-hawthorne-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Honestly, I am past caring how it looks. The Hawthorne loading zone has had a car in it at half six every morning this week and the driver waits in it, which makes it worse. It might be nothing. It has not felt like nothing. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-hawthorne-3",
+       "denyFlag": "hub:h-bakery-hawthorne-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Flour Run, Hawthorne — that's done.",
+       "turnin": "h-bakery-hawthorne-2"
+      },
+      {
+       "text": "The Loading Zone, Hawthorne — that's done.",
+       "turnin": "h-bakery-hawthorne-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-hawthorne-kwame",
+   "name": "Kwame, front of house at Hawthorne",
+   "x": -5627,
+   "z": 1151,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Give me a second. Right. Go.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I would do it myself if I could leave the counter. Somebody two doors down from Hawthorne put up a sign on a public holiday nobody remembered that says the same six words as ours, in the same order. I would not ask if there was anyone else about. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-hawthorne-4",
+       "denyFlag": "hub:h-bakery-hawthorne-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You will think I am making this up. This business was at Taverners Hill before it was at Hawthorne, and there is a woman there who still has the original book. You can tell me I am imagining it. Tell me after. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-hawthorne-5",
+       "denyFlag": "hub:h-bakery-hawthorne-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "The Sourdough Sign, Hawthorne — that's done.",
+       "turnin": "h-bakery-hawthorne-4"
+      },
+      {
+       "text": "The Old Site, Hawthorne — that's done.",
+       "turnin": "h-bakery-hawthorne-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-international-airport-charlie",
+   "name": "Charlie, lifeguard at International Airport",
+   "x": -4005.3,
+   "z": 7493.5,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are not from around the corner, are you.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I have been putting it off since Easter. Council has been saying the International Airport pool is at end of life since Thursdays and the crack they keep pointing at is not in the shell. The paperwork says one thing and my eyes say another. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-international-airport-0",
+       "denyFlag": "hub:h-pool-international-airport-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Before you say anything: yes, I know. We are running a stall for International Airport on Thursdays and a stall needs $36 of gear that nobody has volunteered to pay for. It has been going on longer than I have admitted to anyone. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-international-airport-1",
+       "denyFlag": "hub:h-pool-international-airport-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "The International Airport Pool — that's done.",
+       "turnin": "h-pool-international-airport-0"
+      },
+      {
+       "text": "The Petition Stall, International Airport — that's done.",
+       "turnin": "h-pool-international-airport-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-international-airport-raul",
+   "name": "Raul, swim coach at International Airport",
+   "x": -3800,
+   "z": 7498,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Half of this suburb has walked past already. Not one stopped.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is not a police matter and I have checked. I coach 94 kids at International Airport at just gone midnight and three of them have stopped coming without anybody ringing me. I have got no proof, which is exactly why I am asking. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-international-airport-2",
+       "denyFlag": "hub:h-pool-international-airport-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Honestly, I am past caring how it looks. A group has been coming over the International Airport fence after close and swimming in the dark, which is how International Airport loses its pool. It might be nothing. It has not felt like nothing. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-international-airport-3",
+       "denyFlag": "hub:h-pool-international-airport-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "Squad, International Airport — that's done.",
+       "turnin": "h-pool-international-airport-2"
+      },
+      {
+       "text": "The Deep End, International Airport — that's done.",
+       "turnin": "h-pool-international-airport-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-international-airport-mia",
+   "name": "Mia, kiosk operator at International Airport",
+   "x": -3814.3,
+   "z": 7382.4,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Whatever it is, I have had worse this week.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I would do it myself if I could leave the counter. The kiosk at International Airport has a milk crate in it and a freezer that has been running warm since Thursdays. I would not ask if there was anyone else about. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-international-airport-4",
+       "denyFlag": "hub:h-pool-international-airport-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You will think I am making this up. They want everyone from International Airport to drive to the new centre at Wolli Creek, so somebody should go and see whether it is any good. You can tell me I am imagining it. Tell me after. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-international-airport-5",
+       "denyFlag": "hub:h-pool-international-airport-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "The Kiosk Freezer, International Airport — that's done.",
+       "turnin": "h-pool-international-airport-4"
+      },
+      {
+       "text": "The Aquatic Centre, International Airport — that's done.",
+       "turnin": "h-pool-international-airport-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-barangaroo-robbo",
+   "name": "Robbo, taxi driver at Barangaroo",
+   "x": -570,
+   "z": -1025,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sit down if you like. Nobody else is using it.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I have been putting it off since Easter. The rank outside Barangaroo used to hold nine cars and since the week of the show it holds four, and nobody will say who moved the line. The paperwork says one thing and my eyes say another. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-barangaroo-0",
+       "denyFlag": "hub:h-rank-barangaroo-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Before you say anything: yes, I know. Since the rank at Barangaroo shrank I am $43 a week down, and the association wants that number from somebody who can prove it. It has been going on longer than I have admitted to anyone. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-barangaroo-1",
+       "denyFlag": "hub:h-rank-barangaroo-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "The Barangaroo Rank — that's done.",
+       "turnin": "h-rank-barangaroo-0"
+      },
+      {
+       "text": "Lost Fares, Barangaroo — that's done.",
+       "turnin": "h-rank-barangaroo-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-barangaroo-marika",
+   "name": "Marika, rank marshal at Barangaroo",
+   "x": -563,
+   "z": -843,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You will have to speak up, the trains are in.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is not a police matter and I have checked. Cars that have never sat in the Barangaroo queue turn up at just gone midnight and take the front of it, and the drivers who waited say nothing. I have got no proof, which is exactly why I am asking. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-barangaroo-2",
+       "denyFlag": "hub:h-rank-barangaroo-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Honestly, I am past caring how it looks. When the last train into Barangaroo is late, 23 people come out at once and I have to have cars there before they do. It might be nothing. It has not felt like nothing. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-barangaroo-3",
+       "denyFlag": "hub:h-rank-barangaroo-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "Queue Jumpers, Barangaroo — that's done.",
+       "turnin": "h-rank-barangaroo-2"
+      },
+      {
+       "text": "The Late Train, Barangaroo — that's done.",
+       "turnin": "h-rank-barangaroo-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-barangaroo-alana",
+   "name": "Alana, hotel doorman at Barangaroo",
+   "x": -597.2,
+   "z": -1142.9,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I have got about four minutes before I am needed.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I would do it myself if I could leave the counter. I have stood on this door near Barangaroo for 23 years and since the week of the show somebody has been sending my guests to a different rank. I would not ask if there was anyone else about. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-barangaroo-4",
+       "denyFlag": "hub:h-rank-barangaroo-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You will think I am making this up. The plates working the Barangaroo rank are dispatched from a depot at Martin Place, and the man who runs it has never met a driver he liked. You can tell me I am imagining it. Tell me after. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-barangaroo-5",
+       "denyFlag": "hub:h-rank-barangaroo-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "The Door, Barangaroo — that's done.",
+       "turnin": "h-rank-barangaroo-4"
+      },
+      {
+       "text": "The Depot, Barangaroo — that's done.",
+       "turnin": "h-rank-barangaroo-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-bella-vista-nguyet",
+   "name": "Nguyet, newsagent at Bella Vista",
+   "x": -24703.4,
+   "z": -14803.4,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Been here since before it was like this. Go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is not a police matter and I have checked. I am sending back 74 papers a day from Bella Vista and paying to have them collected, which is a business model somebody invented on purpose. I am not after trouble. I am after an answer. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-bella-vista-0",
+       "denyFlag": "hub:h-newsagent-bella-vista-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Honestly, I am past caring how it looks. They will drop my Bella Vista order if I can show $114 of turnover on the other side of the shop by a public holiday nobody remembered. Nobody else seems to have noticed, which is its own problem. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-bella-vista-1",
+       "denyFlag": "hub:h-newsagent-bella-vista-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "Returns at Bella Vista — that's done.",
+       "turnin": "h-newsagent-bella-vista-0"
+      },
+      {
+       "text": "The Better Rate, Bella Vista — that's done.",
+       "turnin": "h-newsagent-bella-vista-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-bella-vista-hemi",
+   "name": "Hemi, paper runner at Bella Vista",
+   "x": -24981,
+   "z": -14779,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Do not mind the mess. It is structural now.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I would do it myself if I could leave the counter. I do the Bella Vista round from the second express and for the last fortnight somebody has been taking the papers off the front steps behind me. Everyone I have told has looked at me the way you are now. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-bella-vista-2",
+       "denyFlag": "hub:h-newsagent-bella-vista-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You will think I am making this up. There is a dog on the Bella Vista round that has had two of my bags and a laminated notice that was not even mine. This is the third time I have had this conversation. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-bella-vista-3",
+       "denyFlag": "hub:h-newsagent-bella-vista-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "The Bella Vista Round — that's done.",
+       "turnin": "h-newsagent-bella-vista-2"
+      },
+      {
+       "text": "The Dog on Ash Street, Bella Vista — that's done.",
+       "turnin": "h-newsagent-bella-vista-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-bella-vista-senna",
+   "name": "Senna, lotto regular at Bella Vista",
+   "x": -24769,
+   "z": -14942,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are selling something the answer is no.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "There is no clever way to say this. Nine of us at Bella Vista have gone in on the same numbers since a public holiday nobody remembered and one of us has stopped putting money in. It started small, the way these things do. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-bella-vista-4",
+       "denyFlag": "hub:h-newsagent-bella-vista-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You look like you have twenty minutes. The agency at Norwest closed six months before Bella Vista started struggling, and I would very much like to know what they know. It is the not knowing that has got me, honestly. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-newsagent-bella-vista-5",
+       "denyFlag": "hub:h-newsagent-bella-vista-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "The Syndicate, Bella Vista — that's done.",
+       "turnin": "h-newsagent-bella-vista-4"
+      },
+      {
+       "text": "The Other Agency, Bella Vista — that's done.",
+       "turnin": "h-newsagent-bella-vista-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-glenfield-fionn",
+   "name": "Fionn, panel beater at Glenfield",
+   "x": -29195,
+   "z": 11935,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Cash only and no, I am joking. What do you want.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is not a police matter and I have checked. There has been a car in the Glenfield yard since every second Friday with a esky of warm cans on the passenger seat and no owner answering. I am not after trouble. I am after an answer. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-glenfield-0",
+       "denyFlag": "hub:h-workshop-glenfield-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Honestly, I am past caring how it looks. Now that it is documented, Glenfield is owed $169 in storage and the only person who can pay it is the person not answering. Nobody else seems to have noticed, which is its own problem. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-glenfield-1",
+       "denyFlag": "hub:h-workshop-glenfield-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "The Unclaimed Falcon, Glenfield — that's done.",
+       "turnin": "h-workshop-glenfield-0"
+      },
+      {
+       "text": "Storage Fees, Glenfield — that's done.",
+       "turnin": "h-workshop-glenfield-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-glenfield-yannick",
+   "name": "Yannick, apprentice at Glenfield",
+   "x": -29103,
+   "z": 11989,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You have got a face like you can keep your mouth shut.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I would do it myself if I could leave the counter. I am in my first year at Glenfield and I have to log 61 hours on a job I am not allowed to touch on my own. Everyone I have told has looked at me the way you are now. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-glenfield-2",
+       "denyFlag": "hub:h-workshop-glenfield-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You will think I am making this up. Somebody has been coming into the Glenfield yard after quarter to six to use the air line, and last week they used the compressor as well. This is the third time I have had this conversation. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-glenfield-3",
+       "denyFlag": "hub:h-workshop-glenfield-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "First Year, Glenfield — that's done.",
+       "turnin": "h-workshop-glenfield-2"
+      },
+      {
+       "text": "The Air Line, Glenfield — that's done.",
+       "turnin": "h-workshop-glenfield-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-glenfield-alfie",
+   "name": "Alfie, the bloke whose car it is at Glenfield",
+   "x": -29187,
+   "z": 12143,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Right. Talk while I do this.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "There is no clever way to say this. My car has been at Glenfield since every second Friday and every time I ring, the quote has grown by about $61. It started small, the way these things do. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-glenfield-4",
+       "denyFlag": "hub:h-workshop-glenfield-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You look like you have twenty minutes. The insurance assessor who signs off every job at Glenfield works out of Macquarie Fields, and he has never once seen the car he is assessing. It is the not knowing that has got me, honestly. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-workshop-glenfield-5",
+       "denyFlag": "hub:h-workshop-glenfield-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "My Own Car, Glenfield — that's done.",
+       "turnin": "h-workshop-glenfield-4"
+      },
+      {
+       "text": "The Assessor, Glenfield — that's done.",
+       "turnin": "h-workshop-glenfield-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-mortdale-aoife",
+   "name": "Aoife, shop manager at Mortdale",
+   "x": -11723,
+   "z": 11503,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You right there? I am mid-something but go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is not a police matter and I have checked. People leave things at the Mortdale roller door after quarter to six and by morning it is rained on and it is our problem and our tip fee. I am not after trouble. I am after an answer. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-mortdale-0",
+       "denyFlag": "hub:h-opshop-mortdale-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Honestly, I am past caring how it looks. The photos worked, which means Mortdale can claim back the $37 we have paid to throw away other people's furniture since the Sunday after payday. Nobody else seems to have noticed, which is its own problem. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-mortdale-1",
+       "denyFlag": "hub:h-opshop-mortdale-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "Dumped Out the Back, Mortdale — that's done.",
+       "turnin": "h-opshop-mortdale-0"
+      },
+      {
+       "text": "The Tip Fee, Mortdale — that's done.",
+       "turnin": "h-opshop-mortdale-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-mortdale-ebony",
+   "name": "Ebony, sorter at Mortdale",
+   "x": -11720.2,
+   "z": 11633.5,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are here about the sign, the sign is wrong.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I would do it myself if I could leave the counter. Something came into Mortdale on the Sunday after payday in a box of paperbacks that I do not think the family meant to give away. Everyone I have told has looked at me the way you are now. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-mortdale-2",
+       "denyFlag": "hub:h-opshop-mortdale-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You will think I am making this up. Two people have been coming into the Mortdale sorting room since the Sunday after payday and taking the good stock before it reaches the floor, and one of them volunteers here. This is the third time I have had this conversation. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-mortdale-3",
+       "denyFlag": "hub:h-opshop-mortdale-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Good Box, Mortdale — that's done.",
+       "turnin": "h-opshop-mortdale-2"
+      },
+      {
+       "text": "Sorting Room, Mortdale — that's done.",
+       "turnin": "h-opshop-mortdale-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-mortdale-walid",
+   "name": "Walid, volunteer driver at Mortdale",
+   "x": -11735.1,
+   "z": 11373.3,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand in the doorway, mate, come round.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "There is no clever way to say this. I do the Mortdale pick-ups in a van with 78 thousand on it and a door that only opens if you know about it. It started small, the way these things do. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-mortdale-4",
+       "denyFlag": "hub:h-opshop-mortdale-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You look like you have twenty minutes. Everything Mortdale cannot sell goes to a warehouse at Oatley, and nobody there has ever answered a phone in my hearing. It is the not knowing that has got me, honestly. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-opshop-mortdale-5",
+       "denyFlag": "hub:h-opshop-mortdale-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "The Van, Mortdale — that's done.",
+       "turnin": "h-opshop-mortdale-4"
+      },
+      {
+       "text": "Head Office, Mortdale — that's done.",
+       "turnin": "h-opshop-mortdale-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

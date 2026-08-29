@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-bowlo-moore-park-0",
+   "act": 3,
+   "title": "The Dead Patch at Moore Park",
+   "blurb": "Someone has to, and it may as well be you. The number three green at Moore Park has had a bald patch the shape of Tasmania since the Sunday after payday, and the committee thinks I am inventing it. I have got no proof, which is exactly why I am asking. Say nothing to anyone on the way.",
+   "giver": "hub-moore-park-marlon",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 1164,
+     "z": 2755,
+     "radius": 35,
+     "label": "the patch, with something in frame for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring it to me before the meeting",
+     "npc": "hub-moore-park-marlon"
+    }
+   ],
+   "reward": {
+    "cash": 81,
+    "xp": 230,
+    "unlock": [
+     "hub:h-bowlo-moore-park-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-moore-park-1",
+   "act": 3,
+   "title": "Turf Money, Moore Park",
+   "blurb": "You are the first person to stop all morning. They have seen the photograph and now they want it re-laid by the Sunday after payday, which means finding $53 that the Moore Park club does not have. It might be nothing. It has not felt like nothing. Do not make a scene about it.",
+   "giver": "hub-moore-park-marlon",
+   "level": 3,
+   "requires": [
+    "h-bowlo-moore-park-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 53,
+     "label": "$53, however you like, I am not asking"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "put it in my hand, not the safe",
+     "npc": "hub-moore-park-marlon"
+    }
+   ],
+   "reward": {
+    "cash": 125,
+    "xp": 312,
+    "unlock": [
+     "hub:h-bowlo-moore-park-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-moore-park-2",
+   "act": 3,
+   "title": "The Moore Park Membership Count",
+   "blurb": "Not being dramatic about this. Our books say 84 members at Moore Park and I would bet the bar takings that half of them are dead or moved to Queensland. I would not ask if there was anyone else about. Ask for me by name at the counter.",
+   "giver": "hub-moore-park-yasmin",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 1010,
+     "z": 2841,
+     "radius": 25,
+     "label": "stand at the side door where the list is kept"
+    },
+    {
+     "kind": "photo",
+     "x": 981,
+     "z": 2832,
+     "radius": 35,
+     "label": "the board with the names still on it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "read me the ones you did not recognise",
+     "npc": "hub-moore-park-yasmin"
+    }
+   ],
+   "reward": {
+    "cash": 97,
+    "xp": 227,
+    "unlock": [
+     "hub:h-bowlo-moore-park-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-moore-park-3",
+   "act": 3,
+   "title": "Closing Time Rumour, Moore Park",
+   "blurb": "I am told you do odd jobs. Since two in the afternoon somebody has been going round the Moore Park greens telling the barefoot bowlers we are shutting, and we are not shutting. You can tell me I am imagining it. Tell me after. Come back and tell me straight.",
+   "giver": "hub-moore-park-yasmin",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "whoever is doing the telling"
+    },
+    {
+     "kind": "earn",
+     "dollars": 124,
+     "label": "and take the bar money off them while you are there"
+    }
+   ],
+   "reward": {
+    "cash": 81,
+    "xp": 228,
+    "unlock": [
+     "hub:h-bowlo-moore-park-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-moore-park-4",
+   "act": 3,
+   "title": "Behind the Bar at Moore Park",
+   "blurb": "I'll be straight with you. There is a milk crate in the chest freezer behind the bar at Moore Park and I am not opening it on an empty stomach. I would have sorted it myself a year ago. Do that and we're square.",
+   "giver": "hub-moore-park-raul",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "get one into you first, seriously"
+    },
+    {
+     "kind": "goto",
+     "x": 1052,
+     "z": 2668,
+     "radius": 25,
+     "label": "round the back where the cellar door is"
+    },
+    {
+     "kind": "photo",
+     "x": 1059,
+     "z": 2653,
+     "radius": 35,
+     "label": "whatever is in there, before I lose my nerve"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 209,
+    "unlock": [
+     "hub:h-bowlo-moore-park-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-moore-park-5",
+   "act": 3,
+   "title": "The Old Greenkeeper, Moore Park",
+   "blurb": "It has been three weeks. The man who kept these greens before me drinks at Surry Hills now, and he owes Moore Park an explanation about the drainage. It is not the money. It has stopped being the money. I will owe you one, and I pay those.",
+   "giver": "hub-moore-park-raul",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 258,
+     "z": 1960,
+     "radius": 60,
+     "label": "find him and hear him out"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come back and tell me what he said",
+     "npc": "hub-moore-park-raul"
+    }
+   ],
+   "reward": {
+    "cash": 84,
+    "xp": 214,
+    "unlock": [
+     "hub:h-bowlo-moore-park-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-stanmore-0",
+   "act": 3,
+   "title": "Nights at Stanmore",
+   "blurb": "Someone has to, and it may as well be you. Every night around knock-off the same car does three laps of the Stanmore forecourt and never buys fuel. I have got no proof, which is exactly why I am asking. Say nothing to anyone on the way.",
+   "giver": "hub-stanmore-tao",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -4292,
+     "z": 2904,
+     "radius": 35,
+     "label": "the car, plate if you can get it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it on record before I ring anyone",
+     "npc": "hub-stanmore-tao"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 216,
+    "unlock": [
+     "hub:h-servo-stanmore-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-stanmore-1",
+   "act": 3,
+   "title": "The Third Lap, Stanmore",
+   "blurb": "You are the first person to stop all morning. Now I know the plate, I want to know where it goes after it leaves Stanmore at knock-off, because it is not going home. It might be nothing. It has not felt like nothing. Do not make a scene about it.",
+   "giver": "hub-stanmore-tao",
+   "level": 3,
+   "requires": [
+    "h-servo-stanmore-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Stanmore",
+     "to": "Petersham",
+     "label": "follow it as far as Petersham"
+    },
+    {
+     "kind": "photo",
+     "x": -4297,
+     "z": 2907,
+     "radius": 35,
+     "label": "wherever it stops"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 301,
+    "unlock": [
+     "hub:h-servo-stanmore-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-stanmore-2",
+   "act": 3,
+   "title": "Bay Two, Stanmore",
+   "blurb": "Not being dramatic about this. Bay two at the Stanmore workshop has had the same car in it since grand final week and the owner has stopped answering. I would not ask if there was anyone else about. Ask for me by name at the counter.",
+   "giver": "hub-stanmore-sigrid",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -4302,
+     "z": 2809,
+     "radius": 25,
+     "label": "the address on the job card"
+    },
+    {
+     "kind": "photo",
+     "x": -4303,
+     "z": 2796,
+     "radius": 35,
+     "label": "the letterbox, so I know I have the right house"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if anybody actually lives there",
+     "npc": "hub-stanmore-sigrid"
+    }
+   ],
+   "reward": {
+    "cash": 92,
+    "xp": 214,
+    "unlock": [
+     "hub:h-servo-stanmore-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-stanmore-3",
+   "act": 3,
+   "title": "Tools Off the Bench, Stanmore",
+   "blurb": "I am told you do odd jobs. Someone has been walking out of Stanmore with a socket set at a time since grand final week, and I have run out of ways to be polite about it. You can tell me I am imagining it. Tell me after. Come back and tell me straight.",
+   "giver": "hub-stanmore-sigrid",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 3,
+     "label": "the ones hanging round the air hose"
+    },
+    {
+     "kind": "earn",
+     "dollars": 65,
+     "label": "$65 of it back, that is what the set cost"
+    }
+   ],
+   "reward": {
+    "cash": 94,
+    "xp": 210,
+    "unlock": [
+     "hub:h-servo-stanmore-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-stanmore-4",
+   "act": 3,
+   "title": "The Stanmore Price Board",
+   "blurb": "I'll be straight with you. Head office says the Stanmore board has been wrong since grand final week and I say it has been right for eleven years, and one of us is about to be embarrassed. I would have sorted it myself a year ago. Do that and we're square.",
+   "giver": "hub-stanmore-behrouz",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "buy something so it is a real transaction"
+    },
+    {
+     "kind": "photo",
+     "x": -4171,
+     "z": 2803,
+     "radius": 35,
+     "label": "the board and the pump, both in the one shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that settles it either way",
+     "npc": "hub-stanmore-behrouz"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 222,
+    "unlock": [
+     "hub:h-servo-stanmore-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-stanmore-5",
+   "act": 3,
+   "title": "The Other Franchise, Stanmore",
+   "blurb": "It has been three weeks. The bloke who runs the site at Lewisham has had the same trouble Stanmore has, and he will talk to you before he talks to me. It is not the money. It has stopped being the money. I will owe you one, and I pay those.",
+   "giver": "hub-stanmore-behrouz",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5491,
+     "z": 2800,
+     "radius": 60,
+     "label": "find him on shift"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever he says, I want it word for word",
+     "npc": "hub-stanmore-behrouz"
+    }
+   ],
+   "reward": {
+    "cash": 91,
+    "xp": 231,
+    "unlock": [
+     "hub:h-servo-stanmore-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-sutherland-0",
+   "act": 3,
+   "title": "Level Two, Sutherland",
+   "blurb": "Someone has to, and it may as well be you. Water has been coming through the level two ceiling of the Sutherland block since grand final week and the strata report says there is no water. I have got no proof, which is exactly why I am asking. Say nothing to anyone on the way.",
+   "giver": "hub-sutherland-peg",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -13754,
+     "z": 18312,
+     "radius": 35,
+     "label": "the ceiling, with the stain visible"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that goes in the file whether they like it or not",
+     "npc": "hub-sutherland-peg"
+    }
+   ],
+   "reward": {
+    "cash": 100,
+    "xp": 270,
+    "unlock": [
+     "hub:h-strata-sutherland-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-sutherland-1",
+   "act": 3,
+   "title": "The Special Levy, Sutherland",
+   "blurb": "You are the first person to stop all morning. The photo did it. It might be nothing. It has not felt like nothing. Now every owner at Sutherland owes $61 and I have to collect it from people who have avoided me for a year. Do not make a scene about it.",
+   "giver": "hub-sutherland-peg",
+   "level": 4,
+   "requires": [
+    "h-strata-sutherland-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 61,
+     "label": "$61 out of them, in any state"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will not ask how",
+     "npc": "hub-sutherland-peg"
+    }
+   ],
+   "reward": {
+    "cash": 145,
+    "xp": 355,
+    "unlock": [
+     "hub:h-strata-sutherland-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-sutherland-2",
+   "act": 3,
+   "title": "Car Space 14, Sutherland",
+   "blurb": "Not being dramatic about this. Somebody who does not live at Sutherland has parked in space fourteen every night since grand final week and the manager will not look at it. I would not ask if there was anyone else about. Ask for me by name at the counter.",
+   "giver": "hub-sutherland-efrain",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -13837,
+     "z": 18265,
+     "radius": 25,
+     "label": "down to the basement, the far corner"
+    },
+    {
+     "kind": "photo",
+     "x": -13844,
+     "z": 18258,
+     "radius": 35,
+     "label": "the car in the space with the number painted beside it"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 264,
+    "unlock": [
+     "hub:h-strata-sutherland-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-sutherland-3",
+   "act": 3,
+   "title": "The Meeting, Sutherland",
+   "blurb": "I am told you do odd jobs. The Sutherland AGM is on grand final week and I would like to arrive with something stronger than a grievance and a printout. You can tell me I am imagining it. Tell me after. Come back and tell me straight.",
+   "giver": "hub-sutherland-efrain",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "two coffees, one is for me"
+    },
+    {
+     "kind": "goto",
+     "x": -13769,
+     "z": 18086,
+     "radius": 25,
+     "label": "the community room where they hold it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "walk in with me, they behave when there is a witness",
+     "npc": "hub-sutherland-efrain"
+    }
+   ],
+   "reward": {
+    "cash": 104,
+    "xp": 261,
+    "unlock": [
+     "hub:h-strata-sutherland-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-sutherland-4",
+   "act": 3,
+   "title": "Bin Night at Sutherland",
+   "blurb": "I'll be straight with you. Three units at Sutherland have put their bins out on the wrong night since grand final week and I have taken it personally, which I accept is a choice I made. I would have sorted it myself a year ago. Do that and we're square.",
+   "giver": "hub-sutherland-aisha",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "the ones who argue about it"
+    },
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "the fine the council gave me, off them"
+    }
+   ],
+   "reward": {
+    "cash": 95,
+    "xp": 255,
+    "unlock": [
+     "hub:h-strata-sutherland-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-sutherland-5",
+   "act": 3,
+   "title": "The Other Block, Sutherland",
+   "blurb": "It has been three weeks. There is a block at Kirrawee with the same builder and the same cracks, and their manager has already been through what Sutherland is starting. It is not the money. It has stopped being the money. I will owe you one, and I pay those.",
+   "giver": "hub-sutherland-aisha",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -12370,
+     "z": 18525,
+     "radius": 60,
+     "label": "go and ask them how it ended"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I need to know how much worse this gets",
+     "npc": "hub-sutherland-aisha"
+    }
+   ],
+   "reward": {
+    "cash": 97,
+    "xp": 256,
+    "unlock": [
+     "hub:h-strata-sutherland-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-bowlo-st-james-0",
+   "act": 3,
+   "title": "The Dead Patch at St James",
+   "blurb": "You look like you have twenty minutes. The number three green at St James has had a bald patch the shape of Tasmania since a wet Monday, and the committee thinks I am inventing it. This is the third time I have had this conversation. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-st-james-dev",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 381,
+     "z": 130,
+     "radius": 35,
+     "label": "the patch, with something in frame for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring it to me before the meeting",
+     "npc": "hub-st-james-dev"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 133,
+    "unlock": [
+     "hub:h-bowlo-st-james-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bowlo-st-james-1",
+   "act": 3,
+   "title": "Turf Money, St James",
+   "blurb": "Keep it between us for now. They have seen the photograph and now they want it re-laid by a wet Monday, which means finding $43 that the St James club does not have. It started small, the way these things do. If anyone asks, you were never here.",
+   "giver": "hub-st-james-dev",
+   "level": 1,
+   "requires": [
+    "h-bowlo-st-james-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 43,
+     "label": "$43, however you like, I am not asking"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "put it in my hand, not the safe",
+     "npc": "hub-st-james-dev"
+    }
+   ],
+   "reward": {
+    "cash": 94,
+    "xp": 228,
+    "unlock": [
+     "hub:h-bowlo-st-james-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bowlo-st-james-2",
+   "act": 3,
+   "title": "The St James Membership Count",
+   "blurb": "Right. Since you asked. Our books say 60 members at St James and I would bet the bar takings that half of them are dead or moved to Queensland. It is the not knowing that has got me, honestly. There is no rush, but there is a Friday.",
+   "giver": "hub-st-james-bridie",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 159,
+     "z": 144,
+     "radius": 25,
+     "label": "stand at the side door where the list is kept"
+    },
+    {
+     "kind": "photo",
+     "x": 198,
+     "z": 207,
+     "radius": 35,
+     "label": "the board with the names still on it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "read me the ones you did not recognise",
+     "npc": "hub-st-james-bridie"
+    }
+   ],
+   "reward": {
+    "cash": 64,
+    "xp": 122,
+    "unlock": [
+     "hub:h-bowlo-st-james-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bowlo-st-james-3",
+   "act": 3,
+   "title": "Closing Time Rumour, St James",
+   "blurb": "My knees are gone, so. Since the back of seven somebody has been going round the St James greens telling the barefoot bowlers we are shutting, and we are not shutting. There is probably a simple explanation and I would love to hear it. I'll see you right for it.",
+   "giver": "hub-st-james-bridie",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "whoever is doing the telling"
+    },
+    {
+     "kind": "earn",
+     "dollars": 100,
+     "label": "and take the bar money off them while you are there"
+    }
+   ],
+   "reward": {
+    "cash": 59,
+    "xp": 140,
+    "unlock": [
+     "hub:h-bowlo-st-james-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bowlo-st-james-4",
+   "act": 3,
+   "title": "Behind the Bar at St James",
+   "blurb": "This is going to sound small. There is a chest freezer that hums in D in the chest freezer behind the bar at St James and I am not opening it on an empty stomach. You will see what I mean the second you get there. I'll put the kettle on for when you're back.",
+   "giver": "hub-st-james-duc",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "get one into you first, seriously"
+    },
+    {
+     "kind": "goto",
+     "x": 310,
+     "z": 29,
+     "radius": 25,
+     "label": "round the back where the cellar door is"
+    },
+    {
+     "kind": "photo",
+     "x": 327,
+     "z": 24,
+     "radius": 35,
+     "label": "whatever is in there, before I lose my nerve"
+    }
+   ],
+   "reward": {
+    "cash": 50,
+    "xp": 117,
+    "unlock": [
+     "hub:h-bowlo-st-james-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bowlo-st-james-5",
+   "act": 3,
+   "title": "The Old Greenkeeper, St James",
+   "blurb": "I have written it down twice and lost it twice. The man who kept these greens before me drinks at Circular Quay now, and he owes St James an explanation about the drainage. There is a version of this where I am the unreasonable one. Just do not come back empty-handed.",
+   "giver": "hub-st-james-duc",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 197,
+     "z": -990,
+     "radius": 60,
+     "label": "find him and hear him out"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come back and tell me what he said",
+     "npc": "hub-st-james-duc"
+    }
+   ],
+   "reward": {
+    "cash": 63,
+    "xp": 137,
+    "unlock": [
+     "hub:h-bowlo-st-james-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-servo-tascott-0",
+   "act": 3,
+   "title": "Nights at Tascott",
+   "blurb": "You look like you have twenty minutes. Every night around twenty past four the same car does three laps of the Tascott forecourt and never buys fuel. This is the third time I have had this conversation. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-tascott-tinashe",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 9440,
+     "z": -46404,
+     "radius": 35,
+     "label": "the car, plate if you can get it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it on record before I ring anyone",
+     "npc": "hub-tascott-tinashe"
+    }
+   ],
+   "reward": {
+    "cash": 56,
+    "xp": 130,
+    "unlock": [
+     "hub:h-servo-tascott-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-servo-tascott-1",
+   "act": 3,
+   "title": "The Third Lap, Tascott",
+   "blurb": "Keep it between us for now. Now I know the plate, I want to know where it goes after it leaves Tascott at twenty past four, because it is not going home. It started small, the way these things do. If anyone asks, you were never here.",
+   "giver": "hub-tascott-tinashe",
+   "level": 1,
+   "requires": [
+    "h-servo-tascott-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Tascott",
+     "to": "Point Clare",
+     "label": "follow it as far as Point Clare"
+    },
+    {
+     "kind": "photo",
+     "x": 9265,
+     "z": -46529,
+     "radius": 35,
+     "label": "wherever it stops"
+    }
+   ],
+   "reward": {
+    "cash": 103,
+    "xp": 215,
+    "unlock": [
+     "hub:h-servo-tascott-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-servo-tascott-2",
+   "act": 3,
+   "title": "Bay Two, Tascott",
+   "blurb": "Right. Since you asked. Bay two at the Tascott workshop has had the same car in it since Thursdays and the owner has stopped answering. It is the not knowing that has got me, honestly. There is no rush, but there is a Friday.",
+   "giver": "hub-tascott-ola",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 9284,
+     "z": -46538,
+     "radius": 25,
+     "label": "the address on the job card"
+    },
+    {
+     "kind": "photo",
+     "x": 9283,
+     "z": -46551,
+     "radius": 35,
+     "label": "the letterbox, so I know I have the right house"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if anybody actually lives there",
+     "npc": "hub-tascott-ola"
+    }
+   ],
+   "reward": {
+    "cash": 65,
+    "xp": 128,
+    "unlock": [
+     "hub:h-servo-tascott-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-servo-tascott-3",
+   "act": 3,
+   "title": "Tools Off the Bench, Tascott",
+   "blurb": "My knees are gone, so. Someone has been walking out of Tascott with a socket set at a time since Thursdays, and I have run out of ways to be polite about it. There is probably a simple explanation and I would love to hear it. I'll see you right for it.",
+   "giver": "hub-tascott-ola",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 3,
+     "label": "the ones hanging round the air hose"
+    },
+    {
+     "kind": "earn",
+     "dollars": 45,
+     "label": "$45 of it back, that is what the set cost"
+    }
+   ],
+   "reward": {
+    "cash": 56,
+    "xp": 119,
+    "unlock": [
+     "hub:h-servo-tascott-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-servo-tascott-4",
+   "act": 3,
+   "title": "The Tascott Price Board",
+   "blurb": "This is going to sound small. Head office says the Tascott board has been wrong since Thursdays and I say it has been right for eleven years, and one of us is about to be embarrassed. You will see what I mean the second you get there. I'll put the kettle on for when you're back.",
+   "giver": "hub-tascott-shahid",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "buy something so it is a real transaction"
+    },
+    {
+     "kind": "photo",
+     "x": 9442,
+     "z": -46529,
+     "radius": 35,
+     "label": "the board and the pump, both in the one shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that settles it either way",
+     "npc": "hub-tascott-shahid"
+    }
+   ],
+   "reward": {
+    "cash": 59,
+    "xp": 119,
+    "unlock": [
+     "hub:h-servo-tascott-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-servo-tascott-5",
+   "act": 3,
+   "title": "The Other Franchise, Tascott",
+   "blurb": "I have written it down twice and lost it twice. The bloke who runs the site at Point Clare has had the same trouble Tascott has, and he will talk to you before he talks to me. There is a version of this where I am the unreasonable one. Just do not come back empty-handed.",
+   "giver": "hub-tascott-shahid",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 10178,
+     "z": -47027,
+     "radius": 60,
+     "label": "find him on shift"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever he says, I want it word for word",
+     "npc": "hub-tascott-shahid"
+    }
+   ],
+   "reward": {
+    "cash": 50,
+    "xp": 136,
+    "unlock": [
+     "hub:h-servo-tascott-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-strata-regents-park-0",
+   "act": 3,
+   "title": "Level Two, Regents Park",
+   "blurb": "You look like you have twenty minutes. Water has been coming through the level two ceiling of the Regents Park block since the week of the show and the strata report says there is no water. This is the third time I have had this conversation. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-regents-park-kirra",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -17112,
+     "z": 1796,
+     "radius": 35,
+     "label": "the ceiling, with the stain visible"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that goes in the file whether they like it or not",
+     "npc": "hub-regents-park-kirra"
+    }
+   ],
+   "reward": {
+    "cash": 56,
+    "xp": 123,
+    "unlock": [
+     "hub:h-strata-regents-park-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-strata-regents-park-1",
+   "act": 3,
+   "title": "The Special Levy, Regents Park",
+   "blurb": "Keep it between us for now. The photo did it. It started small, the way these things do. Now every owner at Regents Park owes $43 and I have to collect it from people who have avoided me for a year. If anyone asks, you were never here.",
+   "giver": "hub-regents-park-kirra",
+   "level": 1,
+   "requires": [
+    "h-strata-regents-park-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 43,
+     "label": "$43 out of them, in any state"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will not ask how",
+     "npc": "hub-regents-park-kirra"
+    }
+   ],
+   "reward": {
+    "cash": 105,
+    "xp": 216,
+    "unlock": [
+     "hub:h-strata-regents-park-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-strata-regents-park-2",
+   "act": 3,
+   "title": "Car Space 14, Regents Park",
+   "blurb": "Right. Since you asked. Somebody who does not live at Regents Park has parked in space fourteen every night since the week of the show and the manager will not look at it. It is the not knowing that has got me, honestly. There is no rush, but there is a Friday.",
+   "giver": "hub-regents-park-tamar",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -17241,
+     "z": 1771,
+     "radius": 25,
+     "label": "down to the basement, the far corner"
+    },
+    {
+     "kind": "photo",
+     "x": -17248,
+     "z": 1764,
+     "radius": 35,
+     "label": "the car in the space with the number painted beside it"
+    }
+   ],
+   "reward": {
+    "cash": 54,
+    "xp": 127,
+    "unlock": [
+     "hub:h-strata-regents-park-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-strata-regents-park-3",
+   "act": 3,
+   "title": "The Meeting, Regents Park",
+   "blurb": "My knees are gone, so. The Regents Park AGM is on the week of the show and I would like to arrive with something stronger than a grievance and a printout. There is probably a simple explanation and I would love to hear it. I'll see you right for it.",
+   "giver": "hub-regents-park-tamar",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "two coffees, one is for me"
+    },
+    {
+     "kind": "goto",
+     "x": -17173,
+     "z": 1592,
+     "radius": 25,
+     "label": "the community room where they hold it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "walk in with me, they behave when there is a witness",
+     "npc": "hub-regents-park-tamar"
+    }
+   ],
+   "reward": {
+    "cash": 58,
+    "xp": 120,
+    "unlock": [
+     "hub:h-strata-regents-park-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-strata-regents-park-4",
+   "act": 3,
+   "title": "Bin Night at Regents Park",
+   "blurb": "This is going to sound small. Three units at Regents Park have put their bins out on the wrong night since the week of the show and I have taken it personally, which I accept is a choice I made. You will see what I mean the second you get there. I'll put the kettle on for when you're back.",
+   "giver": "hub-regents-park-fenella",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "the ones who argue about it"
+    },
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "the fine the council gave me, off them"
+    }
+   ],
+   "reward": {
+    "cash": 50,
+    "xp": 137,
+    "unlock": [
+     "hub:h-strata-regents-park-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-strata-regents-park-5",
+   "act": 3,
+   "title": "The Other Block, Regents Park",
+   "blurb": "I have written it down twice and lost it twice. There is a block at Birrong with the same builder and the same cracks, and their manager has already been through what Regents Park is starting. There is a version of this where I am the unreasonable one. Just do not come back empty-handed.",
+   "giver": "hub-regents-park-fenella",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -17131,
+     "z": 2831,
+     "radius": 60,
+     "label": "go and ask them how it ended"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I need to know how much worse this gets",
+     "npc": "hub-regents-park-fenella"
+    }
+   ],
+   "reward": {
+    "cash": 57,
+    "xp": 133,
+    "unlock": [
+     "hub:h-strata-regents-park-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-exhibition-centre-mamadou",
+   "name": "Mamadou, greenkeeper at Exhibition Centre",
+   "x": -1003,
+   "z": 789,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Ah. Someone with two working legs.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I am told you do odd jobs. The number three green at Exhibition Centre has had a bald patch the shape of Tasmania since school holidays, and the committee thinks I am inventing it. There is probably a simple explanation and I would love to hear it. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-exhibition-centre-0",
+       "denyFlag": "hub:h-bowlo-exhibition-centre-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I'll be straight with you. They have seen the photograph and now they want it re-laid by school holidays, which means finding $44 that the Exhibition Centre club does not have. You will see what I mean the second you get there. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-exhibition-centre-1",
+       "denyFlag": "hub:h-bowlo-exhibition-centre-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "The Dead Patch at Exhibition Centre — that's done.",
+       "turnin": "h-bowlo-exhibition-centre-0"
+      },
+      {
+       "text": "Turf Money, Exhibition Centre — that's done.",
+       "turnin": "h-bowlo-exhibition-centre-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-exhibition-centre-wesley",
+   "name": "Wesley, club president at Exhibition Centre",
+   "x": -1035,
+   "z": 913,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are early. Or late. I have lost track.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It has been three weeks. Our books say 55 members at Exhibition Centre and I would bet the bar takings that half of them are dead or moved to Queensland. There is a version of this where I am the unreasonable one. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-exhibition-centre-2",
+       "denyFlag": "hub:h-bowlo-exhibition-centre-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Nobody else has offered, so. Since five in the morning somebody has been going round the Exhibition Centre greens telling the barefoot bowlers we are shutting, and we are not shutting. The paperwork says one thing and my eyes say another. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-exhibition-centre-3",
+       "denyFlag": "hub:h-bowlo-exhibition-centre-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Exhibition Centre Membership Count — that's done.",
+       "turnin": "h-bowlo-exhibition-centre-2"
+      },
+      {
+       "text": "Closing Time Rumour, Exhibition Centre — that's done.",
+       "turnin": "h-bowlo-exhibition-centre-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-exhibition-centre-zane",
+   "name": "Zane, bar manager at Exhibition Centre",
+   "x": -833,
+   "z": 1015,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Been here since before it was like this. Go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "The council knows and the council does not care. There is a roll of raffle tickets in the chest freezer behind the bar at Exhibition Centre and I am not opening it on an empty stomach. It has been going on longer than I have admitted to anyone. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-exhibition-centre-4",
+       "denyFlag": "hub:h-bowlo-exhibition-centre-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have been putting it off since Easter. The man who kept these greens before me drinks at Glebe now, and he owes Exhibition Centre an explanation about the drainage. I have got no proof, which is exactly why I am asking. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-exhibition-centre-5",
+       "denyFlag": "hub:h-bowlo-exhibition-centre-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Behind the Bar at Exhibition Centre — that's done.",
+       "turnin": "h-bowlo-exhibition-centre-4"
+      },
+      {
+       "text": "The Old Greenkeeper, Exhibition Centre — that's done.",
+       "turnin": "h-bowlo-exhibition-centre-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-kingsford-rishi",
+   "name": "Rishi, night console operator at Kingsford",
+   "x": 1886,
+   "z": 5976,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Do not mind the mess. It is structural now.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I am told you do odd jobs. Every night around quarter to six the same car does three laps of the Kingsford forecourt and never buys fuel. There is probably a simple explanation and I would love to hear it. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-kingsford-0",
+       "denyFlag": "hub:h-servo-kingsford-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I'll be straight with you. Now I know the plate, I want to know where it goes after it leaves Kingsford at quarter to six, because it is not going home. You will see what I mean the second you get there. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-kingsford-1",
+       "denyFlag": "hub:h-servo-kingsford-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "Nights at Kingsford — that's done.",
+       "turnin": "h-servo-kingsford-0"
+      },
+      {
+       "text": "The Third Lap, Kingsford — that's done.",
+       "turnin": "h-servo-kingsford-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-kingsford-etienne",
+   "name": "Etienne, mechanic at Kingsford",
+   "x": 1819,
+   "z": 5923,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are selling something the answer is no.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It has been three weeks. Bay two at the Kingsford workshop has had the same car in it since a Tuesday and the owner has stopped answering. There is a version of this where I am the unreasonable one. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-kingsford-2",
+       "denyFlag": "hub:h-servo-kingsford-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Nobody else has offered, so. Someone has been walking out of Kingsford with a socket set at a time since a Tuesday, and I have run out of ways to be polite about it. The paperwork says one thing and my eyes say another. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-kingsford-3",
+       "denyFlag": "hub:h-servo-kingsford-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Bay Two, Kingsford — that's done.",
+       "turnin": "h-servo-kingsford-2"
+      },
+      {
+       "text": "Tools Off the Bench, Kingsford — that's done.",
+       "turnin": "h-servo-kingsford-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-kingsford-helios",
+   "name": "Helios, franchisee at Kingsford",
+   "x": 1584,
+   "z": 5881,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Cash only and no, I am joking. What do you want.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "The council knows and the council does not care. Head office says the Kingsford board has been wrong since a Tuesday and I say it has been right for eleven years, and one of us is about to be embarrassed. It has been going on longer than I have admitted to anyone. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-kingsford-4",
+       "denyFlag": "hub:h-servo-kingsford-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have been putting it off since Easter. The bloke who runs the site at UNSW High Street has had the same trouble Kingsford has, and he will talk to you before he talks to me. I have got no proof, which is exactly why I am asking. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-kingsford-5",
+       "denyFlag": "hub:h-servo-kingsford-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "The Kingsford Price Board — that's done.",
+       "turnin": "h-servo-kingsford-4"
+      },
+      {
+       "text": "The Other Franchise, Kingsford — that's done.",
+       "turnin": "h-servo-kingsford-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-crows-nest-alina",
+   "name": "Alina, building manager at Crows Nest",
+   "x": -906,
+   "z": -4784,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You have got a face like you can keep your mouth shut.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I am told you do odd jobs. Water has been coming through the level two ceiling of the Crows Nest block since Thursdays and the strata report says there is no water. There is probably a simple explanation and I would love to hear it. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-crows-nest-0",
+       "denyFlag": "hub:h-strata-crows-nest-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I'll be straight with you. The photo did it. You will see what I mean the second you get there. Now every owner at Crows Nest owes $66 and I have to collect it from people who have avoided me for a year. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-crows-nest-1",
+       "denyFlag": "hub:h-strata-crows-nest-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "Level Two, Crows Nest — that's done.",
+       "turnin": "h-strata-crows-nest-0"
+      },
+      {
+       "text": "The Special Levy, Crows Nest — that's done.",
+       "turnin": "h-strata-crows-nest-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-crows-nest-elan",
+   "name": "Elan, owner-occupier at Crows Nest",
+   "x": -1140,
+   "z": -4731,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Right. Talk while I do this.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It has been three weeks. Somebody who does not live at Crows Nest has parked in space fourteen every night since Thursdays and the manager will not look at it. There is a version of this where I am the unreasonable one. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-crows-nest-2",
+       "denyFlag": "hub:h-strata-crows-nest-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Nobody else has offered, so. The Crows Nest AGM is on Thursdays and I would like to arrive with something stronger than a grievance and a printout. The paperwork says one thing and my eyes say another. I'll put the kettle on for when you're back.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-crows-nest-3",
+       "denyFlag": "hub:h-strata-crows-nest-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "Car Space 14, Crows Nest — that's done.",
+       "turnin": "h-strata-crows-nest-2"
+      },
+      {
+       "text": "The Meeting, Crows Nest — that's done.",
+       "turnin": "h-strata-crows-nest-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-crows-nest-sibel",
+   "name": "Sibel, the one who does the bins at Crows Nest",
+   "x": -861,
+   "z": -4732,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You right there? I am mid-something but go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "The council knows and the council does not care. Three units at Crows Nest have put their bins out on the wrong night since Thursdays and I have taken it personally, which I accept is a choice I made. It has been going on longer than I have admitted to anyone. Just do not come back empty-handed.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-crows-nest-4",
+       "denyFlag": "hub:h-strata-crows-nest-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I have been putting it off since Easter. There is a block at Victoria Cross with the same builder and the same cracks, and their manager has already been through what Crows Nest is starting. I have got no proof, which is exactly why I am asking. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-crows-nest-5",
+       "denyFlag": "hub:h-strata-crows-nest-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "Bin Night at Crows Nest — that's done.",
+       "turnin": "h-strata-crows-nest-4"
+      },
+      {
+       "text": "The Other Block, Crows Nest — that's done.",
+       "turnin": "h-strata-crows-nest-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

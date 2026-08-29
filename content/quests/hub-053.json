@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-bowlo-surry-hills-0",
+   "act": 3,
+   "title": "The Dead Patch at Surry Hills",
+   "blurb": "The council knows and the council does not care. The number three green at Surry Hills has had a bald patch the shape of Tasmania since a wet Monday, and the committee thinks I am inventing it. It is the not knowing that has got me, honestly. Ask for me by name at the counter.",
+   "giver": "hub-surry-hills-manon",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 307,
+     "z": 2183,
+     "radius": 35,
+     "label": "the patch, with something in frame for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring it to me before the meeting",
+     "npc": "hub-surry-hills-manon"
+    }
+   ],
+   "reward": {
+    "cash": 158,
+    "xp": 394,
+    "unlock": [
+     "hub:h-bowlo-surry-hills-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-surry-hills-1",
+   "act": 3,
+   "title": "Turf Money, Surry Hills",
+   "blurb": "I have been putting it off since Easter. They have seen the photograph and now they want it re-laid by a wet Monday, which means finding $117 that the Surry Hills club does not have. There is probably a simple explanation and I would love to hear it. Come back and tell me straight.",
+   "giver": "hub-surry-hills-manon",
+   "level": 7,
+   "requires": [
+    "h-bowlo-surry-hills-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 117,
+     "label": "$117, however you like, I am not asking"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "put it in my hand, not the safe",
+     "npc": "hub-surry-hills-manon"
+    }
+   ],
+   "reward": {
+    "cash": 179,
+    "xp": 497,
+    "unlock": [
+     "hub:h-bowlo-surry-hills-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-surry-hills-2",
+   "act": 3,
+   "title": "The Surry Hills Membership Count",
+   "blurb": "Before you say anything: yes, I know. Our books say 72 members at Surry Hills and I would bet the bar takings that half of them are dead or moved to Queensland. You will see what I mean the second you get there. Do that and we're square.",
+   "giver": "hub-surry-hills-kata",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 153,
+     "z": 2269,
+     "radius": 25,
+     "label": "stand at the side door where the list is kept"
+    },
+    {
+     "kind": "photo",
+     "x": 124,
+     "z": 2260,
+     "radius": 35,
+     "label": "the board with the names still on it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "read me the ones you did not recognise",
+     "npc": "hub-surry-hills-kata"
+    }
+   ],
+   "reward": {
+    "cash": 154,
+    "xp": 402,
+    "unlock": [
+     "hub:h-bowlo-surry-hills-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-surry-hills-3",
+   "act": 3,
+   "title": "Closing Time Rumour, Surry Hills",
+   "blurb": "It is not a police matter and I have checked. Since the middle of the news somebody has been going round the Surry Hills greens telling the barefoot bowlers we are shutting, and we are not shutting. There is a version of this where I am the unreasonable one. I will owe you one, and I pay those.",
+   "giver": "hub-surry-hills-kata",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "whoever is doing the telling"
+    },
+    {
+     "kind": "earn",
+     "dollars": 112,
+     "label": "and take the bar money off them while you are there"
+    }
+   ],
+   "reward": {
+    "cash": 145,
+    "xp": 397,
+    "unlock": [
+     "hub:h-bowlo-surry-hills-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-surry-hills-4",
+   "act": 3,
+   "title": "Behind the Bar at Surry Hills",
+   "blurb": "Honestly, I am past caring how it looks. There is a chest freezer that hums in D in the chest freezer behind the bar at Surry Hills and I am not opening it on an empty stomach. The paperwork says one thing and my eyes say another. Do not let them talk you into anything.",
+   "giver": "hub-surry-hills-serge",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "get one into you first, seriously"
+    },
+    {
+     "kind": "goto",
+     "x": 195,
+     "z": 2096,
+     "radius": 25,
+     "label": "round the back where the cellar door is"
+    },
+    {
+     "kind": "photo",
+     "x": 202,
+     "z": 2081,
+     "radius": 35,
+     "label": "whatever is in there, before I lose my nerve"
+    }
+   ],
+   "reward": {
+    "cash": 149,
+    "xp": 409,
+    "unlock": [
+     "hub:h-bowlo-surry-hills-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-surry-hills-5",
+   "act": 3,
+   "title": "The Old Greenkeeper, Surry Hills",
+   "blurb": "I would do it myself if I could leave the counter. The man who kept these greens before me drinks at Moore Park now, and he owes Surry Hills an explanation about the drainage. It has been going on longer than I have admitted to anyone. There's cash in it. Not a lot.",
+   "giver": "hub-surry-hills-serge",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 1188,
+     "z": 2812,
+     "radius": 60,
+     "label": "find him and hear him out"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come back and tell me what he said",
+     "npc": "hub-surry-hills-serge"
+    }
+   ],
+   "reward": {
+    "cash": 147,
+    "xp": 415,
+    "unlock": [
+     "hub:h-bowlo-surry-hills-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-toongabbie-0",
+   "act": 3,
+   "title": "Nights at Toongabbie",
+   "blurb": "The council knows and the council does not care. Every night around twenty past four the same car does three laps of the Toongabbie forecourt and never buys fuel. It is the not knowing that has got me, honestly. Ask for me by name at the counter.",
+   "giver": "hub-toongabbie-esme",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -24090,
+     "z": -8442,
+     "radius": 35,
+     "label": "the car, plate if you can get it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it on record before I ring anyone",
+     "npc": "hub-toongabbie-esme"
+    }
+   ],
+   "reward": {
+    "cash": 161,
+    "xp": 443,
+    "unlock": [
+     "hub:h-servo-toongabbie-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-toongabbie-1",
+   "act": 3,
+   "title": "The Third Lap, Toongabbie",
+   "blurb": "I have been putting it off since Easter. Now I know the plate, I want to know where it goes after it leaves Toongabbie at twenty past four, because it is not going home. There is probably a simple explanation and I would love to hear it. Come back and tell me straight.",
+   "giver": "hub-toongabbie-esme",
+   "level": 8,
+   "requires": [
+    "h-servo-toongabbie-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Toongabbie",
+     "to": "Pendle Hill",
+     "label": "follow it as far as Pendle Hill"
+    },
+    {
+     "kind": "photo",
+     "x": -24163,
+     "z": -8486,
+     "radius": 35,
+     "label": "wherever it stops"
+    }
+   ],
+   "reward": {
+    "cash": 200,
+    "xp": 532,
+    "unlock": [
+     "hub:h-servo-toongabbie-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-toongabbie-2",
+   "act": 3,
+   "title": "Bay Two, Toongabbie",
+   "blurb": "Before you say anything: yes, I know. Bay two at the Toongabbie workshop has had the same car in it since Thursdays and the owner has stopped answering. You will see what I mean the second you get there. Do that and we're square.",
+   "giver": "hub-toongabbie-milena",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -24168,
+     "z": -8584,
+     "radius": 25,
+     "label": "the address on the job card"
+    },
+    {
+     "kind": "photo",
+     "x": -24169,
+     "z": -8597,
+     "radius": 35,
+     "label": "the letterbox, so I know I have the right house"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if anybody actually lives there",
+     "npc": "hub-toongabbie-milena"
+    }
+   ],
+   "reward": {
+    "cash": 157,
+    "xp": 442,
+    "unlock": [
+     "hub:h-servo-toongabbie-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-toongabbie-3",
+   "act": 3,
+   "title": "Tools Off the Bench, Toongabbie",
+   "blurb": "It is not a police matter and I have checked. Someone has been walking out of Toongabbie with a socket set at a time since Thursdays, and I have run out of ways to be polite about it. There is a version of this where I am the unreasonable one. I will owe you one, and I pay those.",
+   "giver": "hub-toongabbie-milena",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 3,
+     "label": "the ones hanging round the air hose"
+    },
+    {
+     "kind": "earn",
+     "dollars": 103,
+     "label": "$103 of it back, that is what the set cost"
+    }
+   ],
+   "reward": {
+    "cash": 165,
+    "xp": 457,
+    "unlock": [
+     "hub:h-servo-toongabbie-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-toongabbie-4",
+   "act": 3,
+   "title": "The Toongabbie Price Board",
+   "blurb": "Honestly, I am past caring how it looks. Head office says the Toongabbie board has been wrong since Thursdays and I say it has been right for eleven years, and one of us is about to be embarrassed. The paperwork says one thing and my eyes say another. Do not let them talk you into anything.",
+   "giver": "hub-toongabbie-levi",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "buy something so it is a real transaction"
+    },
+    {
+     "kind": "photo",
+     "x": -24055,
+     "z": -8485,
+     "radius": 35,
+     "label": "the board and the pump, both in the one shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that settles it either way",
+     "npc": "hub-toongabbie-levi"
+    }
+   ],
+   "reward": {
+    "cash": 161,
+    "xp": 444,
+    "unlock": [
+     "hub:h-servo-toongabbie-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-toongabbie-5",
+   "act": 3,
+   "title": "The Other Franchise, Toongabbie",
+   "blurb": "I would do it myself if I could leave the counter. The bloke who runs the site at Pendle Hill has had the same trouble Toongabbie has, and he will talk to you before he talks to me. It has been going on longer than I have admitted to anyone. There's cash in it. Not a lot.",
+   "giver": "hub-toongabbie-levi",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -23488,
+     "z": -7082,
+     "radius": 60,
+     "label": "find him on shift"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever he says, I want it word for word",
+     "npc": "hub-toongabbie-levi"
+    }
+   ],
+   "reward": {
+    "cash": 156,
+    "xp": 450,
+    "unlock": [
+     "hub:h-servo-toongabbie-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-edgecliff-0",
+   "act": 3,
+   "title": "Level Two, Edgecliff",
+   "blurb": "The council knows and the council does not care. Water has been coming through the level two ceiling of the Edgecliff block since school holidays and the strata report says there is no water. It is the not knowing that has got me, honestly. Ask for me by name at the counter.",
+   "giver": "hub-edgecliff-rowena",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 2501,
+     "z": 1165,
+     "radius": 35,
+     "label": "the ceiling, with the stain visible"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that goes in the file whether they like it or not",
+     "npc": "hub-edgecliff-rowena"
+    }
+   ],
+   "reward": {
+    "cash": 182,
+    "xp": 499,
+    "unlock": [
+     "hub:h-strata-edgecliff-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-edgecliff-1",
+   "act": 3,
+   "title": "The Special Levy, Edgecliff",
+   "blurb": "I have been putting it off since Easter. The photo did it. There is probably a simple explanation and I would love to hear it. Now every owner at Edgecliff owes $131 and I have to collect it from people who have avoided me for a year. Come back and tell me straight.",
+   "giver": "hub-edgecliff-rowena",
+   "level": 9,
+   "requires": [
+    "h-strata-edgecliff-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 131,
+     "label": "$131 out of them, in any state"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will not ask how",
+     "npc": "hub-edgecliff-rowena"
+    }
+   ],
+   "reward": {
+    "cash": 215,
+    "xp": 590,
+    "unlock": [
+     "hub:h-strata-edgecliff-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-edgecliff-2",
+   "act": 3,
+   "title": "Car Space 14, Edgecliff",
+   "blurb": "Before you say anything: yes, I know. Somebody who does not live at Edgecliff has parked in space fourteen every night since school holidays and the manager will not look at it. You will see what I mean the second you get there. Do that and we're square.",
+   "giver": "hub-edgecliff-kristo",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 2418,
+     "z": 1118,
+     "radius": 25,
+     "label": "down to the basement, the far corner"
+    },
+    {
+     "kind": "photo",
+     "x": 2412,
+     "z": 1043,
+     "radius": 35,
+     "label": "the car in the space with the number painted beside it"
+    }
+   ],
+   "reward": {
+    "cash": 189,
+    "xp": 497,
+    "unlock": [
+     "hub:h-strata-edgecliff-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-edgecliff-3",
+   "act": 3,
+   "title": "The Meeting, Edgecliff",
+   "blurb": "It is not a police matter and I have checked. The Edgecliff AGM is on school holidays and I would like to arrive with something stronger than a grievance and a printout. There is a version of this where I am the unreasonable one. I will owe you one, and I pay those.",
+   "giver": "hub-edgecliff-kristo",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 2,
+     "label": "two coffees, one is for me"
+    },
+    {
+     "kind": "goto",
+     "x": 2486,
+     "z": 939,
+     "radius": 25,
+     "label": "the community room where they hold it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "walk in with me, they behave when there is a witness",
+     "npc": "hub-edgecliff-kristo"
+    }
+   ],
+   "reward": {
+    "cash": 182,
+    "xp": 494,
+    "unlock": [
+     "hub:h-strata-edgecliff-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-edgecliff-4",
+   "act": 3,
+   "title": "Bin Night at Edgecliff",
+   "blurb": "Honestly, I am past caring how it looks. Three units at Edgecliff have put their bins out on the wrong night since school holidays and I have taken it personally, which I accept is a choice I made. The paperwork says one thing and my eyes say another. Do not let them talk you into anything.",
+   "giver": "hub-edgecliff-jarrah",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 2,
+     "label": "the ones who argue about it"
+    },
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "the fine the council gave me, off them"
+    }
+   ],
+   "reward": {
+    "cash": 179,
+    "xp": 495,
+    "unlock": [
+     "hub:h-strata-edgecliff-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-edgecliff-5",
+   "act": 3,
+   "title": "The Other Block, Edgecliff",
+   "blurb": "I would do it myself if I could leave the counter. There is a block at Kings Cross with the same builder and the same cracks, and their manager has already been through what Edgecliff is starting. It has been going on longer than I have admitted to anyone. There's cash in it. Not a lot.",
+   "giver": "hub-edgecliff-jarrah",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 1037,
+     "z": 700,
+     "radius": 60,
+     "label": "go and ask them how it ended"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I need to know how much worse this gets",
+     "npc": "hub-edgecliff-jarrah"
+    }
+   ],
+   "reward": {
+    "cash": 187,
+    "xp": 491,
+    "unlock": [
+     "hub:h-strata-edgecliff-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

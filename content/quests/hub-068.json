@@ -1,0 +1,651 @@
+{
+ "quests": [
+  {
+   "id": "h-bakery-st-marys-0",
+   "act": 3,
+   "title": "quarter to six at St Marys",
+   "blurb": "It is not a police matter and I have checked. I start at quarter to six and for a month the St Marys back lane has had somebody in it who is not waiting for bread. I am not after trouble. I am after an answer. I'll see you right for it.",
+   "giver": "hub-st-marys-reg",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -40412,
+     "z": -10993,
+     "radius": 35,
+     "label": "the lane, from the door, no flash"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I am not calling anyone until I am sure",
+     "npc": "hub-st-marys-reg"
+    }
+   ],
+   "reward": {
+    "cash": 69,
+    "xp": 123,
+    "unlock": [
+     "hub:h-bakery-st-marys-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bakery-st-marys-1",
+   "act": 3,
+   "title": "The Lane Light, St Marys",
+   "blurb": "Honestly, I am past caring how it looks. A light on that lane costs St Marys $34 and the landlord has said no twice, so we are doing it ourselves. Nobody else seems to have noticed, which is its own problem. I'll put the kettle on for when you're back.",
+   "giver": "hub-st-marys-reg",
+   "level": 1,
+   "requires": [
+    "h-bakery-st-marys-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 34,
+     "label": "$34 and I will fit it myself"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "do not tell him where it came from",
+     "npc": "hub-st-marys-reg"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 207,
+    "unlock": [
+     "hub:h-bakery-st-marys-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bakery-st-marys-2",
+   "act": 3,
+   "title": "Flour Run, St Marys",
+   "blurb": "I would do it myself if I could leave the counter. The flour for St Marys comes off a truck at quarter to six and last grand final week the truck came and the flour did not. Everyone I have told has looked at me the way you are now. Just do not come back empty-handed.",
+   "giver": "hub-st-marys-wiremu",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "St Marys",
+     "to": "Werrington",
+     "label": "ride out to Werrington where the load is made up"
+    },
+    {
+     "kind": "photo",
+     "x": -40513,
+     "z": -11097,
+     "radius": 35,
+     "label": "the pallet with our name on it, if it exists"
+    }
+   ],
+   "reward": {
+    "cash": 64,
+    "xp": 127,
+    "unlock": [
+     "hub:h-bakery-st-marys-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bakery-st-marys-3",
+   "act": 3,
+   "title": "The Loading Zone, St Marys",
+   "blurb": "You will think I am making this up. The St Marys loading zone has had a car in it at quarter to six every morning this week and the driver waits in it, which makes it worse. This is the third time I have had this conversation. I will know if you skipped a bit.",
+   "giver": "hub-st-marys-wiremu",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "the one who says he is only a minute"
+    },
+    {
+     "kind": "earn",
+     "dollars": 90,
+     "label": "and the ticket I got, off him"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 132,
+    "unlock": [
+     "hub:h-bakery-st-marys-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bakery-st-marys-4",
+   "act": 3,
+   "title": "The Sourdough Sign, St Marys",
+   "blurb": "There is no clever way to say this. Somebody two doors down from St Marys put up a sign on grand final week that says the same six words as ours, in the same order. It started small, the way these things do. Say nothing to anyone on the way.",
+   "giver": "hub-st-marys-sefa",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -40397,
+     "z": -11127,
+     "radius": 25,
+     "label": "walk down and read it properly"
+    },
+    {
+     "kind": "photo",
+     "x": -40389,
+     "z": -11130,
+     "radius": 35,
+     "label": "both signs if you can get them in one frame"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me I am not imagining it",
+     "npc": "hub-st-marys-sefa"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 130,
+    "unlock": [
+     "hub:h-bakery-st-marys-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-bakery-st-marys-5",
+   "act": 3,
+   "title": "The Old Site, St Marys",
+   "blurb": "You look like you have twenty minutes. This business was at Werrington before it was at St Marys, and there is a woman there who still has the original book. It is the not knowing that has got me, honestly. Do not make a scene about it.",
+   "giver": "hub-st-marys-sefa",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -42054,
+     "z": -11155,
+     "radius": 60,
+     "label": "she is usually about in the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring back whatever she is willing to say",
+     "npc": "hub-st-marys-sefa"
+    }
+   ],
+   "reward": {
+    "cash": 55,
+    "xp": 129,
+    "unlock": [
+     "hub:h-bakery-st-marys-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-pool-beecroft-0",
+   "act": 3,
+   "title": "The Beecroft Pool",
+   "blurb": "It is not a police matter and I have checked. Council has been saying the Beecroft pool is at end of life since the long weekend and the crack they keep pointing at is not in the shell. I am not after trouble. I am after an answer. I'll see you right for it.",
+   "giver": "hub-beecroft-behrouz",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -13393,
+     "z": -12954,
+     "radius": 35,
+     "label": "the crack, close, with something for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "an engineer can read that. A councillor cannot.",
+     "npc": "hub-beecroft-behrouz"
+    }
+   ],
+   "reward": {
+    "cash": 59,
+    "xp": 132,
+    "unlock": [
+     "hub:h-pool-beecroft-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-pool-beecroft-1",
+   "act": 3,
+   "title": "The Petition Stall, Beecroft",
+   "blurb": "Honestly, I am past caring how it looks. We are running a stall for Beecroft on the long weekend and a stall needs $42 of gear that nobody has volunteered to pay for. Nobody else seems to have noticed, which is its own problem. I'll put the kettle on for when you're back.",
+   "giver": "hub-beecroft-behrouz",
+   "level": 1,
+   "requires": [
+    "h-pool-beecroft-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 42,
+     "label": "$42 and a table, if you see one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will be there from eight either way",
+     "npc": "hub-beecroft-behrouz"
+    }
+   ],
+   "reward": {
+    "cash": 107,
+    "xp": 215,
+    "unlock": [
+     "hub:h-pool-beecroft-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-pool-beecroft-2",
+   "act": 3,
+   "title": "Squad, Beecroft",
+   "blurb": "I would do it myself if I could leave the counter. I coach 89 kids at Beecroft at ten past five and three of them have stopped coming without anybody ringing me. Everyone I have told has looked at me the way you are now. Just do not come back empty-handed.",
+   "giver": "hub-beecroft-zelda",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -13573,
+     "z": -12910,
+     "radius": 25,
+     "label": "the flats where two of them live"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "take something with you, it is a long walk up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I do not need them back. I need to know.",
+     "npc": "hub-beecroft-zelda"
+    }
+   ],
+   "reward": {
+    "cash": 50,
+    "xp": 130,
+    "unlock": [
+     "hub:h-pool-beecroft-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-pool-beecroft-3",
+   "act": 3,
+   "title": "The Deep End, Beecroft",
+   "blurb": "You will think I am making this up. A group has been coming over the Beecroft fence after close and swimming in the dark, which is how Beecroft loses its pool. This is the third time I have had this conversation. I will know if you skipped a bit.",
+   "giver": "hub-beecroft-zelda",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 3,
+     "label": "the ones who go over the fence"
+    },
+    {
+     "kind": "photo",
+     "x": -13497,
+     "z": -13002,
+     "radius": 35,
+     "label": "the spot in the fence they use"
+    }
+   ],
+   "reward": {
+    "cash": 50,
+    "xp": 122,
+    "unlock": [
+     "hub:h-pool-beecroft-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-pool-beecroft-4",
+   "act": 3,
+   "title": "The Kiosk Freezer, Beecroft",
+   "blurb": "There is no clever way to say this. The kiosk at Beecroft has a milk crate in it and a freezer that has been running warm since the long weekend. It started small, the way these things do. Say nothing to anyone on the way.",
+   "giver": "hub-beecroft-dilan",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 2,
+     "label": "get two, we are going to be here"
+    },
+    {
+     "kind": "goto",
+     "x": -13407,
+     "z": -13002,
+     "radius": 25,
+     "label": "the plant room behind the kiosk"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether it is the freezer or the power",
+     "npc": "hub-beecroft-dilan"
+    }
+   ],
+   "reward": {
+    "cash": 60,
+    "xp": 127,
+    "unlock": [
+     "hub:h-pool-beecroft-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-pool-beecroft-5",
+   "act": 3,
+   "title": "The Aquatic Centre, Beecroft",
+   "blurb": "You look like you have twenty minutes. They want everyone from Beecroft to drive to the new centre at Cheltenham, so somebody should go and see whether it is any good. It is the not knowing that has got me, honestly. Do not make a scene about it.",
+   "giver": "hub-beecroft-dilan",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -12318,
+     "z": -12447,
+     "radius": 60,
+     "label": "have a proper look, not a quick one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "be honest with me, even if it is nice",
+     "npc": "hub-beecroft-dilan"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 133,
+    "unlock": [
+     "hub:h-pool-beecroft-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-rank-allawah-0",
+   "act": 3,
+   "title": "The Allawah Rank",
+   "blurb": "It is not a police matter and I have checked. The rank outside Allawah used to hold nine cars and since grand final week it holds four, and nobody will say who moved the line. I am not after trouble. I am after an answer. I'll see you right for it.",
+   "giver": "hub-allawah-moira",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -8534,
+     "z": 11458,
+     "radius": 35,
+     "label": "the painted line and the old one under it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the old paint is still there, that is the whole argument",
+     "npc": "hub-allawah-moira"
+    }
+   ],
+   "reward": {
+    "cash": 52,
+    "xp": 139,
+    "unlock": [
+     "hub:h-rank-allawah-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-rank-allawah-1",
+   "act": 3,
+   "title": "Lost Fares, Allawah",
+   "blurb": "Honestly, I am past caring how it looks. Since the rank at Allawah shrank I am $50 a week down, and the association wants that number from somebody who can prove it. Nobody else seems to have noticed, which is its own problem. I'll put the kettle on for when you're back.",
+   "giver": "hub-allawah-moira",
+   "level": 1,
+   "requires": [
+    "h-rank-allawah-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 50,
+     "label": "$50 in a week, to show it can be done"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the submission, right there",
+     "npc": "hub-allawah-moira"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 215,
+    "unlock": [
+     "hub:h-rank-allawah-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-rank-allawah-2",
+   "act": 3,
+   "title": "Queue Jumpers, Allawah",
+   "blurb": "I would do it myself if I could leave the counter. Cars that have never sat in the Allawah queue turn up at five in the morning and take the front of it, and the drivers who waited say nothing. Everyone I have told has looked at me the way you are now. Just do not come back empty-handed.",
+   "giver": "hub-allawah-elin",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 2,
+     "label": "the ones who take the front"
+    },
+    {
+     "kind": "earn",
+     "dollars": 33,
+     "label": "$33, which is about one airport run"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 137,
+    "unlock": [
+     "hub:h-rank-allawah-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-rank-allawah-3",
+   "act": 3,
+   "title": "The Late Train, Allawah",
+   "blurb": "You will think I am making this up. When the last train into Allawah is late, 33 people come out at once and I have to have cars there before they do. This is the third time I have had this conversation. I will know if you skipped a bit.",
+   "giver": "hub-allawah-elin",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Allawah",
+     "to": "Carlton",
+     "label": "come in on the last one from Carlton and see it"
+    },
+    {
+     "kind": "photo",
+     "x": -8566,
+     "z": 11422,
+     "radius": 35,
+     "label": "the rank at the moment the doors open"
+    }
+   ],
+   "reward": {
+    "cash": 51,
+    "xp": 128,
+    "unlock": [
+     "hub:h-rank-allawah-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-rank-allawah-4",
+   "act": 3,
+   "title": "The Door, Allawah",
+   "blurb": "There is no clever way to say this. I have stood on this door near Allawah for 33 years and since grand final week somebody has been sending my guests to a different rank. It started small, the way these things do. Say nothing to anyone on the way.",
+   "giver": "hub-allawah-jonty",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -8546,
+     "z": 11303,
+     "radius": 25,
+     "label": "follow one of them and see where they end up"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you will be standing about, get something"
+    }
+   ],
+   "reward": {
+    "cash": 59,
+    "xp": 140,
+    "unlock": [
+     "hub:h-rank-allawah-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-rank-allawah-5",
+   "act": 3,
+   "title": "The Depot, Allawah",
+   "blurb": "You look like you have twenty minutes. The plates working the Allawah rank are dispatched from a depot at Hurstville, and the man who runs it has never met a driver he liked. It is the not knowing that has got me, honestly. Do not make a scene about it.",
+   "giver": "hub-allawah-jonty",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -9854,
+     "z": 11168,
+     "radius": 60,
+     "label": "go and be pleasant at him anyway"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether he is the problem or the symptom",
+     "npc": "hub-allawah-jonty"
+    }
+   ],
+   "reward": {
+    "cash": 64,
+    "xp": 139,
+    "unlock": [
+     "hub:h-rank-allawah-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  }
+ ]
+}

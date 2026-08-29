@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-cornershop-taverners-hill-0",
+   "act": 3,
+   "title": "Short Delivery, Taverners Hill",
+   "blurb": "I would do it myself if I could leave the counter. The Taverners Hill order has been two cartons light every week since every second Friday and the invoice says otherwise every time. There is a version of this where I am the unreasonable one. I will know if you skipped a bit.",
+   "giver": "hub-taverners-hill-ursula",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5880,
+     "z": 2402,
+     "radius": 25,
+     "label": "the loading bay round the side"
+    },
+    {
+     "kind": "photo",
+     "x": -5891,
+     "z": 2405,
+     "radius": 35,
+     "label": "the pallet as it actually arrives"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I have got something to send them",
+     "npc": "hub-taverners-hill-ursula"
+    }
+   ],
+   "reward": {
+    "cash": 80,
+    "xp": 213,
+    "unlock": [
+     "hub:h-cornershop-taverners-hill-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-taverners-hill-1",
+   "act": 3,
+   "title": "The Credit Note, Taverners Hill",
+   "blurb": "You will think I am making this up. They admitted it, which I did not expect, so now there is $59 owing to Taverners Hill and it is not going to walk in here itself. The paperwork says one thing and my eyes say another. Say nothing to anyone on the way.",
+   "giver": "hub-taverners-hill-ursula",
+   "level": 3,
+   "requires": [
+    "h-cornershop-taverners-hill-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 59,
+     "label": "$59, and do not take a voucher"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "cash, on the counter, and I will believe it",
+     "npc": "hub-taverners-hill-ursula"
+    }
+   ],
+   "reward": {
+    "cash": 137,
+    "xp": 309,
+    "unlock": [
+     "hub:h-cornershop-taverners-hill-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-taverners-hill-2",
+   "act": 3,
+   "title": "The Taverners Hill Run",
+   "blurb": "There is no clever way to say this. I do the Taverners Hill run at knock-off and there is a stretch of it where the van gets followed, which I have told nobody until now. It has been going on longer than I have admitted to anyone. Do not make a scene about it.",
+   "giver": "hub-taverners-hill-toma",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Taverners Hill",
+     "to": "Lewisham",
+     "label": "ride it with me as far as Lewisham"
+    },
+    {
+     "kind": "photo",
+     "x": -5954,
+     "z": 2220,
+     "radius": 35,
+     "label": "whatever is behind us when we stop"
+    }
+   ],
+   "reward": {
+    "cash": 79,
+    "xp": 231,
+    "unlock": [
+     "hub:h-cornershop-taverners-hill-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-taverners-hill-3",
+   "act": 3,
+   "title": "Locked Out, Taverners Hill",
+   "blurb": "You look like you have twenty minutes. I have got a clipboard nobody signs in the back of the van and the Taverners Hill shop is shut, and the number on the door rings out. I have got no proof, which is exactly why I am asking. Ask for me by name at the counter.",
+   "giver": "hub-taverners-hill-toma",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5784,
+     "z": 2203,
+     "radius": 25,
+     "label": "try the flat above the shop"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get one in you, this takes a while"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "somebody has to sign for it",
+     "npc": "hub-taverners-hill-toma"
+    }
+   ],
+   "reward": {
+    "cash": 91,
+    "xp": 223,
+    "unlock": [
+     "hub:h-cornershop-taverners-hill-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-taverners-hill-4",
+   "act": 3,
+   "title": "The Regulars, Taverners Hill",
+   "blurb": "Keep it between us for now. Three of the Taverners Hill regulars have started coming in together and going out separately, and the till is $14 down on those days. It might be nothing. It has not felt like nothing. Come back and tell me straight.",
+   "giver": "hub-taverners-hill-sonja",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "the ones who come in as a set"
+    },
+    {
+     "kind": "earn",
+     "dollars": 14,
+     "label": "$14, which is exactly what the till says"
+    }
+   ],
+   "reward": {
+    "cash": 81,
+    "xp": 212,
+    "unlock": [
+     "hub:h-cornershop-taverners-hill-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-taverners-hill-5",
+   "act": 3,
+   "title": "The Wholesaler, Taverners Hill",
+   "blurb": "Right. Since you asked. Everything Taverners Hill sells comes off a floor at Hawthorne, and the woman who runs it will tell you things she will not put in writing. I would not ask if there was anyone else about. Do that and we're square.",
+   "giver": "hub-taverners-hill-sonja",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5679,
+     "z": 1465,
+     "radius": 60,
+     "label": "go and see her before the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come and tell me what she said about us",
+     "npc": "hub-taverners-hill-sonja"
+    }
+   ],
+   "reward": {
+    "cash": 81,
+    "xp": 226,
+    "unlock": [
+     "hub:h-cornershop-taverners-hill-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-casula-0",
+   "act": 3,
+   "title": "Under 12s at Casula",
+   "blurb": "I would do it myself if I could leave the counter. I have got eleven kids for a twelve-a-side at Casula on a Tuesday and one of them has a note from his mother. There is a version of this where I am the unreasonable one. I will know if you skipped a bit.",
+   "giver": "hub-casula-sian",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -27282,
+     "z": 9633,
+     "radius": 25,
+     "label": "the estate behind the ground, ask around"
+    },
+    {
+     "kind": "photo",
+     "x": -27291,
+     "z": 9656,
+     "radius": 35,
+     "label": "the noticeboard where the sign-on sheet went up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "any kid with boots will do at this point",
+     "npc": "hub-casula-sian"
+    }
+   ],
+   "reward": {
+    "cash": 87,
+    "xp": 209,
+    "unlock": [
+     "hub:h-oval-casula-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-casula-1",
+   "act": 3,
+   "title": "Registration, Casula",
+   "blurb": "You will think I am making this up. We found a twelfth, which means the Casula club now owes the association $62 it had budgeted on not owing. The paperwork says one thing and my eyes say another. Say nothing to anyone on the way.",
+   "giver": "hub-casula-sian",
+   "level": 3,
+   "requires": [
+    "h-oval-casula-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 62,
+     "label": "$62 before the cut-off"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will drive it in myself",
+     "npc": "hub-casula-sian"
+    }
+   ],
+   "reward": {
+    "cash": 136,
+    "xp": 316,
+    "unlock": [
+     "hub:h-oval-casula-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-casula-2",
+   "act": 3,
+   "title": "The Casula Canteen",
+   "blurb": "There is no clever way to say this. The canteen at Casula does two hundred sausages on a Saturday and this week the freezer went off at the back of seven. It has been going on longer than I have admitted to anyone. Do not make a scene about it.",
+   "giver": "hub-casula-malika",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "we are going to need the coffee"
+    },
+    {
+     "kind": "photo",
+     "x": -27399,
+     "z": 9592,
+     "radius": 35,
+     "label": "the thermometer, so the insurance believes us"
+    }
+   ],
+   "reward": {
+    "cash": 90,
+    "xp": 210,
+    "unlock": [
+     "hub:h-oval-casula-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-casula-3",
+   "act": 3,
+   "title": "Grand Final Float, Casula",
+   "blurb": "You look like you have twenty minutes. Somebody walked off with the float from the Casula canteen at about the back of seven during the last home game, and I have a fair idea which somebody. I have got no proof, which is exactly why I am asking. Ask for me by name at the counter.",
+   "giver": "hub-casula-malika",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 2,
+     "label": "the pair who were leaning on the roller door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 35,
+     "label": "$35, which is what was in the tin"
+    }
+   ],
+   "reward": {
+    "cash": 85,
+    "xp": 216,
+    "unlock": [
+     "hub:h-oval-casula-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-casula-4",
+   "act": 3,
+   "title": "Sprinkler Line, Casula",
+   "blurb": "Keep it between us for now. The sprinkler line under the Casula outfield has been leaking since a Tuesday and the wet patch has started to move. It might be nothing. It has not felt like nothing. Come back and tell me straight.",
+   "giver": "hub-casula-dmitri",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -27441,
+     "z": 9456,
+     "radius": 25,
+     "label": "walk the line from the tap to the boundary"
+    },
+    {
+     "kind": "photo",
+     "x": -27422,
+     "z": 9434,
+     "radius": 35,
+     "label": "where the grass has gone dark"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to dig once, not five times",
+     "npc": "hub-casula-dmitri"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 210,
+    "unlock": [
+     "hub:h-oval-casula-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-casula-5",
+   "act": 3,
+   "title": "The Association, Casula",
+   "blurb": "Right. Since you asked. The bloke who allocates grounds for the whole association sits at Glenfield, and Casula has been at the bottom of his list for two seasons. I would not ask if there was anyone else about. Do that and we're square.",
+   "giver": "hub-casula-dmitri",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -29195,
+     "z": 11935,
+     "radius": 60,
+     "label": "go and be reasonable at him"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if it is us or the paperwork",
+     "npc": "hub-casula-dmitri"
+    }
+   ],
+   "reward": {
+    "cash": 94,
+    "xp": 220,
+    "unlock": [
+     "hub:h-oval-casula-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-st-leonards-0",
+   "act": 3,
+   "title": "The Creek Behind St Leonards",
+   "blurb": "I would do it myself if I could leave the counter. Somebody has been tipping fill into the creek behind St Leonards since a wet Monday and it is narrowing the channel a metre at a time. There is a version of this where I am the unreasonable one. I will know if you skipped a bit.",
+   "giver": "hub-st-leonards-elin",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -1451,
+     "z": -5076,
+     "radius": 35,
+     "label": "the fill, with the water level in shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council reads photographs, not letters",
+     "npc": "hub-st-leonards-elin"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 222,
+    "unlock": [
+     "hub:h-creek-st-leonards-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-st-leonards-1",
+   "act": 3,
+   "title": "Willow Removal, St Leonards",
+   "blurb": "You will think I am making this up. They have agreed to a clean-up at St Leonards, which is wonderful, except the grant is $60 short and closes on a wet Monday. The paperwork says one thing and my eyes say another. Say nothing to anyone on the way.",
+   "giver": "hub-st-leonards-elin",
+   "level": 3,
+   "requires": [
+    "h-creek-st-leonards-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "$60, and I do not care whose pocket"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the form needs the number today",
+     "npc": "hub-st-leonards-elin"
+    }
+   ],
+   "reward": {
+    "cash": 134,
+    "xp": 318,
+    "unlock": [
+     "hub:h-creek-st-leonards-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-st-leonards-2",
+   "act": 3,
+   "title": "Sandbags, St Leonards",
+   "blurb": "There is no clever way to say this. We had 47 sandbags in the St Leonards shed on a wet Monday and this morning we have got the pallet they came on. It has been going on longer than I have admitted to anyone. Do not make a scene about it.",
+   "giver": "hub-st-leonards-yenna",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1645,
+     "z": -5191,
+     "radius": 25,
+     "label": "the yards backing onto the reserve"
+    },
+    {
+     "kind": "photo",
+     "x": -1653,
+     "z": -5207,
+     "radius": 35,
+     "label": "anywhere they have obviously been used"
+    }
+   ],
+   "reward": {
+    "cash": 88,
+    "xp": 230,
+    "unlock": [
+     "hub:h-creek-st-leonards-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-st-leonards-3",
+   "act": 3,
+   "title": "The Low Crossing, St Leonards",
+   "blurb": "You look like you have twenty minutes. People keep driving the low crossing at St Leonards at just gone midnight with the water over the sign, and one of them is going to be the one. I have got no proof, which is exactly why I am asking. Ask for me by name at the counter.",
+   "giver": "hub-st-leonards-yenna",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "you will be standing out there a while"
+    },
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 2,
+     "label": "the ones who argue with the barrier"
+    }
+   ],
+   "reward": {
+    "cash": 80,
+    "xp": 224,
+    "unlock": [
+     "hub:h-creek-st-leonards-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-st-leonards-4",
+   "act": 3,
+   "title": "Under the House, St Leonards",
+   "blurb": "Keep it between us for now. The water came through my place at St Leonards on a wet Monday and the assessor wants photographs of things I have already thrown out. It might be nothing. It has not felt like nothing. Come back and tell me straight.",
+   "giver": "hub-st-leonards-joaquin",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1479,
+     "z": -5269,
+     "radius": 25,
+     "label": "round the side, where the pile is"
+    },
+    {
+     "kind": "photo",
+     "x": -1460,
+     "z": -5267,
+     "radius": 35,
+     "label": "the high-water mark on the brick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the whole claim, that mark",
+     "npc": "hub-st-leonards-joaquin"
+    }
+   ],
+   "reward": {
+    "cash": 79,
+    "xp": 209,
+    "unlock": [
+     "hub:h-creek-st-leonards-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-st-leonards-5",
+   "act": 3,
+   "title": "Upstream, St Leonards",
+   "blurb": "Right. Since you asked. Whatever is happening to St Leonards starts upstream at Artarmon, and there are people up there who have been saying so for years. I would not ask if there was anyone else about. Do that and we're square.",
+   "giver": "hub-st-leonards-joaquin",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2483,
+     "z": -6654,
+     "radius": 60,
+     "label": "go up and find them"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear it from someone who is not me",
+     "npc": "hub-st-leonards-joaquin"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 224,
+    "unlock": [
+     "hub:h-creek-st-leonards-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

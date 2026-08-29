@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-bowlo-prince-alfred-square-0",
+   "act": 3,
+   "title": "The Dead Patch at Prince Alfred Square",
+   "blurb": "It has been three weeks. The number three green at Prince Alfred Square has had a bald patch the shape of Tasmania since the first of the month, and the committee thinks I am inventing it. You can tell me I am imagining it. Tell me after. I'll put the kettle on for when you're back.",
+   "giver": "hub-prince-alfred-square-maja",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -18990,
+     "z": -6232,
+     "radius": 35,
+     "label": "the patch, with something in frame for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring it to me before the meeting",
+     "npc": "hub-prince-alfred-square-maja"
+    }
+   ],
+   "reward": {
+    "cash": 150,
+    "xp": 416,
+    "unlock": [
+     "hub:h-bowlo-prince-alfred-square-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-prince-alfred-square-1",
+   "act": 3,
+   "title": "Turf Money, Prince Alfred Square",
+   "blurb": "Nobody else has offered, so. They have seen the photograph and now they want it re-laid by the first of the month, which means finding $92 that the Prince Alfred Square club does not have. I would have sorted it myself a year ago. Just do not come back empty-handed.",
+   "giver": "hub-prince-alfred-square-maja",
+   "level": 7,
+   "requires": [
+    "h-bowlo-prince-alfred-square-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 92,
+     "label": "$92, however you like, I am not asking"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "put it in my hand, not the safe",
+     "npc": "hub-prince-alfred-square-maja"
+    }
+   ],
+   "reward": {
+    "cash": 199,
+    "xp": 502,
+    "unlock": [
+     "hub:h-bowlo-prince-alfred-square-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-prince-alfred-square-2",
+   "act": 3,
+   "title": "The Prince Alfred Square Membership Count",
+   "blurb": "The council knows and the council does not care. Our books say 24 members at Prince Alfred Square and I would bet the bar takings that half of them are dead or moved to Queensland. It is not the money. It has stopped being the money. I will know if you skipped a bit.",
+   "giver": "hub-prince-alfred-square-wafa",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -19144,
+     "z": -6146,
+     "radius": 25,
+     "label": "stand at the side door where the list is kept"
+    },
+    {
+     "kind": "photo",
+     "x": -19173,
+     "z": -6155,
+     "radius": 35,
+     "label": "the board with the names still on it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "read me the ones you did not recognise",
+     "npc": "hub-prince-alfred-square-wafa"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 395,
+    "unlock": [
+     "hub:h-bowlo-prince-alfred-square-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-prince-alfred-square-3",
+   "act": 3,
+   "title": "Closing Time Rumour, Prince Alfred Square",
+   "blurb": "I have been putting it off since Easter. Since quarter to six somebody has been going round the Prince Alfred Square greens telling the barefoot bowlers we are shutting, and we are not shutting. I did try the official route, for what that was worth. Say nothing to anyone on the way.",
+   "giver": "hub-prince-alfred-square-wafa",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "whoever is doing the telling"
+    },
+    {
+     "kind": "earn",
+     "dollars": 64,
+     "label": "and take the bar money off them while you are there"
+    }
+   ],
+   "reward": {
+    "cash": 155,
+    "xp": 396,
+    "unlock": [
+     "hub:h-bowlo-prince-alfred-square-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-prince-alfred-square-4",
+   "act": 3,
+   "title": "Behind the Bar at Prince Alfred Square",
+   "blurb": "Before you say anything: yes, I know. There is a bucket of odd keys in the chest freezer behind the bar at Prince Alfred Square and I am not opening it on an empty stomach. I have got a photo on my phone but it is useless. Do not make a scene about it.",
+   "giver": "hub-prince-alfred-square-emre",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "get one into you first, seriously"
+    },
+    {
+     "kind": "goto",
+     "x": -19102,
+     "z": -6319,
+     "radius": 25,
+     "label": "round the back where the cellar door is"
+    },
+    {
+     "kind": "photo",
+     "x": -19095,
+     "z": -6334,
+     "radius": 35,
+     "label": "whatever is in there, before I lose my nerve"
+    }
+   ],
+   "reward": {
+    "cash": 157,
+    "xp": 392,
+    "unlock": [
+     "hub:h-bowlo-prince-alfred-square-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-prince-alfred-square-5",
+   "act": 3,
+   "title": "The Old Greenkeeper, Prince Alfred Square",
+   "blurb": "It is not a police matter and I have checked. The man who kept these greens before me drinks at Robin Thomas now, and he owes Prince Alfred Square an explanation about the drainage. I am aware how that sounds. Ask for me by name at the counter.",
+   "giver": "hub-prince-alfred-square-emre",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18594,
+     "z": -5375,
+     "radius": 60,
+     "label": "find him and hear him out"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come back and tell me what he said",
+     "npc": "hub-prince-alfred-square-emre"
+    }
+   ],
+   "reward": {
+    "cash": 158,
+    "xp": 402,
+    "unlock": [
+     "hub:h-bowlo-prince-alfred-square-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-flemington-0",
+   "act": 3,
+   "title": "Nights at Flemington",
+   "blurb": "It has been three weeks. Every night around knock-off the same car does three laps of the Flemington forecourt and never buys fuel. You can tell me I am imagining it. Tell me after. I'll put the kettle on for when you're back.",
+   "giver": "hub-flemington-radha",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -12944,
+     "z": -95,
+     "radius": 35,
+     "label": "the car, plate if you can get it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it on record before I ring anyone",
+     "npc": "hub-flemington-radha"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 452,
+    "unlock": [
+     "hub:h-servo-flemington-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-flemington-1",
+   "act": 3,
+   "title": "The Third Lap, Flemington",
+   "blurb": "Nobody else has offered, so. Now I know the plate, I want to know where it goes after it leaves Flemington at knock-off, because it is not going home. I would have sorted it myself a year ago. Just do not come back empty-handed.",
+   "giver": "hub-flemington-radha",
+   "level": 8,
+   "requires": [
+    "h-servo-flemington-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Flemington",
+     "to": "Homebush",
+     "label": "follow it as far as Homebush"
+    },
+    {
+     "kind": "photo",
+     "x": -13095,
+     "z": -131,
+     "radius": 35,
+     "label": "wherever it stops"
+    }
+   ],
+   "reward": {
+    "cash": 194,
+    "xp": 540,
+    "unlock": [
+     "hub:h-servo-flemington-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-flemington-2",
+   "act": 3,
+   "title": "Bay Two, Flemington",
+   "blurb": "The council knows and the council does not care. Bay two at the Flemington workshop has had the same car in it since every second Friday and the owner has stopped answering. It is not the money. It has stopped being the money. I will know if you skipped a bit.",
+   "giver": "hub-flemington-jia",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -13057,
+     "z": -302,
+     "radius": 25,
+     "label": "the address on the job card"
+    },
+    {
+     "kind": "photo",
+     "x": -13049,
+     "z": -313,
+     "radius": 35,
+     "label": "the letterbox, so I know I have the right house"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if anybody actually lives there",
+     "npc": "hub-flemington-jia"
+    }
+   ],
+   "reward": {
+    "cash": 154,
+    "xp": 443,
+    "unlock": [
+     "hub:h-servo-flemington-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-flemington-3",
+   "act": 3,
+   "title": "Tools Off the Bench, Flemington",
+   "blurb": "I have been putting it off since Easter. Someone has been walking out of Flemington with a socket set at a time since every second Friday, and I have run out of ways to be polite about it. I did try the official route, for what that was worth. Say nothing to anyone on the way.",
+   "giver": "hub-flemington-jia",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 3,
+     "label": "the ones hanging round the air hose"
+    },
+    {
+     "kind": "earn",
+     "dollars": 91,
+     "label": "$91 of it back, that is what the set cost"
+    }
+   ],
+   "reward": {
+    "cash": 174,
+    "xp": 452,
+    "unlock": [
+     "hub:h-servo-flemington-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-flemington-4",
+   "act": 3,
+   "title": "The Flemington Price Board",
+   "blurb": "Before you say anything: yes, I know. Head office says the Flemington board has been wrong since every second Friday and I say it has been right for eleven years, and one of us is about to be embarrassed. I have got a photo on my phone but it is useless. Do not make a scene about it.",
+   "giver": "hub-flemington-gulnaz",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "buy something so it is a real transaction"
+    },
+    {
+     "kind": "photo",
+     "x": -12947,
+     "z": -150,
+     "radius": 35,
+     "label": "the board and the pump, both in the one shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that settles it either way",
+     "npc": "hub-flemington-gulnaz"
+    }
+   ],
+   "reward": {
+    "cash": 164,
+    "xp": 446,
+    "unlock": [
+     "hub:h-servo-flemington-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-flemington-5",
+   "act": 3,
+   "title": "The Other Franchise, Flemington",
+   "blurb": "It is not a police matter and I have checked. The bloke who runs the site at Homebush has had the same trouble Flemington has, and he will talk to you before he talks to me. I am aware how that sounds. Ask for me by name at the counter.",
+   "giver": "hub-flemington-gulnaz",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11177,
+     "z": 1,
+     "radius": 60,
+     "label": "find him on shift"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever he says, I want it word for word",
+     "npc": "hub-flemington-gulnaz"
+    }
+   ],
+   "reward": {
+    "cash": 164,
+    "xp": 457,
+    "unlock": [
+     "hub:h-servo-flemington-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-leightonfield-0",
+   "act": 3,
+   "title": "Level Two, Leightonfield",
+   "blurb": "It has been three weeks. Water has been coming through the level two ceiling of the Leightonfield block since the first of the month and the strata report says there is no water. You can tell me I am imagining it. Tell me after. I'll put the kettle on for when you're back.",
+   "giver": "hub-leightonfield-hina",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -20724,
+     "z": 1835,
+     "radius": 35,
+     "label": "the ceiling, with the stain visible"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that goes in the file whether they like it or not",
+     "npc": "hub-leightonfield-hina"
+    }
+   ],
+   "reward": {
+    "cash": 179,
+    "xp": 485,
+    "unlock": [
+     "hub:h-strata-leightonfield-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-leightonfield-1",
+   "act": 3,
+   "title": "The Special Levy, Leightonfield",
+   "blurb": "Nobody else has offered, so. The photo did it. I would have sorted it myself a year ago. Now every owner at Leightonfield owes $119 and I have to collect it from people who have avoided me for a year. Just do not come back empty-handed.",
+   "giver": "hub-leightonfield-hina",
+   "level": 9,
+   "requires": [
+    "h-strata-leightonfield-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 119,
+     "label": "$119 out of them, in any state"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will not ask how",
+     "npc": "hub-leightonfield-hina"
+    }
+   ],
+   "reward": {
+    "cash": 212,
+    "xp": 581,
+    "unlock": [
+     "hub:h-strata-leightonfield-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-leightonfield-2",
+   "act": 3,
+   "title": "Car Space 14, Leightonfield",
+   "blurb": "The council knows and the council does not care. Somebody who does not live at Leightonfield has parked in space fourteen every night since the first of the month and the manager will not look at it. It is not the money. It has stopped being the money. I will know if you skipped a bit.",
+   "giver": "hub-leightonfield-ondine",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -20853,
+     "z": 1810,
+     "radius": 25,
+     "label": "down to the basement, the far corner"
+    },
+    {
+     "kind": "photo",
+     "x": -20860,
+     "z": 1803,
+     "radius": 35,
+     "label": "the car in the space with the number painted beside it"
+    }
+   ],
+   "reward": {
+    "cash": 186,
+    "xp": 502,
+    "unlock": [
+     "hub:h-strata-leightonfield-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-leightonfield-3",
+   "act": 3,
+   "title": "The Meeting, Leightonfield",
+   "blurb": "I have been putting it off since Easter. The Leightonfield AGM is on the first of the month and I would like to arrive with something stronger than a grievance and a printout. I did try the official route, for what that was worth. Say nothing to anyone on the way.",
+   "giver": "hub-leightonfield-ondine",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 2,
+     "label": "two coffees, one is for me"
+    },
+    {
+     "kind": "goto",
+     "x": -20785,
+     "z": 1631,
+     "radius": 25,
+     "label": "the community room where they hold it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "walk in with me, they behave when there is a witness",
+     "npc": "hub-leightonfield-ondine"
+    }
+   ],
+   "reward": {
+    "cash": 179,
+    "xp": 507,
+    "unlock": [
+     "hub:h-strata-leightonfield-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-leightonfield-4",
+   "act": 3,
+   "title": "Bin Night at Leightonfield",
+   "blurb": "Before you say anything: yes, I know. Three units at Leightonfield have put their bins out on the wrong night since the first of the month and I have taken it personally, which I accept is a choice I made. I have got a photo on my phone but it is useless. Do not make a scene about it.",
+   "giver": "hub-leightonfield-shay",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 2,
+     "label": "the ones who argue about it"
+    },
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "the fine the council gave me, off them"
+    }
+   ],
+   "reward": {
+    "cash": 180,
+    "xp": 508,
+    "unlock": [
+     "hub:h-strata-leightonfield-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-leightonfield-5",
+   "act": 3,
+   "title": "The Other Block, Leightonfield",
+   "blurb": "It is not a police matter and I have checked. There is a block at Chester Hill with the same builder and the same cracks, and their manager has already been through what Leightonfield is starting. I am aware how that sounds. Ask for me by name at the counter.",
+   "giver": "hub-leightonfield-shay",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -19443,
+     "z": 2106,
+     "radius": 60,
+     "label": "go and ask them how it ended"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I need to know how much worse this gets",
+     "npc": "hub-leightonfield-shay"
+    }
+   ],
+   "reward": {
+    "cash": 183,
+    "xp": 504,
+    "unlock": [
+     "hub:h-strata-leightonfield-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

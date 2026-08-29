@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-cornershop-benaud-oval-0",
+   "act": 3,
+   "title": "Short Delivery, Benaud Oval",
+   "blurb": "This is going to sound small. The Benaud Oval order has been two cartons light every week since the week of the show and the invoice says otherwise every time. Everyone I have told has looked at me the way you are now. Do not make a scene about it.",
+   "giver": "hub-benaud-oval-otto",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -19099,
+     "z": -7223,
+     "radius": 25,
+     "label": "the loading bay round the side"
+    },
+    {
+     "kind": "photo",
+     "x": -19110,
+     "z": -7220,
+     "radius": 35,
+     "label": "the pallet as it actually arrives"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I have got something to send them",
+     "npc": "hub-benaud-oval-otto"
+    }
+   ],
+   "reward": {
+    "cash": 138,
+    "xp": 352,
+    "unlock": [
+     "hub:h-cornershop-benaud-oval-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-benaud-oval-1",
+   "act": 3,
+   "title": "The Credit Note, Benaud Oval",
+   "blurb": "I have written it down twice and lost it twice. They admitted it, which I did not expect, so now there is $94 owing to Benaud Oval and it is not going to walk in here itself. This is the third time I have had this conversation. Ask for me by name at the counter.",
+   "giver": "hub-benaud-oval-otto",
+   "level": 6,
+   "requires": [
+    "h-cornershop-benaud-oval-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 94,
+     "label": "$94, and do not take a voucher"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "cash, on the counter, and I will believe it",
+     "npc": "hub-benaud-oval-otto"
+    }
+   ],
+   "reward": {
+    "cash": 175,
+    "xp": 441,
+    "unlock": [
+     "hub:h-cornershop-benaud-oval-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-benaud-oval-2",
+   "act": 3,
+   "title": "The Benaud Oval Run",
+   "blurb": "Do not laugh. I do the Benaud Oval run at first light and there is a stretch of it where the van gets followed, which I have told nobody until now. It started small, the way these things do. Come back and tell me straight.",
+   "giver": "hub-benaud-oval-natasa",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Benaud Oval",
+     "to": "Ngara",
+     "label": "ride it with me as far as Ngara"
+    },
+    {
+     "kind": "photo",
+     "x": -19173,
+     "z": -7405,
+     "radius": 35,
+     "label": "whatever is behind us when we stop"
+    }
+   ],
+   "reward": {
+    "cash": 134,
+    "xp": 364,
+    "unlock": [
+     "hub:h-cornershop-benaud-oval-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-benaud-oval-3",
+   "act": 3,
+   "title": "Locked Out, Benaud Oval",
+   "blurb": "It is the sort of thing you notice or you do not. I have got a folding table in the back of the van and the Benaud Oval shop is shut, and the number on the door rings out. It is the not knowing that has got me, honestly. Do that and we're square.",
+   "giver": "hub-benaud-oval-natasa",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -19003,
+     "z": -7422,
+     "radius": 25,
+     "label": "try the flat above the shop"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "get one in you, this takes a while"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "somebody has to sign for it",
+     "npc": "hub-benaud-oval-natasa"
+    }
+   ],
+   "reward": {
+    "cash": 142,
+    "xp": 361,
+    "unlock": [
+     "hub:h-cornershop-benaud-oval-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-benaud-oval-4",
+   "act": 3,
+   "title": "The Regulars, Benaud Oval",
+   "blurb": "Two people have already said no. Three of the Benaud Oval regulars have started coming in together and going out separately, and the till is $70 down on those days. There is probably a simple explanation and I would love to hear it. I will owe you one, and I pay those.",
+   "giver": "hub-benaud-oval-rahel",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 3,
+     "label": "the ones who come in as a set"
+    },
+    {
+     "kind": "earn",
+     "dollars": 70,
+     "label": "$70, which is exactly what the till says"
+    }
+   ],
+   "reward": {
+    "cash": 137,
+    "xp": 365,
+    "unlock": [
+     "hub:h-cornershop-benaud-oval-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-benaud-oval-5",
+   "act": 3,
+   "title": "The Wholesaler, Benaud Oval",
+   "blurb": "Someone has to, and it may as well be you. Everything Benaud Oval sells comes off a floor at Prince Alfred Square, and the woman who runs it will tell you things she will not put in writing. You will see what I mean the second you get there. Do not let them talk you into anything.",
+   "giver": "hub-benaud-oval-rahel",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -19148,
+     "z": -6197,
+     "radius": 60,
+     "label": "go and see her before the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come and tell me what she said about us",
+     "npc": "hub-benaud-oval-rahel"
+    }
+   ],
+   "reward": {
+    "cash": 138,
+    "xp": 356,
+    "unlock": [
+     "hub:h-cornershop-benaud-oval-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-miranda-0",
+   "act": 3,
+   "title": "Under 12s at Miranda",
+   "blurb": "This is going to sound small. I have got eleven kids for a twelve-a-side at Miranda on the first of the month and one of them has a note from his mother. Everyone I have told has looked at me the way you are now. Do not make a scene about it.",
+   "giver": "hub-miranda-ashwin",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -9458,
+     "z": 18807,
+     "radius": 25,
+     "label": "the estate behind the ground, ask around"
+    },
+    {
+     "kind": "photo",
+     "x": -9467,
+     "z": 18830,
+     "radius": 35,
+     "label": "the noticeboard where the sign-on sheet went up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "any kid with boots will do at this point",
+     "npc": "hub-miranda-ashwin"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 397,
+    "unlock": [
+     "hub:h-oval-miranda-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-miranda-1",
+   "act": 3,
+   "title": "Registration, Miranda",
+   "blurb": "I have written it down twice and lost it twice. We found a twelfth, which means the Miranda club now owes the association $114 it had budgeted on not owing. This is the third time I have had this conversation. Ask for me by name at the counter.",
+   "giver": "hub-miranda-ashwin",
+   "level": 7,
+   "requires": [
+    "h-oval-miranda-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 114,
+     "label": "$114 before the cut-off"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will drive it in myself",
+     "npc": "hub-miranda-ashwin"
+    }
+   ],
+   "reward": {
+    "cash": 199,
+    "xp": 503,
+    "unlock": [
+     "hub:h-oval-miranda-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-miranda-2",
+   "act": 3,
+   "title": "The Miranda Canteen",
+   "blurb": "Do not laugh. The canteen at Miranda does two hundred sausages on a Saturday and this week the freezer went off at half six. It started small, the way these things do. Come back and tell me straight.",
+   "giver": "hub-miranda-ferdi",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 2,
+     "label": "we are going to need the coffee"
+    },
+    {
+     "kind": "photo",
+     "x": -9575,
+     "z": 18766,
+     "radius": 35,
+     "label": "the thermometer, so the insurance believes us"
+    }
+   ],
+   "reward": {
+    "cash": 146,
+    "xp": 396,
+    "unlock": [
+     "hub:h-oval-miranda-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-miranda-3",
+   "act": 3,
+   "title": "Grand Final Float, Miranda",
+   "blurb": "It is the sort of thing you notice or you do not. Somebody walked off with the float from the Miranda canteen at about half six during the last home game, and I have a fair idea which somebody. It is the not knowing that has got me, honestly. Do that and we're square.",
+   "giver": "hub-miranda-ferdi",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "the pair who were leaning on the roller door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 64,
+     "label": "$64, which is what was in the tin"
+    }
+   ],
+   "reward": {
+    "cash": 158,
+    "xp": 402,
+    "unlock": [
+     "hub:h-oval-miranda-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-miranda-4",
+   "act": 3,
+   "title": "Sprinkler Line, Miranda",
+   "blurb": "Two people have already said no. The sprinkler line under the Miranda outfield has been leaking since the first of the month and the wet patch has started to move. There is probably a simple explanation and I would love to hear it. I will owe you one, and I pay those.",
+   "giver": "hub-miranda-dhruv",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -9617,
+     "z": 18630,
+     "radius": 25,
+     "label": "walk the line from the tap to the boundary"
+    },
+    {
+     "kind": "photo",
+     "x": -9598,
+     "z": 18608,
+     "radius": 35,
+     "label": "where the grass has gone dark"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to dig once, not five times",
+     "npc": "hub-miranda-dhruv"
+    }
+   ],
+   "reward": {
+    "cash": 153,
+    "xp": 395,
+    "unlock": [
+     "hub:h-oval-miranda-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-miranda-5",
+   "act": 3,
+   "title": "The Association, Miranda",
+   "blurb": "Someone has to, and it may as well be you. The bloke who allocates grounds for the whole association sits at Gymea, and Miranda has been at the bottom of his list for two seasons. You will see what I mean the second you get there. Do not let them talk you into anything.",
+   "giver": "hub-miranda-dhruv",
+   "level": 7,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10933,
+     "z": 18570,
+     "radius": 60,
+     "label": "go and be reasonable at him"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if it is us or the paperwork",
+     "npc": "hub-miranda-dhruv"
+    }
+   ],
+   "reward": {
+    "cash": 154,
+    "xp": 394,
+    "unlock": [
+     "hub:h-oval-miranda-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-lapstone-0",
+   "act": 3,
+   "title": "The Creek Behind Lapstone",
+   "blurb": "This is going to sound small. Somebody has been tipping fill into the creek behind Lapstone since Thursdays and it is narrowing the channel a metre at a time. Everyone I have told has looked at me the way you are now. Do not make a scene about it.",
+   "giver": "hub-lapstone-sandrine",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -52536,
+     "z": -9448,
+     "radius": 35,
+     "label": "the fill, with the water level in shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council reads photographs, not letters",
+     "npc": "hub-lapstone-sandrine"
+    }
+   ],
+   "reward": {
+    "cash": 173,
+    "xp": 441,
+    "unlock": [
+     "hub:h-creek-lapstone-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-lapstone-1",
+   "act": 3,
+   "title": "Willow Removal, Lapstone",
+   "blurb": "I have written it down twice and lost it twice. They have agreed to a clean-up at Lapstone, which is wonderful, except the grant is $127 short and closes on Thursdays. This is the third time I have had this conversation. Ask for me by name at the counter.",
+   "giver": "hub-lapstone-sandrine",
+   "level": 8,
+   "requires": [
+    "h-creek-lapstone-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 127,
+     "label": "$127, and I do not care whose pocket"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the form needs the number today",
+     "npc": "hub-lapstone-sandrine"
+    }
+   ],
+   "reward": {
+    "cash": 210,
+    "xp": 534,
+    "unlock": [
+     "hub:h-creek-lapstone-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-lapstone-2",
+   "act": 3,
+   "title": "Sandbags, Lapstone",
+   "blurb": "Do not laugh. We had 36 sandbags in the Lapstone shed on Thursdays and this morning we have got the pallet they came on. It started small, the way these things do. Come back and tell me straight.",
+   "giver": "hub-lapstone-hedda",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -52730,
+     "z": -9563,
+     "radius": 25,
+     "label": "the yards backing onto the reserve"
+    },
+    {
+     "kind": "photo",
+     "x": -52738,
+     "z": -9579,
+     "radius": 35,
+     "label": "anywhere they have obviously been used"
+    }
+   ],
+   "reward": {
+    "cash": 170,
+    "xp": 450,
+    "unlock": [
+     "hub:h-creek-lapstone-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-lapstone-3",
+   "act": 3,
+   "title": "The Low Crossing, Lapstone",
+   "blurb": "It is the sort of thing you notice or you do not. People keep driving the low crossing at Lapstone at quarter to six with the water over the sign, and one of them is going to be the one. It is the not knowing that has got me, honestly. Do that and we're square.",
+   "giver": "hub-lapstone-hedda",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you will be standing out there a while"
+    },
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 2,
+     "label": "the ones who argue with the barrier"
+    }
+   ],
+   "reward": {
+    "cash": 158,
+    "xp": 445,
+    "unlock": [
+     "hub:h-creek-lapstone-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-lapstone-4",
+   "act": 3,
+   "title": "Under the House, Lapstone",
+   "blurb": "Two people have already said no. The water came through my place at Lapstone on Thursdays and the assessor wants photographs of things I have already thrown out. There is probably a simple explanation and I would love to hear it. I will owe you one, and I pay those.",
+   "giver": "hub-lapstone-asha",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -52564,
+     "z": -9641,
+     "radius": 25,
+     "label": "round the side, where the pile is"
+    },
+    {
+     "kind": "photo",
+     "x": -52545,
+     "z": -9639,
+     "radius": 35,
+     "label": "the high-water mark on the brick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the whole claim, that mark",
+     "npc": "hub-lapstone-asha"
+    }
+   ],
+   "reward": {
+    "cash": 158,
+    "xp": 441,
+    "unlock": [
+     "hub:h-creek-lapstone-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-lapstone-5",
+   "act": 3,
+   "title": "Upstream, Lapstone",
+   "blurb": "Someone has to, and it may as well be you. Whatever is happening to Lapstone starts upstream at Glenbrook, and there are people up there who have been saying so for years. You will see what I mean the second you get there. Do not let them talk you into anything.",
+   "giver": "hub-lapstone-asha",
+   "level": 8,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -54782,
+     "z": -10071,
+     "radius": 60,
+     "label": "go up and find them"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear it from someone who is not me",
+     "npc": "hub-lapstone-asha"
+    }
+   ],
+   "reward": {
+    "cash": 166,
+    "xp": 453,
+    "unlock": [
+     "hub:h-creek-lapstone-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

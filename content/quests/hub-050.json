@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-cornershop-revesby-0",
+   "act": 3,
+   "title": "Short Delivery, Revesby",
+   "blurb": "There is no clever way to say this. The Revesby order has been two cartons light every week since a wet Monday and the invoice says otherwise every time. Half the street knows and half the street is pretending not to. Do that and we're square.",
+   "giver": "hub-revesby-teodora",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -17863,
+     "z": 9741,
+     "radius": 25,
+     "label": "the loading bay round the side"
+    },
+    {
+     "kind": "photo",
+     "x": -17874,
+     "z": 9744,
+     "radius": 35,
+     "label": "the pallet as it actually arrives"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I have got something to send them",
+     "npc": "hub-revesby-teodora"
+    }
+   ],
+   "reward": {
+    "cash": 88,
+    "xp": 212,
+    "unlock": [
+     "hub:h-cornershop-revesby-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-revesby-1",
+   "act": 3,
+   "title": "The Credit Note, Revesby",
+   "blurb": "You look like you have twenty minutes. They admitted it, which I did not expect, so now there is $65 owing to Revesby and it is not going to walk in here itself. I am not after trouble. I am after an answer. I will owe you one, and I pay those.",
+   "giver": "hub-revesby-teodora",
+   "level": 3,
+   "requires": [
+    "h-cornershop-revesby-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 65,
+     "label": "$65, and do not take a voucher"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "cash, on the counter, and I will believe it",
+     "npc": "hub-revesby-teodora"
+    }
+   ],
+   "reward": {
+    "cash": 135,
+    "xp": 309,
+    "unlock": [
+     "hub:h-cornershop-revesby-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-revesby-2",
+   "act": 3,
+   "title": "The Revesby Run",
+   "blurb": "Keep it between us for now. I do the Revesby run at two in the afternoon and there is a stretch of it where the van gets followed, which I have told nobody until now. Nobody else seems to have noticed, which is its own problem. Do not let them talk you into anything.",
+   "giver": "hub-revesby-adnan",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Revesby",
+     "to": "Panania",
+     "label": "ride it with me as far as Panania"
+    },
+    {
+     "kind": "photo",
+     "x": -17937,
+     "z": 9559,
+     "radius": 35,
+     "label": "whatever is behind us when we stop"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 229,
+    "unlock": [
+     "hub:h-cornershop-revesby-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-revesby-3",
+   "act": 3,
+   "title": "Locked Out, Revesby",
+   "blurb": "Right. Since you asked. I have got a folding table in the back of the van and the Revesby shop is shut, and the number on the door rings out. Everyone I have told has looked at me the way you are now. There's cash in it. Not a lot.",
+   "giver": "hub-revesby-adnan",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -17767,
+     "z": 9542,
+     "radius": 25,
+     "label": "try the flat above the shop"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get one in you, this takes a while"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "somebody has to sign for it",
+     "npc": "hub-revesby-adnan"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 221,
+    "unlock": [
+     "hub:h-cornershop-revesby-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-revesby-4",
+   "act": 3,
+   "title": "The Regulars, Revesby",
+   "blurb": "My knees are gone, so. Three of the Revesby regulars have started coming in together and going out separately, and the till is $10 down on those days. This is the third time I have had this conversation. You'll know it when you see it.",
+   "giver": "hub-revesby-divya",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 3,
+     "label": "the ones who come in as a set"
+    },
+    {
+     "kind": "earn",
+     "dollars": 10,
+     "label": "$10, which is exactly what the till says"
+    }
+   ],
+   "reward": {
+    "cash": 81,
+    "xp": 225,
+    "unlock": [
+     "hub:h-cornershop-revesby-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-revesby-5",
+   "act": 3,
+   "title": "The Wholesaler, Revesby",
+   "blurb": "This is going to sound small. Everything Revesby sells comes off a floor at Panania, and the woman who runs it will tell you things she will not put in writing. It started small, the way these things do. Half now if you want it. Most people don't.",
+   "giver": "hub-revesby-divya",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -19240,
+     "z": 9760,
+     "radius": 60,
+     "label": "go and see her before the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come and tell me what she said about us",
+     "npc": "hub-revesby-divya"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 212,
+    "unlock": [
+     "hub:h-cornershop-revesby-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-coalcliff-0",
+   "act": 3,
+   "title": "Under 12s at Coalcliff",
+   "blurb": "There is no clever way to say this. I have got eleven kids for a twelve-a-side at Coalcliff on a public holiday nobody remembered and one of them has a note from his mother. Half the street knows and half the street is pretending not to. Do that and we're square.",
+   "giver": "hub-coalcliff-gia",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -20557,
+     "z": 41968,
+     "radius": 25,
+     "label": "the estate behind the ground, ask around"
+    },
+    {
+     "kind": "photo",
+     "x": -20566,
+     "z": 41991,
+     "radius": 35,
+     "label": "the noticeboard where the sign-on sheet went up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "any kid with boots will do at this point",
+     "npc": "hub-coalcliff-gia"
+    }
+   ],
+   "reward": {
+    "cash": 88,
+    "xp": 218,
+    "unlock": [
+     "hub:h-oval-coalcliff-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-coalcliff-1",
+   "act": 3,
+   "title": "Registration, Coalcliff",
+   "blurb": "You look like you have twenty minutes. We found a twelfth, which means the Coalcliff club now owes the association $65 it had budgeted on not owing. I am not after trouble. I am after an answer. I will owe you one, and I pay those.",
+   "giver": "hub-coalcliff-gia",
+   "level": 3,
+   "requires": [
+    "h-oval-coalcliff-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 65,
+     "label": "$65 before the cut-off"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will drive it in myself",
+     "npc": "hub-coalcliff-gia"
+    }
+   ],
+   "reward": {
+    "cash": 121,
+    "xp": 313,
+    "unlock": [
+     "hub:h-oval-coalcliff-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-coalcliff-2",
+   "act": 3,
+   "title": "The Coalcliff Canteen",
+   "blurb": "Keep it between us for now. The canteen at Coalcliff does two hundred sausages on a Saturday and this week the freezer went off at ten past five. Nobody else seems to have noticed, which is its own problem. Do not let them talk you into anything.",
+   "giver": "hub-coalcliff-tara",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "we are going to need the coffee"
+    },
+    {
+     "kind": "photo",
+     "x": -20674,
+     "z": 41927,
+     "radius": 35,
+     "label": "the thermometer, so the insurance believes us"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 223,
+    "unlock": [
+     "hub:h-oval-coalcliff-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-coalcliff-3",
+   "act": 3,
+   "title": "Grand Final Float, Coalcliff",
+   "blurb": "Right. Since you asked. Somebody walked off with the float from the Coalcliff canteen at about ten past five during the last home game, and I have a fair idea which somebody. Everyone I have told has looked at me the way you are now. There's cash in it. Not a lot.",
+   "giver": "hub-coalcliff-tara",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 2,
+     "label": "the pair who were leaning on the roller door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 27,
+     "label": "$27, which is what was in the tin"
+    }
+   ],
+   "reward": {
+    "cash": 93,
+    "xp": 209,
+    "unlock": [
+     "hub:h-oval-coalcliff-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-coalcliff-4",
+   "act": 3,
+   "title": "Sprinkler Line, Coalcliff",
+   "blurb": "My knees are gone, so. The sprinkler line under the Coalcliff outfield has been leaking since a public holiday nobody remembered and the wet patch has started to move. This is the third time I have had this conversation. You'll know it when you see it.",
+   "giver": "hub-coalcliff-mehmet",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -20716,
+     "z": 41791,
+     "radius": 25,
+     "label": "walk the line from the tap to the boundary"
+    },
+    {
+     "kind": "photo",
+     "x": -20697,
+     "z": 41769,
+     "radius": 35,
+     "label": "where the grass has gone dark"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to dig once, not five times",
+     "npc": "hub-coalcliff-mehmet"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 229,
+    "unlock": [
+     "hub:h-oval-coalcliff-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-coalcliff-5",
+   "act": 3,
+   "title": "The Association, Coalcliff",
+   "blurb": "This is going to sound small. The bloke who allocates grounds for the whole association sits at Stanwell Park, and Coalcliff has been at the bottom of his list for two seasons. It started small, the way these things do. Half now if you want it. Most people don't.",
+   "giver": "hub-coalcliff-mehmet",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -20505,
+     "z": 40073,
+     "radius": 60,
+     "label": "go and be reasonable at him"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if it is us or the paperwork",
+     "npc": "hub-coalcliff-mehmet"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 210,
+    "unlock": [
+     "hub:h-oval-coalcliff-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-meadowbank-0",
+   "act": 3,
+   "title": "The Creek Behind Meadowbank",
+   "blurb": "There is no clever way to say this. Somebody has been tipping fill into the creek behind Meadowbank since a Tuesday and it is narrowing the channel a metre at a time. Half the street knows and half the street is pretending not to. Do that and we're square.",
+   "giver": "hub-meadowbank-charlie",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -11200,
+     "z": -5595,
+     "radius": 35,
+     "label": "the fill, with the water level in shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council reads photographs, not letters",
+     "npc": "hub-meadowbank-charlie"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 210,
+    "unlock": [
+     "hub:h-creek-meadowbank-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-meadowbank-1",
+   "act": 3,
+   "title": "Willow Removal, Meadowbank",
+   "blurb": "You look like you have twenty minutes. They have agreed to a clean-up at Meadowbank, which is wonderful, except the grant is $47 short and closes on a Tuesday. I am not after trouble. I am after an answer. I will owe you one, and I pay those.",
+   "giver": "hub-meadowbank-charlie",
+   "level": 3,
+   "requires": [
+    "h-creek-meadowbank-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 47,
+     "label": "$47, and I do not care whose pocket"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the form needs the number today",
+     "npc": "hub-meadowbank-charlie"
+    }
+   ],
+   "reward": {
+    "cash": 124,
+    "xp": 315,
+    "unlock": [
+     "hub:h-creek-meadowbank-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-meadowbank-2",
+   "act": 3,
+   "title": "Sandbags, Meadowbank",
+   "blurb": "Keep it between us for now. We had 34 sandbags in the Meadowbank shed on a Tuesday and this morning we have got the pallet they came on. Nobody else seems to have noticed, which is its own problem. Do not let them talk you into anything.",
+   "giver": "hub-meadowbank-dragan",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11394,
+     "z": -5710,
+     "radius": 25,
+     "label": "the yards backing onto the reserve"
+    },
+    {
+     "kind": "photo",
+     "x": -11402,
+     "z": -5726,
+     "radius": 35,
+     "label": "anywhere they have obviously been used"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 214,
+    "unlock": [
+     "hub:h-creek-meadowbank-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-meadowbank-3",
+   "act": 3,
+   "title": "The Low Crossing, Meadowbank",
+   "blurb": "Right. Since you asked. People keep driving the low crossing at Meadowbank at the second express with the water over the sign, and one of them is going to be the one. Everyone I have told has looked at me the way you are now. There's cash in it. Not a lot.",
+   "giver": "hub-meadowbank-dragan",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you will be standing out there a while"
+    },
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 2,
+     "label": "the ones who argue with the barrier"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 219,
+    "unlock": [
+     "hub:h-creek-meadowbank-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-meadowbank-4",
+   "act": 3,
+   "title": "Under the House, Meadowbank",
+   "blurb": "My knees are gone, so. The water came through my place at Meadowbank on a Tuesday and the assessor wants photographs of things I have already thrown out. This is the third time I have had this conversation. You'll know it when you see it.",
+   "giver": "hub-meadowbank-gabriel",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11228,
+     "z": -5788,
+     "radius": 25,
+     "label": "round the side, where the pile is"
+    },
+    {
+     "kind": "photo",
+     "x": -11209,
+     "z": -5786,
+     "radius": 35,
+     "label": "the high-water mark on the brick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the whole claim, that mark",
+     "npc": "hub-meadowbank-gabriel"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 217,
+    "unlock": [
+     "hub:h-creek-meadowbank-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-meadowbank-5",
+   "act": 3,
+   "title": "Upstream, Meadowbank",
+   "blurb": "This is going to sound small. Whatever is happening to Meadowbank starts upstream at West Ryde, and there are people up there who have been saying so for years. It started small, the way these things do. Half now if you want it. Most people don't.",
+   "giver": "hub-meadowbank-gabriel",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11094,
+     "z": -6479,
+     "radius": 60,
+     "label": "go up and find them"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear it from someone who is not me",
+     "npc": "hub-meadowbank-gabriel"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 222,
+    "unlock": [
+     "hub:h-creek-meadowbank-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

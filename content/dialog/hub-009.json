@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-canley-vale-jarrah",
+   "name": "Jarrah, greenkeeper at Canley Vale",
+   "x": -24712,
+   "z": 2503,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Ah. Someone with two working legs.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I would do it myself if I could leave the counter. The number three green at Canley Vale has had a bald patch the shape of Tasmania since a public holiday nobody remembered, and the committee thinks I am inventing it. There is a version of this where I am the unreasonable one. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-canley-vale-0",
+       "denyFlag": "hub:h-bowlo-canley-vale-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You will think I am making this up. They have seen the photograph and now they want it re-laid by a public holiday nobody remembered, which means finding $39 that the Canley Vale club does not have. The paperwork says one thing and my eyes say another. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-canley-vale-1",
+       "denyFlag": "hub:h-bowlo-canley-vale-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "The Dead Patch at Canley Vale — that's done.",
+       "turnin": "h-bowlo-canley-vale-0"
+      },
+      {
+       "text": "Turf Money, Canley Vale — that's done.",
+       "turnin": "h-bowlo-canley-vale-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-canley-vale-joaquin",
+   "name": "Joaquin, club president at Canley Vale",
+   "x": -24435,
+   "z": 2464,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are early. Or late. I have lost track.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "There is no clever way to say this. Our books say 46 members at Canley Vale and I would bet the bar takings that half of them are dead or moved to Queensland. It has been going on longer than I have admitted to anyone. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-canley-vale-2",
+       "denyFlag": "hub:h-bowlo-canley-vale-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You look like you have twenty minutes. Since half six somebody has been going round the Canley Vale greens telling the barefoot bowlers we are shutting, and we are not shutting. I have got no proof, which is exactly why I am asking. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-canley-vale-3",
+       "denyFlag": "hub:h-bowlo-canley-vale-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Canley Vale Membership Count — that's done.",
+       "turnin": "h-bowlo-canley-vale-2"
+      },
+      {
+       "text": "Closing Time Rumour, Canley Vale — that's done.",
+       "turnin": "h-bowlo-canley-vale-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-canley-vale-tao",
+   "name": "Tao, bar manager at Canley Vale",
+   "x": -24427,
+   "z": 2580,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Been here since before it was like this. Go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Keep it between us for now. There is a bucket of odd keys in the chest freezer behind the bar at Canley Vale and I am not opening it on an empty stomach. It might be nothing. It has not felt like nothing. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-canley-vale-4",
+       "denyFlag": "hub:h-bowlo-canley-vale-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Right. Since you asked. The man who kept these greens before me drinks at Cabramatta now, and he owes Canley Vale an explanation about the drainage. I would not ask if there was anyone else about. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-canley-vale-5",
+       "denyFlag": "hub:h-bowlo-canley-vale-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Behind the Bar at Canley Vale — that's done.",
+       "turnin": "h-bowlo-canley-vale-4"
+      },
+      {
+       "text": "The Old Greenkeeper, Canley Vale — that's done.",
+       "turnin": "h-bowlo-canley-vale-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-pyrmont-bay-ida",
+   "name": "Ida, night console operator at Pyrmont Bay",
+   "x": -1139.9,
+   "z": 260,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Do not mind the mess. It is structural now.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I would do it myself if I could leave the counter. Every night around knock-off the same car does three laps of the Pyrmont Bay forecourt and never buys fuel. There is a version of this where I am the unreasonable one. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-pyrmont-bay-0",
+       "denyFlag": "hub:h-servo-pyrmont-bay-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You will think I am making this up. Now I know the plate, I want to know where it goes after it leaves Pyrmont Bay at knock-off, because it is not going home. The paperwork says one thing and my eyes say another. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-pyrmont-bay-1",
+       "denyFlag": "hub:h-servo-pyrmont-bay-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "Nights at Pyrmont Bay — that's done.",
+       "turnin": "h-servo-pyrmont-bay-0"
+      },
+      {
+       "text": "The Third Lap, Pyrmont Bay — that's done.",
+       "turnin": "h-servo-pyrmont-bay-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-pyrmont-bay-ereni",
+   "name": "Ereni, mechanic at Pyrmont Bay",
+   "x": -1179.9,
+   "z": 241.5,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are selling something the answer is no.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "There is no clever way to say this. Bay two at the Pyrmont Bay workshop has had the same car in it since school holidays and the owner has stopped answering. It has been going on longer than I have admitted to anyone. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-pyrmont-bay-2",
+       "denyFlag": "hub:h-servo-pyrmont-bay-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You look like you have twenty minutes. Someone has been walking out of Pyrmont Bay with a socket set at a time since school holidays, and I have run out of ways to be polite about it. I have got no proof, which is exactly why I am asking. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-pyrmont-bay-3",
+       "denyFlag": "hub:h-servo-pyrmont-bay-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Bay Two, Pyrmont Bay — that's done.",
+       "turnin": "h-servo-pyrmont-bay-2"
+      },
+      {
+       "text": "Tools Off the Bench, Pyrmont Bay — that's done.",
+       "turnin": "h-servo-pyrmont-bay-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-pyrmont-bay-saoirse",
+   "name": "Saoirse, franchisee at Pyrmont Bay",
+   "x": -1066,
+   "z": 212,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Cash only and no, I am joking. What do you want.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Keep it between us for now. Head office says the Pyrmont Bay board has been wrong since school holidays and I say it has been right for eleven years, and one of us is about to be embarrassed. It might be nothing. It has not felt like nothing. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-pyrmont-bay-4",
+       "denyFlag": "hub:h-servo-pyrmont-bay-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Right. Since you asked. The bloke who runs the site at Town Hall has had the same trouble Pyrmont Bay has, and he will talk to you before he talks to me. I would not ask if there was anyone else about. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-pyrmont-bay-5",
+       "denyFlag": "hub:h-servo-pyrmont-bay-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "The Pyrmont Bay Price Board — that's done.",
+       "turnin": "h-servo-pyrmont-bay-4"
+      },
+      {
+       "text": "The Other Franchise, Pyrmont Bay — that's done.",
+       "turnin": "h-servo-pyrmont-bay-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-riverwood-zenia",
+   "name": "Zenia, building manager at Riverwood",
+   "x": -14443,
+   "z": 9338,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You have got a face like you can keep your mouth shut.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I would do it myself if I could leave the counter. Water has been coming through the level two ceiling of the Riverwood block since the long weekend and the strata report says there is no water. There is a version of this where I am the unreasonable one. I will know if you skipped a bit.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-riverwood-0",
+       "denyFlag": "hub:h-strata-riverwood-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You will think I am making this up. The photo did it. The paperwork says one thing and my eyes say another. Now every owner at Riverwood owes $38 and I have to collect it from people who have avoided me for a year. Say nothing to anyone on the way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-riverwood-1",
+       "denyFlag": "hub:h-strata-riverwood-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "Level Two, Riverwood — that's done.",
+       "turnin": "h-strata-riverwood-0"
+      },
+      {
+       "text": "The Special Levy, Riverwood — that's done.",
+       "turnin": "h-strata-riverwood-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-riverwood-morgan",
+   "name": "Morgan, owner-occupier at Riverwood",
+   "x": -14326,
+   "z": 9282,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Right. Talk while I do this.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "There is no clever way to say this. Somebody who does not live at Riverwood has parked in space fourteen every night since the long weekend and the manager will not look at it. It has been going on longer than I have admitted to anyone. Do not make a scene about it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-riverwood-2",
+       "denyFlag": "hub:h-strata-riverwood-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You look like you have twenty minutes. The Riverwood AGM is on the long weekend and I would like to arrive with something stronger than a grievance and a printout. I have got no proof, which is exactly why I am asking. Ask for me by name at the counter.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-riverwood-3",
+       "denyFlag": "hub:h-strata-riverwood-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "Car Space 14, Riverwood — that's done.",
+       "turnin": "h-strata-riverwood-2"
+      },
+      {
+       "text": "The Meeting, Riverwood — that's done.",
+       "turnin": "h-strata-riverwood-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-riverwood-yiannis",
+   "name": "Yiannis, the one who does the bins at Riverwood",
+   "x": -14377.3,
+   "z": 9283.4,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You right there? I am mid-something but go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Keep it between us for now. Three units at Riverwood have put their bins out on the wrong night since the long weekend and I have taken it personally, which I accept is a choice I made. It might be nothing. It has not felt like nothing. Come back and tell me straight.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-riverwood-4",
+       "denyFlag": "hub:h-strata-riverwood-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Right. Since you asked. There is a block at Narwee with the same builder and the same cracks, and their manager has already been through what Riverwood is starting. I would not ask if there was anyone else about. Do that and we're square.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-riverwood-5",
+       "denyFlag": "hub:h-strata-riverwood-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "Bin Night at Riverwood — that's done.",
+       "turnin": "h-strata-riverwood-4"
+      },
+      {
+       "text": "The Other Block, Riverwood — that's done.",
+       "turnin": "h-strata-riverwood-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

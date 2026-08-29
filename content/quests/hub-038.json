@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-cornershop-waitara-0",
+   "act": 3,
+   "title": "Short Delivery, Waitara",
+   "blurb": "Honestly, I am past caring how it looks. The Waitara order has been two cartons light every week since Thursdays and the invoice says otherwise every time. It started small, the way these things do. Whatever it costs you, tell me and I will cover it.",
+   "giver": "hub-waitara-mercer",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10028,
+     "z": -17341,
+     "radius": 25,
+     "label": "the loading bay round the side"
+    },
+    {
+     "kind": "photo",
+     "x": -10039,
+     "z": -17338,
+     "radius": 35,
+     "label": "the pallet as it actually arrives"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I have got something to send them",
+     "npc": "hub-waitara-mercer"
+    }
+   ],
+   "reward": {
+    "cash": 98,
+    "xp": 265,
+    "unlock": [
+     "hub:h-cornershop-waitara-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-waitara-1",
+   "act": 3,
+   "title": "The Credit Note, Waitara",
+   "blurb": "I would do it myself if I could leave the counter. They admitted it, which I did not expect, so now there is $70 owing to Waitara and it is not going to walk in here itself. It is the not knowing that has got me, honestly. I would rather know than wonder.",
+   "giver": "hub-waitara-mercer",
+   "level": 4,
+   "requires": [
+    "h-cornershop-waitara-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 70,
+     "label": "$70, and do not take a voucher"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "cash, on the counter, and I will believe it",
+     "npc": "hub-waitara-mercer"
+    }
+   ],
+   "reward": {
+    "cash": 154,
+    "xp": 357,
+    "unlock": [
+     "hub:h-cornershop-waitara-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-waitara-2",
+   "act": 3,
+   "title": "The Waitara Run",
+   "blurb": "You will think I am making this up. I do the Waitara run at first light and there is a stretch of it where the van gets followed, which I have told nobody until now. There is probably a simple explanation and I would love to hear it. That's the whole job. No catch.",
+   "giver": "hub-waitara-vikram",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Waitara",
+     "to": "Hornsby",
+     "label": "ride it with me as far as Hornsby"
+    },
+    {
+     "kind": "photo",
+     "x": -10102,
+     "z": -17523,
+     "radius": 35,
+     "label": "whatever is behind us when we stop"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 266,
+    "unlock": [
+     "hub:h-cornershop-waitara-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-waitara-3",
+   "act": 3,
+   "title": "Locked Out, Waitara",
+   "blurb": "There is no clever way to say this. I have got a roll of raffle tickets in the back of the van and the Waitara shop is shut, and the number on the door rings out. You will see what I mean the second you get there. Be polite about it. It costs nothing.",
+   "giver": "hub-waitara-vikram",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -9932,
+     "z": -17540,
+     "radius": 25,
+     "label": "try the flat above the shop"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "get one in you, this takes a while"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "somebody has to sign for it",
+     "npc": "hub-waitara-vikram"
+    }
+   ],
+   "reward": {
+    "cash": 103,
+    "xp": 272,
+    "unlock": [
+     "hub:h-cornershop-waitara-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-waitara-4",
+   "act": 3,
+   "title": "The Regulars, Waitara",
+   "blurb": "You look like you have twenty minutes. Three of the Waitara regulars have started coming in together and going out separately, and the till is $87 down on those days. There is a version of this where I am the unreasonable one. Take your time. Do not take a week.",
+   "giver": "hub-waitara-aiden",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 3,
+     "label": "the ones who come in as a set"
+    },
+    {
+     "kind": "earn",
+     "dollars": 87,
+     "label": "$87, which is exactly what the till says"
+    }
+   ],
+   "reward": {
+    "cash": 111,
+    "xp": 270,
+    "unlock": [
+     "hub:h-cornershop-waitara-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-waitara-5",
+   "act": 3,
+   "title": "The Wholesaler, Waitara",
+   "blurb": "Keep it between us for now. Everything Waitara sells comes off a floor at Hornsby, and the woman who runs it will tell you things she will not put in writing. The paperwork says one thing and my eyes say another. Come and find me after, either way.",
+   "giver": "hub-waitara-aiden",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10721,
+     "z": -18190,
+     "radius": 60,
+     "label": "go and see her before the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come and tell me what she said about us",
+     "npc": "hub-waitara-aiden"
+    }
+   ],
+   "reward": {
+    "cash": 103,
+    "xp": 263,
+    "unlock": [
+     "hub:h-cornershop-waitara-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-macdonaldtown-0",
+   "act": 3,
+   "title": "Under 12s at Macdonaldtown",
+   "blurb": "Honestly, I am past caring how it looks. I have got eleven kids for a twelve-a-side at Macdonaldtown on the first of the month and one of them has a note from his mother. It started small, the way these things do. Whatever it costs you, tell me and I will cover it.",
+   "giver": "hub-macdonaldtown-amara",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2034,
+     "z": 3243,
+     "radius": 25,
+     "label": "the estate behind the ground, ask around"
+    },
+    {
+     "kind": "photo",
+     "x": -2122,
+     "z": 3299,
+     "radius": 35,
+     "label": "the noticeboard where the sign-on sheet went up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "any kid with boots will do at this point",
+     "npc": "hub-macdonaldtown-amara"
+    }
+   ],
+   "reward": {
+    "cash": 129,
+    "xp": 312,
+    "unlock": [
+     "hub:h-oval-macdonaldtown-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-macdonaldtown-1",
+   "act": 3,
+   "title": "Registration, Macdonaldtown",
+   "blurb": "I would do it myself if I could leave the counter. We found a twelfth, which means the Macdonaldtown club now owes the association $78 it had budgeted on not owing. It is the not knowing that has got me, honestly. I would rather know than wonder.",
+   "giver": "hub-macdonaldtown-amara",
+   "level": 5,
+   "requires": [
+    "h-oval-macdonaldtown-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 78,
+     "label": "$78 before the cut-off"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will drive it in myself",
+     "npc": "hub-macdonaldtown-amara"
+    }
+   ],
+   "reward": {
+    "cash": 160,
+    "xp": 411,
+    "unlock": [
+     "hub:h-oval-macdonaldtown-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-macdonaldtown-2",
+   "act": 3,
+   "title": "The Macdonaldtown Canteen",
+   "blurb": "You will think I am making this up. The canteen at Macdonaldtown does two hundred sausages on a Saturday and this week the freezer went off at the middle of the news. There is probably a simple explanation and I would love to hear it. That's the whole job. No catch.",
+   "giver": "hub-macdonaldtown-ereni",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "we are going to need the coffee"
+    },
+    {
+     "kind": "photo",
+     "x": -2151,
+     "z": 3202,
+     "radius": 35,
+     "label": "the thermometer, so the insurance believes us"
+    }
+   ],
+   "reward": {
+    "cash": 110,
+    "xp": 314,
+    "unlock": [
+     "hub:h-oval-macdonaldtown-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-macdonaldtown-3",
+   "act": 3,
+   "title": "Grand Final Float, Macdonaldtown",
+   "blurb": "There is no clever way to say this. Somebody walked off with the float from the Macdonaldtown canteen at about the middle of the news during the last home game, and I have a fair idea which somebody. You will see what I mean the second you get there. Be polite about it. It costs nothing.",
+   "giver": "hub-macdonaldtown-ereni",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "the pair who were leaning on the roller door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 62,
+     "label": "$62, which is what was in the tin"
+    }
+   ],
+   "reward": {
+    "cash": 116,
+    "xp": 315,
+    "unlock": [
+     "hub:h-oval-macdonaldtown-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-macdonaldtown-4",
+   "act": 3,
+   "title": "Sprinkler Line, Macdonaldtown",
+   "blurb": "You look like you have twenty minutes. The sprinkler line under the Macdonaldtown outfield has been leaking since the first of the month and the wet patch has started to move. There is a version of this where I am the unreasonable one. Take your time. Do not take a week.",
+   "giver": "hub-macdonaldtown-dilan",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2193,
+     "z": 3066,
+     "radius": 25,
+     "label": "walk the line from the tap to the boundary"
+    },
+    {
+     "kind": "photo",
+     "x": -2174,
+     "z": 3044,
+     "radius": 35,
+     "label": "where the grass has gone dark"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to dig once, not five times",
+     "npc": "hub-macdonaldtown-dilan"
+    }
+   ],
+   "reward": {
+    "cash": 113,
+    "xp": 321,
+    "unlock": [
+     "hub:h-oval-macdonaldtown-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-macdonaldtown-5",
+   "act": 3,
+   "title": "The Association, Macdonaldtown",
+   "blurb": "Keep it between us for now. The bloke who allocates grounds for the whole association sits at St Peters, and Macdonaldtown has been at the bottom of his list for two seasons. The paperwork says one thing and my eyes say another. Come and find me after, either way.",
+   "giver": "hub-macdonaldtown-dilan",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2527,
+     "z": 4468,
+     "radius": 60,
+     "label": "go and be reasonable at him"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if it is us or the paperwork",
+     "npc": "hub-macdonaldtown-dilan"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 318,
+    "unlock": [
+     "hub:h-oval-macdonaldtown-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-minto-0",
+   "act": 3,
+   "title": "The Creek Behind Minto",
+   "blurb": "Honestly, I am past caring how it looks. Somebody has been tipping fill into the creek behind Minto since grand final week and it is narrowing the channel a metre at a time. It started small, the way these things do. Whatever it costs you, tell me and I will cover it.",
+   "giver": "hub-minto-sana",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -33634,
+     "z": 18265,
+     "radius": 35,
+     "label": "the fill, with the water level in shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council reads photographs, not letters",
+     "npc": "hub-minto-sana"
+    }
+   ],
+   "reward": {
+    "cash": 110,
+    "xp": 323,
+    "unlock": [
+     "hub:h-creek-minto-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-minto-1",
+   "act": 3,
+   "title": "Willow Removal, Minto",
+   "blurb": "I would do it myself if I could leave the counter. They have agreed to a clean-up at Minto, which is wonderful, except the grant is $81 short and closes on grand final week. It is the not knowing that has got me, honestly. I would rather know than wonder.",
+   "giver": "hub-minto-sana",
+   "level": 5,
+   "requires": [
+    "h-creek-minto-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 81,
+     "label": "$81, and I do not care whose pocket"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the form needs the number today",
+     "npc": "hub-minto-sana"
+    }
+   ],
+   "reward": {
+    "cash": 158,
+    "xp": 400,
+    "unlock": [
+     "hub:h-creek-minto-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-minto-2",
+   "act": 3,
+   "title": "Sandbags, Minto",
+   "blurb": "You will think I am making this up. We had 93 sandbags in the Minto shed on grand final week and this morning we have got the pallet they came on. There is probably a simple explanation and I would love to hear it. That's the whole job. No catch.",
+   "giver": "hub-minto-sanjay",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -33828,
+     "z": 18150,
+     "radius": 25,
+     "label": "the yards backing onto the reserve"
+    },
+    {
+     "kind": "photo",
+     "x": -33836,
+     "z": 18134,
+     "radius": 35,
+     "label": "anywhere they have obviously been used"
+    }
+   ],
+   "reward": {
+    "cash": 121,
+    "xp": 304,
+    "unlock": [
+     "hub:h-creek-minto-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-minto-3",
+   "act": 3,
+   "title": "The Low Crossing, Minto",
+   "blurb": "There is no clever way to say this. People keep driving the low crossing at Minto at the middle of the news with the water over the sign, and one of them is going to be the one. You will see what I mean the second you get there. Be polite about it. It costs nothing.",
+   "giver": "hub-minto-sanjay",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you will be standing out there a while"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "the ones who argue with the barrier"
+    }
+   ],
+   "reward": {
+    "cash": 129,
+    "xp": 313,
+    "unlock": [
+     "hub:h-creek-minto-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-minto-4",
+   "act": 3,
+   "title": "Under the House, Minto",
+   "blurb": "You look like you have twenty minutes. The water came through my place at Minto on grand final week and the assessor wants photographs of things I have already thrown out. There is a version of this where I am the unreasonable one. Take your time. Do not take a week.",
+   "giver": "hub-minto-hasan",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -33662,
+     "z": 18072,
+     "radius": 25,
+     "label": "round the side, where the pile is"
+    },
+    {
+     "kind": "photo",
+     "x": -33643,
+     "z": 18074,
+     "radius": 35,
+     "label": "the high-water mark on the brick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the whole claim, that mark",
+     "npc": "hub-minto-hasan"
+    }
+   ],
+   "reward": {
+    "cash": 121,
+    "xp": 301,
+    "unlock": [
+     "hub:h-creek-minto-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-minto-5",
+   "act": 3,
+   "title": "Upstream, Minto",
+   "blurb": "Keep it between us for now. Whatever is happening to Minto starts upstream at Leumeah, and there are people up there who have been saying so for years. The paperwork says one thing and my eyes say another. Come and find me after, either way.",
+   "giver": "hub-minto-hasan",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -34584,
+     "z": 20710,
+     "radius": 60,
+     "label": "go up and find them"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear it from someone who is not me",
+     "npc": "hub-minto-hasan"
+    }
+   ],
+   "reward": {
+    "cash": 120,
+    "xp": 316,
+    "unlock": [
+     "hub:h-creek-minto-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

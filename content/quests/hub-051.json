@@ -1,0 +1,663 @@
+{
+ "quests": [
+  {
+   "id": "h-newsagent-concord-west-0",
+   "act": 3,
+   "title": "Returns at Concord West",
+   "blurb": "There is no clever way to say this. I am sending back 40 papers a day from Concord West and paying to have them collected, which is a business model somebody invented on purpose. Half the street knows and half the street is pretending not to. Do that and we're square.",
+   "giver": "hub-concord-west-barnaby",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -11368,
+     "z": -1979,
+     "radius": 35,
+     "label": "the returns stack, at its worst"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the distributor needs to see the size of it",
+     "npc": "hub-concord-west-barnaby"
+    }
+   ],
+   "reward": {
+    "cash": 109,
+    "xp": 262,
+    "unlock": [
+     "hub:h-newsagent-concord-west-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-concord-west-1",
+   "act": 3,
+   "title": "The Better Rate, Concord West",
+   "blurb": "You look like you have twenty minutes. They will drop my Concord West order if I can show $84 of turnover on the other side of the shop by a wet Monday. I am not after trouble. I am after an answer. I will owe you one, and I pay those.",
+   "giver": "hub-concord-west-barnaby",
+   "level": 4,
+   "requires": [
+    "h-newsagent-concord-west-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 84,
+     "label": "$84, and cards and stationery count"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "sell anything, I am not proud",
+     "npc": "hub-concord-west-barnaby"
+    }
+   ],
+   "reward": {
+    "cash": 144,
+    "xp": 364,
+    "unlock": [
+     "hub:h-newsagent-concord-west-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-concord-west-2",
+   "act": 3,
+   "title": "The Concord West Round",
+   "blurb": "Keep it between us for now. I do the Concord West round from two in the afternoon and for the last fortnight somebody has been taking the papers off the front steps behind me. Nobody else seems to have noticed, which is its own problem. Do not let them talk you into anything.",
+   "giver": "hub-concord-west-beatrix",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11537,
+     "z": -1911,
+     "radius": 25,
+     "label": "the end of the round, where it starts"
+    },
+    {
+     "kind": "photo",
+     "x": -11563,
+     "z": -1934,
+     "radius": 35,
+     "label": "whoever is on that street at that hour"
+    }
+   ],
+   "reward": {
+    "cash": 97,
+    "xp": 267,
+    "unlock": [
+     "hub:h-newsagent-concord-west-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-concord-west-3",
+   "act": 3,
+   "title": "The Dog on Ash Street, Concord West",
+   "blurb": "Right. Since you asked. There is a dog on the Concord West round that has had two of my bags and a folding table that was not even mine. Everyone I have told has looked at me the way you are now. There's cash in it. Not a lot.",
+   "giver": "hub-concord-west-beatrix",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you will want your wits about you"
+    },
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "the owner, not the dog, I am not a monster"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me it is sorted",
+     "npc": "hub-concord-west-beatrix"
+    }
+   ],
+   "reward": {
+    "cash": 108,
+    "xp": 257,
+    "unlock": [
+     "hub:h-newsagent-concord-west-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-concord-west-4",
+   "act": 3,
+   "title": "The Syndicate, Concord West",
+   "blurb": "My knees are gone, so. Nine of us at Concord West have gone in on the same numbers since a wet Monday and one of us has stopped putting money in. This is the third time I have had this conversation. You'll know it when you see it.",
+   "giver": "hub-concord-west-nalini",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11399,
+     "z": -2127,
+     "radius": 25,
+     "label": "the house of the one who stopped"
+    },
+    {
+     "kind": "earn",
+     "dollars": 40,
+     "label": "$40, which is his share since he stopped"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it said out loud, not in the group chat",
+     "npc": "hub-concord-west-nalini"
+    }
+   ],
+   "reward": {
+    "cash": 101,
+    "xp": 274,
+    "unlock": [
+     "hub:h-newsagent-concord-west-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-concord-west-5",
+   "act": 3,
+   "title": "The Other Agency, Concord West",
+   "blurb": "This is going to sound small. The agency at North Strathfield closed six months before Concord West started struggling, and I would very much like to know what they know. It started small, the way these things do. Half now if you want it. Most people don't.",
+   "giver": "hub-concord-west-nalini",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11091,
+     "z": -1029,
+     "radius": 60,
+     "label": "the shop is shut, the family is not"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever they say, say it slowly to me",
+     "npc": "hub-concord-west-nalini"
+    }
+   ],
+   "reward": {
+    "cash": 101,
+    "xp": 257,
+    "unlock": [
+     "hub:h-newsagent-concord-west-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-riverstone-0",
+   "act": 3,
+   "title": "The Unclaimed Falcon, Riverstone",
+   "blurb": "There is no clever way to say this. There has been a car in the Riverstone yard since the week of the show with a folding table on the passenger seat and no owner answering. Half the street knows and half the street is pretending not to. Do that and we're square.",
+   "giver": "hub-riverstone-rukmini",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -32729,
+     "z": -20374,
+     "radius": 35,
+     "label": "the car and the plate together"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I have to prove I tried before I can move it",
+     "npc": "hub-riverstone-rukmini"
+    }
+   ],
+   "reward": {
+    "cash": 102,
+    "xp": 265,
+    "unlock": [
+     "hub:h-workshop-riverstone-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-riverstone-1",
+   "act": 3,
+   "title": "Storage Fees, Riverstone",
+   "blurb": "You look like you have twenty minutes. Now that it is documented, Riverstone is owed $68 in storage and the only person who can pay it is the person not answering. I am not after trouble. I am after an answer. I will owe you one, and I pay those.",
+   "giver": "hub-riverstone-rukmini",
+   "level": 4,
+   "requires": [
+    "h-workshop-riverstone-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 68,
+     "label": "$68, from him or from the scrap"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "either way it comes off my floor",
+     "npc": "hub-riverstone-rukmini"
+    }
+   ],
+   "reward": {
+    "cash": 142,
+    "xp": 365,
+    "unlock": [
+     "hub:h-workshop-riverstone-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-riverstone-2",
+   "act": 3,
+   "title": "First Year, Riverstone",
+   "blurb": "Keep it between us for now. I am in my first year at Riverstone and I have to log 72 hours on a job I am not allowed to touch on my own. Nobody else seems to have noticed, which is its own problem. Do not let them talk you into anything.",
+   "giver": "hub-riverstone-ava",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -32792,
+     "z": -20408,
+     "radius": 25,
+     "label": "the supplier, two streets over"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "and get him a coffee, it helps"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "sign the book and I owe you",
+     "npc": "hub-riverstone-ava"
+    }
+   ],
+   "reward": {
+    "cash": 103,
+    "xp": 256,
+    "unlock": [
+     "hub:h-workshop-riverstone-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-riverstone-3",
+   "act": 3,
+   "title": "The Air Line, Riverstone",
+   "blurb": "Right. Since you asked. Somebody has been coming into the Riverstone yard after quarter to six to use the air line, and last week they used the compressor as well. Everyone I have told has looked at me the way you are now. There's cash in it. Not a lot.",
+   "giver": "hub-riverstone-ava",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 2,
+     "label": "the ones who think the yard is public"
+    },
+    {
+     "kind": "photo",
+     "x": -32708,
+     "z": -20493,
+     "radius": 35,
+     "label": "the gate they are getting through"
+    }
+   ],
+   "reward": {
+    "cash": 100,
+    "xp": 260,
+    "unlock": [
+     "hub:h-workshop-riverstone-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-riverstone-4",
+   "act": 3,
+   "title": "My Own Car, Riverstone",
+   "blurb": "My knees are gone, so. My car has been at Riverstone since the week of the show and every time I ring, the quote has grown by about $72. This is the third time I have had this conversation. You'll know it when you see it.",
+   "giver": "hub-riverstone-cassian",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -32651,
+     "z": -20499,
+     "radius": 25,
+     "label": "stand in the office where they can see you"
+    },
+    {
+     "kind": "photo",
+     "x": -32641,
+     "z": -20498,
+     "radius": 35,
+     "label": "the job card on the wall, all of it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I know what I am arguing about",
+     "npc": "hub-riverstone-cassian"
+    }
+   ],
+   "reward": {
+    "cash": 114,
+    "xp": 261,
+    "unlock": [
+     "hub:h-workshop-riverstone-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-riverstone-5",
+   "act": 3,
+   "title": "The Assessor, Riverstone",
+   "blurb": "This is going to sound small. The insurance assessor who signs off every job at Riverstone works out of Vineyard, and he has never once seen the car he is assessing. It started small, the way these things do. Half now if you want it. Most people don't.",
+   "giver": "hub-riverstone-cassian",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -33564,
+     "z": -23589,
+     "radius": 60,
+     "label": "catch him before he goes out on the road"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear how he does it",
+     "npc": "hub-riverstone-cassian"
+    }
+   ],
+   "reward": {
+    "cash": 94,
+    "xp": 271,
+    "unlock": [
+     "hub:h-workshop-riverstone-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-arlington-0",
+   "act": 3,
+   "title": "Dumped Out the Back, Arlington",
+   "blurb": "There is no clever way to say this. People leave things at the Arlington roller door after the second express and by morning it is rained on and it is our problem and our tip fee. Half the street knows and half the street is pretending not to. Do that and we're square.",
+   "giver": "hub-arlington-sheela",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -6521,
+     "z": 3825,
+     "radius": 35,
+     "label": "the pile, on a bad morning"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council will not act without one of these",
+     "npc": "hub-arlington-sheela"
+    }
+   ],
+   "reward": {
+    "cash": 109,
+    "xp": 308,
+    "unlock": [
+     "hub:h-opshop-arlington-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-arlington-1",
+   "act": 3,
+   "title": "The Tip Fee, Arlington",
+   "blurb": "You look like you have twenty minutes. The photos worked, which means Arlington can claim back the $72 we have paid to throw away other people's furniture since grand final week. I am not after trouble. I am after an answer. I will owe you one, and I pay those.",
+   "giver": "hub-arlington-sheela",
+   "level": 5,
+   "requires": [
+    "h-opshop-arlington-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 72,
+     "label": "$72, and every receipt counts"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will do the form if you do the walking",
+     "npc": "hub-arlington-sheela"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 404,
+    "unlock": [
+     "hub:h-opshop-arlington-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-arlington-2",
+   "act": 3,
+   "title": "The Good Box, Arlington",
+   "blurb": "Keep it between us for now. Something came into Arlington on grand final week in a box of paperbacks that I do not think the family meant to give away. Nobody else seems to have noticed, which is its own problem. Do not let them talk you into anything.",
+   "giver": "hub-arlington-rumi",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -6629,
+     "z": 3898,
+     "radius": 25,
+     "label": "the address on the donation slip"
+    },
+    {
+     "kind": "photo",
+     "x": -6652,
+     "z": 3884,
+     "radius": 35,
+     "label": "the thing itself, before it goes back"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I would rather give it back than sell it",
+     "npc": "hub-arlington-rumi"
+    }
+   ],
+   "reward": {
+    "cash": 118,
+    "xp": 316,
+    "unlock": [
+     "hub:h-opshop-arlington-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-arlington-3",
+   "act": 3,
+   "title": "Sorting Room, Arlington",
+   "blurb": "Right. Since you asked. Two people have been coming into the Arlington sorting room since grand final week and taking the good stock before it reaches the floor, and one of them volunteers here. Everyone I have told has looked at me the way you are now. There's cash in it. Not a lot.",
+   "giver": "hub-arlington-rumi",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "catch them at the back door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 25,
+     "label": "$25, which is what the good stock made last month"
+    }
+   ],
+   "reward": {
+    "cash": 115,
+    "xp": 324,
+    "unlock": [
+     "hub:h-opshop-arlington-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-arlington-4",
+   "act": 3,
+   "title": "The Van, Arlington",
+   "blurb": "My knees are gone, so. I do the Arlington pick-ups in a van with 25 thousand on it and a door that only opens if you know about it. This is the third time I have had this conversation. You'll know it when you see it.",
+   "giver": "hub-arlington-ismail",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Arlington",
+     "to": "Dulwich Grove",
+     "label": "come out to Dulwich Grove with me, it is a two-person lift"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "we will stop on the way, my shout"
+    }
+   ],
+   "reward": {
+    "cash": 113,
+    "xp": 302,
+    "unlock": [
+     "hub:h-opshop-arlington-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-arlington-5",
+   "act": 3,
+   "title": "Head Office, Arlington",
+   "blurb": "This is going to sound small. Everything Arlington cannot sell goes to a warehouse at Dulwich Hill, and nobody there has ever answered a phone in my hearing. It started small, the way these things do. Half now if you want it. Most people don't.",
+   "giver": "hub-arlington-ismail",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -6284,
+     "z": 4849,
+     "radius": 60,
+     "label": "turn up in person, that is the trick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me there is a person in there",
+     "npc": "hub-arlington-ismail"
+    }
+   ],
+   "reward": {
+    "cash": 117,
+    "xp": 319,
+    "unlock": [
+     "hub:h-opshop-arlington-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

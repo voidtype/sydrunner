@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-hurstville-sabina",
+   "name": "Sabina, greenkeeper at Hurstville",
+   "x": -9854,
+   "z": 11168,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are selling something the answer is no.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I have been putting it off since Easter. The number three green at Hurstville has had a bald patch the shape of Tasmania since a public holiday nobody remembered, and the committee thinks I am inventing it. The paperwork says one thing and my eyes say another. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-hurstville-0",
+       "denyFlag": "hub:h-bowlo-hurstville-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Before you say anything: yes, I know. They have seen the photograph and now they want it re-laid by a public holiday nobody remembered, which means finding $56 that the Hurstville club does not have. It has been going on longer than I have admitted to anyone. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-hurstville-1",
+       "denyFlag": "hub:h-bowlo-hurstville-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Sit. Talk. Then I will decide how I feel.",
+     "choices": [
+      {
+       "text": "The Dead Patch at Hurstville — that's done.",
+       "turnin": "h-bowlo-hurstville-0"
+      },
+      {
+       "text": "Turf Money, Hurstville — that's done.",
+       "turnin": "h-bowlo-hurstville-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-hurstville-ozgur",
+   "name": "Ozgur, club president at Hurstville",
+   "x": -9750,
+   "z": 11293,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Cash only and no, I am joking. What do you want.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is not a police matter and I have checked. Our books say 62 members at Hurstville and I would bet the bar takings that half of them are dead or moved to Queensland. I have got no proof, which is exactly why I am asking. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-hurstville-2",
+       "denyFlag": "hub:h-bowlo-hurstville-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Honestly, I am past caring how it looks. Since twenty past four somebody has been going round the Hurstville greens telling the barefoot bowlers we are shutting, and we are not shutting. It might be nothing. It has not felt like nothing. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-hurstville-3",
+       "denyFlag": "hub:h-bowlo-hurstville-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You have got that look. Good or bad, out with it.",
+     "choices": [
+      {
+       "text": "The Hurstville Membership Count — that's done.",
+       "turnin": "h-bowlo-hurstville-2"
+      },
+      {
+       "text": "Closing Time Rumour, Hurstville — that's done.",
+       "turnin": "h-bowlo-hurstville-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-hurstville-milena",
+   "name": "Milena, bar manager at Hurstville",
+   "x": -9807,
+   "z": 11085,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You have got a face like you can keep your mouth shut.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I would do it myself if I could leave the counter. There is a roll of raffle tickets in the chest freezer behind the bar at Hurstville and I am not opening it on an empty stomach. I would not ask if there was anyone else about. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-hurstville-4",
+       "denyFlag": "hub:h-bowlo-hurstville-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You will think I am making this up. The man who kept these greens before me drinks at Allawah now, and he owes Hurstville an explanation about the drainage. You can tell me I am imagining it. Tell me after. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bowlo-hurstville-5",
+       "denyFlag": "hub:h-bowlo-hurstville-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Before you start: did anyone see you.",
+     "choices": [
+      {
+       "text": "Behind the Bar at Hurstville — that's done.",
+       "turnin": "h-bowlo-hurstville-4"
+      },
+      {
+       "text": "The Old Greenkeeper, Hurstville — that's done.",
+       "turnin": "h-bowlo-hurstville-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-campbelltown-hemi",
+   "name": "Hemi, night console operator at Campbelltown",
+   "x": -35937,
+   "z": 22379,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Right. Talk while I do this.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I have been putting it off since Easter. Every night around the second express the same car does three laps of the Campbelltown forecourt and never buys fuel. The paperwork says one thing and my eyes say another. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-campbelltown-0",
+       "denyFlag": "hub:h-servo-campbelltown-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Before you say anything: yes, I know. Now I know the plate, I want to know where it goes after it leaves Campbelltown at the second express, because it is not going home. It has been going on longer than I have admitted to anyone. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-campbelltown-1",
+       "denyFlag": "hub:h-servo-campbelltown-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "Nights at Campbelltown — that's done.",
+       "turnin": "h-servo-campbelltown-0"
+      },
+      {
+       "text": "The Third Lap, Campbelltown — that's done.",
+       "turnin": "h-servo-campbelltown-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-campbelltown-maya",
+   "name": "Maya, mechanic at Campbelltown",
+   "x": -36024.1,
+   "z": 22158.7,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You right there? I am mid-something but go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is not a police matter and I have checked. Bay two at the Campbelltown workshop has had the same car in it since the week of the show and the owner has stopped answering. I have got no proof, which is exactly why I am asking. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-campbelltown-2",
+       "denyFlag": "hub:h-servo-campbelltown-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Honestly, I am past caring how it looks. Someone has been walking out of Campbelltown with a socket set at a time since the week of the show, and I have run out of ways to be polite about it. It might be nothing. It has not felt like nothing. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-campbelltown-3",
+       "denyFlag": "hub:h-servo-campbelltown-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Bay Two, Campbelltown — that's done.",
+       "turnin": "h-servo-campbelltown-2"
+      },
+      {
+       "text": "Tools Off the Bench, Campbelltown — that's done.",
+       "turnin": "h-servo-campbelltown-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-campbelltown-priya",
+   "name": "Priya, franchisee at Campbelltown",
+   "x": -36020,
+   "z": 22402,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are here about the sign, the sign is wrong.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I would do it myself if I could leave the counter. Head office says the Campbelltown board has been wrong since the week of the show and I say it has been right for eleven years, and one of us is about to be embarrassed. I would not ask if there was anyone else about. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-campbelltown-4",
+       "denyFlag": "hub:h-servo-campbelltown-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You will think I am making this up. The bloke who runs the site at Macarthur has had the same trouble Campbelltown has, and he will talk to you before he talks to me. You can tell me I am imagining it. Tell me after. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-servo-campbelltown-5",
+       "denyFlag": "hub:h-servo-campbelltown-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "The Campbelltown Price Board — that's done.",
+       "turnin": "h-servo-campbelltown-4"
+      },
+      {
+       "text": "The Other Franchise, Campbelltown — that's done.",
+       "turnin": "h-servo-campbelltown-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-lewisham-west-mardi",
+   "name": "Mardi, building manager at Lewisham West",
+   "x": -6085,
+   "z": 2784,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand in the doorway, mate, come round.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I have been putting it off since Easter. Water has been coming through the level two ceiling of the Lewisham West block since a public holiday nobody remembered and the strata report says there is no water. The paperwork says one thing and my eyes say another. Whatever you find, bring it to me first.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-lewisham-west-0",
+       "denyFlag": "hub:h-strata-lewisham-west-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Before you say anything: yes, I know. The photo did it. It has been going on longer than I have admitted to anyone. Now every owner at Lewisham West owes $113 and I have to collect it from people who have avoided me for a year. That's it. That's the whole ask.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-lewisham-west-1",
+       "denyFlag": "hub:h-strata-lewisham-west-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "Level Two, Lewisham West — that's done.",
+       "turnin": "h-strata-lewisham-west-0"
+      },
+      {
+       "text": "The Special Levy, Lewisham West — that's done.",
+       "turnin": "h-strata-lewisham-west-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-lewisham-west-dulcie",
+   "name": "Dulcie, owner-occupier at Lewisham West",
+   "x": -6006,
+   "z": 2981,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Long day. Say what you came to say.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "It is not a police matter and I have checked. Somebody who does not live at Lewisham West has parked in space fourteen every night since a public holiday nobody remembered and the manager will not look at it. I have got no proof, which is exactly why I am asking. If it's nothing, it's nothing. Tell me anyway.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-lewisham-west-2",
+       "denyFlag": "hub:h-strata-lewisham-west-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Honestly, I am past caring how it looks. The Lewisham West AGM is on a public holiday nobody remembered and I would like to arrive with something stronger than a grievance and a printout. It might be nothing. It has not felt like nothing. If anyone asks, you were never here.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-lewisham-west-3",
+       "denyFlag": "hub:h-strata-lewisham-west-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "Car Space 14, Lewisham West — that's done.",
+       "turnin": "h-strata-lewisham-west-2"
+      },
+      {
+       "text": "The Meeting, Lewisham West — that's done.",
+       "turnin": "h-strata-lewisham-west-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-lewisham-west-tash",
+   "name": "Tash, the one who does the bins at Lewisham West",
+   "x": -5874,
+   "z": 2928,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I know that look. Everyone wants something today.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "I would do it myself if I could leave the counter. Three units at Lewisham West have put their bins out on the wrong night since a public holiday nobody remembered and I have taken it personally, which I accept is a choice I made. I would not ask if there was anyone else about. There is no rush, but there is a Friday.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-lewisham-west-4",
+       "denyFlag": "hub:h-strata-lewisham-west-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "You will think I am making this up. There is a block at Arlington with the same builder and the same cracks, and their manager has already been through what Lewisham West is starting. You can tell me I am imagining it. Tell me after. I'll see you right for it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-strata-lewisham-west-5",
+       "denyFlag": "hub:h-strata-lewisham-west-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "Bin Night at Lewisham West — that's done.",
+       "turnin": "h-strata-lewisham-west-4"
+      },
+      {
+       "text": "The Other Block, Lewisham West — that's done.",
+       "turnin": "h-strata-lewisham-west-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

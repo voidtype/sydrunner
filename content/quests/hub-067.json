@@ -1,0 +1,663 @@
+{
+ "quests": [
+  {
+   "id": "h-newsagent-bella-vista-0",
+   "act": 3,
+   "title": "Returns at Bella Vista",
+   "blurb": "It is not a police matter and I have checked. I am sending back 74 papers a day from Bella Vista and paying to have them collected, which is a business model somebody invented on purpose. I am not after trouble. I am after an answer. I'll see you right for it.",
+   "giver": "hub-bella-vista-nguyet",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -24773,
+     "z": -14812,
+     "radius": 35,
+     "label": "the returns stack, at its worst"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the distributor needs to see the size of it",
+     "npc": "hub-bella-vista-nguyet"
+    }
+   ],
+   "reward": {
+    "cash": 178,
+    "xp": 487,
+    "unlock": [
+     "hub:h-newsagent-bella-vista-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-bella-vista-1",
+   "act": 3,
+   "title": "The Better Rate, Bella Vista",
+   "blurb": "Honestly, I am past caring how it looks. They will drop my Bella Vista order if I can show $114 of turnover on the other side of the shop by a public holiday nobody remembered. Nobody else seems to have noticed, which is its own problem. I'll put the kettle on for when you're back.",
+   "giver": "hub-bella-vista-nguyet",
+   "level": 9,
+   "requires": [
+    "h-newsagent-bella-vista-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 114,
+     "label": "$114, and cards and stationery count"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "sell anything, I am not proud",
+     "npc": "hub-bella-vista-nguyet"
+    }
+   ],
+   "reward": {
+    "cash": 212,
+    "xp": 574,
+    "unlock": [
+     "hub:h-newsagent-bella-vista-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-bella-vista-2",
+   "act": 3,
+   "title": "The Bella Vista Round",
+   "blurb": "I would do it myself if I could leave the counter. I do the Bella Vista round from the second express and for the last fortnight somebody has been taking the papers off the front steps behind me. Everyone I have told has looked at me the way you are now. Just do not come back empty-handed.",
+   "giver": "hub-bella-vista-hemi",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -24942,
+     "z": -14744,
+     "radius": 25,
+     "label": "the end of the round, where it starts"
+    },
+    {
+     "kind": "photo",
+     "x": -24968,
+     "z": -14767,
+     "radius": 35,
+     "label": "whoever is on that street at that hour"
+    }
+   ],
+   "reward": {
+    "cash": 183,
+    "xp": 504,
+    "unlock": [
+     "hub:h-newsagent-bella-vista-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-bella-vista-3",
+   "act": 3,
+   "title": "The Dog on Ash Street, Bella Vista",
+   "blurb": "You will think I am making this up. There is a dog on the Bella Vista round that has had two of my bags and a laminated notice that was not even mine. This is the third time I have had this conversation. I will know if you skipped a bit.",
+   "giver": "hub-bella-vista-hemi",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you will want your wits about you"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "the owner, not the dog, I am not a monster"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me it is sorted",
+     "npc": "hub-bella-vista-hemi"
+    }
+   ],
+   "reward": {
+    "cash": 176,
+    "xp": 506,
+    "unlock": [
+     "hub:h-newsagent-bella-vista-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-bella-vista-4",
+   "act": 3,
+   "title": "The Syndicate, Bella Vista",
+   "blurb": "There is no clever way to say this. Nine of us at Bella Vista have gone in on the same numbers since a public holiday nobody remembered and one of us has stopped putting money in. It started small, the way these things do. Say nothing to anyone on the way.",
+   "giver": "hub-bella-vista-senna",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -24804,
+     "z": -14960,
+     "radius": 25,
+     "label": "the house of the one who stopped"
+    },
+    {
+     "kind": "earn",
+     "dollars": 74,
+     "label": "$74, which is his share since he stopped"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it said out loud, not in the group chat",
+     "npc": "hub-bella-vista-senna"
+    }
+   ],
+   "reward": {
+    "cash": 177,
+    "xp": 486,
+    "unlock": [
+     "hub:h-newsagent-bella-vista-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-bella-vista-5",
+   "act": 3,
+   "title": "The Other Agency, Bella Vista",
+   "blurb": "You look like you have twenty minutes. The agency at Norwest closed six months before Bella Vista started struggling, and I would very much like to know what they know. It is the not knowing that has got me, honestly. Do not make a scene about it.",
+   "giver": "hub-bella-vista-senna",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -23155,
+     "z": -14628,
+     "radius": 60,
+     "label": "the shop is shut, the family is not"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever they say, say it slowly to me",
+     "npc": "hub-bella-vista-senna"
+    }
+   ],
+   "reward": {
+    "cash": 182,
+    "xp": 493,
+    "unlock": [
+     "hub:h-newsagent-bella-vista-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-glenfield-0",
+   "act": 3,
+   "title": "The Unclaimed Falcon, Glenfield",
+   "blurb": "It is not a police matter and I have checked. There has been a car in the Glenfield yard since every second Friday with a esky of warm cans on the passenger seat and no owner answering. I am not after trouble. I am after an answer. I'll see you right for it.",
+   "giver": "hub-glenfield-fionn",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -29152,
+     "z": 12081,
+     "radius": 35,
+     "label": "the car and the plate together"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I have to prove I tried before I can move it",
+     "npc": "hub-glenfield-fionn"
+    }
+   ],
+   "reward": {
+    "cash": 201,
+    "xp": 532,
+    "unlock": [
+     "hub:h-workshop-glenfield-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-glenfield-1",
+   "act": 3,
+   "title": "Storage Fees, Glenfield",
+   "blurb": "Honestly, I am past caring how it looks. Now that it is documented, Glenfield is owed $169 in storage and the only person who can pay it is the person not answering. Nobody else seems to have noticed, which is its own problem. I'll put the kettle on for when you're back.",
+   "giver": "hub-glenfield-fionn",
+   "level": 10,
+   "requires": [
+    "h-workshop-glenfield-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 169,
+     "label": "$169, from him or from the scrap"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "either way it comes off my floor",
+     "npc": "hub-glenfield-fionn"
+    }
+   ],
+   "reward": {
+    "cash": 224,
+    "xp": 630,
+    "unlock": [
+     "hub:h-workshop-glenfield-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-glenfield-2",
+   "act": 3,
+   "title": "First Year, Glenfield",
+   "blurb": "I would do it myself if I could leave the counter. I am in my first year at Glenfield and I have to log 61 hours on a job I am not allowed to touch on my own. Everyone I have told has looked at me the way you are now. Just do not come back empty-handed.",
+   "giver": "hub-glenfield-yannick",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -29259,
+     "z": 12046,
+     "radius": 25,
+     "label": "the supplier, two streets over"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "and get him a coffee, it helps"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "sign the book and I owe you",
+     "npc": "hub-glenfield-yannick"
+    }
+   ],
+   "reward": {
+    "cash": 196,
+    "xp": 531,
+    "unlock": [
+     "hub:h-workshop-glenfield-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-glenfield-3",
+   "act": 3,
+   "title": "The Air Line, Glenfield",
+   "blurb": "You will think I am making this up. Somebody has been coming into the Glenfield yard after quarter to six to use the air line, and last week they used the compressor as well. This is the third time I have had this conversation. I will know if you skipped a bit.",
+   "giver": "hub-glenfield-yannick",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "the ones who think the yard is public"
+    },
+    {
+     "kind": "photo",
+     "x": -29206,
+     "z": 11988,
+     "radius": 35,
+     "label": "the gate they are getting through"
+    }
+   ],
+   "reward": {
+    "cash": 190,
+    "xp": 546,
+    "unlock": [
+     "hub:h-workshop-glenfield-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-glenfield-4",
+   "act": 3,
+   "title": "My Own Car, Glenfield",
+   "blurb": "There is no clever way to say this. My car has been at Glenfield since every second Friday and every time I ring, the quote has grown by about $61. It started small, the way these things do. Say nothing to anyone on the way.",
+   "giver": "hub-glenfield-alfie",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -29118,
+     "z": 11955,
+     "radius": 25,
+     "label": "stand in the office where they can see you"
+    },
+    {
+     "kind": "photo",
+     "x": -29108,
+     "z": 11956,
+     "radius": 35,
+     "label": "the job card on the wall, all of it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I know what I am arguing about",
+     "npc": "hub-glenfield-alfie"
+    }
+   ],
+   "reward": {
+    "cash": 201,
+    "xp": 540,
+    "unlock": [
+     "hub:h-workshop-glenfield-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-glenfield-5",
+   "act": 3,
+   "title": "The Assessor, Glenfield",
+   "blurb": "You look like you have twenty minutes. The insurance assessor who signs off every job at Glenfield works out of Macquarie Fields, and he has never once seen the car he is assessing. It is the not knowing that has got me, honestly. Do not make a scene about it.",
+   "giver": "hub-glenfield-alfie",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -30133,
+     "z": 13395,
+     "radius": 60,
+     "label": "catch him before he goes out on the road"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear how he does it",
+     "npc": "hub-glenfield-alfie"
+    }
+   ],
+   "reward": {
+    "cash": 193,
+    "xp": 553,
+    "unlock": [
+     "hub:h-workshop-glenfield-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-mortdale-0",
+   "act": 3,
+   "title": "Dumped Out the Back, Mortdale",
+   "blurb": "It is not a police matter and I have checked. People leave things at the Mortdale roller door after quarter to six and by morning it is rained on and it is our problem and our tip fee. I am not after trouble. I am after an answer. I'll see you right for it.",
+   "giver": "hub-mortdale-aoife",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -11699,
+     "z": 11534,
+     "radius": 35,
+     "label": "the pile, on a bad morning"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council will not act without one of these",
+     "npc": "hub-mortdale-aoife"
+    }
+   ],
+   "reward": {
+    "cash": 67,
+    "xp": 137,
+    "unlock": [
+     "hub:h-opshop-mortdale-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-opshop-mortdale-1",
+   "act": 3,
+   "title": "The Tip Fee, Mortdale",
+   "blurb": "Honestly, I am past caring how it looks. The photos worked, which means Mortdale can claim back the $37 we have paid to throw away other people's furniture since the Sunday after payday. Nobody else seems to have noticed, which is its own problem. I'll put the kettle on for when you're back.",
+   "giver": "hub-mortdale-aoife",
+   "level": 1,
+   "requires": [
+    "h-opshop-mortdale-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 37,
+     "label": "$37, and every receipt counts"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will do the form if you do the walking",
+     "npc": "hub-mortdale-aoife"
+    }
+   ],
+   "reward": {
+    "cash": 102,
+    "xp": 218,
+    "unlock": [
+     "hub:h-opshop-mortdale-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-opshop-mortdale-2",
+   "act": 3,
+   "title": "The Good Box, Mortdale",
+   "blurb": "I would do it myself if I could leave the counter. Something came into Mortdale on the Sunday after payday in a box of paperbacks that I do not think the family meant to give away. Everyone I have told has looked at me the way you are now. Just do not come back empty-handed.",
+   "giver": "hub-mortdale-ebony",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11807,
+     "z": 11607,
+     "radius": 25,
+     "label": "the address on the donation slip"
+    },
+    {
+     "kind": "photo",
+     "x": -11830,
+     "z": 11593,
+     "radius": 35,
+     "label": "the thing itself, before it goes back"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I would rather give it back than sell it",
+     "npc": "hub-mortdale-ebony"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 116,
+    "unlock": [
+     "hub:h-opshop-mortdale-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-opshop-mortdale-3",
+   "act": 3,
+   "title": "Sorting Room, Mortdale",
+   "blurb": "You will think I am making this up. Two people have been coming into the Mortdale sorting room since the Sunday after payday and taking the good stock before it reaches the floor, and one of them volunteers here. This is the third time I have had this conversation. I will know if you skipped a bit.",
+   "giver": "hub-mortdale-ebony",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "catch them at the back door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 78,
+     "label": "$78, which is what the good stock made last month"
+    }
+   ],
+   "reward": {
+    "cash": 67,
+    "xp": 133,
+    "unlock": [
+     "hub:h-opshop-mortdale-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-opshop-mortdale-4",
+   "act": 3,
+   "title": "The Van, Mortdale",
+   "blurb": "There is no clever way to say this. I do the Mortdale pick-ups in a van with 78 thousand on it and a door that only opens if you know about it. It started small, the way these things do. Say nothing to anyone on the way.",
+   "giver": "hub-mortdale-walid",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Mortdale",
+     "to": "Penshurst",
+     "label": "come out to Penshurst with me, it is a two-person lift"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "we will stop on the way, my shout"
+    }
+   ],
+   "reward": {
+    "cash": 57,
+    "xp": 117,
+    "unlock": [
+     "hub:h-opshop-mortdale-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-opshop-mortdale-5",
+   "act": 3,
+   "title": "Head Office, Mortdale",
+   "blurb": "You look like you have twenty minutes. Everything Mortdale cannot sell goes to a warehouse at Oatley, and nobody there has ever answered a phone in my hearing. It is the not knowing that has got me, honestly. Do not make a scene about it.",
+   "giver": "hub-mortdale-walid",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11764,
+     "z": 12698,
+     "radius": 60,
+     "label": "turn up in person, that is the trick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me there is a person in there",
+     "npc": "hub-mortdale-walid"
+    }
+   ],
+   "reward": {
+    "cash": 59,
+    "xp": 127,
+    "unlock": [
+     "hub:h-opshop-mortdale-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  }
+ ]
+}

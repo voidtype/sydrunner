@@ -1,0 +1,450 @@
+{
+ "quests": [
+  {
+   "id": "h-bowlo-qvb-0",
+   "act": 3,
+   "title": "The Dead Patch at QVB",
+   "blurb": "You will think I am making this up. The number three green at QVB has had a bald patch the shape of Tasmania since the Sunday after payday, and the committee thinks I am inventing it. I have got a photo on my phone but it is useless. Come and find me after, either way.",
+   "giver": "hub-qvb-bruna",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -258,
+     "z": 335,
+     "radius": 35,
+     "label": "the patch, with something in frame for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring it to me before the meeting",
+     "npc": "hub-qvb-bruna"
+    }
+   ],
+   "reward": {
+    "cash": 87,
+    "xp": 225,
+    "unlock": [
+     "hub:h-bowlo-qvb-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-qvb-1",
+   "act": 3,
+   "title": "Turf Money, QVB",
+   "blurb": "There is no clever way to say this. They have seen the photograph and now they want it re-laid by the Sunday after payday, which means finding $66 that the QVB club does not have. I am aware how that sounds. Whatever you find, bring it to me first.",
+   "giver": "hub-qvb-bruna",
+   "level": 3,
+   "requires": [
+    "h-bowlo-qvb-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 66,
+     "label": "$66, however you like, I am not asking"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "put it in my hand, not the safe",
+     "npc": "hub-qvb-bruna"
+    }
+   ],
+   "reward": {
+    "cash": 130,
+    "xp": 318,
+    "unlock": [
+     "hub:h-bowlo-qvb-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-qvb-2",
+   "act": 3,
+   "title": "The QVB Membership Count",
+   "blurb": "You look like you have twenty minutes. Our books say 63 members at QVB and I would bet the bar takings that half of them are dead or moved to Queensland. My wife says I should let it go. My wife is wrong. That's it. That's the whole ask.",
+   "giver": "hub-qvb-vanni",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -412,
+     "z": 421,
+     "radius": 25,
+     "label": "stand at the side door where the list is kept"
+    },
+    {
+     "kind": "photo",
+     "x": -441,
+     "z": 412,
+     "radius": 35,
+     "label": "the board with the names still on it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "read me the ones you did not recognise",
+     "npc": "hub-qvb-vanni"
+    }
+   ],
+   "reward": {
+    "cash": 87,
+    "xp": 213,
+    "unlock": [
+     "hub:h-bowlo-qvb-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-qvb-3",
+   "act": 3,
+   "title": "Closing Time Rumour, QVB",
+   "blurb": "Keep it between us for now. Since just gone midnight somebody has been going round the QVB greens telling the barefoot bowlers we are shutting, and we are not shutting. I have rung the number on the letter four times. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-qvb-vanni",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 2,
+     "label": "whoever is doing the telling"
+    },
+    {
+     "kind": "earn",
+     "dollars": 103,
+     "label": "and take the bar money off them while you are there"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 221,
+    "unlock": [
+     "hub:h-bowlo-qvb-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-qvb-4",
+   "act": 3,
+   "title": "Behind the Bar at QVB",
+   "blurb": "Right. Since you asked. There is a docket book in the chest freezer behind the bar at QVB and I am not opening it on an empty stomach. Half the street knows and half the street is pretending not to. If anyone asks, you were never here.",
+   "giver": "hub-qvb-gideon",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get one into you first, seriously"
+    },
+    {
+     "kind": "goto",
+     "x": -370,
+     "z": 248,
+     "radius": 25,
+     "label": "round the back where the cellar door is"
+    },
+    {
+     "kind": "photo",
+     "x": -363,
+     "z": 233,
+     "radius": 35,
+     "label": "whatever is in there, before I lose my nerve"
+    }
+   ],
+   "reward": {
+    "cash": 95,
+    "xp": 210,
+    "unlock": [
+     "hub:h-bowlo-qvb-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-qvb-5",
+   "act": 3,
+   "title": "The Old Greenkeeper, QVB",
+   "blurb": "My knees are gone, so. The man who kept these greens before me drinks at Haymarket now, and he owes QVB an explanation about the drainage. I am not after trouble. I am after an answer. There is no rush, but there is a Friday.",
+   "giver": "hub-qvb-gideon",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -305,
+     "z": 1552,
+     "radius": 60,
+     "label": "find him and hear him out"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come back and tell me what he said",
+     "npc": "hub-qvb-gideon"
+    }
+   ],
+   "reward": {
+    "cash": 81,
+    "xp": 232,
+    "unlock": [
+     "hub:h-bowlo-qvb-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-bridge-street-0",
+   "act": 3,
+   "title": "Nights at Bridge Street",
+   "blurb": "You will think I am making this up. Every night around quarter to six the same car does three laps of the Bridge Street forecourt and never buys fuel. I have got a photo on my phone but it is useless. Come and find me after, either way.",
+   "giver": "hub-bridge-street-irina",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -256,
+     "z": -443,
+     "radius": 35,
+     "label": "the car, plate if you can get it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it on record before I ring anyone",
+     "npc": "hub-bridge-street-irina"
+    }
+   ],
+   "reward": {
+    "cash": 79,
+    "xp": 208,
+    "unlock": [
+     "hub:h-servo-bridge-street-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-bridge-street-1",
+   "act": 3,
+   "title": "The Third Lap, Bridge Street",
+   "blurb": "There is no clever way to say this. Now I know the plate, I want to know where it goes after it leaves Bridge Street at quarter to six, because it is not going home. I am aware how that sounds. Whatever you find, bring it to me first.",
+   "giver": "hub-bridge-street-irina",
+   "level": 3,
+   "requires": [
+    "h-servo-bridge-street-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Bridge Street",
+     "to": "Wynyard",
+     "label": "follow it as far as Wynyard"
+    },
+    {
+     "kind": "photo",
+     "x": -407,
+     "z": -479,
+     "radius": 35,
+     "label": "wherever it stops"
+    }
+   ],
+   "reward": {
+    "cash": 123,
+    "xp": 301,
+    "unlock": [
+     "hub:h-servo-bridge-street-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-bridge-street-2",
+   "act": 3,
+   "title": "Bay Two, Bridge Street",
+   "blurb": "You look like you have twenty minutes. Bay two at the Bridge Street workshop has had the same car in it since the week of the show and the owner has stopped answering. My wife says I should let it go. My wife is wrong. That's it. That's the whole ask.",
+   "giver": "hub-bridge-street-cruz",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -412,
+     "z": -577,
+     "radius": 25,
+     "label": "the address on the job card"
+    },
+    {
+     "kind": "photo",
+     "x": -413,
+     "z": -590,
+     "radius": 35,
+     "label": "the letterbox, so I know I have the right house"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if anybody actually lives there",
+     "npc": "hub-bridge-street-cruz"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 219,
+    "unlock": [
+     "hub:h-servo-bridge-street-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-bridge-street-3",
+   "act": 3,
+   "title": "Tools Off the Bench, Bridge Street",
+   "blurb": "Keep it between us for now. Someone has been walking out of Bridge Street with a socket set at a time since the week of the show, and I have run out of ways to be polite about it. I have rung the number on the letter four times. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-bridge-street-cruz",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 3,
+     "label": "the ones hanging round the air hose"
+    },
+    {
+     "kind": "earn",
+     "dollars": 61,
+     "label": "$61 of it back, that is what the set cost"
+    }
+   ],
+   "reward": {
+    "cash": 95,
+    "xp": 217,
+    "unlock": [
+     "hub:h-servo-bridge-street-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-bridge-street-4",
+   "act": 3,
+   "title": "The Bridge Street Price Board",
+   "blurb": "Right. Since you asked. Head office says the Bridge Street board has been wrong since the week of the show and I say it has been right for eleven years, and one of us is about to be embarrassed. Half the street knows and half the street is pretending not to. If anyone asks, you were never here.",
+   "giver": "hub-bridge-street-jenna",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "buy something so it is a real transaction"
+    },
+    {
+     "kind": "photo",
+     "x": -281,
+     "z": -583,
+     "radius": 35,
+     "label": "the board and the pump, both in the one shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that settles it either way",
+     "npc": "hub-bridge-street-jenna"
+    }
+   ],
+   "reward": {
+    "cash": 93,
+    "xp": 230,
+    "unlock": [
+     "hub:h-servo-bridge-street-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-bridge-street-5",
+   "act": 3,
+   "title": "The Other Franchise, Bridge Street",
+   "blurb": "My knees are gone, so. The bloke who runs the site at Town Hall has had the same trouble Bridge Street has, and he will talk to you before he talks to me. I am not after trouble. I am after an answer. There is no rush, but there is a Friday.",
+   "giver": "hub-bridge-street-jenna",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -44,
+     "z": 533,
+     "radius": 60,
+     "label": "find him on shift"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever he says, I want it word for word",
+     "npc": "hub-bridge-street-jenna"
+    }
+   ],
+   "reward": {
+    "cash": 87,
+    "xp": 210,
+    "unlock": [
+     "hub:h-servo-bridge-street-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

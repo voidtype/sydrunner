@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-cornershop-eastwood-0",
+   "act": 3,
+   "title": "Short Delivery, Eastwood",
+   "blurb": "Someone has to, and it may as well be you. The Eastwood order has been two cartons light every week since the long weekend and the invoice says otherwise every time. I have got no proof, which is exactly why I am asking. Say nothing to anyone on the way.",
+   "giver": "hub-eastwood-kayo",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11981,
+     "z": -8366,
+     "radius": 25,
+     "label": "the loading bay round the side"
+    },
+    {
+     "kind": "photo",
+     "x": -11992,
+     "z": -8363,
+     "radius": 35,
+     "label": "the pallet as it actually arrives"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I have got something to send them",
+     "npc": "hub-eastwood-kayo"
+    }
+   ],
+   "reward": {
+    "cash": 107,
+    "xp": 261,
+    "unlock": [
+     "hub:h-cornershop-eastwood-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-eastwood-1",
+   "act": 3,
+   "title": "The Credit Note, Eastwood",
+   "blurb": "You are the first person to stop all morning. They admitted it, which I did not expect, so now there is $63 owing to Eastwood and it is not going to walk in here itself. It might be nothing. It has not felt like nothing. Do not make a scene about it.",
+   "giver": "hub-eastwood-kayo",
+   "level": 4,
+   "requires": [
+    "h-cornershop-eastwood-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 63,
+     "label": "$63, and do not take a voucher"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "cash, on the counter, and I will believe it",
+     "npc": "hub-eastwood-kayo"
+    }
+   ],
+   "reward": {
+    "cash": 149,
+    "xp": 361,
+    "unlock": [
+     "hub:h-cornershop-eastwood-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-eastwood-2",
+   "act": 3,
+   "title": "The Eastwood Run",
+   "blurb": "Not being dramatic about this. I do the Eastwood run at twenty past four and there is a stretch of it where the van gets followed, which I have told nobody until now. I would not ask if there was anyone else about. Ask for me by name at the counter.",
+   "giver": "hub-eastwood-verity",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Eastwood",
+     "to": "Denistone",
+     "label": "ride it with me as far as Denistone"
+    },
+    {
+     "kind": "photo",
+     "x": -12055,
+     "z": -8548,
+     "radius": 35,
+     "label": "whatever is behind us when we stop"
+    }
+   ],
+   "reward": {
+    "cash": 109,
+    "xp": 276,
+    "unlock": [
+     "hub:h-cornershop-eastwood-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-eastwood-3",
+   "act": 3,
+   "title": "Locked Out, Eastwood",
+   "blurb": "I am told you do odd jobs. I have got a docket book in the back of the van and the Eastwood shop is shut, and the number on the door rings out. You can tell me I am imagining it. Tell me after. Come back and tell me straight.",
+   "giver": "hub-eastwood-verity",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11833,
+     "z": -8490,
+     "radius": 25,
+     "label": "try the flat above the shop"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "get one in you, this takes a while"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "somebody has to sign for it",
+     "npc": "hub-eastwood-verity"
+    }
+   ],
+   "reward": {
+    "cash": 94,
+    "xp": 256,
+    "unlock": [
+     "hub:h-cornershop-eastwood-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-eastwood-4",
+   "act": 3,
+   "title": "The Regulars, Eastwood",
+   "blurb": "I'll be straight with you. Three of the Eastwood regulars have started coming in together and going out separately, and the till is $16 down on those days. I would have sorted it myself a year ago. Do that and we're square.",
+   "giver": "hub-eastwood-cathal",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 3,
+     "label": "the ones who come in as a set"
+    },
+    {
+     "kind": "earn",
+     "dollars": 16,
+     "label": "$16, which is exactly what the till says"
+    }
+   ],
+   "reward": {
+    "cash": 109,
+    "xp": 266,
+    "unlock": [
+     "hub:h-cornershop-eastwood-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-eastwood-5",
+   "act": 3,
+   "title": "The Wholesaler, Eastwood",
+   "blurb": "It has been three weeks. Everything Eastwood sells comes off a floor at Denistone, and the woman who runs it will tell you things she will not put in writing. It is not the money. It has stopped being the money. I will owe you one, and I pay those.",
+   "giver": "hub-eastwood-cathal",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11446,
+     "z": -7641,
+     "radius": 60,
+     "label": "go and see her before the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come and tell me what she said about us",
+     "npc": "hub-eastwood-cathal"
+    }
+   ],
+   "reward": {
+    "cash": 102,
+    "xp": 259,
+    "unlock": [
+     "hub:h-cornershop-eastwood-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-blaxland-0",
+   "act": 3,
+   "title": "Under 12s at Blaxland",
+   "blurb": "Someone has to, and it may as well be you. I have got eleven kids for a twelve-a-side at Blaxland on the long weekend and one of them has a note from his mother. I have got no proof, which is exactly why I am asking. Say nothing to anyone on the way.",
+   "giver": "hub-blaxland-boris",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -55802,
+     "z": -12690,
+     "radius": 25,
+     "label": "the estate behind the ground, ask around"
+    },
+    {
+     "kind": "photo",
+     "x": -55811,
+     "z": -12667,
+     "radius": 35,
+     "label": "the noticeboard where the sign-on sheet went up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "any kid with boots will do at this point",
+     "npc": "hub-blaxland-boris"
+    }
+   ],
+   "reward": {
+    "cash": 114,
+    "xp": 307,
+    "unlock": [
+     "hub:h-oval-blaxland-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-blaxland-1",
+   "act": 3,
+   "title": "Registration, Blaxland",
+   "blurb": "You are the first person to stop all morning. We found a twelfth, which means the Blaxland club now owes the association $90 it had budgeted on not owing. It might be nothing. It has not felt like nothing. Do not make a scene about it.",
+   "giver": "hub-blaxland-boris",
+   "level": 5,
+   "requires": [
+    "h-oval-blaxland-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 90,
+     "label": "$90 before the cut-off"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will drive it in myself",
+     "npc": "hub-blaxland-boris"
+    }
+   ],
+   "reward": {
+    "cash": 165,
+    "xp": 413,
+    "unlock": [
+     "hub:h-oval-blaxland-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-blaxland-2",
+   "act": 3,
+   "title": "The Blaxland Canteen",
+   "blurb": "Not being dramatic about this. The canteen at Blaxland does two hundred sausages on a Saturday and this week the freezer went off at twenty past four. I would not ask if there was anyone else about. Ask for me by name at the counter.",
+   "giver": "hub-blaxland-imogen",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "we are going to need the coffee"
+    },
+    {
+     "kind": "photo",
+     "x": -55919,
+     "z": -12731,
+     "radius": 35,
+     "label": "the thermometer, so the insurance believes us"
+    }
+   ],
+   "reward": {
+    "cash": 117,
+    "xp": 303,
+    "unlock": [
+     "hub:h-oval-blaxland-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-blaxland-3",
+   "act": 3,
+   "title": "Grand Final Float, Blaxland",
+   "blurb": "I am told you do odd jobs. Somebody walked off with the float from the Blaxland canteen at about twenty past four during the last home game, and I have a fair idea which somebody. You can tell me I am imagining it. Tell me after. Come back and tell me straight.",
+   "giver": "hub-blaxland-imogen",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "the pair who were leaning on the roller door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 49,
+     "label": "$49, which is what was in the tin"
+    }
+   ],
+   "reward": {
+    "cash": 123,
+    "xp": 303,
+    "unlock": [
+     "hub:h-oval-blaxland-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-blaxland-4",
+   "act": 3,
+   "title": "Sprinkler Line, Blaxland",
+   "blurb": "I'll be straight with you. The sprinkler line under the Blaxland outfield has been leaking since the long weekend and the wet patch has started to move. I would have sorted it myself a year ago. Do that and we're square.",
+   "giver": "hub-blaxland-ekaterina",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -55961,
+     "z": -12867,
+     "radius": 25,
+     "label": "walk the line from the tap to the boundary"
+    },
+    {
+     "kind": "photo",
+     "x": -55942,
+     "z": -12889,
+     "radius": 35,
+     "label": "where the grass has gone dark"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to dig once, not five times",
+     "npc": "hub-blaxland-ekaterina"
+    }
+   ],
+   "reward": {
+    "cash": 117,
+    "xp": 323,
+    "unlock": [
+     "hub:h-oval-blaxland-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-blaxland-5",
+   "act": 3,
+   "title": "The Association, Blaxland",
+   "blurb": "It has been three weeks. The bloke who allocates grounds for the whole association sits at Warrimoo, and Blaxland has been at the bottom of his list for two seasons. It is not the money. It has stopped being the money. I will owe you one, and I pay those.",
+   "giver": "hub-blaxland-ekaterina",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -56333,
+     "z": -15235,
+     "radius": 60,
+     "label": "go and be reasonable at him"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if it is us or the paperwork",
+     "npc": "hub-blaxland-ekaterina"
+    }
+   ],
+   "reward": {
+    "cash": 120,
+    "xp": 318,
+    "unlock": [
+     "hub:h-oval-blaxland-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-dulwich-grove-0",
+   "act": 3,
+   "title": "The Creek Behind Dulwich Grove",
+   "blurb": "Someone has to, and it may as well be you. Somebody has been tipping fill into the creek behind Dulwich Grove since the first of the month and it is narrowing the channel a metre at a time. I have got no proof, which is exactly why I am asking. Say nothing to anyone on the way.",
+   "giver": "hub-dulwich-grove-damir",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -6480,
+     "z": 4164,
+     "radius": 35,
+     "label": "the fill, with the water level in shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council reads photographs, not letters",
+     "npc": "hub-dulwich-grove-damir"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 310,
+    "unlock": [
+     "hub:h-creek-dulwich-grove-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-dulwich-grove-1",
+   "act": 3,
+   "title": "Willow Removal, Dulwich Grove",
+   "blurb": "You are the first person to stop all morning. They have agreed to a clean-up at Dulwich Grove, which is wonderful, except the grant is $63 short and closes on the first of the month. It might be nothing. It has not felt like nothing. Do not make a scene about it.",
+   "giver": "hub-dulwich-grove-damir",
+   "level": 5,
+   "requires": [
+    "h-creek-dulwich-grove-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 63,
+     "label": "$63, and I do not care whose pocket"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the form needs the number today",
+     "npc": "hub-dulwich-grove-damir"
+    }
+   ],
+   "reward": {
+    "cash": 152,
+    "xp": 390,
+    "unlock": [
+     "hub:h-creek-dulwich-grove-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-dulwich-grove-2",
+   "act": 3,
+   "title": "Sandbags, Dulwich Grove",
+   "blurb": "Not being dramatic about this. We had 31 sandbags in the Dulwich Grove shed on the first of the month and this morning we have got the pallet they came on. I would not ask if there was anyone else about. Ask for me by name at the counter.",
+   "giver": "hub-dulwich-grove-hugo",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -6674,
+     "z": 4049,
+     "radius": 25,
+     "label": "the yards backing onto the reserve"
+    },
+    {
+     "kind": "photo",
+     "x": -6682,
+     "z": 4033,
+     "radius": 35,
+     "label": "anywhere they have obviously been used"
+    }
+   ],
+   "reward": {
+    "cash": 121,
+    "xp": 304,
+    "unlock": [
+     "hub:h-creek-dulwich-grove-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-dulwich-grove-3",
+   "act": 3,
+   "title": "The Low Crossing, Dulwich Grove",
+   "blurb": "I am told you do odd jobs. People keep driving the low crossing at Dulwich Grove at the second express with the water over the sign, and one of them is going to be the one. You can tell me I am imagining it. Tell me after. Come back and tell me straight.",
+   "giver": "hub-dulwich-grove-hugo",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "you will be standing out there a while"
+    },
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "the ones who argue with the barrier"
+    }
+   ],
+   "reward": {
+    "cash": 117,
+    "xp": 313,
+    "unlock": [
+     "hub:h-creek-dulwich-grove-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-dulwich-grove-4",
+   "act": 3,
+   "title": "Under the House, Dulwich Grove",
+   "blurb": "I'll be straight with you. The water came through my place at Dulwich Grove on the first of the month and the assessor wants photographs of things I have already thrown out. I would have sorted it myself a year ago. Do that and we're square.",
+   "giver": "hub-dulwich-grove-finlay",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -6508,
+     "z": 3971,
+     "radius": 25,
+     "label": "round the side, where the pile is"
+    },
+    {
+     "kind": "photo",
+     "x": -6489,
+     "z": 3973,
+     "radius": 35,
+     "label": "the high-water mark on the brick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the whole claim, that mark",
+     "npc": "hub-dulwich-grove-finlay"
+    }
+   ],
+   "reward": {
+    "cash": 123,
+    "xp": 313,
+    "unlock": [
+     "hub:h-creek-dulwich-grove-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-dulwich-grove-5",
+   "act": 3,
+   "title": "Upstream, Dulwich Grove",
+   "blurb": "It has been three weeks. Whatever is happening to Dulwich Grove starts upstream at Hurlstone Park, and there are people up there who have been saying so for years. It is not the money. It has stopped being the money. I will owe you one, and I pay those.",
+   "giver": "hub-dulwich-grove-finlay",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7193,
+     "z": 4884,
+     "radius": 60,
+     "label": "go up and find them"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear it from someone who is not me",
+     "npc": "hub-dulwich-grove-finlay"
+    }
+   ],
+   "reward": {
+    "cash": 112,
+    "xp": 316,
+    "unlock": [
+     "hub:h-creek-dulwich-grove-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

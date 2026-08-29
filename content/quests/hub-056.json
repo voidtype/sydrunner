@@ -1,0 +1,651 @@
+{
+ "quests": [
+  {
+   "id": "h-bakery-ourimbah-0",
+   "act": 3,
+   "title": "two in the afternoon at Ourimbah",
+   "blurb": "The council knows and the council does not care. I start at two in the afternoon and for a month the Ourimbah back lane has had somebody in it who is not waiting for bread. It is the not knowing that has got me, honestly. Ask for me by name at the counter.",
+   "giver": "hub-ourimbah-kaveh",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 14037,
+     "z": -56605,
+     "radius": 35,
+     "label": "the lane, from the door, no flash"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I am not calling anyone until I am sure",
+     "npc": "hub-ourimbah-kaveh"
+    }
+   ],
+   "reward": {
+    "cash": 64,
+    "xp": 170,
+    "unlock": [
+     "hub:h-bakery-ourimbah-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-ourimbah-1",
+   "act": 3,
+   "title": "The Lane Light, Ourimbah",
+   "blurb": "I have been putting it off since Easter. A light on that lane costs Ourimbah $51 and the landlord has said no twice, so we are doing it ourselves. There is probably a simple explanation and I would love to hear it. Come back and tell me straight.",
+   "giver": "hub-ourimbah-kaveh",
+   "level": 2,
+   "requires": [
+    "h-bakery-ourimbah-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 51,
+     "label": "$51 and I will fit it myself"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "do not tell him where it came from",
+     "npc": "hub-ourimbah-kaveh"
+    }
+   ],
+   "reward": {
+    "cash": 116,
+    "xp": 261,
+    "unlock": [
+     "hub:h-bakery-ourimbah-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-ourimbah-2",
+   "act": 3,
+   "title": "Flour Run, Ourimbah",
+   "blurb": "Before you say anything: yes, I know. The flour for Ourimbah comes off a truck at two in the afternoon and last a Tuesday the truck came and the flour did not. You will see what I mean the second you get there. Do that and we're square.",
+   "giver": "hub-ourimbah-alistair",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Ourimbah",
+     "to": "Lisarow",
+     "label": "ride out to Lisarow where the load is made up"
+    },
+    {
+     "kind": "photo",
+     "x": 13936,
+     "z": -56709,
+     "radius": 35,
+     "label": "the pallet with our name on it, if it exists"
+    }
+   ],
+   "reward": {
+    "cash": 76,
+    "xp": 184,
+    "unlock": [
+     "hub:h-bakery-ourimbah-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-ourimbah-3",
+   "act": 3,
+   "title": "The Loading Zone, Ourimbah",
+   "blurb": "It is not a police matter and I have checked. The Ourimbah loading zone has had a car in it at two in the afternoon every morning this week and the driver waits in it, which makes it worse. There is a version of this where I am the unreasonable one. I will owe you one, and I pay those.",
+   "giver": "hub-ourimbah-alistair",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 1,
+     "label": "the one who says he is only a minute"
+    },
+    {
+     "kind": "earn",
+     "dollars": 90,
+     "label": "and the ticket I got, off him"
+    }
+   ],
+   "reward": {
+    "cash": 71,
+    "xp": 174,
+    "unlock": [
+     "hub:h-bakery-ourimbah-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-ourimbah-4",
+   "act": 3,
+   "title": "The Sourdough Sign, Ourimbah",
+   "blurb": "Honestly, I am past caring how it looks. Somebody two doors down from Ourimbah put up a sign on a Tuesday that says the same six words as ours, in the same order. The paperwork says one thing and my eyes say another. Do not let them talk you into anything.",
+   "giver": "hub-ourimbah-ishaan",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 14052,
+     "z": -56739,
+     "radius": 25,
+     "label": "walk down and read it properly"
+    },
+    {
+     "kind": "photo",
+     "x": 14060,
+     "z": -56742,
+     "radius": 35,
+     "label": "both signs if you can get them in one frame"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me I am not imagining it",
+     "npc": "hub-ourimbah-ishaan"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 177,
+    "unlock": [
+     "hub:h-bakery-ourimbah-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-ourimbah-5",
+   "act": 3,
+   "title": "The Old Site, Ourimbah",
+   "blurb": "I would do it myself if I could leave the counter. This business was at Lisarow before it was at Ourimbah, and there is a woman there who still has the original book. It has been going on longer than I have admitted to anyone. There's cash in it. Not a lot.",
+   "giver": "hub-ourimbah-ishaan",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 13892,
+     "z": -54242,
+     "radius": 60,
+     "label": "she is usually about in the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring back whatever she is willing to say",
+     "npc": "hub-ourimbah-ishaan"
+    }
+   ],
+   "reward": {
+    "cash": 65,
+    "xp": 171,
+    "unlock": [
+     "hub:h-bakery-ourimbah-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-granville-0",
+   "act": 3,
+   "title": "The Granville Pool",
+   "blurb": "The council knows and the council does not care. Council has been saying the Granville pool is at end of life since grand final week and the crack they keep pointing at is not in the shell. It is the not knowing that has got me, honestly. Ask for me by name at the counter.",
+   "giver": "hub-granville-molly",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -18271,
+     "z": -3659,
+     "radius": 35,
+     "label": "the crack, close, with something for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "an engineer can read that. A councillor cannot.",
+     "npc": "hub-granville-molly"
+    }
+   ],
+   "reward": {
+    "cash": 71,
+    "xp": 184,
+    "unlock": [
+     "hub:h-pool-granville-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-granville-1",
+   "act": 3,
+   "title": "The Petition Stall, Granville",
+   "blurb": "I have been putting it off since Easter. We are running a stall for Granville on grand final week and a stall needs $49 of gear that nobody has volunteered to pay for. There is probably a simple explanation and I would love to hear it. Come back and tell me straight.",
+   "giver": "hub-granville-molly",
+   "level": 2,
+   "requires": [
+    "h-pool-granville-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 49,
+     "label": "$49 and a table, if you see one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will be there from eight either way",
+     "npc": "hub-granville-molly"
+    }
+   ],
+   "reward": {
+    "cash": 120,
+    "xp": 254,
+    "unlock": [
+     "hub:h-pool-granville-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-granville-2",
+   "act": 3,
+   "title": "Squad, Granville",
+   "blurb": "Before you say anything: yes, I know. I coach 23 kids at Granville at first light and three of them have stopped coming without anybody ringing me. You will see what I mean the second you get there. Do that and we're square.",
+   "giver": "hub-granville-ewan",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18451,
+     "z": -3615,
+     "radius": 25,
+     "label": "the flats where two of them live"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "take something with you, it is a long walk up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I do not need them back. I need to know.",
+     "npc": "hub-granville-ewan"
+    }
+   ],
+   "reward": {
+    "cash": 75,
+    "xp": 167,
+    "unlock": [
+     "hub:h-pool-granville-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-granville-3",
+   "act": 3,
+   "title": "The Deep End, Granville",
+   "blurb": "It is not a police matter and I have checked. A group has been coming over the Granville fence after close and swimming in the dark, which is how Granville loses its pool. There is a version of this where I am the unreasonable one. I will owe you one, and I pay those.",
+   "giver": "hub-granville-ewan",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 3,
+     "label": "the ones who go over the fence"
+    },
+    {
+     "kind": "photo",
+     "x": -18345,
+     "z": -3739,
+     "radius": 35,
+     "label": "the spot in the fence they use"
+    }
+   ],
+   "reward": {
+    "cash": 64,
+    "xp": 180,
+    "unlock": [
+     "hub:h-pool-granville-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-granville-4",
+   "act": 3,
+   "title": "The Kiosk Freezer, Granville",
+   "blurb": "Honestly, I am past caring how it looks. The kiosk at Granville has a clipboard nobody signs in it and a freezer that has been running warm since grand final week. The paperwork says one thing and my eyes say another. Do not let them talk you into anything.",
+   "giver": "hub-granville-tahlia",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "get two, we are going to be here"
+    },
+    {
+     "kind": "goto",
+     "x": -18285,
+     "z": -3707,
+     "radius": 25,
+     "label": "the plant room behind the kiosk"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether it is the freezer or the power",
+     "npc": "hub-granville-tahlia"
+    }
+   ],
+   "reward": {
+    "cash": 80,
+    "xp": 168,
+    "unlock": [
+     "hub:h-pool-granville-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-granville-5",
+   "act": 3,
+   "title": "The Aquatic Centre, Granville",
+   "blurb": "I would do it myself if I could leave the counter. They want everyone from Granville to drive to the new centre at Harris Park, so somebody should go and see whether it is any good. It has been going on longer than I have admitted to anyone. There's cash in it. Not a lot.",
+   "giver": "hub-granville-tahlia",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18680,
+     "z": -4727,
+     "radius": 60,
+     "label": "have a proper look, not a quick one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "be honest with me, even if it is nice",
+     "npc": "hub-granville-tahlia"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 164,
+    "unlock": [
+     "hub:h-pool-granville-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-mount-colah-0",
+   "act": 3,
+   "title": "The Mount Colah Rank",
+   "blurb": "The council knows and the council does not care. The rank outside Mount Colah used to hold nine cars and since the first of the month it holds four, and nobody will say who moved the line. It is the not knowing that has got me, honestly. Ask for me by name at the counter.",
+   "giver": "hub-mount-colah-shahid",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -9134,
+     "z": -21491,
+     "radius": 35,
+     "label": "the painted line and the old one under it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the old paint is still there, that is the whole argument",
+     "npc": "hub-mount-colah-shahid"
+    }
+   ],
+   "reward": {
+    "cash": 80,
+    "xp": 231,
+    "unlock": [
+     "hub:h-rank-mount-colah-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-mount-colah-1",
+   "act": 3,
+   "title": "Lost Fares, Mount Colah",
+   "blurb": "I have been putting it off since Easter. Since the rank at Mount Colah shrank I am $62 a week down, and the association wants that number from somebody who can prove it. There is probably a simple explanation and I would love to hear it. Come back and tell me straight.",
+   "giver": "hub-mount-colah-shahid",
+   "level": 3,
+   "requires": [
+    "h-rank-mount-colah-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 62,
+     "label": "$62 in a week, to show it can be done"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the submission, right there",
+     "npc": "hub-mount-colah-shahid"
+    }
+   ],
+   "reward": {
+    "cash": 122,
+    "xp": 310,
+    "unlock": [
+     "hub:h-rank-mount-colah-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-mount-colah-2",
+   "act": 3,
+   "title": "Queue Jumpers, Mount Colah",
+   "blurb": "Before you say anything: yes, I know. Cars that have never sat in the Mount Colah queue turn up at first light and take the front of it, and the drivers who waited say nothing. You will see what I mean the second you get there. Do that and we're square.",
+   "giver": "hub-mount-colah-taini",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "the ones who take the front"
+    },
+    {
+     "kind": "earn",
+     "dollars": 82,
+     "label": "$82, which is about one airport run"
+    }
+   ],
+   "reward": {
+    "cash": 95,
+    "xp": 224,
+    "unlock": [
+     "hub:h-rank-mount-colah-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-mount-colah-3",
+   "act": 3,
+   "title": "The Late Train, Mount Colah",
+   "blurb": "It is not a police matter and I have checked. When the last train into Mount Colah is late, 82 people come out at once and I have to have cars there before they do. There is a version of this where I am the unreasonable one. I will owe you one, and I pay those.",
+   "giver": "hub-mount-colah-taini",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Mount Colah",
+     "to": "Asquith",
+     "label": "come in on the last one from Asquith and see it"
+    },
+    {
+     "kind": "photo",
+     "x": -9166,
+     "z": -21527,
+     "radius": 35,
+     "label": "the rank at the moment the doors open"
+    }
+   ],
+   "reward": {
+    "cash": 93,
+    "xp": 219,
+    "unlock": [
+     "hub:h-rank-mount-colah-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-mount-colah-4",
+   "act": 3,
+   "title": "The Door, Mount Colah",
+   "blurb": "Honestly, I am past caring how it looks. I have stood on this door near Mount Colah for 82 years and since the first of the month somebody has been sending my guests to a different rank. The paperwork says one thing and my eyes say another. Do not let them talk you into anything.",
+   "giver": "hub-mount-colah-thanh",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -9146,
+     "z": -21646,
+     "radius": 25,
+     "label": "follow one of them and see where they end up"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you will be standing about, get something"
+    }
+   ],
+   "reward": {
+    "cash": 92,
+    "xp": 229,
+    "unlock": [
+     "hub:h-rank-mount-colah-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-mount-colah-5",
+   "act": 3,
+   "title": "The Depot, Mount Colah",
+   "blurb": "I would do it myself if I could leave the counter. The plates working the Mount Colah rank are dispatched from a depot at Asquith, and the man who runs it has never met a driver he liked. It has been going on longer than I have admitted to anyone. There's cash in it. Not a lot.",
+   "giver": "hub-mount-colah-thanh",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -9679,
+     "z": -19724,
+     "radius": 60,
+     "label": "go and be pleasant at him anyway"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether he is the problem or the symptom",
+     "npc": "hub-mount-colah-thanh"
+    }
+   ],
+   "reward": {
+    "cash": 87,
+    "xp": 213,
+    "unlock": [
+     "hub:h-rank-mount-colah-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

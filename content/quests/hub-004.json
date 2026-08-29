@@ -1,0 +1,651 @@
+{
+ "quests": [
+  {
+   "id": "h-bakery-merrylands-0",
+   "act": 3,
+   "title": "knock-off at Merrylands",
+   "blurb": "Not being dramatic about this. I start at knock-off and for a month the Merrylands back lane has had somebody in it who is not waiting for bread. I am aware how that sounds. Come back and tell me straight.",
+   "giver": "hub-merrylands-tane",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -20224,
+     "z": -3134,
+     "radius": 35,
+     "label": "the lane, from the door, no flash"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I am not calling anyone until I am sure",
+     "npc": "hub-merrylands-tane"
+    }
+   ],
+   "reward": {
+    "cash": 91,
+    "xp": 222,
+    "unlock": [
+     "hub:h-bakery-merrylands-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-merrylands-1",
+   "act": 3,
+   "title": "The Lane Light, Merrylands",
+   "blurb": "I am told you do odd jobs. A light on that lane costs Merrylands $59 and the landlord has said no twice, so we are doing it ourselves. My wife says I should let it go. My wife is wrong. Do that and we're square.",
+   "giver": "hub-merrylands-tane",
+   "level": 3,
+   "requires": [
+    "h-bakery-merrylands-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 59,
+     "label": "$59 and I will fit it myself"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "do not tell him where it came from",
+     "npc": "hub-merrylands-tane"
+    }
+   ],
+   "reward": {
+    "cash": 138,
+    "xp": 301,
+    "unlock": [
+     "hub:h-bakery-merrylands-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-merrylands-2",
+   "act": 3,
+   "title": "Flour Run, Merrylands",
+   "blurb": "I'll be straight with you. The flour for Merrylands comes off a truck at knock-off and last every second Friday the truck came and the flour did not. I have rung the number on the letter four times. I will owe you one, and I pay those.",
+   "giver": "hub-merrylands-lilith",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Merrylands",
+     "to": "Granville",
+     "label": "ride out to Granville where the load is made up"
+    },
+    {
+     "kind": "photo",
+     "x": -20279,
+     "z": -3227,
+     "radius": 35,
+     "label": "the pallet with our name on it, if it exists"
+    }
+   ],
+   "reward": {
+    "cash": 93,
+    "xp": 225,
+    "unlock": [
+     "hub:h-bakery-merrylands-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-merrylands-3",
+   "act": 3,
+   "title": "The Loading Zone, Merrylands",
+   "blurb": "It has been three weeks. The Merrylands loading zone has had a car in it at knock-off every morning this week and the driver waits in it, which makes it worse. Half the street knows and half the street is pretending not to. Do not let them talk you into anything.",
+   "giver": "hub-merrylands-lilith",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "the one who says he is only a minute"
+    },
+    {
+     "kind": "earn",
+     "dollars": 90,
+     "label": "and the ticket I got, off him"
+    }
+   ],
+   "reward": {
+    "cash": 98,
+    "xp": 223,
+    "unlock": [
+     "hub:h-bakery-merrylands-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-merrylands-4",
+   "act": 3,
+   "title": "The Sourdough Sign, Merrylands",
+   "blurb": "Nobody else has offered, so. Somebody two doors down from Merrylands put up a sign on every second Friday that says the same six words as ours, in the same order. I am not after trouble. I am after an answer. There's cash in it. Not a lot.",
+   "giver": "hub-merrylands-ramona",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -20163,
+     "z": -3257,
+     "radius": 25,
+     "label": "walk down and read it properly"
+    },
+    {
+     "kind": "photo",
+     "x": -20155,
+     "z": -3260,
+     "radius": 35,
+     "label": "both signs if you can get them in one frame"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me I am not imagining it",
+     "npc": "hub-merrylands-ramona"
+    }
+   ],
+   "reward": {
+    "cash": 85,
+    "xp": 224,
+    "unlock": [
+     "hub:h-bakery-merrylands-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-merrylands-5",
+   "act": 3,
+   "title": "The Old Site, Merrylands",
+   "blurb": "The council knows and the council does not care. This business was at Granville before it was at Merrylands, and there is a woman there who still has the original book. Nobody else seems to have noticed, which is its own problem. You'll know it when you see it.",
+   "giver": "hub-merrylands-ramona",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18184,
+     "z": -3761,
+     "radius": 60,
+     "label": "she is usually about in the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring back whatever she is willing to say",
+     "npc": "hub-merrylands-ramona"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 223,
+    "unlock": [
+     "hub:h-bakery-merrylands-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-leppington-0",
+   "act": 3,
+   "title": "The Leppington Pool",
+   "blurb": "Not being dramatic about this. Council has been saying the Leppington pool is at end of life since a Tuesday and the crack they keep pointing at is not in the shell. I am aware how that sounds. Come back and tell me straight.",
+   "giver": "hub-leppington-nell",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -36903,
+     "z": 10266,
+     "radius": 35,
+     "label": "the crack, close, with something for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "an engineer can read that. A councillor cannot.",
+     "npc": "hub-leppington-nell"
+    }
+   ],
+   "reward": {
+    "cash": 105,
+    "xp": 260,
+    "unlock": [
+     "hub:h-pool-leppington-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-leppington-1",
+   "act": 3,
+   "title": "The Petition Stall, Leppington",
+   "blurb": "I am told you do odd jobs. We are running a stall for Leppington on a Tuesday and a stall needs $49 of gear that nobody has volunteered to pay for. My wife says I should let it go. My wife is wrong. Do that and we're square.",
+   "giver": "hub-leppington-nell",
+   "level": 4,
+   "requires": [
+    "h-pool-leppington-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 49,
+     "label": "$49 and a table, if you see one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will be there from eight either way",
+     "npc": "hub-leppington-nell"
+    }
+   ],
+   "reward": {
+    "cash": 151,
+    "xp": 346,
+    "unlock": [
+     "hub:h-pool-leppington-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-leppington-2",
+   "act": 3,
+   "title": "Squad, Leppington",
+   "blurb": "I'll be straight with you. I coach 90 kids at Leppington at knock-off and three of them have stopped coming without anybody ringing me. I have rung the number on the letter four times. I will owe you one, and I pay those.",
+   "giver": "hub-leppington-leonie",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -37083,
+     "z": 10310,
+     "radius": 25,
+     "label": "the flats where two of them live"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "take something with you, it is a long walk up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I do not need them back. I need to know.",
+     "npc": "hub-leppington-leonie"
+    }
+   ],
+   "reward": {
+    "cash": 109,
+    "xp": 259,
+    "unlock": [
+     "hub:h-pool-leppington-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-leppington-3",
+   "act": 3,
+   "title": "The Deep End, Leppington",
+   "blurb": "It has been three weeks. A group has been coming over the Leppington fence after close and swimming in the dark, which is how Leppington loses its pool. Half the street knows and half the street is pretending not to. Do not let them talk you into anything.",
+   "giver": "hub-leppington-leonie",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 3,
+     "label": "the ones who go over the fence"
+    },
+    {
+     "kind": "photo",
+     "x": -37007,
+     "z": 10218,
+     "radius": 35,
+     "label": "the spot in the fence they use"
+    }
+   ],
+   "reward": {
+    "cash": 112,
+    "xp": 275,
+    "unlock": [
+     "hub:h-pool-leppington-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-leppington-4",
+   "act": 3,
+   "title": "The Kiosk Freezer, Leppington",
+   "blurb": "Nobody else has offered, so. The kiosk at Leppington has a clipboard nobody signs in it and a freezer that has been running warm since a Tuesday. I am not after trouble. I am after an answer. There's cash in it. Not a lot.",
+   "giver": "hub-leppington-roxana",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "get two, we are going to be here"
+    },
+    {
+     "kind": "goto",
+     "x": -36899,
+     "z": 10251,
+     "radius": 25,
+     "label": "the plant room behind the kiosk"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether it is the freezer or the power",
+     "npc": "hub-leppington-roxana"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 262,
+    "unlock": [
+     "hub:h-pool-leppington-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-leppington-5",
+   "act": 3,
+   "title": "The Aquatic Centre, Leppington",
+   "blurb": "The council knows and the council does not care. They want everyone from Leppington to drive to the new centre at Edmondson Park, so somebody should go and see whether it is any good. Nobody else seems to have noticed, which is its own problem. You'll know it when you see it.",
+   "giver": "hub-leppington-roxana",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -32035,
+     "z": 11858,
+     "radius": 60,
+     "label": "have a proper look, not a quick one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "be honest with me, even if it is nice",
+     "npc": "hub-leppington-roxana"
+    }
+   ],
+   "reward": {
+    "cash": 114,
+    "xp": 264,
+    "unlock": [
+     "hub:h-pool-leppington-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-holsworthy-0",
+   "act": 3,
+   "title": "The Holsworthy Rank",
+   "blurb": "Not being dramatic about this. The rank outside Holsworthy used to hold nine cars and since a public holiday nobody remembered it holds four, and nobody will say who moved the line. I am aware how that sounds. Come back and tell me straight.",
+   "giver": "hub-holsworthy-nico",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -23100,
+     "z": 10979,
+     "radius": 35,
+     "label": "the painted line and the old one under it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the old paint is still there, that is the whole argument",
+     "npc": "hub-holsworthy-nico"
+    }
+   ],
+   "reward": {
+    "cash": 97,
+    "xp": 254,
+    "unlock": [
+     "hub:h-rank-holsworthy-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-holsworthy-1",
+   "act": 3,
+   "title": "Lost Fares, Holsworthy",
+   "blurb": "I am told you do odd jobs. Since the rank at Holsworthy shrank I am $64 a week down, and the association wants that number from somebody who can prove it. My wife says I should let it go. My wife is wrong. Do that and we're square.",
+   "giver": "hub-holsworthy-nico",
+   "level": 4,
+   "requires": [
+    "h-rank-holsworthy-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 64,
+     "label": "$64 in a week, to show it can be done"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the submission, right there",
+     "npc": "hub-holsworthy-nico"
+    }
+   ],
+   "reward": {
+    "cash": 150,
+    "xp": 351,
+    "unlock": [
+     "hub:h-rank-holsworthy-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-holsworthy-2",
+   "act": 3,
+   "title": "Queue Jumpers, Holsworthy",
+   "blurb": "I'll be straight with you. Cars that have never sat in the Holsworthy queue turn up at half six and take the front of it, and the drivers who waited say nothing. I have rung the number on the letter four times. I will owe you one, and I pay those.",
+   "giver": "hub-holsworthy-tane",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "the ones who take the front"
+    },
+    {
+     "kind": "earn",
+     "dollars": 86,
+     "label": "$86, which is about one airport run"
+    }
+   ],
+   "reward": {
+    "cash": 97,
+    "xp": 257,
+    "unlock": [
+     "hub:h-rank-holsworthy-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-holsworthy-3",
+   "act": 3,
+   "title": "The Late Train, Holsworthy",
+   "blurb": "It has been three weeks. When the last train into Holsworthy is late, 86 people come out at once and I have to have cars there before they do. Half the street knows and half the street is pretending not to. Do not let them talk you into anything.",
+   "giver": "hub-holsworthy-tane",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Holsworthy",
+     "to": "East Hills",
+     "label": "come in on the last one from East Hills and see it"
+    },
+    {
+     "kind": "photo",
+     "x": -23132,
+     "z": 10943,
+     "radius": 35,
+     "label": "the rank at the moment the doors open"
+    }
+   ],
+   "reward": {
+    "cash": 103,
+    "xp": 266,
+    "unlock": [
+     "hub:h-rank-holsworthy-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-holsworthy-4",
+   "act": 3,
+   "title": "The Door, Holsworthy",
+   "blurb": "Nobody else has offered, so. I have stood on this door near Holsworthy for 86 years and since a public holiday nobody remembered somebody has been sending my guests to a different rank. I am not after trouble. I am after an answer. There's cash in it. Not a lot.",
+   "giver": "hub-holsworthy-anwar",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -23112,
+     "z": 10824,
+     "radius": 25,
+     "label": "follow one of them and see where they end up"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "you will be standing about, get something"
+    }
+   ],
+   "reward": {
+    "cash": 98,
+    "xp": 273,
+    "unlock": [
+     "hub:h-rank-holsworthy-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-holsworthy-5",
+   "act": 3,
+   "title": "The Depot, Holsworthy",
+   "blurb": "The council knows and the council does not care. The plates working the Holsworthy rank are dispatched from a depot at Panania, and the man who runs it has never met a driver he liked. Nobody else seems to have noticed, which is its own problem. You'll know it when you see it.",
+   "giver": "hub-holsworthy-anwar",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -19240,
+     "z": 9760,
+     "radius": 60,
+     "label": "go and be pleasant at him anyway"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether he is the problem or the symptom",
+     "npc": "hub-holsworthy-anwar"
+    }
+   ],
+   "reward": {
+    "cash": 107,
+    "xp": 264,
+    "unlock": [
+     "hub:h-rank-holsworthy-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

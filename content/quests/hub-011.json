@@ -1,0 +1,663 @@
+{
+ "quests": [
+  {
+   "id": "h-newsagent-telopea-0",
+   "act": 3,
+   "title": "Returns at Telopea",
+   "blurb": "I would do it myself if I could leave the counter. I am sending back 79 papers a day from Telopea and paying to have them collected, which is a business model somebody invented on purpose. There is a version of this where I am the unreasonable one. I will know if you skipped a bit.",
+   "giver": "hub-telopea-larissa",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -15695,
+     "z": -7861,
+     "radius": 35,
+     "label": "the returns stack, at its worst"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the distributor needs to see the size of it",
+     "npc": "hub-telopea-larissa"
+    }
+   ],
+   "reward": {
+    "cash": 100,
+    "xp": 273,
+    "unlock": [
+     "hub:h-newsagent-telopea-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-telopea-1",
+   "act": 3,
+   "title": "The Better Rate, Telopea",
+   "blurb": "You will think I am making this up. They will drop my Telopea order if I can show $65 of turnover on the other side of the shop by the long weekend. The paperwork says one thing and my eyes say another. Say nothing to anyone on the way.",
+   "giver": "hub-telopea-larissa",
+   "level": 4,
+   "requires": [
+    "h-newsagent-telopea-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 65,
+     "label": "$65, and cards and stationery count"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "sell anything, I am not proud",
+     "npc": "hub-telopea-larissa"
+    }
+   ],
+   "reward": {
+    "cash": 149,
+    "xp": 354,
+    "unlock": [
+     "hub:h-newsagent-telopea-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-telopea-2",
+   "act": 3,
+   "title": "The Telopea Round",
+   "blurb": "There is no clever way to say this. I do the Telopea round from first light and for the last fortnight somebody has been taking the papers off the front steps behind me. It has been going on longer than I have admitted to anyone. Do not make a scene about it.",
+   "giver": "hub-telopea-massimo",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -15864,
+     "z": -7793,
+     "radius": 25,
+     "label": "the end of the round, where it starts"
+    },
+    {
+     "kind": "photo",
+     "x": -15890,
+     "z": -7816,
+     "radius": 35,
+     "label": "whoever is on that street at that hour"
+    }
+   ],
+   "reward": {
+    "cash": 101,
+    "xp": 265,
+    "unlock": [
+     "hub:h-newsagent-telopea-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-telopea-3",
+   "act": 3,
+   "title": "The Dog on Ash Street, Telopea",
+   "blurb": "You look like you have twenty minutes. There is a dog on the Telopea round that has had two of my bags and a milk crate that was not even mine. I have got no proof, which is exactly why I am asking. Ask for me by name at the counter.",
+   "giver": "hub-telopea-massimo",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you will want your wits about you"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "the owner, not the dog, I am not a monster"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me it is sorted",
+     "npc": "hub-telopea-massimo"
+    }
+   ],
+   "reward": {
+    "cash": 97,
+    "xp": 278,
+    "unlock": [
+     "hub:h-newsagent-telopea-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-telopea-4",
+   "act": 3,
+   "title": "The Syndicate, Telopea",
+   "blurb": "Keep it between us for now. Nine of us at Telopea have gone in on the same numbers since the long weekend and one of us has stopped putting money in. It might be nothing. It has not felt like nothing. Come back and tell me straight.",
+   "giver": "hub-telopea-nalini",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -15726,
+     "z": -8009,
+     "radius": 25,
+     "label": "the house of the one who stopped"
+    },
+    {
+     "kind": "earn",
+     "dollars": 79,
+     "label": "$79, which is his share since he stopped"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it said out loud, not in the group chat",
+     "npc": "hub-telopea-nalini"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 262,
+    "unlock": [
+     "hub:h-newsagent-telopea-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-telopea-5",
+   "act": 3,
+   "title": "The Other Agency, Telopea",
+   "blurb": "Right. Since you asked. The agency at Carlingford closed six months before Telopea started struggling, and I would very much like to know what they know. I would not ask if there was anyone else about. Do that and we're square.",
+   "giver": "hub-telopea-nalini",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -15193,
+     "z": -9277,
+     "radius": 60,
+     "label": "the shop is shut, the family is not"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever they say, say it slowly to me",
+     "npc": "hub-telopea-nalini"
+    }
+   ],
+   "reward": {
+    "cash": 98,
+    "xp": 257,
+    "unlock": [
+     "hub:h-newsagent-telopea-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-waterfall-0",
+   "act": 3,
+   "title": "The Unclaimed Falcon, Waterfall",
+   "blurb": "I would do it myself if I could leave the counter. There has been a car in the Waterfall yard since every second Friday with a milk crate on the passenger seat and no owner answering. There is a version of this where I am the unreasonable one. I will know if you skipped a bit.",
+   "giver": "hub-waterfall-usman",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -19368,
+     "z": 29876,
+     "radius": 35,
+     "label": "the car and the plate together"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I have to prove I tried before I can move it",
+     "npc": "hub-waterfall-usman"
+    }
+   ],
+   "reward": {
+    "cash": 97,
+    "xp": 265,
+    "unlock": [
+     "hub:h-workshop-waterfall-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-waterfall-1",
+   "act": 3,
+   "title": "Storage Fees, Waterfall",
+   "blurb": "You will think I am making this up. Now that it is documented, Waterfall is owed $67 in storage and the only person who can pay it is the person not answering. The paperwork says one thing and my eyes say another. Say nothing to anyone on the way.",
+   "giver": "hub-waterfall-usman",
+   "level": 4,
+   "requires": [
+    "h-workshop-waterfall-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 67,
+     "label": "$67, from him or from the scrap"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "either way it comes off my floor",
+     "npc": "hub-waterfall-usman"
+    }
+   ],
+   "reward": {
+    "cash": 148,
+    "xp": 368,
+    "unlock": [
+     "hub:h-workshop-waterfall-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-waterfall-2",
+   "act": 3,
+   "title": "First Year, Waterfall",
+   "blurb": "There is no clever way to say this. I am in my first year at Waterfall and I have to log 93 hours on a job I am not allowed to touch on my own. It has been going on longer than I have admitted to anyone. Do not make a scene about it.",
+   "giver": "hub-waterfall-kareem",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -19475,
+     "z": 29841,
+     "radius": 25,
+     "label": "the supplier, two streets over"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "and get him a coffee, it helps"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "sign the book and I owe you",
+     "npc": "hub-waterfall-kareem"
+    }
+   ],
+   "reward": {
+    "cash": 101,
+    "xp": 266,
+    "unlock": [
+     "hub:h-workshop-waterfall-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-waterfall-3",
+   "act": 3,
+   "title": "The Air Line, Waterfall",
+   "blurb": "You look like you have twenty minutes. Somebody has been coming into the Waterfall yard after the back of seven to use the air line, and last week they used the compressor as well. I have got no proof, which is exactly why I am asking. Ask for me by name at the counter.",
+   "giver": "hub-waterfall-kareem",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "the ones who think the yard is public"
+    },
+    {
+     "kind": "photo",
+     "x": -19422,
+     "z": 29783,
+     "radius": 35,
+     "label": "the gate they are getting through"
+    }
+   ],
+   "reward": {
+    "cash": 100,
+    "xp": 255,
+    "unlock": [
+     "hub:h-workshop-waterfall-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-waterfall-4",
+   "act": 3,
+   "title": "My Own Car, Waterfall",
+   "blurb": "Keep it between us for now. My car has been at Waterfall since every second Friday and every time I ring, the quote has grown by about $93. It might be nothing. It has not felt like nothing. Come back and tell me straight.",
+   "giver": "hub-waterfall-moira",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -19292,
+     "z": 29855,
+     "radius": 25,
+     "label": "stand in the office where they can see you"
+    },
+    {
+     "kind": "photo",
+     "x": -19288,
+     "z": 29800,
+     "radius": 35,
+     "label": "the job card on the wall, all of it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I know what I am arguing about",
+     "npc": "hub-waterfall-moira"
+    }
+   ],
+   "reward": {
+    "cash": 104,
+    "xp": 260,
+    "unlock": [
+     "hub:h-workshop-waterfall-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-waterfall-5",
+   "act": 3,
+   "title": "The Assessor, Waterfall",
+   "blurb": "Right. Since you asked. The insurance assessor who signs off every job at Waterfall works out of Helensburgh, and he has never once seen the car he is assessing. I would not ask if there was anyone else about. Do that and we're square.",
+   "giver": "hub-waterfall-moira",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -19138,
+     "z": 34644,
+     "radius": 60,
+     "label": "catch him before he goes out on the road"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear how he does it",
+     "npc": "hub-waterfall-moira"
+    }
+   ],
+   "reward": {
+    "cash": 111,
+    "xp": 259,
+    "unlock": [
+     "hub:h-workshop-waterfall-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-north-sydney-0",
+   "act": 3,
+   "title": "Dumped Out the Back, North Sydney",
+   "blurb": "I would do it myself if I could leave the counter. People leave things at the North Sydney roller door after just gone midnight and by morning it is rained on and it is our problem and our tip fee. There is a version of this where I am the unreasonable one. I will know if you skipped a bit.",
+   "giver": "hub-north-sydney-anika",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -203,
+     "z": -3001,
+     "radius": 35,
+     "label": "the pile, on a bad morning"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council will not act without one of these",
+     "npc": "hub-north-sydney-anika"
+    }
+   ],
+   "reward": {
+    "cash": 125,
+    "xp": 323,
+    "unlock": [
+     "hub:h-opshop-north-sydney-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-north-sydney-1",
+   "act": 3,
+   "title": "The Tip Fee, North Sydney",
+   "blurb": "You will think I am making this up. The photos worked, which means North Sydney can claim back the $86 we have paid to throw away other people's furniture since every second Friday. The paperwork says one thing and my eyes say another. Say nothing to anyone on the way.",
+   "giver": "hub-north-sydney-anika",
+   "level": 5,
+   "requires": [
+    "h-opshop-north-sydney-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 86,
+     "label": "$86, and every receipt counts"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will do the form if you do the walking",
+     "npc": "hub-north-sydney-anika"
+    }
+   ],
+   "reward": {
+    "cash": 168,
+    "xp": 399,
+    "unlock": [
+     "hub:h-opshop-north-sydney-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-north-sydney-2",
+   "act": 3,
+   "title": "The Good Box, North Sydney",
+   "blurb": "There is no clever way to say this. Something came into North Sydney on every second Friday in a box of paperbacks that I do not think the family meant to give away. It has been going on longer than I have admitted to anyone. Do not make a scene about it.",
+   "giver": "hub-north-sydney-omar",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -311,
+     "z": -2928,
+     "radius": 25,
+     "label": "the address on the donation slip"
+    },
+    {
+     "kind": "photo",
+     "x": -334,
+     "z": -2942,
+     "radius": 35,
+     "label": "the thing itself, before it goes back"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I would rather give it back than sell it",
+     "npc": "hub-north-sydney-omar"
+    }
+   ],
+   "reward": {
+    "cash": 120,
+    "xp": 307,
+    "unlock": [
+     "hub:h-opshop-north-sydney-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-north-sydney-3",
+   "act": 3,
+   "title": "Sorting Room, North Sydney",
+   "blurb": "You look like you have twenty minutes. Two people have been coming into the North Sydney sorting room since every second Friday and taking the good stock before it reaches the floor, and one of them volunteers here. I have got no proof, which is exactly why I am asking. Ask for me by name at the counter.",
+   "giver": "hub-north-sydney-omar",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "catch them at the back door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 89,
+     "label": "$89, which is what the good stock made last month"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 314,
+    "unlock": [
+     "hub:h-opshop-north-sydney-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-north-sydney-4",
+   "act": 3,
+   "title": "The Van, North Sydney",
+   "blurb": "Keep it between us for now. I do the North Sydney pick-ups in a van with 89 thousand on it and a door that only opens if you know about it. It might be nothing. It has not felt like nothing. Come back and tell me straight.",
+   "giver": "hub-north-sydney-bruna",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "North Sydney",
+     "to": "Victoria Cross",
+     "label": "come out to Victoria Cross with me, it is a two-person lift"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "we will stop on the way, my shout"
+    }
+   ],
+   "reward": {
+    "cash": 117,
+    "xp": 315,
+    "unlock": [
+     "hub:h-opshop-north-sydney-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-north-sydney-5",
+   "act": 3,
+   "title": "Head Office, North Sydney",
+   "blurb": "Right. Since you asked. Everything North Sydney cannot sell goes to a warehouse at Crows Nest, and nobody there has ever answered a phone in my hearing. I would not ask if there was anyone else about. Do that and we're square.",
+   "giver": "hub-north-sydney-bruna",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -906,
+     "z": -4784,
+     "radius": 60,
+     "label": "turn up in person, that is the trick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me there is a person in there",
+     "npc": "hub-north-sydney-bruna"
+    }
+   ],
+   "reward": {
+    "cash": 111,
+    "xp": 302,
+    "unlock": [
+     "hub:h-opshop-north-sydney-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,886 @@
+{
+ "npcs": [
+  {
+   "id": "hub-austinmer-isabeau",
+   "name": "Isabeau, baker at Austinmer",
+   "x": -24784,
+   "z": 49116,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I have got about four minutes before I am needed.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Honestly, I am past caring how it looks. I start at half six and for a month the Austinmer back lane has had somebody in it who is not waiting for bread. It started small, the way these things do. Whatever it costs you, tell me and I will cover it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-austinmer-0",
+       "denyFlag": "hub:h-bakery-austinmer-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I would do it myself if I could leave the counter. A light on that lane costs Austinmer $105 and the landlord has said no twice, so we are doing it ourselves. It is the not knowing that has got me, honestly. I would rather know than wonder.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-austinmer-1",
+       "denyFlag": "hub:h-bakery-austinmer-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Alright. I am listening properly this time.",
+     "choices": [
+      {
+       "text": "half six at Austinmer — that's done.",
+       "turnin": "h-bakery-austinmer-0"
+      },
+      {
+       "text": "The Lane Light, Austinmer — that's done.",
+       "turnin": "h-bakery-austinmer-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-austinmer-parvati",
+   "name": "Parvati, night delivery at Austinmer",
+   "x": -24972,
+   "z": 49088,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Ah. Someone with two working legs.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You will think I am making this up. The flour for Austinmer comes off a truck at half six and last a public holiday nobody remembered the truck came and the flour did not. There is probably a simple explanation and I would love to hear it. That's the whole job. No catch.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-austinmer-2",
+       "denyFlag": "hub:h-bakery-austinmer-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "There is no clever way to say this. The Austinmer loading zone has had a car in it at half six every morning this week and the driver waits in it, which makes it worse. You will see what I mean the second you get there. Be polite about it. It costs nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-austinmer-3",
+       "denyFlag": "hub:h-bakery-austinmer-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Say it plain and I will pay you plain.",
+     "choices": [
+      {
+       "text": "Flour Run, Austinmer — that's done.",
+       "turnin": "h-bakery-austinmer-2"
+      },
+      {
+       "text": "The Loading Zone, Austinmer — that's done.",
+       "turnin": "h-bakery-austinmer-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-austinmer-isha",
+   "name": "Isha, front of house at Austinmer",
+   "x": -24930,
+   "z": 48896,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You are early. Or late. I have lost track.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You look like you have twenty minutes. Somebody two doors down from Austinmer put up a sign on a public holiday nobody remembered that says the same six words as ours, in the same order. There is a version of this where I am the unreasonable one. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-austinmer-4",
+       "denyFlag": "hub:h-bakery-austinmer-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Keep it between us for now. This business was at Thirroul before it was at Austinmer, and there is a woman there who still has the original book. The paperwork says one thing and my eyes say another. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-bakery-austinmer-5",
+       "denyFlag": "hub:h-bakery-austinmer-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I had a feeling. Go on.",
+     "choices": [
+      {
+       "text": "The Sourdough Sign, Austinmer — that's done.",
+       "turnin": "h-bakery-austinmer-4"
+      },
+      {
+       "text": "The Old Site, Austinmer — that's done.",
+       "turnin": "h-bakery-austinmer-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-strathfield-arta",
+   "name": "Arta, lifeguard at Strathfield",
+   "x": -10493,
+   "z": 412,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Been here since before it was like this. Go on.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Honestly, I am past caring how it looks. Council has been saying the Strathfield pool is at end of life since grand final week and the crack they keep pointing at is not in the shell. It started small, the way these things do. Whatever it costs you, tell me and I will cover it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-strathfield-0",
+       "denyFlag": "hub:h-pool-strathfield-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I would do it myself if I could leave the counter. We are running a stall for Strathfield on grand final week and a stall needs $129 of gear that nobody has volunteered to pay for. It is the not knowing that has got me, honestly. I would rather know than wonder.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-strathfield-1",
+       "denyFlag": "hub:h-pool-strathfield-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Take a breath. Then say the whole thing.",
+     "choices": [
+      {
+       "text": "The Strathfield Pool — that's done.",
+       "turnin": "h-pool-strathfield-0"
+      },
+      {
+       "text": "The Petition Stall, Strathfield — that's done.",
+       "turnin": "h-pool-strathfield-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "No dramas. Come back when you are bored.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-strathfield-kwame",
+   "name": "Kwame, swim coach at Strathfield",
+   "x": -10585,
+   "z": 467,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Do not mind the mess. It is structural now.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You will think I am making this up. I coach 38 kids at Strathfield at first light and three of them have stopped coming without anybody ringing me. There is probably a simple explanation and I would love to hear it. That's the whole job. No catch.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-strathfield-2",
+       "denyFlag": "hub:h-pool-strathfield-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "There is no clever way to say this. A group has been coming over the Strathfield fence after close and swimming in the dark, which is how Strathfield loses its pool. You will see what I mean the second you get there. Be polite about it. It costs nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-strathfield-3",
+       "denyFlag": "hub:h-pool-strathfield-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Go on then. What did you find.",
+     "choices": [
+      {
+       "text": "Squad, Strathfield — that's done.",
+       "turnin": "h-pool-strathfield-2"
+      },
+      {
+       "text": "The Deep End, Strathfield — that's done.",
+       "turnin": "h-pool-strathfield-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-strathfield-karina",
+   "name": "Karina, kiosk operator at Strathfield",
+   "x": -10684,
+   "z": 612,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If you are selling something the answer is no.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You look like you have twenty minutes. The kiosk at Strathfield has a bucket of odd keys in it and a freezer that has been running warm since grand final week. There is a version of this where I am the unreasonable one. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-strathfield-4",
+       "denyFlag": "hub:h-pool-strathfield-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Keep it between us for now. They want everyone from Strathfield to drive to the new centre at Homebush, so somebody should go and see whether it is any good. The paperwork says one thing and my eyes say another. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-pool-strathfield-5",
+       "denyFlag": "hub:h-pool-strathfield-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "You came back. That already puts you ahead.",
+     "choices": [
+      {
+       "text": "The Kiosk Freezer, Strathfield — that's done.",
+       "turnin": "h-pool-strathfield-4"
+      },
+      {
+       "text": "The Aquatic Centre, Strathfield — that's done.",
+       "turnin": "h-pool-strathfield-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-wentworthville-faisal",
+   "name": "Faisal, taxi driver at Wentworthville",
+   "x": -21991,
+   "z": -6508,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Cash only and no, I am joking. What do you want.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "Honestly, I am past caring how it looks. The rank outside Wentworthville used to hold nine cars and since the first of the month it holds four, and nobody will say who moved the line. It started small, the way these things do. Whatever it costs you, tell me and I will cover it.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-wentworthville-0",
+       "denyFlag": "hub:h-rank-wentworthville-0"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "I would do it myself if I could leave the counter. Since the rank at Wentworthville shrank I am $120 a week down, and the association wants that number from somebody who can prove it. It is the not knowing that has got me, honestly. I would rather know than wonder.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-wentworthville-1",
+       "denyFlag": "hub:h-rank-wentworthville-1"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Right. Tell me and do not soften it.",
+     "choices": [
+      {
+       "text": "The Wentworthville Rank — that's done.",
+       "turnin": "h-rank-wentworthville-0"
+      },
+      {
+       "text": "Lost Fares, Wentworthville — that's done.",
+       "turnin": "h-rank-wentworthville-1"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Right you are. Mind the step.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-wentworthville-linh",
+   "name": "Linh, rank marshal at Wentworthville",
+   "x": -21961,
+   "z": -6490,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You have got a face like you can keep your mouth shut.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You will think I am making this up. Cars that have never sat in the Wentworthville queue turn up at knock-off and take the front of it, and the drivers who waited say nothing. There is probably a simple explanation and I would love to hear it. That's the whole job. No catch.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-wentworthville-2",
+       "denyFlag": "hub:h-rank-wentworthville-2"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "There is no clever way to say this. When the last train into Wentworthville is late, 43 people come out at once and I have to have cars there before they do. You will see what I mean the second you get there. Be polite about it. It costs nothing.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-wentworthville-3",
+       "denyFlag": "hub:h-rank-wentworthville-3"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "I have been thinking about it all day. Out with it.",
+     "choices": [
+      {
+       "text": "Queue Jumpers, Wentworthville — that's done.",
+       "turnin": "h-rank-wentworthville-2"
+      },
+      {
+       "text": "The Late Train, Wentworthville — that's done.",
+       "turnin": "h-rank-wentworthville-3"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Fair enough. You know where I am.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hub-wentworthville-atticus",
+   "name": "Atticus, hotel doorman at Wentworthville",
+   "x": -22075,
+   "z": -6526,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Right. Talk while I do this.",
+     "choices": [
+      {
+       "text": "What have you got?",
+       "goto": "j0"
+      },
+      {
+       "text": "Anything else?",
+       "goto": "j1"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "ledger"
+      },
+      {
+       "text": "Not today.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j0",
+     "line": "You look like you have twenty minutes. I have stood on this door near Wentworthville for 43 years and since the first of the month somebody has been sending my guests to a different rank. There is a version of this where I am the unreasonable one. Take your time. Do not take a week.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-wentworthville-4",
+       "denyFlag": "hub:h-rank-wentworthville-4"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "j1",
+     "line": "Keep it between us for now. The plates working the Wentworthville rank are dispatched from a depot at Westmead, and the man who runs it has never met a driver he liked. The paperwork says one thing and my eyes say another. Come and find me after, either way.",
+     "choices": [
+      {
+       "text": "Alright. I'll do it.",
+       "accept": "h-rank-wentworthville-5",
+       "denyFlag": "hub:h-rank-wentworthville-5"
+      },
+      {
+       "text": "What else is there?",
+       "goto": "hello"
+      },
+      {
+       "text": "Not for me.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "ledger",
+     "line": "Well? I can read your face from here.",
+     "choices": [
+      {
+       "text": "The Door, Wentworthville — that's done.",
+       "turnin": "h-rank-wentworthville-4"
+      },
+      {
+       "text": "The Depot, Wentworthville — that's done.",
+       "turnin": "h-rank-wentworthville-5"
+      },
+      {
+       "text": "Still on it.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "bye",
+     "line": "Suit yourself. The offer does not go anywhere.",
+     "choices": [
+      {
+       "text": "Right.",
+       "goto": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

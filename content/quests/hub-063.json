@@ -1,0 +1,663 @@
+{
+ "quests": [
+  {
+   "id": "h-newsagent-st-peters-0",
+   "act": 3,
+   "title": "Returns at St Peters",
+   "blurb": "Right. Since you asked. I am sending back 21 papers a day from St Peters and paying to have them collected, which is a business model somebody invented on purpose. I did try the official route, for what that was worth. Just do not come back empty-handed.",
+   "giver": "hub-st-peters-taini",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2553,
+     "z": 4344,
+     "radius": 35,
+     "label": "the returns stack, at its worst"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the distributor needs to see the size of it",
+     "npc": "hub-st-peters-taini"
+    }
+   ],
+   "reward": {
+    "cash": 67,
+    "xp": 170,
+    "unlock": [
+     "hub:h-newsagent-st-peters-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-st-peters-1",
+   "act": 3,
+   "title": "The Better Rate, St Peters",
+   "blurb": "My knees are gone, so. They will drop my St Peters order if I can show $52 of turnover on the other side of the shop by the long weekend. I have got a photo on my phone but it is useless. I will know if you skipped a bit.",
+   "giver": "hub-st-peters-taini",
+   "level": 2,
+   "requires": [
+    "h-newsagent-st-peters-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 52,
+     "label": "$52, and cards and stationery count"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "sell anything, I am not proud",
+     "npc": "hub-st-peters-taini"
+    }
+   ],
+   "reward": {
+    "cash": 123,
+    "xp": 263,
+    "unlock": [
+     "hub:h-newsagent-st-peters-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-st-peters-2",
+   "act": 3,
+   "title": "The St Peters Round",
+   "blurb": "This is going to sound small. I do the St Peters round from the back of seven and for the last fortnight somebody has been taking the papers off the front steps behind me. I am aware how that sounds. Say nothing to anyone on the way.",
+   "giver": "hub-st-peters-indira",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2735,
+     "z": 4279,
+     "radius": 25,
+     "label": "the end of the round, where it starts"
+    },
+    {
+     "kind": "photo",
+     "x": -2739,
+     "z": 4244,
+     "radius": 35,
+     "label": "whoever is on that street at that hour"
+    }
+   ],
+   "reward": {
+    "cash": 76,
+    "xp": 172,
+    "unlock": [
+     "hub:h-newsagent-st-peters-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-st-peters-3",
+   "act": 3,
+   "title": "The Dog on Ash Street, St Peters",
+   "blurb": "I have written it down twice and lost it twice. There is a dog on the St Peters round that has had two of my bags and a laminated notice that was not even mine. My wife says I should let it go. My wife is wrong. Do not make a scene about it.",
+   "giver": "hub-st-peters-indira",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you will want your wits about you"
+    },
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "the owner, not the dog, I am not a monster"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me it is sorted",
+     "npc": "hub-st-peters-indira"
+    }
+   ],
+   "reward": {
+    "cash": 78,
+    "xp": 168,
+    "unlock": [
+     "hub:h-newsagent-st-peters-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-st-peters-4",
+   "act": 3,
+   "title": "The Syndicate, St Peters",
+   "blurb": "Do not laugh. Nine of us at St Peters have gone in on the same numbers since the long weekend and one of us has stopped putting money in. I have rung the number on the letter four times. Ask for me by name at the counter.",
+   "giver": "hub-st-peters-vaila",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2558,
+     "z": 4169,
+     "radius": 25,
+     "label": "the house of the one who stopped"
+    },
+    {
+     "kind": "earn",
+     "dollars": 21,
+     "label": "$21, which is his share since he stopped"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it said out loud, not in the group chat",
+     "npc": "hub-st-peters-vaila"
+    }
+   ],
+   "reward": {
+    "cash": 74,
+    "xp": 167,
+    "unlock": [
+     "hub:h-newsagent-st-peters-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-st-peters-5",
+   "act": 3,
+   "title": "The Other Agency, St Peters",
+   "blurb": "It is the sort of thing you notice or you do not. The agency at Erskineville closed six months before St Peters started struggling, and I would very much like to know what they know. Half the street knows and half the street is pretending not to. Come back and tell me straight.",
+   "giver": "hub-st-peters-vaila",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2000,
+     "z": 3668,
+     "radius": 60,
+     "label": "the shop is shut, the family is not"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever they say, say it slowly to me",
+     "npc": "hub-st-peters-vaila"
+    }
+   ],
+   "reward": {
+    "cash": 78,
+    "xp": 168,
+    "unlock": [
+     "hub:h-newsagent-st-peters-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-lakemba-0",
+   "act": 3,
+   "title": "The Unclaimed Falcon, Lakemba",
+   "blurb": "Right. Since you asked. There has been a car in the Lakemba yard since every second Friday with a clipboard nobody signs on the passenger seat and no owner answering. I did try the official route, for what that was worth. Just do not come back empty-handed.",
+   "giver": "hub-lakemba-zuri",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -12254,
+     "z": 6071,
+     "radius": 35,
+     "label": "the car and the plate together"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I have to prove I tried before I can move it",
+     "npc": "hub-lakemba-zuri"
+    }
+   ],
+   "reward": {
+    "cash": 85,
+    "xp": 222,
+    "unlock": [
+     "hub:h-workshop-lakemba-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-lakemba-1",
+   "act": 3,
+   "title": "Storage Fees, Lakemba",
+   "blurb": "My knees are gone, so. Now that it is documented, Lakemba is owed $60 in storage and the only person who can pay it is the person not answering. I have got a photo on my phone but it is useless. I will know if you skipped a bit.",
+   "giver": "hub-lakemba-zuri",
+   "level": 3,
+   "requires": [
+    "h-workshop-lakemba-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "$60, from him or from the scrap"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "either way it comes off my floor",
+     "npc": "hub-lakemba-zuri"
+    }
+   ],
+   "reward": {
+    "cash": 127,
+    "xp": 310,
+    "unlock": [
+     "hub:h-workshop-lakemba-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-lakemba-2",
+   "act": 3,
+   "title": "First Year, Lakemba",
+   "blurb": "This is going to sound small. I am in my first year at Lakemba and I have to log 84 hours on a job I am not allowed to touch on my own. I am aware how that sounds. Say nothing to anyone on the way.",
+   "giver": "hub-lakemba-keanu",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -12361,
+     "z": 6036,
+     "radius": 25,
+     "label": "the supplier, two streets over"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "and get him a coffee, it helps"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "sign the book and I owe you",
+     "npc": "hub-lakemba-keanu"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 218,
+    "unlock": [
+     "hub:h-workshop-lakemba-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-lakemba-3",
+   "act": 3,
+   "title": "The Air Line, Lakemba",
+   "blurb": "I have written it down twice and lost it twice. Somebody has been coming into the Lakemba yard after first light to use the air line, and last week they used the compressor as well. My wife says I should let it go. My wife is wrong. Do not make a scene about it.",
+   "giver": "hub-lakemba-keanu",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "the ones who think the yard is public"
+    },
+    {
+     "kind": "photo",
+     "x": -12308,
+     "z": 5978,
+     "radius": 35,
+     "label": "the gate they are getting through"
+    }
+   ],
+   "reward": {
+    "cash": 87,
+    "xp": 213,
+    "unlock": [
+     "hub:h-workshop-lakemba-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-lakemba-4",
+   "act": 3,
+   "title": "My Own Car, Lakemba",
+   "blurb": "Do not laugh. My car has been at Lakemba since every second Friday and every time I ring, the quote has grown by about $84. I have rung the number on the letter four times. Ask for me by name at the counter.",
+   "giver": "hub-lakemba-filip",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -12220,
+     "z": 5945,
+     "radius": 25,
+     "label": "stand in the office where they can see you"
+    },
+    {
+     "kind": "photo",
+     "x": -12210,
+     "z": 5946,
+     "radius": 35,
+     "label": "the job card on the wall, all of it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I know what I am arguing about",
+     "npc": "hub-lakemba-filip"
+    }
+   ],
+   "reward": {
+    "cash": 98,
+    "xp": 222,
+    "unlock": [
+     "hub:h-workshop-lakemba-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-lakemba-5",
+   "act": 3,
+   "title": "The Assessor, Lakemba",
+   "blurb": "It is the sort of thing you notice or you do not. The insurance assessor who signs off every job at Lakemba works out of Belmore, and he has never once seen the car he is assessing. Half the street knows and half the street is pretending not to. Come back and tell me straight.",
+   "giver": "hub-lakemba-filip",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10986,
+     "z": 5597,
+     "radius": 60,
+     "label": "catch him before he goes out on the road"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear how he does it",
+     "npc": "hub-lakemba-filip"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 208,
+    "unlock": [
+     "hub:h-workshop-lakemba-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-kingswood-0",
+   "act": 3,
+   "title": "Dumped Out the Back, Kingswood",
+   "blurb": "Right. Since you asked. People leave things at the Kingswood roller door after two in the afternoon and by morning it is rained on and it is our problem and our tip fee. I did try the official route, for what that was worth. Just do not come back empty-handed.",
+   "giver": "hub-kingswood-mareike",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -45501,
+     "z": -11325,
+     "radius": 35,
+     "label": "the pile, on a bad morning"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council will not act without one of these",
+     "npc": "hub-kingswood-mareike"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 208,
+    "unlock": [
+     "hub:h-opshop-kingswood-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-kingswood-1",
+   "act": 3,
+   "title": "The Tip Fee, Kingswood",
+   "blurb": "My knees are gone, so. The photos worked, which means Kingswood can claim back the $55 we have paid to throw away other people's furniture since a wet Monday. I have got a photo on my phone but it is useless. I will know if you skipped a bit.",
+   "giver": "hub-kingswood-mareike",
+   "level": 3,
+   "requires": [
+    "h-opshop-kingswood-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 55,
+     "label": "$55, and every receipt counts"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will do the form if you do the walking",
+     "npc": "hub-kingswood-mareike"
+    }
+   ],
+   "reward": {
+    "cash": 130,
+    "xp": 306,
+    "unlock": [
+     "hub:h-opshop-kingswood-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-kingswood-2",
+   "act": 3,
+   "title": "The Good Box, Kingswood",
+   "blurb": "This is going to sound small. Something came into Kingswood on a wet Monday in a box of paperbacks that I do not think the family meant to give away. I am aware how that sounds. Say nothing to anyone on the way.",
+   "giver": "hub-kingswood-hania",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -45582,
+     "z": -11272,
+     "radius": 25,
+     "label": "the address on the donation slip"
+    },
+    {
+     "kind": "photo",
+     "x": -45605,
+     "z": -11286,
+     "radius": 35,
+     "label": "the thing itself, before it goes back"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I would rather give it back than sell it",
+     "npc": "hub-kingswood-hania"
+    }
+   ],
+   "reward": {
+    "cash": 95,
+    "xp": 217,
+    "unlock": [
+     "hub:h-opshop-kingswood-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-kingswood-3",
+   "act": 3,
+   "title": "Sorting Room, Kingswood",
+   "blurb": "I have written it down twice and lost it twice. Two people have been coming into the Kingswood sorting room since a wet Monday and taking the good stock before it reaches the floor, and one of them volunteers here. My wife says I should let it go. My wife is wrong. Do not make a scene about it.",
+   "giver": "hub-kingswood-hania",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "catch them at the back door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 41,
+     "label": "$41, which is what the good stock made last month"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 209,
+    "unlock": [
+     "hub:h-opshop-kingswood-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-kingswood-4",
+   "act": 3,
+   "title": "The Van, Kingswood",
+   "blurb": "Do not laugh. I do the Kingswood pick-ups in a van with 41 thousand on it and a door that only opens if you know about it. I have rung the number on the letter four times. Ask for me by name at the counter.",
+   "giver": "hub-kingswood-sibel",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Kingswood",
+     "to": "Penrith",
+     "label": "come out to Penrith with me, it is a two-person lift"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "we will stop on the way, my shout"
+    }
+   ],
+   "reward": {
+    "cash": 90,
+    "xp": 230,
+    "unlock": [
+     "hub:h-opshop-kingswood-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-kingswood-5",
+   "act": 3,
+   "title": "Head Office, Kingswood",
+   "blurb": "It is the sort of thing you notice or you do not. Everything Kingswood cannot sell goes to a warehouse at Penrith, and nobody there has ever answered a phone in my hearing. Half the street knows and half the street is pretending not to. Come back and tell me straight.",
+   "giver": "hub-kingswood-sibel",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -47881,
+     "z": -12411,
+     "radius": 60,
+     "label": "turn up in person, that is the trick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me there is a person in there",
+     "npc": "hub-kingswood-sibel"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 222,
+    "unlock": [
+     "hub:h-opshop-kingswood-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

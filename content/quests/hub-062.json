@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-cornershop-emu-plains-0",
+   "act": 3,
+   "title": "Short Delivery, Emu Plains",
+   "blurb": "Right. Since you asked. The Emu Plains order has been two cartons light every week since every second Friday and the invoice says otherwise every time. I did try the official route, for what that was worth. Just do not come back empty-handed.",
+   "giver": "hub-emu-plains-sibel",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -50028,
+     "z": -12551,
+     "radius": 25,
+     "label": "the loading bay round the side"
+    },
+    {
+     "kind": "photo",
+     "x": -50039,
+     "z": -12548,
+     "radius": 35,
+     "label": "the pallet as it actually arrives"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I have got something to send them",
+     "npc": "hub-emu-plains-sibel"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 128,
+    "unlock": [
+     "hub:h-cornershop-emu-plains-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-cornershop-emu-plains-1",
+   "act": 3,
+   "title": "The Credit Note, Emu Plains",
+   "blurb": "My knees are gone, so. They admitted it, which I did not expect, so now there is $51 owing to Emu Plains and it is not going to walk in here itself. I have got a photo on my phone but it is useless. I will know if you skipped a bit.",
+   "giver": "hub-emu-plains-sibel",
+   "level": 1,
+   "requires": [
+    "h-cornershop-emu-plains-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 51,
+     "label": "$51, and do not take a voucher"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "cash, on the counter, and I will believe it",
+     "npc": "hub-emu-plains-sibel"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 222,
+    "unlock": [
+     "hub:h-cornershop-emu-plains-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-cornershop-emu-plains-2",
+   "act": 3,
+   "title": "The Emu Plains Run",
+   "blurb": "This is going to sound small. I do the Emu Plains run at the back of seven and there is a stretch of it where the van gets followed, which I have told nobody until now. I am aware how that sounds. Say nothing to anyone on the way.",
+   "giver": "hub-emu-plains-liam",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Emu Plains",
+     "to": "Penrith",
+     "label": "ride it with me as far as Penrith"
+    },
+    {
+     "kind": "photo",
+     "x": -50102,
+     "z": -12733,
+     "radius": 35,
+     "label": "whatever is behind us when we stop"
+    }
+   ],
+   "reward": {
+    "cash": 61,
+    "xp": 121,
+    "unlock": [
+     "hub:h-cornershop-emu-plains-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-cornershop-emu-plains-3",
+   "act": 3,
+   "title": "Locked Out, Emu Plains",
+   "blurb": "I have written it down twice and lost it twice. I have got a laminated notice in the back of the van and the Emu Plains shop is shut, and the number on the door rings out. My wife says I should let it go. My wife is wrong. Do not make a scene about it.",
+   "giver": "hub-emu-plains-liam",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -49932,
+     "z": -12750,
+     "radius": 25,
+     "label": "try the flat above the shop"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get one in you, this takes a while"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "somebody has to sign for it",
+     "npc": "hub-emu-plains-liam"
+    }
+   ],
+   "reward": {
+    "cash": 64,
+    "xp": 139,
+    "unlock": [
+     "hub:h-cornershop-emu-plains-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-cornershop-emu-plains-4",
+   "act": 3,
+   "title": "The Regulars, Emu Plains",
+   "blurb": "Do not laugh. Three of the Emu Plains regulars have started coming in together and going out separately, and the till is $76 down on those days. I have rung the number on the letter four times. Ask for me by name at the counter.",
+   "giver": "hub-emu-plains-isha",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 3,
+     "label": "the ones who come in as a set"
+    },
+    {
+     "kind": "earn",
+     "dollars": 76,
+     "label": "$76, which is exactly what the till says"
+    }
+   ],
+   "reward": {
+    "cash": 62,
+    "xp": 133,
+    "unlock": [
+     "hub:h-cornershop-emu-plains-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-cornershop-emu-plains-5",
+   "act": 3,
+   "title": "The Wholesaler, Emu Plains",
+   "blurb": "It is the sort of thing you notice or you do not. Everything Emu Plains sells comes off a floor at Penrith, and the woman who runs it will tell you things she will not put in writing. Half the street knows and half the street is pretending not to. Come back and tell me straight.",
+   "giver": "hub-emu-plains-isha",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -47881,
+     "z": -12411,
+     "radius": 60,
+     "label": "go and see her before the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come and tell me what she said about us",
+     "npc": "hub-emu-plains-isha"
+    }
+   ],
+   "reward": {
+    "cash": 69,
+    "xp": 129,
+    "unlock": [
+     "hub:h-cornershop-emu-plains-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-oval-marion-0",
+   "act": 3,
+   "title": "Under 12s at Marion",
+   "blurb": "Right. Since you asked. I have got eleven kids for a twelve-a-side at Marion on school holidays and one of them has a note from his mother. I did try the official route, for what that was worth. Just do not come back empty-handed.",
+   "giver": "hub-marion-jacinta",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5815,
+     "z": 1805,
+     "radius": 25,
+     "label": "the estate behind the ground, ask around"
+    },
+    {
+     "kind": "photo",
+     "x": -5824,
+     "z": 1828,
+     "radius": 35,
+     "label": "the noticeboard where the sign-on sheet went up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "any kid with boots will do at this point",
+     "npc": "hub-marion-jacinta"
+    }
+   ],
+   "reward": {
+    "cash": 75,
+    "xp": 164,
+    "unlock": [
+     "hub:h-oval-marion-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-marion-1",
+   "act": 3,
+   "title": "Registration, Marion",
+   "blurb": "My knees are gone, so. We found a twelfth, which means the Marion club now owes the association $36 it had budgeted on not owing. I have got a photo on my phone but it is useless. I will know if you skipped a bit.",
+   "giver": "hub-marion-jacinta",
+   "level": 2,
+   "requires": [
+    "h-oval-marion-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 36,
+     "label": "$36 before the cut-off"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will drive it in myself",
+     "npc": "hub-marion-jacinta"
+    }
+   ],
+   "reward": {
+    "cash": 107,
+    "xp": 271,
+    "unlock": [
+     "hub:h-oval-marion-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-marion-2",
+   "act": 3,
+   "title": "The Marion Canteen",
+   "blurb": "This is going to sound small. The canteen at Marion does two hundred sausages on a Saturday and this week the freezer went off at twenty past four. I am aware how that sounds. Say nothing to anyone on the way.",
+   "giver": "hub-marion-zuri",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "we are going to need the coffee"
+    },
+    {
+     "kind": "photo",
+     "x": -5932,
+     "z": 1764,
+     "radius": 35,
+     "label": "the thermometer, so the insurance believes us"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 164,
+    "unlock": [
+     "hub:h-oval-marion-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-marion-3",
+   "act": 3,
+   "title": "Grand Final Float, Marion",
+   "blurb": "I have written it down twice and lost it twice. Somebody walked off with the float from the Marion canteen at about twenty past four during the last home game, and I have a fair idea which somebody. My wife says I should let it go. My wife is wrong. Do not make a scene about it.",
+   "giver": "hub-marion-zuri",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "the pair who were leaning on the roller door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 43,
+     "label": "$43, which is what was in the tin"
+    }
+   ],
+   "reward": {
+    "cash": 76,
+    "xp": 181,
+    "unlock": [
+     "hub:h-oval-marion-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-marion-4",
+   "act": 3,
+   "title": "Sprinkler Line, Marion",
+   "blurb": "Do not laugh. The sprinkler line under the Marion outfield has been leaking since school holidays and the wet patch has started to move. I have rung the number on the letter four times. Ask for me by name at the counter.",
+   "giver": "hub-marion-eamon",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5974,
+     "z": 1628,
+     "radius": 25,
+     "label": "walk the line from the tap to the boundary"
+    },
+    {
+     "kind": "photo",
+     "x": -5955,
+     "z": 1606,
+     "radius": 35,
+     "label": "where the grass has gone dark"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to dig once, not five times",
+     "npc": "hub-marion-eamon"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 186,
+    "unlock": [
+     "hub:h-oval-marion-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-marion-5",
+   "act": 3,
+   "title": "The Association, Marion",
+   "blurb": "It is the sort of thing you notice or you do not. The bloke who allocates grounds for the whole association sits at Summer Hill, and Marion has been at the bottom of his list for two seasons. Half the street knows and half the street is pretending not to. Come back and tell me straight.",
+   "giver": "hub-marion-eamon",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -6591,
+     "z": 2533,
+     "radius": 60,
+     "label": "go and be reasonable at him"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if it is us or the paperwork",
+     "npc": "hub-marion-eamon"
+    }
+   ],
+   "reward": {
+    "cash": 77,
+    "xp": 163,
+    "unlock": [
+     "hub:h-oval-marion-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-victoria-cross-0",
+   "act": 3,
+   "title": "The Creek Behind Victoria Cross",
+   "blurb": "Right. Since you asked. Somebody has been tipping fill into the creek behind Victoria Cross since grand final week and it is narrowing the channel a metre at a time. I did try the official route, for what that was worth. Just do not come back empty-handed.",
+   "giver": "hub-victoria-cross-roma",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -146,
+     "z": -3502,
+     "radius": 35,
+     "label": "the fill, with the water level in shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council reads photographs, not letters",
+     "npc": "hub-victoria-cross-roma"
+    }
+   ],
+   "reward": {
+    "cash": 71,
+    "xp": 169,
+    "unlock": [
+     "hub:h-creek-victoria-cross-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-victoria-cross-1",
+   "act": 3,
+   "title": "Willow Removal, Victoria Cross",
+   "blurb": "My knees are gone, so. They have agreed to a clean-up at Victoria Cross, which is wonderful, except the grant is $52 short and closes on grand final week. I have got a photo on my phone but it is useless. I will know if you skipped a bit.",
+   "giver": "hub-victoria-cross-roma",
+   "level": 2,
+   "requires": [
+    "h-creek-victoria-cross-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 52,
+     "label": "$52, and I do not care whose pocket"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the form needs the number today",
+     "npc": "hub-victoria-cross-roma"
+    }
+   ],
+   "reward": {
+    "cash": 113,
+    "xp": 261,
+    "unlock": [
+     "hub:h-creek-victoria-cross-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-victoria-cross-2",
+   "act": 3,
+   "title": "Sandbags, Victoria Cross",
+   "blurb": "This is going to sound small. We had 48 sandbags in the Victoria Cross shed on grand final week and this morning we have got the pallet they came on. I am aware how that sounds. Say nothing to anyone on the way.",
+   "giver": "hub-victoria-cross-gabriel",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -340,
+     "z": -3617,
+     "radius": 25,
+     "label": "the yards backing onto the reserve"
+    },
+    {
+     "kind": "photo",
+     "x": -348,
+     "z": -3633,
+     "radius": 35,
+     "label": "anywhere they have obviously been used"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 170,
+    "unlock": [
+     "hub:h-creek-victoria-cross-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-victoria-cross-3",
+   "act": 3,
+   "title": "The Low Crossing, Victoria Cross",
+   "blurb": "I have written it down twice and lost it twice. People keep driving the low crossing at Victoria Cross at ten past five with the water over the sign, and one of them is going to be the one. My wife says I should let it go. My wife is wrong. Do not make a scene about it.",
+   "giver": "hub-victoria-cross-gabriel",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you will be standing out there a while"
+    },
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "the ones who argue with the barrier"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 172,
+    "unlock": [
+     "hub:h-creek-victoria-cross-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-victoria-cross-4",
+   "act": 3,
+   "title": "Under the House, Victoria Cross",
+   "blurb": "Do not laugh. The water came through my place at Victoria Cross on grand final week and the assessor wants photographs of things I have already thrown out. I have rung the number on the letter four times. Ask for me by name at the counter.",
+   "giver": "hub-victoria-cross-mikko",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -174,
+     "z": -3695,
+     "radius": 25,
+     "label": "round the side, where the pile is"
+    },
+    {
+     "kind": "photo",
+     "x": -155,
+     "z": -3693,
+     "radius": 35,
+     "label": "the high-water mark on the brick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the whole claim, that mark",
+     "npc": "hub-victoria-cross-mikko"
+    }
+   ],
+   "reward": {
+    "cash": 79,
+    "xp": 169,
+    "unlock": [
+     "hub:h-creek-victoria-cross-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-victoria-cross-5",
+   "act": 3,
+   "title": "Upstream, Victoria Cross",
+   "blurb": "It is the sort of thing you notice or you do not. Whatever is happening to Victoria Cross starts upstream at Milsons Point, and there are people up there who have been saying so for years. Half the street knows and half the street is pretending not to. Come back and tell me straight.",
+   "giver": "hub-victoria-cross-mikko",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 74,
+     "z": -2435,
+     "radius": 60,
+     "label": "go up and find them"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear it from someone who is not me",
+     "npc": "hub-victoria-cross-mikko"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 178,
+    "unlock": [
+     "hub:h-creek-victoria-cross-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

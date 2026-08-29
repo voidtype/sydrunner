@@ -600,6 +600,15 @@ export class ContentStore {
     }
   }
 
+  /**
+   * The serialised bundle and its gzip, keyed on the revision that produced it.
+   *
+   * One object rather than two fields so the two can never be a revision apart:
+   * a gzip of yesterday's quests served under today's ETag is the kind of bug
+   * that looks like a caching problem for a week.
+   */
+  private wire: { revision: string; json: string; gzip: Uint8Array<ArrayBuffer> | null } | null = null;
+
   close(): void {
     if (this.timer !== null) clearInterval(this.timer);
     this.timer = null;
@@ -607,7 +616,49 @@ export class ContentStore {
 
   /** What `GET /content` serves. The client walks this and nothing else. */
   serialise(): string {
-    return JSON.stringify({ revision: this.live.revision, quests: this.live.quests, npcs: this.live.npcs });
+    const cached = this.wire;
+    if (cached !== null && cached.revision === this.live.revision) return cached.json;
+    const json = JSON.stringify({ revision: this.live.revision, quests: this.live.quests, npcs: this.live.npcs });
+    this.wire = { revision: this.live.revision, json, gzip: null };
+    return json;
+  }
+
+  /**
+   * The same bytes, gzipped, built once per revision.
+   *
+   * **This became necessary rather than nice on the day the city went from six
+   * hundred quests to two thousand.** The bundle is 6.4 MB of JSON now, it is
+   * fetched on every cold load, and DESIGN.md rule 8 makes the egress budget a
+   * design constraint rather than an ops detail: at 6.4 MB a month's 20 GB buys
+   * about three thousand page loads. Gzipped it is 718 kB, which buys thirty
+   * thousand, and the ETag means a returning player pays neither.
+   *
+   * Compressed **here** and not at Caddy deliberately. Caddy would recompress
+   * the same six megabytes on every request on a one-vCPU box; this pays for it
+   * once, when the ledger changes, which in practice is once a day. Level 9
+   * because the cost is amortised over every fetch until the next content
+   * commit -- there is no reason to be quick about it.
+   *
+   * Returns null if compression fails, and `contentResponse` then serves the
+   * plain JSON. A content endpoint that 500s because a compressor was unhappy
+   * would take every quest in the game down with it.
+   */
+  gzipped(): Uint8Array<ArrayBuffer> | null {
+    const json = this.serialise();
+    const wire = this.wire;
+    if (wire === null) return null;
+    if (wire.gzip !== null) return wire.gzip;
+    try {
+      // Copied into a fresh buffer rather than handed over as the view Bun
+      // returns: `Response` wants a body backed by a plain `ArrayBuffer`, and
+      // one 718 kB copy per content revision -- which is about one a day -- is
+      // not a cost worth a cast to get around.
+      wire.gzip = new Uint8Array(Bun.gzipSync(new TextEncoder().encode(json), { level: 9 }));
+    } catch (err) {
+      console.error(`[sydney] quests: could not gzip the bundle: ${String(err).slice(0, 120)}`);
+      return null;
+    }
+    return wire.gzip;
   }
 }
 
@@ -1631,15 +1682,24 @@ export function contentResponse(store: ContentStore, req: Request): Response {
   if (req.headers.get('if-none-match') === etag) {
     return new Response(null, { status: 304, headers: { etag, 'access-control-allow-origin': '*' } });
   }
-  return new Response(store.serialise(), {
-    status: 200,
-    headers: {
-      'content-type': 'application/json',
-      etag,
-      // Short, because the ETag is doing the work and this only decides how
-      // often a client bothers to ask.
-      'cache-control': 'public, max-age=60',
-      'access-control-allow-origin': '*',
-    },
-  });
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    etag,
+    // Short, because the ETag is doing the work and this only decides how
+    // often a client bothers to ask.
+    'cache-control': 'public, max-age=60',
+    'access-control-allow-origin': '*',
+    // The response body differs by encoding, so a shared cache must not hand a
+    // gzip to a client that did not ask for one. One header, and it is the
+    // difference between working and working until somebody puts a proxy in
+    // front of it.
+    vary: 'accept-encoding',
+  };
+  const wantsGzip = (req.headers.get('accept-encoding') ?? '').toLowerCase().includes('gzip');
+  const gzip = wantsGzip ? store.gzipped() : null;
+  if (gzip !== null) {
+    headers['content-encoding'] = 'gzip';
+    return new Response(gzip, { status: 200, headers });
+  }
+  return new Response(store.serialise(), { status: 200, headers });
 }

@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-bowlo-tramway-avenue-0",
+   "act": 3,
+   "title": "The Dead Patch at Tramway Avenue",
+   "blurb": "Honestly, I am past caring how it looks. The number three green at Tramway Avenue has had a bald patch the shape of Tasmania since a Tuesday, and the committee thinks I am inventing it. It started small, the way these things do. Whatever it costs you, tell me and I will cover it.",
+   "giver": "hub-tramway-avenue-stefanos",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -17644,
+     "z": -5331,
+     "radius": 35,
+     "label": "the patch, with something in frame for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring it to me before the meeting",
+     "npc": "hub-tramway-avenue-stefanos"
+    }
+   ],
+   "reward": {
+    "cash": 94,
+    "xp": 211,
+    "unlock": [
+     "hub:h-bowlo-tramway-avenue-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-tramway-avenue-1",
+   "act": 3,
+   "title": "Turf Money, Tramway Avenue",
+   "blurb": "I would do it myself if I could leave the counter. They have seen the photograph and now they want it re-laid by a Tuesday, which means finding $51 that the Tramway Avenue club does not have. It is the not knowing that has got me, honestly. I would rather know than wonder.",
+   "giver": "hub-tramway-avenue-stefanos",
+   "level": 3,
+   "requires": [
+    "h-bowlo-tramway-avenue-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 51,
+     "label": "$51, however you like, I am not asking"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "put it in my hand, not the safe",
+     "npc": "hub-tramway-avenue-stefanos"
+    }
+   ],
+   "reward": {
+    "cash": 138,
+    "xp": 305,
+    "unlock": [
+     "hub:h-bowlo-tramway-avenue-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-tramway-avenue-2",
+   "act": 3,
+   "title": "The Tramway Avenue Membership Count",
+   "blurb": "You will think I am making this up. Our books say 77 members at Tramway Avenue and I would bet the bar takings that half of them are dead or moved to Queensland. There is probably a simple explanation and I would love to hear it. That's the whole job. No catch.",
+   "giver": "hub-tramway-avenue-keziah",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -17798,
+     "z": -5245,
+     "radius": 25,
+     "label": "stand at the side door where the list is kept"
+    },
+    {
+     "kind": "photo",
+     "x": -17827,
+     "z": -5254,
+     "radius": 35,
+     "label": "the board with the names still on it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "read me the ones you did not recognise",
+     "npc": "hub-tramway-avenue-keziah"
+    }
+   ],
+   "reward": {
+    "cash": 87,
+    "xp": 217,
+    "unlock": [
+     "hub:h-bowlo-tramway-avenue-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-tramway-avenue-3",
+   "act": 3,
+   "title": "Closing Time Rumour, Tramway Avenue",
+   "blurb": "There is no clever way to say this. Since first light somebody has been going round the Tramway Avenue greens telling the barefoot bowlers we are shutting, and we are not shutting. You will see what I mean the second you get there. Be polite about it. It costs nothing.",
+   "giver": "hub-tramway-avenue-keziah",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 2,
+     "label": "whoever is doing the telling"
+    },
+    {
+     "kind": "earn",
+     "dollars": 117,
+     "label": "and take the bar money off them while you are there"
+    }
+   ],
+   "reward": {
+    "cash": 97,
+    "xp": 231,
+    "unlock": [
+     "hub:h-bowlo-tramway-avenue-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-tramway-avenue-4",
+   "act": 3,
+   "title": "Behind the Bar at Tramway Avenue",
+   "blurb": "You look like you have twenty minutes. There is a milk crate in the chest freezer behind the bar at Tramway Avenue and I am not opening it on an empty stomach. There is a version of this where I am the unreasonable one. Take your time. Do not take a week.",
+   "giver": "hub-tramway-avenue-lorcan",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get one into you first, seriously"
+    },
+    {
+     "kind": "goto",
+     "x": -17756,
+     "z": -5418,
+     "radius": 25,
+     "label": "round the back where the cellar door is"
+    },
+    {
+     "kind": "photo",
+     "x": -17749,
+     "z": -5433,
+     "radius": 35,
+     "label": "whatever is in there, before I lose my nerve"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 219,
+    "unlock": [
+     "hub:h-bowlo-tramway-avenue-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-tramway-avenue-5",
+   "act": 3,
+   "title": "The Old Greenkeeper, Tramway Avenue",
+   "blurb": "Keep it between us for now. The man who kept these greens before me drinks at Harris Park now, and he owes Tramway Avenue an explanation about the drainage. The paperwork says one thing and my eyes say another. Come and find me after, either way.",
+   "giver": "hub-tramway-avenue-lorcan",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18680,
+     "z": -4727,
+     "radius": 60,
+     "label": "find him and hear him out"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come back and tell me what he said",
+     "npc": "hub-tramway-avenue-lorcan"
+    }
+   ],
+   "reward": {
+    "cash": 93,
+    "xp": 222,
+    "unlock": [
+     "hub:h-bowlo-tramway-avenue-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-cowan-0",
+   "act": 3,
+   "title": "Nights at Cowan",
+   "blurb": "Honestly, I am past caring how it looks. Every night around knock-off the same car does three laps of the Cowan forecourt and never buys fuel. It started small, the way these things do. Whatever it costs you, tell me and I will cover it.",
+   "giver": "hub-cowan-kiara",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -3914,
+     "z": -30389,
+     "radius": 35,
+     "label": "the car, plate if you can get it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it on record before I ring anyone",
+     "npc": "hub-cowan-kiara"
+    }
+   ],
+   "reward": {
+    "cash": 81,
+    "xp": 221,
+    "unlock": [
+     "hub:h-servo-cowan-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-cowan-1",
+   "act": 3,
+   "title": "The Third Lap, Cowan",
+   "blurb": "I would do it myself if I could leave the counter. Now I know the plate, I want to know where it goes after it leaves Cowan at knock-off, because it is not going home. It is the not knowing that has got me, honestly. I would rather know than wonder.",
+   "giver": "hub-cowan-kiara",
+   "level": 3,
+   "requires": [
+    "h-servo-cowan-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Cowan",
+     "to": "Berowra",
+     "label": "follow it as far as Berowra"
+    },
+    {
+     "kind": "photo",
+     "x": -4065,
+     "z": -30425,
+     "radius": 35,
+     "label": "wherever it stops"
+    }
+   ],
+   "reward": {
+    "cash": 126,
+    "xp": 308,
+    "unlock": [
+     "hub:h-servo-cowan-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-cowan-2",
+   "act": 3,
+   "title": "Bay Two, Cowan",
+   "blurb": "You will think I am making this up. Bay two at the Cowan workshop has had the same car in it since Thursdays and the owner has stopped answering. There is probably a simple explanation and I would love to hear it. That's the whole job. No catch.",
+   "giver": "hub-cowan-apirana",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -4070,
+     "z": -30523,
+     "radius": 25,
+     "label": "the address on the job card"
+    },
+    {
+     "kind": "photo",
+     "x": -4071,
+     "z": -30536,
+     "radius": 35,
+     "label": "the letterbox, so I know I have the right house"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if anybody actually lives there",
+     "npc": "hub-cowan-apirana"
+    }
+   ],
+   "reward": {
+    "cash": 92,
+    "xp": 211,
+    "unlock": [
+     "hub:h-servo-cowan-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-cowan-3",
+   "act": 3,
+   "title": "Tools Off the Bench, Cowan",
+   "blurb": "There is no clever way to say this. Someone has been walking out of Cowan with a socket set at a time since Thursdays, and I have run out of ways to be polite about it. You will see what I mean the second you get there. Be polite about it. It costs nothing.",
+   "giver": "hub-cowan-apirana",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 3,
+     "label": "the ones hanging round the air hose"
+    },
+    {
+     "kind": "earn",
+     "dollars": 54,
+     "label": "$54 of it back, that is what the set cost"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 220,
+    "unlock": [
+     "hub:h-servo-cowan-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-cowan-4",
+   "act": 3,
+   "title": "The Cowan Price Board",
+   "blurb": "You look like you have twenty minutes. Head office says the Cowan board has been wrong since Thursdays and I say it has been right for eleven years, and one of us is about to be embarrassed. There is a version of this where I am the unreasonable one. Take your time. Do not take a week.",
+   "giver": "hub-cowan-samir",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "buy something so it is a real transaction"
+    },
+    {
+     "kind": "photo",
+     "x": -3939,
+     "z": -30529,
+     "radius": 35,
+     "label": "the board and the pump, both in the one shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that settles it either way",
+     "npc": "hub-cowan-samir"
+    }
+   ],
+   "reward": {
+    "cash": 80,
+    "xp": 214,
+    "unlock": [
+     "hub:h-servo-cowan-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-cowan-5",
+   "act": 3,
+   "title": "The Other Franchise, Cowan",
+   "blurb": "Keep it between us for now. The bloke who runs the site at Berowra has had the same trouble Cowan has, and he will talk to you before he talks to me. The paperwork says one thing and my eyes say another. Come and find me after, either way.",
+   "giver": "hub-cowan-samir",
+   "level": 3,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5690,
+     "z": -26972,
+     "radius": 60,
+     "label": "find him on shift"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever he says, I want it word for word",
+     "npc": "hub-cowan-samir"
+    }
+   ],
+   "reward": {
+    "cash": 92,
+    "xp": 228,
+    "unlock": [
+     "hub:h-servo-cowan-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-john-street-square-0",
+   "act": 3,
+   "title": "Level Two, John Street Square",
+   "blurb": "Honestly, I am past caring how it looks. Water has been coming through the level two ceiling of the John Street Square block since the first of the month and the strata report says there is no water. It started small, the way these things do. Whatever it costs you, tell me and I will cover it.",
+   "giver": "hub-john-street-square-marcelo",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -1491,
+     "z": -38,
+     "radius": 35,
+     "label": "the ceiling, with the stain visible"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that goes in the file whether they like it or not",
+     "npc": "hub-john-street-square-marcelo"
+    }
+   ],
+   "reward": {
+    "cash": 101,
+    "xp": 271,
+    "unlock": [
+     "hub:h-strata-john-street-square-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-john-street-square-1",
+   "act": 3,
+   "title": "The Special Levy, John Street Square",
+   "blurb": "I would do it myself if I could leave the counter. The photo did it. It is the not knowing that has got me, honestly. Now every owner at John Street Square owes $62 and I have to collect it from people who have avoided me for a year. I would rather know than wonder.",
+   "giver": "hub-john-street-square-marcelo",
+   "level": 4,
+   "requires": [
+    "h-strata-john-street-square-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 62,
+     "label": "$62 out of them, in any state"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will not ask how",
+     "npc": "hub-john-street-square-marcelo"
+    }
+   ],
+   "reward": {
+    "cash": 147,
+    "xp": 362,
+    "unlock": [
+     "hub:h-strata-john-street-square-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-john-street-square-2",
+   "act": 3,
+   "title": "Car Space 14, John Street Square",
+   "blurb": "You will think I am making this up. Somebody who does not live at John Street Square has parked in space fourteen every night since the first of the month and the manager will not look at it. There is probably a simple explanation and I would love to hear it. That's the whole job. No catch.",
+   "giver": "hub-john-street-square-reeta",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1620,
+     "z": -63,
+     "radius": 25,
+     "label": "down to the basement, the far corner"
+    },
+    {
+     "kind": "photo",
+     "x": -1627,
+     "z": -70,
+     "radius": 35,
+     "label": "the car in the space with the number painted beside it"
+    }
+   ],
+   "reward": {
+    "cash": 109,
+    "xp": 254,
+    "unlock": [
+     "hub:h-strata-john-street-square-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-john-street-square-3",
+   "act": 3,
+   "title": "The Meeting, John Street Square",
+   "blurb": "There is no clever way to say this. The John Street Square AGM is on the first of the month and I would like to arrive with something stronger than a grievance and a printout. You will see what I mean the second you get there. Be polite about it. It costs nothing.",
+   "giver": "hub-john-street-square-reeta",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 2,
+     "label": "two coffees, one is for me"
+    },
+    {
+     "kind": "goto",
+     "x": -1552,
+     "z": -242,
+     "radius": 25,
+     "label": "the community room where they hold it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "walk in with me, they behave when there is a witness",
+     "npc": "hub-john-street-square-reeta"
+    }
+   ],
+   "reward": {
+    "cash": 106,
+    "xp": 278,
+    "unlock": [
+     "hub:h-strata-john-street-square-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-john-street-square-4",
+   "act": 3,
+   "title": "Bin Night at John Street Square",
+   "blurb": "You look like you have twenty minutes. Three units at John Street Square have put their bins out on the wrong night since the first of the month and I have taken it personally, which I accept is a choice I made. There is a version of this where I am the unreasonable one. Take your time. Do not take a week.",
+   "giver": "hub-john-street-square-cosima",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "the ones who argue about it"
+    },
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "the fine the council gave me, off them"
+    }
+   ],
+   "reward": {
+    "cash": 108,
+    "xp": 257,
+    "unlock": [
+     "hub:h-strata-john-street-square-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-john-street-square-5",
+   "act": 3,
+   "title": "The Other Block, John Street Square",
+   "blurb": "Keep it between us for now. There is a block at Glebe with the same builder and the same cracks, and their manager has already been through what John Street Square is starting. The paperwork says one thing and my eyes say another. Come and find me after, either way.",
+   "giver": "hub-john-street-square-cosima",
+   "level": 4,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1950,
+     "z": 1020,
+     "radius": 60,
+     "label": "go and ask them how it ended"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I need to know how much worse this gets",
+     "npc": "hub-john-street-square-cosima"
+    }
+   ],
+   "reward": {
+    "cash": 108,
+    "xp": 273,
+    "unlock": [
+     "hub:h-strata-john-street-square-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

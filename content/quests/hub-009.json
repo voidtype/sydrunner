@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-bowlo-canley-vale-0",
+   "act": 3,
+   "title": "The Dead Patch at Canley Vale",
+   "blurb": "I would do it myself if I could leave the counter. The number three green at Canley Vale has had a bald patch the shape of Tasmania since a public holiday nobody remembered, and the committee thinks I am inventing it. There is a version of this where I am the unreasonable one. I will know if you skipped a bit.",
+   "giver": "hub-canley-vale-jarrah",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -24442,
+     "z": 2551,
+     "radius": 35,
+     "label": "the patch, with something in frame for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring it to me before the meeting",
+     "npc": "hub-canley-vale-jarrah"
+    }
+   ],
+   "reward": {
+    "cash": 78,
+    "xp": 174,
+    "unlock": [
+     "hub:h-bowlo-canley-vale-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-canley-vale-1",
+   "act": 3,
+   "title": "Turf Money, Canley Vale",
+   "blurb": "You will think I am making this up. They have seen the photograph and now they want it re-laid by a public holiday nobody remembered, which means finding $39 that the Canley Vale club does not have. The paperwork says one thing and my eyes say another. Say nothing to anyone on the way.",
+   "giver": "hub-canley-vale-jarrah",
+   "level": 2,
+   "requires": [
+    "h-bowlo-canley-vale-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 39,
+     "label": "$39, however you like, I am not asking"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "put it in my hand, not the safe",
+     "npc": "hub-canley-vale-jarrah"
+    }
+   ],
+   "reward": {
+    "cash": 112,
+    "xp": 253,
+    "unlock": [
+     "hub:h-bowlo-canley-vale-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-canley-vale-2",
+   "act": 3,
+   "title": "The Canley Vale Membership Count",
+   "blurb": "There is no clever way to say this. Our books say 46 members at Canley Vale and I would bet the bar takings that half of them are dead or moved to Queensland. It has been going on longer than I have admitted to anyone. Do not make a scene about it.",
+   "giver": "hub-canley-vale-joaquin",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -24596,
+     "z": 2637,
+     "radius": 25,
+     "label": "stand at the side door where the list is kept"
+    },
+    {
+     "kind": "photo",
+     "x": -24680,
+     "z": 2538,
+     "radius": 35,
+     "label": "the board with the names still on it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "read me the ones you did not recognise",
+     "npc": "hub-canley-vale-joaquin"
+    }
+   ],
+   "reward": {
+    "cash": 77,
+    "xp": 185,
+    "unlock": [
+     "hub:h-bowlo-canley-vale-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-canley-vale-3",
+   "act": 3,
+   "title": "Closing Time Rumour, Canley Vale",
+   "blurb": "You look like you have twenty minutes. Since half six somebody has been going round the Canley Vale greens telling the barefoot bowlers we are shutting, and we are not shutting. I have got no proof, which is exactly why I am asking. Ask for me by name at the counter.",
+   "giver": "hub-canley-vale-joaquin",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "whoever is doing the telling"
+    },
+    {
+     "kind": "earn",
+     "dollars": 86,
+     "label": "and take the bar money off them while you are there"
+    }
+   ],
+   "reward": {
+    "cash": 64,
+    "xp": 181,
+    "unlock": [
+     "hub:h-bowlo-canley-vale-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-canley-vale-4",
+   "act": 3,
+   "title": "Behind the Bar at Canley Vale",
+   "blurb": "Keep it between us for now. There is a bucket of odd keys in the chest freezer behind the bar at Canley Vale and I am not opening it on an empty stomach. It might be nothing. It has not felt like nothing. Come back and tell me straight.",
+   "giver": "hub-canley-vale-tao",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get one into you first, seriously"
+    },
+    {
+     "kind": "goto",
+     "x": -24554,
+     "z": 2464,
+     "radius": 25,
+     "label": "round the back where the cellar door is"
+    },
+    {
+     "kind": "photo",
+     "x": -24547,
+     "z": 2449,
+     "radius": 35,
+     "label": "whatever is in there, before I lose my nerve"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 164,
+    "unlock": [
+     "hub:h-bowlo-canley-vale-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-canley-vale-5",
+   "act": 3,
+   "title": "The Old Greenkeeper, Canley Vale",
+   "blurb": "Right. Since you asked. The man who kept these greens before me drinks at Cabramatta now, and he owes Canley Vale an explanation about the drainage. I would not ask if there was anyone else about. Do that and we're square.",
+   "giver": "hub-canley-vale-tao",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -25013,
+     "z": 3453,
+     "radius": 60,
+     "label": "find him and hear him out"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come back and tell me what he said",
+     "npc": "hub-canley-vale-tao"
+    }
+   ],
+   "reward": {
+    "cash": 75,
+    "xp": 184,
+    "unlock": [
+     "hub:h-bowlo-canley-vale-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-pyrmont-bay-0",
+   "act": 3,
+   "title": "Nights at Pyrmont Bay",
+   "blurb": "I would do it myself if I could leave the counter. Every night around knock-off the same car does three laps of the Pyrmont Bay forecourt and never buys fuel. There is a version of this where I am the unreasonable one. I will know if you skipped a bit.",
+   "giver": "hub-pyrmont-bay-ida",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -1081,
+     "z": 341,
+     "radius": 35,
+     "label": "the car, plate if you can get it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it on record before I ring anyone",
+     "npc": "hub-pyrmont-bay-ida"
+    }
+   ],
+   "reward": {
+    "cash": 76,
+    "xp": 186,
+    "unlock": [
+     "hub:h-servo-pyrmont-bay-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-pyrmont-bay-1",
+   "act": 3,
+   "title": "The Third Lap, Pyrmont Bay",
+   "blurb": "You will think I am making this up. Now I know the plate, I want to know where it goes after it leaves Pyrmont Bay at knock-off, because it is not going home. The paperwork says one thing and my eyes say another. Say nothing to anyone on the way.",
+   "giver": "hub-pyrmont-bay-ida",
+   "level": 2,
+   "requires": [
+    "h-servo-pyrmont-bay-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Pyrmont Bay",
+     "to": "The Star",
+     "label": "follow it as far as The Star"
+    },
+    {
+     "kind": "photo",
+     "x": -1232,
+     "z": 305,
+     "radius": 35,
+     "label": "wherever it stops"
+    }
+   ],
+   "reward": {
+    "cash": 122,
+    "xp": 270,
+    "unlock": [
+     "hub:h-servo-pyrmont-bay-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-pyrmont-bay-2",
+   "act": 3,
+   "title": "Bay Two, Pyrmont Bay",
+   "blurb": "There is no clever way to say this. Bay two at the Pyrmont Bay workshop has had the same car in it since school holidays and the owner has stopped answering. It has been going on longer than I have admitted to anyone. Do not make a scene about it.",
+   "giver": "hub-pyrmont-bay-ereni",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1237,
+     "z": 207,
+     "radius": 25,
+     "label": "the address on the job card"
+    },
+    {
+     "kind": "photo",
+     "x": -1238,
+     "z": 194,
+     "radius": 35,
+     "label": "the letterbox, so I know I have the right house"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if anybody actually lives there",
+     "npc": "hub-pyrmont-bay-ereni"
+    }
+   ],
+   "reward": {
+    "cash": 77,
+    "xp": 180,
+    "unlock": [
+     "hub:h-servo-pyrmont-bay-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-pyrmont-bay-3",
+   "act": 3,
+   "title": "Tools Off the Bench, Pyrmont Bay",
+   "blurb": "You look like you have twenty minutes. Someone has been walking out of Pyrmont Bay with a socket set at a time since school holidays, and I have run out of ways to be polite about it. I have got no proof, which is exactly why I am asking. Ask for me by name at the counter.",
+   "giver": "hub-pyrmont-bay-ereni",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "the ones hanging round the air hose"
+    },
+    {
+     "kind": "earn",
+     "dollars": 50,
+     "label": "$50 of it back, that is what the set cost"
+    }
+   ],
+   "reward": {
+    "cash": 79,
+    "xp": 186,
+    "unlock": [
+     "hub:h-servo-pyrmont-bay-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-pyrmont-bay-4",
+   "act": 3,
+   "title": "The Pyrmont Bay Price Board",
+   "blurb": "Keep it between us for now. Head office says the Pyrmont Bay board has been wrong since school holidays and I say it has been right for eleven years, and one of us is about to be embarrassed. It might be nothing. It has not felt like nothing. Come back and tell me straight.",
+   "giver": "hub-pyrmont-bay-saoirse",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "buy something so it is a real transaction"
+    },
+    {
+     "kind": "photo",
+     "x": -1106,
+     "z": 201,
+     "radius": 35,
+     "label": "the board and the pump, both in the one shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that settles it either way",
+     "npc": "hub-pyrmont-bay-saoirse"
+    }
+   ],
+   "reward": {
+    "cash": 78,
+    "xp": 178,
+    "unlock": [
+     "hub:h-servo-pyrmont-bay-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-pyrmont-bay-5",
+   "act": 3,
+   "title": "The Other Franchise, Pyrmont Bay",
+   "blurb": "Right. Since you asked. The bloke who runs the site at Town Hall has had the same trouble Pyrmont Bay has, and he will talk to you before he talks to me. I would not ask if there was anyone else about. Do that and we're square.",
+   "giver": "hub-pyrmont-bay-saoirse",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -44,
+     "z": 533,
+     "radius": 60,
+     "label": "find him on shift"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever he says, I want it word for word",
+     "npc": "hub-pyrmont-bay-saoirse"
+    }
+   ],
+   "reward": {
+    "cash": 75,
+    "xp": 169,
+    "unlock": [
+     "hub:h-servo-pyrmont-bay-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-riverwood-0",
+   "act": 3,
+   "title": "Level Two, Riverwood",
+   "blurb": "I would do it myself if I could leave the counter. Water has been coming through the level two ceiling of the Riverwood block since the long weekend and the strata report says there is no water. There is a version of this where I am the unreasonable one. I will know if you skipped a bit.",
+   "giver": "hub-riverwood-zenia",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -14336,
+     "z": 9358,
+     "radius": 35,
+     "label": "the ceiling, with the stain visible"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that goes in the file whether they like it or not",
+     "npc": "hub-riverwood-zenia"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 185,
+    "unlock": [
+     "hub:h-strata-riverwood-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-riverwood-1",
+   "act": 3,
+   "title": "The Special Levy, Riverwood",
+   "blurb": "You will think I am making this up. The photo did it. The paperwork says one thing and my eyes say another. Now every owner at Riverwood owes $38 and I have to collect it from people who have avoided me for a year. Say nothing to anyone on the way.",
+   "giver": "hub-riverwood-zenia",
+   "level": 2,
+   "requires": [
+    "h-strata-riverwood-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 38,
+     "label": "$38 out of them, in any state"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will not ask how",
+     "npc": "hub-riverwood-zenia"
+    }
+   ],
+   "reward": {
+    "cash": 122,
+    "xp": 262,
+    "unlock": [
+     "hub:h-strata-riverwood-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-riverwood-2",
+   "act": 3,
+   "title": "Car Space 14, Riverwood",
+   "blurb": "There is no clever way to say this. Somebody who does not live at Riverwood has parked in space fourteen every night since the long weekend and the manager will not look at it. It has been going on longer than I have admitted to anyone. Do not make a scene about it.",
+   "giver": "hub-riverwood-morgan",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -14465,
+     "z": 9333,
+     "radius": 25,
+     "label": "down to the basement, the far corner"
+    },
+    {
+     "kind": "photo",
+     "x": -14472,
+     "z": 9326,
+     "radius": 35,
+     "label": "the car in the space with the number painted beside it"
+    }
+   ],
+   "reward": {
+    "cash": 76,
+    "xp": 168,
+    "unlock": [
+     "hub:h-strata-riverwood-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-riverwood-3",
+   "act": 3,
+   "title": "The Meeting, Riverwood",
+   "blurb": "You look like you have twenty minutes. The Riverwood AGM is on the long weekend and I would like to arrive with something stronger than a grievance and a printout. I have got no proof, which is exactly why I am asking. Ask for me by name at the counter.",
+   "giver": "hub-riverwood-morgan",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 2,
+     "label": "two coffees, one is for me"
+    },
+    {
+     "kind": "goto",
+     "x": -14397,
+     "z": 9154,
+     "radius": 25,
+     "label": "the community room where they hold it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "walk in with me, they behave when there is a witness",
+     "npc": "hub-riverwood-morgan"
+    }
+   ],
+   "reward": {
+    "cash": 75,
+    "xp": 174,
+    "unlock": [
+     "hub:h-strata-riverwood-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-riverwood-4",
+   "act": 3,
+   "title": "Bin Night at Riverwood",
+   "blurb": "Keep it between us for now. Three units at Riverwood have put their bins out on the wrong night since the long weekend and I have taken it personally, which I accept is a choice I made. It might be nothing. It has not felt like nothing. Come back and tell me straight.",
+   "giver": "hub-riverwood-yiannis",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 2,
+     "label": "the ones who argue about it"
+    },
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "the fine the council gave me, off them"
+    }
+   ],
+   "reward": {
+    "cash": 65,
+    "xp": 177,
+    "unlock": [
+     "hub:h-strata-riverwood-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-riverwood-5",
+   "act": 3,
+   "title": "The Other Block, Riverwood",
+   "blurb": "Right. Since you asked. There is a block at Narwee with the same builder and the same cracks, and their manager has already been through what Riverwood is starting. I would not ask if there was anyone else about. Do that and we're square.",
+   "giver": "hub-riverwood-yiannis",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -12822,
+     "z": 9030,
+     "radius": 60,
+     "label": "go and ask them how it ended"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I need to know how much worse this gets",
+     "npc": "hub-riverwood-yiannis"
+    }
+   ],
+   "reward": {
+    "cash": 75,
+    "xp": 177,
+    "unlock": [
+     "hub:h-strata-riverwood-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

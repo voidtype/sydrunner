@@ -1,0 +1,663 @@
+{
+ "quests": [
+  {
+   "id": "h-newsagent-dulwich-hill-0",
+   "act": 3,
+   "title": "Returns at Dulwich Hill",
+   "blurb": "I have been putting it off since Easter. I am sending back 15 papers a day from Dulwich Hill and paying to have them collected, which is a business model somebody invented on purpose. The paperwork says one thing and my eyes say another. Whatever you find, bring it to me first.",
+   "giver": "hub-dulwich-hill-hussein",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -6321,
+     "z": 4813,
+     "radius": 35,
+     "label": "the returns stack, at its worst"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the distributor needs to see the size of it",
+     "npc": "hub-dulwich-hill-hussein"
+    }
+   ],
+   "reward": {
+    "cash": 169,
+    "xp": 484,
+    "unlock": [
+     "hub:h-newsagent-dulwich-hill-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-dulwich-hill-1",
+   "act": 3,
+   "title": "The Better Rate, Dulwich Hill",
+   "blurb": "Before you say anything: yes, I know. They will drop my Dulwich Hill order if I can show $74 of turnover on the other side of the shop by the first of the month. It has been going on longer than I have admitted to anyone. That's it. That's the whole ask.",
+   "giver": "hub-dulwich-hill-hussein",
+   "level": 9,
+   "requires": [
+    "h-newsagent-dulwich-hill-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 74,
+     "label": "$74, and cards and stationery count"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "sell anything, I am not proud",
+     "npc": "hub-dulwich-hill-hussein"
+    }
+   ],
+   "reward": {
+    "cash": 223,
+    "xp": 584,
+    "unlock": [
+     "hub:h-newsagent-dulwich-hill-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-dulwich-hill-2",
+   "act": 3,
+   "title": "The Dulwich Hill Round",
+   "blurb": "It is not a police matter and I have checked. I do the Dulwich Hill round from half six and for the last fortnight somebody has been taking the papers off the front steps behind me. I have got no proof, which is exactly why I am asking. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-dulwich-hill-wafa",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -6464,
+     "z": 4854,
+     "radius": 25,
+     "label": "the end of the round, where it starts"
+    },
+    {
+     "kind": "photo",
+     "x": -6490,
+     "z": 4831,
+     "radius": 35,
+     "label": "whoever is on that street at that hour"
+    }
+   ],
+   "reward": {
+    "cash": 178,
+    "xp": 489,
+    "unlock": [
+     "hub:h-newsagent-dulwich-hill-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-dulwich-hill-3",
+   "act": 3,
+   "title": "The Dog on Ash Street, Dulwich Hill",
+   "blurb": "Honestly, I am past caring how it looks. There is a dog on the Dulwich Hill round that has had two of my bags and a esky of warm cans that was not even mine. It might be nothing. It has not felt like nothing. If anyone asks, you were never here.",
+   "giver": "hub-dulwich-hill-wafa",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "you will want your wits about you"
+    },
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "the owner, not the dog, I am not a monster"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me it is sorted",
+     "npc": "hub-dulwich-hill-wafa"
+    }
+   ],
+   "reward": {
+    "cash": 187,
+    "xp": 490,
+    "unlock": [
+     "hub:h-newsagent-dulwich-hill-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-dulwich-hill-4",
+   "act": 3,
+   "title": "The Syndicate, Dulwich Hill",
+   "blurb": "I would do it myself if I could leave the counter. Nine of us at Dulwich Hill have gone in on the same numbers since the first of the month and one of us has stopped putting money in. I would not ask if there was anyone else about. There is no rush, but there is a Friday.",
+   "giver": "hub-dulwich-hill-pania",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -6326,
+     "z": 4638,
+     "radius": 25,
+     "label": "the house of the one who stopped"
+    },
+    {
+     "kind": "earn",
+     "dollars": 15,
+     "label": "$15, which is his share since he stopped"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it said out loud, not in the group chat",
+     "npc": "hub-dulwich-hill-pania"
+    }
+   ],
+   "reward": {
+    "cash": 183,
+    "xp": 494,
+    "unlock": [
+     "hub:h-newsagent-dulwich-hill-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-dulwich-hill-5",
+   "act": 3,
+   "title": "The Other Agency, Dulwich Hill",
+   "blurb": "You will think I am making this up. The agency at Arlington closed six months before Dulwich Hill started struggling, and I would very much like to know what they know. You can tell me I am imagining it. Tell me after. I'll see you right for it.",
+   "giver": "hub-dulwich-hill-pania",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -6587,
+     "z": 3745,
+     "radius": 60,
+     "label": "the shop is shut, the family is not"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever they say, say it slowly to me",
+     "npc": "hub-dulwich-hill-pania"
+    }
+   ],
+   "reward": {
+    "cash": 187,
+    "xp": 490,
+    "unlock": [
+     "hub:h-newsagent-dulwich-hill-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-norwest-0",
+   "act": 3,
+   "title": "The Unclaimed Falcon, Norwest",
+   "blurb": "I have been putting it off since Easter. There has been a car in the Norwest yard since grand final week with a whiteboard with last March still on it on the passenger seat and no owner answering. The paperwork says one thing and my eyes say another. Whatever you find, bring it to me first.",
+   "giver": "hub-norwest-oona",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -23051,
+     "z": -14493,
+     "radius": 35,
+     "label": "the car and the plate together"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I have to prove I tried before I can move it",
+     "npc": "hub-norwest-oona"
+    }
+   ],
+   "reward": {
+    "cash": 197,
+    "xp": 547,
+    "unlock": [
+     "hub:h-workshop-norwest-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-norwest-1",
+   "act": 3,
+   "title": "Storage Fees, Norwest",
+   "blurb": "Before you say anything: yes, I know. Now that it is documented, Norwest is owed $103 in storage and the only person who can pay it is the person not answering. It has been going on longer than I have admitted to anyone. That's it. That's the whole ask.",
+   "giver": "hub-norwest-oona",
+   "level": 10,
+   "requires": [
+    "h-workshop-norwest-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 103,
+     "label": "$103, from him or from the scrap"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "either way it comes off my floor",
+     "npc": "hub-norwest-oona"
+    }
+   ],
+   "reward": {
+    "cash": 238,
+    "xp": 643,
+    "unlock": [
+     "hub:h-workshop-norwest-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-norwest-2",
+   "act": 3,
+   "title": "First Year, Norwest",
+   "blurb": "It is not a police matter and I have checked. I am in my first year at Norwest and I have to log 84 hours on a job I am not allowed to touch on my own. I have got no proof, which is exactly why I am asking. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-norwest-suleiman",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -23114,
+     "z": -14527,
+     "radius": 25,
+     "label": "the supplier, two streets over"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "and get him a coffee, it helps"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "sign the book and I owe you",
+     "npc": "hub-norwest-suleiman"
+    }
+   ],
+   "reward": {
+    "cash": 204,
+    "xp": 554,
+    "unlock": [
+     "hub:h-workshop-norwest-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-norwest-3",
+   "act": 3,
+   "title": "The Air Line, Norwest",
+   "blurb": "Honestly, I am past caring how it looks. Somebody has been coming into the Norwest yard after quarter to six to use the air line, and last week they used the compressor as well. It might be nothing. It has not felt like nothing. If anyone asks, you were never here.",
+   "giver": "hub-norwest-suleiman",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 2,
+     "label": "the ones who think the yard is public"
+    },
+    {
+     "kind": "photo",
+     "x": -23061,
+     "z": -14585,
+     "radius": 35,
+     "label": "the gate they are getting through"
+    }
+   ],
+   "reward": {
+    "cash": 185,
+    "xp": 550,
+    "unlock": [
+     "hub:h-workshop-norwest-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-norwest-4",
+   "act": 3,
+   "title": "My Own Car, Norwest",
+   "blurb": "I would do it myself if I could leave the counter. My car has been at Norwest since grand final week and every time I ring, the quote has grown by about $84. I would not ask if there was anyone else about. There is no rush, but there is a Friday.",
+   "giver": "hub-norwest-jelena",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -22973,
+     "z": -14618,
+     "radius": 25,
+     "label": "stand in the office where they can see you"
+    },
+    {
+     "kind": "photo",
+     "x": -22963,
+     "z": -14617,
+     "radius": 35,
+     "label": "the job card on the wall, all of it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I know what I am arguing about",
+     "npc": "hub-norwest-jelena"
+    }
+   ],
+   "reward": {
+    "cash": 192,
+    "xp": 545,
+    "unlock": [
+     "hub:h-workshop-norwest-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-norwest-5",
+   "act": 3,
+   "title": "The Assessor, Norwest",
+   "blurb": "You will think I am making this up. The insurance assessor who signs off every job at Norwest works out of Bella Vista, and he has never once seen the car he is assessing. You can tell me I am imagining it. Tell me after. I'll see you right for it.",
+   "giver": "hub-norwest-jelena",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -24693,
+     "z": -14800,
+     "radius": 60,
+     "label": "catch him before he goes out on the road"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear how he does it",
+     "npc": "hub-norwest-jelena"
+    }
+   ],
+   "reward": {
+    "cash": 184,
+    "xp": 538,
+    "unlock": [
+     "hub:h-workshop-norwest-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-helensburgh-0",
+   "act": 3,
+   "title": "Dumped Out the Back, Helensburgh",
+   "blurb": "I have been putting it off since Easter. People leave things at the Helensburgh roller door after twenty past four and by morning it is rained on and it is our problem and our tip fee. The paperwork says one thing and my eyes say another. Whatever you find, bring it to me first.",
+   "giver": "hub-helensburgh-laurie",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -19109,
+     "z": 34608,
+     "radius": 35,
+     "label": "the pile, on a bad morning"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council will not act without one of these",
+     "npc": "hub-helensburgh-laurie"
+    }
+   ],
+   "reward": {
+    "cash": 59,
+    "xp": 129,
+    "unlock": [
+     "hub:h-opshop-helensburgh-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-opshop-helensburgh-1",
+   "act": 3,
+   "title": "The Tip Fee, Helensburgh",
+   "blurb": "Before you say anything: yes, I know. The photos worked, which means Helensburgh can claim back the $32 we have paid to throw away other people's furniture since the first of the month. It has been going on longer than I have admitted to anyone. That's it. That's the whole ask.",
+   "giver": "hub-helensburgh-laurie",
+   "level": 1,
+   "requires": [
+    "h-opshop-helensburgh-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 32,
+     "label": "$32, and every receipt counts"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will do the form if you do the walking",
+     "npc": "hub-helensburgh-laurie"
+    }
+   ],
+   "reward": {
+    "cash": 108,
+    "xp": 222,
+    "unlock": [
+     "hub:h-opshop-helensburgh-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-opshop-helensburgh-2",
+   "act": 3,
+   "title": "The Good Box, Helensburgh",
+   "blurb": "It is not a police matter and I have checked. Something came into Helensburgh on the first of the month in a box of paperbacks that I do not think the family meant to give away. I have got no proof, which is exactly why I am asking. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-helensburgh-gareth",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -19217,
+     "z": 34681,
+     "radius": 25,
+     "label": "the address on the donation slip"
+    },
+    {
+     "kind": "photo",
+     "x": -19240,
+     "z": 34667,
+     "radius": 35,
+     "label": "the thing itself, before it goes back"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I would rather give it back than sell it",
+     "npc": "hub-helensburgh-gareth"
+    }
+   ],
+   "reward": {
+    "cash": 65,
+    "xp": 132,
+    "unlock": [
+     "hub:h-opshop-helensburgh-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-opshop-helensburgh-3",
+   "act": 3,
+   "title": "Sorting Room, Helensburgh",
+   "blurb": "Honestly, I am past caring how it looks. Two people have been coming into the Helensburgh sorting room since the first of the month and taking the good stock before it reaches the floor, and one of them volunteers here. It might be nothing. It has not felt like nothing. If anyone asks, you were never here.",
+   "giver": "hub-helensburgh-gareth",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "catch them at the back door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 44,
+     "label": "$44, which is what the good stock made last month"
+    }
+   ],
+   "reward": {
+    "cash": 51,
+    "xp": 117,
+    "unlock": [
+     "hub:h-opshop-helensburgh-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-opshop-helensburgh-4",
+   "act": 3,
+   "title": "The Van, Helensburgh",
+   "blurb": "I would do it myself if I could leave the counter. I do the Helensburgh pick-ups in a van with 44 thousand on it and a door that only opens if you know about it. I would not ask if there was anyone else about. There is no rush, but there is a Friday.",
+   "giver": "hub-helensburgh-nico",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Helensburgh",
+     "to": "Otford",
+     "label": "come out to Otford with me, it is a two-person lift"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "we will stop on the way, my shout"
+    }
+   ],
+   "reward": {
+    "cash": 64,
+    "xp": 136,
+    "unlock": [
+     "hub:h-opshop-helensburgh-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-opshop-helensburgh-5",
+   "act": 3,
+   "title": "Head Office, Helensburgh",
+   "blurb": "You will think I am making this up. Everything Helensburgh cannot sell goes to a warehouse at Otford, and nobody there has ever answered a phone in my hearing. You can tell me I am imagining it. Tell me after. I'll see you right for it.",
+   "giver": "hub-helensburgh-nico",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18223,
+     "z": 38274,
+     "radius": 60,
+     "label": "turn up in person, that is the trick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me there is a person in there",
+     "npc": "hub-helensburgh-nico"
+    }
+   ],
+   "reward": {
+    "cash": 53,
+    "xp": 134,
+    "unlock": [
+     "hub:h-opshop-helensburgh-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  }
+ ]
+}

@@ -145,13 +145,46 @@ for (const f of readdirSync(join(CONTENT, 'dialog'))) {
   }
 }
 
-// --- No two givers share a first name ------------------------------------------------
+// --- No two givers *near each other* share a first name --------------------------------
+//
+// **This used to be a rule about the whole city and it stopped being one.**
+//
+// The requirement it protects is real and unchanged: a player must never be
+// confused about which Dave. What changed is the arithmetic. At a hundred and
+// nine givers, one Dave in Sydney was a fine way to guarantee that. At thirteen
+// hundred it is a straitjacket -- the name pool is six hundred deep, so the rule
+// was not producing clarity, it was producing a ceiling on how many people this
+// city may contain.
+//
+// It is also, at that size, wrong about Sydney. A city of five million with
+// exactly one Ahmad in it is a stranger claim than two of them forty kilometres
+// apart.
+//
+// So the rule is now what it always meant: unique within `NAME_REACH_M`. That is
+// wider than a hub, wider than a suburb, and comfortably wider than any distance
+// over which a player holds two givers in their head at once -- you cannot be
+// confused between a Dave at Redfern and a Dave at Penrith, because you will
+// never see them in the same afternoon.
+//
+// O(n^2) over thirteen hundred givers is under two million distance tests and
+// runs in well under a second, which is not worth a grid.
 
-const first = new Map<string, string>();
-for (const n of npcs) {
-  const k = n.name.split(',')[0].trim().toLowerCase();
-  if (first.has(k)) bad.push(`two givers called "${n.name.split(',')[0].trim()}": ${first.get(k)} and ${n.id} (${n.pack})`);
-  else first.set(k, n.id);
+const NAME_REACH_M = 2500;
+{
+  const reach2 = NAME_REACH_M * NAME_REACH_M;
+  const firstOf = npcs.map((n) => n.name.split(',')[0].trim());
+  for (let i = 0; i < npcs.length; i++) {
+    for (let j = i + 1; j < npcs.length; j++) {
+      if (firstOf[i].toLowerCase() !== firstOf[j].toLowerCase()) continue;
+      const dx = npcs[i].x - npcs[j].x;
+      const dz = npcs[i].z - npcs[j].z;
+      if (dx * dx + dz * dz > reach2) continue;
+      bad.push(
+        `two givers called "${firstOf[i]}" ${Math.round(Math.sqrt(dx * dx + dz * dz))} m apart: ` +
+          `${npcs[i].id} (${npcs[i].pack}) and ${npcs[j].id} (${npcs[j].pack})`,
+      );
+    }
+  }
 }
 
 // --- No two givers stand within 25 m of each other -------------------------------------

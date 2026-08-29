@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-bowlo-hurstville-0",
+   "act": 3,
+   "title": "The Dead Patch at Hurstville",
+   "blurb": "I have been putting it off since Easter. The number three green at Hurstville has had a bald patch the shape of Tasmania since a public holiday nobody remembered, and the committee thinks I am inventing it. The paperwork says one thing and my eyes say another. Whatever you find, bring it to me first.",
+   "giver": "hub-hurstville-sabina",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -9721,
+     "z": 11217,
+     "radius": 35,
+     "label": "the patch, with something in frame for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring it to me before the meeting",
+     "npc": "hub-hurstville-sabina"
+    }
+   ],
+   "reward": {
+    "cash": 109,
+    "xp": 321,
+    "unlock": [
+     "hub:h-bowlo-hurstville-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-hurstville-1",
+   "act": 3,
+   "title": "Turf Money, Hurstville",
+   "blurb": "Before you say anything: yes, I know. They have seen the photograph and now they want it re-laid by a public holiday nobody remembered, which means finding $56 that the Hurstville club does not have. It has been going on longer than I have admitted to anyone. That's it. That's the whole ask.",
+   "giver": "hub-hurstville-sabina",
+   "level": 5,
+   "requires": [
+    "h-bowlo-hurstville-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 56,
+     "label": "$56, however you like, I am not asking"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "put it in my hand, not the safe",
+     "npc": "hub-hurstville-sabina"
+    }
+   ],
+   "reward": {
+    "cash": 153,
+    "xp": 392,
+    "unlock": [
+     "hub:h-bowlo-hurstville-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-hurstville-2",
+   "act": 3,
+   "title": "The Hurstville Membership Count",
+   "blurb": "It is not a police matter and I have checked. Our books say 62 members at Hurstville and I would bet the bar takings that half of them are dead or moved to Queensland. I have got no proof, which is exactly why I am asking. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-hurstville-ozgur",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -9875,
+     "z": 11303,
+     "radius": 25,
+     "label": "stand at the side door where the list is kept"
+    },
+    {
+     "kind": "photo",
+     "x": -9904,
+     "z": 11294,
+     "radius": 35,
+     "label": "the board with the names still on it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "read me the ones you did not recognise",
+     "npc": "hub-hurstville-ozgur"
+    }
+   ],
+   "reward": {
+    "cash": 121,
+    "xp": 316,
+    "unlock": [
+     "hub:h-bowlo-hurstville-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-hurstville-3",
+   "act": 3,
+   "title": "Closing Time Rumour, Hurstville",
+   "blurb": "Honestly, I am past caring how it looks. Since twenty past four somebody has been going round the Hurstville greens telling the barefoot bowlers we are shutting, and we are not shutting. It might be nothing. It has not felt like nothing. If anyone asks, you were never here.",
+   "giver": "hub-hurstville-ozgur",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 2,
+     "label": "whoever is doing the telling"
+    },
+    {
+     "kind": "earn",
+     "dollars": 102,
+     "label": "and take the bar money off them while you are there"
+    }
+   ],
+   "reward": {
+    "cash": 117,
+    "xp": 307,
+    "unlock": [
+     "hub:h-bowlo-hurstville-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-hurstville-4",
+   "act": 3,
+   "title": "Behind the Bar at Hurstville",
+   "blurb": "I would do it myself if I could leave the counter. There is a roll of raffle tickets in the chest freezer behind the bar at Hurstville and I am not opening it on an empty stomach. I would not ask if there was anyone else about. There is no rush, but there is a Friday.",
+   "giver": "hub-hurstville-milena",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get one into you first, seriously"
+    },
+    {
+     "kind": "goto",
+     "x": -9833,
+     "z": 11130,
+     "radius": 25,
+     "label": "round the back where the cellar door is"
+    },
+    {
+     "kind": "photo",
+     "x": -9826,
+     "z": 11115,
+     "radius": 35,
+     "label": "whatever is in there, before I lose my nerve"
+    }
+   ],
+   "reward": {
+    "cash": 120,
+    "xp": 323,
+    "unlock": [
+     "hub:h-bowlo-hurstville-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bowlo-hurstville-5",
+   "act": 3,
+   "title": "The Old Greenkeeper, Hurstville",
+   "blurb": "You will think I am making this up. The man who kept these greens before me drinks at Allawah now, and he owes Hurstville an explanation about the drainage. You can tell me I am imagining it. Tell me after. I'll see you right for it.",
+   "giver": "hub-hurstville-milena",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -8581,
+     "z": 11520,
+     "radius": 60,
+     "label": "find him and hear him out"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come back and tell me what he said",
+     "npc": "hub-hurstville-milena"
+    }
+   ],
+   "reward": {
+    "cash": 115,
+    "xp": 310,
+    "unlock": [
+     "hub:h-bowlo-hurstville-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-campbelltown-0",
+   "act": 3,
+   "title": "Nights at Campbelltown",
+   "blurb": "I have been putting it off since Easter. Every night around the second express the same car does three laps of the Campbelltown forecourt and never buys fuel. The paperwork says one thing and my eyes say another. Whatever you find, bring it to me first.",
+   "giver": "hub-campbelltown-hemi",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -35966,
+     "z": 22407,
+     "radius": 35,
+     "label": "the car, plate if you can get it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it on record before I ring anyone",
+     "npc": "hub-campbelltown-hemi"
+    }
+   ],
+   "reward": {
+    "cash": 111,
+    "xp": 323,
+    "unlock": [
+     "hub:h-servo-campbelltown-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-campbelltown-1",
+   "act": 3,
+   "title": "The Third Lap, Campbelltown",
+   "blurb": "Before you say anything: yes, I know. Now I know the plate, I want to know where it goes after it leaves Campbelltown at the second express, because it is not going home. It has been going on longer than I have admitted to anyone. That's it. That's the whole ask.",
+   "giver": "hub-campbelltown-hemi",
+   "level": 5,
+   "requires": [
+    "h-servo-campbelltown-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Campbelltown",
+     "to": "Macarthur",
+     "label": "follow it as far as Macarthur"
+    },
+    {
+     "kind": "photo",
+     "x": -36141,
+     "z": 22282,
+     "radius": 35,
+     "label": "wherever it stops"
+    }
+   ],
+   "reward": {
+    "cash": 149,
+    "xp": 392,
+    "unlock": [
+     "hub:h-servo-campbelltown-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-campbelltown-2",
+   "act": 3,
+   "title": "Bay Two, Campbelltown",
+   "blurb": "It is not a police matter and I have checked. Bay two at the Campbelltown workshop has had the same car in it since the week of the show and the owner has stopped answering. I have got no proof, which is exactly why I am asking. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-campbelltown-maya",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -36122,
+     "z": 22273,
+     "radius": 25,
+     "label": "the address on the job card"
+    },
+    {
+     "kind": "photo",
+     "x": -36123,
+     "z": 22260,
+     "radius": 35,
+     "label": "the letterbox, so I know I have the right house"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if anybody actually lives there",
+     "npc": "hub-campbelltown-maya"
+    }
+   ],
+   "reward": {
+    "cash": 118,
+    "xp": 322,
+    "unlock": [
+     "hub:h-servo-campbelltown-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-campbelltown-3",
+   "act": 3,
+   "title": "Tools Off the Bench, Campbelltown",
+   "blurb": "Honestly, I am past caring how it looks. Someone has been walking out of Campbelltown with a socket set at a time since the week of the show, and I have run out of ways to be polite about it. It might be nothing. It has not felt like nothing. If anyone asks, you were never here.",
+   "giver": "hub-campbelltown-maya",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 3,
+     "label": "the ones hanging round the air hose"
+    },
+    {
+     "kind": "earn",
+     "dollars": 102,
+     "label": "$102 of it back, that is what the set cost"
+    }
+   ],
+   "reward": {
+    "cash": 109,
+    "xp": 313,
+    "unlock": [
+     "hub:h-servo-campbelltown-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-campbelltown-4",
+   "act": 3,
+   "title": "The Campbelltown Price Board",
+   "blurb": "I would do it myself if I could leave the counter. Head office says the Campbelltown board has been wrong since the week of the show and I say it has been right for eleven years, and one of us is about to be embarrassed. I would not ask if there was anyone else about. There is no rush, but there is a Friday.",
+   "giver": "hub-campbelltown-priya",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "buy something so it is a real transaction"
+    },
+    {
+     "kind": "photo",
+     "x": -35991,
+     "z": 22267,
+     "radius": 35,
+     "label": "the board and the pump, both in the one shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that settles it either way",
+     "npc": "hub-campbelltown-priya"
+    }
+   ],
+   "reward": {
+    "cash": 116,
+    "xp": 321,
+    "unlock": [
+     "hub:h-servo-campbelltown-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-servo-campbelltown-5",
+   "act": 3,
+   "title": "The Other Franchise, Campbelltown",
+   "blurb": "You will think I am making this up. The bloke who runs the site at Macarthur has had the same trouble Campbelltown has, and he will talk to you before he talks to me. You can tell me I am imagining it. Tell me after. I'll see you right for it.",
+   "giver": "hub-campbelltown-priya",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -37573,
+     "z": 23303,
+     "radius": 60,
+     "label": "find him on shift"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever he says, I want it word for word",
+     "npc": "hub-campbelltown-priya"
+    }
+   ],
+   "reward": {
+    "cash": 127,
+    "xp": 301,
+    "unlock": [
+     "hub:h-servo-campbelltown-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-lewisham-west-0",
+   "act": 3,
+   "title": "Level Two, Lewisham West",
+   "blurb": "I have been putting it off since Easter. Water has been coming through the level two ceiling of the Lewisham West block since a public holiday nobody remembered and the strata report says there is no water. The paperwork says one thing and my eyes say another. Whatever you find, bring it to me first.",
+   "giver": "hub-lewisham-west-mardi",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -5944,
+     "z": 2953,
+     "radius": 35,
+     "label": "the ceiling, with the stain visible"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that goes in the file whether they like it or not",
+     "npc": "hub-lewisham-west-mardi"
+    }
+   ],
+   "reward": {
+    "cash": 140,
+    "xp": 347,
+    "unlock": [
+     "hub:h-strata-lewisham-west-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-lewisham-west-1",
+   "act": 3,
+   "title": "The Special Levy, Lewisham West",
+   "blurb": "Before you say anything: yes, I know. The photo did it. It has been going on longer than I have admitted to anyone. Now every owner at Lewisham West owes $113 and I have to collect it from people who have avoided me for a year. That's it. That's the whole ask.",
+   "giver": "hub-lewisham-west-mardi",
+   "level": 6,
+   "requires": [
+    "h-strata-lewisham-west-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 113,
+     "label": "$113 out of them, in any state"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will not ask how",
+     "npc": "hub-lewisham-west-mardi"
+    }
+   ],
+   "reward": {
+    "cash": 181,
+    "xp": 448,
+    "unlock": [
+     "hub:h-strata-lewisham-west-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-lewisham-west-2",
+   "act": 3,
+   "title": "Car Space 14, Lewisham West",
+   "blurb": "It is not a police matter and I have checked. Somebody who does not live at Lewisham West has parked in space fourteen every night since a public holiday nobody remembered and the manager will not look at it. I have got no proof, which is exactly why I am asking. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-lewisham-west-dulcie",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -6073,
+     "z": 2928,
+     "radius": 25,
+     "label": "down to the basement, the far corner"
+    },
+    {
+     "kind": "photo",
+     "x": -6080,
+     "z": 2921,
+     "radius": 35,
+     "label": "the car in the space with the number painted beside it"
+    }
+   ],
+   "reward": {
+    "cash": 127,
+    "xp": 349,
+    "unlock": [
+     "hub:h-strata-lewisham-west-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-lewisham-west-3",
+   "act": 3,
+   "title": "The Meeting, Lewisham West",
+   "blurb": "Honestly, I am past caring how it looks. The Lewisham West AGM is on a public holiday nobody remembered and I would like to arrive with something stronger than a grievance and a printout. It might be nothing. It has not felt like nothing. If anyone asks, you were never here.",
+   "giver": "hub-lewisham-west-dulcie",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 2,
+     "label": "two coffees, one is for me"
+    },
+    {
+     "kind": "goto",
+     "x": -6005,
+     "z": 2749,
+     "radius": 25,
+     "label": "the community room where they hold it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "walk in with me, they behave when there is a witness",
+     "npc": "hub-lewisham-west-dulcie"
+    }
+   ],
+   "reward": {
+    "cash": 137,
+    "xp": 354,
+    "unlock": [
+     "hub:h-strata-lewisham-west-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-lewisham-west-4",
+   "act": 3,
+   "title": "Bin Night at Lewisham West",
+   "blurb": "I would do it myself if I could leave the counter. Three units at Lewisham West have put their bins out on the wrong night since a public holiday nobody remembered and I have taken it personally, which I accept is a choice I made. I would not ask if there was anyone else about. There is no rush, but there is a Friday.",
+   "giver": "hub-lewisham-west-tash",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "the ones who argue about it"
+    },
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "the fine the council gave me, off them"
+    }
+   ],
+   "reward": {
+    "cash": 131,
+    "xp": 369,
+    "unlock": [
+     "hub:h-strata-lewisham-west-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-strata-lewisham-west-5",
+   "act": 3,
+   "title": "The Other Block, Lewisham West",
+   "blurb": "You will think I am making this up. There is a block at Arlington with the same builder and the same cracks, and their manager has already been through what Lewisham West is starting. You can tell me I am imagining it. Tell me after. I'll see you right for it.",
+   "giver": "hub-lewisham-west-tash",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -6587,
+     "z": 3745,
+     "radius": 60,
+     "label": "go and ask them how it ended"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I need to know how much worse this gets",
+     "npc": "hub-lewisham-west-tash"
+    }
+   ],
+   "reward": {
+    "cash": 141,
+    "xp": 358,
+    "unlock": [
+     "hub:h-strata-lewisham-west-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

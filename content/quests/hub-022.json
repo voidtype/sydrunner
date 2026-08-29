@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-cornershop-rooty-hill-0",
+   "act": 3,
+   "title": "Short Delivery, Rooty Hill",
+   "blurb": "You look like you have twenty minutes. The Rooty Hill order has been two cartons light every week since the long weekend and the invoice says otherwise every time. This is the third time I have had this conversation. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-rooty-hill-talia",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -34098,
+     "z": -10137,
+     "radius": 25,
+     "label": "the loading bay round the side"
+    },
+    {
+     "kind": "photo",
+     "x": -34109,
+     "z": -10142,
+     "radius": 35,
+     "label": "the pallet as it actually arrives"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I have got something to send them",
+     "npc": "hub-rooty-hill-talia"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 128,
+    "unlock": [
+     "hub:h-cornershop-rooty-hill-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-cornershop-rooty-hill-1",
+   "act": 3,
+   "title": "The Credit Note, Rooty Hill",
+   "blurb": "Keep it between us for now. They admitted it, which I did not expect, so now there is $37 owing to Rooty Hill and it is not going to walk in here itself. It started small, the way these things do. If anyone asks, you were never here.",
+   "giver": "hub-rooty-hill-talia",
+   "level": 1,
+   "requires": [
+    "h-cornershop-rooty-hill-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 37,
+     "label": "$37, and do not take a voucher"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "cash, on the counter, and I will believe it",
+     "npc": "hub-rooty-hill-talia"
+    }
+   ],
+   "reward": {
+    "cash": 97,
+    "xp": 230,
+    "unlock": [
+     "hub:h-cornershop-rooty-hill-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-cornershop-rooty-hill-2",
+   "act": 3,
+   "title": "The Rooty Hill Run",
+   "blurb": "Right. Since you asked. I do the Rooty Hill run at half six and there is a stretch of it where the van gets followed, which I have told nobody until now. It is the not knowing that has got me, honestly. There is no rush, but there is a Friday.",
+   "giver": "hub-rooty-hill-lara",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Rooty Hill",
+     "to": "Mount Druitt",
+     "label": "ride it with me as far as Mount Druitt"
+    },
+    {
+     "kind": "photo",
+     "x": -34106,
+     "z": -10292,
+     "radius": 35,
+     "label": "whatever is behind us when we stop"
+    }
+   ],
+   "reward": {
+    "cash": 62,
+    "xp": 136,
+    "unlock": [
+     "hub:h-cornershop-rooty-hill-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-cornershop-rooty-hill-3",
+   "act": 3,
+   "title": "Locked Out, Rooty Hill",
+   "blurb": "My knees are gone, so. I have got a milk crate in the back of the van and the Rooty Hill shop is shut, and the number on the door rings out. There is probably a simple explanation and I would love to hear it. I'll see you right for it.",
+   "giver": "hub-rooty-hill-lara",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -33936,
+     "z": -10309,
+     "radius": 25,
+     "label": "try the flat above the shop"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get one in you, this takes a while"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "somebody has to sign for it",
+     "npc": "hub-rooty-hill-lara"
+    }
+   ],
+   "reward": {
+    "cash": 60,
+    "xp": 118,
+    "unlock": [
+     "hub:h-cornershop-rooty-hill-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-cornershop-rooty-hill-4",
+   "act": 3,
+   "title": "The Regulars, Rooty Hill",
+   "blurb": "This is going to sound small. Three of the Rooty Hill regulars have started coming in together and going out separately, and the till is $14 down on those days. You will see what I mean the second you get there. I'll put the kettle on for when you're back.",
+   "giver": "hub-rooty-hill-ameera",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 3,
+     "label": "the ones who come in as a set"
+    },
+    {
+     "kind": "earn",
+     "dollars": 14,
+     "label": "$14, which is exactly what the till says"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 138,
+    "unlock": [
+     "hub:h-cornershop-rooty-hill-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-cornershop-rooty-hill-5",
+   "act": 3,
+   "title": "The Wholesaler, Rooty Hill",
+   "blurb": "I have written it down twice and lost it twice. Everything Rooty Hill sells comes off a floor at Mount Druitt, and the woman who runs it will tell you things she will not put in writing. There is a version of this where I am the unreasonable one. Just do not come back empty-handed.",
+   "giver": "hub-rooty-hill-ameera",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -36299,
+     "z": -10273,
+     "radius": 60,
+     "label": "go and see her before the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come and tell me what she said about us",
+     "npc": "hub-rooty-hill-ameera"
+    }
+   ],
+   "reward": {
+    "cash": 60,
+    "xp": 120,
+    "unlock": [
+     "hub:h-cornershop-rooty-hill-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-oval-lidcombe-0",
+   "act": 3,
+   "title": "Under 12s at Lidcombe",
+   "blurb": "You look like you have twenty minutes. I have got eleven kids for a twelve-a-side at Lidcombe on school holidays and one of them has a note from his mother. This is the third time I have had this conversation. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-lidcombe-ashwin",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -15032,
+     "z": -279,
+     "radius": 25,
+     "label": "the estate behind the ground, ask around"
+    },
+    {
+     "kind": "photo",
+     "x": -15120,
+     "z": -223,
+     "radius": 35,
+     "label": "the noticeboard where the sign-on sheet went up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "any kid with boots will do at this point",
+     "npc": "hub-lidcombe-ashwin"
+    }
+   ],
+   "reward": {
+    "cash": 74,
+    "xp": 183,
+    "unlock": [
+     "hub:h-oval-lidcombe-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-lidcombe-1",
+   "act": 3,
+   "title": "Registration, Lidcombe",
+   "blurb": "Keep it between us for now. We found a twelfth, which means the Lidcombe club now owes the association $55 it had budgeted on not owing. It started small, the way these things do. If anyone asks, you were never here.",
+   "giver": "hub-lidcombe-ashwin",
+   "level": 2,
+   "requires": [
+    "h-oval-lidcombe-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 55,
+     "label": "$55 before the cut-off"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will drive it in myself",
+     "npc": "hub-lidcombe-ashwin"
+    }
+   ],
+   "reward": {
+    "cash": 115,
+    "xp": 262,
+    "unlock": [
+     "hub:h-oval-lidcombe-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-lidcombe-2",
+   "act": 3,
+   "title": "The Lidcombe Canteen",
+   "blurb": "Right. Since you asked. The canteen at Lidcombe does two hundred sausages on a Saturday and this week the freezer went off at ten past five. It is the not knowing that has got me, honestly. There is no rush, but there is a Friday.",
+   "giver": "hub-lidcombe-charlie",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "we are going to need the coffee"
+    },
+    {
+     "kind": "photo",
+     "x": -15149,
+     "z": -320,
+     "radius": 35,
+     "label": "the thermometer, so the insurance believes us"
+    }
+   ],
+   "reward": {
+    "cash": 80,
+    "xp": 183,
+    "unlock": [
+     "hub:h-oval-lidcombe-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-lidcombe-3",
+   "act": 3,
+   "title": "Grand Final Float, Lidcombe",
+   "blurb": "My knees are gone, so. Somebody walked off with the float from the Lidcombe canteen at about ten past five during the last home game, and I have a fair idea which somebody. There is probably a simple explanation and I would love to hear it. I'll see you right for it.",
+   "giver": "hub-lidcombe-charlie",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 2,
+     "label": "the pair who were leaning on the roller door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 66,
+     "label": "$66, which is what was in the tin"
+    }
+   ],
+   "reward": {
+    "cash": 77,
+    "xp": 169,
+    "unlock": [
+     "hub:h-oval-lidcombe-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-lidcombe-4",
+   "act": 3,
+   "title": "Sprinkler Line, Lidcombe",
+   "blurb": "This is going to sound small. The sprinkler line under the Lidcombe outfield has been leaking since school holidays and the wet patch has started to move. You will see what I mean the second you get there. I'll put the kettle on for when you're back.",
+   "giver": "hub-lidcombe-kyra",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -15191,
+     "z": -456,
+     "radius": 25,
+     "label": "walk the line from the tap to the boundary"
+    },
+    {
+     "kind": "photo",
+     "x": -15172,
+     "z": -478,
+     "radius": 35,
+     "label": "where the grass has gone dark"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to dig once, not five times",
+     "npc": "hub-lidcombe-kyra"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 181,
+    "unlock": [
+     "hub:h-oval-lidcombe-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-lidcombe-5",
+   "act": 3,
+   "title": "The Association, Lidcombe",
+   "blurb": "I have written it down twice and lost it twice. The bloke who allocates grounds for the whole association sits at Auburn, and Lidcombe has been at the bottom of his list for two seasons. There is a version of this where I am the unreasonable one. Just do not come back empty-handed.",
+   "giver": "hub-lidcombe-kyra",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -16455,
+     "z": -1755,
+     "radius": 60,
+     "label": "go and be reasonable at him"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if it is us or the paperwork",
+     "npc": "hub-lidcombe-kyra"
+    }
+   ],
+   "reward": {
+    "cash": 84,
+    "xp": 173,
+    "unlock": [
+     "hub:h-oval-lidcombe-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-richmond-0",
+   "act": 3,
+   "title": "The Creek Behind Richmond",
+   "blurb": "You look like you have twenty minutes. Somebody has been tipping fill into the creek behind Richmond since the week of the show and it is narrowing the channel a metre at a time. This is the third time I have had this conversation. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-richmond-jenna",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -42776,
+     "z": -29098,
+     "radius": 35,
+     "label": "the fill, with the water level in shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council reads photographs, not letters",
+     "npc": "hub-richmond-jenna"
+    }
+   ],
+   "reward": {
+    "cash": 73,
+    "xp": 178,
+    "unlock": [
+     "hub:h-creek-richmond-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-richmond-1",
+   "act": 3,
+   "title": "Willow Removal, Richmond",
+   "blurb": "Keep it between us for now. They have agreed to a clean-up at Richmond, which is wonderful, except the grant is $41 short and closes on the week of the show. It started small, the way these things do. If anyone asks, you were never here.",
+   "giver": "hub-richmond-jenna",
+   "level": 2,
+   "requires": [
+    "h-creek-richmond-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 41,
+     "label": "$41, and I do not care whose pocket"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the form needs the number today",
+     "npc": "hub-richmond-jenna"
+    }
+   ],
+   "reward": {
+    "cash": 105,
+    "xp": 259,
+    "unlock": [
+     "hub:h-creek-richmond-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-richmond-2",
+   "act": 3,
+   "title": "Sandbags, Richmond",
+   "blurb": "Right. Since you asked. We had 94 sandbags in the Richmond shed on the week of the show and this morning we have got the pallet they came on. It is the not knowing that has got me, honestly. There is no rush, but there is a Friday.",
+   "giver": "hub-richmond-verity",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -42970,
+     "z": -29213,
+     "radius": 25,
+     "label": "the yards backing onto the reserve"
+    },
+    {
+     "kind": "photo",
+     "x": -42978,
+     "z": -29229,
+     "radius": 35,
+     "label": "anywhere they have obviously been used"
+    }
+   ],
+   "reward": {
+    "cash": 78,
+    "xp": 162,
+    "unlock": [
+     "hub:h-creek-richmond-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-richmond-3",
+   "act": 3,
+   "title": "The Low Crossing, Richmond",
+   "blurb": "My knees are gone, so. People keep driving the low crossing at Richmond at first light with the water over the sign, and one of them is going to be the one. There is probably a simple explanation and I would love to hear it. I'll see you right for it.",
+   "giver": "hub-richmond-verity",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "you will be standing out there a while"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "the ones who argue with the barrier"
+    }
+   ],
+   "reward": {
+    "cash": 71,
+    "xp": 180,
+    "unlock": [
+     "hub:h-creek-richmond-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-richmond-4",
+   "act": 3,
+   "title": "Under the House, Richmond",
+   "blurb": "This is going to sound small. The water came through my place at Richmond on the week of the show and the assessor wants photographs of things I have already thrown out. You will see what I mean the second you get there. I'll put the kettle on for when you're back.",
+   "giver": "hub-richmond-yosef",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -42804,
+     "z": -29291,
+     "radius": 25,
+     "label": "round the side, where the pile is"
+    },
+    {
+     "kind": "photo",
+     "x": -42785,
+     "z": -29289,
+     "radius": 35,
+     "label": "the high-water mark on the brick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the whole claim, that mark",
+     "npc": "hub-richmond-yosef"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 186,
+    "unlock": [
+     "hub:h-creek-richmond-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-creek-richmond-5",
+   "act": 3,
+   "title": "Upstream, Richmond",
+   "blurb": "I have written it down twice and lost it twice. Whatever is happening to Richmond starts upstream at Clarendon, and there are people up there who have been saying so for years. There is a version of this where I am the unreasonable one. Just do not come back empty-handed.",
+   "giver": "hub-richmond-yosef",
+   "level": 2,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -39630,
+     "z": -28005,
+     "radius": 60,
+     "label": "go up and find them"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear it from someone who is not me",
+     "npc": "hub-richmond-yosef"
+    }
+   ],
+   "reward": {
+    "cash": 84,
+    "xp": 183,
+    "unlock": [
+     "hub:h-creek-richmond-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

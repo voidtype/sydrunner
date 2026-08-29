@@ -1,0 +1,665 @@
+{
+ "quests": [
+  {
+   "id": "h-cornershop-oatley-0",
+   "act": 3,
+   "title": "Short Delivery, Oatley",
+   "blurb": "My knees are gone, so. The Oatley order has been two cartons light every week since every second Friday and the invoice says otherwise every time. I have rung the number on the letter four times. That's the whole job. No catch.",
+   "giver": "hub-oatley-sibel",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11878,
+     "z": 12681,
+     "radius": 25,
+     "label": "the loading bay round the side"
+    },
+    {
+     "kind": "photo",
+     "x": -11889,
+     "z": 12676,
+     "radius": 35,
+     "label": "the pallet as it actually arrives"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I have got something to send them",
+     "npc": "hub-oatley-sibel"
+    }
+   ],
+   "reward": {
+    "cash": 191,
+    "xp": 539,
+    "unlock": [
+     "hub:h-cornershop-oatley-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-oatley-1",
+   "act": 3,
+   "title": "The Credit Note, Oatley",
+   "blurb": "This is going to sound small. They admitted it, which I did not expect, so now there is $128 owing to Oatley and it is not going to walk in here itself. Half the street knows and half the street is pretending not to. Be polite about it. It costs nothing.",
+   "giver": "hub-oatley-sibel",
+   "level": 10,
+   "requires": [
+    "h-cornershop-oatley-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 128,
+     "label": "$128, and do not take a voucher"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "cash, on the counter, and I will believe it",
+     "npc": "hub-oatley-sibel"
+    }
+   ],
+   "reward": {
+    "cash": 241,
+    "xp": 623,
+    "unlock": [
+     "hub:h-cornershop-oatley-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-oatley-2",
+   "act": 3,
+   "title": "The Oatley Run",
+   "blurb": "I have written it down twice and lost it twice. I do the Oatley run at knock-off and there is a stretch of it where the van gets followed, which I have told nobody until now. I am not after trouble. I am after an answer. Take your time. Do not take a week.",
+   "giver": "hub-oatley-rosita",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Oatley",
+     "to": "Mortdale",
+     "label": "ride it with me as far as Mortdale"
+    },
+    {
+     "kind": "photo",
+     "x": -11886,
+     "z": 12526,
+     "radius": 35,
+     "label": "whatever is behind us when we stop"
+    }
+   ],
+   "reward": {
+    "cash": 200,
+    "xp": 530,
+    "unlock": [
+     "hub:h-cornershop-oatley-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-oatley-3",
+   "act": 3,
+   "title": "Locked Out, Oatley",
+   "blurb": "Do not laugh. I have got a esky of warm cans in the back of the van and the Oatley shop is shut, and the number on the door rings out. Nobody else seems to have noticed, which is its own problem. Come and find me after, either way.",
+   "giver": "hub-oatley-rosita",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11716,
+     "z": 12509,
+     "radius": 25,
+     "label": "try the flat above the shop"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "get one in you, this takes a while"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "somebody has to sign for it",
+     "npc": "hub-oatley-rosita"
+    }
+   ],
+   "reward": {
+    "cash": 192,
+    "xp": 532,
+    "unlock": [
+     "hub:h-cornershop-oatley-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-oatley-4",
+   "act": 3,
+   "title": "The Regulars, Oatley",
+   "blurb": "It is the sort of thing you notice or you do not. Three of the Oatley regulars have started coming in together and going out separately, and the till is $36 down on those days. Everyone I have told has looked at me the way you are now. Whatever you find, bring it to me first.",
+   "giver": "hub-oatley-fiona",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 3,
+     "label": "the ones who come in as a set"
+    },
+    {
+     "kind": "earn",
+     "dollars": 36,
+     "label": "$36, which is exactly what the till says"
+    }
+   ],
+   "reward": {
+    "cash": 198,
+    "xp": 545,
+    "unlock": [
+     "hub:h-cornershop-oatley-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-cornershop-oatley-5",
+   "act": 3,
+   "title": "The Wholesaler, Oatley",
+   "blurb": "Two people have already said no. Everything Oatley sells comes off a floor at Mortdale, and the woman who runs it will tell you things she will not put in writing. This is the third time I have had this conversation. That's it. That's the whole ask.",
+   "giver": "hub-oatley-fiona",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11723,
+     "z": 11503,
+     "radius": 60,
+     "label": "go and see her before the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "come and tell me what she said about us",
+     "npc": "hub-oatley-fiona"
+    }
+   ],
+   "reward": {
+    "cash": 184,
+    "xp": 534,
+    "unlock": [
+     "hub:h-cornershop-oatley-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-oval-werrington-0",
+   "act": 3,
+   "title": "Under 12s at Werrington",
+   "blurb": "My knees are gone, so. I have got eleven kids for a twelve-a-side at Werrington on a Tuesday and one of them has a note from his mother. I have rung the number on the letter four times. That's the whole job. No catch.",
+   "giver": "hub-werrington-roma",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -41940,
+     "z": -11278,
+     "radius": 25,
+     "label": "the estate behind the ground, ask around"
+    },
+    {
+     "kind": "photo",
+     "x": -41949,
+     "z": -11255,
+     "radius": 35,
+     "label": "the noticeboard where the sign-on sheet went up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "any kid with boots will do at this point",
+     "npc": "hub-werrington-roma"
+    }
+   ],
+   "reward": {
+    "cash": 65,
+    "xp": 126,
+    "unlock": [
+     "hub:h-oval-werrington-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-oval-werrington-1",
+   "act": 3,
+   "title": "Registration, Werrington",
+   "blurb": "This is going to sound small. We found a twelfth, which means the Werrington club now owes the association $42 it had budgeted on not owing. Half the street knows and half the street is pretending not to. Be polite about it. It costs nothing.",
+   "giver": "hub-werrington-roma",
+   "level": 1,
+   "requires": [
+    "h-oval-werrington-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 42,
+     "label": "$42 before the cut-off"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will drive it in myself",
+     "npc": "hub-werrington-roma"
+    }
+   ],
+   "reward": {
+    "cash": 101,
+    "xp": 225,
+    "unlock": [
+     "hub:h-oval-werrington-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-oval-werrington-2",
+   "act": 3,
+   "title": "The Werrington Canteen",
+   "blurb": "I have written it down twice and lost it twice. The canteen at Werrington does two hundred sausages on a Saturday and this week the freezer went off at quarter to six. I am not after trouble. I am after an answer. Take your time. Do not take a week.",
+   "giver": "hub-werrington-aurelio",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 2,
+     "label": "we are going to need the coffee"
+    },
+    {
+     "kind": "photo",
+     "x": -42057,
+     "z": -11319,
+     "radius": 35,
+     "label": "the thermometer, so the insurance believes us"
+    }
+   ],
+   "reward": {
+    "cash": 49,
+    "xp": 124,
+    "unlock": [
+     "hub:h-oval-werrington-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-oval-werrington-3",
+   "act": 3,
+   "title": "Grand Final Float, Werrington",
+   "blurb": "Do not laugh. Somebody walked off with the float from the Werrington canteen at about quarter to six during the last home game, and I have a fair idea which somebody. Nobody else seems to have noticed, which is its own problem. Come and find me after, either way.",
+   "giver": "hub-werrington-aurelio",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 2,
+     "label": "the pair who were leaning on the roller door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 70,
+     "label": "$70, which is what was in the tin"
+    }
+   ],
+   "reward": {
+    "cash": 64,
+    "xp": 134,
+    "unlock": [
+     "hub:h-oval-werrington-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-oval-werrington-4",
+   "act": 3,
+   "title": "Sprinkler Line, Werrington",
+   "blurb": "It is the sort of thing you notice or you do not. The sprinkler line under the Werrington outfield has been leaking since a Tuesday and the wet patch has started to move. Everyone I have told has looked at me the way you are now. Whatever you find, bring it to me first.",
+   "giver": "hub-werrington-genevieve",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -42099,
+     "z": -11455,
+     "radius": 25,
+     "label": "walk the line from the tap to the boundary"
+    },
+    {
+     "kind": "photo",
+     "x": -42080,
+     "z": -11477,
+     "radius": 35,
+     "label": "where the grass has gone dark"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to dig once, not five times",
+     "npc": "hub-werrington-genevieve"
+    }
+   ],
+   "reward": {
+    "cash": 51,
+    "xp": 124,
+    "unlock": [
+     "hub:h-oval-werrington-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-oval-werrington-5",
+   "act": 3,
+   "title": "The Association, Werrington",
+   "blurb": "Two people have already said no. The bloke who allocates grounds for the whole association sits at St Marys, and Werrington has been at the bottom of his list for two seasons. This is the third time I have had this conversation. That's it. That's the whole ask.",
+   "giver": "hub-werrington-genevieve",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -40263,
+     "z": -10971,
+     "radius": 60,
+     "label": "go and be reasonable at him"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me if it is us or the paperwork",
+     "npc": "hub-werrington-genevieve"
+    }
+   ],
+   "reward": {
+    "cash": 64,
+    "xp": 125,
+    "unlock": [
+     "hub:h-oval-werrington-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-creek-hurlstone-park-0",
+   "act": 3,
+   "title": "The Creek Behind Hurlstone Park",
+   "blurb": "My knees are gone, so. Somebody has been tipping fill into the creek behind Hurlstone Park since a public holiday nobody remembered and it is narrowing the channel a metre at a time. I have rung the number on the letter four times. That's the whole job. No catch.",
+   "giver": "hub-hurlstone-park-trang",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -7080,
+     "z": 4869,
+     "radius": 35,
+     "label": "the fill, with the water level in shot"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council reads photographs, not letters",
+     "npc": "hub-hurlstone-park-trang"
+    }
+   ],
+   "reward": {
+    "cash": 57,
+    "xp": 121,
+    "unlock": [
+     "hub:h-creek-hurlstone-park-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-creek-hurlstone-park-1",
+   "act": 3,
+   "title": "Willow Removal, Hurlstone Park",
+   "blurb": "This is going to sound small. They have agreed to a clean-up at Hurlstone Park, which is wonderful, except the grant is $29 short and closes on a public holiday nobody remembered. Half the street knows and half the street is pretending not to. Be polite about it. It costs nothing.",
+   "giver": "hub-hurlstone-park-trang",
+   "level": 1,
+   "requires": [
+    "h-creek-hurlstone-park-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 29,
+     "label": "$29, and I do not care whose pocket"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the form needs the number today",
+     "npc": "hub-hurlstone-park-trang"
+    }
+   ],
+   "reward": {
+    "cash": 97,
+    "xp": 222,
+    "unlock": [
+     "hub:h-creek-hurlstone-park-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-creek-hurlstone-park-2",
+   "act": 3,
+   "title": "Sandbags, Hurlstone Park",
+   "blurb": "I have written it down twice and lost it twice. We had 72 sandbags in the Hurlstone Park shed on a public holiday nobody remembered and this morning we have got the pallet they came on. I am not after trouble. I am after an answer. Take your time. Do not take a week.",
+   "giver": "hub-hurlstone-park-nina",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7274,
+     "z": 4754,
+     "radius": 25,
+     "label": "the yards backing onto the reserve"
+    },
+    {
+     "kind": "photo",
+     "x": -7282,
+     "z": 4738,
+     "radius": 35,
+     "label": "anywhere they have obviously been used"
+    }
+   ],
+   "reward": {
+    "cash": 50,
+    "xp": 127,
+    "unlock": [
+     "hub:h-creek-hurlstone-park-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-creek-hurlstone-park-3",
+   "act": 3,
+   "title": "The Low Crossing, Hurlstone Park",
+   "blurb": "Do not laugh. People keep driving the low crossing at Hurlstone Park at the second express with the water over the sign, and one of them is going to be the one. Nobody else seems to have noticed, which is its own problem. Come and find me after, either way.",
+   "giver": "hub-hurlstone-park-nina",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you will be standing out there a while"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "the ones who argue with the barrier"
+    }
+   ],
+   "reward": {
+    "cash": 49,
+    "xp": 140,
+    "unlock": [
+     "hub:h-creek-hurlstone-park-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-creek-hurlstone-park-4",
+   "act": 3,
+   "title": "Under the House, Hurlstone Park",
+   "blurb": "It is the sort of thing you notice or you do not. The water came through my place at Hurlstone Park on a public holiday nobody remembered and the assessor wants photographs of things I have already thrown out. Everyone I have told has looked at me the way you are now. Whatever you find, bring it to me first.",
+   "giver": "hub-hurlstone-park-eryk",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7108,
+     "z": 4676,
+     "radius": 25,
+     "label": "round the side, where the pile is"
+    },
+    {
+     "kind": "photo",
+     "x": -7089,
+     "z": 4678,
+     "radius": 35,
+     "label": "the high-water mark on the brick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the whole claim, that mark",
+     "npc": "hub-hurlstone-park-eryk"
+    }
+   ],
+   "reward": {
+    "cash": 64,
+    "xp": 118,
+    "unlock": [
+     "hub:h-creek-hurlstone-park-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-creek-hurlstone-park-5",
+   "act": 3,
+   "title": "Upstream, Hurlstone Park",
+   "blurb": "Two people have already said no. Whatever is happening to Hurlstone Park starts upstream at Dulwich Grove, and there are people up there who have been saying so for years. This is the third time I have had this conversation. That's it. That's the whole ask.",
+   "giver": "hub-hurlstone-park-eryk",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -6489,
+     "z": 4040,
+     "radius": 60,
+     "label": "go up and find them"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear it from someone who is not me",
+     "npc": "hub-hurlstone-park-eryk"
+    }
+   ],
+   "reward": {
+    "cash": 56,
+    "xp": 125,
+    "unlock": [
+     "hub:h-creek-hurlstone-park-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  }
+ ]
+}

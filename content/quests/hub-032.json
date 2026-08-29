@@ -1,0 +1,651 @@
+{
+ "quests": [
+  {
+   "id": "h-bakery-yennora-0",
+   "act": 3,
+   "title": "two in the afternoon at Yennora",
+   "blurb": "You are the first person to stop all morning. I start at two in the afternoon and for a month the Yennora back lane has had somebody in it who is not waiting for bread. I would have sorted it myself a year ago. Take your time. Do not take a week.",
+   "giver": "hub-yennora-lien",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -22115,
+     "z": -36,
+     "radius": 35,
+     "label": "the lane, from the door, no flash"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I am not calling anyone until I am sure",
+     "npc": "hub-yennora-lien"
+    }
+   ],
+   "reward": {
+    "cash": 115,
+    "xp": 309,
+    "unlock": [
+     "hub:h-bakery-yennora-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-yennora-1",
+   "act": 3,
+   "title": "The Lane Light, Yennora",
+   "blurb": "Not being dramatic about this. A light on that lane costs Yennora $71 and the landlord has said no twice, so we are doing it ourselves. It is not the money. It has stopped being the money. Come and find me after, either way.",
+   "giver": "hub-yennora-lien",
+   "level": 5,
+   "requires": [
+    "h-bakery-yennora-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 71,
+     "label": "$71 and I will fit it myself"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "do not tell him where it came from",
+     "npc": "hub-yennora-lien"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 407,
+    "unlock": [
+     "hub:h-bakery-yennora-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-yennora-2",
+   "act": 3,
+   "title": "Flour Run, Yennora",
+   "blurb": "I am told you do odd jobs. The flour for Yennora comes off a truck at two in the afternoon and last Thursdays the truck came and the flour did not. I did try the official route, for what that was worth. Whatever you find, bring it to me first.",
+   "giver": "hub-yennora-suha",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Yennora",
+     "to": "Fairfield",
+     "label": "ride out to Fairfield where the load is made up"
+    },
+    {
+     "kind": "photo",
+     "x": -22170,
+     "z": -129,
+     "radius": 35,
+     "label": "the pallet with our name on it, if it exists"
+    }
+   ],
+   "reward": {
+    "cash": 127,
+    "xp": 311,
+    "unlock": [
+     "hub:h-bakery-yennora-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-yennora-3",
+   "act": 3,
+   "title": "The Loading Zone, Yennora",
+   "blurb": "I'll be straight with you. The Yennora loading zone has had a car in it at two in the afternoon every morning this week and the driver waits in it, which makes it worse. I have got a photo on my phone but it is useless. That's it. That's the whole ask.",
+   "giver": "hub-yennora-suha",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "the one who says he is only a minute"
+    },
+    {
+     "kind": "earn",
+     "dollars": 90,
+     "label": "and the ticket I got, off him"
+    }
+   ],
+   "reward": {
+    "cash": 124,
+    "xp": 313,
+    "unlock": [
+     "hub:h-bakery-yennora-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-yennora-4",
+   "act": 3,
+   "title": "The Sourdough Sign, Yennora",
+   "blurb": "It has been three weeks. Somebody two doors down from Yennora put up a sign on Thursdays that says the same six words as ours, in the same order. I am aware how that sounds. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-yennora-suleiman",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -22054,
+     "z": -159,
+     "radius": 25,
+     "label": "walk down and read it properly"
+    },
+    {
+     "kind": "photo",
+     "x": -22046,
+     "z": -162,
+     "radius": 35,
+     "label": "both signs if you can get them in one frame"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me I am not imagining it",
+     "npc": "hub-yennora-suleiman"
+    }
+   ],
+   "reward": {
+    "cash": 123,
+    "xp": 314,
+    "unlock": [
+     "hub:h-bakery-yennora-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-bakery-yennora-5",
+   "act": 3,
+   "title": "The Old Site, Yennora",
+   "blurb": "Nobody else has offered, so. This business was at Fairfield before it was at Yennora, and there is a woman there who still has the original book. My wife says I should let it go. My wife is wrong. If anyone asks, you were never here.",
+   "giver": "hub-yennora-suleiman",
+   "level": 5,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -23357,
+     "z": 768,
+     "radius": 60,
+     "label": "she is usually about in the afternoon"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "bring back whatever she is willing to say",
+     "npc": "hub-yennora-suleiman"
+    }
+   ],
+   "reward": {
+    "cash": 110,
+    "xp": 309,
+    "unlock": [
+     "hub:h-bakery-yennora-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-engadine-0",
+   "act": 3,
+   "title": "The Engadine Pool",
+   "blurb": "You are the first person to stop all morning. Council has been saying the Engadine pool is at end of life since the first of the month and the crack they keep pointing at is not in the shell. I would have sorted it myself a year ago. Take your time. Do not take a week.",
+   "giver": "hub-engadine-talia",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -17518,
+     "z": 22550,
+     "radius": 35,
+     "label": "the crack, close, with something for scale"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "an engineer can read that. A councillor cannot.",
+     "npc": "hub-engadine-talia"
+    }
+   ],
+   "reward": {
+    "cash": 142,
+    "xp": 354,
+    "unlock": [
+     "hub:h-pool-engadine-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-engadine-1",
+   "act": 3,
+   "title": "The Petition Stall, Engadine",
+   "blurb": "Not being dramatic about this. We are running a stall for Engadine on the first of the month and a stall needs $109 of gear that nobody has volunteered to pay for. It is not the money. It has stopped being the money. Come and find me after, either way.",
+   "giver": "hub-engadine-talia",
+   "level": 6,
+   "requires": [
+    "h-pool-engadine-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 109,
+     "label": "$109 and a table, if you see one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will be there from eight either way",
+     "npc": "hub-engadine-talia"
+    }
+   ],
+   "reward": {
+    "cash": 178,
+    "xp": 457,
+    "unlock": [
+     "hub:h-pool-engadine-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-engadine-2",
+   "act": 3,
+   "title": "Squad, Engadine",
+   "blurb": "I am told you do odd jobs. I coach 51 kids at Engadine at the back of seven and three of them have stopped coming without anybody ringing me. I did try the official route, for what that was worth. Whatever you find, bring it to me first.",
+   "giver": "hub-engadine-mahi",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -17713,
+     "z": 22496,
+     "radius": 25,
+     "label": "the flats where two of them live"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "take something with you, it is a long walk up"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I do not need them back. I need to know.",
+     "npc": "hub-engadine-mahi"
+    }
+   ],
+   "reward": {
+    "cash": 132,
+    "xp": 346,
+    "unlock": [
+     "hub:h-pool-engadine-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-engadine-3",
+   "act": 3,
+   "title": "The Deep End, Engadine",
+   "blurb": "I'll be straight with you. A group has been coming over the Engadine fence after close and swimming in the dark, which is how Engadine loses its pool. I have got a photo on my phone but it is useless. That's it. That's the whole ask.",
+   "giver": "hub-engadine-mahi",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 3,
+     "label": "the ones who go over the fence"
+    },
+    {
+     "kind": "photo",
+     "x": -17592,
+     "z": 22470,
+     "radius": 35,
+     "label": "the spot in the fence they use"
+    }
+   ],
+   "reward": {
+    "cash": 136,
+    "xp": 354,
+    "unlock": [
+     "hub:h-pool-engadine-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-engadine-4",
+   "act": 3,
+   "title": "The Kiosk Freezer, Engadine",
+   "blurb": "It has been three weeks. The kiosk at Engadine has a milk crate in it and a freezer that has been running warm since the first of the month. I am aware how that sounds. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-engadine-alessia",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 2,
+     "label": "get two, we are going to be here"
+    },
+    {
+     "kind": "goto",
+     "x": -17532,
+     "z": 22502,
+     "radius": 25,
+     "label": "the plant room behind the kiosk"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether it is the freezer or the power",
+     "npc": "hub-engadine-alessia"
+    }
+   ],
+   "reward": {
+    "cash": 135,
+    "xp": 363,
+    "unlock": [
+     "hub:h-pool-engadine-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-pool-engadine-5",
+   "act": 3,
+   "title": "The Aquatic Centre, Engadine",
+   "blurb": "Nobody else has offered, so. They want everyone from Engadine to drive to the new centre at Heathcote, so somebody should go and see whether it is any good. My wife says I should let it go. My wife is wrong. If anyone asks, you were never here.",
+   "giver": "hub-engadine-alessia",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -17996,
+     "z": 24795,
+     "radius": 60,
+     "label": "have a proper look, not a quick one"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "be honest with me, even if it is nice",
+     "npc": "hub-engadine-alessia"
+    }
+   ],
+   "reward": {
+    "cash": 132,
+    "xp": 359,
+    "unlock": [
+     "hub:h-pool-engadine-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-north-strathfield-0",
+   "act": 3,
+   "title": "The North Strathfield Rank",
+   "blurb": "You are the first person to stop all morning. The rank outside North Strathfield used to hold nine cars and since Thursdays it holds four, and nobody will say who moved the line. I would have sorted it myself a year ago. Take your time. Do not take a week.",
+   "giver": "hub-north-strathfield-hedda",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -11257,
+     "z": -880,
+     "radius": 35,
+     "label": "the painted line and the old one under it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the old paint is still there, that is the whole argument",
+     "npc": "hub-north-strathfield-hedda"
+    }
+   ],
+   "reward": {
+    "cash": 135,
+    "xp": 368,
+    "unlock": [
+     "hub:h-rank-north-strathfield-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-north-strathfield-1",
+   "act": 3,
+   "title": "Lost Fares, North Strathfield",
+   "blurb": "Not being dramatic about this. Since the rank at North Strathfield shrank I am $72 a week down, and the association wants that number from somebody who can prove it. It is not the money. It has stopped being the money. Come and find me after, either way.",
+   "giver": "hub-north-strathfield-hedda",
+   "level": 6,
+   "requires": [
+    "h-rank-north-strathfield-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 72,
+     "label": "$72 in a week, to show it can be done"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "that is the submission, right there",
+     "npc": "hub-north-strathfield-hedda"
+    }
+   ],
+   "reward": {
+    "cash": 172,
+    "xp": 438,
+    "unlock": [
+     "hub:h-rank-north-strathfield-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-north-strathfield-2",
+   "act": 3,
+   "title": "Queue Jumpers, North Strathfield",
+   "blurb": "I am told you do odd jobs. Cars that have never sat in the North Strathfield queue turn up at ten past five and take the front of it, and the drivers who waited say nothing. I did try the official route, for what that was worth. Whatever you find, bring it to me first.",
+   "giver": "hub-north-strathfield-dalia",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "the ones who take the front"
+    },
+    {
+     "kind": "earn",
+     "dollars": 45,
+     "label": "$45, which is about one airport run"
+    }
+   ],
+   "reward": {
+    "cash": 141,
+    "xp": 369,
+    "unlock": [
+     "hub:h-rank-north-strathfield-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-north-strathfield-3",
+   "act": 3,
+   "title": "The Late Train, North Strathfield",
+   "blurb": "I'll be straight with you. When the last train into North Strathfield is late, 45 people come out at once and I have to have cars there before they do. I have got a photo on my phone but it is useless. That's it. That's the whole ask.",
+   "giver": "hub-north-strathfield-dalia",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "North Strathfield",
+     "to": "Homebush",
+     "label": "come in on the last one from Homebush and see it"
+    },
+    {
+     "kind": "photo",
+     "x": -11216,
+     "z": -929,
+     "radius": 35,
+     "label": "the rank at the moment the doors open"
+    }
+   ],
+   "reward": {
+    "cash": 140,
+    "xp": 346,
+    "unlock": [
+     "hub:h-rank-north-strathfield-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-north-strathfield-4",
+   "act": 3,
+   "title": "The Door, North Strathfield",
+   "blurb": "It has been three weeks. I have stood on this door near North Strathfield for 45 years and since Thursdays somebody has been sending my guests to a different rank. I am aware how that sounds. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "hub-north-strathfield-elodie",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11229,
+     "z": -988,
+     "radius": 25,
+     "label": "follow one of them and see where they end up"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "you will be standing about, get something"
+    }
+   ],
+   "reward": {
+    "cash": 127,
+    "xp": 351,
+    "unlock": [
+     "hub:h-rank-north-strathfield-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-rank-north-strathfield-5",
+   "act": 3,
+   "title": "The Depot, North Strathfield",
+   "blurb": "Nobody else has offered, so. The plates working the North Strathfield rank are dispatched from a depot at Concord West, and the man who runs it has never met a driver he liked. My wife says I should let it go. My wife is wrong. If anyone asks, you were never here.",
+   "giver": "hub-north-strathfield-elodie",
+   "level": 6,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11437,
+     "z": -2110,
+     "radius": 60,
+     "label": "go and be pleasant at him anyway"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me whether he is the problem or the symptom",
+     "npc": "hub-north-strathfield-elodie"
+    }
+   ],
+   "reward": {
+    "cash": 124,
+    "xp": 346,
+    "unlock": [
+     "hub:h-rank-north-strathfield-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  }
+ ]
+}

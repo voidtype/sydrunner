@@ -1,0 +1,663 @@
+{
+ "quests": [
+  {
+   "id": "h-newsagent-campsie-0",
+   "act": 3,
+   "title": "Returns at Campsie",
+   "blurb": "This is going to sound small. I am sending back 74 papers a day from Campsie and paying to have them collected, which is a business model somebody invented on purpose. Everyone I have told has looked at me the way you are now. Do not make a scene about it.",
+   "giver": "hub-campsie-charlie",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -9815,
+     "z": 4837,
+     "radius": 35,
+     "label": "the returns stack, at its worst"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the distributor needs to see the size of it",
+     "npc": "hub-campsie-charlie"
+    }
+   ],
+   "reward": {
+    "cash": 177,
+    "xp": 506,
+    "unlock": [
+     "hub:h-newsagent-campsie-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-campsie-1",
+   "act": 3,
+   "title": "The Better Rate, Campsie",
+   "blurb": "I have written it down twice and lost it twice. They will drop my Campsie order if I can show $142 of turnover on the other side of the shop by the week of the show. This is the third time I have had this conversation. Ask for me by name at the counter.",
+   "giver": "hub-campsie-charlie",
+   "level": 9,
+   "requires": [
+    "h-newsagent-campsie-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 142,
+     "label": "$142, and cards and stationery count"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "sell anything, I am not proud",
+     "npc": "hub-campsie-charlie"
+    }
+   ],
+   "reward": {
+    "cash": 217,
+    "xp": 588,
+    "unlock": [
+     "hub:h-newsagent-campsie-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-campsie-2",
+   "act": 3,
+   "title": "The Campsie Round",
+   "blurb": "Do not laugh. I do the Campsie round from the middle of the news and for the last fortnight somebody has been taking the papers off the front steps behind me. It started small, the way these things do. Come back and tell me straight.",
+   "giver": "hub-campsie-tomasz",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -9958,
+     "z": 4878,
+     "radius": 25,
+     "label": "the end of the round, where it starts"
+    },
+    {
+     "kind": "photo",
+     "x": -10001,
+     "z": 4737,
+     "radius": 35,
+     "label": "whoever is on that street at that hour"
+    }
+   ],
+   "reward": {
+    "cash": 181,
+    "xp": 498,
+    "unlock": [
+     "hub:h-newsagent-campsie-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-campsie-3",
+   "act": 3,
+   "title": "The Dog on Ash Street, Campsie",
+   "blurb": "It is the sort of thing you notice or you do not. There is a dog on the Campsie round that has had two of my bags and an esky with no lid that was not even mine. It is the not knowing that has got me, honestly. Do that and we're square.",
+   "giver": "hub-campsie-tomasz",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "you will want your wits about you"
+    },
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "the owner, not the dog, I am not a monster"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me it is sorted",
+     "npc": "hub-campsie-tomasz"
+    }
+   ],
+   "reward": {
+    "cash": 179,
+    "xp": 504,
+    "unlock": [
+     "hub:h-newsagent-campsie-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-campsie-4",
+   "act": 3,
+   "title": "The Syndicate, Campsie",
+   "blurb": "Two people have already said no. Nine of us at Campsie have gone in on the same numbers since the week of the show and one of us has stopped putting money in. There is probably a simple explanation and I would love to hear it. I will owe you one, and I pay those.",
+   "giver": "hub-campsie-verity",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -9820,
+     "z": 4662,
+     "radius": 25,
+     "label": "the house of the one who stopped"
+    },
+    {
+     "kind": "earn",
+     "dollars": 74,
+     "label": "$74, which is his share since he stopped"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want it said out loud, not in the group chat",
+     "npc": "hub-campsie-verity"
+    }
+   ],
+   "reward": {
+    "cash": 172,
+    "xp": 508,
+    "unlock": [
+     "hub:h-newsagent-campsie-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-newsagent-campsie-5",
+   "act": 3,
+   "title": "The Other Agency, Campsie",
+   "blurb": "Someone has to, and it may as well be you. The agency at Belmore closed six months before Campsie started struggling, and I would very much like to know what they know. You will see what I mean the second you get there. Do not let them talk you into anything.",
+   "giver": "hub-campsie-verity",
+   "level": 9,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10986,
+     "z": 5597,
+     "radius": 60,
+     "label": "the shop is shut, the family is not"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "whatever they say, say it slowly to me",
+     "npc": "hub-campsie-verity"
+    }
+   ],
+   "reward": {
+    "cash": 175,
+    "xp": 487,
+    "unlock": [
+     "hub:h-newsagent-campsie-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-castle-hill-0",
+   "act": 3,
+   "title": "The Unclaimed Falcon, Castle Hill",
+   "blurb": "This is going to sound small. There has been a car in the Castle Hill yard since a wet Monday with a docket book on the passenger seat and no owner answering. Everyone I have told has looked at me the way you are now. Do not make a scene about it.",
+   "giver": "hub-castle-hill-alina",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -18866,
+     "z": -14772,
+     "radius": 35,
+     "label": "the car and the plate together"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I have to prove I tried before I can move it",
+     "npc": "hub-castle-hill-alina"
+    }
+   ],
+   "reward": {
+    "cash": 191,
+    "xp": 549,
+    "unlock": [
+     "hub:h-workshop-castle-hill-0"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-castle-hill-1",
+   "act": 3,
+   "title": "Storage Fees, Castle Hill",
+   "blurb": "I have written it down twice and lost it twice. Now that it is documented, Castle Hill is owed $136 in storage and the only person who can pay it is the person not answering. This is the third time I have had this conversation. Ask for me by name at the counter.",
+   "giver": "hub-castle-hill-alina",
+   "level": 10,
+   "requires": [
+    "h-workshop-castle-hill-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 136,
+     "label": "$136, from him or from the scrap"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "either way it comes off my floor",
+     "npc": "hub-castle-hill-alina"
+    }
+   ],
+   "reward": {
+    "cash": 224,
+    "xp": 641,
+    "unlock": [
+     "hub:h-workshop-castle-hill-1"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-castle-hill-2",
+   "act": 3,
+   "title": "First Year, Castle Hill",
+   "blurb": "Do not laugh. I am in my first year at Castle Hill and I have to log 67 hours on a job I am not allowed to touch on my own. It started small, the way these things do. Come back and tell me straight.",
+   "giver": "hub-castle-hill-vicente",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18973,
+     "z": -14807,
+     "radius": 25,
+     "label": "the supplier, two streets over"
+    },
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "and get him a coffee, it helps"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "sign the book and I owe you",
+     "npc": "hub-castle-hill-vicente"
+    }
+   ],
+   "reward": {
+    "cash": 195,
+    "xp": 530,
+    "unlock": [
+     "hub:h-workshop-castle-hill-2"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-castle-hill-3",
+   "act": 3,
+   "title": "The Air Line, Castle Hill",
+   "blurb": "It is the sort of thing you notice or you do not. Somebody has been coming into the Castle Hill yard after two in the afternoon to use the air line, and last week they used the compressor as well. It is the not knowing that has got me, honestly. Do that and we're square.",
+   "giver": "hub-castle-hill-vicente",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "the ones who think the yard is public"
+    },
+    {
+     "kind": "photo",
+     "x": -18920,
+     "z": -14865,
+     "radius": 35,
+     "label": "the gate they are getting through"
+    }
+   ],
+   "reward": {
+    "cash": 189,
+    "xp": 543,
+    "unlock": [
+     "hub:h-workshop-castle-hill-3"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-castle-hill-4",
+   "act": 3,
+   "title": "My Own Car, Castle Hill",
+   "blurb": "Two people have already said no. My car has been at Castle Hill since a wet Monday and every time I ring, the quote has grown by about $67. There is probably a simple explanation and I would love to hear it. I will owe you one, and I pay those.",
+   "giver": "hub-castle-hill-elin",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18832,
+     "z": -14898,
+     "radius": 25,
+     "label": "stand in the office where they can see you"
+    },
+    {
+     "kind": "photo",
+     "x": -18822,
+     "z": -14897,
+     "radius": 35,
+     "label": "the job card on the wall, all of it"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "now I know what I am arguing about",
+     "npc": "hub-castle-hill-elin"
+    }
+   ],
+   "reward": {
+    "cash": 193,
+    "xp": 549,
+    "unlock": [
+     "hub:h-workshop-castle-hill-4"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-workshop-castle-hill-5",
+   "act": 3,
+   "title": "The Assessor, Castle Hill",
+   "blurb": "Someone has to, and it may as well be you. The insurance assessor who signs off every job at Castle Hill works out of Hills Showground, and he has never once seen the car he is assessing. You will see what I mean the second you get there. Do not let them talk you into anything.",
+   "giver": "hub-castle-hill-elin",
+   "level": 10,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -20806,
+     "z": -15395,
+     "radius": 60,
+     "label": "catch him before he goes out on the road"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I want to hear how he does it",
+     "npc": "hub-castle-hill-elin"
+    }
+   ],
+   "reward": {
+    "cash": 188,
+    "xp": 537,
+    "unlock": [
+     "hub:h-workshop-castle-hill-5"
+    ]
+   },
+   "needFlags": [
+    "act1:open"
+   ]
+  },
+  {
+   "id": "h-opshop-gymea-0",
+   "act": 3,
+   "title": "Dumped Out the Back, Gymea",
+   "blurb": "This is going to sound small. People leave things at the Gymea roller door after two in the afternoon and by morning it is rained on and it is our problem and our tip fee. Everyone I have told has looked at me the way you are now. Do not make a scene about it.",
+   "giver": "hub-gymea-ximena",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -11048,
+     "z": 18654,
+     "radius": 35,
+     "label": "the pile, on a bad morning"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "the council will not act without one of these",
+     "npc": "hub-gymea-ximena"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 134,
+    "unlock": [
+     "hub:h-opshop-gymea-0"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-opshop-gymea-1",
+   "act": 3,
+   "title": "The Tip Fee, Gymea",
+   "blurb": "I have written it down twice and lost it twice. The photos worked, which means Gymea can claim back the $42 we have paid to throw away other people's furniture since a Tuesday. This is the third time I have had this conversation. Ask for me by name at the counter.",
+   "giver": "hub-gymea-ximena",
+   "level": 1,
+   "requires": [
+    "h-opshop-gymea-0"
+   ],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 42,
+     "label": "$42, and every receipt counts"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I will do the form if you do the walking",
+     "npc": "hub-gymea-ximena"
+    }
+   ],
+   "reward": {
+    "cash": 92,
+    "xp": 217,
+    "unlock": [
+     "hub:h-opshop-gymea-1"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-opshop-gymea-2",
+   "act": 3,
+   "title": "The Good Box, Gymea",
+   "blurb": "Do not laugh. Something came into Gymea on a Tuesday in a box of paperbacks that I do not think the family meant to give away. It started small, the way these things do. Come back and tell me straight.",
+   "giver": "hub-gymea-behrouz",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11156,
+     "z": 18727,
+     "radius": 25,
+     "label": "the address on the donation slip"
+    },
+    {
+     "kind": "photo",
+     "x": -11179,
+     "z": 18713,
+     "radius": 35,
+     "label": "the thing itself, before it goes back"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "I would rather give it back than sell it",
+     "npc": "hub-gymea-behrouz"
+    }
+   ],
+   "reward": {
+    "cash": 51,
+    "xp": 125,
+    "unlock": [
+     "hub:h-opshop-gymea-2"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-opshop-gymea-3",
+   "act": 3,
+   "title": "Sorting Room, Gymea",
+   "blurb": "It is the sort of thing you notice or you do not. Two people have been coming into the Gymea sorting room since a Tuesday and taking the good stock before it reaches the floor, and one of them volunteers here. It is the not knowing that has got me, honestly. Do that and we're square.",
+   "giver": "hub-gymea-behrouz",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "catch them at the back door"
+    },
+    {
+     "kind": "earn",
+     "dollars": 31,
+     "label": "$31, which is what the good stock made last month"
+    }
+   ],
+   "reward": {
+    "cash": 55,
+    "xp": 124,
+    "unlock": [
+     "hub:h-opshop-gymea-3"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-opshop-gymea-4",
+   "act": 3,
+   "title": "The Van, Gymea",
+   "blurb": "Two people have already said no. I do the Gymea pick-ups in a van with 31 thousand on it and a door that only opens if you know about it. There is probably a simple explanation and I would love to hear it. I will owe you one, and I pay those.",
+   "giver": "hub-gymea-dinesh",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Gymea",
+     "to": "Kirrawee",
+     "label": "come out to Kirrawee with me, it is a two-person lift"
+    },
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "we will stop on the way, my shout"
+    }
+   ],
+   "reward": {
+    "cash": 61,
+    "xp": 119,
+    "unlock": [
+     "hub:h-opshop-gymea-4"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  },
+  {
+   "id": "h-opshop-gymea-5",
+   "act": 3,
+   "title": "Head Office, Gymea",
+   "blurb": "Someone has to, and it may as well be you. Everything Gymea cannot sell goes to a warehouse at Kirrawee, and nobody there has ever answered a phone in my hearing. You will see what I mean the second you get there. Do not let them talk you into anything.",
+   "giver": "hub-gymea-dinesh",
+   "level": 1,
+   "requires": [],
+   "repeatable": false,
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -12370,
+     "z": 18525,
+     "radius": 60,
+     "label": "turn up in person, that is the trick"
+    },
+    {
+     "kind": "dialog",
+     "node": "ledger",
+     "label": "tell me there is a person in there",
+     "npc": "hub-gymea-dinesh"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 140,
+    "unlock": [
+     "hub:h-opshop-gymea-5"
+    ]
+   },
+   "needFlags": [
+    "act0:trained"
+   ]
+  }
+ ]
+}

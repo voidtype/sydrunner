@@ -5,7 +5,7 @@
    "id": "f3-the-clock-kirrawee",
    "act": 3,
    "title": "The Clock at Kirrawee",
-   "blurb": "Somebody set the Kirrawee clock that way on purpose and everyone who knows why is nearly gone. The old crew drink near Gymea on a wet Monday. Go and ask, and nobody upstairs wants to hear it.",
+   "blurb": "Nobody else has offered, so. Somebody set the Kirrawee clock that way on purpose and everyone who knows why is nearly gone. Everyone I have told has looked at me the way you are now. The old crew drink near Gymea on the long weekend. Go and ask, and it has been like that since the merge. Come and find me after, either way.",
    "giver": "field-kirrawee-indira",
    "level": 3,
    "requires": [],
@@ -13,8 +13,8 @@
    "steps": [
     {
      "kind": "photo",
-     "x": -12328,
-     "z": 18553,
+     "x": -12543,
+     "z": 18615,
      "radius": 20,
      "label": "the clock, four minutes fast, for the file"
     },
@@ -33,8 +33,8 @@
     }
    ],
    "reward": {
-    "cash": 76,
-    "xp": 218,
+    "cash": 80,
+    "xp": 210,
     "unlock": [
      "field:f3-the-clock-kirrawee"
     ]
@@ -47,7 +47,7 @@
    "id": "f3-the-dog-villawood",
    "act": 3,
    "title": "The Dog at Villawood",
-   "blurb": "A dog meets the 5:40 at Villawood every weekday and nobody gets off for it. Four months of this. I have decided it is not going to be a sad story. Find out whose it is.",
+   "blurb": "I'll be straight with you. Sits at the yellow line at Villawood at knock-off, waits, then walks off on its own. I am not after trouble. I am after an answer. Half the platform knows and nobody has done anything, including me, and I am past being reasonable about it. Be polite about it. It costs nothing.",
    "giver": "field-villawood-ines",
    "level": 3,
    "requires": [],
@@ -55,15 +55,22 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -21496,
-     "z": 1763,
+     "x": -21555,
+     "z": 1851,
      "radius": 20,
      "label": "the end of the platform, at twenty to six"
     },
     {
+     "kind": "photo",
+     "x": -21550,
+     "z": 1829,
+     "radius": 25,
+     "label": "the collar, if it has got one"
+    },
+    {
      "kind": "goto",
-     "x": -21529,
-     "z": 1933,
+     "x": -21588,
+     "z": 2021,
      "radius": 25,
      "label": "the street it walks home to"
     },
@@ -75,8 +82,8 @@
     }
    ],
    "reward": {
-    "cash": 74,
-    "xp": 208,
+    "cash": 83,
+    "xp": 200,
     "unlock": [
      "field:f3-the-dog-villawood"
     ]
@@ -89,7 +96,7 @@
    "id": "f3-the-numbers-clyde",
    "act": 3,
    "title": "The Book at Clyde",
-   "blurb": "I run a small book on things that are not races — weather, delays, whether the the back of seven out of Clyde runs on time. Somebody is beating it by information, not luck. Ride the run they ride.",
+   "blurb": "I have been putting it off since Easter. Up four hundred over eleven weeks on the Clyde delay market. It started small, the way these things do. You cannot beat a delay book unless you can see the roster, and nobody will put it in writing. Think about who can see the roster. That's it. That's the whole ask.",
    "giver": "field-clyde-inge",
    "level": 3,
    "requires": [],
@@ -104,19 +111,19 @@
     },
     {
      "kind": "ko",
-     "npc": "eshay",
+     "npc": "drunk",
      "count": 2,
      "label": "the two who follow you off it"
     },
     {
      "kind": "earn",
-     "dollars": 39,
-     "label": "$39 back off the book"
+     "dollars": 38,
+     "label": "$38 back off the book"
     }
    ],
    "reward": {
-    "cash": 91,
-    "xp": 203,
+    "cash": 87,
+    "xp": 195,
     "unlock": [
      "field:f3-the-numbers-clyde"
     ]
@@ -129,7 +136,7 @@
    "id": "f3-last-service-kingswood",
    "act": 3,
    "title": "Last Service out of Kingswood",
-   "blurb": "Nothing runs out of Kingswood after half six. I lock this end and a bloke everyone calls Macca locks the other and in between there is a kilometre of lit platform for nobody. Ride the last one to Penrith and bring me a photograph of that.",
+   "blurb": "Before you say anything: yes, I know. Nothing runs out of Kingswood after the second express. It is the not knowing that has got me, honestly. I lock this end and the woman who runs the newsagent locks the other and in between there is a kilometre of lit platform for nobody. Ride the last one to Penrith and bring me a photograph of that. If it's nothing, it's nothing. Tell me anyway.",
    "giver": "field-kingswood-ioana",
    "level": 3,
    "requires": [],
@@ -144,8 +151,8 @@
     },
     {
      "kind": "photo",
-     "x": -45515,
-     "z": -11157,
+     "x": -45529,
+     "z": -11423,
      "radius": 30,
      "label": "the empty platform, lit and pointless"
     },
@@ -157,8 +164,8 @@
     }
    ],
    "reward": {
-    "cash": 90,
-    "xp": 217,
+    "cash": 80,
+    "xp": 207,
     "unlock": [
      "field:f3-last-service-kingswood"
     ]
@@ -171,7 +178,7 @@
    "id": "f3-opal-ghost-mulgrave",
    "act": 3,
    "title": "The Mulgrave Tap-Off",
-   "blurb": "A card ending 45 boards at Mulgrave on grand final week and vanishes. Not a fare thing — ninety cents. I want to know *how*, and I am past being reasonable about it.",
+   "blurb": "The council knows and the council does not care. A card ending 48 boards at Mulgrave on school holidays and vanishes. This is the third time I have had this conversation. Not a fare thing — ninety cents. I want to know *how*, and it has been like that since the merge. Whatever you find, bring it to me first.",
    "giver": "field-mulgrave-iolanda",
    "level": 3,
    "requires": [],
@@ -186,22 +193,22 @@
     },
     {
      "kind": "goto",
-     "x": -35634,
-     "z": -26294,
+     "x": -35624,
+     "z": -26243,
      "radius": 20,
      "label": "the gap in the fence everyone knows about"
     },
     {
      "kind": "photo",
-     "x": -35634,
-     "z": -26294,
+     "x": -35624,
+     "z": -26243,
      "radius": 25,
      "label": "photograph it before somebody welds it"
     }
    ],
    "reward": {
     "cash": 94,
-    "xp": 194,
+    "xp": 192,
     "unlock": [
      "field:f3-opal-ghost-mulgrave"
     ]
@@ -214,7 +221,7 @@
    "id": "f3-coffee-run-st-james",
    "act": 3,
    "title": "The St James Order",
-   "blurb": "I have made the same order for the same person every morning since I opened at St James. Since a Tuesday they have not turned up, and I am the only one who seems to have noticed. Go and knock.",
+   "blurb": "The council knows and the council does not care. I have made the same order for the same person every morning since I opened at St James. This is the third time I have had this conversation. Since a Tuesday they have not turned up, and I have run out of ways to say it politely. Go and knock. Whatever you find, bring it to me first.",
    "giver": "field-st-james-ira",
    "level": 3,
    "requires": [],
@@ -228,20 +235,20 @@
     },
     {
      "kind": "goto",
-     "x": 486,
-     "z": 333,
+     "x": 428,
+     "z": 279,
      "radius": 25,
      "label": "the office they walk to, or used to"
     },
     {
      "kind": "earn",
-     "dollars": 40,
-     "label": "come back with $40 — I am not running a charity"
+     "dollars": 36,
+     "label": "come back with $36 — I am not running a charity"
     }
    ],
    "reward": {
-    "cash": 87,
-    "xp": 196,
+    "cash": 85,
+    "xp": 221,
     "unlock": [
      "field:f3-coffee-run-st-james"
     ]
@@ -254,7 +261,7 @@
    "id": "f3-timetable-lie-marion",
    "act": 3,
    "title": "Four Minutes at Marion",
-   "blurb": "Nobody upstairs believes me about Marion because I have 7 years and no data. Go and stand on that platform on the first of the month and get me the data, and they keep sending a different bloke.",
+   "blurb": "It is not a police matter and I have checked. Nobody upstairs believes me about Marion because I have 25 years and no data. There is probably a simple explanation and I would love to hear it. Go and stand on that platform on a wet Monday and get me the data, and I have run out of ways to say it politely. If anyone asks, you were never here.",
    "giver": "field-marion-irina",
    "level": 3,
    "requires": [],
@@ -262,15 +269,15 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -5758,
-     "z": 1742,
+     "x": -5863,
+     "z": 1713,
      "radius": 18,
      "label": "stand under the board and wait like everyone else"
     },
     {
      "kind": "photo",
-     "x": -5758,
-     "z": 1742,
+     "x": -5863,
+     "z": 1713,
      "radius": 25,
      "label": "photograph the board saying four minutes"
     },
@@ -289,8 +296,8 @@
     }
    ],
    "reward": {
-    "cash": 82,
-    "xp": 207,
+    "cash": 81,
+    "xp": 221,
     "unlock": [
      "field:f3-timetable-lie-marion"
     ]
@@ -303,7 +310,7 @@
    "id": "f3-lost-property-chinatown",
    "act": 3,
    "title": "Unclaimed at Chinatown",
-   "blurb": "Everything anyone leaves on the Chinatown line ends up in a room and the room is full. Nine hundred umbrellas and one a milk crate with a name on it and a number that rings out. Go to the address on the tag.",
+   "blurb": "It is not a police matter and I have checked. Somebody lost something off the Chinatown line on Thursdays and has not come for it, which never happens. There is probably a simple explanation and I would love to hear it. Find out why not. If anyone asks, you were never here.",
    "giver": "field-chinatown-isabeau",
    "level": 3,
    "requires": [],
@@ -311,26 +318,26 @@
    "steps": [
     {
      "kind": "goto",
-     "x": -195,
-     "z": 996,
+     "x": -398,
+     "z": 1226,
      "radius": 20,
      "label": "the address on the tag"
     },
     {
      "kind": "ko",
-     "npc": "tradie",
+     "npc": "eshay",
      "count": 2,
      "label": "the two who got there before you"
     },
     {
      "kind": "earn",
-     "dollars": 37,
-     "label": "$37 — whatever it is, it is worth that to somebody"
+     "dollars": 47,
+     "label": "$47 — whatever it is, it is worth that to somebody"
     }
    ],
    "reward": {
-    "cash": 91,
-    "xp": 222,
+    "cash": 90,
+    "xp": 204,
     "unlock": [
      "field:f3-lost-property-chinatown"
     ]
@@ -343,7 +350,7 @@
    "id": "f3-quiet-carriage-padstow",
    "act": 3,
    "title": "The Quiet Carriage, Padstow",
-   "blurb": "The quiet carriage runs on shame and somebody on the just gone midnight out of Padstow has stopped feeling it. Ride it, see the crime, and apply the shame manually.",
+   "blurb": "Honestly, I am past caring how it looks. Speakerphone. You will see what I mean the second you get there. A wet Monday, Padstow to town, speakerphone. I have made eye contact eleven times and it has achieved nothing. There is no rush, but there is a Friday.",
    "giver": "field-padstow-isha",
    "level": 3,
    "requires": [],
@@ -358,21 +365,21 @@
     },
     {
      "kind": "ko",
-     "npc": "police",
+     "npc": "drunk",
      "count": 1,
      "label": "apply the shame manually"
     },
     {
      "kind": "photo",
-     "x": -16265,
-     "z": 9618,
+     "x": -16294,
+     "z": 9561,
      "radius": 30,
      "label": "photograph the sign, for the record"
     }
    ],
    "reward": {
-    "cash": 72,
-    "xp": 200,
+    "cash": 85,
+    "xp": 217,
     "unlock": [
      "field:f3-quiet-carriage-padstow"
     ]
@@ -385,7 +392,7 @@
    "id": "f3-the-shortcut-bondi-junction",
    "act": 3,
    "title": "The Bondi Junction Shortcut",
-   "blurb": "Nine minutes between the shortcut at Bondi Junction and the long way, and nine minutes is four drops. Since the first of the month there has been a padlock on it, and nobody will put it in writing.",
+   "blurb": "Before you say anything: yes, I know. Nine minutes between the shortcut at Bondi Junction and the long way, and nine minutes is four drops. It is the not knowing that has got me, honestly. Since school holidays there has been a padlock on it, and it has been like that since the merge. If it's nothing, it's nothing. Tell me anyway.",
    "giver": "field-bondi-junction-ishaan",
    "level": 3,
    "requires": [],
@@ -393,27 +400,27 @@
    "steps": [
     {
      "kind": "goto",
-     "x": 3702,
-     "z": 2585,
+     "x": 3723,
+     "z": 2671,
      "radius": 22,
      "label": "the end they lock"
     },
     {
      "kind": "goto",
-     "x": 3651,
-     "z": 2353,
+     "x": 3600,
+     "z": 2516,
      "radius": 25,
      "label": "the long way round, so you understand what it costs"
     },
     {
      "kind": "earn",
-     "dollars": 41,
-     "label": "$41, which is what the long way costs me a week"
+     "dollars": 35,
+     "label": "$35, which is what the long way costs me a week"
     }
    ],
    "reward": {
     "cash": 81,
-    "xp": 196,
+    "xp": 203,
     "unlock": [
      "field:f3-the-shortcut-bondi-junction"
     ]
