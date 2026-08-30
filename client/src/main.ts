@@ -5147,7 +5147,7 @@ async function main(): Promise<void> {
     ...verifyBoundaryLog(),
   ];
   if (dialogFailures.length > 0) {
-    hud.fatal('Quest content self-checks failed:\n' + dialogFailures.map((f) => '  - ' + f).join('\n'));
+    hud.fatal('Client self-checks failed:\n' + dialogFailures.map((f) => '  - ' + f).join('\n'));
   }
   /**
    * The pack, mutable and empty until `/content` answers.

@@ -102,6 +102,21 @@ const BUDGET_FRAME_FACTOR = 1.4;
 const MIN_ADMITS_PER_FRAME = 4;
 
 /**
+ * The most builds a bounded frame may run, for a check to hold it to.
+ *
+ * Stated once and derived, because it was stated twice as `6` and raising
+ * `MIN_ADMITS_PER_FRAME` from one to four left both copies convicting a gate
+ * that was behaving exactly as designed. A frame runs every build that *starts*
+ * at or under budget -- `floor(budget / cost) + 1` of them -- and then admits
+ * the floor on top. Two builds of slack absorb the clock: `performance.now()`
+ * is clamped to about 100 us in a browser and is nanosecond-sharp under bun,
+ * and an exact bound passes in one and fails in the other.
+ */
+function boundedBuilds(budgetMs: number, costMs: number): number {
+  return Math.floor(budgetMs / costMs) + 1 + MIN_ADMITS_PER_FRAME + 2;
+}
+
+/**
  * The budget for a machine whose frames cost `medianMs`.
  *
  * Pure, exported and checked, because it is the number that decides whether a
@@ -860,7 +875,7 @@ export function verifyAsyncPipes(): string[] {
     const g = new AsyncPipelines();
     if (!g.install(host as unknown as PipelineHost)) failures.push('the gate did not install on a full renderer.');
 
-    const objs = Array.from({ length: 10 }, (_, i) => ({ n: i }));
+    const objs = Array.from({ length: 30 }, (_, i) => ({ n: i }));
     // three sets this to `null` on construction, not absent -- the difference
     // is what let a wrong sentinel through to production.
     for (const o of objs) state.set(o, { _nodeBuilderState: null });
@@ -873,8 +888,11 @@ export function verifyAsyncPipes(): string[] {
     // a browser and is nanosecond-sharp under bun -- an exact bound passes in
     // one and fails in the other, which is how a boot check once refused to
     // start the live client.
-    if (ran > 6) {
-      failures.push(`a 6 ms budget ran ${ran} builds at 3 ms each; the frame is not bounded and can still stall.`);
+    if (ran > boundedBuilds(6, 3)) {
+      failures.push(
+        `a 6 ms budget ran ${ran} builds at 3 ms each, over a bound of ${boundedBuilds(6, 3)}; ` +
+          `the frame is not bounded and can still stall.`,
+      );
     }
     if (ran === 0) failures.push('a 6 ms budget built nothing; the gate is shut rather than bounded.');
     if (g.deferrals === 0) failures.push('nothing was declined on an exhausted budget; the budget is not enforced.');
@@ -1089,7 +1107,12 @@ export function verifyAsyncPipes(): string[] {
     if (g.deferrals === 0) {
       failures.push(`a 6 ms budget declined nothing across 20 builds of 3 ms dispatched through _handleObjectFunction.`);
     }
-    if (r.ran > 6) failures.push(`${r.ran} of 20 builds ran on a 6 ms budget; the frame is not bounded.`);
+    if (r.ran > boundedBuilds(6, 3)) {
+      failures.push(
+        `${r.ran} of 20 builds ran on a 6 ms budget, over a bound of ${boundedBuilds(6, 3)}; ` +
+          `the frame is not bounded.`,
+      );
+    }
   }
 
   // --- Many cheap calls, one enormous frame.
