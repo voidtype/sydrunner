@@ -539,7 +539,18 @@ export class AsyncPipelines {
               const ro = objects.get(
                 args[0], args[1], args[2], args[3], args[4], host._currentRenderContext, args[6], args[7],
               ) as { _nodeBuilderState?: unknown } | null | undefined;
-              built = ro === null || ro === undefined || ro._nodeBuilderState !== undefined;
+              // **`null`, not `undefined`.** `RenderObject`'s constructor sets
+              // `this._nodeBuilderState = null` and `getNodeBuilderState()`
+              // fills it in lazily behind a `||`. Testing `!== undefined` calls
+              // every freshly-created render object already built, so the gate
+              // declined nothing: a live session reported 448,863 consecutive
+              // draws all classified as built, `peak 2230 ms`, `0 deferred`.
+              if (ro === null || ro === undefined) {
+                built = true;
+              } else {
+                const nbs = ro._nodeBuilderState;
+                built = nbs !== null && nbs !== undefined;
+              }
             } catch {
               // three moved the cache. Draw it: a stall is better than a hole.
               built = true;
@@ -762,7 +773,8 @@ export function verifyAsyncPipes(): string[] {
       _renderObjectDirect: (o: unknown): void => {
         ran++;
         const rec = state.get(o);
-        if (rec !== undefined && rec._nodeBuilderState === undefined) {
+        // Unbuilt is `null` here, the way three leaves it.
+        if (rec !== undefined && (rec._nodeBuilderState === null || rec._nodeBuilderState === undefined)) {
           spin(3);
           rec._nodeBuilderState = {};
         }
@@ -772,7 +784,9 @@ export function verifyAsyncPipes(): string[] {
     if (!g.install(host as unknown as PipelineHost)) failures.push('the gate did not install on a full renderer.');
 
     const objs = Array.from({ length: 10 }, (_, i) => ({ n: i }));
-    for (const o of objs) state.set(o, {});
+    // three sets this to `null` on construction, not absent -- the difference
+    // is what let a wrong sentinel through to production.
+    for (const o of objs) state.set(o, { _nodeBuilderState: null });
 
     g.frame(6);
     for (const o of objs) host._renderObjectDirect(o);
@@ -816,7 +830,7 @@ export function verifyAsyncPipes(): string[] {
     // and proved nothing. Boot's objects are real and unbuilt; model that.
     const bootObjs = Array.from({ length: 40 }, (_, i) => ({ n: i }));
     const bootState = new Map<unknown, { _nodeBuilderState?: unknown }>();
-    for (const o of bootObjs) bootState.set(o, {});
+    for (const o of bootObjs) bootState.set(o, { _nodeBuilderState: null });
     const host = {
       _pipelines: { getForRender: () => ({ id: 'p' }) },
       backend: { draw: () => {}, get: () => ({}) },
@@ -926,7 +940,8 @@ export function verifyAsyncPipes(): string[] {
       ran = 0;
       _renderObjectDirect(o: unknown): void {
         const rec = this.state.get(o);
-        if (rec !== undefined && rec._nodeBuilderState === undefined) {
+        // Unbuilt is `null` here, the way three leaves it.
+        if (rec !== undefined && (rec._nodeBuilderState === null || rec._nodeBuilderState === undefined)) {
           spin(3);
           rec._nodeBuilderState = {};
         }
@@ -972,7 +987,9 @@ export function verifyAsyncPipes(): string[] {
   {
     const objs = Array.from({ length: 60 }, (_, i) => ({ n: i }));
     const state = new Map<unknown, { _nodeBuilderState?: unknown }>();
-    for (const o of objs) state.set(o, {});
+    // three sets this to `null` on construction, not absent -- the difference
+    // is what let a wrong sentinel through to production.
+    for (const o of objs) state.set(o, { _nodeBuilderState: null });
     let ran = 0;
     const host = {
       _pipelines: { getForRender: (): unknown => ({ id: 'p' }) },
@@ -1026,8 +1043,8 @@ export function verifyAsyncPipes(): string[] {
     const state = new Map<string, { _nodeBuilderState?: unknown }>();
     const key = (o: unknown, pass: unknown): string => `${(o as { n: number }).n}|${String(pass)}`;
     for (const o of objs) {
-      state.set(key(o, 'beauty'), {});
-      state.set(key(o, 'shadow'), {});
+      state.set(key(o, 'beauty'), { _nodeBuilderState: null });
+      state.set(key(o, 'shadow'), { _nodeBuilderState: null });
     }
     let ran = 0;
     const host = {
