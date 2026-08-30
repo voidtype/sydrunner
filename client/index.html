@@ -302,8 +302,22 @@
          Sections wrap, so a window too narrow for three columns gets two and
          one too narrow for two gets one, without a media query having to guess
          where the breaks are. */
+      /* **Anchored to the top, not the bottom**, and it is the one line in this
+         block that changes what a player can actually read.
+
+         The panel is 1,992 px of content in a 760 px window -- fifteen sections
+         of bindings, measured -- and pinned to `bottom` it grew *upwards*, so
+         pressing `h` showed you `no pointer lock` and `credits` while
+         `movement`, `talents` and `cars` were a thousand pixels above the top
+         edge. Every control anybody opens this panel to look up was the part
+         that was off screen. From the top, the overflow falls off the end
+         instead, which is the half nobody needs first.
+
+         That it overflows at all is not fixed here: it wants either shorter
+         descriptions or a panel with pages, and both are decisions about the
+         content rather than about the stylesheet. */
       #helpfull {
-        position: fixed; right: 14px; bottom: 16px;
+        position: fixed; right: 14px; top: 16px;
         display: none; flex-wrap: wrap; align-content: flex-start;
         gap: 12px 28px; max-width: min(560px, 92vw);
         pointer-events: none; z-index: 4;
@@ -342,8 +356,14 @@
       #helpfull h2::before {
         content: ""; width: 6px; height: 6px; background: var(--sun); flex: 0 0 auto;
       }
+      /* **No vertical padding, and a ring rather than a border.** Both are the
+         same constraint: this panel is already taller than the window it opens
+         in (see `#helpfull`'s own note), so a rule that adds a pixel per row
+         adds sixty to a panel that cannot afford one. `padding: 1px 6px` and a
+         real border cost 96 px between them, measured. An inset shadow draws
+         the same box and takes no space at all. */
       #helpfull kbd {
-        min-width: 0; margin-right: 8px; padding: 1px 6px;
+        min-width: 0; margin-right: 8px; padding: 0 6px;
         color: var(--ink-bright); font-weight: 700;
         box-shadow: inset 0 0 0 1px var(--edge);
       }
@@ -2348,17 +2368,31 @@
       #nameprompt-login .field {
         display: flex; flex-direction: column; align-items: flex-start; gap: 5px; margin-bottom: 12px;
       }
+      /* **`display: flex` above outranks the UA's `[hidden] { display: none }`**,
+         which is the lowest-specificity rule there is -- so the confirm field
+         that `JoinGate.paint` hides by setting `hidden` was on screen anyway,
+         and every player logging in has been shown a `password again` box that
+         the form does not want and does not read. It has been that way since
+         the pane was written. Restated here at the specificity it needs. */
+      #nameprompt-login .field[hidden] { display: none; }
       #nameprompt-login label {
         font-size: var(--t-micro); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-muted);
       }
       #nameprompt-login input { font-size: 15px; width: 260px; }
       /* The second button in the login pane is a mode switch, not an action:
          `sign up instead` must not look like `log in`. Outlined, and quiet. */
-      #account-switch {
+      /* Scoped through `#nameprompt` to beat `#nameprompt button`, which is an
+         id plus a type and therefore outranks a bare id on its own. Without the
+         extra step this rule loses the background and `sign up instead` renders
+         as a second solid sun block beside `log in` -- two equal-looking
+         buttons where one is the action and the other only changes the form. */
+      #nameprompt #account-switch {
         background: transparent; color: var(--ink-dim);
         box-shadow: inset 0 0 0 1px var(--edge);
       }
-      #account-switch:hover { background: transparent; color: var(--ink-bright); box-shadow: inset 0 0 0 1px var(--ink-faint); }
+      #nameprompt #account-switch:hover {
+        background: transparent; color: var(--ink-bright); box-shadow: inset 0 0 0 1px var(--ink-faint);
+      }
       /* The signed-in line. Above the title rather than in the corner of the
          panel, which is where the first cut put it: the panel is centred, so
          "the corner" was directly over the wordmark. In the flow it is a line
