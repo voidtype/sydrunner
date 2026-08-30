@@ -112,6 +112,7 @@ import { ShadowWarm, ShadowSweep, verifyShadowWarm } from './world/shadowwarm.ts
 import { AsyncPipelines, verifyAsyncPipes } from './world/asyncpipes.ts';
 import { verifyTilePriority } from './world/tilepriority.ts';
 import { verifyPointable } from './waypoint.ts';
+import { verifySuspension } from './game/suspension.ts';
 import type { PipelineHost } from './world/asyncpipes.ts';
 // WORKSTREAM AB: where the browser frame goes. One import block and one
 // `FrameProfile` in the loop's closure; every `frame.at(FSEC.x)` below is a
@@ -5081,6 +5082,7 @@ async function main(): Promise<void> {
     ...verifyAsyncPipes(),
     ...verifyTilePriority(),
     ...verifyPointable(),
+    ...verifySuspension(),
     ...verifyMandala(),
     ...verifyQuestAim(),
     ...verifyQuestAreas(),

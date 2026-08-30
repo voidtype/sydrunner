@@ -60,6 +60,7 @@
  * a 180 m radius is not a thing that exists.
  */
 
+import { suspensionY } from '../game/suspension.ts';
 import {
   CAR_BODY_SIZE,
   createCarPose,
@@ -191,6 +192,25 @@ export class DrivenCarView {
   private readonly fire = createFireGrade();
   private readonly brakePose: CarPose = createCarPose();
   private readonly driverScratch: DriverPose = { x: 0, y: 0, z: 0, yaw: 0 };
+  /**
+   * Where each driven car's body was *drawn* last frame, for the suspension.
+   *
+   * Keyed on the record id and dropped the moment a car has no driver, so it is
+   * bounded by the number of cars anyone is sitting in rather than by the four
+   * hundred records the field holds. A car nobody is driving is posed from the
+   * record and has nothing to settle.
+   */
+  private readonly bodyY = new Map<number, number>();
+  /**
+   * The frame delta, stashed by `update` for `forEach` to read.
+   *
+   * `forEach` is also reached through `source` and `claims`, which are called by
+   * `TrafficMovers` rather than by `update`, and threading a delta down two
+   * closures that exist to hand out poses would be a worse trade than one
+   * field. A stale delta here is one frame of a filter whose whole job is to be
+   * approximate.
+   */
+  private frameDt = 1 / 60;
   /** Last frame's speed per driver, for the deceleration test. See `BRAKE_THRESHOLD`. */
   private readonly lastSpeed = new Map<number, number>();
 
@@ -284,12 +304,29 @@ export class DrivenCarView {
       // now that cars no longer despawn, and this is what stops the draw loop
       // paying for the ones in Penrith -- one subtract and one compare each,
       // before `drivenCarPose`'s two transcendentals.
+      // A car nobody is in is posed from its record and has nothing to settle;
+      // dropping it here is what bounds `bodyY` to the cars being driven.
+      if (!live) this.bodyY.delete(car.id);
       if (!this.near(live ? d.x : car.x, live ? d.z : car.z)) continue;
       const out = this.pose;
       drivenCarPose(car, out);
       if (live) {
         out.x = d.x;
-        out.y = d.y;
+        /*
+         * --- The suspension, and it is only ever what is *drawn*.
+         *
+         * `d.y` is the simulated height and stays the simulated height: the
+         * collision probe, the wire and `net/client.reconcile`'s replay all
+         * read it, and a filter in front of any of those would be a second
+         * opinion about where a car is. This moves the body and nothing else.
+         *
+         * The owner asked for suspension "almost too good to be true", and was
+         * explicit that it is there to hide the roughness of the surface rather
+         * than to model a spring -- the ground is a polygonal Sydney and every
+         * kerb, tile seam and terrain facet arrives at the body as a step. See
+         * `game/suspension.ts`, including why there is a bump stop.
+         */
+        out.y = this.settleY(car.id, d.y);
         out.z = d.z;
         // Re-derive the heading from the live yaw. `drivenCarPose` already did
         // it from the record's, which for an occupied car is stale by however
@@ -360,6 +397,7 @@ export class DrivenCarView {
     cameraY = 0,
     cameraZ = 0,
   ): void {
+    this.frameDt = dt;
     lights.beginBrakes();
     if (smoke !== null) smoke.begin(dt, cameraX, cameraY, cameraZ);
     const live = new Set<number>();
@@ -423,6 +461,20 @@ export class DrivenCarView {
     if (shed <= 0) return 0;
     // Full dip at a full-strength stop, which is the handbrake's 16 m/s^2.
     return Math.min(1, shed / 16) * DRIVE_CAM_DIP;
+  }
+
+  /**
+   * One frame of suspension travel for one car's body. See `game/suspension.ts`.
+   *
+   * A car seen for the first time has nothing to ease from and starts where it
+   * is -- `suspensionY` takes the `NaN` as "no previous frame", which is the
+   * difference between a car appearing on the road and a car appearing at sea
+   * level and rising to meet it.
+   */
+  private settleY(id: number, target: number): number {
+    const drawn = suspensionY(this.bodyY.get(id) ?? Number.NaN, target, this.frameDt);
+    this.bodyY.set(id, drawn);
+    return drawn;
   }
 
   /** A copy of a pose, because `addBrake` is called from inside `forEach`'s visit. */

@@ -298,6 +298,7 @@ import { verifyQuestLog } from '../client/src/game/questlog.ts';
 import { verifyFrameStep } from '../client/src/game/framestep.ts';
 import { verifyStallRing } from '../client/src/game/stallring.ts';
 import { verifyTilePriority } from '../client/src/world/tilepriority.ts';
+import { verifySuspension } from '../client/src/game/suspension.ts';
 import { verifyBoundaryLog } from '../client/src/world/boundarylog.ts';
 import { decodeQuest, verifyQuestWire } from '../client/src/net/quests.ts';
 import { ContentStore, ImprovCache, QuestEngine, contentResponse, type QuestWorld } from './quests.ts';
@@ -818,6 +819,7 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     ['verifyFrameStep', verifyFrameStep()],
     ['verifyStallRing', verifyStallRing()],
     ['verifyTilePriority', verifyTilePriority()],
+    ['verifySuspension', verifySuspension()],
     ['verifyBoundaryLog', verifyBoundaryLog()],
     // WORKSTREAM N (carry): the sentence a restored session is visible as. Run
     // here as well as in the browser for `verifyLevelHud`'s reason one line up
