@@ -321,8 +321,104 @@ export function mayEvictCollision(distanceM: number): boolean {
  * a keep radius that slipped under the load radius is prisms disappearing from
  * under a player's feet with no error anywhere.
  */
+/** What a tile is, from the outside. See `tilePhaseOf`. */
+export type TilePhase = 'built' | 'building' | 'loading' | 'failed' | 'missing' | 'absent';
+
+/** The flags `TileStreamer` holds about one tile. */
+export interface TileFlags {
+  /** Its geometry has been constructed and inserted into the scene. */
+  loaded: boolean;
+  /**
+   * Its pipelines have been compiled, so it is allowed to draw.
+   *
+   * `TileStreamer` sets this after a `compileAsync` over the tile's group, and
+   * its visibility test is `tile.group.visible = tile.warm && ...`. A tile that
+   * is loaded and not warm is **in the scene and not on the screen**.
+   */
+  warm: boolean;
+  building: boolean;
+  loading: boolean;
+  permanent: boolean;
+  retrying: boolean;
+}
+
+/**
+ * What phase one tile is in, and `built` means *the player can see it*.
+ *
+ * **It used to mean "the geometry is resident", and that cost the owner a wall
+ * at Lilyfield.** The streamer draws a tile only when `warm` is set, which is
+ * after a `compileAsync` over the whole tile group -- so between the geometry
+ * landing and the pipelines finishing there is a window where the tile is in
+ * the scene, invisible, and its collision prisms are solid. That window is the
+ * invisible wall this codebase has been chasing, and reporting it as `built`
+ * hid it from the two things built to catch it: `world/invisible-walls.ts`
+ * skips any tile whose phase is `built`, so it drew no hazard, and
+ * `world/wallghosts.ts` only draws a box where there is a hazard -- so the one
+ * feature whose entire job is "show the player what stopped them" was switched
+ * off by a word meaning the wrong thing.
+ *
+ * A tile that is loaded and not warm reports `building`, which is what it is:
+ * still being made ready. Nothing downstream needed a new case, and every
+ * consumer got more correct for free -- including
+ * `world/collision-window-check.ts`, which will now measure the true width of
+ * the window rather than the half of it that ends at residency.
+ *
+ * Here rather than on the streamer because the streamer imports three and this
+ * file does not, which is the difference between a rule a check can hold still
+ * and one that needs a renderer to ask.
+ */
+export function tilePhaseOf(f: TileFlags): TilePhase {
+  if (f.loaded) return f.warm ? 'built' : 'building';
+  if (f.building) return 'building';
+  if (f.loading) return 'loading';
+  if (f.permanent) return 'missing';
+  if (f.retrying) return 'failed';
+  return 'absent';
+}
+
 export function verifyTileLifecycle(): string[] {
   const failures: string[] = [];
+
+  // --- `built` means the player can see it.
+  //
+  // The whole of the Lilyfield wall. A tile in the scene whose pipelines have
+  // not compiled is invisible and solid, and calling that `built` switched off
+  // both things written to catch it: `invisible-walls` skips a built tile, and
+  // `wallghosts` only draws where `invisible-walls` found a hazard.
+  {
+    const flags = (over: Partial<TileFlags>): TileFlags => ({
+      loaded: false,
+      warm: false,
+      building: false,
+      loading: false,
+      permanent: false,
+      retrying: false,
+      ...over,
+    });
+    if (tilePhaseOf(flags({ loaded: true, warm: false })) === 'built') {
+      failures.push(
+        'a tile that is in the scene but not warm reported `built`. It is invisible and its prisms are ' +
+          'solid, and every hazard check skips a built tile -- which is an invisible wall with the one ' +
+          'overlay that would have shown it switched off.',
+      );
+    }
+    if (tilePhaseOf(flags({ loaded: true, warm: true })) !== 'built') {
+      failures.push('a drawn tile did not report `built`; the map would hatch the whole city as a hazard.');
+    }
+    if (tilePhaseOf(flags({ loaded: true, warm: false })) !== 'building') {
+      failures.push('a loaded-but-unwarm tile did not report `building`.');
+    }
+    // The rest of the ladder, in the order the streamer checks it.
+    if (tilePhaseOf(flags({ building: true })) !== 'building') failures.push('a decoded tile did not report `building`.');
+    if (tilePhaseOf(flags({ loading: true })) !== 'loading') failures.push('an in-flight tile did not report `loading`.');
+    if (tilePhaseOf(flags({ permanent: true })) !== 'missing') failures.push('a 404 tile did not report `missing`.');
+    if (tilePhaseOf(flags({ retrying: true })) !== 'failed') failures.push('a backing-off tile did not report `failed`.');
+    if (tilePhaseOf(flags({})) !== 'absent') failures.push('an unknown tile did not report `absent`.');
+    // Residency outranks the rest: a loaded tile is never "loading" again.
+    if (tilePhaseOf(flags({ loaded: true, warm: true, loading: true })) !== 'built') {
+      failures.push('a drawn tile that is also re-fetching reported something other than `built`.');
+    }
+  }
 
   // --- 1. The taxonomy. Both directions, because both are silent.
   {

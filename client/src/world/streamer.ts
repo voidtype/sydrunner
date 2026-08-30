@@ -253,6 +253,7 @@ import {
   TileRetryLedger,
   classifyTileFailure,
   mayEvictCollision,
+  tilePhaseOf,
 } from './tile-lifecycle.ts';
 import { worldVersionSuffix } from './version.ts';
 import {
@@ -2630,12 +2631,19 @@ export class TileStreamer implements LampSource {
    * redraw for a few dozen tiles.
    */
   tilePhase(key: string): 'built' | 'building' | 'loading' | 'failed' | 'missing' | 'absent' {
-    if (this.loaded.has(key)) return 'built';
-    if (this.building.has(key)) return 'building';
-    if (this.loading.has(key)) return 'loading';
-    if (this.ledger.isPermanent(key)) return 'missing';
-    if (this.ledger.isRetrying(key)) return 'failed';
-    return 'absent';
+    // The ladder itself is `world/tile-lifecycle.tilePhaseOf`, which is where a
+    // check can reach it -- and where the argument lives for why `built` means
+    // *drawable* rather than *resident*. `warm` is the difference, and it is the
+    // difference the owner walked into at Lilyfield.
+    const tile = this.loaded.get(key);
+    return tilePhaseOf({
+      loaded: tile !== undefined,
+      warm: tile?.warm === true,
+      building: this.building.has(key),
+      loading: this.loading.has(key),
+      permanent: this.ledger.isPermanent(key),
+      retrying: this.ledger.isRetrying(key),
+    });
   }
 
   /**
