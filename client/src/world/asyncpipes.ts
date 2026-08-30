@@ -125,9 +125,16 @@ export interface PipelineHost {
    * shadows the prototype from the next frame on.
    */
   _renderObjectDirect?: (...args: unknown[]) => void;
-  /** three's render-object cache. Consulted only on an exhausted budget. */
-  _objects?: { get: (...args: unknown[]) => unknown } | null;
-  _currentRenderContext?: unknown;
+  /*
+   * **`_objects` is deliberately not on this interface.** It was, and the gate
+   * consulted it to tell a built draw from a fresh one -- which shipped the
+   * renderer a corruption bug: `RenderObjects.get()` disposes a render object
+   * whose cache key has drifted, taking its binding buffers with it, and doing
+   * that to an object with a `createRenderPipelineAsync` still in flight
+   * produces `[Buffer "bindingBuffer..."] used in submit while destroyed`.
+   * The gate keeps its own note now (`drawnIn`) and asks three nothing. Leaving
+   * the field off the type is what stops the next person reaching for it.
+   */
 }
 
 export class AsyncPipelines {
@@ -258,18 +265,27 @@ export class AsyncPipelines {
    */
   private gateCalls = 0;
   private gateHooked = false;
-  private gateBlind = false;
   /**
-   * Objects that have completed a draw, for the case where `_objects` is not
-   * reachable.
+   * Which passes each object has completed a draw in, keyed by `passId`.
    *
-   * A fallback rather than the main path: it cannot tell the beauty pass from
-   * the shadow pass, so an object drawn in both is charged once and gets its
-   * second build free. That is bounded and wrong in the safe direction, and it
-   * is enormously better than the alternative this replaces, which was for the
-   * gate to decline nothing at all and say nothing about it.
+   * **This exists because asking three the same question corrupts the
+   * renderer.** `RenderObjects.get()` looks like a lookup and is not: when a
+   * render object's cache key has drifted it calls `renderObject.dispose()` and
+   * builds a fresh one, and `dispose` frees the binding buffers. The gate called
+   * it once per declined draw, every frame it was over budget, which disposed
+   * objects whose `createRenderPipelineAsync` was still in flight -- and the
+   * pending creation then submitted against a destroyed buffer:
+   *
+   *     Async render pipeline creation failed (renderPipeline_foliage_102):
+   *     [Buffer "bindingBuffer10952..."] used in submit while destroyed.
+   *
+   * So the gate keeps its own note instead, and never asks. Keyed on the object
+   * *and the pass* because the shadow pass of an already-drawn mesh is a
+   * different render object with a different pipeline behind the same
+   * `Object3D`; keying on the object alone would call it built and never decline
+   * the builds that actually cost the most.
    */
-  private readonly ranOnce = new WeakSet<object>();
+  private readonly drawnIn = new WeakMap<object, Set<string>>();
 
   get skipped(): number {
     return this.skippedDraws;
@@ -290,7 +306,6 @@ export class AsyncPipelines {
     if (!this.gateHooked) return 'budget off (no hook)';
     if (this.gateCalls === 0) return 'budget idle (never called)';
     const peak = Math.max(this.peakMs, this.spentMs).toFixed(0);
-    if (this.gateBlind) return `budget blind (no _objects), ${this.gateCalls} draws, peak ${peak} ms`;
     return `budget on, ${this.gateCalls} draws, peak ${peak} ms`;
   }
 
@@ -529,33 +544,13 @@ export class AsyncPipelines {
          * world in -- slowly, rather than never.
          */
         if (this.framed && this.spentMs > this.budgetMs) {
-          const objects = host._objects;
-          let built: boolean;
-          if (objects === null || objects === undefined) {
-            this.gateBlind = true;
-            built = this.ranOnce.has(args[0] as object);
-          } else {
-            try {
-              const ro = objects.get(
-                args[0], args[1], args[2], args[3], args[4], host._currentRenderContext, args[6], args[7],
-              ) as { _nodeBuilderState?: unknown } | null | undefined;
-              // **`null`, not `undefined`.** `RenderObject`'s constructor sets
-              // `this._nodeBuilderState = null` and `getNodeBuilderState()`
-              // fills it in lazily behind a `||`. Testing `!== undefined` calls
-              // every freshly-created render object already built, so the gate
-              // declined nothing: a live session reported 448,863 consecutive
-              // draws all classified as built, `peak 2230 ms`, `0 deferred`.
-              if (ro === null || ro === undefined) {
-                built = true;
-              } else {
-                const nbs = ro._nodeBuilderState;
-                built = nbs !== null && nbs !== undefined;
-              }
-            } catch {
-              // three moved the cache. Draw it: a stall is better than a hole.
-              built = true;
-            }
-          }
+          // **Our own note, never `_objects.get`.** See `drawnIn`: that call
+          // disposes render objects and takes their buffers with them.
+          const pass = typeof args[7] === 'string' ? args[7] : '';
+          const subject = args[0];
+          const seen =
+            typeof subject === 'object' && subject !== null ? this.drawnIn.get(subject) : undefined;
+          const built = seen !== undefined && seen.has(pass);
           if (!built) {
             // One unbuilt object gets through per frame, so progress is never
             // zero even on a machine that blows the budget on ordinary draws.
@@ -569,7 +564,20 @@ export class AsyncPipelines {
         const t0 = performance.now();
         innerDirect(...args);
         this.spentMs += performance.now() - t0;
-        this.ranOnce.add(args[0] as object);
+        // Guarded because this runs inside the draw path: a `WeakMap` given a
+        // non-object throws, and a throw here takes the frame down rather than
+        // costing a note. three always passes an `Object3D`; a stub in a check
+        // might not, and neither should be able to stop a render.
+        const drawnObj = args[0];
+        if (typeof drawnObj === 'object' && drawnObj !== null) {
+          const donePass = typeof args[7] === 'string' ? args[7] : '';
+          let passes = this.drawnIn.get(drawnObj);
+          if (passes === undefined) {
+            passes = new Set<string>();
+            this.drawnIn.set(drawnObj, passes);
+          }
+          passes.add(donePass);
+        }
       };
     }
     return true;
@@ -891,21 +899,61 @@ export function verifyAsyncPipes(): string[] {
         }
       },
     };
-    const blind = new AsyncPipelines();
-    blind.install(host as unknown as PipelineHost);
-    if (!blind.budgetState().startsWith('budget idle')) {
-      failures.push(`a hooked gate that has never been called reported "${blind.budgetState()}".`);
+    const gate = new AsyncPipelines();
+    gate.install(host as unknown as PipelineHost);
+    if (!gate.budgetState().startsWith('budget idle')) {
+      failures.push(`a hooked gate that has never been called reported "${gate.budgetState()}".`);
     }
-    blind.frame(6);
+    gate.frame(6);
     for (const o of objs) host._renderObjectDirect(o);
-    if (blind.deferrals === 0) {
-      failures.push(
-        `with no \`_objects\` the gate declined nothing and reported "${blind.budgetState()}"; ` +
-          `it waves a whole frame of builds through and says 0 deferred, which is the bug this check exists for.`,
-      );
+    if (gate.deferrals === 0) {
+      failures.push(`the gate declined nothing and reported "${gate.budgetState()}".`);
     }
-    if (!blind.budgetState().includes('blind')) {
-      failures.push(`the gate could not reach \`_objects\` and reported "${blind.budgetState()}" rather than saying so.`);
+
+    // --- **The gate must never ask three about a render object.**
+    //
+    // `RenderObjects.get()` reads like a lookup and is not: a render object
+    // whose cache key has drifted is `dispose()`d and rebuilt, and `dispose`
+    // frees its binding buffers. The gate used to call it once per declined
+    // draw, every frame it was over budget, which disposed objects with a
+    // `createRenderPipelineAsync` still in flight -- and the pending creation
+    // then submitted against a destroyed buffer:
+    //
+    //     Async render pipeline creation failed (renderPipeline_foliage_102):
+    //     [Buffer "bindingBuffer10952..."] used in submit while destroyed
+    //
+    // The game ran for thirty seconds. `_objects` is off the host type now, and
+    // this fails if anything puts it back.
+    {
+      let asked = 0;
+      const trap = {
+        _pipelines: { getForRender: (): unknown => ({ id: 'p' }) },
+        backend: { draw: (): void => {}, get: (): Record<string, never> => ({}) },
+        _objects: {
+          get: (): unknown => {
+            asked++;
+            return null;
+          },
+        },
+        _currentRenderContext: null,
+        _renderObjectDirect: (_o: unknown): void => {
+          const until = performance.now() + 0.3;
+          let sink = 0;
+          while (performance.now() < until) sink++;
+          if (sink === -1) throw new Error('unreachable');
+        },
+      };
+      const g2 = new AsyncPipelines();
+      g2.install(trap as unknown as PipelineHost);
+      g2.frame(1);
+      const trapObjs = Array.from({ length: 40 }, (_, i) => ({ n: i }));
+      for (const o of trapObjs) trap._renderObjectDirect(o);
+      if (asked > 0) {
+        failures.push(
+          `the gate called \`_objects.get\` ${asked} times. That disposes render objects and frees their ` +
+            `binding buffers, and doing it to one with an async pipeline in flight kills the renderer.`,
+        );
+      }
     }
   }
 
