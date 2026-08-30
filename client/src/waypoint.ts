@@ -88,6 +88,48 @@ export interface WaypointSource {
 /** How often the text and the distance are re-derived. The needle is every frame. */
 export const WAYPOINT_RESCAN_HZ = 4;
 
+/**
+ * The waypoint, if it can actually point at something.
+ *
+ * A quest step is allowed to have no place attached -- "network with three
+ * locals" is a real objective and there is nowhere to draw an arrow to. What it
+ * must not do is take the banner off a target that *does* have a place, which
+ * is what an `??` chain does the moment the locationless one comes first.
+ */
+export function pointable(w: Waypoint | null): Waypoint | null {
+  if (w === null) return null;
+  return w.x === null || w.z === null ? null : w;
+}
+
+/**
+ * `pointable`, held still.
+ *
+ * Small, and it exists because the bug it guards was invisible in code and
+ * obvious on screen: the chain read fine, and what it produced was the one
+ * instrument that says which way to walk, saying a sentence with no arrow.
+ */
+export function verifyPointable(): string[] {
+  const failures: string[] = [];
+  const at = (x: number | null, z: number | null): Waypoint => ({
+    questId: 'q',
+    stepIndex: 0,
+    text: 'do a thing',
+    x,
+    z,
+    radius: 10,
+  });
+  if (pointable(null) !== null) failures.push('nothing became something.');
+  if (pointable(at(null, null)) !== null) {
+    failures.push('a step with no place was called pointable; it would take the banner off one that has a place.');
+  }
+  if (pointable(at(1, null)) !== null || pointable(at(null, 1)) !== null) {
+    failures.push('a half-placed step was called pointable; the needle would aim at NaN.');
+  }
+  const real = at(10, 20);
+  if (pointable(real) !== real) failures.push('a placed step was refused; the banner would fall through to nothing.');
+  return failures;
+}
+
 export class WaypointBanner {
   private readonly root = document.getElementById('waypoint');
   private readonly needle = document.getElementById('waypoint-needle');
@@ -165,10 +207,31 @@ export class WaypointBanner {
     const pose = this.source.pose();
     if (this.sinceRescan >= 1 / WAYPOINT_RESCAN_HZ) {
       this.sinceRescan = 0;
+      /*
+       * **A target with nowhere to point does not get the banner while one that
+       * points somewhere is available**, and that is a reversal of what this
+       * used to do on purpose. `drawSlow` still says a step with no location
+       * "keeps the banner and loses the needle"; the owner saw what that looks
+       * like and the verdict was "not helpful, cut off too" -- a long objective
+       * in 22 px uppercase, no arrow, no distance, filling the one instrument
+       * on screen whose entire job is to say which way to walk.
+       *
+       * So the pointable ones are tried first, in the old order, and the
+       * locationless ones only get a look once nothing on screen can point
+       * anywhere at all. That last clause matters: an objective with no place
+       * attached is still the thing the player is doing, and an empty banner
+       * tells them less than a sentence does.
+       */
+      const pinned = this.pinnedWaypoint();
+      const active = activeWaypoint(this.source.quests(), this.source.cursors(), pose.x, pose.z);
+      const fallback = this.source.fallback?.() ?? null;
       this.current =
-        this.pinnedWaypoint() ??
-        activeWaypoint(this.source.quests(), this.source.cursors(), pose.x, pose.z) ??
-        this.source.fallback?.() ??
+        pointable(pinned) ??
+        pointable(active) ??
+        pointable(fallback) ??
+        pinned ??
+        active ??
+        fallback ??
         null;
       // Arriving is what takes the pin down. Checked here rather than in `pin`
       // for the obvious reason: the player is not standing there when they press

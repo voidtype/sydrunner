@@ -654,7 +654,10 @@
         fill: var(--quest);
         filter: drop-shadow(0 0 3px rgba(6,10,16,.95)) drop-shadow(0 2px 4px rgba(0,0,0, .75));
       }
-      #waypoint-body { display: flex; flex-direction: column; line-height: 1.15; }
+      /* `min-width: 0` because this is a flex child: without it the text's own
+         intrinsic width wins and a long objective pushes the lozenge off both
+         edges of the screen instead of wrapping inside it. */
+      #waypoint-body { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
       /* 700, not the 600 it was. At 22 px the difference between a semibold and
          a bold is visible where at 11 px it was not, and "bold" is what was
          asked for. The tracking comes *down* as the size goes up -- .16em on
@@ -663,6 +666,12 @@
       #waypoint-text {
         font-size: 22px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
         color: var(--quest); text-shadow: 0 2px 6px rgba(0,0,0, .9);
+        /* Wrapped, never clipped. A quest objective is a sentence and some of
+           them are long; an ellipsis on the one line that says what to do is
+           the worst possible place to save space. Two lines at most, balanced
+           so a five-word objective does not leave one word stranded. */
+        max-width: min(34ch, 74vw);
+        white-space: normal; overflow-wrap: break-word; text-wrap: balance;
       }
       #waypoint-range {
         font-size: 20px; letter-spacing: .04em;
