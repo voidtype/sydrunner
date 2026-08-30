@@ -112,6 +112,7 @@
  * this closes.
  */
 
+import { admits, cancels, priorityTiles, type SlotFacts } from './tilepriority.ts';
 import {
   Box3,
   BufferAttribute,
@@ -1037,6 +1038,31 @@ export class TileStreamer implements LampSource {
   private parityHolds = 0;
   /** Rebuilds put at the head of the queue because collision was resident. */
   private priorityBuilds = 0;
+  /**
+   * One controller per in-flight tile, so a fetch can be asked to stand down.
+   *
+   * The streamer had no cancellation at all before this: the ranking was
+   * recomputed every frame but the four concurrency slots were committed at the
+   * moment a fetch started and held until the bytes landed. Three seconds of
+   * driving and all four belonged to tiles chosen from where the player used to
+   * be, while the ground under their feet queued behind a megabyte and a half of
+   * city they had already left. See `world/tilepriority.ts`.
+   */
+  private readonly aborts = new Map<string, AbortController>();
+  /**
+   * Tiles that were the current-or-next pair when their fetch started.
+   *
+   * They keep their slot for the whole of its life. Without this, crossing a
+   * boundary cancels the tile you have just left *while it is arriving*, and
+   * wants it again a second later because it is still well inside the radius --
+   * strictly worse than not cancelling, paid for in bytes.
+   */
+  private readonly startedPriority = new Set<string>();
+  /** Fetches asked to stand down, for the overlay. */
+  private cancelledLoads = 0;
+  /** Where the camera was last frame, for a heading. */
+  private lastCamX: number | null = null;
+  private lastCamZ: number | null = null;
 
   private readonly loadRadius: number;
   private readonly concurrency: number;
@@ -2628,6 +2654,8 @@ export class TileStreamer implements LampSource {
     collisionEvicted: number;
     holds: number;
     priorityBuilds: number;
+    /** Fetches asked to stand down so the player's own tile could take the link. */
+    cancelled: number;
     absent: Array<[string, string]>;
   } {
     const soonest = this.ledger.soonestRetryInMs(Date.now());
@@ -2639,6 +2667,7 @@ export class TileStreamer implements LampSource {
       collisionEvicted: this.collisionEvictions,
       holds: this.parityHolds,
       priorityBuilds: this.priorityBuilds,
+      cancelled: this.cancelledLoads,
       absent: this.ledger.permanentEntries(),
     };
   }
@@ -3095,6 +3124,36 @@ export class TileStreamer implements LampSource {
     }
     wanted.sort((a, b) => a.dist - b.dist);
 
+    /*
+     * --- The priority pair: the tile underfoot, and the one being driven into.
+     *
+     * The sort above is recomputed every frame; the four concurrency slots are
+     * not. A slot is committed when a fetch starts and held until the bytes
+     * land, so three seconds of driving leaves all four held by tiles chosen
+     * from where the player *was* while the ground at their feet queues behind
+     * a megabyte and a half of city they have already left. Ranking harder
+     * cannot fix that -- nothing re-reads the ranking. `world/tilepriority.ts`
+     * carries the argument and the rules; this is the wiring.
+     *
+     * The heading is the camera's own step since last frame rather than where
+     * it is looking, because what the streamer needs is where the player is
+     * *going*: in third person the eye trails the body, and a player reversing
+     * down a street is looking at the tile they are leaving.
+     */
+    const stepX = this.lastCamX === null ? 0 : cam.x - this.lastCamX;
+    const stepZ = this.lastCamZ === null ? 0 : cam.z - this.lastCamZ;
+    this.lastCamX = cam.x;
+    this.lastCamZ = cam.z;
+    // Metres per second off a nominal 60 Hz, because the streamer is handed a
+    // camera and not a frame delta. Only the `MOVING_MPS` threshold reads it,
+    // and a threshold does not need a better clock than that.
+    const speed = Math.sqrt(stepX * stepX + stepZ * stepZ) * 60;
+    const pair = priorityTiles(this.index.tiles, cam.x, cam.z, stepX, stepZ, speed);
+    const outstanding = (key: string | null): boolean =>
+      key !== null && !this.loaded.has(key) && !this.building.has(key);
+    const priorityOutstanding = outstanding(pair.current) || outstanding(pair.next);
+    if (priorityOutstanding) this.standDown(pair);
+
     // WORKSTREAM AJ: phase 0, and it is deliberately in front of everything that
     // asks for a tile's geometry.
     //
@@ -3151,8 +3210,16 @@ export class TileStreamer implements LampSource {
       // is bounded and why the extra slots are the ones that matter.
       const hazard = this.collisionSink?.hasTile(entry.key) === true;
       const slots = hazard ? this.concurrency + HAZARD_EXTRA_SLOTS : this.concurrency;
+      const facts: SlotFacts = {
+        priority: entry.key === pair.current || entry.key === pair.next,
+        startedAsPriority: this.startedPriority.has(entry.key),
+        hazard,
+      };
       if (
-        this.loading.size < slots &&
+        // The slot count, the priority pair and the hold-back, in one call. A
+        // priority tile ignores the count outright -- the same extra-slot
+        // argument `HAZARD_EXTRA_SLOTS` makes, for the same reason.
+        admits(facts, priorityOutstanding, this.loading.size, slots) &&
         !this.loading.has(entry.key) &&
         // WORKSTREAM AJ: **and this tile's own ground has settled.** The whole
         // cross-tile ordering, in one clause. `pumpGround` above asked for the
@@ -3188,6 +3255,11 @@ export class TileStreamer implements LampSource {
         // first defect -- see `TileRetryLedger`.
         this.ledger.ready(entry.key, now)
       ) {
+        // Remembered *at the start*, not read at cancellation time: a tile that
+        // was the player's own when it was asked for keeps its slot even after
+        // they have driven off it. That is the owner's "unless it's previous
+        // current and already downloading it".
+        if (facts.priority) this.startedPriority.add(entry.key);
         void this.loadTile(entry);
       }
     }
@@ -3448,8 +3520,41 @@ export class TileStreamer implements LampSource {
    * and the risk is that a build abandoned before it commits has to give it
    * back, which is exactly what the builder's `finally` does.
    */
+  /**
+   * Ask every in-flight fetch that is not paying its way to stand down.
+   *
+   * Called only while a priority tile is outstanding, which is the only thing
+   * that makes a cancellation worth its bytes: those bytes are gone and the
+   * tile is still wanted, so the trade is only ever "the ground at the player's
+   * feet, sooner". `world/tilepriority.cancels` holds the rules -- and holds
+   * them where a check can reach them, which is why the decision is not written
+   * out here.
+   */
+  private standDown(pair: { current: string | null; next: string | null }): void {
+    for (const key of this.loading) {
+      const facts: SlotFacts = {
+        priority: key === pair.current || key === pair.next,
+        startedAsPriority: this.startedPriority.has(key),
+        hazard: this.collisionSink?.hasTile(key) === true,
+      };
+      if (!cancels(facts, true)) continue;
+      const controller = this.aborts.get(key);
+      if (controller === undefined) continue;
+      this.aborts.delete(key);
+      this.cancelledLoads++;
+      controller.abort();
+    }
+  }
+
   private async loadTile(entry: TileEntry): Promise<void> {
     this.loading.add(entry.key);
+    // Only the two big per-tile payloads carry the signal. Aborting either
+    // rejects the `Promise.all` immediately, which is the whole point; the nine
+    // sidecars behind it are small, finish on their own and have their results
+    // dropped. Threading a signal through every one of them would buy back
+    // kilobytes and cost a parameter on six call sites.
+    const abort = new AbortController();
+    this.aborts.set(entry.key, abort);
     try {
       // The console's fault injection, before a byte is asked for, so a faulted
       // attempt leaves nothing half-done and holds no atlas row. See
@@ -3475,11 +3580,15 @@ export class TileStreamer implements LampSource {
           // the CDN changes -- this is the same one entry point, with the same
           // per-file fallback and the same strike counter behind it, and the
           // fallback has already happened by the time a status is seen here.
-          fetchWorldAsset(this.baseUrl, `tiles/${entry.key}.glb`, this.version).then((r) => {
+          fetchWorldAsset(this.baseUrl, `tiles/${entry.key}.glb`, this.version, {
+            signal: abort.signal,
+          }).then((r) => {
             if (!r.ok) throw new TileFetchError(`tiles/${entry.key}.glb`, r.status);
             return r.arrayBuffer();
           }),
-          fetchWorldAsset(this.baseUrl, `tiles/${entry.key}.params.bin`, this.version).then((r) => {
+          fetchWorldAsset(this.baseUrl, `tiles/${entry.key}.params.bin`, this.version, {
+            signal: abort.signal,
+          }).then((r) => {
             if (!r.ok) throw new TileFetchError(`tiles/${entry.key}.params.bin`, r.status);
             return r.arrayBuffer();
           }),
@@ -3582,6 +3691,14 @@ export class TileStreamer implements LampSource {
       // A 404 is a fact about the build and is remembered; everything else is a
       // fact about one moment and comes back on a widening backoff. See
       // `world/tile-lifecycle.ts`.
+      // **A tile we cancelled is not a tile that failed**, and the difference is
+      // the first defect in this file's header seen from the other side: an
+      // `AbortError` classifies as transient, and a transient failure buys a
+      // five-second backoff. Standing a fetch down to clear the link and then
+      // refusing to re-ask for that tile for five seconds is worse than never
+      // standing it down at all. It goes back in the queue on the very next
+      // frame, ranked by distance like everything else.
+      if (abort.signal.aborted) return;
       const now = Date.now();
       if (classifyTileFailure(err) === 'permanent') {
         // Logged once, at `warn`, because a tile in range that the pipeline
@@ -3605,6 +3722,9 @@ export class TileStreamer implements LampSource {
       }
     } finally {
       this.loading.delete(entry.key);
+      this.aborts.delete(entry.key);
+      // The grandfathering lasts exactly as long as the fetch it protects.
+      this.startedPriority.delete(entry.key);
     }
   }
 
