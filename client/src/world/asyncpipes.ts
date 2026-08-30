@@ -210,8 +210,23 @@ export class AsyncPipelines {
   private probeDead = false;
   /** Milliseconds spent inside the draw path this frame, all calls counted. */
   private spentMs = 0;
-  /** Builds let through this frame; at least one always is. */
-  private buildsThisFrame = 0;
+  /**
+   * Unbuilt render objects admitted *after* the budget ran out, this frame.
+   *
+   * Exactly one is allowed, so a machine slow enough to exhaust its budget on
+   * ordinary draws still fills its world in rather than never.
+   *
+   * **The counter this replaces asked whether the `Object3D` was new, and that
+   * held the gate permanently shut.** A live session reported `peak 2376 ms`
+   * beside `0 deferred`: the accumulator watched a frame spend two and a half
+   * seconds in the draw path and declined nothing, because the guard wanted a
+   * brand-new object and there were none. The expensive builds are the *shadow*
+   * passes of objects already drawn -- same object, different render object,
+   * different pipeline -- so "have I seen this object" was the wrong question.
+   * Whether *this render object* is built is the right one, and the lookup
+   * below already answers it.
+   */
+  private newWhileOver = 0;
   /** The worst frame's accumulated draw time, for the console line. */
   private peakMs = 0;
   /** False until a frame opens a budget; boot runs unbudgeted. */
@@ -291,7 +306,7 @@ export class AsyncPipelines {
   frame(budgetMs = COMPILE_BUDGET_MS): void {
     if (this.spentMs > this.peakMs) this.peakMs = this.spentMs;
     this.spentMs = 0;
-    this.buildsThisFrame = 0;
+    this.newWhileOver = 0;
     this.budgetMs = budgetMs;
     this.framed = true;
   }
@@ -513,7 +528,7 @@ export class AsyncPipelines {
          * slow enough to exhaust the budget on ordinary draws still fills the
          * world in -- slowly, rather than never.
          */
-        if (this.framed && this.spentMs > this.budgetMs && this.buildsThisFrame > 0) {
+        if (this.framed && this.spentMs > this.budgetMs) {
           const objects = host._objects;
           let built: boolean;
           if (objects === null || objects === undefined) {
@@ -531,21 +546,18 @@ export class AsyncPipelines {
             }
           }
           if (!built) {
-            this.deferredDraws++;
-            return;
+            // One unbuilt object gets through per frame, so progress is never
+            // zero even on a machine that blows the budget on ordinary draws.
+            if (this.newWhileOver > 0) {
+              this.deferredDraws++;
+              return;
+            }
+            this.newWhileOver++;
           }
         }
-        // **New work admitted, not slow calls seen.** Gating forward progress
-        // on `dt > FRESH_MS` reintroduced the exact bug this rewrite is for: a
-        // frame whose calls are each cheap but whose total is enormous would
-        // never register a "build", so the guard below would never open and the
-        // gate would decline nothing. Whether an object is new is the question;
-        // how long it took is not.
-        const isNew = !this.ranOnce.has(args[0] as object);
         const t0 = performance.now();
         innerDirect(...args);
         this.spentMs += performance.now() - t0;
-        if (isNew) this.buildsThisFrame++;
         this.ranOnce.add(args[0] as object);
       };
     }
@@ -985,6 +997,63 @@ export function verifyAsyncPipes(): string[] {
     }
     if (ran === 0) failures.push('the gate declined everything, including the first build; nothing would ever appear.');
     if (!g.budgetState().includes('peak')) failures.push('the gate does not report the frame time it accumulated.');
+  }
+
+  // --- The second pass over an object it has already drawn.
+  //
+  // **This is the shape that held the gate shut on a live machine**, reported
+  // as `peak 2376 ms` beside `0 deferred`: the accumulator watched one frame
+  // spend two and a half seconds in the draw path and declined nothing. The
+  // forward-progress guard asked whether the `Object3D` was new, and after the
+  // first frame none of them are -- but the expensive builds are the *shadow*
+  // passes of objects already drawn, a different render object and a different
+  // pipeline behind the same object. Every other check here uses objects seen
+  // for the first time and so could never have caught it.
+  {
+    const objs = Array.from({ length: 200 }, (_, i) => ({ n: i }));
+    // Keyed on object *and* pass, the way three keys a render object.
+    const state = new Map<string, { _nodeBuilderState?: unknown }>();
+    const key = (o: unknown, pass: unknown): string => `${(o as { n: number }).n}|${String(pass)}`;
+    for (const o of objs) {
+      state.set(key(o, 'beauty'), {});
+      state.set(key(o, 'shadow'), {});
+    }
+    let ran = 0;
+    const host = {
+      _pipelines: { getForRender: (): unknown => ({ id: 'p' }) },
+      backend: { draw: (): void => {}, get: (): Record<string, never> => ({}) },
+      _objects: { get: (...a: unknown[]): unknown => state.get(key(a[0], a[7])) ?? null },
+      _currentRenderContext: null,
+      _renderObjectDirect: (o: unknown, ...rest: unknown[]): void => {
+        ran++;
+        let sink = 0;
+        for (let i = 0; i < 6000; i++) sink += i;
+        if (sink === -1) throw new Error('unreachable');
+        const rec = state.get(key(o, rest[6]));
+        if (rec !== undefined) rec._nodeBuilderState = {};
+      },
+    };
+    const g = new AsyncPipelines();
+    g.install(host as unknown as PipelineHost);
+
+    // Frame one: the beauty pass, with room to build everything. Every object
+    // is now one this gate has drawn, which is the premise of frame two.
+    g.frame(1000);
+    for (const o of objs) host._renderObjectDirect(o, null, null, null, null, null, null, 'beauty');
+    const afterBeauty = g.deferrals;
+
+    // Frame two: the shadow pass over the same objects, none of it built, on a
+    // budget the pass blows immediately.
+    g.frame(0.5);
+    for (const o of objs) host._renderObjectDirect(o, null, null, null, null, null, null, 'shadow');
+    if (g.deferrals === afterBeauty) {
+      failures.push(
+        `a second pass over objects already drawn was never declined ("${g.budgetState()}"). ` +
+          `The shadow pass builds a different render object behind the same Object3D, so a guard that ` +
+          `asks whether the object is new holds the gate shut forever -- reported live as peak 2376 ms, 0 deferred.`,
+      );
+    }
+    if (ran <= objs.length) failures.push('the shadow pass was declined whole; shadows would never appear.');
   }
 
   return failures;
