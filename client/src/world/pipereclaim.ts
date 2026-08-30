@@ -102,13 +102,23 @@ export const RETIRE_DELAY_FRAMES = 3;
 /**
  * Disposals allowed in one frame.
  *
- * A teleport evicts every resident tile at once -- 49 of them at the streaming
- * radius, each with a dozen instanced meshes and two passes apiece -- and doing
- * all of that in the frame it comes due would be a stall of exactly the kind
- * the compile budget exists to prevent. The queue is drained at a rate instead,
- * and a backlog simply takes a few more frames to clear.
+ * A teleport evicts every resident tile at once -- 58 of them at the streaming
+ * radius, each with a dozen instanced meshes and two passes apiece, which
+ * measured as a queue 2,189 deep -- and doing all of that in the frame it comes
+ * due would be a stall of exactly the kind the compile budget exists to
+ * prevent. The queue is drained at a rate instead.
+ *
+ * **256 rather than the 96 this shipped with, because the cost was measured
+ * rather than guessed.** Draining 96 costs 0.1-0.4 ms against a live client on
+ * the box: it is map deletes and a reference count, not GPU work. The reason to
+ * raise it is not the frame time it saves but the window it closes -- until the
+ * backlog drains, those pipelines are still on the GPU, and holding two
+ * thousand of them for twenty-three frames is a smaller version of the exact
+ * condition this file exists to end. At 256 the same teleport clears in nine
+ * frames for about 0.8 ms each, which is comfortably inside a frame that is
+ * already busy building the tiles it just arrived at.
  */
-export const MAX_DISPOSE_PER_FRAME = 96;
+export const MAX_DISPOSE_PER_FRAME = 256;
 
 /**
  * Can this object still be reached from a scene through its parents?
