@@ -91,13 +91,42 @@ export interface ReclaimHost {
 }
 
 /**
- * Frames between an eviction and the disposal it causes.
+ * How long an evicted tile keeps its pipelines before they are given back.
  *
- * See the header: this is the window in which a pipeline already being built
- * asynchronously for a mesh that has just gone can still submit against buffers
- * this would otherwise have freed underneath it.
+ * **This replaced a three-frame delay, and the story is worth keeping.** The
+ * first version waited three frames on the reasoning that nothing could still
+ * be in flight by then. A ride disproved it:
+ *
+ *     Async render pipeline creation failed (renderPipeline_street_furniture_108):
+ *     [Buffer "bindingBuffer9640_render_(vertex,fragment,compute)"] used in
+ *     submit while destroyed.
+ *
+ * Three frames is 75 ms at the 40 fps that ride was getting, and the same log
+ * has frames of 3,105 ms in it. A frame count is not a clock, and it was never
+ * the right question anyway -- `AsyncPipelines.isBuilding` answers the real one
+ * exactly, and this queue now asks it before every disposal.
+ *
+ * Given a correct guard, the delay is free to be about something else, and
+ * twenty seconds buys the thing the three-frame version was actively costing:
+ * **a tile you come back to still has its pipelines.** Riding a bike along a
+ * street and turning round crosses the same boundary twice in a few seconds,
+ * and the first version threw the pipelines away on the way out and rebuilt
+ * every one of them on the way back -- paying the most expensive thing in this
+ * renderer, twice, for nothing. Twenty seconds is long enough that ordinary
+ * doubling back is free and short enough that a session cannot accumulate a
+ * city.
  */
-export const RETIRE_DELAY_FRAMES = 3;
+export const RETIRE_GRACE_MS = 20_000;
+
+/**
+ * Retired render objects held before the grace period stops being honoured.
+ *
+ * The grace above is a cache, and a cache with no size is the leak this file
+ * was written to end wearing a longer name. Past this many waiting, the oldest
+ * go early -- memory pressure is what loses the device, and a recompile is only
+ * a stutter. The busy guard is *not* waived by this, ever: that one is a crash.
+ */
+export const MAX_PENDING = 2_500;
 
 /**
  * Disposals allowed in one frame.
@@ -108,15 +137,9 @@ export const RETIRE_DELAY_FRAMES = 3;
  * due would be a stall of exactly the kind the compile budget exists to
  * prevent. The queue is drained at a rate instead.
  *
- * **256 rather than the 96 this shipped with, because the cost was measured
- * rather than guessed.** Draining 96 costs 0.1-0.4 ms against a live client on
- * the box: it is map deletes and a reference count, not GPU work. The reason to
- * raise it is not the frame time it saves but the window it closes -- until the
- * backlog drains, those pipelines are still on the GPU, and holding two
- * thousand of them for twenty-three frames is a smaller version of the exact
- * condition this file exists to end. At 256 the same teleport clears in nine
- * frames for about 0.8 ms each, which is comfortably inside a frame that is
- * already busy building the tiles it just arrived at.
+ * 256 rather than the 96 this shipped with, because the cost was measured
+ * rather than guessed: draining 96 costs 0.1-0.4 ms against a live client on
+ * the box. It is map deletes and a reference count, not GPU work.
  */
 export const MAX_DISPOSE_PER_FRAME = 256;
 
@@ -141,7 +164,8 @@ export function attachedToScene(o: ReclaimObject | null | undefined): boolean {
 /** One mesh waiting to have its render objects disposed. */
 interface Pending {
   mesh: ReclaimObject;
-  dueFrame: number;
+  /** When it was evicted, on the caller's clock. */
+  atMs: number;
 }
 
 /**
@@ -153,11 +177,21 @@ interface Pending {
 export class PipelineReclaim {
   /** Every render object three has built for a given object, while it lives. */
   private readonly byObject = new WeakMap<ReclaimObject, Set<ReclaimRenderObject>>();
-  /** Meshes retired but not yet due. */
+  /** Meshes retired but not yet due, oldest first. */
   private queue: Pending[] = [];
   /** Already queued, so a double eviction cannot queue a mesh twice. */
   private readonly queued = new WeakSet<ReclaimObject>();
-  private frameNo = 0;
+  /** The clock, and the only reason this file is testable. */
+  private nowMs = 0;
+  /**
+   * Asks whether a pipeline is still being built for a render object.
+   *
+   * Null until `main.ts` wires `AsyncPipelines.isBuilding` in. **A reclaimer
+   * with no probe disposes nothing**, which is the only safe default: the
+   * alternative is freeing binding buffers under live pipeline creation, which
+   * is precisely the crash this guard exists for.
+   */
+  private busy: ((renderObject: ReclaimRenderObject) => boolean) | null = null;
 
   /** Render objects successfully disposed. */
   reclaimed = 0;
@@ -165,6 +199,10 @@ export class PipelineReclaim {
   retired = 0;
   /** Meshes that had come back by the time they were due, and were left alone. */
   spared = 0;
+  /** Disposals held back because a pipeline was still being built. */
+  heldBusy = 0;
+  /** Disposals taken early because the queue was over `MAX_PENDING`. */
+  forced = 0;
   /** Disposals that threw. Never zero silently -- it goes on the frame line. */
   failed = 0;
   /** True once `install` has taken. */
@@ -178,6 +216,13 @@ export class PipelineReclaim {
    * reclaim, not a reason to lose the client. The caller says so on the boot
    * line and the game runs exactly as it did before this file existed.
    */
+  /**
+   * Wire the in-flight probe. Until this is called nothing is ever disposed.
+   */
+  setBusyProbe(probe: (renderObject: ReclaimRenderObject) => boolean): void {
+    this.busy = probe;
+  }
+
   install(host: ReclaimHost): boolean {
     const objects = host._objects;
     if (objects === undefined || objects === null) return false;
@@ -221,42 +266,86 @@ export class PipelineReclaim {
     if (group === null || group === undefined) return;
     const kids = group.children;
     if (kids === undefined) return;
-    const due = this.frameNo + RETIRE_DELAY_FRAMES;
     for (const child of kids) {
       if (child.isMesh !== true) continue;
       if (this.queued.has(child)) continue;
       this.queued.add(child);
-      this.queue.push({ mesh: child, dueFrame: due });
+      this.queue.push({ mesh: child, atMs: this.nowMs });
       this.retired++;
     }
   }
 
   /**
-   * One frame. Drains whatever has come due, up to the per-frame cap.
+   * One frame. Call it at the top, before anything renders.
    *
-   * Call it at the top of the frame, before anything renders: the point of the
-   * delay is that nothing is mid-submission, and the top of a frame is the only
-   * moment that is reliably true.
+   * Three things have to be true before a render object is disposed, and they
+   * are three different questions:
+   *
+   * - **Is it still on screen?** A tile can be evicted and stream back inside
+   *   the grace period -- a player reversing over a boundary does exactly that
+   *   -- and disposing a mesh that is drawn again would blank it.
+   * - **Is anything still building for it?** The one that crashed a ride. See
+   *   `RETIRE_GRACE_MS`; a frame count could never answer this and
+   *   `AsyncPipelines.isBuilding` answers it exactly.
+   * - **Has it waited long enough?** Only to save the recompile when a player
+   *   doubles back, and the only one of the three that pressure may waive.
    */
-  frame(): void {
-    this.frameNo++;
+  frame(nowMs: number): void {
+    this.nowMs = nowMs;
     if (this.queue.length === 0) return;
+    // Past this depth the grace stops being a kindness and starts being the
+    // leak again. The busy guard is never waived; that one is a crash.
+    const pressed = this.queue.length > MAX_PENDING;
     let budget = MAX_DISPOSE_PER_FRAME;
     const keep: Pending[] = [];
     for (const entry of this.queue) {
-      if (budget <= 0 || entry.dueFrame > this.frameNo) {
+      if (budget <= 0) {
         keep.push(entry);
         continue;
       }
-      this.queued.delete(entry.mesh);
-      // It came back. Leave it entirely alone -- it is on screen.
+      if (!pressed && nowMs - entry.atMs < RETIRE_GRACE_MS) {
+        keep.push(entry);
+        continue;
+      }
+      // It came back. Drop it from the queue entirely and leave it alone.
       if (attachedToScene(entry.mesh)) {
+        this.queued.delete(entry.mesh);
         this.spared++;
         continue;
       }
       const set = this.byObject.get(entry.mesh);
-      if (set === undefined) continue;
+      if (set === undefined) {
+        this.queued.delete(entry.mesh);
+        continue;
+      }
+      // **No probe, no disposal.** A reclaimer that cannot ask whether a
+      // pipeline is in flight must not free the buffers one would be using.
+      const probe = this.busy;
+      if (probe === null) {
+        keep.push(entry);
+        continue;
+      }
+      let building = false;
+      for (const ro of set) {
+        try {
+          if (probe(ro)) {
+            building = true;
+            break;
+          }
+        } catch {
+          // A probe that throws is a probe that cannot clear this object.
+          building = true;
+          break;
+        }
+      }
+      if (building) {
+        this.heldBusy++;
+        keep.push(entry);
+        continue;
+      }
+      this.queued.delete(entry.mesh);
       this.byObject.delete(entry.mesh);
+      if (pressed) this.forced++;
       for (const ro of set) {
         budget--;
         try {
@@ -280,9 +369,12 @@ export class PipelineReclaim {
   /** One clause for the frame line. */
   state(): string {
     if (!this.installed) return 'reclaim off';
+    if (this.busy === null) return `reclaim unprobed, ${this.pending} queued`;
     return (
       `reclaim ${this.reclaimed} freed, ${this.pending} queued` +
       (this.spared > 0 ? `, ${this.spared} spared` : '') +
+      (this.heldBusy > 0 ? `, ${this.heldBusy} held` : '') +
+      (this.forced > 0 ? `, ${this.forced} forced` : '') +
       (this.failed > 0 ? `, ${this.failed} FAILED` : '')
     );
   }
@@ -314,7 +406,8 @@ export function retireGroup(group: ReclaimObject | null | undefined): void {
  *
  * Everything here is duck-typed: a "render object" is `{ dispose }` and a
  * "mesh" is `{ isMesh, parent }`, which is the whole reason this file does not
- * import three and the whole reason the server can run these.
+ * import three and the whole reason the server can run these. The clock is a
+ * number the caller passes in, so every wait below is exact rather than timed.
  */
 export function verifyPipeReclaim(): string[] {
   const failures: string[] = [];
@@ -323,54 +416,124 @@ export function verifyPipeReclaim(): string[] {
     let n = 0;
     return { ro: { dispose: (): void => { n++; } }, disposed: (): number => n };
   };
+  /** A reclaimer with nothing in flight, which is the ordinary case. */
+  const idle = (r: PipelineReclaim): void => r.setBusyProbe(() => false);
+  const put = (r: PipelineReclaim, mesh: ReclaimObject, ros: ReclaimRenderObject[]): void => {
+    (r as unknown as { byObject: WeakMap<ReclaimObject, Set<ReclaimRenderObject>> }).byObject.set(mesh, new Set(ros));
+  };
 
   // --- The shape of the leak, and that this closes it.
   {
     const scene: ReclaimObject = { isScene: true, children: [] };
     const group: ReclaimObject = { parent: scene, children: [] };
-    const a = mk();
-    const b = mk();
+    const colour = mk();
+    const shadow = mk();
     const mesh: ReclaimObject = { isMesh: true, parent: group };
     group.children = [mesh];
 
     const r = new PipelineReclaim();
-    const host: ReclaimHost = {
-      _objects: {
-        createRenderObject: (...args: unknown[]): unknown => (args[3] === mesh ? a.ro : b.ro),
-      },
-    };
+    idle(r);
+    const host: ReclaimHost = { _objects: { createRenderObject: (): unknown => colour.ro } };
     if (!r.install(host)) failures.push('the reclaimer did not install on a renderer that has `_objects`.');
-    // Three builds two render objects for it: the colour pass and the shadow.
     (host._objects as { createRenderObject: (...a: unknown[]) => unknown }).createRenderObject(0, 0, 0, mesh);
-    const second = mk();
-    const inner = host._objects as { createRenderObject: (...a: unknown[]) => unknown };
-    // A second, different render object for the same mesh -- the shadow pass.
-    const host2: ReclaimHost = { _objects: { createRenderObject: (): unknown => second.ro } };
-    r.install(host2);
-    (host2._objects as { createRenderObject: (...a: unknown[]) => unknown }).createRenderObject(0, 0, 0, mesh);
-    void inner;
+    // Three builds the shadow pass as a separate render object for the same mesh.
+    put(r, mesh, [colour.ro, shadow.ro]);
 
-    // Evict: detached first, the way `TileStreamer.dispose` does it.
+    r.frame(0);
     group.parent = null;
     r.retire(group);
     if (r.retired !== 1) failures.push(`retiring a group of one mesh queued ${r.retired}.`);
 
-    // Not yet. The whole point is that it is not yet.
-    r.frame();
-    if (a.disposed() !== 0) {
-      failures.push('a render object was disposed on the frame of its eviction; an in-flight pipeline could still submit against it.');
+    r.frame(RETIRE_GRACE_MS - 1);
+    if (colour.disposed() !== 0) {
+      failures.push('a render object was disposed inside the grace period; a tile you doubled back to would recompile.');
     }
-    for (let i = 0; i < RETIRE_DELAY_FRAMES; i++) r.frame();
-    if (a.disposed() !== 1) failures.push(`after ${RETIRE_DELAY_FRAMES} frames the colour-pass render object was disposed ${a.disposed()} times, not once.`);
-    if (second.disposed() !== 1) failures.push('the shadow-pass render object was not disposed; a mesh has one per pass and both leak.');
+    r.frame(RETIRE_GRACE_MS + 1);
+    if (colour.disposed() !== 1) failures.push(`the colour-pass render object was disposed ${colour.disposed()} times, not once.`);
+    if (shadow.disposed() !== 1) failures.push('the shadow-pass render object was not disposed; a mesh has one per pass and both leak.');
     if (r.reclaimed !== 2) failures.push(`reclaimed ${r.reclaimed} render objects for a mesh that had two.`);
     if (r.pending !== 0) failures.push(`${r.pending} meshes still queued after the queue drained.`);
   }
 
-  // --- A tile that comes back before the queue drains is left alone.
+  // --- **A pipeline still being built is never freed under.**
   //
-  // A player reversing over a tile boundary evicts and reloads inside three
-  // frames. Disposing then would blank a mesh that is on screen.
+  // The one that crashed a real ride: `[Buffer "bindingBuffer9640..."] used in
+  // submit while destroyed`, from an async creation that outlived a three-frame
+  // delay. No amount of waiting substitutes for asking.
+  {
+    const group: ReclaimObject = { parent: null, children: [] };
+    const a = mk();
+    const mesh: ReclaimObject = { isMesh: true, parent: group };
+    group.children = [mesh];
+    const r = new PipelineReclaim();
+    let inFlight = true;
+    r.setBusyProbe(() => inFlight);
+    put(r, mesh, [a.ro]);
+    r.retire(group);
+    for (let t = 0; t <= RETIRE_GRACE_MS * 20; t += RETIRE_GRACE_MS) r.frame(t);
+    if (a.disposed() !== 0) {
+      failures.push('a render object was disposed while a pipeline was still being built for it; that is the crash this guard exists for.');
+    }
+    if (r.heldBusy === 0) failures.push('a busy render object was not counted as held.');
+    inFlight = false;
+    r.frame(RETIRE_GRACE_MS * 21);
+    if (a.disposed() !== 1) failures.push('a render object was never freed after its build finished; the leak would come back.');
+  }
+
+  // --- Pressure waives the grace. It never waives the busy guard.
+  {
+    const group: ReclaimObject = { parent: null, children: [] };
+    const kids: ReclaimObject[] = [];
+    const r = new PipelineReclaim();
+    idle(r);
+    const total = MAX_PENDING + 40;
+    for (let i = 0; i < total; i++) {
+      const m = mk();
+      const mesh: ReclaimObject = { isMesh: true, parent: group };
+      kids.push(mesh);
+      put(r, mesh, [m.ro]);
+    }
+    group.children = kids;
+    r.retire(group);
+    r.frame(1);
+    if (r.reclaimed === 0) failures.push('a queue over MAX_PENDING froze behind the grace period; the grace is a cache with no size.');
+    if (r.reclaimed > MAX_DISPOSE_PER_FRAME) {
+      failures.push(`one frame disposed ${r.reclaimed}, over the cap of ${MAX_DISPOSE_PER_FRAME}; a teleport would stall.`);
+    }
+    if (r.forced === 0) failures.push('an early disposal under pressure was not counted as forced.');
+
+    const r2 = new PipelineReclaim();
+    r2.setBusyProbe(() => true);
+    const g2: ReclaimObject = { parent: null, children: [] };
+    const k2: ReclaimObject[] = [];
+    for (let i = 0; i < total; i++) {
+      const m = mk();
+      const mesh: ReclaimObject = { isMesh: true, parent: g2 };
+      k2.push(mesh);
+      put(r2, mesh, [m.ro]);
+    }
+    g2.children = k2;
+    r2.retire(g2);
+    r2.frame(1);
+    if (r2.reclaimed !== 0) failures.push('pressure waived the busy guard; that trades a stutter for a crash.');
+  }
+
+  // --- No probe wired, nothing disposed.
+  {
+    const group: ReclaimObject = { parent: null, children: [] };
+    const a = mk();
+    const mesh: ReclaimObject = { isMesh: true, parent: group };
+    group.children = [mesh];
+    const r = new PipelineReclaim();               // installed, but deliberately no setBusyProbe
+    r.install({ _objects: { createRenderObject: (): unknown => a.ro } });
+    put(r, mesh, [a.ro]);
+    r.retire(group);
+    r.frame(RETIRE_GRACE_MS * 10);
+    if (a.disposed() !== 0) failures.push('a reclaimer with no in-flight probe disposed something anyway.');
+    if (!r.state().includes('unprobed')) failures.push(`an unprobed reclaimer reported "${r.state()}" and did not say so.`);
+  }
+
+  // --- A tile that comes back inside the grace is left alone.
   {
     const scene: ReclaimObject = { isScene: true, children: [] };
     const group: ReclaimObject = { parent: null, children: [] };
@@ -378,20 +541,17 @@ export function verifyPipeReclaim(): string[] {
     const mesh: ReclaimObject = { isMesh: true, parent: group };
     group.children = [mesh];
     const r = new PipelineReclaim();
-    r.install({ _objects: { createRenderObject: (): unknown => a.ro } });
-    (r as unknown as { byObject: WeakMap<ReclaimObject, Set<ReclaimRenderObject>> }).byObject.set(mesh, new Set([a.ro]));
+    idle(r);
+    put(r, mesh, [a.ro]);
     r.retire(group);
-    group.parent = scene; // it came back
-    for (let i = 0; i <= RETIRE_DELAY_FRAMES; i++) r.frame();
+    group.parent = scene;
+    r.frame(RETIRE_GRACE_MS + 1);
     if (a.disposed() !== 0) failures.push('a mesh that was back in the scene was disposed anyway; it would have gone blank.');
     if (r.spared !== 1) failures.push(`a returned mesh was not counted as spared (${r.spared}).`);
+    if (r.pending !== 0) failures.push('a spared mesh stayed in the queue.');
   }
 
   // --- Detachment is the parent chain, not the immediate parent.
-  //
-  // `releaseGroupGeometry` runs after `root.remove(group)`, so the mesh's own
-  // parent is still the group and only the group is detached. A check that
-  // looked one level up would refuse to ever free anything.
   {
     const scene: ReclaimObject = { isScene: true };
     const live: ReclaimObject = { parent: { parent: { parent: scene } } };
@@ -399,38 +559,10 @@ export function verifyPipeReclaim(): string[] {
     const dead: ReclaimObject = { parent: { parent: { parent: null } } };
     if (attachedToScene(dead)) failures.push('a mesh whose chain ends in null was called attached; nothing would ever be reclaimed.');
     if (attachedToScene(null)) failures.push('null was called attached.');
-    // A cycle must not hang the frame.
     const x: ReclaimObject = {};
     const y: ReclaimObject = { parent: x };
     x.parent = y;
     if (attachedToScene(x)) failures.push('a parent cycle reported a scene that is not there.');
-  }
-
-  // --- The per-frame cap holds, and the backlog still clears.
-  {
-    const group: ReclaimObject = { parent: null, children: [] };
-    const kids: ReclaimObject[] = [];
-    const counters: Array<() => number> = [];
-    const r = new PipelineReclaim();
-    const total = MAX_DISPOSE_PER_FRAME * 2 + 5;
-    for (let i = 0; i < total; i++) {
-      const m = mk();
-      counters.push(m.disposed);
-      const mesh: ReclaimObject = { isMesh: true, parent: group };
-      kids.push(mesh);
-      (r as unknown as { byObject: WeakMap<ReclaimObject, Set<ReclaimRenderObject>> }).byObject.set(mesh, new Set([m.ro]));
-    }
-    group.children = kids;
-    r.retire(group);
-    for (let i = 0; i < RETIRE_DELAY_FRAMES; i++) r.frame();
-    if (r.reclaimed > MAX_DISPOSE_PER_FRAME) {
-      failures.push(`one frame disposed ${r.reclaimed}, over the cap of ${MAX_DISPOSE_PER_FRAME}; a teleport would stall.`);
-    }
-    if (r.reclaimed === 0) failures.push('the capped drain freed nothing at all.');
-    for (let i = 0; i < 6; i++) r.frame();
-    if (r.pending !== 0) failures.push(`a backlog of ${total} did not clear in six further frames (${r.pending} left).`);
-    if (r.reclaimed !== total) failures.push(`the backlog freed ${r.reclaimed} of ${total}.`);
-    if (counters.some((c) => c() !== 1)) failures.push('a queued mesh was disposed other than exactly once.');
   }
 
   // --- A dispose that throws costs a pipeline, never the frame.
@@ -439,19 +571,31 @@ export function verifyPipeReclaim(): string[] {
     const mesh: ReclaimObject = { isMesh: true, parent: group };
     group.children = [mesh];
     const r = new PipelineReclaim();
-    (r as unknown as { byObject: WeakMap<ReclaimObject, Set<ReclaimRenderObject>> }).byObject.set(
-      mesh,
-      new Set([{ dispose: (): void => { throw new Error('gpu gone'); } }]),
-    );
+    idle(r);
+    put(r, mesh, [{ dispose: (): void => { throw new Error('gpu gone'); } }]);
     r.retire(group);
     let threw = false;
     try {
-      for (let i = 0; i <= RETIRE_DELAY_FRAMES; i++) r.frame();
+      r.frame(RETIRE_GRACE_MS + 1);
     } catch {
       threw = true;
     }
     if (threw) failures.push('a render object whose dispose threw took the frame with it.');
     if (r.failed !== 1) failures.push(`a throwing dispose was not counted (${r.failed}); it would leak in silence.`);
+  }
+
+  // --- A probe that throws is treated as busy, not as clear.
+  {
+    const group: ReclaimObject = { parent: null, children: [] };
+    const a = mk();
+    const mesh: ReclaimObject = { isMesh: true, parent: group };
+    group.children = [mesh];
+    const r = new PipelineReclaim();
+    r.setBusyProbe(() => { throw new Error('gate gone'); });
+    put(r, mesh, [a.ro]);
+    r.retire(group);
+    r.frame(RETIRE_GRACE_MS + 1);
+    if (a.disposed() !== 0) failures.push('a probe that threw was read as "not building" and the object was freed anyway.');
   }
 
   // --- Double eviction does not queue a mesh twice.
@@ -460,6 +604,7 @@ export function verifyPipeReclaim(): string[] {
     const mesh: ReclaimObject = { isMesh: true, parent: group };
     group.children = [mesh];
     const r = new PipelineReclaim();
+    idle(r);
     r.retire(group);
     r.retire(group);
     if (r.pending !== 1) failures.push(`the same mesh queued ${r.pending} times; its render objects would be disposed twice.`);
@@ -468,6 +613,7 @@ export function verifyPipeReclaim(): string[] {
   // --- Groups with no meshes, and a renderer of the wrong shape.
   {
     const r = new PipelineReclaim();
+    idle(r);
     r.retire(null);
     r.retire({ children: undefined });
     r.retire({ children: [{ isMesh: false }] });
@@ -475,8 +621,7 @@ export function verifyPipeReclaim(): string[] {
     if (r.install({})) failures.push('the reclaimer claimed to install on a renderer with no `_objects`.');
     if (r.install({ _objects: {} })) failures.push('the reclaimer claimed to install with no `createRenderObject` to wrap.');
     if (r.state() !== 'reclaim off') failures.push(`an uninstalled reclaimer reported "${r.state()}".`);
-    // And it must still be safe to run frames on one that never installed.
-    r.frame();
+    r.frame(0);
   }
 
   // --- The wrapper returns what three returns, and records nothing odd.
@@ -493,12 +638,9 @@ export function verifyPipeReclaim(): string[] {
       },
     };
     r.install(host);
-    const got = (host._objects as { createRenderObject: (...a: unknown[]) => unknown }).createRenderObject(
-      1, 2, 3, { isMesh: true }, 5,
-    );
-    if (got !== sentinel) failures.push('the wrapper did not return three\'s own render object; every draw would break.');
+    const got = (host._objects as { createRenderObject: (...a: unknown[]) => unknown }).createRenderObject(1, 2, 3, { isMesh: true }, 5);
+    if (got !== sentinel) failures.push("the wrapper did not return three's own render object; every draw would break.");
     if (sawArgs.length !== 5) failures.push(`the wrapper passed ${sawArgs.length} of 5 arguments through.`);
-    // A creation whose object argument is not an object must not throw.
     (host._objects as { createRenderObject: (...a: unknown[]) => unknown }).createRenderObject(1, 2, 3, null, 5);
   }
 

@@ -1841,6 +1841,18 @@ async function main(): Promise<void> {
   if (!pipeReclaim.install(renderer as unknown as { _objects?: { createRenderObject?: (...a: unknown[]) => unknown } })) {
     console.warn('[render] the pipeline reclaimer did not install; evicted tiles will keep their pipelines.');
   }
+  /*
+   * **The probe is what makes disposal safe, and without it nothing is freed.**
+   *
+   * The first version of the reclaim waited three frames and assumed nothing
+   * could still be building. A ride answered that with `[Buffer
+   * "bindingBuffer9640..."] used in submit while destroyed` from an async
+   * creation that was still running -- three frames is 75 ms at 40 fps, and the
+   * same log has frames of 3,105 ms in it. The gate above is the only thing
+   * that knows which render objects have creations outstanding, so it is what
+   * gets asked. See `asyncpipes.isBuilding`.
+   */
+  pipeReclaim.setBusyProbe((renderObject) => asyncPipes.isBuilding(renderObject));
   setActiveReclaim(pipeReclaim);
 
   /**
@@ -10664,6 +10676,7 @@ async function main(): Promise<void> {
           ` over ${pipelineWatch.frames} frame(s), worst ${pipelineWatch.worstMs.toFixed(0)} ms` +
           `  |  compiles ${asyncPipes.compiles} over ${asyncPipes.distinct} keys, ${asyncPipes.objects} objects` +
           `, ${asyncPipes.deferrals} deferred (${asyncPipes.budgetState()})` +
+          `  |  ${asyncPipes.outstanding} building, ${asyncPipes.ceilingDeclines} over ceiling` +
           `  |  ${pipeReclaim.state()}` +
           `  |  ${asyncPipes.drift()}` +
           `  |  worst: ${asyncPipes.top(3)}` +
@@ -10717,7 +10730,9 @@ async function main(): Promise<void> {
     asyncPipes.frame(budgetFor(stalls.medianFrameMs()));
     // Here, and not lower: disposing a render object frees its binding buffers,
     // and the top of the frame is the one moment nothing is mid-submission.
-    pipeReclaim.frame();
+    // The clock rather than a frame count, because the grace period is about
+    // how long a player might take to double back -- see `RETIRE_GRACE_MS`.
+    pipeReclaim.frame(now);
     frameProfile.begin();
     frameProfile.at(FSEC.input);
     input.forward = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);

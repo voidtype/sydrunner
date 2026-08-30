@@ -102,6 +102,27 @@ const BUDGET_FRAME_FACTOR = 1.4;
 const MIN_ADMITS_PER_FRAME = 4;
 
 /**
+ * How far past the budget the *floor* may take a frame.
+ *
+ * The floor above had no ceiling, and a real ride found what that costs: a
+ * `[frame] 240 ms gap` line reporting `peak 3092 ms` beside `worst 3120 ms`.
+ * Four admits is a hard bound on the *count* of builds and no bound at all on
+ * their cost, and a single first sighting of an instanced shadow material can
+ * spend the better part of a second generating WGSL. Four of those in one frame
+ * is the three-second freeze, arriving through the rule that exists to stop
+ * freezes.
+ *
+ * So the floor is two promises, not one. **At least one new object always gets
+ * through**, whatever it costs -- that is what keeps a slow machine filling in
+ * rather than never finishing, and it is not negotiable. The *second* through
+ * the fourth are a courtesy, and they are withdrawn the moment the frame is
+ * already four budgets deep. At a 35 ms budget that caps the overshoot at one
+ * build instead of four, which turns a 3,100 ms frame into roughly a 700 ms
+ * one on the same machine doing the same work.
+ */
+const HARD_CEILING_FACTOR = 4;
+
+/**
  * The most builds a bounded frame may run, for a check to hold it to.
  *
  * Stated once and derived, because it was stated twice as `6` and raising
@@ -345,6 +366,36 @@ export class AsyncPipelines {
    */
   private readonly drawnIn = new WeakMap<object, Set<string>>();
 
+  /**
+   * Pipeline creations still outstanding, per render object.
+   *
+   * Filled by the `getForRender` wrapper and drained when each promise settles;
+   * see the long note there. It exists so `world/pipereclaim.ts` can ask the
+   * only question that actually makes a disposal safe -- *is anything still
+   * building for this?* -- rather than waiting a fixed number of frames and
+   * hoping, which is what freed a binding buffer under a live
+   * `createRenderPipelineAsync` and crashed a ride.
+   */
+  private readonly building = new WeakMap<object, number>();
+
+  /** Creations outstanding across everything, for the frame line. */
+  outstanding = 0;
+
+  /** Draws declined because the frame was already past the hard ceiling. */
+  ceilingDeclines = 0;
+
+  /**
+   * Is a pipeline still being created for this render object?
+   *
+   * Conservative in both directions that matter: anything that is not an object
+   * cannot be tracked and is reported busy-free, and a render object this gate
+   * never saw has no outstanding work by definition.
+   */
+  isBuilding(renderObject: unknown): boolean {
+    if (typeof renderObject !== 'object' || renderObject === null) return false;
+    return (this.building.get(renderObject) ?? 0) > 0;
+  }
+
   get skipped(): number {
     return this.skippedDraws;
   }
@@ -543,9 +594,49 @@ export class AsyncPipelines {
          * event that mattered. A no-op catch costs nothing and keeps the console
          * readable on the one occasion anybody needs to read it.
          */
+        /*
+         * And the same loop now answers a second question, because it is the
+         * only place that knows the answer: **is a pipeline still being built
+         * for this render object right now?**
+         *
+         * `world/pipereclaim.ts` frees the render objects an evicted tile
+         * leaves behind, and its first version waited three frames before doing
+         * it, on the reasoning that nothing could still be in flight by then.
+         * A real ride disproved that in the plainest possible way:
+         *
+         *     THREE.WebGPURenderer: Async render pipeline creation failed
+         *     (renderPipeline_street_furniture_108): [Buffer
+         *     "bindingBuffer9640_render_(vertex,fragment,compute)"] used in
+         *     submit while destroyed.
+         *
+         * Three frames is 75 ms at the 40 fps that ride was getting, and the
+         * same log has frames of 3,105 ms in it. A creation that outlives the
+         * delay gets its binding buffer freed underneath it. A frame count was
+         * never the right clock; this is, because it is the thing itself.
+         */
+        const subject = typeof renderObject === 'object' && renderObject !== null ? renderObject : null;
+        if (subject !== null) this.building.set(subject, (this.building.get(subject) ?? 0) + sink.length);
+        this.outstanding += sink.length;
         for (const p of sink) {
-          if (p !== null && typeof p === 'object' && typeof (p as { catch?: unknown }).catch === 'function') {
-            void (p as Promise<unknown>).catch(() => {});
+          if (p !== null && typeof p === 'object' && typeof (p as { then?: unknown }).then === 'function') {
+            const settled = (): void => {
+              this.outstanding--;
+              if (subject === null) return;
+              const left = (this.building.get(subject) ?? 1) - 1;
+              if (left > 0) this.building.set(subject, left);
+              else this.building.delete(subject);
+            };
+            // `then(settled, settled)` rather than a bare `catch`: it both
+            // clears the count and handles the rejection, and the day the
+            // device goes away every one of these rejects at once. See above.
+            void (p as Promise<unknown>).then(settled, settled);
+          } else {
+            this.outstanding--;
+            if (subject !== null) {
+              const left = (this.building.get(subject) ?? 1) - 1;
+              if (left > 0) this.building.set(subject, left);
+              else this.building.delete(subject);
+            }
           }
         }
       }
@@ -636,10 +727,18 @@ export class AsyncPipelines {
             typeof subject === 'object' && subject !== null ? this.drawnIn.get(subject) : undefined;
           const built = seen !== undefined && seen.has(pass);
           if (!built) {
-            // One unbuilt object gets through per frame, so progress is never
-            // zero even on a machine that blows the budget on ordinary draws.
-            if (this.newWhileOver >= MIN_ADMITS_PER_FRAME) {
+            // The first one is unconditional: progress is never zero, even on a
+            // machine that blows the budget on ordinary draws, and even if this
+            // single build turns out to cost most of a second.
+            //
+            // The rest are withdrawn once the frame is already `HARD_CEILING_FACTOR`
+            // budgets deep. Counting admits bounded how many builds a bad frame
+            // took on and said nothing about what they cost, which is how four
+            // admits became a 3,100 ms freeze. See that constant.
+            const overCeiling = this.spentMs > this.budgetMs * HARD_CEILING_FACTOR;
+            if (this.newWhileOver >= MIN_ADMITS_PER_FRAME || (this.newWhileOver > 0 && overCeiling)) {
               this.deferredDraws++;
+              if (overCeiling) this.ceilingDeclines++;
               return;
             }
             this.newWhileOver++;
@@ -908,6 +1007,104 @@ export function verifyAsyncPipes(): string[] {
     g.frame(6);
     for (const o of objs) host._renderObjectDirect(o);
     if (ran <= before) failures.push('`frame` did not reopen the budget; a declined object would never be built.');
+  }
+
+  // --- A frame full of *expensive* builds stops at one, not at four.
+  //
+  // **The three-second freeze.** `MIN_ADMITS_PER_FRAME` bounded how many new
+  // objects a spent frame took on and said nothing about what they cost, and a
+  // real ride reported `peak 3092 ms` beside `worst 3120 ms`: four first
+  // sightings of an instanced shadow material, each spending most of a second
+  // generating WGSL, admitted by the rule that exists to prevent freezes.
+  //
+  // The floor keeps its promise -- one build always gets through, however
+  // expensive -- and the second through fourth are withdrawn once the frame is
+  // already `HARD_CEILING_FACTOR` budgets deep. Builds here cost five times the
+  // budget each, so the ceiling is passed by the first one.
+  {
+    const spin = (ms: number): void => {
+      const until = performance.now() + ms;
+      let sink = 0;
+      while (performance.now() < until) sink++;
+      if (sink === -1) throw new Error('unreachable');
+    };
+    interface Rec {
+      _nodeBuilderState: unknown;
+    }
+    const state = new Map<unknown, Rec>();
+    let ran = 0;
+    const host = {
+      _pipelines: { getForRender: () => ({ id: 'p' }) },
+      backend: { draw: () => {}, get: () => ({}) },
+      _currentRenderContext: null,
+      _renderObjectDirect: (o: unknown): void => {
+        ran++;
+        const rec = state.get(o);
+        if (rec !== undefined && (rec._nodeBuilderState === null || rec._nodeBuilderState === undefined)) {
+          // Five budgets each: one of these alone puts the frame over the
+          // ceiling, which is the shape of the ride that produced this.
+          spin(30);
+          rec._nodeBuilderState = {};
+        }
+      },
+    };
+    const g = new AsyncPipelines();
+    g.install(host as unknown as PipelineHost);
+    const objs = Array.from({ length: 12 }, (_, i) => ({ n: i }));
+    for (const o of objs) state.set(o, { _nodeBuilderState: null });
+    g.frame(6);
+    for (const o of objs) host._renderObjectDirect(o);
+    // One free build (the frame starts under budget) plus the one the floor
+    // always allows. Two of slack for a clock that is clamped in a browser.
+    if (ran > 4) {
+      failures.push(
+        `a 6 ms frame ran ${ran} builds of 30 ms each; the floor has no ceiling and this is the ` +
+          `three-second freeze coming back.`,
+      );
+    }
+    if (ran === 0) failures.push('the ceiling closed the gate entirely; a slow machine would never finish loading.');
+    if (g.ceilingDeclines === 0) failures.push('nothing was declined by the hard ceiling, so the ceiling is not doing anything.');
+  }
+
+  // --- Nothing is reported as building once its promises have settled.
+  //
+  // `pipereclaim` frees an evicted tile's render objects and asks this before
+  // every disposal. An answer that stayed `true` for ever would stop the
+  // reclaim dead and bring the leak back; an answer that went `false` early is
+  // the buffer-destroyed-in-submit crash.
+  {
+    const g = new AsyncPipelines();
+    let resolve: (() => void) | null = null;
+    const pending = new Promise<void>((r) => {
+      resolve = r;
+    });
+    const ro = { id: 'ro' };
+    const host = {
+      _pipelines: {
+        getForRender: (_r: unknown, promises?: unknown): unknown => {
+          if (Array.isArray(promises)) promises.push(pending);
+          return { id: 'p' };
+        },
+      },
+      backend: { draw: () => {}, get: () => ({}) },
+      _currentRenderContext: null,
+      _renderObjectDirect: () => {},
+    };
+    g.install(host as unknown as PipelineHost);
+    if (g.isBuilding(ro)) failures.push('a render object nothing has touched was reported as building.');
+    (host._pipelines as { getForRender: (r: unknown, p?: unknown) => unknown }).getForRender(ro, null);
+    if (!g.isBuilding(ro)) {
+      failures.push('a render object with an outstanding pipeline creation was not reported as building; the reclaim would free its buffers underneath it.');
+    }
+    if (g.outstanding !== 1) failures.push(`outstanding was ${g.outstanding} with one creation in flight.`);
+    if (resolve !== null) (resolve as () => void)();
+    // The settle is a microtask; drain it the way the frame loop would.
+    void Promise.resolve().then(() => {
+      if (g.isBuilding(ro)) {
+        failures.push('a render object was still reported as building after its creation settled; the reclaim would never free it.');
+      }
+    });
+    if (g.isBuilding(null) || g.isBuilding(7)) failures.push('a non-object was reported as building.');
   }
 
   // --- Before the first frame, the gate is open.

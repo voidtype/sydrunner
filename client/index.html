@@ -2318,7 +2318,13 @@
         font-weight: 700; color: var(--on-sun); background: var(--sun); cursor: pointer;
         border: 0; padding: 3px 22px;
       }
-      #nameprompt button:hover { background: #ffc451; }
+      /* **Not the tabs.** `#nameprompt button` is an id plus a type, so this
+         hover outranked `#nameprompt-tabs button`'s own background and repainted
+         the inactive tab light orange -- while the tab rule below was still
+         setting its text to `--ink`, a pale blue. Pale blue on light orange is
+         the washed-out `LOG IN / SIGN UP` that got reported. The tabs carry
+         their own hover, two rules down. */
+      #nameprompt button:not(#nameprompt-tabs button):hover { background: #ffc451; }
       #nameprompt button:focus-visible { outline: 2px solid var(--ink-bright); outline-offset: 2px; }
       #nameprompt-note, #account-note, #signedin-note {
         font-size: var(--t-small); color: var(--ink-faint); margin-top: 14px; line-height: 1.6;
@@ -2359,7 +2365,13 @@
         padding: 9px 15px; cursor: pointer;
       }
       #nameprompt-tabs button.on { color: var(--on-sun); background: var(--sun); }
-      #nameprompt-tabs button:hover:not(.on) { color: var(--ink); }
+      /* Hover moves the *surface*, and the text colour follows it rather than
+         being set independently: an inactive tab lifts to the next value up the
+         ladder and keeps its light text, and the selected one brightens its sun
+         and keeps its dark ink. The bug this replaces set a text colour against
+         a background it did not control. */
+      #nameprompt-tabs button:hover:not(.on) { color: var(--ink-bright); background: #26313f; }
+      #nameprompt-tabs button.on:hover { color: var(--on-sun); background: #ffc451; }
       #nameprompt-tabs button:focus-visible { outline: 2px solid var(--ink-bright); outline-offset: -2px; }
       .joinpane { display: none; }
       .joinpane.on { display: block; }
