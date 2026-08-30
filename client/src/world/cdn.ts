@@ -169,6 +169,11 @@ export interface CdnStats {
    * at all. The number this whole pass exists to move -- see `world/regions.ts`.
    */
   bundled: number;
+  /**
+   * Served from the browser's own disk, having been fetched in an earlier
+   * session or an earlier lap of the same one.
+   */
+  disk: number;
   /** Whether the CDN is currently believed usable. */
   enabled: boolean;
   /** Why not, when `enabled` is false and something decided that. */
@@ -180,6 +185,7 @@ const stats: CdnStats = {
   fallbacks: 0,
   origin: 0,
   bundled: 0,
+  disk: 0,
   enabled: false,
   reason: 'not armed',
 };
@@ -430,6 +436,68 @@ export function setLocalAssetSource(source: LocalAssetSource | null): void {
  * @param path    world-relative, no leading slash: `tiles/5_-1.glb`
  * @param version the `?v=<built>` suffix from `streamer.assetVersion`
  */
+/**
+ * The prefix every version of the on-disk world cache shares.
+ *
+ * The world's `built` stamp goes on the end, so a retile does not invalidate
+ * anything -- it simply names a different cache, and the old one is deleted the
+ * first time this is opened. That is the owner's "as long as they haven't been
+ * rebaked", and it is free: the version is already in every URL as `?v=`.
+ */
+const CACHE_PREFIX = 'sydney-world-v';
+
+/** The open cache, `null` once we know there is not one. `undefined` = untried. */
+let worldCache: Cache | null | undefined;
+
+/**
+ * The browser's own disk, or `null` where there isn't one.
+ *
+ * **Why this is worth having at all.** Measured against the live world, a tile
+ * is 130 kB to 1.07 MB and takes about 0.3 s to arrive -- of which 0.25 s is
+ * time to first byte. It is almost entirely round trip, not size. And the
+ * objects come back with no `Cache-Control` and `cf-cache-status: DYNAMIC`, so
+ * nothing at the edge or in the browser is allowed to keep them: driving out of
+ * a suburb and back re-downloads every tile in it, at a quarter-second of
+ * latency each, forever.
+ *
+ * Fixing the header on the bucket is the other half and the better half -- it
+ * would help a cold player too, and `publish-world-r2.sh` already tries to set
+ * it -- but this half is ours, works whatever the CDN is configured to do, and
+ * survives a reload rather than only a lap.
+ *
+ * Every failure here is a silent `null`. Cache Storage is absent in insecure
+ * contexts, refused in some private modes, and throws on quota; none of those
+ * are reasons for the world to stop loading.
+ */
+async function diskCache(version: string): Promise<Cache | null> {
+  if (worldCache !== undefined) return worldCache;
+  worldCache = null;
+  try {
+    if (typeof caches === 'undefined') return null;
+    const name = `${CACHE_PREFIX}${version}`;
+    // Every other version is a world that no longer exists. Dropped without
+    // awaiting: a stale cache costs disk, not correctness, and blocking the
+    // first tile of a session on a delete is the wrong trade.
+    void caches
+      .keys()
+      .then((keys) => {
+        for (const k of keys) {
+          if (k.startsWith(CACHE_PREFIX) && k !== name) void caches.delete(k);
+        }
+      })
+      .catch(() => {});
+    worldCache = await caches.open(name);
+  } catch {
+    worldCache = null;
+  }
+  return worldCache;
+}
+
+/** Which paths are worth keeping. The pivots must never be stale. */
+function cacheable(path: string): boolean {
+  return path.startsWith('tiles/') || path.startsWith('regions/') || path.startsWith('hexes/');
+}
+
 export async function fetchWorldAsset(
   baseUrl: string,
   path: string,
@@ -453,14 +521,51 @@ export async function fetchWorldAsset(
       return new Response(bytes, { status: 200 });
     }
   }
+  // --- The browser's own disk, between the bundle and the network.
+  //
+  // After `localSource`, because a region bundle is already in memory and
+  // nothing beats that; before the network, because a quarter-second of round
+  // trip is what this exists to avoid. The key carries `?v=`, so a rebake is a
+  // different key and a different cache -- there is no staleness to reason
+  // about.
+  const url = originAssetUrl(baseUrl, path, version);
+  const cache = cacheable(path) ? await diskCache(version) : null;
+  if (cache !== null) {
+    try {
+      const hit = await cache.match(url);
+      if (hit !== undefined) {
+        stats.disk += 1;
+        return hit;
+      }
+    } catch {
+      // A cache that will not answer is a cache we do not have.
+    }
+  }
+
+  let resp: Response;
   if (stats.enabled && (await ensureProbe()) && stats.enabled) {
     const buf = await tryCdn(path, version, init);
-    if (buf) return new Response(buf, { status: 200 });
-    stats.fallbacks += 1;
+    if (buf) {
+      resp = new Response(buf, { status: 200 });
+    } else {
+      stats.fallbacks += 1;
+      resp = await fetch(url, init);
+    }
   } else {
     stats.origin += 1;
+    resp = await fetch(url, init);
   }
-  return fetch(originAssetUrl(baseUrl, path, version), init);
+  // Kept only if it is worth keeping. A 404 cached for a session would turn a
+  // transient publish gap into a hole in the city until the tab is closed.
+  if (cache !== null && resp.ok) {
+    try {
+      void cache.put(url, resp.clone()).catch(() => {});
+    } catch {
+      // Quota, a private window, an opaque response: none of them are reasons
+      // to fail the fetch that already succeeded.
+    }
+  }
+  return resp;
 }
 
 /**
