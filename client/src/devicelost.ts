@@ -78,8 +78,8 @@ export interface LostPlan {
 const TITLE = 'The graphics card handed this tab back.';
 const DETAIL =
   'Browsers do this to a tab that has been in the background a while, or when another ' +
-  'program wants the GPU. Nothing is lost -- your level, your cash and your jobs are on ' +
-  'the server, not in this page.';
+  'program wants the GPU. Nothing is lost \u2014 your level, your cash and your jobs are ' +
+  'on the server, not in this page.';
 const ACTION = 'Reload and rejoin';
 
 /**
@@ -164,6 +164,12 @@ export function verifyDeviceLost(): string[] {
     }
     if (/WebGPU|GPUDevice|adapter/i.test(m)) {
       failures.push('the message uses the API\'s words rather than the player\'s.');
+    }
+    // The house style writes `--` in comments; the *interface* writes an em
+    // dash, the way `groundProgressLine` does one screen earlier. A double
+    // hyphen rendered at 15px on the overlay reads as a typo.
+    if (m.includes('--')) {
+      failures.push('the overlay copy has a double hyphen in it where the interface uses an em dash.');
     }
   }
 

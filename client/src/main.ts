@@ -112,6 +112,7 @@ import { ShadowWarm, ShadowSweep, verifyShadowWarm } from './world/shadowwarm.ts
 import { AsyncPipelines, budgetFor, verifyAsyncPipes } from './world/asyncpipes.ts';
 import { PipelineReclaim, setActiveReclaim, verifyPipeReclaim } from './world/pipereclaim.ts';
 import { lostMessage, lostPlan, verifyDeviceLost } from './devicelost.ts';
+import { verifyIndexDom } from './domcheck.ts';
 import { verifyTilePriority } from './world/tilepriority.ts';
 import { verifyPointable } from './waypoint.ts';
 import { verifySuspension } from './game/suspension.ts';
@@ -5153,6 +5154,13 @@ async function main(): Promise<void> {
     ...verifyAsyncPipes(),
     ...verifyPipeReclaim(),
     ...verifyDeviceLost(),
+    /*
+     * And the index itself, which no compiler reads. Client-only of the four
+     * added tonight, because it is the one that needs a `document`. See
+     * `domcheck.ts` for the two bugs that produced it, both of which had been
+     * shipped for a long time and neither of which said anything.
+     */
+    ...verifyIndexDom(),
     ...verifyTilePriority(),
     ...verifyPointable(),
     ...verifySuspension(),
