@@ -72,6 +72,43 @@
         /* something has gone wrong and you cannot */
         --danger: #d98b8b;
 
+        /* ------------------------------------------------------------------
+           TWO ACCENTS, AND A LADDER OF SURFACES.
+
+           Added for the screens a player meets before the world does -- the
+           join gate, the loading screen and the controls -- which had grown
+           into undifferentiated 13px lowercase monospace and were fairly
+           described as primitive. The greys above say how *loud* a thing is;
+           these say what *kind* of thing it is, which is the axis that was
+           missing.
+
+           Sun is you: your cash, your level, your condition, and every control
+           that acts on your behalf. Harbour is the world: places, distances,
+           what other people have voted for. Nothing is coloured for decoration,
+           so a player can learn the two in a minute and then read a screen
+           without being told. `--warn` and `--danger` above keep their jobs;
+           neither accent is ever used for an error.
+
+           The four surfaces replace what a blur used to do. A panel is lighter
+           than the ground; a field you type into is *darker* than the panel it
+           sits in. Recession is a value, not an effect -- which is what makes
+           it survive being composited over a moving render, and what keeps this
+           interface flat rather than glassy. */
+        /* you: cash, level, condition, the thing you press */
+        --sun: #ffb020;
+        /* text and icons drawn *on* a filled sun block */
+        --on-sun: #14100a;
+        /* the world: places, distance, what other people did */
+        --harbour: #5fd3f3;
+        /* a surface above the ground */
+        --panel: #121a25;
+        /* a field, recessed into the panel it sits in */
+        --recess: #0a1119;
+        /* a small raised block: a tab strip, a status chip */
+        --chip: #1e2836;
+        /* the hairline between two surfaces of similar value */
+        --edge: #26313f;
+
         /* Type: seven steps. The interface is monospace, so the scale carries
            the whole hierarchy -- there is no second family to lean on. 10.5px
            and 9.5px were rounding noise, not steps, and are gone. */
@@ -208,6 +245,14 @@
          column headings use. It is a label for the block above it, not another
          line of it. */
       #help .more { color: var(--ink-muted); }
+      /* The keys, picked out of the sentence they are in.
+         **Colour only, and the weight is inherited on purpose.** Every width in
+         the long comment below is measured at this size and this weight -- the
+         Escape line is 363 px against a 390 px cap -- and bold is wider, so a
+         `font-weight: 700` here would push the one line that must never be cut
+         over the edge and cut it. Sun because these are the controls you press;
+         see the token block at the top of this file. */
+      #help b { color: var(--sun); font-weight: inherit; }
       /* The one line in this block that must never be cut.
          Every other line clips with an ellipsis because losing the tail of
          "wheel zoom out · v third person" costs a control nobody was reading;
@@ -274,6 +319,40 @@
         color: var(--ink); font-size: 13px; letter-spacing: .02em;
       }
       #helpfull.shown { display: flex; }
+      /* --- Controls, as a list you can find something in.
+         Fifty-odd bindings at one size, one weight and one colour, in sections
+         whose headings were the same 9px grey as the hints under them. The key
+         is the thing a reader is scanning for -- nobody opens this panel to
+         read prose -- so the key gets a shape and a step up in weight, and the
+         sentence beside it stays the tone down it already was.
+
+         The section headings get the sun square rather than more letter
+         spacing, for the same reason: a marker is found at a glance and a
+         tracking change has to be read. Two accents, one meaning each; see the
+         token block at the top of this file. */
+      #helpfull { background: var(--panel); border-color: var(--edge); }
+      #helpfull h1 {
+        color: var(--ink-bright); font-size: 11px; font-weight: 700; letter-spacing: .3em;
+        margin-bottom: 2px;
+      }
+      #helpfull h2 {
+        display: flex; align-items: center; gap: 6px;
+        color: var(--sun); font-weight: 700; letter-spacing: .17em; font-size: 9px;
+      }
+      #helpfull h2::before {
+        content: ""; width: 6px; height: 6px; background: var(--sun); flex: 0 0 auto;
+      }
+      #helpfull kbd {
+        min-width: 0; margin-right: 8px; padding: 1px 6px;
+        color: var(--ink-bright); font-weight: 700;
+        box-shadow: inset 0 0 0 1px var(--edge);
+      }
+      /* The key column stops being a fixed 7em and becomes a shape, so a row is
+         `[ WASD ] move` rather than two columns of grey. The rows keep their
+         alignment from the flex line below rather than from the old min-width,
+         which was set to the longest key in the whole panel and left every
+         short one adrift in white space. */
+      #helpfull section div { display: flex; align-items: baseline; }
       /* A short window gets a wider panel, which is the opposite of what it
          sounds like: the sections wrap, so more width is fewer rows and fewer
          rows is a shorter panel. Three columns of five sections is 367 px tall,
@@ -2153,90 +2232,148 @@
          with an input in it. Styled to disappear into the rest: the field is a
          bottom rule rather than a box, the button is the effects chip's border
          at the effects chip's size, and neither has a corner radius. */
+      /* --- The join gate ------------------------------------------------
+         The first screen anybody sees, and until now a lowercase wordmark,
+         two tabs and a name box: it never said what the game *was*, so a
+         first-time player typed a name into a box with no idea they were about
+         to be dropped into sixty kilometres of Sydney. The copy the panel needs
+         is in the markup below; this is the shape of it.
+
+         Left-aligned rather than centred. Centring is what the panel did when
+         it was three short lines, and it is the reason everything since has had
+         to stay short: a centred column has no spine, so a sentence added to it
+         reads as an interruption. Ranged left, the wordmark, the pitch, the
+         field and the note all start on one line and the panel can carry a
+         paragraph without looking broken.
+
+         Every id, class and `data-join` here is `client/src/accounts.ts`'s and
+         is untouched -- this block changes how the gate looks and not one thing
+         about what it does. */
       #nameprompt {
         position: fixed; inset: 0; display: none; place-items: center;
-        background: rgba(11,13,16,.82);
-        -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+        background: var(--ground);
         z-index: 11;
       }
       #nameprompt.shown { display: grid; }
-      #nameprompt-inner { text-align: center; padding: 24px; max-width: 420px; }
+      #nameprompt-inner {
+        text-align: left; padding: 34px 30px; width: min(560px, calc(100vw - 40px));
+      }
+      /* The wordmark, at a size that admits this is the title screen. */
       #nameprompt-title {
-        font-size: 13px; letter-spacing: .55em; color: var(--ink-muted);
-        margin-bottom: 6px; text-transform: uppercase;
+        font-size: 46px; line-height: .96; font-weight: 700; letter-spacing: -.02em;
+        color: var(--ink-bright); margin-bottom: 0; text-transform: none;
       }
+      /* Purely presentational, and named so nothing in TypeScript is tempted to
+         reach for it. */
+      #nameprompt-place {
+        display: inline-block; margin-top: 10px;
+        font-size: var(--t-micro); letter-spacing: .3em; text-transform: uppercase;
+        color: var(--sun);
+      }
+      #nameprompt-rule { height: 3px; width: 74px; background: var(--sun); margin: 12px 0 18px; }
+      /* The sentence the screen did not have. */
+      #nameprompt-pitch {
+        font-size: 14px; line-height: 1.5; color: var(--ink-dim);
+        margin-bottom: 22px; max-width: 42ch;
+      }
+      #nameprompt-pitch b { color: var(--ink-bright); font-weight: 700; }
       #nameprompt-sub {
-        font-size: 11px; line-height: 1.7; color: #b9cbdb; margin-bottom: 22px;
+        font-size: var(--t-micro); letter-spacing: .15em; text-transform: uppercase;
+        line-height: 1.7; color: var(--ink-muted); margin-bottom: 10px;
       }
-      /* A class as well as the id, because the login pane needs the same row
-         and an id may appear once. The id is kept so the quick-play markup this
-         panel grew out of reads unchanged. */
-      #nameprompt-row, .nameprompt-row { display: flex; gap: 10px; align-items: stretch; justify-content: center; }
+      #nameprompt-row, .nameprompt-row { display: flex; gap: 8px; align-items: stretch; justify-content: flex-start; }
+      /* Recessed: darker than the panel, with the sun edge marking the one
+         field that wants your attention. */
       #nameprompt input {
-        font: inherit; font-size: 13px; letter-spacing: .08em;
-        color: var(--ink-bright); background: transparent; text-align: center;
-        border: 0; border-bottom: 1px solid rgba(207,226,242, .34);
-        padding: 6px 8px; width: 220px; outline: none;
+        font: inherit; font-size: 18px; font-weight: 700; letter-spacing: .02em;
+        color: var(--ink-bright); background: var(--recess); text-align: left;
+        border: 0; border-left: 3px solid var(--edge);
+        padding: 12px 14px; width: 240px; outline: none;
       }
-      #nameprompt input:focus { border-bottom-color: var(--ink); }
-      #nameprompt input::placeholder { color: var(--ink-faint); }
+      #nameprompt input:focus { border-left-color: var(--sun); }
+      #nameprompt input::placeholder { color: var(--ink-faint); font-weight: 400; }
+      /* Solid, not outlined. This is the button the whole screen exists for. */
       #nameprompt button {
-        font: inherit; font-size: 9px; letter-spacing: .16em; text-transform: uppercase;
-        color: var(--ink); background: transparent; cursor: pointer;
-        border: 1px solid rgba(207,226,242, .34); padding: 3px 14px;
+        font: inherit; font-size: 12px; letter-spacing: .12em; text-transform: uppercase;
+        font-weight: 700; color: var(--on-sun); background: var(--sun); cursor: pointer;
+        border: 0; padding: 3px 22px;
       }
-      #nameprompt button:hover { border-color: var(--ink); }
+      #nameprompt button:hover { background: #ffc451; }
+      #nameprompt button:focus-visible { outline: 2px solid var(--ink-bright); outline-offset: 2px; }
       #nameprompt-note, #account-note, #signedin-note {
-        font-size: 10px; color: var(--ink-faint); margin-top: 16px; line-height: 1.6;
+        font-size: var(--t-small); color: var(--ink-faint); margin-top: 14px; line-height: 1.6;
       }
       #nameprompt-note.bad, #account-note.bad { color: var(--warn); }
       #nameprompt-note.ok, #account-note.ok { color: #8fd9a0; }
 
+      /* The three facts that separate the two tabs, which were previously
+         stated only inside a pane you cannot see until you have already
+         chosen. Presentational; nothing reads it. */
+      #nameprompt-foot {
+        display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 26px;
+        padding-top: 18px; border-top: 1px solid var(--edge);
+      }
+      #nameprompt-foot span {
+        display: flex; align-items: center; gap: 7px;
+        font-size: var(--t-small); color: var(--ink-dim);
+      }
+      #nameprompt-foot span::before {
+        content: ""; width: 6px; height: 6px; background: var(--harbour); flex: 0 0 auto;
+      }
+
       /* --- The two ways in: quick play, or an account.
          Workstream G. `client/src/accounts.ts` drives all of it.
 
-         The tab strip is `#panel-tabs`' to the pixel -- same 9px uppercase,
-         same underline-on-selected, same `type="button"` -- rather than a new
-         idiom, because this document already has one way of saying "two views
-         of one panel" and a second would be a second thing to keep in step. The
-         difference is that these are centred, since the panel they sit in is. */
+         Filled blocks rather than the underlined strip this used to share with
+         `#panel-tabs`. The two panels are no longer the same kind of thing: the
+         suggestion box's tabs are four views of one screen you are already
+         looking at, and these two are a fork in the road taken once. A choice
+         that changes what the rest of the panel asks you for should look like a
+         choice, and an underline is the quietest possible way to show one. */
       #nameprompt-tabs {
-        display: flex; gap: 18px; justify-content: center; margin-bottom: 18px;
+        display: flex; gap: 2px; justify-content: flex-start; margin: 0 0 20px;
       }
       #nameprompt-tabs button {
-        font: inherit; font-size: 9px; letter-spacing: .16em; text-transform: uppercase;
-        color: var(--ink-faint); background: transparent; border: 0; border-bottom: 1px solid transparent;
-        padding: 3px 2px; cursor: pointer;
+        font: inherit; font-size: var(--t-small); letter-spacing: .1em; text-transform: uppercase;
+        font-weight: 700; color: var(--ink-muted); background: var(--chip); border: 0;
+        padding: 9px 15px; cursor: pointer;
       }
-      #nameprompt-tabs button.on { color: var(--ink); border-bottom-color: var(--ink); }
-      #nameprompt-tabs button:hover { color: #b9cbdb; }
+      #nameprompt-tabs button.on { color: var(--on-sun); background: var(--sun); }
+      #nameprompt-tabs button:hover:not(.on) { color: var(--ink); }
+      #nameprompt-tabs button:focus-visible { outline: 2px solid var(--ink-bright); outline-offset: -2px; }
       .joinpane { display: none; }
       .joinpane.on { display: block; }
       /* The login pane stacks where quick play is a row, because it has two
          fields and a row of three controls would be wider than the panel. */
       #nameprompt-login .field {
-        display: flex; flex-direction: column; align-items: center; gap: 2px; margin-bottom: 12px;
+        display: flex; flex-direction: column; align-items: flex-start; gap: 5px; margin-bottom: 12px;
       }
       #nameprompt-login label {
-        font-size: 9px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-faint);
+        font-size: var(--t-micro); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-muted);
       }
-      /* The signed-in line, in the corner of the panel. Small, quiet, and with
-         the log-out control as a text button rather than a bordered one: it is
-         a thing you should be able to find and not a thing anybody should press
-         by accident on their way into a game. */
-      /* Above the title rather than absolutely positioned in the corner of the
-         panel, which is where the first cut put it: the panel is 420px and
-         centred, so "the corner" was directly over the wordmark. In the flow it
-         is a line of its own and cannot collide with anything. */
+      #nameprompt-login input { font-size: 15px; width: 260px; }
+      /* The second button in the login pane is a mode switch, not an action:
+         `sign up instead` must not look like `log in`. Outlined, and quiet. */
+      #account-switch {
+        background: transparent; color: var(--ink-dim);
+        box-shadow: inset 0 0 0 1px var(--edge);
+      }
+      #account-switch:hover { background: transparent; color: var(--ink-bright); box-shadow: inset 0 0 0 1px var(--ink-faint); }
+      /* The signed-in line. Above the title rather than in the corner of the
+         panel, which is where the first cut put it: the panel is centred, so
+         "the corner" was directly over the wordmark. In the flow it is a line
+         of its own and cannot collide with anything. */
       #nameprompt-who {
-        text-align: right; margin-bottom: 8px;
-        font-size: 10px; color: var(--ink-muted); letter-spacing: .04em;
+        text-align: left; margin-bottom: 14px;
+        font-size: var(--t-small); color: var(--ink-muted); letter-spacing: .04em;
       }
       #nameprompt-who:empty { display: none; }
       #nameprompt-who button {
-        font: inherit; font-size: 10px; color: var(--ink); background: transparent;
+        font: inherit; font-size: var(--t-small); color: var(--ink); background: transparent;
         border: 0; padding: 0 0 0 6px; cursor: pointer; text-decoration: underline;
+        text-transform: none; letter-spacing: 0; font-weight: 400;
       }
+      #nameprompt-who button:hover { background: transparent; color: var(--ink-bright); }
 
       /* --- The feedback gate, in the two panels that need an account.
          Sits where the compose box would be; see `client/src/accounts.ts`. */
@@ -2513,16 +2650,53 @@
         background: var(--ground); z-index: 10; transition: opacity .22s ease;
       }
       #loading.hidden { opacity: 0; pointer-events: none; }
-      #loading-inner { text-align: center; max-width: 720px; padding: 24px; }
+      #loading-inner { text-align: left; max-width: 620px; padding: 24px; }
       #loading-title {
-        font-size: 13px; letter-spacing: .55em; color: var(--ink-muted);
-        margin-bottom: 18px; text-transform: uppercase;
+        font-size: 34px; line-height: 1; font-weight: 700; letter-spacing: -.02em;
+        color: var(--ink-bright); margin-bottom: 20px; text-transform: none;
       }
       #loading-text {
-        font-size: 12px; line-height: 1.7; color: #b9cbdb; white-space: pre-wrap;
+        font-size: 15px; line-height: 1.6; color: var(--ink); white-space: pre-wrap;
         text-align: left;
       }
-      #loading-text.error { color: var(--warn); }
+      #loading-text.error { color: var(--warn); font-size: 13px; }
+      /* --- A wait that can be told from a hang.
+         The screen used to be a wordmark over one line of text, and the report
+         that produced this was a player who sat in front of it long enough to
+         conclude his computer was broken. `groundProgressLine` had already made
+         the *words* honest -- "laying the ground — 4 of 11 tiles" -- but a line
+         of text that changes every few seconds is indistinguishable from a line
+         of text that has stopped, and nothing else on the screen moved.
+
+         Indeterminate on purpose. The honest number is in the line above it and
+         it counts to eleven; a bar pretending to know a percentage would be
+         inventing one. This one only claims that something is still happening,
+         which is the single fact the screen was failing to communicate.
+
+         Hidden under a fatal error: `fatal` writes into the same element and a
+         bar still sliding under "WebGPU is not available in this browser"
+         would be promising a wait that is never going to end. */
+      #loading-bar {
+        height: 3px; margin-top: 20px; background: var(--chip); overflow: hidden;
+      }
+      #loading-bar i {
+        display: block; height: 100%; width: 34%; background: var(--harbour);
+        animation: loading-sweep 1.5s ease-in-out infinite;
+      }
+      @keyframes loading-sweep {
+        0% { transform: translateX(-110%); }
+        100% { transform: translateX(330%); }
+      }
+      #loading-inner:has(#loading-text.error) #loading-bar { display: none; }
+      /* True since the world assets went into Cache Storage, and worth saying
+         out loud on the one screen where a slow machine is deciding whether
+         this game is worth a second try. */
+      #loading-note {
+        margin-top: 22px; padding-left: 12px; border-left: 3px solid var(--sun);
+        font-size: 12px; line-height: 1.6; color: var(--ink-dim); max-width: 46ch;
+      }
+      #loading-note b { color: var(--ink-bright); font-weight: 700; }
+      #loading-inner:has(#loading-text.error) #loading-note { display: none; }
       /* The way out of a lost graphics device. Only `Hud.recoverable` ever
          creates it, and only for an error a reload actually fixes -- a build
          that cannot run offers nothing to press, on purpose. Left-aligned with
@@ -2662,8 +2836,8 @@
          same eighteen strings with a loop around them. `hud.ts` only toggles a
          class on these two. -->
     <div id="help">
-      <div class="keys">wasd move · space jump · shift sprint</div>
-      <div class="keys">mouse look · left click bat · right click footy</div>
+      <div class="keys"><b>wasd</b> move · <b>space</b> jump · <b>shift</b> sprint</div>
+      <div class="keys"><b>mouse</b> look · <b>left click</b> bat · <b>right click</b> footy</div>
       <!-- The zoom is here, in the block nobody has to press anything to read,
            because the report that produced it was a player who could not find
            it: "cant zoom out anymore by scrolling". A control every game binds
@@ -2676,8 +2850,8 @@
            Sharing this line rather than taking its own, because the camera
            bindings beside it are the same kind of thing — something in your
            hand rather than a panel. See `main.ts`'s keydown listener. -->
-      <div class="keys">wheel zoom out · c third person · f torch · b your build</div>
-      <div class="more">h — all controls</div>
+      <div class="keys"><b>wheel</b> zoom out · <b>c</b> third person · <b>f</b> torch · <b>b</b> your build</div>
+      <div class="more"><b>h</b> — all controls</div>
       <!-- The box behind Escape grew two more tabs — what's new, and report a
            bug — and this line still said "suggestions", so the one panel in the
            game a player can file a bug from was named after a third of itself.
@@ -2691,17 +2865,17 @@
            and 363px, and it fits. See `client/src/suggestions.ts` for the three
            tabs it names and `#help.hidden` above for the two moments in a
            session it is not on the screen. -->
-      <div class="more wrap">esc — suggestions · what's new · report a bug · talents</div>
+      <div class="more wrap"><b>esc</b> — suggestions · what's new · report a bug · talents</div>
       <!-- The slots and the phone. Its own line for the same reason the escape
            line has one: a player has no way to discover that the number row
            does anything, and "3 phone" is the entry point to the wallet, the
            Centrelink list and the rideshare job all at once. See
            `client/src/phone.ts`. -->
-      <div class="more wrap">1 bat · 2 footy · 4 fists · shift+n off hand</div>
+      <div class="more wrap"><b>1</b> bat · <b>2</b> footy · <b>4</b> fists · <b>shift+n</b> off hand</div>
       <!-- `q` is on the always-on line rather than only in the full list,
            because a quest log a player has to go looking for is the problem it
            was added to solve. See `Phone.openObligations`. -->
-      <div class="more wrap">j — jobs · q — QuestBuddy · m — map</div>
+      <div class="more wrap"><b>j</b> — jobs · <b>q</b> — QuestBuddy · <b>m</b> — map</div>
     </div>
 
     <div id="helpfull">
@@ -2772,6 +2946,7 @@
         <div>on the second hill west of the kilns, 230 m from where you spawn</div>
         <div>the sun screams until sunset, for everyone on the server</div>
         <div>then it recharges for three days — that is three real hours</div>
+      </section>
       <!-- Its own section on `lime bikes`' argument exactly: a car is a topic a
            player looks up ("can I drive one of these"), not two more lines in
            `movement`. `e` appears in three sections now and that is correct —
@@ -3158,6 +3333,17 @@
         <!-- "playing as Bazza · log out", written by `JoinGate.paint`. -->
         <div id="nameprompt-who"></div>
         <div id="nameprompt-title">Sydney</div>
+        <!-- Presentational, all three of these, and named so that nothing in
+             `accounts.ts` is tempted to reach for them. The panel had a
+             wordmark and a name box and never once said what it was: the one
+             sentence below is the whole of the pitch a first-time player got,
+             and it did not exist. -->
+        <div id="nameprompt-place">NSW &middot; Australia</div>
+        <div id="nameprompt-rule"></div>
+        <div id="nameprompt-pitch">
+          Sixty kilometres of Greater Sydney, to the metre.
+          <b>Grab a bat, take a car, and meet whoever else is on.</b>
+        </div>
         <div id="nameprompt-tabs" role="tablist">
           <button class="on" type="button" data-join="quick" role="tab">quick play</button>
           <button type="button" data-join="account" role="tab">log in / sign up</button>
@@ -3210,6 +3396,16 @@
           </div>
           <div id="account-note">handles are unique · there is no password reset</div>
         </section>
+        <!-- What actually separates the two tabs, which was previously stated
+             only inside the pane you cannot see until you have already chosen:
+             `your level and your cash are on this account` lives in the
+             signed-in pane. A player deciding between quick play and an account
+             could not read the one line that would decide it for them. -->
+        <div id="nameprompt-foot">
+          <span>No download</span>
+          <span>No account needed to play</span>
+          <span>Make one and your level and cash keep</span>
+        </div>
       </div>
     </div>
 
@@ -3217,6 +3413,14 @@
       <div id="loading-inner">
         <div id="loading-title">Sydney</div>
         <div id="loading-text">Starting renderer&hellip;</div>
+        <!-- Both presentational and both hidden under a fatal error by the
+             `:has` rules in the stylesheet; nothing in TypeScript touches
+             either. See the comment on `#loading-bar`. -->
+        <div id="loading-bar"><i></i></div>
+        <div id="loading-note">
+          The first visit is the slow one &mdash; <b>the city is kept on disk after this</b>,
+          so the next one starts in seconds.
+        </div>
       </div>
     </div>
 
