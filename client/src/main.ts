@@ -113,6 +113,8 @@ import { AsyncPipelines, verifyAsyncPipes } from './world/asyncpipes.ts';
 import { verifyTilePriority } from './world/tilepriority.ts';
 import { verifyPointable } from './waypoint.ts';
 import { verifySuspension } from './game/suspension.ts';
+import { verifyRadio } from './game/radio.ts';
+import { CarRadio, verifyCarRadio } from './carradio.ts';
 import type { PipelineHost } from './world/asyncpipes.ts';
 // WORKSTREAM AB: where the browser frame goes. One import block and one
 // `FrameProfile` in the loop's closure; every `frame.at(FSEC.x)` below is a
@@ -5083,6 +5085,8 @@ async function main(): Promise<void> {
     ...verifyTilePriority(),
     ...verifyPointable(),
     ...verifySuspension(),
+    ...verifyRadio(),
+    ...verifyCarRadio(),
     ...verifyMandala(),
     ...verifyQuestAim(),
     ...verifyQuestAreas(),
@@ -10316,6 +10320,14 @@ async function main(): Promise<void> {
   const stalls = new StallRing();
   const boundaries = new BoundaryLog(streamer.tileSize);
   /** The previous frame's facts, so a stall can be described by what caused it. */
+  /**
+   * The car radio. See `carradio.ts` for why it is one bare `<audio>` element
+   * and `game/radio.ts` for why the list is six stations of ABC and Sydney
+   * community rather than anything commercial.
+   */
+  const carRadio = new CarRadio();
+  /** Whether the player was in a car last frame, for the radio's edge. */
+  let radioWasDriving = false;
   const prev = { compiles: 0, tiles: 0, sheets: 0, crossed: '', speed: 0, steps: 0 };
   /**
    * The longest `longtask` the browser has reported, and when it ended.
@@ -10598,6 +10610,22 @@ async function main(): Promise<void> {
      * mesh's own node graph, so two tiles' trees genuinely need two shaders --
      * but nothing says they must all be built in the same frame.
      */
+    /*
+     * The radio, on the edge of `drivingCar` rather than at the three places a
+     * car can be got into or out of. Two comparisons a frame against three call
+     * sites that would each have to remember; and the fourth way to end up out
+     * of a car -- the car being destroyed under you -- goes through none of
+     * them, which is exactly the sort of thing an edge catches and a hook does
+     * not. `Math.random` because a radio is cosmetic and client-only; nothing
+     * here is evaluated on both ends.
+     */
+    const radioDriving = playerCombat.drivingCar !== 0;
+    if (radioDriving !== radioWasDriving) {
+      radioWasDriving = radioDriving;
+      if (radioDriving) carRadio.enter(Math.random());
+      else carRadio.leave();
+    }
+
     asyncPipes.frame();
     frameProfile.begin();
     frameProfile.at(FSEC.input);

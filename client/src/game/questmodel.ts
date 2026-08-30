@@ -1301,6 +1301,29 @@ export function reconcileCursor(cursor: QuestCursor, quest: Quest): boolean {
   }
   let s = 0;
   while (s < want && (cursor.c[s] ?? 0) >= stepTarget(quest.steps[s])) s++;
+  /*
+   * **A cursor never goes backwards, and this clause is the whole of why.**
+   *
+   * The scan above derives the open step from the counters alone, from step
+   * zero, every time the pack revision changes -- and the pack changes under
+   * live players by design, every five minutes, from GitHub. So any edit that
+   * raises a step's target rewrites history: a player who earned $40 of $40 and
+   * moved on is, the moment an author makes it $60, back on that leg with $40
+   * of $60 showing. The owner's report was "quests keep forgetting where I'm up
+   * to and sending me to earlier legs", and a regenerated pack -- which is how
+   * all 1,989 of these are authored -- moves a lot of targets at once.
+   *
+   * Progress is the player's, not the pack's. Content may *extend* a quest and
+   * a longer quest correctly stops being `done`; it may not un-complete work
+   * somebody has already done. So the derived step is a floor and the stored
+   * one wins when it is further along, clamped to the steps that now exist so a
+   * quest that lost a step cannot leave a cursor pointing past its own end.
+   *
+   * The cost is a player who keeps a step they would now have to redo, which is
+   * the right way round: the alternative is the one that made somebody drive to
+   * Redfern twice.
+   */
+  if (s < cursor.s) s = Math.min(cursor.s, want);
   const done = s >= want;
   if (cursor.s !== s || cursor.d !== done) {
     cursor.s = s;
@@ -1629,6 +1652,48 @@ export function clampImprov(raw: unknown): string {
  */
 export function verifyQuests(): string[] {
   const failures: string[] = [];
+
+  // --- A content edit may extend a quest. It may not rewind a player.
+  //
+  // The pack changes under live players every five minutes, and `reconcile`
+  // re-derives the open step from the counters alone. Before this was a floor,
+  // raising any step's target sent everyone on that quest back to it -- which
+  // is what "quests keep forgetting where I'm up to and sending me to earlier
+  // legs" looked like from the inside, and a regenerated pack moves a lot of
+  // targets at once.
+  {
+    const step = (dollars: number): QuestStep =>
+      ({ kind: STEP_KIND.EARN, dollars, text: 'earn' }) as unknown as QuestStep;
+    const quest = (targets: number[]): Quest =>
+      ({ id: 'q', steps: targets.map(step) }) as unknown as Quest;
+
+    // Earned $40 of $40 and moved on; an author makes it $60.
+    const cursor = { s: 1, c: [40, 0], d: false };
+    reconcileCursor(cursor, quest([60, 10]));
+    if (cursor.s < 1) {
+      failures.push(
+        `raising a step's target walked the cursor back to step ${cursor.s}; a content edit rewrote ` +
+          `work the player had already done.`,
+      );
+    }
+
+    // Forward is still allowed: a counter that now meets its target advances.
+    const ahead = { s: 0, c: [10, 0], d: false };
+    reconcileCursor(ahead, quest([5, 10]));
+    if (ahead.s !== 1) failures.push(`a satisfied step did not advance the cursor (s=${ahead.s}).`);
+
+    // A quest that lost a step must not leave the cursor past its own end.
+    const shrunk = { s: 5, c: [1, 1, 1, 1, 1], d: true };
+    reconcileCursor(shrunk, quest([1, 1]));
+    if (shrunk.s > 2) failures.push(`a shortened quest left the cursor at step ${shrunk.s} of 2.`);
+    if (!shrunk.d) failures.push('a cursor past the end of a shortened quest was not marked done.');
+
+    // And a quest that gained one correctly stops being done.
+    const grew = { s: 2, c: [1, 1], d: true };
+    reconcileCursor(grew, quest([1, 1, 1]));
+    if (grew.d) failures.push('a quest that gained a step stayed done; the new leg would never be offered.');
+    if (grew.s !== 2) failures.push(`a quest that gained a step moved the cursor to ${grew.s}, not 2.`);
+  }
 
   // --- THE MERGE PARSES AT THE SCALE THE SERVER ACTUALLY SERVES IT.
   //
