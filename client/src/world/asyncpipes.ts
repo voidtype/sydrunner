@@ -464,6 +464,32 @@ export class AsyncPipelines {
       if (sink.length > 0) {
         this.started += sink.length;
         this.note(renderObject);
+        /*
+         * **Nothing awaits these, so something has to catch them.**
+         *
+         * Handing three an array is what routes a frame's compile to
+         * `createRenderPipelineAsync`, and not awaiting the result is the whole
+         * point -- the pipeline object is cached synchronously and the draw
+         * guard decides when it is usable. But a promise with no handler that
+         * rejects is an unhandled rejection, and the day they all reject at once
+         * is the day the GPU goes away:
+         *
+         *     WebGPU Device Lost: A valid external Instance reference no longer
+         *     exists.
+         *     Uncaught (in promise) OperationError: Instance dropped in
+         *     popErrorScope        (x25, x19, x13, x13, x6 ...)
+         *
+         * Tabbing back after thirteen seconds lost the device, every in-flight
+         * creation rejected, and this line was every stack in the wall. It did
+         * not cause the loss; it turned one failure into fifty and buried the
+         * event that mattered. A no-op catch costs nothing and keeps the console
+         * readable on the one occasion anybody needs to read it.
+         */
+        for (const p of sink) {
+          if (p !== null && typeof p === 'object' && typeof (p as { catch?: unknown }).catch === 'function') {
+            void (p as Promise<unknown>).catch(() => {});
+          }
+        }
       }
       if (pipeline !== null && pipeline !== undefined) this.seen.add(pipeline);
       return pipeline;
