@@ -2746,6 +2746,14 @@ export class TileStreamer implements LampSource {
       resident: this.loaded.size,
       loading: this.loading.size,
       /**
+       * Fetches asked to stand down so the tile under the player could take the
+       * link. On the overlay's stats rather than only the build report, because
+       * this is the one number that says the priority pair is doing anything:
+       * zero of them across a long drive means the hold-back never fired, which
+       * is the whole feature not working. See `world/tilepriority.ts`.
+       */
+      cancelled: this.cancelledLoads,
+      /**
        * WORKSTREAM AJ: ground sheets standing, and how many this session built.
        *
        * The pair says whether the ground is actually leading. `ground` should
