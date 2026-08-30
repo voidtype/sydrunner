@@ -758,6 +758,36 @@ export class Hud {
    */
   private loadingLocked = false;
 
+  /**
+   * A fatal error the player can actually do something about.
+   *
+   * `fatal` is for a build that cannot run: a missing self-check, an atlas too
+   * big for the GPU, no WebGPU at all. Nothing the player does will change any
+   * of those, so it correctly offers nothing to press. A lost graphics device is
+   * the opposite -- the page is fine, the account is fine, and a reload fixes it
+   * completely -- so it gets the same overlay with a way out attached.
+   *
+   * The button is created once and reused, because this can fire twice: a device
+   * can be lost while the reload the first loss armed is still waiting for the
+   * player to come back to the tab. See `devicelost.ts`.
+   */
+  recoverable(message: string, label: string, onAction: () => void): void {
+    this.fatal(message);
+    if (this.actionButton === null) {
+      const b = document.createElement('button');
+      b.id = 'loading-action';
+      b.type = 'button';
+      this.loadingText.insertAdjacentElement('afterend', b);
+      this.actionButton = b;
+    }
+    this.actionButton.textContent = label;
+    this.actionButton.onclick = onAction;
+    this.actionButton.style.display = '';
+  }
+
+  /** The button `recoverable` shows, made once. */
+  private actionButton: HTMLButtonElement | null = null;
+
   fatal(message: string): void {
     this.loadingLocked = true;
     this.loading.classList.remove('hidden');

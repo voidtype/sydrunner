@@ -113,6 +113,7 @@
  */
 
 import { admits, blendHeading, cancels, priorityTiles, type SlotFacts } from './tilepriority.ts';
+import { retireGroup, type ReclaimObject } from './pipereclaim.ts';
 import {
   Box3,
   BufferAttribute,
@@ -5129,6 +5130,18 @@ export class TileStreamer implements LampSource {
  * other material in this loop.
  */
 function releaseGroupGeometry(group: Group): void {
+  // **Before the loop**, while the children are still on the group: at the
+  // abandoned-build site below this is followed by `group.clear()`, and a
+  // reclaimer handed an empty group would queue nothing and leak everything.
+  //
+  // Three releases a render object -- and with it a pipeline, a bind group and
+  // a compiled node graph -- only when its *material* is disposed, and the
+  // materials here are shared world-wide and must never be. So every tile this
+  // function has ever freed left its render objects behind, one per instanced
+  // mesh per pass, for the whole session. See `world/pipereclaim.ts`, which
+  // takes them three frames from now, once nothing can still be submitting
+  // against their buffers.
+  retireGroup(group as unknown as ReclaimObject);
   for (const child of group.children) {
     const mesh = child as Mesh;
     if (!mesh.isMesh) continue;

@@ -170,6 +170,9 @@ import { verifyTalentLive } from '../client/src/game/talentlive.ts';
 // lamp, and an accuracy curve at the ground officers' floor is free damage from
 // something a player cannot fight. See `client/src/game/polair.ts`.
 import { verifyPolair } from '../client/src/game/polair.ts';
+import { verifyAsyncPipes } from '../client/src/world/asyncpipes.ts';
+import { verifyPipeReclaim } from '../client/src/world/pipereclaim.ts';
+import { verifyDeviceLost } from '../client/src/devicelost.ts';
 // --- Workstream E. Three self-checks, all three of them shared modules being
 // run in the second runtime -- which is the premise this whole block exists to
 // test. See the comment above the list.
@@ -448,6 +451,25 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // back at a different hour on every host. See `game/teamfx.ts`.
     ['verifyTeamFx', [...verifyTeamFx(), ...verifyAbilities(), ...verifyTalentLive()]],
     ['verifyPolair', verifyPolair()],
+    /*
+     * The three render-lifetime checks, run **here** for a reason none of the
+     * rest of this list has: they had no way to fail a deploy.
+     *
+     * All three are pure and import nothing from three -- a renderer is a
+     * literal with a `createRenderObject` on it, a render object is something
+     * with a `dispose` -- so this process can run them, and once it can, the
+     * deploy gate does. That matters because the alternative has now happened:
+     * raising the compile gate's admit floor left two of `verifyAsyncPipes`'
+     * bounds stale, the client called `hud.fatal` at boot and refused to start,
+     * the box booted perfectly and answered `/health`, and the build shipped.
+     * A check that only runs in the browser is a check the deploy cannot see.
+     *
+     * See `client/src/world/asyncpipes.ts`, `world/pipereclaim.ts` and
+     * `client/src/devicelost.ts`.
+     */
+    ['verifyAsyncPipes', verifyAsyncPipes()],
+    ['verifyPipeReclaim', verifyPipeReclaim()],
+    ['verifyDeviceLost', verifyDeviceLost()],
     // --- WORKSTREAM V. `verifyTeams` is the contract's own and is here for a
     // reason the rest of this list does not have: it is a **spelling** check.
     // The owner's instruction was *"always follow the capitalisation Marita and

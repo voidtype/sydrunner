@@ -2523,6 +2523,20 @@
         text-align: left;
       }
       #loading-text.error { color: var(--warn); }
+      /* The way out of a lost graphics device. Only `Hud.recoverable` ever
+         creates it, and only for an error a reload actually fixes -- a build
+         that cannot run offers nothing to press, on purpose. Left-aligned with
+         the message above it rather than centred under it, because the message
+         is left-aligned and a lone centred button under left-aligned text reads
+         as belonging to something else. */
+      #loading-action {
+        display: block; margin: 18px auto 0 0; padding: 9px 18px; cursor: pointer;
+        font: inherit; font-size: 12px; letter-spacing: .04em;
+        color: var(--ground); background: var(--ink-bright);
+        border: 0; border-radius: 3px;
+      }
+      #loading-action:hover { background: #fff; }
+      #loading-action:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
     </style>
   </head>
   <body>

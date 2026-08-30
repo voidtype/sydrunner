@@ -110,6 +110,8 @@ import {
 } from './world/warmup.ts';
 import { ShadowWarm, ShadowSweep, verifyShadowWarm } from './world/shadowwarm.ts';
 import { AsyncPipelines, budgetFor, verifyAsyncPipes } from './world/asyncpipes.ts';
+import { PipelineReclaim, setActiveReclaim, verifyPipeReclaim } from './world/pipereclaim.ts';
+import { lostMessage, lostPlan, verifyDeviceLost } from './devicelost.ts';
 import { verifyTilePriority } from './world/tilepriority.ts';
 import { verifyPointable } from './waypoint.ts';
 import { verifySuspension } from './game/suspension.ts';
@@ -1822,6 +1824,25 @@ async function main(): Promise<void> {
   }
 
   /**
+   * And the other end of a pipeline's life.
+   *
+   * The gate above decides how fast pipelines may be *built*; nothing until now
+   * decided when any of them were given back. Three frees a render object only
+   * on its material's dispose event, our materials are shared world-wide and are
+   * correctly never disposed, and every tile the player drives through therefore
+   * leaves its pipelines in the chain map for the rest of the session -- 8,183
+   * of them after a five-minute drive, which is what was still holding the GPU
+   * when a backgrounded tab came back to a dead device. See
+   * `world/pipereclaim.ts`; the streamer hands evicted groups over through the
+   * module handle set here.
+   */
+  const pipeReclaim = new PipelineReclaim();
+  if (!pipeReclaim.install(renderer as unknown as { _objects?: { createRenderObject?: (...a: unknown[]) => unknown } })) {
+    console.warn('[render] the pipeline reclaimer did not install; evicted tiles will keep their pipelines.');
+  }
+  setActiveReclaim(pipeReclaim);
+
+  /**
    * Intercept the one call in three that has crashed this client three times.
    *
    * Installed here and not earlier because `renderer._textures` does not exist
@@ -1875,6 +1896,53 @@ async function main(): Promise<void> {
   if (device) {
     device.addEventListener('uncapturederror', (event) => {
       hud.gpuError((event as GPUUncapturedErrorEvent).error.message);
+    });
+    /*
+     * And the failure that had no listener at all.
+     *
+     * "when i tabbed back, the game crashed" was a lost WebGPU device, and the
+     * reason it read as a crash is that nothing was watching this promise: three
+     * kept calling into a dead backend, every submission rejected into a console
+     * nobody opens, and the player got a still frame with a stopped clock.
+     *
+     * There is no recovering a scene onto a new device -- every texture, buffer
+     * and pipeline belonged to the old one -- so the response is to say what
+     * happened and reload. `devicelost.ts` holds the decision and the words; the
+     * three things that can only be done here are stopping the animation loop
+     * (which otherwise spends the next minute submitting to a dead queue),
+     * knowing whether the page is on its way out, and waiting for a hidden tab
+     * to come back before reloading into a room nobody is looking at.
+     */
+    let deliberate = false;
+    const goingAway = (): void => {
+      deliberate = true;
+    };
+    window.addEventListener('pagehide', goingAway);
+    window.addEventListener('beforeunload', goingAway);
+    void device.lost.then((info) => {
+      const plan = lostPlan(String(info.reason ?? 'unknown'), deliberate, !document.hidden);
+      if (!plan.show) return;
+      // First, and before anything paints: every frame from here is a
+      // submission to a queue that will never run it.
+      try {
+        renderer.setAnimationLoop(null);
+      } catch {
+        // A renderer too far gone to stop is still a renderer we are leaving.
+      }
+      const reload = (): void => {
+        window.location.reload();
+      };
+      hud.recoverable(lostMessage(plan), plan.action, reload);
+      if (!plan.reload) return;
+      if (plan.whenVisible) {
+        document.addEventListener(
+          'visibilitychange',
+          () => {
+            if (!document.hidden) reload();
+          },
+          { once: true },
+        );
+      }
     });
     // Guard the one limit this project is likely to exceed. The facade parameter
     // atlas is sized against it, so a mismatch should say so plainly.
@@ -1996,6 +2064,7 @@ async function main(): Promise<void> {
     sky,
     streamer,
     index,
+    pipeReclaim,
     /** Which boot stage is outstanding. `'ready'` once the loop is running. */
     boot: 'warming shaders',
   };
@@ -5082,6 +5151,8 @@ async function main(): Promise<void> {
     ...verifyTripPass(),
     ...verifyShadowWarm(),
     ...verifyAsyncPipes(),
+    ...verifyPipeReclaim(),
+    ...verifyDeviceLost(),
     ...verifyTilePriority(),
     ...verifyPointable(),
     ...verifySuspension(),
@@ -10585,6 +10656,7 @@ async function main(): Promise<void> {
           ` over ${pipelineWatch.frames} frame(s), worst ${pipelineWatch.worstMs.toFixed(0)} ms` +
           `  |  compiles ${asyncPipes.compiles} over ${asyncPipes.distinct} keys, ${asyncPipes.objects} objects` +
           `, ${asyncPipes.deferrals} deferred (${asyncPipes.budgetState()})` +
+          `  |  ${pipeReclaim.state()}` +
           `  |  ${asyncPipes.drift()}` +
           `  |  worst: ${asyncPipes.top(3)}` +
           `\n[stalls] ${s.line}  |  floor ${stalls.baseline().toFixed(1)} ms  |  sydney.stalls() for the table`,
@@ -10635,6 +10707,9 @@ async function main(): Promise<void> {
     // player ended up parked in the amber hatch deciding his computer was the
     // problem. See `asyncpipes.budgetFor`.
     asyncPipes.frame(budgetFor(stalls.medianFrameMs()));
+    // Here, and not lower: disposing a render object frees its binding buffers,
+    // and the top of the frame is the one moment nothing is mid-submission.
+    pipeReclaim.frame();
     frameProfile.begin();
     frameProfile.at(FSEC.input);
     input.forward = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
