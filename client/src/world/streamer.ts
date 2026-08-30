@@ -112,7 +112,7 @@
  * this closes.
  */
 
-import { admits, cancels, priorityTiles, type SlotFacts } from './tilepriority.ts';
+import { admits, blendHeading, cancels, priorityTiles, type SlotFacts } from './tilepriority.ts';
 import {
   Box3,
   BufferAttribute,
@@ -1063,6 +1063,15 @@ export class TileStreamer implements LampSource {
   /** Where the camera was last frame, for a heading. */
   private lastCamX: number | null = null;
   private lastCamZ: number | null = null;
+  /**
+   * The smoothed heading, in metres per frame.
+   *
+   * One frame of a car on a rough surface swings several degrees, and the
+   * nomination follows it -- which spends the one slot that outranks everything
+   * on churn between two tiles. See `tilepriority.HEADING_BLEND`.
+   */
+  private headX = 0;
+  private headZ = 0;
 
   private readonly loadRadius: number;
   private readonly concurrency: number;
@@ -3152,11 +3161,31 @@ export class TileStreamer implements LampSource {
     const stepZ = this.lastCamZ === null ? 0 : cam.z - this.lastCamZ;
     this.lastCamX = cam.x;
     this.lastCamZ = cam.z;
+    const blended = blendHeading(this.headX, this.headZ, stepX, stepZ);
+    this.headX = blended.x;
+    this.headZ = blended.z;
     // Metres per second off a nominal 60 Hz, because the streamer is handed a
     // camera and not a frame delta. Only the `MOVING_MPS` threshold reads it,
     // and a threshold does not need a better clock than that.
     const speed = Math.sqrt(stepX * stepX + stepZ * stepZ) * 60;
-    const pair = priorityTiles(this.index.tiles, cam.x, cam.z, stepX, stepZ, speed);
+    /*
+     * `loaded` is what makes the prediction *chain*. The march walks along the
+     * heading and takes the first tile that is not here yet, so the moment one
+     * lands the next one along is nominated on the same frame -- the owner's
+     * "download the best next tile, and as soon as that's done, do the next"
+     * -- with no queue to keep and nothing to drain. `building` counts as here:
+     * a tile whose bytes have arrived and is waiting on the build budget does
+     * not want asking for again.
+     */
+    const pair = priorityTiles(
+      this.index.tiles,
+      cam.x,
+      cam.z,
+      this.headX,
+      this.headZ,
+      speed,
+      (key) => this.loaded.has(key) || this.building.has(key),
+    );
     const outstanding = (key: string | null): boolean =>
       key !== null && !this.loaded.has(key) && !this.building.has(key);
     const priorityOutstanding = outstanding(pair.current) || outstanding(pair.next);

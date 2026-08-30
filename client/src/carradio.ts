@@ -34,8 +34,23 @@
 
 import { STATIONS, stationAt, stationFor, type Station } from './game/radio.ts';
 
-/** How loud the radio sits under everything else. */
-const RADIO_VOLUME = 0.55;
+/**
+ * How loud the radio sits under everything else, at full fade-in.
+ *
+ * 30% down on the 0.55 it shipped at, on the owner's ear: a car radio is
+ * something you hear the city over, not something that replaces it.
+ */
+const RADIO_VOLUME = 0.385;
+
+/**
+ * How long the fade takes in each direction, seconds.
+ *
+ * A stream that starts at full volume the instant a door shuts is a jump-scare,
+ * and one that stops dead is worse -- an Icecast mount cut mid-word reads as a
+ * bug rather than as getting out of a car. A second either way is long enough
+ * to feel deliberate and short enough that nobody waits for it.
+ */
+const FADE_S = 1;
 
 export class CarRadio {
   private readonly el: HTMLAudioElement | null;
@@ -43,6 +58,18 @@ export class CarRadio {
   /** Stations tried since the last successful `enter`, to stop a dead-air loop. */
   private tried = 0;
   private on = false;
+  /** The fade, 0..1, as a fraction of `RADIO_VOLUME`. */
+  private level = 0;
+  private target = 0;
+  /**
+   * Set while a fade-out is still running, so the hang-up waits for silence.
+   *
+   * Dropping `src` the moment the player steps out would cut the stream mid-fade
+   * and make the fade pointless; keeping the connection open forever after would
+   * be the bug the header is about. So the disconnect is what happens at the
+   * *end* of the fade, and this is the flag that remembers one is owed.
+   */
+  private hangUp = false;
 
   constructor(doc: Document = document) {
     if (typeof doc.createElement !== 'function') {
@@ -54,7 +81,7 @@ export class CarRadio {
     // available later without a silent failure.
     el.crossOrigin = 'anonymous';
     el.preload = 'none';
-    el.volume = RADIO_VOLUME;
+    el.volume = 0;
     el.addEventListener('error', () => {
       // Dark mount. Move along rather than sit on it, but only a lap's worth --
       // a player with no network would otherwise generate one request per
@@ -79,16 +106,47 @@ export class CarRadio {
     if (this.el === null || this.on) return;
     this.on = true;
     this.tried = 0;
+    this.hangUp = false;
+    this.target = 1;
     this.tune(stationFor(roll));
   }
 
-  /** Get out. Drops the connection rather than pausing it -- see the header. */
+  /**
+   * Get out. Fades down, then drops the connection -- see the header on why the
+   * disconnect matters and `FADE_S` on why it waits.
+   */
   leave(): void {
     if (this.el === null || !this.on) return;
     this.on = false;
-    this.el.pause();
-    this.el.removeAttribute('src');
-    this.el.load();
+    this.target = 0;
+    this.hangUp = true;
+  }
+
+  /**
+   * One frame of fade. Called from the frame loop.
+   *
+   * A linear ramp rather than the exponential ease used everywhere else in this
+   * codebase, and for one reason: an exponential never actually reaches its
+   * target, so the hang-up at the bottom of a fade-out would never fire and the
+   * connection would stay open at an inaudible volume forever.
+   */
+  update(dt: number): void {
+    const el = this.el;
+    if (el === null) return;
+    if (this.level !== this.target) {
+      const rate = dt > 0 ? dt / FADE_S : 1;
+      this.level =
+        this.level < this.target
+          ? Math.min(this.target, this.level + rate)
+          : Math.max(this.target, this.level - rate);
+      el.volume = this.level * RADIO_VOLUME;
+    }
+    if (this.hangUp && this.level <= 0) {
+      this.hangUp = false;
+      el.pause();
+      el.removeAttribute('src');
+      el.load();
+    }
   }
 
   /** Next station, wrapping. A player pressing this has cleared the dead-air count. */
@@ -156,12 +214,38 @@ export function verifyCarRadio(): string[] {
   radio.next();
   if (radio.nowPlaying?.name !== STATIONS[1].name) failures.push('the dial did not advance.');
 
+  // --- The fade in.
+  //
+  // It starts silent and arrives at the reduced ceiling, not at 1. A radio that
+  // starts at full volume the instant a door shuts is a jump-scare.
+  if ((el.volume as number) !== 0) failures.push(`the radio started at volume ${String(el.volume)} rather than silent.`);
+  const frame = 1 / 60;
+  for (let i = 0; i < 30; i++) radio.update(frame);
+  const half = el.volume as number;
+  if (half <= 0 || half >= 0.385) failures.push(`half a second into the fade the volume was ${half}; it is not ramping.`);
+  for (let i = 0; i < 40; i++) radio.update(frame);
+  if (Math.abs((el.volume as number) - 0.385) > 1e-9) {
+    failures.push(`after a full fade the volume was ${String(el.volume)}, not the 0.385 ceiling.`);
+  }
+
   radio.leave();
   if (radio.nowPlaying !== null) failures.push('the radio kept playing after the player got out.');
+  // **The hang-up waits for silence.** Cutting the stream on the frame the
+  // player steps out makes the fade pointless; never cutting it is the bug the
+  // header is about. So mid-fade the source is still there and still audible.
+  radio.update(frame);
+  if (el.src === '') failures.push('the stream was cut on the first frame of the fade-out; the fade does nothing.');
+  if ((el.volume as number) >= 0.385) failures.push('the fade-out did not start.');
+  for (let i = 0; i < 90; i++) radio.update(frame);
+  if ((el.volume as number) !== 0) failures.push(`the fade-out stalled at ${String(el.volume)}.`);
   // Pausing is not hanging up: a paused element on a live mount keeps pulling
   // bytes. `src` must be gone and the element reloaded.
-  if (el.src !== '') failures.push('leaving the car left a source on the element; it keeps downloading.');
-  if ((el.loaded as number) < 1) failures.push('leaving the car did not `load()`; the connection stays open.');
+  if (el.src !== '') failures.push('the fade finished but the source is still attached; it keeps downloading.');
+  if ((el.loaded as number) < 1) failures.push('the fade finished without a `load()`; the connection stays open.');
+  // And the hang-up happens once, not every frame after.
+  const loadsAfter = el.loaded as number;
+  for (let i = 0; i < 10; i++) radio.update(frame);
+  if ((el.loaded as number) !== loadsAfter) failures.push('the element is being reloaded every frame after the fade.');
 
   // A play() that rejects -- the autoplay policy -- must not throw.
   el = make();

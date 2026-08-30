@@ -10625,6 +10625,10 @@ async function main(): Promise<void> {
       if (radioDriving) carRadio.enter(Math.random());
       else carRadio.leave();
     }
+    // The fade, every frame either way -- a fade-out is still running for a
+    // second after the edge that started it, and the hang-up is what happens at
+    // the end of it. See `carradio.FADE_S`.
+    carRadio.update(frameDt);
 
     asyncPipes.frame();
     frameProfile.begin();
