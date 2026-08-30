@@ -2350,6 +2350,12 @@
       #nameprompt-foot span::before {
         content: ""; width: 6px; height: 6px; background: var(--harbour); flex: 0 0 auto;
       }
+      /* Not for somebody who already has an account. Every line of it argues a
+         decision they have made -- `no account needed to play`, `make one and
+         your level and cash keep` -- and arguing it again under a `play as
+         Bazza` button is the same mistake the tab strip was making one element
+         up. See `JoinGate.applyPanes`. */
+      #nameprompt-inner:has(#nameprompt-signedin.on) #nameprompt-foot { display: none; }
 
       /* --- The two ways in: quick play, or an account.
          Workstream G. `client/src/accounts.ts` drives all of it.
