@@ -1853,6 +1853,34 @@ async function main(): Promise<void> {
    * gets asked. See `asyncpipes.isBuilding`.
    */
   pipeReclaim.setBusyProbe((renderObject) => asyncPipes.isBuilding(renderObject));
+  /*
+   * **And whether it ever drew at all**, which is the guard the black screen
+   * asked for.
+   *
+   * `Bindings.deleteForRender` decrements a shared bind group's `usedTimes`
+   * whatever happens; `Bindings._createBindings` only increments it for a
+   * render object that reached `getForRender`. The gate above declines
+   * thousands of draws a session -- `6250 deferred` on the ride that produced
+   * this -- and every declined draw leaves a render object whose bindings were
+   * never initialised. Disposing one takes a reference it never held, a uniform
+   * buffer other objects are still using is destroyed under them, and the next
+   * frame to write to it throws `parameter 1 is not of type 'GPUBuffer'` from
+   * somebody else's draw. Hence a black screen rather than one missing thing.
+   *
+   * `initialized` is the flag three itself sets in `getForRender`, so this asks
+   * the same question three answers, in the same place it stores the answer.
+   */
+  const bindingsOf = (renderer as unknown as {
+    _bindings?: { get?: (o: unknown) => { initialized?: boolean } };
+  })._bindings;
+  pipeReclaim.setDrawnProbe((renderObject) => {
+    if (bindingsOf === undefined || typeof bindingsOf.get !== 'function') return false;
+    try {
+      return bindingsOf.get(renderObject).initialized === true;
+    } catch {
+      return false;
+    }
+  });
   setActiveReclaim(pipeReclaim);
 
   /**

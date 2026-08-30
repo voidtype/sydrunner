@@ -2326,6 +2326,10 @@
          their own hover, two rules down. */
       #nameprompt button:not(#nameprompt-tabs button):hover { background: #ffc451; }
       #nameprompt button:focus-visible { outline: 2px solid var(--ink-bright); outline-offset: 2px; }
+      /* The one action on the signed-in pane, and the whole point of it. Bigger
+         than the tab strip above it by a clear step, so "play as Bazza" is what
+         the eye lands on rather than a way back to being a stranger. */
+      #account-play { font-size: 14px; padding: 11px 30px; letter-spacing: .1em; }
       #nameprompt-note, #account-note, #signedin-note {
         font-size: var(--t-small); color: var(--ink-faint); margin-top: 14px; line-height: 1.6;
       }
@@ -2364,14 +2368,31 @@
         font-weight: 700; color: var(--ink-muted); background: var(--chip); border: 0;
         padding: 9px 15px; cursor: pointer;
       }
-      #nameprompt-tabs button.on { color: var(--on-sun); background: var(--sun); }
+      /* **A tab is navigation, not an action, and must not be filled with sun.**
+         The first cut made the selected tab a solid sun block, which put two
+         equally loud sun blocks on the panel -- `QUICK PLAY` and the button
+         underneath it -- and the louder-looking one was the tab. For somebody
+         arriving with a saved session that reads as an invitation to leave
+         their account, which is the opposite of what this screen wants.
+
+         So sun keeps one meaning on this panel: the thing you press to act.
+         The selected tab is a lifted surface with a sun edge under it -- lit,
+         clearly chosen, and quieter than any button. */
+      #nameprompt-tabs button.on {
+        color: var(--ink-bright); background: var(--chip);
+        box-shadow: inset 0 -2px 0 var(--sun);
+      }
       /* Hover moves the *surface*, and the text colour follows it rather than
          being set independently: an inactive tab lifts to the next value up the
-         ladder and keeps its light text, and the selected one brightens its sun
-         and keeps its dark ink. The bug this replaces set a text colour against
-         a background it did not control. */
+         ladder and keeps its light text. The bug this replaces set a text
+         colour against a background it did not control, which is how a pale
+         blue ended up on light orange. */
       #nameprompt-tabs button:hover:not(.on) { color: var(--ink-bright); background: #26313f; }
-      #nameprompt-tabs button.on:hover { color: var(--on-sun); background: #ffc451; }
+      #nameprompt-tabs button.on:hover { background: #26313f; }
+      /* Nothing to choose between: see `JoinGate.applyPanes`. A player who is
+         already signed in is not asked whether they would rather be a guest,
+         and `log out` in the corner of the panel is the way back. */
+      #nameprompt-tabs.gone { display: none; }
       #nameprompt-tabs button:focus-visible { outline: 2px solid var(--ink-bright); outline-offset: -2px; }
       .joinpane { display: none; }
       .joinpane.on { display: block; }

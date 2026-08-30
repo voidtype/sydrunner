@@ -448,6 +448,21 @@ export class JoinGate {
     for (const button of this.tabs.querySelectorAll<HTMLButtonElement>('button')) {
       button.classList.toggle('on', (button.dataset.join === 'account') === (pane === 'account'));
     }
+    /*
+     * **The strip goes away for somebody who is already signed in.**
+     *
+     * Both of its tabs ask a question that player has answered: `quick play`
+     * offers to make them a stranger, and `log in / sign up` offers to make
+     * them an account they already have. Leaving it up put `QUICK PLAY` at the
+     * top of the panel as the lit, first-read thing while the pane underneath
+     * said `play as Bazza` -- an invitation to throw away the level and the
+     * cash the pane below is holding.
+     *
+     * No path is lost: `log out` sits in the corner of the panel and brings the
+     * strip straight back. That is the right shape for the rare case, and it is
+     * one deliberate click rather than the default reading of the screen.
+     */
+    this.tabs.classList.toggle('gone', pane === 'signedin');
   }
 
   private applyMode(): void {

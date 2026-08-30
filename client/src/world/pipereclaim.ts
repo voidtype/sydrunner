@@ -192,6 +192,34 @@ export class PipelineReclaim {
    * is precisely the crash this guard exists for.
    */
   private busy: ((renderObject: ReclaimRenderObject) => boolean) | null = null;
+  /**
+   * Asks whether a render object was ever actually drawn.
+   *
+   * **The second crash, and the subtler one.** `Bindings.deleteForRender`
+   * decrements a bind group's `usedTimes` unconditionally, but `_createBindings`
+   * only *increments* it for a render object that reached `getForRender` -- and
+   * bind groups are shared, so the count is what keeps a uniform buffer alive
+   * for everyone using it.
+   *
+   * The compile gate one file over declines draws by the thousand (`6250
+   * deferred` in the ride that produced this), and a declined draw never runs
+   * `updateForRender`, so its render object exists with bindings that were
+   * never initialised. Disposing one of those takes a reference it never held.
+   * The count reaches zero with live objects still pointing at the buffer, and
+   * the next frame to touch it says:
+   *
+   *     Failed to execute 'writeBuffer' on 'GPUQueue': parameter 1 is not of
+   *     type 'GPUBuffer'.
+   *
+   * -- from `Bindings._update`, on somebody else's render object entirely.
+   * Which is why the screen went black rather than one thing disappearing.
+   *
+   * The happy part: a render object that never drew holds **no pipeline and no
+   * bindings**, both of which are created inside the same `updateForRender` it
+   * never reached. There is nothing to reclaim from it, so skipping it costs
+   * exactly nothing and is not a compromise.
+   */
+  private drawn: ((renderObject: ReclaimRenderObject) => boolean) | null = null;
 
   /** Render objects successfully disposed. */
   reclaimed = 0;
@@ -201,6 +229,8 @@ export class PipelineReclaim {
   spared = 0;
   /** Disposals held back because a pipeline was still being built. */
   heldBusy = 0;
+  /** Render objects dropped un-disposed because they never drew, so held nothing. */
+  undrawn = 0;
   /** Disposals taken early because the queue was over `MAX_PENDING`. */
   forced = 0;
   /** Disposals that threw. Never zero silently -- it goes on the frame line. */
@@ -221,6 +251,17 @@ export class PipelineReclaim {
    */
   setBusyProbe(probe: (renderObject: ReclaimRenderObject) => boolean): void {
     this.busy = probe;
+  }
+
+  /**
+   * Wire the was-it-drawn probe. Until this is called nothing is ever disposed.
+   *
+   * Same safe default as the busy probe and for a sharper reason: without it
+   * every declined draw's render object looks disposable, and disposing those
+   * is what destroys other objects' uniform buffers. See `drawn`.
+   */
+  setDrawnProbe(probe: (renderObject: ReclaimRenderObject) => boolean): void {
+    this.drawn = probe;
   }
 
   install(host: ReclaimHost): boolean {
@@ -318,17 +359,22 @@ export class PipelineReclaim {
         this.queued.delete(entry.mesh);
         continue;
       }
-      // **No probe, no disposal.** A reclaimer that cannot ask whether a
-      // pipeline is in flight must not free the buffers one would be using.
-      const probe = this.busy;
-      if (probe === null) {
+      // **No probes, no disposal.** A reclaimer that cannot ask whether a
+      // pipeline is in flight, or whether the object ever drew, must not free
+      // anything: one of those questions guards a destroyed buffer in a live
+      // submit, and the other guards a shared uniform buffer's reference count.
+      const busyProbe = this.busy;
+      const drawnProbe = this.drawn;
+      if (busyProbe === null || drawnProbe === null) {
         keep.push(entry);
         continue;
       }
       let building = false;
+      let anyDrawn = false;
       for (const ro of set) {
         try {
-          if (probe(ro)) {
+          if (drawnProbe(ro)) anyDrawn = true;
+          if (busyProbe(ro)) {
             building = true;
             break;
           }
@@ -345,8 +391,27 @@ export class PipelineReclaim {
       }
       this.queued.delete(entry.mesh);
       this.byObject.delete(entry.mesh);
+      // Never drawn, so it holds no pipeline and no bindings -- and disposing
+      // it would take a bind-group reference it never took. Drop it untouched.
+      if (!anyDrawn) {
+        this.undrawn++;
+        continue;
+      }
       if (pressed) this.forced++;
       for (const ro of set) {
+        // Per render object, because a mesh's colour pass can have drawn while
+        // its shadow pass was declined, and only the one that drew owns
+        // anything worth giving back.
+        let everDrew = false;
+        try {
+          everDrew = drawnProbe(ro);
+        } catch {
+          everDrew = false;
+        }
+        if (!everDrew) {
+          this.undrawn++;
+          continue;
+        }
         budget--;
         try {
           ro.dispose();
@@ -369,11 +434,12 @@ export class PipelineReclaim {
   /** One clause for the frame line. */
   state(): string {
     if (!this.installed) return 'reclaim off';
-    if (this.busy === null) return `reclaim unprobed, ${this.pending} queued`;
+    if (this.busy === null || this.drawn === null) return `reclaim unprobed, ${this.pending} queued`;
     return (
       `reclaim ${this.reclaimed} freed, ${this.pending} queued` +
       (this.spared > 0 ? `, ${this.spared} spared` : '') +
       (this.heldBusy > 0 ? `, ${this.heldBusy} held` : '') +
+      (this.undrawn > 0 ? `, ${this.undrawn} undrawn` : '') +
       (this.forced > 0 ? `, ${this.forced} forced` : '') +
       (this.failed > 0 ? `, ${this.failed} FAILED` : '')
     );
@@ -416,8 +482,14 @@ export function verifyPipeReclaim(): string[] {
     let n = 0;
     return { ro: { dispose: (): void => { n++; } }, disposed: (): number => n };
   };
-  /** A reclaimer with nothing in flight, which is the ordinary case. */
-  const idle = (r: PipelineReclaim): void => r.setBusyProbe(() => false);
+  /**
+   * A reclaimer with nothing in flight and everything drawn: the ordinary case,
+   * and the one every block below wants unless it says otherwise.
+   */
+  const idle = (r: PipelineReclaim): void => {
+    r.setBusyProbe(() => false);
+    r.setDrawnProbe(() => true);
+  };
   const put = (r: PipelineReclaim, mesh: ReclaimObject, ros: ReclaimRenderObject[]): void => {
     (r as unknown as { byObject: WeakMap<ReclaimObject, Set<ReclaimRenderObject>> }).byObject.set(mesh, new Set(ros));
   };
@@ -468,6 +540,7 @@ export function verifyPipeReclaim(): string[] {
     const r = new PipelineReclaim();
     let inFlight = true;
     r.setBusyProbe(() => inFlight);
+    r.setDrawnProbe(() => true);
     put(r, mesh, [a.ro]);
     r.retire(group);
     for (let t = 0; t <= RETIRE_GRACE_MS * 20; t += RETIRE_GRACE_MS) r.frame(t);
@@ -478,6 +551,76 @@ export function verifyPipeReclaim(): string[] {
     inFlight = false;
     r.frame(RETIRE_GRACE_MS * 21);
     if (a.disposed() !== 1) failures.push('a render object was never freed after its build finished; the leak would come back.');
+  }
+
+  // --- **A render object that never drew is never disposed.**
+  //
+  // The second crash, and the one that blacked the screen out:
+  // `writeBuffer: parameter 1 is not of type 'GPUBuffer'`, thrown from
+  // `Bindings._update` on a render object we never touched.
+  // `Bindings.deleteForRender` decrements a shared bind group's `usedTimes`
+  // unconditionally; `_createBindings` only increments it for an object that
+  // reached `getForRender`. The compile gate declines thousands of draws, each
+  // leaving a render object whose bindings were never initialised, and
+  // disposing one takes a reference it never held -- so a uniform buffer other
+  // objects are still using is destroyed under them.
+  {
+    const group: ReclaimObject = { parent: null, children: [] };
+    const never = mk();
+    const drew = mk();
+    const meshA: ReclaimObject = { isMesh: true, parent: group };
+    const meshB: ReclaimObject = { isMesh: true, parent: group };
+    group.children = [meshA, meshB];
+    const r = new PipelineReclaim();
+    r.setBusyProbe(() => false);
+    r.setDrawnProbe((ro) => ro === drew.ro);
+    put(r, meshA, [never.ro]);
+    put(r, meshB, [drew.ro]);
+    r.retire(group);
+    r.frame(RETIRE_GRACE_MS + 1);
+    if (never.disposed() !== 0) {
+      failures.push('a render object that never drew was disposed; that decrements a bind group it never took a reference to, and destroys a live uniform buffer.');
+    }
+    if (drew.disposed() !== 1) failures.push('a render object that did draw was not reclaimed; the leak would come back.');
+    if (r.undrawn === 0) failures.push('an undrawn render object was not counted.');
+  }
+
+  // --- One mesh, one pass drawn and one declined.
+  //
+  // The ordinary case in a real frame: the colour pass drew and the shadow pass
+  // was declined by the budget. Only the one that drew owns anything.
+  {
+    const group: ReclaimObject = { parent: null, children: [] };
+    const colour = mk();
+    const shadow = mk();
+    const mesh: ReclaimObject = { isMesh: true, parent: group };
+    group.children = [mesh];
+    const r = new PipelineReclaim();
+    r.setBusyProbe(() => false);
+    r.setDrawnProbe((ro) => ro === colour.ro);
+    put(r, mesh, [colour.ro, shadow.ro]);
+    r.retire(group);
+    r.frame(RETIRE_GRACE_MS + 1);
+    if (colour.disposed() !== 1) failures.push('the drawn pass of a half-drawn mesh was not reclaimed.');
+    if (shadow.disposed() !== 0) {
+      failures.push('the declined pass of a half-drawn mesh was disposed; per-mesh is not a fine enough grain for this guard.');
+    }
+  }
+
+  // --- No drawn probe, nothing disposed.
+  {
+    const group: ReclaimObject = { parent: null, children: [] };
+    const a = mk();
+    const mesh: ReclaimObject = { isMesh: true, parent: group };
+    group.children = [mesh];
+    const r = new PipelineReclaim();
+    r.install({ _objects: { createRenderObject: (): unknown => a.ro } });
+    r.setBusyProbe(() => false);                   // busy wired, drawn deliberately not
+    put(r, mesh, [a.ro]);
+    r.retire(group);
+    r.frame(RETIRE_GRACE_MS * 10);
+    if (a.disposed() !== 0) failures.push('a reclaimer with no drawn probe disposed something anyway.');
+    if (!r.state().includes('unprobed')) failures.push(`a half-probed reclaimer reported "${r.state()}" and did not say so.`);
   }
 
   // --- Pressure waives the grace. It never waives the busy guard.
@@ -504,6 +647,7 @@ export function verifyPipeReclaim(): string[] {
 
     const r2 = new PipelineReclaim();
     r2.setBusyProbe(() => true);
+    r2.setDrawnProbe(() => true);
     const g2: ReclaimObject = { parent: null, children: [] };
     const k2: ReclaimObject[] = [];
     for (let i = 0; i < total; i++) {
@@ -592,6 +736,7 @@ export function verifyPipeReclaim(): string[] {
     group.children = [mesh];
     const r = new PipelineReclaim();
     r.setBusyProbe(() => { throw new Error('gate gone'); });
+    r.setDrawnProbe(() => true);
     put(r, mesh, [a.ro]);
     r.retire(group);
     r.frame(RETIRE_GRACE_MS + 1);
