@@ -109,7 +109,7 @@ import {
   type WarmupPart,
 } from './world/warmup.ts';
 import { ShadowWarm, ShadowSweep, verifyShadowWarm } from './world/shadowwarm.ts';
-import { AsyncPipelines, verifyAsyncPipes } from './world/asyncpipes.ts';
+import { AsyncPipelines, budgetFor, verifyAsyncPipes } from './world/asyncpipes.ts';
 import { verifyTilePriority } from './world/tilepriority.ts';
 import { verifyPointable } from './waypoint.ts';
 import { verifySuspension } from './game/suspension.ts';
@@ -10630,7 +10630,11 @@ async function main(): Promise<void> {
     // the end of it. See `carradio.FADE_S`.
     carRadio.update(frameDt);
 
-    asyncPipes.frame();
+    // Scaled to this machine, not to the one this was tuned on. A fixed budget
+    // is generous at a 17 ms median and starving at 60 ms, which is how a real
+    // player ended up parked in the amber hatch deciding his computer was the
+    // problem. See `asyncpipes.budgetFor`.
+    asyncPipes.frame(budgetFor(stalls.medianFrameMs()));
     frameProfile.begin();
     frameProfile.at(FSEC.input);
     input.forward = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);

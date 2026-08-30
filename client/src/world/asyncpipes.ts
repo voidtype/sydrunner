@@ -70,6 +70,49 @@ const HALF_CAP = 512;
  */
 const COMPILE_BUDGET_MS = 24;
 
+/**
+ * How much of a *slow* machine's frame the budget is allowed to be.
+ *
+ * **A fixed budget is generous on a fast machine and starving on a slow one,
+ * which is exactly backwards.** At a 17 ms median, 24 ms is a frame and a half
+ * and the gate almost never closes. At a 60 ms median it closes on the first
+ * few draws of every frame, permanently, and the world then arrives at the
+ * forward-progress floor -- one new object a frame. A tile is about thirteen
+ * instanced sets plus their shadow variants, so at 15 fps that is seconds per
+ * tile and a map hatched amber for minutes.
+ *
+ * A player reported exactly that and reasonably concluded his computer was too
+ * slow. It is slow; it is not too slow. It was being throttled by a constant
+ * tuned on a machine four times faster.
+ *
+ * So the budget is a multiple of what a frame on *this* machine already costs.
+ * Above one, because a frame that is already 60 ms is not made meaningfully
+ * worse by 40% more while the world is arriving, and is made much worse by
+ * never arriving.
+ */
+const BUDGET_FRAME_FACTOR = 1.4;
+
+/**
+ * New objects admitted per frame once the budget is spent.
+ *
+ * One was enough to guarantee progress and not enough to make it. Four is still
+ * a hard bound on a bad frame -- four builds, not four hundred -- and it is the
+ * difference between a tile arriving in four frames and in twenty-five.
+ */
+const MIN_ADMITS_PER_FRAME = 4;
+
+/**
+ * The budget for a machine whose frames cost `medianMs`.
+ *
+ * Pure, exported and checked, because it is the number that decides whether a
+ * slow machine ever finishes loading -- and the last version of it was a
+ * constant nobody could hold still.
+ */
+export function budgetFor(medianMs: number): number {
+  const m = Number.isFinite(medianMs) && medianMs > 0 ? medianMs : 0;
+  return Math.max(COMPILE_BUDGET_MS, m * BUDGET_FRAME_FACTOR);
+}
+
 /*
  * There was a `FRESH_MS` here -- a threshold above which a call counted as
  * having built something -- and it is gone rather than tidied away, because
@@ -580,7 +623,7 @@ export class AsyncPipelines {
           if (!built) {
             // One unbuilt object gets through per frame, so progress is never
             // zero even on a machine that blows the budget on ordinary draws.
-            if (this.newWhileOver > 0) {
+            if (this.newWhileOver >= MIN_ADMITS_PER_FRAME) {
               this.deferredDraws++;
               return;
             }
@@ -1157,6 +1200,65 @@ export function verifyAsyncPipes(): string[] {
       );
     }
     if (ran <= objs.length) failures.push('the shadow pass was declined whole; shadows would never appear.');
+  }
+
+  // --- The budget scales with the machine, or a slow one never finishes.
+  //
+  // **A real player sat in the amber hatch and concluded his computer was too
+  // slow.** It was being throttled by a constant tuned on a machine four times
+  // faster: at a 60 ms median a fixed 24 ms budget closes the gate on the first
+  // few draws of every frame, permanently, and the world then arrives at the
+  // forward-progress floor alone.
+  {
+    if (budgetFor(17) !== 24) {
+      failures.push(`a fast machine's budget moved to ${budgetFor(17)}; the tuning that works must not change.`);
+    }
+    if (budgetFor(60) <= 24) {
+      failures.push(
+        `a machine with a 60 ms frame got a ${budgetFor(60)} ms budget -- the same as one four times faster. ` +
+          `The gate would sit permanently over budget and the world would arrive one object a frame.`,
+      );
+    }
+    if (budgetFor(60) <= budgetFor(30)) failures.push('the budget did not grow with the frame time.');
+    // Nonsense in, something usable out: a median of zero is a session that has
+    // not measured one yet, not a reason to stop building the world.
+    if (budgetFor(0) !== 24) failures.push('an unmeasured machine got no budget at all.');
+    if (budgetFor(Number.NaN) !== 24) failures.push('a NaN median produced a NaN budget.');
+    if (budgetFor(-5) !== 24) failures.push('a negative median produced a negative budget.');
+  }
+
+  // --- Forward progress is enough progress to finish.
+  {
+    const spin = (ms: number): void => {
+      const until = performance.now() + ms;
+      let sink = 0;
+      while (performance.now() < until) sink++;
+      if (sink === -1) throw new Error('unreachable');
+    };
+    let ran = 0;
+    const host = {
+      _pipelines: { getForRender: (): unknown => ({ id: 'p' }) },
+      backend: { draw: (): void => {}, get: (): Record<string, never> => ({}) },
+      _renderObjectDirect: (_o: unknown): void => {
+        ran++;
+        spin(0.4);
+      },
+    };
+    const g = new AsyncPipelines();
+    g.install(host as unknown as PipelineHost);
+    // A frame already over budget before it starts: every draw is new.
+    g.frame(0.2);
+    const objs = Array.from({ length: 40 }, (_, i) => ({ n: i }));
+    for (const o of objs) host._renderObjectDirect(o);
+    if (ran < 2) {
+      failures.push(
+        `a permanently over-budget frame admitted ${ran} builds. That is a slow machine sitting in the ` +
+          `amber hatch: a tile is thirteen instanced sets and it would take thirteen frames to draw one.`,
+      );
+    }
+    if (ran > MIN_ADMITS_PER_FRAME + 1) {
+      failures.push(`an over-budget frame admitted ${ran} builds; the bound is meant to be ${MIN_ADMITS_PER_FRAME}.`);
+    }
   }
 
   return failures;
