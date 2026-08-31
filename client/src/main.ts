@@ -113,6 +113,7 @@ import { AsyncPipelines, budgetFor, verifyAsyncPipes } from './world/asyncpipes.
 import { PipelineReclaim, setActiveReclaim, verifyPipeReclaim } from './world/pipereclaim.ts';
 import { verifyRangeAlloc } from './world/rangealloc.ts';
 import { verifyFloorPlan } from './world/floorplan.ts';
+import { doorAt, verifyDoorway, type DoorSite } from './world/doorway.ts';
 import { lostMessage, lostPlan, verifyDeviceLost } from './devicelost.ts';
 import { verifyIndexDom } from './domcheck.ts';
 import { verifyTilePriority } from './world/tilepriority.ts';
@@ -135,7 +136,7 @@ import {
   verifyNightLights,
   verifyTrainLightKit,
 } from './world/nightlights.ts';
-import { CollisionWorld } from './player/collision.ts';
+import { CollisionWorld, type Prism } from './player/collision.ts';
 import {
   EYE_HEIGHT,
   PLAYER_RADIUS,
@@ -5227,6 +5228,13 @@ async function main(): Promise<void> {
      * `world/floorplan.ts`.
      */
     ...verifyFloorPlan(),
+    /*
+     * And which building a player is standing at. Same totality argument as the
+     * plan: any wall in sixty kilometres can be walked up to, so a footprint
+     * this cannot read is a prompt that never appears or a crash found by
+     * walking. See `world/doorway.ts`.
+     */
+    ...verifyDoorway(),
     ...verifyDeviceLost(),
     /*
      * And the index itself, which no compiler reads. Client-only of the four
@@ -6150,6 +6158,21 @@ async function main(): Promise<void> {
   /** Where `driving.shapeDriveSteering` writes. One object, reused every frame. */
   const driveSteering: DriveSteering = { right: 0, yawDelta: 0 };
   /** Scratch for `resolveTake`, so a prompt asked sixty times a second allocates nothing. */
+  /*
+   * --- Doors. See `world/doorway.ts`.
+   *
+   * Scratch held here rather than allocated per frame: the prompt is recomputed
+   * every frame and a fresh array and vector sixty times a second is garbage
+   * this loop has spent a lot of effort not making.
+   *
+   * The scan radius is the door reach plus room for a building whose *wall* is
+   * in reach while its centre is not -- `prismsWithin` is a query about prisms
+   * near a point, and a warehouse's prism is nearer than its wall.
+   */
+  const DOOR_SCAN_M = 12;
+  const doorPrisms: Prism[] = [];
+  const doorGaze = new Vector3();
+  let doorSite: DoorSite | null = null;
   const takeScratch = createDrivingScratch();
   /** Whether there is a car within reach this frame. Recomputed, never stored. */
   let takeableNear = false;
@@ -9520,11 +9543,43 @@ async function main(): Promise<void> {
         );
       }
     }
+    /*
+     * --- The door you are standing at, if you are standing at one.
+     *
+     * **Last in the chain, and that ordering is the whole of its contention
+     * rule.** `E` already means four things -- take a car, board a train, get
+     * off a bike, talk to a giver -- and every one of them is a better answer
+     * than a door when both are in reach. A player at a pub's front door with a
+     * ute parked across it wants the ute; a player being talked to wants the
+     * conversation. So the door offers itself only when nothing else did, which
+     * costs nothing to state here because the `||` chain already ranks them.
+     *
+     * Recomputed per frame rather than cached: it is a loop over the handful of
+     * prisms already within two and a half metres, which the collision grid
+     * hands back without a search. See `world/doorway.doorAt`.
+     */
+    doorSite = null;
+    if (playerCombat.drivingCar === 0 && playerCombat.ridingBike === 0 && !isAboard(playerCombat.aboard)) {
+      camera.getWorldDirection(doorGaze);
+      const gazeLen = Math.hypot(doorGaze.x, doorGaze.z);
+      if (gazeLen > 1e-4) {
+        doorPrisms.length = 0;
+        collision.prismsWithin(player.position.x, player.position.z, DOOR_SCAN_M, doorPrisms);
+        doorSite = doorAt(
+          doorPrisms,
+          player.position.x,
+          player.position.z,
+          doorGaze.x / gazeLen,
+          doorGaze.z / gazeLen,
+        );
+      }
+    }
     hud.derived(
       sunButton.prompt(player.position.x, player.position.z) ||
         trainPill ||
         ridePrompt(playerCombat, playerCombat.phase, rideNudgeT, rideNudgeText) ||
-        takePrompt(takeableNear, playerCombat.drivingCar !== 0, playerCombat.phase),
+        takePrompt(takeableNear, playerCombat.drivingCar !== 0, playerCombat.phase) ||
+        (doorSite !== null ? 'E — go inside' : ''),
     );
 
     // Reconciliation, at the top of the tick and before anything is advanced.
