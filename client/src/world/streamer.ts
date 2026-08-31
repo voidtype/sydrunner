@@ -114,6 +114,7 @@
 
 import { admits, blendHeading, cancels, priorityTiles, type SlotFacts } from './tilepriority.ts';
 import { retireGroup, type ReclaimObject } from './pipereclaim.ts';
+import { InstancePool, type InstanceClaim } from './instancepool.ts';
 import {
   Box3,
   BufferAttribute,
@@ -759,6 +760,16 @@ interface LoadedTile {
   centre: Vector3;
   /** Half-diagonal plus tallest building, for frustum culling. */
   box: Box3;
+  /**
+   * The spans of the shared instance meshes this tile owns.
+   *
+   * Its trees no longer hang off `group`: they are ranges of one
+   * `InstancedMesh` per species that outlives every tile. So they are not
+   * disposed with the group and have to be handed back explicitly -- see
+   * `dispose`, and `world/instancepool.ts` for why the meshes are shared at
+   * all.
+   */
+  claims: InstanceClaim[];
   /** Trees resident in this tile. Reported, and used by nothing else. */
   trees: number;
   /** Water triangles resident in this tile. Likewise. */
@@ -1106,6 +1117,17 @@ export class TileStreamer implements LampSource {
   private readonly materials: Map<MaterialName, NodeMaterial>;
   /** Six tree geometries and one foliage material, likewise shared world-wide. */
   private readonly vegetation = new VegetationAssets();
+
+  /**
+   * One `InstancedMesh` per species for the whole world.
+   *
+   * Constructed on `this.root` rather than on any tile group, which is the
+   * entire point: a pooled mesh outlives every tile that writes into it, so
+   * three builds its node graph, its shader and its pipeline **once** instead
+   * of once per tile. See `world/instancepool.ts`, and the `warm` flag's own
+   * comment above for the freeze this removes the cause of.
+   */
+  readonly instancePool = new InstancePool(this.root);
   /** Five car bodies and one paint material, on the same terms. */
   private readonly carAssets = new CarAssets();
 
@@ -3801,6 +3823,17 @@ export class TileStreamer implements LampSource {
     const group = new Group();
     group.name = entry.key;
     let committed = false;
+    /*
+     * The shared-mesh spans this tile takes, collected here rather than at the
+     * point of use so the `finally` below can hand them back.
+     *
+     * A tile's trees are ranges of one `InstancedMesh` per species that outlives
+     * every tile, so they are *not* released by `releaseGroupGeometry` -- and an
+     * abandoned build that dropped them on the floor would leave a suburb of
+     * gums standing in mid-air, owned by nobody, for the rest of the session.
+     * See `world/instancepool.ts`.
+     */
+    const claims: InstanceClaim[] = [];
 
     /**
      * WORKSTREAM AJ: the step the builder is on, checked against the table.
@@ -3997,16 +4030,24 @@ export class TileStreamer implements LampSource {
       let trees = 0;
       if (veg !== null) {
         let built = 0;
-        for (const mesh of buildTileTrees(veg, this.vegetation, groundAt)) {
-          mesh.castShadow = true;
-          mesh.receiveShadow = false;
-          group.add(mesh);
+        // World-space, because the mesh these land in is shared with tiles in
+        // other suburbs and cannot inherit this group's translation.
+        for (const claim of buildTileTrees(
+          veg,
+          this.vegetation,
+          this.instancePool,
+          group.position.x,
+          group.position.z,
+          groundAt,
+        )) {
+          claims.push(claim);
           // The budget's checkpoint, on `GLB_PRIMITIVES_PER_STEP`'s terms
           // exactly. `buildTileTrees` is a generator for this line's sake: it
           // used to hand back a finished array, so a tile's whole vegetation
           // was one step no budget could interrupt.
           if (++built % TREE_MESHES_PER_STEP === 0) yield;
         }
+        this.instancePool.flush();
         trees = veg.count;
         // The mushrooms, from the same array the meshes were just built from.
         // After the build rather than before it, so a tile that throws while
@@ -4454,6 +4495,7 @@ export class TileStreamer implements LampSource {
         receives: false,
         centre,
         box,
+        claims,
         trees,
         water: waterTriangles,
         waterPlan,
@@ -4500,6 +4542,9 @@ export class TileStreamer implements LampSource {
         this.root.remove(group);
         releaseGroupGeometry(group);
         group.clear();
+        // The spans too: they are not in the group and nothing else would.
+        for (const claim of claims) this.instancePool.release(claim);
+        claims.length = 0;
         this.atlas.release(entry.key);
       }
     }
@@ -5056,6 +5101,12 @@ export class TileStreamer implements LampSource {
     // every instant, including the instant of the swap.
     this.farCity?.setTileResident(key, false);
     releaseGroupGeometry(tile.group);
+    // The shared-mesh spans, which are not in the group and which
+    // `releaseGroupGeometry` therefore cannot see. Zeroed as they go, so the
+    // instances stop drawing the moment the tile does. See
+    // `world/instancepool.ts`.
+    for (const claim of tile.claims) this.instancePool.release(claim);
+    tile.claims.length = 0;
     // The icons go with the tile; their *state* does not. The sink keeps the
     // points so a respawn clock started before the eviction is the same clock
     // still running when the tile comes back -- see `PowerupField`.
@@ -5146,6 +5197,12 @@ function releaseGroupGeometry(group: Group): void {
     const mesh = child as Mesh;
     if (!mesh.isMesh) continue;
     if (
+      // Kept though nothing sets it any more: trees are ranges of a shared
+      // mesh now (`world/instancepool.ts`) and never enter a tile group at all.
+      // The branch stays because the *rule* it encodes -- shared geometry is
+      // released by `InstancedMesh.dispose`, never `geometry.dispose` -- is the
+      // one every flag beside it depends on, and deleting the example makes the
+      // next person adding one guess.
       mesh.userData.vegetation === true ||
       mesh.userData.cars === true ||
       mesh.userData.poles === true ||

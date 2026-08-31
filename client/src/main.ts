@@ -111,6 +111,7 @@ import {
 import { ShadowWarm, ShadowSweep, verifyShadowWarm } from './world/shadowwarm.ts';
 import { AsyncPipelines, budgetFor, verifyAsyncPipes } from './world/asyncpipes.ts';
 import { PipelineReclaim, setActiveReclaim, verifyPipeReclaim } from './world/pipereclaim.ts';
+import { verifyRangeAlloc } from './world/rangealloc.ts';
 import { lostMessage, lostPlan, verifyDeviceLost } from './devicelost.ts';
 import { verifyIndexDom } from './domcheck.ts';
 import { verifyTilePriority } from './world/tilepriority.ts';
@@ -5193,6 +5194,13 @@ async function main(): Promise<void> {
     ...verifyShadowWarm(),
     ...verifyAsyncPipes(),
     ...verifyPipeReclaim(),
+    /*
+     * The bookkeeping under the shared instance meshes. Every property it
+     * asserts is one that, wrong, puts one tile's trees at another tile's
+     * coordinates or grows a buffer that never shrinks. See
+     * `world/rangealloc.ts`.
+     */
+    ...verifyRangeAlloc(),
     ...verifyDeviceLost(),
     /*
      * And the index itself, which no compiler reads. Client-only of the four
@@ -10706,6 +10714,7 @@ async function main(): Promise<void> {
           `, ${asyncPipes.deferrals} deferred (${asyncPipes.budgetState()})` +
           `  |  ${asyncPipes.outstanding} building, ${asyncPipes.ceilingDeclines} over ceiling` +
           `  |  ${pipeReclaim.state()}` +
+          `  |  ${streamer.instancePool.state()}` +
           `  |  ${asyncPipes.drift()}` +
           `  |  worst: ${asyncPipes.top(3)}` +
           `\n[stalls] ${s.line}  |  floor ${stalls.baseline().toFixed(1)} ms  |  sydney.stalls() for the table`,

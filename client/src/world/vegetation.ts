@@ -145,12 +145,12 @@ import {
   BufferAttribute,
   BufferGeometry,
   Color,
-  InstancedMesh,
   Matrix4,
   MeshStandardNodeMaterial,
   Quaternion,
   Vector3,
 } from 'three/webgpu';
+import type { InstanceClaim, InstancePool } from './instancepool.ts';
 import {
   Fn,
   dot,
@@ -1289,8 +1289,11 @@ const _stem = /*#__PURE__*/ newStemVariation();
 export function* buildTileTrees(
   data: TileVegetation,
   assets: VegetationAssets,
+  pool: InstancePool,
+  originX: number,
+  originZ: number,
   groundAt: (x: number, z: number) => number = () => 0,
-): Generator<InstancedMesh> {
+): Generator<InstanceClaim> {
   // Bucketed by species **and crown archetype**, because an archetype is a
   // different geometry and therefore a different mesh. `stemCrown` is the
   // cheap half of `stemVariation` and exists so this pass can be made without
@@ -1312,14 +1315,56 @@ export function* buildTileTrees(
     const s = (bucket / CROWN_COUNT) | 0;
     const crown = bucket % CROWN_COUNT;
 
-    const mesh = new InstancedMesh(assets.geometry(s, crown), assets.material, members.length);
-    mesh.name = `trees_${s}_${crown}`;
+    /*
+     * **A span of the species' one mesh, not a mesh of this tile's own.**
+     *
+     * This built `new InstancedMesh(...)` per bucket per tile, and that single
+     * line was the most expensive thing in the client. Three puts `object.uuid`
+     * into the material cache key of every instanced mesh and keys
+     * `NodeManager.nodeBuilderCache` on it, so each of those meshes generated
+     * its own node graph and its own WGSL -- byte-identical WGSL, measured, for
+     * forty-odd meshes of the same species. Fifty-six tiles held 3,260 node
+     * builder states, the compile budget could not drain the queue, and the
+     * draws it deferred are objects with no pipeline: ride into new ground and
+     * nothing is standing on it.
+     *
+     * One mesh per (species, crown) for the whole city instead. See
+     * `world/rangealloc.ts` for the full argument and `world/instancepool.ts`
+     * for what a claim is.
+     */
+    const claim = pool.claim(
+      `trees_${s}_${crown}`,
+      assets.geometry(s, crown),
+      assets.material,
+      members.length,
+      (mesh) => {
+        mesh.castShadow = true;
+        mesh.receiveShadow = false;
+      },
+    );
+    // A species that has hit its ceiling draws nothing for this tile, which is
+    // what a tile that failed to build did before. `InstancePool.state` counts
+    // it onto the frame line rather than throwing a boot away.
+    if (claim === null) continue;
     const [nominalHeight, nominalRadius] = NOMINAL[s];
 
     for (let n = 0; n < members.length; n++) {
       const i = members[n];
       stemVariation(s, data.seed[i], data.x[i], data.z[i], _stem);
-      _position.set(data.x[i], groundAt(data.x[i], data.z[i]), data.z[i]);
+      /*
+       * **World space, not tile space.**
+       *
+       * The mesh this replaces hung off the tile's own group and inherited its
+       * translation, so these were tile-local metres. A pooled mesh sits at the
+       * origin and is shared by tiles in different suburbs, so the tile's own
+       * offset has to be in the matrix. Getting this wrong stands a suburb of
+       * gums in the middle of the harbour, which is at least unmistakable.
+       */
+      _position.set(
+        originX + data.x[i],
+        groundAt(data.x[i], data.z[i]),
+        originZ + data.z[i],
+      );
 
       // Yaw. A row of street trees all facing the same way is the single most
       // obvious tell that they were instanced -- and this was already here, off
@@ -1351,7 +1396,7 @@ export function* buildTileTrees(
       // fiction.
       _scale.set(sxz * _stem.aspect, sy, sxz / _stem.aspect);
       _matrix.compose(_position, _quaternion, _scale);
-      mesh.setMatrixAt(n, _matrix);
+      pool.setMatrixAt(claim, n, _matrix);
 
       // Value and hue off one axis rather than three independent channels --
       // `tile-decode.ts`'s `stemVariation` holds the argument, and the short of
@@ -1361,18 +1406,8 @@ export function* buildTileTrees(
       // `instanceColor` multiply. It scales the trunk too, which is correct --
       // bark varies at least as much as foliage does.
       _colour.setRGB(_stem.tintR, _stem.tintG, _stem.tintB);
-      mesh.setColorAt(n, _colour);
+      pool.setColorAt(claim, n, _colour);
     }
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    // Culled with its tile, like every other primitive the streamer loads: a
-    // per-object frustum test on 40 instanced meshes buys nothing over the one
-    // box test the tile already does.
-    mesh.frustumCulled = false;
-    // Read by `streamer.ts` in two places -- the shadow role and, critically,
-    // disposal, where the geometry is *shared* and must not be released with
-    // the tile.
-    mesh.userData.vegetation = true;
     /*
      * **Yielded rather than collected, so the caller can stop.**
      *
@@ -1382,11 +1417,11 @@ export function* buildTileTrees(
      * streamer's header measured "under 1.5 ms on the worst tile in the build";
      * the bushland round then took the world from 1.77 M trees to 17.4 M and
      * nothing re-measured the assumption. A tile buckets into as many as
-     * `SPECIES_COUNT * CROWN_COUNT` meshes and each is a matrix loop over its own
-     * members, so handing them over one at a time gives the budget somewhere to
-     * breathe.
+     * `SPECIES_COUNT * CROWN_COUNT` claims and each is a matrix loop over its
+     * own members, so handing them over one at a time gives the budget somewhere
+     * to breathe.
      */
-    yield mesh;
+    yield claim;
   }
 }
 
