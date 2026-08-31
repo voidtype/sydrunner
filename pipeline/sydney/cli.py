@@ -6495,8 +6495,35 @@ def cmd_far_cover(args: argparse.Namespace) -> int:
         name = "none" if code == 0 else code_name.get(code, f"?{code}")
         n = counts[code]
         print(f"  {name:<10}{n:>10,}{n * cell_km2:>12,.0f}{100.0 * n / total:>8.1f}%")
-    print("\n  index.json needs this block under far.terrain for the client to read it:")
-    print(f'      "cover": {{"bytes": {written}, "classes": {len(vegetation.COVER_CODE) + 1}}}')
+    # --- Stamp the index, rather than printing a block for somebody to paste.
+    #
+    # This used to end by printing the JSON a human was supposed to copy into
+    # `index.json` under `far.terrain`, and on the live world nobody ever did.
+    # Nothing failed when it was skipped: `far-cover.bin` published correctly,
+    # the client gated its fetch on the flag that was never written, and every
+    # metre past the streaming radius rendered on the plain ground material --
+    # grey slabs on blank terrain to the horizon, which is the exact thing the
+    # docstring above says this command exists to prevent.
+    #
+    # The client no longer needs the flag (it asks for the file and lets the
+    # length check decide), but the index should still describe what the build
+    # produced, and a step whose last instruction is "now go and edit a
+    # generated file by hand" is a step that will be skipped again.
+    classes = len(vegetation.COVER_CODE) + 1
+    index_path = out / "index.json"
+    if index_path.exists():
+        try:
+            index = json.loads(index_path.read_text())
+            terrain = index.setdefault("far", {}).setdefault("terrain", {})
+            terrain["cover"] = {"bytes": written, "classes": classes}
+            index_path.write_text(json.dumps(index, indent=2))
+            print(f"  stamped far.terrain.cover into {index_path}")
+        except (OSError, ValueError) as err:
+            print(f"  could NOT stamp {index_path}: {err}")
+            print(f'  add by hand under far.terrain: "cover": {{"bytes": {written}, "classes": {classes}}}')
+    else:
+        print(f"  no {index_path} to stamp -- run `sydney index` after this, or add by hand:")
+        print(f'      "cover": {{"bytes": {written}, "classes": {classes}}}')
     return EXIT_PASS
 
 

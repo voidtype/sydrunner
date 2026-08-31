@@ -1211,14 +1211,32 @@ export async function loadFarLayer(
       fetchWorldAsset(baseUrl, 'far-terrain.bin', version).then((r) =>
         r.ok ? r.arrayBuffer() : null,
       ),
-      // Whole-world like the terrain it rides on, for the same reason: 59 kB
-      // for the entire 60 km extent, and it is the surface every slab stands
-      // on. Only asked for when the index says the build produced one.
-      far.terrain.cover
-        ? fetchWorldAsset(baseUrl, 'far-cover.bin', version).then((r) =>
-            r.ok ? r.arrayBuffer() : null,
-          )
-        : Promise.resolve(null),
+      /*
+       * Whole-world like the terrain it rides on, for the same reason: 59 kB
+       * for the entire 60 km extent, and it is the surface every slab stands
+       * on.
+       *
+       * **Asked for unconditionally, rather than only when the index admits to
+       * having one.** This used to be gated on `far.terrain.cover`, and the
+       * live world proved why that was the wrong guard: `far-cover.bin` was
+       * published, correct and exactly 243 x 243 bytes -- and the index's
+       * `terrain` block never mentioned it, because `tiles.py` writes that block
+       * and `sydney far-cover` is a *later, separate* command that writes the
+       * file and never goes back to stamp the flag. So the client never asked,
+       * the far ground was built with no cover attribute and the plain ground
+       * material, and everything past the streaming radius was bare: grey slabs
+       * standing on blank terrain to the horizon. The pipeline's own docstring
+       * for that command says it "is what stops the horizon being brown".
+       *
+       * The length check below is the real guard and always was -- a truncated
+       * or absent file is refused there on its size, which is a fact about the
+       * bytes rather than a claim in a manifest that something else has to
+       * remember to write. A world with no cover file answers 404 here, `r.ok`
+       * is false, and the feature stays off exactly as before.
+       */
+      fetchWorldAsset(baseUrl, 'far-cover.bin', version).then((r) =>
+        r.ok ? r.arrayBuffer() : null,
+      ),
     ]);
 
     const tower = archetypes.indexOf('tower');
