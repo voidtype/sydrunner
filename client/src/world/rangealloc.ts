@@ -385,6 +385,61 @@ export function verifyRangeAlloc(): string[] {
     if (a.highWater !== 0) failures.push(`highWater was ${a.highWater} after everything was released.`);
   }
 
+  // --- **The high-water mark never passes the capacity.**
+  //
+  // This is the arithmetic half of the bug that blacked the screen out. The
+  // pool writes `highWater` into `InstancedMesh.count`, and `count` is what the
+  // draw call asks the GPU for: one past the instance buffer is not a glitch,
+  // it is an invalid command buffer and every frame after it is black.
+  //
+  //     Instance range (first: 0, count: 4113) requires a larger buffer
+  //     (263232) than the bound buffer size (262144)
+  //
+  // The failure there was the pool's -- it grew the allocator and left the
+  // buffer behind -- but the invariant belongs here, where the number comes
+  // from, and it must hold through every growth and release.
+  {
+    const a = new RangeAllocator(64);
+    a.alloc(64);
+    if (a.highWater > a.capacity) failures.push('highWater passed capacity on a full allocator.');
+    a.grow(256);
+    if (a.highWater > a.capacity) failures.push('highWater passed capacity after growth.');
+    const x = a.alloc(190);
+    if (a.highWater > a.capacity) failures.push(`highWater (${a.highWater}) passed capacity (${a.capacity}) after allocating into grown room.`);
+    if (x + 190 > a.capacity) failures.push('an allocation ran past the end of the buffer.');
+    a.free_(x, 190);
+    if (a.highWater > a.capacity) failures.push('highWater passed capacity after a release.');
+    // And through a lot of churn, since that is where an off-by-one hides.
+    let seed = 99;
+    const rnd = (n: number): number => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed % n;
+    };
+    const held: Array<{ start: number; len: number }> = [];
+    for (let i = 0; i < 1500; i++) {
+      if (held.length > 0 && rnd(2) === 0) {
+        const k = rnd(held.length);
+        a.free_(held[k].start, held[k].len);
+        held.splice(k, 1);
+      } else {
+        const len = 1 + rnd(40);
+        const start = a.alloc(len);
+        if (start === NO_SPACE) a.grow(a.capacity * 2);
+        else held.push({ start, len });
+      }
+      if (a.highWater > a.capacity) {
+        failures.push('highWater passed capacity during churn; the mesh count would run past its instance buffer.');
+        break;
+      }
+      for (const h of held) {
+        if (h.start + h.len > a.capacity) {
+          failures.push('a live span ran past the capacity; its instances have no buffer behind them.');
+          break;
+        }
+      }
+    }
+  }
+
   // --- A zero-capacity allocator is legal and simply never allocates.
   {
     const a = new RangeAllocator(0);

@@ -46,8 +46,17 @@ import { NO_SPACE, RangeAllocator } from './rangealloc.ts';
  * counted and put on the frame line rather than thrown.
  */
 
-/** The initial room per species. A suburb of trees fits without growing. */
-const INITIAL_CAPACITY = 4096;
+/**
+ * The initial room per species.
+ *
+ * 4,096 was the first guess and a real ride went past it: a dense stand of gums
+ * asked for 4,113 and then 4,483. Growth is correct now -- see `resize` -- but
+ * each one still costs this species a recompile, so the opening size is set
+ * above what a tile ring of the densest thing in the world actually holds.
+ * 8,192 matrices is 512 KB per species, and the eighteen kinds this pool holds
+ * come to about 11 MB, which `PERFORMANCE.md`'s budget has room for.
+ */
+const INITIAL_CAPACITY = 8192;
 
 /**
  * The ceiling per species.
@@ -163,7 +172,7 @@ export class InstancePool {
       this.resize(slot, next);
       start = slot.alloc.alloc(want);
     }
-    slot.mesh.count = slot.alloc.highWater;
+    slot.mesh.count = this.drawableCount(slot);
     return { key, start, count: want, originX, originZ };
   }
 
@@ -202,7 +211,21 @@ export class InstancePool {
     for (let i = claim.start; i < end; i++) _zero.toArray(matrices, i * 16);
     if (!slot.alloc.free_(claim.start, claim.count)) return;
     slot.mesh.instanceMatrix.needsUpdate = true;
-    slot.mesh.count = slot.alloc.highWater;
+    slot.mesh.count = this.drawableCount(slot);
+  }
+
+  /**
+   * How many instances may actually be drawn.
+   *
+   * **Never the high-water mark alone.** `count` is what the draw call asks the
+   * GPU for and the instance buffer is what backs it, so a `count` one past the
+   * buffer is not a glitch -- it is an invalid command buffer and every frame
+   * after it is black. Clamped here, in the one place both numbers are known,
+   * rather than trusted at four call sites.
+   */
+  private drawableCount(slot: Slot): number {
+    const capacity = (slot.mesh.instanceMatrix.array as Float32Array).length / 16;
+    return Math.max(0, Math.min(slot.alloc.highWater, Math.floor(capacity)));
   }
 
   /**
@@ -292,27 +315,73 @@ export class InstancePool {
   }
 
   /**
-   * Reallocate a species' buffers, preserving what is in them.
+   * Give a species more room, by **replacing its mesh** rather than its buffers.
    *
-   * The one expensive moment in this file: a new `InstancedBufferAttribute` is
-   * a new node attribute, so three rebuilds this species' node graph once. That
-   * is a single compile against the thousands this arrangement removes, and it
-   * doubles, so it happens a few times a session and then never again.
+   * The first version of this swapped `mesh.instanceMatrix` for a longer
+   * `InstancedBufferAttribute` and left the mesh alone, which looked obviously
+   * right and is obviously wrong the moment you read `RenderObject`:
+   *
+   * ```js
+   * getAttributes() {
+   *   if ( this.attributes !== null ) return this.attributes;   // cached
+   * ```
+   *
+   * That list is built once and cleared only by the *geometry's* dispose event
+   * -- which never fires here, because the geometry is shared and must never be
+   * disposed. So the render object went on pointing at the old, shorter buffer
+   * while `count` had already grown past it, and the GPU said so:
+   *
+   *     Instance range (first: 0, count: 4113) requires a larger buffer
+   *     (263232) than the bound buffer size (262144) of the vertex buffer at
+   *     slot 2 with stride 64.
+   *
+   * 262144 is 4096 x 64: exactly `INITIAL_CAPACITY` matrices. Every frame after
+   * that was an invalid command buffer, which is a black screen.
+   *
+   * A new mesh has a new uuid, so three builds one fresh render object for it
+   * and caches the *new* attributes -- and it costs exactly the one recompile
+   * for this species that growth was always going to cost. The old mesh leaves
+   * the scene and gives its instance buffers back.
+   *
+   * **This was not caught before shipping because it never ran**: every soak
+   * reported `0 grows`, since no single species passed 4,096 instances in the
+   * ring I was churning. A dense stand of gums does. See `verifyRangeAlloc` for
+   * the arithmetic half, which is checkable without a GPU, and `state()` for the
+   * counter that would have shown growth happening at all.
    */
   private resize(slot: Slot, capacity: number): void {
     const next = Math.min(capacity, MAX_CAPACITY);
-    const mesh = slot.mesh;
-    const oldMatrices = mesh.instanceMatrix.array as Float32Array;
-    const matrices = new Float32Array(next * 16);
+    const old = slot.mesh;
+    const grown = new InstancedMesh(old.geometry, old.material, next);
+    grown.name = old.name;
+    grown.frustumCulled = false;
+    grown.castShadow = old.castShadow;
+    grown.receiveShadow = old.receiveShadow;
+    grown.renderOrder = old.renderOrder;
+    grown.visible = old.visible;
+
+    const matrices = grown.instanceMatrix.array as Float32Array;
+    matrices.fill(0);
+    const oldMatrices = old.instanceMatrix.array as Float32Array;
     matrices.set(oldMatrices.subarray(0, Math.min(oldMatrices.length, matrices.length)));
-    mesh.instanceMatrix = new InstancedBufferAttribute(matrices, 16);
-    mesh.instanceMatrix.setUsage(DynamicDrawUsage);
-    const oldColours = mesh.instanceColor === null ? null : (mesh.instanceColor.array as Float32Array);
+    grown.instanceMatrix.setUsage(DynamicDrawUsage);
+    grown.instanceMatrix.needsUpdate = true;
+
     const colours = new Float32Array(next * 3);
+    const oldColours = old.instanceColor === null ? null : (old.instanceColor.array as Float32Array);
     if (oldColours !== null) colours.set(oldColours.subarray(0, Math.min(oldColours.length, colours.length)));
-    mesh.instanceColor = new InstancedBufferAttribute(colours, 3);
-    mesh.instanceColor.setUsage(DynamicDrawUsage);
+    grown.instanceColor = new InstancedBufferAttribute(colours, 3);
+    grown.instanceColor.setUsage(DynamicDrawUsage);
+    grown.instanceColor.needsUpdate = true;
+
     slot.alloc.grow(next);
+    // **Before the swap**, so no frame can see a mesh whose count is past its
+    // buffer -- that ordering is the whole bug this replaced.
+    grown.count = Math.min(slot.alloc.highWater, next);
+    this.root.add(grown);
+    this.root.remove(old);
+    old.dispose();
+    slot.mesh = grown;
     slot.dirty = true;
     this.grows++;
     void _identity;
