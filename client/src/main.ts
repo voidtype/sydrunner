@@ -3239,7 +3239,24 @@ async function main(): Promise<void> {
       ? Promise.resolve({ name: storedName || sanitiseName(suggestName()), token: '' })
       : joinGate
           .restore()
-          .then(() => joinGate.landing(storedName || sanitiseName(suggestName())));
+          .then(() => joinGate.landing(storedName || sanitiseName(suggestName())))
+          /*
+           * **Tell the loading screen the button was pressed.**
+           *
+           * Walked through as a first-time player: the panel goes away and the
+           * same black screen he was looking at ten seconds ago comes back,
+           * still counting tiles. He committed to the one control on the page
+           * and got no acknowledgement, and the honest reading is "did it not
+           * work?" -- so he waits, or clicks something, or leaves.
+           *
+           * Nothing about the wait changes, because nothing can: the ground
+           * under the spawn genuinely is not laid yet. What changes is that the
+           * screen now answers him. See `Hud.joining`.
+           */
+          .then((choice) => {
+            hud.joining();
+            return choice;
+          });
 
   /**
    * Wait for something, but never for longer than `ms`.

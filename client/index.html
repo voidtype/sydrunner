@@ -244,7 +244,17 @@
       /* The key that opens the rest, in the dim tone the leaderboard's own
          column headings use. It is a label for the block above it, not another
          line of it. */
-      #help .more { color: var(--ink-muted); }
+      /* **Two tiers, so it is a list and not a wall.**
+         Seven lines of the same grey at the same size is a block a new player
+         does not read -- walked through as somebody who has never played, he
+         finds WASD by trying it and never looks at the corner again. Nothing is
+         removed, because every line here was added for a reason and two came
+         from player reports; what changes is that the three lines holding the
+         controls you need in the first minute stay at full strength and the
+         four that answer later questions step back a size. The keys inside them
+         keep their sun, so the block can still be scanned for a letter. */
+      #help .keys { color: var(--ink-bright); }
+      #help .more { color: var(--ink-muted); font-size: 12px; }
       /* The keys, picked out of the sentence they are in.
          **Colour only, and the weight is inherited on purpose.** Every width in
          the long comment below is measured at this size and this weight -- the
@@ -2723,11 +2733,22 @@
         background: var(--ground); z-index: 10; transition: opacity .22s ease;
       }
       #loading.hidden { opacity: 0; pointer-events: none; }
+      /* **The words go before the backdrop does.** The overlay cross-fades over
+         .22 s, and for that fifth of a second the loading copy hangs over trees
+         and sky -- which to somebody who has never seen a cross-fade reads as a
+         glitch rather than as a transition. The ground behind it can fade at
+         its own pace; the text has no business being legible over the game. */
+      #loading.hidden #loading-inner { opacity: 0; transition: opacity .08s ease; }
       #loading-inner { text-align: left; max-width: 620px; padding: 24px; }
       #loading-title {
         font-size: 34px; line-height: 1; font-weight: 700; letter-spacing: -.02em;
         color: var(--ink-bright); margin-bottom: 20px; text-transform: none;
       }
+      /* `Hud.joining` sets this the moment the player presses the one button on
+         the page, so the wait that follows reads as a consequence of the press
+         rather than as the same screen coming back. Sun because it is about
+         him; see the token block at the top of this file. */
+      #loading-title.joined { color: var(--sun); }
       #loading-text {
         font-size: 15px; line-height: 1.6; color: var(--ink); white-space: pre-wrap;
         text-align: left;
@@ -3485,7 +3506,13 @@
     <div id="loading">
       <div id="loading-inner">
         <div id="loading-title">Sydney</div>
-        <div id="loading-text">Starting renderer&hellip;</div>
+        <!-- Not "Starting renderer". Walked through as a player who does not
+             know what a renderer is: the first word the game says to him named
+             one of its own subsystems, and the honest reading of a strange word
+             on a black screen is "is that a thing I need, and did I break it?".
+             `groundProgressLine` replaces this the moment there is a number to
+             show; this is only what stands there first. -->
+        <div id="loading-text">Getting Sydney ready&hellip;</div>
         <!-- Both presentational and both hidden under a fatal error by the
              `:has` rules in the stylesheet; nothing in TypeScript touches
              either. See the comment on `#loading-bar`. -->

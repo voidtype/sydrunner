@@ -542,6 +542,7 @@ export function verifyHud(maxBallCharges: number): string[] {
 export class Hud {
   private readonly loading = document.getElementById('loading')!;
   private readonly loadingText = document.getElementById('loading-text')!;
+  private readonly loadingTitle = document.getElementById('loading-title')!;
   private readonly debug = document.getElementById('debug')!;
   private readonly hint = document.getElementById('hint')!;
   private readonly help = document.getElementById('help')!;
@@ -787,6 +788,26 @@ export class Hud {
 
   /** The button `recoverable` shows, made once. */
   private actionButton: HTMLButtonElement | null = null;
+
+  /**
+   * The player has pressed the one button on the page.
+   *
+   * The wait after it is real -- the ground under the spawn is still being laid
+   * -- but until now the screen did not acknowledge the press at all: the panel
+   * vanished and the same black screen came back, still counting tiles. To
+   * somebody who has never seen this game that reads as a button that did
+   * nothing, and the next move is to click again or to leave.
+   *
+   * So the heading stops being the game's name, which he has already read, and
+   * becomes the answer to what he just did. The line under it keeps counting,
+   * because that part was always honest. Refused once anything has claimed the
+   * screen -- `fatal` above all -- on `loadingProgress`' own terms.
+   */
+  joining(): void {
+    if (this.loadingLocked) return;
+    this.loadingTitle.textContent = "You're in";
+    this.loadingTitle.classList.add('joined');
+  }
 
   fatal(message: string): void {
     this.loadingLocked = true;

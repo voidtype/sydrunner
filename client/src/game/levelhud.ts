@@ -148,7 +148,23 @@ export function levelLine(level: number, kills: number, guest: boolean): string 
   const lvl = clampLevel(level);
   const p = levelProgress(lvl, kills);
   const head = p.capped ? `LVL ${lvl} · MAX` : `LVL ${lvl} · ${p.into}/${p.need}`;
-  return guest ? `${head} · sign up to level up` : head;
+  /*
+   * **Not on a bar that has not moved yet.**
+   *
+   * The paragraph above is right that a guest's bar fills and then stops
+   * forever, and that a full inert bar with no explanation is a bug report. But
+   * it explains a *stuck* bar, and a bar at `0/10` is not stuck -- it is a bar
+   * nothing has happened to. Shown there, the sentence is the loudest thing on
+   * a new player's screen at second zero: an ask, before the game has given
+   * them anything, from someone who does not yet know what levelling is for.
+   *
+   * So it appears the moment it starts being an explanation -- the first credit
+   * in, or the ceiling -- and not before. The words are unchanged and the state
+   * it describes is unchanged; what moves is the moment, from "hello" to "you
+   * have seen this bar move once and are about to see it stop".
+   */
+  const explaining = p.capped || p.into > 0;
+  return guest && explaining ? `${head} · sign up to level up` : head;
 }
 
 /**
@@ -255,6 +271,25 @@ export function verifyLevelHud(): string[] {
     const line = levelLine(1, 23, true);
     if (!line.includes('sign up')) {
       failures.push(`A guest's level line is ${JSON.stringify(line)}; it must say how to make the bar mean something.`);
+    }
+    /*
+     * **And not on the very first frame.** A guest who has done nothing has a
+     * bar at `0/10`, which is not stuck and needs no explanation -- and the
+     * sentence is the loudest thing on a new player's screen, asking before the
+     * game has given them anything. Walked through as somebody who does not
+     * know what levelling is: "sign up? I just got here."
+     */
+    const arrival = levelLine(1, 0, true);
+    if (arrival.includes('sign up')) {
+      failures.push(
+        `A guest's very first level line is ${JSON.stringify(arrival)} -- the game asks them to sign up ` +
+          `at second zero, before the bar has moved once.`,
+      );
+    }
+    if (!arrival.includes('0/10')) failures.push(`A guest's first line lost its progress: ${JSON.stringify(arrival)}.`);
+    // One credit in, the bar has moved and the sentence starts explaining.
+    if (!levelLine(1, 1, true).includes('sign up')) {
+      failures.push('a guest who has scored once is not told why their bar will stop.');
     }
     const p = levelProgress(1, 23);
     if (p.into !== KILLS_PER_LEVEL || p.fraction !== 1) {

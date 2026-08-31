@@ -63,6 +63,25 @@ import { questAim, type AimKind } from './game/questaim.ts';
  * quest markers are built from, deliberately -- an arrow pointing at a step the
  * panel disagrees about would be two copies of the register.
  */
+/**
+ * What the arrow is asking the player to do, from the kind it already carries.
+ *
+ * The panel used to show a place and a distance -- `ST PETERS / 83 m` -- and
+ * nothing else. Walked through as somebody who has never played: a suburb he
+ * has never heard of, a number, and no verb anywhere. He does not know it is a
+ * job, that somebody is standing there, or that walking to it is the game. The
+ * kind was known all along and simply never said out loud.
+ *
+ * Three words rather than a sentence, because the line under it is already the
+ * step's own text and two sentences stacked is a paragraph nobody reads at a
+ * glance.
+ */
+export function aimVerb(kind: AimKind): string {
+  if (kind === 'giver') return 'go and see';
+  if (kind === 'turnin') return 'hand in at';
+  return 'go to';
+}
+
 export interface WaypointSource {
   quests(): readonly Quest[];
   cursors(): QuestCursors;
@@ -133,6 +152,7 @@ export function verifyPointable(): string[] {
 export class WaypointBanner {
   private readonly root = document.getElementById('waypoint');
   private readonly needle = document.getElementById('waypoint-needle');
+  private readonly verb = document.getElementById('waypoint-verb');
   private readonly text = document.getElementById('waypoint-text');
   private readonly range = document.getElementById('waypoint-range');
   private readonly source: WaypointSource;
@@ -300,6 +320,7 @@ export class WaypointBanner {
       x: target.x,
       z: target.z,
       radius: target.radius,
+      kind: target.kind,
     };
   }
 
@@ -314,13 +335,15 @@ export class WaypointBanner {
     // has spaces in it: a key two different pairs could both produce is a guard
     // that occasionally does not fire. A newline cannot appear in either half --
     // `questmodel.str` collapses all whitespace to single spaces at the parse.
-    const key = target === null ? '' : `${target.text}\n${distance}`;
+    const key = target === null ? '' : `${target.kind ?? ''}\n${target.text}\n${distance}`;
     if (key === this.drawn) return;
     this.drawn = key;
     this.root?.classList.toggle('shown', target !== null);
     if (target === null) return;
     if (this.text) this.text.textContent = target.text;
     if (this.range) this.range.textContent = distance;
+    // The verb, above the place. See `aimVerb`.
+    if (this.verb) this.verb.textContent = target.kind === undefined ? '' : aimVerb(target.kind);
     // A step with nowhere to point keeps the banner and loses the needle. An
     // arrow that stayed pointing at the last `goto` while the player is being
     // asked to knock three people over is worse than no arrow, and the sentence

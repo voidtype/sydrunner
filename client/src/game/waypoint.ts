@@ -110,6 +110,15 @@ export interface Waypoint {
   z: number | null;
   /** How close counts as arrived. Metres; `questmodel.withinStep`'s circle. */
   radius: number;
+  /**
+   * What the player is being asked to do there, when the caller knows.
+   *
+   * Optional because most waypoints come from a step rather than from an aim,
+   * and a step's own words are already the line. It exists so the arrow can put
+   * a verb above the place: the panel used to read `ST PETERS / 83 m`, which is
+   * a suburb and a number and no instruction anywhere. See `waypoint.aimVerb`.
+   */
+  kind?: 'giver' | 'objective' | 'turnin';
 }
 
 /**
