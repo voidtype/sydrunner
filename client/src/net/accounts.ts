@@ -962,6 +962,41 @@ export interface AccountView {
 export const AUTH_PER_MIN = 10;
 export const CHECK_PER_MIN = 120;
 
+// --- Signing in with somebody else's account -------------------------------------------
+
+/**
+ * The handle a social sign-in gets, given who is already registered.
+ *
+ * **The rule that matters is the one it refuses to break: a provider identity
+ * never lands on an account that already exists.** Reddit hands back a name,
+ * and somewhere in a city of players there is already a Bazza -- so "log in
+ * with Reddit as Bazza, be given Bazza's account" is account takeover wearing a
+ * convenience feature. If the obvious handle is taken, the new player gets a
+ * free variant and the existing Bazza never learns any of this happened.
+ *
+ * The *identity* is the provider's subject id, never the name: Reddit lets
+ * people rename, and a link keyed on the name would silently follow the name to
+ * whoever picks it up next.
+ *
+ * Returns `''` when nothing usable can be made, which the caller must treat as
+ * a refusal rather than as a blank handle.
+ */
+export function providerHandle(raw: string, taken: (handle: string) => boolean): string {
+  const base = sanitiseHandle(raw);
+  if (base !== '' && !taken(base)) return base;
+  // A short numeric suffix rather than a random string: it stays inside the
+  // sixteen-character cap, it reads as a person rather than as a hash, and it
+  // is what every forum has done since forums existed.
+  const stem = base === '' ? 'player' : base;
+  for (let n = 2; n <= 999; n++) {
+    const suffix = String(n);
+    const room = MAX_NAME_CHARS - suffix.length;
+    const candidate = sanitiseHandle(stem.slice(0, Math.max(1, room)) + suffix);
+    if (candidate !== '' && !taken(candidate)) return candidate;
+  }
+  return '';
+}
+
 // --- The landing panel's one decision ------------------------------------------------
 
 /** Which of the join panel's three panes is showing. See `joinPane`. */
@@ -1531,6 +1566,50 @@ export function verifyAccounts(): string[] {
   }
   if (CHECK_PER_MIN <= AUTH_PER_MIN) {
     failures.push('The handle check is limited at least as tightly as login; the landing field would rate-limit itself.');
+  }
+
+  // --- **A social sign-in never lands on somebody else's account.**
+  //
+  // Reddit hands back a name, and somewhere in a city of players there is
+  // already a Bazza. "Log in with Reddit as Bazza, be given Bazza's account" is
+  // account takeover wearing a convenience feature, and it is the one way this
+  // feature can hurt somebody who never used it.
+  {
+    const registered = new Set(['bazza', 'shazza']);
+    const taken = (h: string): boolean => registered.has(h.toLowerCase());
+
+    const free = providerHandle('Drongo', taken);
+    if (free !== 'Drongo') failures.push(`an unused handle was not granted as-is (${JSON.stringify(free)}).`);
+
+    const clash = providerHandle('Bazza', taken);
+    if (clash === '') failures.push('a social sign-in whose name is taken was refused a handle entirely.');
+    if (taken(clash)) {
+      failures.push(
+        `a social sign-in was handed ${JSON.stringify(clash)}, which already belongs to somebody -- ` +
+          `that is account takeover.`,
+      );
+    }
+    if (!clash.toLowerCase().startsWith('bazza')) {
+      failures.push(`a clashing handle became ${JSON.stringify(clash)}, which no longer resembles the name asked for.`);
+    }
+
+    // A name that sanitises away entirely still gets somebody a handle.
+    const junk = providerHandle('***', taken);
+    if (junk === '') failures.push('a name that sanitises to nothing left the player with no handle at all.');
+    if (taken(junk)) failures.push('the fallback handle collided with a registered one.');
+
+    // The suffix must stay inside the wire's cap, or the handle is unsendable.
+    const longName = providerHandle('x'.repeat(40), taken);
+    if ([...longName].length > MAX_NAME_CHARS) {
+      failures.push(`a long provider name produced a ${[...longName].length}-character handle, over the ${MAX_NAME_CHARS} cap.`);
+    }
+
+    // And a crowded namespace still terminates rather than looping or
+    // returning something taken.
+    const crowded = new Set<string>();
+    for (let i = 0; i < 200; i++) crowded.add(providerHandle('Bazza', (h) => crowded.has(h.toLowerCase())).toLowerCase());
+    if (crowded.has('')) failures.push('a crowded namespace eventually returned an empty handle.');
+    if (crowded.size !== 200) failures.push(`200 sign-ins for one name produced ${crowded.size} distinct handles; two players would share one.`);
   }
 
   return failures;
