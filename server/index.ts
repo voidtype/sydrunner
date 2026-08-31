@@ -174,6 +174,7 @@ import { verifyAsyncPipes } from '../client/src/world/asyncpipes.ts';
 import { verifyPipeReclaim } from '../client/src/world/pipereclaim.ts';
 import { verifyRangeAlloc } from '../client/src/world/rangealloc.ts';
 import { verifyFloorPlan } from '../client/src/world/floorplan.ts';
+import { verifySpaces } from '../client/src/net/spaces.ts';
 import { verifyDeviceLost } from '../client/src/devicelost.ts';
 // --- Workstream E. Three self-checks, all three of them shared modules being
 // run in the second runtime -- which is the premise this whole block exists to
@@ -473,6 +474,7 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     ['verifyPipeReclaim', verifyPipeReclaim()],
     ['verifyRangeAlloc', verifyRangeAlloc()],
     ['verifyFloorPlan', verifyFloorPlan()],
+    ['verifySpaces', verifySpaces()],
     ['verifyDeviceLost', verifyDeviceLost()],
     // --- WORKSTREAM V. `verifyTeams` is the contract's own and is here for a
     // reason the rest of this list does not have: it is a **spelling** check.

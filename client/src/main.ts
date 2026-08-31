@@ -114,6 +114,7 @@ import { PipelineReclaim, setActiveReclaim, verifyPipeReclaim } from './world/pi
 import { verifyRangeAlloc } from './world/rangealloc.ts';
 import { verifyFloorPlan } from './world/floorplan.ts';
 import { doorAt, verifyDoorway, type DoorSite } from './world/doorway.ts';
+import { verifySpaces } from './net/spaces.ts';
 import { lostMessage, lostPlan, verifyDeviceLost } from './devicelost.ts';
 import { verifyIndexDom } from './domcheck.ts';
 import { verifyTilePriority } from './world/tilepriority.ts';
@@ -5235,6 +5236,14 @@ async function main(): Promise<void> {
      * walking. See `world/doorway.ts`.
      */
     ...verifyDoorway(),
+    /*
+     * And which world a participant is standing in. Shared with the server
+     * because both ends must agree exactly: the browser predicts your position
+     * in a space and the server adjudicates it in the same one, and a
+     * disagreement is not a rubber-band -- it is one player alone in a room
+     * everybody else is also in. See `net/spaces.ts`.
+     */
+    ...verifySpaces(),
     ...verifyDeviceLost(),
     /*
      * And the index itself, which no compiler reads. Client-only of the four
