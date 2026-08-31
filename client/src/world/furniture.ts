@@ -135,7 +135,6 @@ import {
   ClampToEdgeWrapping,
   Color,
   Group,
-  InstancedMesh,
   LinearFilter,
   LinearMipmapLinearFilter,
   Matrix4,
@@ -144,6 +143,7 @@ import {
   MeshStandardNodeMaterial,
   SRGBColorSpace,
 } from 'three/webgpu';
+import type { InstanceClaim, InstancePool, PooledSet } from './instancepool.ts';
 
 import {
   LAMP_COUNT,
@@ -1472,23 +1472,42 @@ function hash(...parts: number[]): number {
   return ((h ^ (h >>> 13)) >>> 0) / 0xffffffff;
 }
 
-/** One `InstancedMesh`, set up the way every streamed instance set in this project is. */
-function instanced(
+/**
+ * One span of this kind's shared mesh, set up the way every streamed instance
+ * set in this project now is.
+ *
+ * This made `new InstancedMesh(...)` per tile, and that is the line the client
+ * was spending its frames on: three keys a node builder state on
+ * `object.uuid`, so a hundred and ninety street-furniture meshes across a tile
+ * ring were a hundred and ninety node graphs and a hundred and ninety WGSL
+ * generations of the same shader. One mesh per kind for the whole city instead.
+ * See `world/instancepool.ts`.
+ *
+ * `castShadow` is decided here rather than by the streamer, because the streamer
+ * decided it by walking the tile group and these are no longer in one. The lit
+ * signal lamps are the one kind that never casts -- an eight-triangle disc of
+ * pure emission contributes a dotted line to the depth map and nothing else.
+ */
+function pooled(
+  pool: InstancePool,
+  key: string,
   geometry: BufferGeometry,
   material: MeshStandardNodeMaterial | MeshBasicNodeMaterial,
   count: number,
-  name: string,
-): InstancedMesh {
-  const mesh = new InstancedMesh(geometry, material, count);
-  mesh.name = name;
-  // Culled with its tile, like every other primitive the streamer loads.
-  mesh.frustumCulled = false;
-  // Read by `streamer.ts` for disposal, where the geometry is *shared* and must
-  // not be released with the tile. Its own flag rather than sharing
-  // `userData.poles`, so a future change to either cannot silently free the
-  // other's geometry.
-  mesh.userData.furniture = true;
-  return mesh;
+  originX: number,
+  originZ: number,
+  casts = true,
+): PooledSet | null {
+  return pool.set(key, geometry, material, count, originX, originZ, (mesh) => {
+    mesh.castShadow = casts;
+    mesh.receiveShadow = false;
+  });
+}
+
+/** Give back a partly-built set when a later claim in the same kind is refused. */
+function unclaim(pool: InstancePool, sets: Array<PooledSet | null>): InstanceClaim[] {
+  for (const set of sets) if (set !== null) pool.release(set.claim);
+  return [];
 }
 
 /**
@@ -1504,10 +1523,17 @@ function instanced(
  * terrain -- the pipeline has already added the paving's 15 cm. A bin sampled
  * against the terrain here would sink to its axle in the concrete.
  */
-export function buildTileBins(data: TileFurniture, assets: FurnitureAssets): InstancedMesh[] {
+export function buildTileBins(
+  data: TileFurniture,
+  assets: FurnitureAssets,
+  pool: InstancePool,
+  originX: number,
+  originZ: number,
+): InstanceClaim[] {
   if (data.binCount === 0) return [];
-  const bodies = instanced(assets.binBody, assets.propMaterial, data.binCount, 'bin_bodies');
-  const lids = instanced(assets.binLid, assets.propMaterial, data.binCount, 'bin_lids');
+  const bodies = pooled(pool, 'bin_bodies', assets.binBody, assets.propMaterial, data.binCount, originX, originZ);
+  const lids = pooled(pool, 'bin_lids', assets.binLid, assets.propMaterial, data.binCount, originX, originZ);
+  if (bodies === null || lids === null) return unclaim(pool, [bodies, lids]);
 
   for (let i = 0; i < data.binCount; i++) {
     _matrix.makeTranslation(data.binX[i], data.binGroundY[i], data.binZ[i]);
@@ -1532,11 +1558,7 @@ export function buildTileBins(data: TileFurniture, assets: FurnitureAssets): Ins
     _colour.setRGB(lid[0] * k, lid[1] * k, lid[2] * k);
     lids.setColorAt(i, _colour);
   }
-  for (const mesh of [bodies, lids]) {
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  }
-  return [bodies, lids];
+  return [bodies.claim, lids.claim];
 }
 
 /**
@@ -1553,11 +1575,18 @@ export function buildTileBins(data: TileFurniture, assets: FurnitureAssets): Ins
  * drops `BLADE_STACK`. Two blades at the same height would pass through each
  * other's middle at right angles.
  */
-export function buildTilePosts(data: TileFurniture, assets: FurnitureAssets): InstancedMesh[] {
+export function buildTilePosts(
+  data: TileFurniture,
+  assets: FurnitureAssets,
+  pool: InstancePool,
+  originX: number,
+  originZ: number,
+): InstanceClaim[] {
   if (data.postCount === 0) return [];
-  const out: InstancedMesh[] = [];
+  const out: InstanceClaim[] = [];
 
-  const posts = instanced(assets.namePost, assets.propMaterial, data.postCount, 'name_posts');
+  const posts = pooled(pool, 'name_posts', assets.namePost, assets.propMaterial, data.postCount, originX, originZ);
+  if (posts === null) return out;
   for (let i = 0; i < data.postCount; i++) {
     _matrix.makeTranslation(data.postX[i], data.postGroundY[i], data.postZ[i]);
     // No yaw on the post itself: it is a hexagon on its own axis, so any
@@ -1570,9 +1599,7 @@ export function buildTilePosts(data: TileFurniture, assets: FurnitureAssets): In
     _colour.setRGB(t, t, t);
     posts.setColorAt(i, _colour);
   }
-  posts.instanceMatrix.needsUpdate = true;
-  if (posts.instanceColor) posts.instanceColor.needsUpdate = true;
-  out.push(posts);
+  out.push(posts.claim);
 
   // The plates, one `InstancedMesh` per style present in the tile. Counted
   // first so neither is allocated at the tile's full blade count -- a tile is
@@ -1584,12 +1611,16 @@ export function buildTilePosts(data: TileFurniture, assets: FurnitureAssets): In
 
   for (let style = 0; style < STYLE_COUNT; style++) {
     if (perStyle[style] === 0) continue;
-    const blades = instanced(
+    const blades = pooled(
+      pool,
+      style === STYLE_RMS_WHITE ? 'name_blades_rms' : 'name_blades_cos',
       assets.blade,
       assets.bladeMaterial[style],
       perStyle[style],
-      style === STYLE_RMS_WHITE ? 'name_blades_rms' : 'name_blades_cos',
+      originX,
+      originZ,
     );
+    if (blades === null) continue;
     let n = 0;
     for (let b = 0; b < data.bladeCount; b++) {
       const i = data.bladePost[b];
@@ -1603,11 +1634,10 @@ export function buildTilePosts(data: TileFurniture, assets: FurnitureAssets): In
       _matrix.multiply(_yaw);
       blades.setMatrixAt(n++, _matrix);
     }
-    blades.instanceMatrix.needsUpdate = true;
     // No `instanceColor` at all: every blade of a style is the same two colours,
     // and an unused instance colour buffer is 12 bytes an instance of upload
     // that the shader would multiply by one.
-    out.push(blades);
+    out.push(blades.claim);
   }
   return out;
 }
@@ -1807,10 +1837,21 @@ export class BladeLabels {
  * three lamp heights the sidecar names and coloured by `instanceColor`, so a
  * junction showing two greens and two reds is one draw of four discs.
  */
-export function buildTileSignals(data: TileFurniture, assets: FurnitureAssets): InstancedMesh[] {
+export function buildTileSignals(
+  data: TileFurniture,
+  assets: FurnitureAssets,
+  pool: InstancePool,
+  originX: number,
+  originZ: number,
+): InstanceClaim[] {
   if (data.signalCount === 0) return [];
-  const heads = instanced(assets.signal, assets.propMaterial, data.signalCount, 'signal_heads');
-  const lamps = instanced(assets.lamp, assets.lampMaterial, data.signalCount, 'signal_lamps');
+  const heads = pooled(pool, 'signal_heads', assets.signal, assets.propMaterial, data.signalCount, originX, originZ);
+  // The lamps never cast and never receive: an 8-triangle disc of pure emission
+  // whose contribution to the depth map is a dotted line at 4 m up. This was
+  // `userData.noShadow`, read by `applyShadowRole` off the tile group -- which
+  // these are no longer in.
+  const lamps = pooled(pool, 'signal_lamps', assets.lamp, assets.lampMaterial, data.signalCount, originX, originZ, false);
+  if (heads === null || lamps === null) return unclaim(pool, [heads, lamps]);
 
   for (let i = 0; i < data.signalCount; i++) {
     _yaw.makeRotationY(data.signalYaw[i]);
@@ -1839,15 +1880,5 @@ export function buildTileSignals(data: TileFurniture, assets: FurnitureAssets): 
     _colour.setRGB(c[0], c[1], c[2]);
     lamps.setColorAt(i, _colour);
   }
-  for (const mesh of [heads, lamps]) {
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  }
-  // The lamps never cast and never receive: they are an 8-triangle disc of pure
-  // emission, so a shadow lookup on one would be a texture fetch whose result is
-  // discarded, and their contribution to the depth map would be a dotted line at
-  // 4 m up. The same flag `power.ts` puts on its wires, read by
-  // `applyShadowRole` in `streamer.ts`.
-  lamps.userData.noShadow = true;
-  return [heads, lamps];
+  return [heads.claim, lamps.claim];
 }

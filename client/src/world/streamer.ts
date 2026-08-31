@@ -4115,11 +4115,17 @@ export class TileStreamer implements LampSource {
         // the pole on the eleven per cent that fall through `deriveYaw`'s
         // fallback. See `power.poleYaws`.
         const yaws = poleYaws(lines);
-        for (const mesh of buildTilePoles(lines, this.powerAssets, yaws)) {
-          mesh.castShadow = true;
-          mesh.receiveShadow = false;
-          group.add(mesh);
-        }
+        claims.push(
+          ...buildTilePoles(
+            lines,
+            this.powerAssets,
+            this.instancePool,
+            group.position.x,
+            group.position.z,
+            yaws,
+          ),
+        );
+        this.instancePool.flush();
         const wires = buildTileWires(lines, this.powerAssets);
         if (wires !== null) {
           wires.castShadow = false;
@@ -4167,16 +4173,18 @@ export class TileStreamer implements LampSource {
       let signals = 0;
       let bladeLabels: BladeLabelSite[] = [];
       if (props !== null) {
-        for (const mesh of [
-          ...buildTileBins(props, this.furnitureAssets),
-          ...buildTilePosts(props, this.furnitureAssets),
-          ...buildTileSignals(props, this.furnitureAssets),
-        ]) {
-          const noShadow = mesh.userData.noShadow === true;
-          mesh.castShadow = !noShadow;
-          mesh.receiveShadow = false;
-          group.add(mesh);
-        }
+        // Spans of the shared per-kind meshes rather than meshes of this
+        // tile's own, and therefore not in `group` and not shadow-flagged by
+        // walking it -- each kind decides its own casting once, where it is
+        // built. See `world/instancepool.ts`.
+        const ox = group.position.x;
+        const oz = group.position.z;
+        claims.push(
+          ...buildTileBins(props, this.furnitureAssets, this.instancePool, ox, oz),
+          ...buildTilePosts(props, this.furnitureAssets, this.instancePool, ox, oz),
+          ...buildTileSignals(props, this.furnitureAssets, this.instancePool, ox, oz),
+        );
+        this.instancePool.flush();
         bins = props.binCount;
         posts = props.postCount;
         signals = props.signalCount;

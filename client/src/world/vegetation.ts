@@ -1341,6 +1341,8 @@ export function* buildTileTrees(
         mesh.castShadow = true;
         mesh.receiveShadow = false;
       },
+      originX,
+      originZ,
     );
     // A species that has hit its ceiling draws nothing for this tile, which is
     // what a tile that failed to build did before. `InstancePool.state` counts
@@ -1360,11 +1362,7 @@ export function* buildTileTrees(
        * offset has to be in the matrix. Getting this wrong stands a suburb of
        * gums in the middle of the harbour, which is at least unmistakable.
        */
-      _position.set(
-        originX + data.x[i],
-        groundAt(data.x[i], data.z[i]),
-        originZ + data.z[i],
-      );
+      _position.set(data.x[i], groundAt(data.x[i], data.z[i]), data.z[i]);
 
       // Yaw. A row of street trees all facing the same way is the single most
       // obvious tell that they were instanced -- and this was already here, off

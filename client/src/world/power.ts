@@ -90,7 +90,6 @@ import {
   BufferGeometry,
   Color,
   DoubleSide,
-  InstancedMesh,
   Matrix4,
   Mesh,
   MeshBasicNodeMaterial,
@@ -98,6 +97,7 @@ import {
   Quaternion,
   Vector3,
 } from 'three/webgpu';
+import type { InstanceClaim, InstancePool } from './instancepool.ts';
 
 import { POLE_KIND_COUNT, decodePower, type TilePower } from './tile-decode.ts';
 
@@ -758,21 +758,39 @@ function poleDirections(data: TilePower): { dirX: Float32Array; dirZ: Float32Arr
 export function buildTilePoles(
   data: TilePower,
   assets: PowerAssets,
+  pool: InstancePool,
+  originX: number,
+  originZ: number,
   /** The headings, if the caller has already derived them. See `poleYaws`. */
   yaws: Float32Array = poleYaws(data),
-): InstancedMesh[] {
+): InstanceClaim[] {
   if (data.poleCount === 0) return [];
 
   const perKind: number[][] = Array.from({ length: KIND_COUNT }, () => []);
   for (let i = 0; i < data.poleCount; i++) perKind[data.kind[i]].push(i);
 
-  const out: InstancedMesh[] = [];
+  const out: InstanceClaim[] = [];
   for (let k = 0; k < KIND_COUNT; k++) {
     const members = perKind[k];
     if (members.length === 0) continue;
 
-    const mesh = new InstancedMesh(assets.geometry(k), assets.poleMaterial, members.length);
-    mesh.name = `poles_${k}`;
+    // A span of this kind's one mesh for the whole city, not a mesh of this
+    // tile's own: three keys a node builder state on `object.uuid`, so the
+    // hundred-odd pole meshes across a tile ring were a hundred-odd copies of
+    // one shader. See `world/instancepool.ts`.
+    const mesh = pool.set(
+      `poles_${k}`,
+      assets.geometry(k),
+      assets.poleMaterial,
+      members.length,
+      originX,
+      originZ,
+      (m) => {
+        m.castShadow = true;
+        m.receiveShadow = false;
+      },
+    );
+    if (mesh === null) continue;
 
     for (let n = 0; n < members.length; n++) {
       const i = members[n];
@@ -812,16 +830,8 @@ export function buildTilePoles(
       _colour.setRGB(t, t, t);
       mesh.setColorAt(n, _colour);
     }
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    // Culled with its tile, like every other primitive the streamer loads.
-    mesh.frustumCulled = false;
-    // Read by `streamer.ts` for disposal, where the geometry is *shared* and
-    // must not be released with the tile. Its own flag rather than sharing
-    // `userData.cars`, so a future change to either cannot silently free the
-    // other's geometry.
-    mesh.userData.poles = true;
-    out.push(mesh);
+
+    out.push(mesh.claim);
   }
   return out;
 }

@@ -64,6 +64,43 @@ export interface InstanceClaim {
   readonly key: string;
   readonly start: number;
   readonly count: number;
+  /**
+   * The tile origin these instances are written relative to.
+   *
+   * **Applied here rather than by every caller**, and that is a deliberate
+   * choice about where a mistake can happen. Each builder in this project
+   * composes matrices in tile-local metres because that is what the sidecars
+   * hold, and a pooled mesh sits at the world origin -- so somebody has to add
+   * the tile's offset. Doing it in `setMatrixAt` means the builders keep the
+   * arithmetic they already had and the conversion cannot be got wrong one
+   * file at a time.
+   */
+  readonly originX: number;
+  readonly originZ: number;
+}
+
+/**
+ * A claim wearing the two methods every builder in this project already calls.
+ *
+ * `buildTileBins`, `buildTilePoles`, `buildTileCars` and the rest were written
+ * against `InstancedMesh`, and their matrix arithmetic is the part worth *not*
+ * touching -- it is where the yaw, the lean, the kerb heights and the tonal
+ * jitter live. So the shim carries the same two methods and each conversion is
+ * a change of constructor rather than a rewrite of a loop.
+ */
+export class PooledSet {
+  constructor(
+    private readonly pool: InstancePool,
+    readonly claim: InstanceClaim,
+  ) {}
+
+  setMatrixAt(index: number, matrix: Matrix4): void {
+    this.pool.setMatrixAt(this.claim, index, matrix);
+  }
+
+  setColorAt(index: number, colour: Color): void {
+    this.pool.setColorAt(this.claim, index, colour);
+  }
 }
 
 interface Slot {
@@ -104,6 +141,8 @@ export class InstancePool {
     material: Material,
     count: number,
     configure?: (mesh: InstancedMesh) => void,
+    originX = 0,
+    originZ = 0,
   ): InstanceClaim | null {
     if (!Number.isFinite(count) || count <= 0) return null;
     const want = Math.floor(count);
@@ -125,7 +164,25 @@ export class InstancePool {
       start = slot.alloc.alloc(want);
     }
     slot.mesh.count = slot.alloc.highWater;
-    return { key, start, count: want };
+    return { key, start, count: want, originX, originZ };
+  }
+
+  /**
+   * The same claim, wearing `setMatrixAt` and `setColorAt`.
+   *
+   * What every converted builder calls in place of `new InstancedMesh(...)`.
+   */
+  set(
+    key: string,
+    geometry: BufferGeometry,
+    material: Material,
+    count: number,
+    originX: number,
+    originZ: number,
+    configure?: (mesh: InstancedMesh) => void,
+  ): PooledSet | null {
+    const claim = this.claim(key, geometry, material, count, configure, originX, originZ);
+    return claim === null ? null : new PooledSet(this, claim);
   }
 
   /**
@@ -148,11 +205,22 @@ export class InstancePool {
     slot.mesh.count = slot.alloc.highWater;
   }
 
-  /** Write one instance's matrix, in world space. */
+  /**
+   * Write one instance's matrix, in the tile-local metres the builders use.
+   *
+   * The claim's origin is added to the translation here. Elements 12 and 14 of
+   * a column-major `Matrix4` are the x and z of the translation, so this is two
+   * additions after the copy rather than a matrix multiply per instance -- which
+   * matters at nine thousand trees a tile ring.
+   */
   setMatrixAt(claim: InstanceClaim, index: number, matrix: Matrix4): void {
     const slot = this.slots.get(claim.key);
     if (slot === undefined || index < 0 || index >= claim.count) return;
-    matrix.toArray(slot.mesh.instanceMatrix.array as Float32Array, (claim.start + index) * 16);
+    const array = slot.mesh.instanceMatrix.array as Float32Array;
+    const at = (claim.start + index) * 16;
+    matrix.toArray(array, at);
+    array[at + 12] += claim.originX;
+    array[at + 14] += claim.originZ;
     slot.dirty = true;
   }
 
