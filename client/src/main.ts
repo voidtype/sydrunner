@@ -112,6 +112,7 @@ import { ShadowWarm, ShadowSweep, verifyShadowWarm } from './world/shadowwarm.ts
 import { AsyncPipelines, budgetFor, verifyAsyncPipes } from './world/asyncpipes.ts';
 import { PipelineReclaim, setActiveReclaim, verifyPipeReclaim } from './world/pipereclaim.ts';
 import { verifyRangeAlloc } from './world/rangealloc.ts';
+import { verifyFloorPlan } from './world/floorplan.ts';
 import { lostMessage, lostPlan, verifyDeviceLost } from './devicelost.ts';
 import { verifyIndexDom } from './domcheck.ts';
 import { verifyTilePriority } from './world/tilepriority.ts';
@@ -5218,6 +5219,14 @@ async function main(): Promise<void> {
      * `world/rangealloc.ts`.
      */
     ...verifyRangeAlloc(),
+    /*
+     * Interiors. The one property that matters is that it is **total**: there
+     * is no curated list of buildings, so every footprint in Greater Sydney
+     * reaches this generator, and a shape it cannot handle is a door that opens
+     * onto a crash -- found by a player walking up to it. See
+     * `world/floorplan.ts`.
+     */
+    ...verifyFloorPlan(),
     ...verifyDeviceLost(),
     /*
      * And the index itself, which no compiler reads. Client-only of the four
