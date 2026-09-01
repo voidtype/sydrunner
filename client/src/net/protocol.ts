@@ -928,7 +928,29 @@ export const MSG = {
  * message a client cannot parse is exactly the disagreement this number exists
  * to refuse, so it moves.
  */
-export const PROTOCOL_VERSION = 23;
+/*
+ * v24: the rooms behind a door changed shape, and **no layout moved**.
+ *
+ * The first thing this number has ever been bumped for that is not a byte on
+ * the wire, and it is worth saying why it counts as one. Interiors are
+ * generated rather than sent: `world/floorplan.ts` and `world/interior.ts` are
+ * pure, both ends run them over the same footprint, and the whole reason
+ * nothing about a room crosses the socket is that the two answers are
+ * *identical*. That makes those generators part of the protocol as surely as
+ * `PLAYER_BYTES` is -- a shared computation the two ends must agree about
+ * exactly.
+ *
+ * `SPLIT_AREA_M2` went 26 -> 110 and `MIN_ROOM_M` 2.2 -> 4.5 (the rooms were
+ * cupboards; see their own notes). A tab left open across that deploy would
+ * predict its body against walls the server does not have, in the same place
+ * and with the same message ids, and the symptom would be a player shoved
+ * around a room by an invisible partition -- silent, unreportable, and exactly
+ * the disagreement this number exists to refuse.
+ *
+ * If a later change makes a generator's output depend on a version, this note
+ * is the precedent: move the number.
+ */
+export const PROTOCOL_VERSION = 24;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;
