@@ -7581,20 +7581,6 @@ async function main(): Promise<void> {
   };
 
   /**
-   * Put the body into its carriage for one step, and say which world to step it
-   * against. `sim.enterCarriage`, client side, argument for argument.
-   */
-  /**
-   * The scene that draws whatever building this browser is standing in.
-   *
-   * One mesh, one material, one layer -- see `world/interiorview.ts`. The layer
-   * is what hides the city: an interior sits at the *same coordinates* as the
-   * building it is inside, so the terrace's own walls, the street, the traffic
-   * and the sky are all standing in it, and pointing the camera at a layer
-   * nothing else is on is exact where hiding a few dozen scene children by hand
-   * would not be.
-   */
-  /**
    * Draw this object in an interior as well as in the city.
    *
    * The city is hidden indoors by pointing the camera at a layer nothing else
@@ -7656,6 +7642,16 @@ async function main(): Promise<void> {
   showIndoors(sky.bounce);
   showIndoors(sky.moonLight);
 
+  /**
+   * The scene that draws whatever building this browser is standing in.
+   *
+   * One mesh, one material, one layer -- see `world/interiorview.ts`. The layer
+   * is what hides the city: an interior sits at the *same coordinates* as the
+   * building it is inside, so the terrace's own walls, the street, the traffic
+   * and the sky are all standing in it, and pointing the camera at a layer
+   * nothing else is on is exact where hiding a few dozen scene children by hand
+   * would not be.
+   */
   const interiorView = new InteriorView(scene);
 
   /**
@@ -7837,6 +7833,10 @@ async function main(): Promise<void> {
     rideActive = false;
   };
 
+  /**
+   * Put the body into its carriage for one step, and say which world to step it
+   * against. `sim.enterCarriage`, client side, argument for argument.
+   */
   const enterCarriage = (): CombatWorld => {
     // **Indoors, before anything else**, and this is `sim.enterCarriage`'s own
     // first line: the local body is predicted against the building's walls and
