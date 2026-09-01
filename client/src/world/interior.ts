@@ -814,6 +814,59 @@ function onShell(it: Interior, x: number, z: number): boolean {
   return false;
 }
 
+/**
+ * A deterministic 0..1 out of two integers. The project's own FNV-ish hash.
+ *
+ * Every "random" thing about how an interior looks comes through here, so that
+ * two people in one pub are standing on the same floorboards. No `Math.random`
+ * and no `Math.sin`; DESIGN.md rule 5.
+ */
+function hash2(a: number, b: number): number {
+  let h = Math.imul((a | 0) ^ 0x9e3779b9, 0x85ebca6b) >>> 0;
+  h = Math.imul(h ^ (b | 0), 0xc2b2ae35) >>> 0;
+  h ^= h >>> 15;
+  return (h >>> 8) / 0x1000000;
+}
+
+/** What this building is finished in. A pure function of its seed. */
+export const FLOOR = { BOARDS: 0, CARPET: 1, TILE: 2 } as const;
+export const WALLS = { PAINT: 0, BRICK: 1, PANEL: 2 } as const;
+
+/**
+ * The finishes, from the building's own seed.
+ *
+ * *"random floorboard vs carpet on ground, walls and windows"* -- the owner.
+ * Random per building and identical for everybody who walks into that building,
+ * which is the same guarantee the rooms themselves have and for the same
+ * reason: it is derived, so it costs nothing on the wire and survives a reload.
+ *
+ * The floor is weighted rather than uniform. Boards are the Sydney default --
+ * every terrace, every pub, every warehouse -- so they get half of all
+ * buildings, carpet a third (offices, older flats) and tile the rest (shops,
+ * kitchens, foyers). A uniform third each would make the city read as more
+ * carpeted than it is.
+ */
+function finishOf(seed: number): { floor: number; walls: number } {
+  const f = hash2(seed, 0x100);
+  const w = hash2(seed, 0x200);
+  return {
+    floor: f < 0.5 ? FLOOR.BOARDS : f < 0.83 ? FLOOR.CARPET : FLOOR.TILE,
+    walls: w < 0.55 ? WALLS.PAINT : w < 0.82 ? WALLS.BRICK : WALLS.PANEL,
+  };
+}
+
+/**
+ * How many quads the floor covering may cost.
+ *
+ * A 120 x 64 m warehouse at a realistic 130 mm board is a quarter of a million
+ * quads for a floor nobody is looking at closely, so the covering is sized to
+ * fit this budget instead: a terrace gets real boards, a warehouse gets planks
+ * a metre wide, and neither costs more than the other. The number is generous
+ * because this is *one* mesh in *one* draw call with no texture fetch, built
+ * once when a player walks through a door.
+ */
+const MAX_FLOOR_QUADS = 1600;
+
 /** The tint of one building's plaster, from its own seed. */
 function shadeOf(seed: number): { r: number; g: number; b: number } {
   // FNV-ish, the integer hash this project uses everywhere. Three bytes out of
@@ -846,6 +899,40 @@ export function interiorMesh(
   const nor: number[] = [];
   const col: number[] = [];
   const tint = shadeOf(it.seed);
+  const finish = finishOf(it.seed);
+  /**
+   * The carpet, which is the one surface that is not a shade of the plaster.
+   *
+   * A carpet the colour of the walls is not a carpet; it is a floor somebody
+   * forgot to finish. Four hues out of the seed -- the reds, greens and greys
+   * an Australian pub or office block is actually laid with -- and they are
+   * muted, because a saturated floor in an unlit room reads as a bug.
+   */
+  /**
+   * What a window is full of.
+   *
+   * The material is unlit, so this is not a reflection or a sky -- it is the
+   * one deliberately bright surface in the building, and its whole job is to be
+   * the brightest thing in the room so a player's eye goes to it. Slightly
+   * blue, because daylight is.
+   */
+  const daylight = { r: 0.80, g: 0.88, b: 0.97 };
+  const carpet = (() => {
+    const pick = Math.floor(hash2(it.seed, 0x300) * 4);
+    const v = 0.9 + hash2(it.seed, 0x301) * 0.25;
+    const swatch =
+      pick === 0 ? { r: 0.42, g: 0.20, b: 0.20 } :
+      pick === 1 ? { r: 0.22, g: 0.30, b: 0.24 } :
+      pick === 2 ? { r: 0.30, g: 0.28, b: 0.36 } :
+      { r: 0.34, g: 0.32, b: 0.28 };
+    return { r: swatch.r * v, g: swatch.g * v, b: swatch.b * v };
+  })();
+  /** A colour times a shade, clamped. The buffers must stay inside 0..1. */
+  const scaled = (c: { r: number; g: number; b: number }, k: number): { r: number; g: number; b: number } => ({
+    r: Math.min(1, c.r * k),
+    g: Math.min(1, c.g * k),
+    b: Math.min(1, c.b * k),
+  });
   const floorY = it.base;
   const ceilY = it.base + CEILING_M;
 
@@ -891,6 +978,80 @@ export function interiorMesh(
     tri(ax, y0, az, bx, y1, bz, ax, y1, az, nx, 0, nz, hi, rgb);
   };
 
+  /**
+   * A wall with a finish on it: skirting, courses, a dado rail.
+   *
+   * The same two triangles as `wall` for every band, and the bands are the
+   * whole of the "texture" -- *"texture the inside ... walls"*. There is no
+   * image anywhere in this feature and there must not be: one unlit material
+   * with vertex colours is what keeps every interior in the game to a single
+   * pipeline (see the header), and a texture would mean an atlas, a fetch and a
+   * second material variant.
+   *
+   * What each finish is doing, and none of it is decoration:
+   *
+   *   - **A skirting board on every wall.** It is a dark band 14 cm tall at the
+   *     floor, and it is the single cheapest thing that makes a room read as a
+   *     room -- it gives the eye the floor/wall join, which an unlit box
+   *     otherwise has to infer from a shade change. It also hides the ragged
+   *     centimetres where the floor covering stops short of the shell.
+   *   - **Brick** is eight courses of alternating shade. Coarse for a brick, and
+   *     right for a warehouse or a pub's back wall at the distance anybody
+   *     stands from it.
+   *   - **Panel** puts a dado rail at a metre, which is the one horizontal line
+   *     a person's eye uses to judge how big a room is.
+   */
+  const finishedWall = (
+    ax: number, az: number, bx: number, bz: number,
+    nx: number, nz: number, lo: number, hi: number,
+  ): void => {
+    const top = ceilY - floorY;
+    const band = (y0: number, y1: number, shade: number): void => {
+      if (y1 <= y0) return;
+      wall(ax, az, bx, bz, nx, nz, shade, shade, floorY + y0, floorY + y1);
+    };
+    const skirt = Math.min(0.14, top * 0.06);
+    band(0, skirt, lo * 0.62);
+    if (finish.walls === WALLS.BRICK) {
+      // Eight courses, alternating, over whatever is left above the skirting.
+      const COURSES = 8;
+      const h = (top - skirt) / COURSES;
+      for (let i = 0; i < COURSES; i++) {
+        const k = i & 1 ? 0.94 : 1.04;
+        // A hairline of variation per course, from the wall's own position, so
+        // two walls of one building are not the same eight stripes.
+        const j = hash2(it.seed ^ Math.round(ax * 100), i * 37 + Math.round(az * 100)) * 0.06;
+        band(skirt + i * h, skirt + (i + 1) * h, (lo + (hi - lo) * (i / COURSES)) * (k + j));
+      }
+      return;
+    }
+    if (finish.walls === WALLS.PANEL) {
+      const rail = Math.min(1.0, top * 0.42);
+      band(skirt, rail, lo * 0.9);
+      band(rail, rail + 0.09, lo * 0.55);
+      band(rail + 0.09, top - 0.1, hi);
+      band(top - 0.1, top, hi * 0.72);
+      return;
+    }
+    // Paint: body, and a cornice so the ceiling has an edge.
+    band(skirt, top - 0.1, (lo + hi) / 2);
+    band(top - 0.1, top, hi * 0.78);
+  };
+
+  /**
+   * A flat rectangle standing on a wall, inset off it. Frames, glass, sills.
+   *
+   * `wall` with an explicit colour and an explicit height, plus the inset that
+   * keeps three coplanar rectangles from fighting over the same depth.
+   */
+  const finishedFrame = (
+    ax: number, az: number, bx: number, bz: number,
+    nx: number, nz: number, y0: number, y1: number, inset: number,
+    rgb: { r: number; g: number; b: number },
+  ): void => {
+    wall(ax + nx * inset, az + nz * inset, bx + nx * inset, bz + nz * inset, nx, nz, 1, 1, y0, y1, rgb);
+  };
+
   // --- The floor and the ceiling, as fans over the shell.
   //
   // A fan is exact here and only here: the shell is an intersection of
@@ -914,6 +1075,116 @@ export function interiorMesh(
     }
   }
 
+  /*
+   * --- What the floor is finished in. Boards, carpet or tile.
+   *
+   * Laid as a grid of quads four millimetres over the fan above, **in the
+   * building's own frame** so the boards run with the walls rather than with
+   * the compass -- which is the same reason the rooms are laid out in that
+   * frame, and is the difference between a floor and a doormat.
+   *
+   * A quad is emitted only when its centre is inside the shell. That leaves a
+   * ragged few centimetres at the wall where the fan shows through, which is
+   * exactly what a skirting board covers in a real room and reads as one here.
+   * Clipping each quad properly would be a polygon clip per quad for a seam
+   * nobody can see.
+   *
+   * The cell size is chosen from the floor's own area against
+   * `MAX_FLOOR_QUADS`, so a terrace gets 130 mm boards and a warehouse gets
+   * planks -- and neither costs more than the other.
+   */
+  {
+    const box = it.plan.box;
+    // The floor's extent in its own frame, from the shell rather than the box:
+    // the box circumscribes the footprint and the shell is the footprint.
+    let minU = Infinity;
+    let maxU = -Infinity;
+    let minV = Infinity;
+    let maxV = -Infinity;
+    for (let i = 0; i < it.shell.length; i += 2) {
+      const u = it.shell[i] * box.ux + it.shell[i + 1] * box.uz;
+      const v = -it.shell[i] * box.uz + it.shell[i + 1] * box.ux;
+      if (u < minU) minU = u;
+      if (u > maxU) maxU = u;
+      if (v < minV) minV = v;
+      if (v > maxV) maxV = v;
+    }
+    const spanU = Math.max(0.5, maxU - minU);
+    const spanV = Math.max(0.5, maxV - minV);
+    // The natural size of one piece of this covering, and its aspect: a board
+    // is long and narrow, a carpet tile and a floor tile are square.
+    const wide = finish.floor === FLOOR.BOARDS ? 0.16 : finish.floor === FLOOR.TILE ? 0.45 : 0.7;
+    const longM = finish.floor === FLOOR.BOARDS ? 1.9 : wide;
+    // Grown together until the count fits the budget, which keeps the aspect.
+    let grow = 1;
+    while ((spanU / (wide * grow)) * (spanV / (longM * grow)) > MAX_FLOOR_QUADS) grow *= 1.25;
+    const cu = wide * grow;
+    const cv = longM * grow;
+    const y = floorY + 0.004;
+    const nu = Math.ceil(spanU / cu);
+    const nv = Math.ceil(spanV / cv);
+    for (let i = 0; i < nu; i++) {
+      for (let j = 0; j < nv; j++) {
+        const u0 = minU + i * cu;
+        const v0 = minV + j * cv;
+        const u1 = Math.min(u0 + cu, maxU);
+        const v1 = Math.min(v0 + cv, maxV);
+        const mu = (u0 + u1) / 2;
+        const mv = (v0 + v1) / 2;
+        const wx = mu * box.ux - mv * box.uz;
+        const wz = mu * box.uz + mv * box.ux;
+        let inside = true;
+        for (const pl of it.planes) {
+          if (pl.nx * wx + pl.nz * wz - pl.d < 0.02) {
+            inside = false;
+            break;
+          }
+        }
+        if (!inside) continue;
+        /*
+         * The shade of this one piece, and it is the whole of the "texture".
+         *
+         * Boards take a wide per-plank spread and **stagger their joins**: the
+         * row index is offset by the column, so the short ends do not line up
+         * across the floor, which is the single thing that makes a grid of
+         * quads read as a floor rather than as graph paper. Carpet takes a
+         * narrow spread, because a carpet with visible tiles is a carpet tile.
+         * Tile alternates two shades in a chequer and keeps a darker grout line
+         * by leaving the fan showing at every edge.
+         */
+        let shade: number;
+        if (finish.floor === FLOOR.BOARDS) {
+          shade = 0.86 + hash2(it.seed ^ (i * 7919), j + ((i * 3) % 5)) * 0.28;
+        } else if (finish.floor === FLOOR.CARPET) {
+          shade = 0.70 + hash2(it.seed ^ (i * 131), j * 17) * 0.08;
+        } else {
+          shade = ((i + j) & 1 ? 0.98 : 0.86) + hash2(it.seed, i * 31 + j) * 0.04;
+        }
+        // Tile keeps a grout line; boards keep a hairline join. Both are the
+        // fan below showing through, which costs no geometry at all.
+        const gap = finish.floor === FLOOR.TILE ? 0.02 : finish.floor === FLOOR.BOARDS ? 0.012 : 0;
+        const a0 = u0 + gap;
+        const a1 = u1 - gap;
+        const b0 = v0 + gap;
+        const b1 = v1 - gap;
+        if (a1 <= a0 || b1 <= b0) continue;
+        const p00x = a0 * box.ux - b0 * box.uz;
+        const p00z = a0 * box.uz + b0 * box.ux;
+        const p10x = a1 * box.ux - b0 * box.uz;
+        const p10z = a1 * box.uz + b0 * box.ux;
+        const p11x = a1 * box.ux - b1 * box.uz;
+        const p11z = a1 * box.uz + b1 * box.ux;
+        const p01x = a0 * box.ux - b1 * box.uz;
+        const p01z = a0 * box.uz + b1 * box.ux;
+        // Carpet is not the building's plaster tint. Boards and tile are, which
+        // is what keeps a room looking like one material rather than three.
+        const rgb = finish.floor === FLOOR.CARPET ? carpet : null;
+        tri(p00x, y, p00z, p10x, y, p10z, p11x, y, p11z, 0, 1, 0, shade, rgb === null ? null : scaled(rgb, shade));
+        tri(p00x, y, p00z, p11x, y, p11z, p01x, y, p01z, 0, 1, 0, shade, rgb === null ? null : scaled(rgb, shade));
+      }
+    }
+  }
+
   // --- The outer wall, inward-facing, and the door panel in it.
   {
     const n = it.shell.length >> 1;
@@ -934,7 +1205,66 @@ export function interiorMesh(
       // points every outer wall out of the room, which is a building rendered
       // entirely by its backfaces -- and therefore not rendered at all.
       const pl = it.planes[j] ?? it.planes[0];
-      wall(ax, az, bx, bz, pl.nx, pl.nz, 0.72, 0.86);
+      finishedWall(ax, az, bx, bz, pl.nx, pl.nz, 0.72, 0.86);
+
+      /*
+       * --- And the windows in it.
+       *
+       * *"walls and windows"* -- the owner, and they are worth more than the
+       * word suggests: an interior generated out of a footprint is by
+       * construction a windowless box, and a windowless box is the one shape
+       * that reads as unfinished however well it is finished. A bright rectangle
+       * at eye height is also the only thing in here that says which way is out.
+       *
+       * Spaced along the wall rather than placed, because there is nothing in
+       * the data that knows where a window goes -- the same reason the door is
+       * the nearest point on the perimeter. Every 3.6 m, centred in what the
+       * wall can hold, and **skipped wherever the door is**, which is the one
+       * place a window certainly is not.
+       *
+       * They are drawn, not cut. A hole would need the shell to stop being an
+       * intersection of half-planes, and there is nothing to see through it: the
+       * city is on another layer.
+       */
+      const WINDOW_EVERY_M = 3.6;
+      const WINDOW_W = 1.25;
+      const WINDOW_H = 1.3;
+      const SILL_M = 0.95;
+      // A metre and a half of wall each side, so a window is a window in a
+      // wall rather than a glass wall with a bit of brick round it.
+      if (len >= WINDOW_W + 1.6 && ceilY - floorY > SILL_M + WINDOW_H + 0.25) {
+        const count = Math.max(1, Math.floor(len / WINDOW_EVERY_M));
+        const pitch = len / count;
+        for (let w = 0; w < count; w++) {
+          const t = (w + 0.5) * pitch;
+          const wx = ax + ex * t;
+          const wz = az + ez * t;
+          // Not over the door, and not half over it either.
+          if (Math.hypot(wx - doorX, wz - doorZ) < DOOR_GAP_M * 0.9 + WINDOW_W / 2) continue;
+          const half = WINDOW_W / 2;
+          // Frame first, then the glass a further two centimetres in, so
+          // neither can z-fight with the wall or with the other.
+          finishedFrame(
+            wx - ex * (half + 0.09), wz - ez * (half + 0.09),
+            wx + ex * (half + 0.09), wz + ez * (half + 0.09),
+            pl.nx, pl.nz, floorY + SILL_M - 0.09, floorY + SILL_M + WINDOW_H + 0.09, 0.05,
+            { r: 0.20, g: 0.18, b: 0.15 },
+          );
+          finishedFrame(
+            wx - ex * half, wz - ez * half,
+            wx + ex * half, wz + ez * half,
+            pl.nx, pl.nz, floorY + SILL_M, floorY + SILL_M + WINDOW_H, 0.09,
+            daylight,
+          );
+          // A sill, because a window with no sill is a poster of a window.
+          finishedFrame(
+            wx - ex * (half + 0.14), wz - ez * (half + 0.14),
+            wx + ex * (half + 0.14), wz + ez * (half + 0.14),
+            pl.nx, pl.nz, floorY + SILL_M - 0.14, floorY + SILL_M - 0.09, 0.14,
+            { r: 0.62, g: 0.60, b: 0.56 },
+          );
+        }
+      }
     }
   }
 
@@ -999,8 +1329,8 @@ export function interiorMesh(
     const h = WALL_THICK_M / 2;
     // The two faces, each offset half a thickness off the centre line and each
     // facing outward from it.
-    wall(w.ax + nx * h, w.az + nz * h, w.bx + nx * h, w.bz + nz * h, nx, nz, 0.66, 0.80);
-    wall(w.bx - nx * h, w.bz - nz * h, w.ax - nx * h, w.az - nz * h, -nx, -nz, 0.66, 0.80);
+    finishedWall(w.ax + nx * h, w.az + nz * h, w.bx + nx * h, w.bz + nz * h, nx, nz, 0.66, 0.80);
+    finishedWall(w.bx - nx * h, w.bz - nz * h, w.ax - nx * h, w.az - nz * h, -nx, -nz, 0.66, 0.80);
     // And the two ends, which are what a doorway's reveal is: without them a
     // partition is a sheet of paper and every opening in the building shows it.
     //
@@ -1405,6 +1735,105 @@ export function verifyInterior(): string[] {
         }
       }
       if (outward > 0) failures.push(`${outward} outer-wall triangles face out of the room; the building would render as nothing.`);
+    }
+  }
+
+  // --- The finishes: deterministic, bounded, and actually there.
+  //
+  // *"random floorboard vs carpet on ground, walls and windows"*. Four things
+  // to hold, and the first is the one that would be invisible until two people
+  // stood in one room and described different floors to each other.
+  {
+    // Deterministic per building, and different between buildings. The whole
+    // reason none of this is on the wire.
+    const pts = poly(0, 0, 16, 0, 16, 24, 0, 24);
+    const a = southDoor(pts, 0, 9, 111);
+    const b = southDoor(pts, 0, 9, 111);
+    if (a === null || b === null) failures.push('a plain building generated nothing to finish.');
+    else {
+      const ma = interiorMesh(a, 8, 0, 0, -1);
+      const mb = interiorMesh(b, 8, 0, 0, -1);
+      if (ma.colors.length !== mb.colors.length) failures.push('one building generated two different meshes.');
+      else {
+        let differs = 0;
+        for (let i = 0; i < ma.colors.length; i++) if (ma.colors[i] !== mb.colors[i]) differs++;
+        if (differs > 0) failures.push(`${differs} vertex colours differ between two builds of one building; two players would see different floors.`);
+      }
+    }
+    // And every finish is reachable. A weighting that never picked carpet would
+    // be a feature that shipped as one branch, and nothing else would say so.
+    const floors = new Set<number>();
+    const walls = new Set<number>();
+    for (let seed = 1; seed < 400; seed++) {
+      const f = finishOf(seed);
+      floors.add(f.floor);
+      walls.add(f.walls);
+    }
+    if (floors.size !== 3) failures.push(`only ${floors.size} of 3 floor finishes are ever chosen.`);
+    if (walls.size !== 3) failures.push(`only ${walls.size} of 3 wall finishes are ever chosen.`);
+  }
+
+  // --- Bounded. A floor covering laid at its natural size over a warehouse is
+  // a quarter of a million quads, and this is one mesh built on a door press.
+  {
+    for (const [what, pts, height] of [
+      ['a terrace', poly(0, 0, 6, 0, 6, 18, 0, 18), 7.4],
+      ['a 30 m block', poly(0, 0, 30, 0, 30, 30, 0, 30), 12],
+      ['a warehouse', poly(0, 0, 400, 0, 400, 260, 0, 260), 9],
+    ] as Array<[string, Float32Array, number]>) {
+      const it = southDoor(pts, 0, height, 9);
+      if (it === null) continue;
+      const mesh = interiorMesh(it, 3, 0, 0, -1);
+      // The floor is the only unbounded thing in here; everything else is a
+      // constant per wall. Twice the quad budget, in triangles, plus room for
+      // the walls and their courses.
+      if (mesh.triangles > MAX_FLOOR_QUADS * 2 + 6000) {
+        failures.push(`${what} drew ${mesh.triangles} triangles; the floor covering is not bounded.`);
+      }
+      if (mesh.triangles < 40) failures.push(`${what} drew only ${mesh.triangles} triangles; it has no finish on it.`);
+    }
+  }
+
+  // --- Windows: on the outer wall, never over the door, inside the storey.
+  {
+    const pts = poly(0, 0, 18, 0, 18, 26, 0, 26);
+    const it = southDoor(pts, 6, 9, 7);
+    if (it === null) failures.push('an 18 x 26 m building generated no interior.');
+    else {
+      const mesh = interiorMesh(it, 9, 0, 0, -1);
+      // The glass is the one deliberately bright surface in the building, and
+      // that is how it is counted: nothing else is over 0.78 on all three
+      // channels. If this ever finds none, the windows have stopped being drawn.
+      let glass = 0;
+      let overDoor = 0;
+      for (let t = 0; t < mesh.triangles; t++) {
+        const i = t * 9;
+        const c = t * 9;
+        if (mesh.colors[c] < 0.78 || mesh.colors[c + 1] < 0.85 || mesh.colors[c + 2] < 0.9) continue;
+        glass++;
+        const cx = (mesh.positions[i] + mesh.positions[i + 3] + mesh.positions[i + 6]) / 3;
+        const cz = (mesh.positions[i + 2] + mesh.positions[i + 5] + mesh.positions[i + 8]) / 3;
+        if (Math.hypot(cx - 9, cz - 0) < DOOR_GAP_M / 2) overDoor++;
+      }
+      if (glass === 0) failures.push('a building with 26 m walls has no windows in it.');
+      if (overDoor > 0) failures.push(`${overDoor} window triangles are drawn over the door.`);
+      // And every one of them is **in the outer wall**, not floating in the
+      // middle of a room. A window that missed its wall would be a bright
+      // rectangle hanging in the air, and it would look deliberate.
+      let adrift = 0;
+      for (let t = 0; t < mesh.triangles; t++) {
+        const i = t * 9;
+        const c = t * 9;
+        if (mesh.colors[c] < 0.78 || mesh.colors[c + 1] < 0.85 || mesh.colors[c + 2] < 0.9) continue;
+        const cx = (mesh.positions[i] + mesh.positions[i + 3] + mesh.positions[i + 6]) / 3;
+        const cz = (mesh.positions[i + 2] + mesh.positions[i + 5] + mesh.positions[i + 8]) / 3;
+        let onWall = false;
+        for (const pl of it.planes) {
+          if (Math.abs(pl.nx * cx + pl.nz * cz - pl.d) < 0.25) onWall = true;
+        }
+        if (!onWall) adrift++;
+      }
+      if (adrift > 0) failures.push(`${adrift} window triangles are not on any outer wall.`);
     }
   }
 

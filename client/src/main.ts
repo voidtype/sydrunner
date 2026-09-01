@@ -8174,7 +8174,23 @@ async function main(): Promise<void> {
         return;
       }
       const scale = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1;
-      const delta = e.deltaY * scale;
+      /*
+       * --- `deltaX` when Shift is down, and it is the browser's doing.
+       *
+       * Every major browser remaps a vertical wheel to the **horizontal** axis
+       * while Shift is held -- it is how you scroll a wide page sideways -- so a
+       * shift-wheel arrives here with `deltaY === 0` and all of its movement in
+       * `deltaX`. The old line read `deltaY` alone and returned on the zero, so
+       * holding Shift silently switched the camera zoom off. Reported as *"i
+       * just want shift not to affect the zoom behavior, atm it blocks it"*,
+       * which is exactly what it was doing: Shift is sprint, so this was the
+       * camera refusing to move for anybody zooming while they ran.
+       *
+       * Guarded on `e.shiftKey` rather than taken whenever `deltaY` is zero,
+       * because a genuine horizontal wheel -- two fingers sideways on a
+       * trackpad -- is a different gesture and should still mean nothing here.
+       */
+      const delta = (e.deltaY !== 0 || !e.shiftKey ? e.deltaY : e.deltaX) * scale;
       if (delta === 0) return;
       if (delta > 0 !== wheelCamera > 0) wheelCamera = 0;
       wheelCamera += delta;
