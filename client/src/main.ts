@@ -9086,6 +9086,15 @@ async function main(): Promise<void> {
    * for the same reasons -- no train, doors shut, standing too far from the door.
    */
   const pressMount = (): boolean => {
+    /* --- Nothing to mount indoors, ahead of even the sun button.
+     *
+     * `sim.resolveMount` returns on the same test and this is the prediction of
+     * it. Without it a player standing at a front window takes the e-bike or
+     * the ute parked on the pavement a metre away, through the wall: the
+     * browser predicts the mount, the camera drops into the saddle, and the
+     * server -- which refuses -- corrects it a round trip later. A refusal the
+     * client already knows about should never be predicted. */
+    if (interior !== null) return false;
     /* --- The button in Sydney Park, **ahead of everything**, and it is the one
      *     addition to this chain that does not need to be in `sim.resolveMount`.
      *
@@ -9946,13 +9955,23 @@ async function main(): Promise<void> {
         }
       }
     }
+    /*
+     * And indoors, the only prompt there is is the way out.
+     *
+     * Everything above it measures a distance in world metres to something in
+     * the city -- the button in Sydney Park, a platform, a bike, a car -- and
+     * every one of those is on the other side of a wall from a body in a
+     * building. Offering them would be offering four things `pressMount` has
+     * just been taught to refuse.
+     */
     hud.derived(
-      sunButton.prompt(player.position.x, player.position.z) ||
-        trainPill ||
-        ridePrompt(playerCombat, playerCombat.phase, rideNudgeT, rideNudgeText) ||
-        takePrompt(takeableNear, playerCombat.drivingCar !== 0, playerCombat.phase) ||
-        (atExit ? 'E — back outside' : '') ||
-        (doorSite !== null ? 'E — go inside' : ''),
+      interior !== null
+        ? (atExit ? 'E — back outside' : '')
+        : sunButton.prompt(player.position.x, player.position.z) ||
+          trainPill ||
+          ridePrompt(playerCombat, playerCombat.phase, rideNudgeT, rideNudgeText) ||
+          takePrompt(takeableNear, playerCombat.drivingCar !== 0, playerCombat.phase) ||
+          (doorSite !== null ? 'E — go inside' : ''),
     );
 
     // Reconciliation, at the top of the tick and before anything is advanced.
