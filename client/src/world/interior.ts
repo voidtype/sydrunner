@@ -100,6 +100,16 @@ const MIN_CONTACT_M = 2.2;
 export const CEILING_M = 2.7;
 
 /**
+ * Head height of an opening between two rooms, metres.
+ *
+ * The wall carries on above it -- see `Interior.headers`. 2.1 rather than a
+ * real 2.04 m door head, because the extra six centimetres is free and a
+ * player jumping through a doorway should not clip a lintel that is not there
+ * as far as collision is concerned.
+ */
+export const DOOR_HEAD_M = 2.1;
+
+/**
  * The narrowest building with an inside worth having, metres across.
  *
  * A body is 0.7 m wide and the walls take 0.32 of the span, so anything under
@@ -151,6 +161,14 @@ export interface Interior {
   rooms: readonly Room[];
   /** Partitions between those rooms, doorways already subtracted. */
   walls: readonly InteriorWall[];
+  /**
+   * The wall over each opening -- the lintel, and what makes a gap a doorway.
+   *
+   * **Drawing only. Deliberately not in `walls`, which is collision**: you walk
+   * under a header, and a resolver that saw one would put a wall across every
+   * doorway in the building.
+   */
+  headers: readonly InteriorWall[];
   /** The walkable shell: the footprint inset by a wall. Convex, world x,z pairs. */
   shell: Float32Array;
   /** The same shell as half-planes, which is what the resolver actually reads. */
@@ -582,10 +600,34 @@ export function buildInterior(
   const merged = unionSpans(edges);
 
   const pieces: Span[] = [];
+  /*
+   * The wall **above** each opening, which is what makes it a doorway.
+   *
+   * A gap subtracted from a wall over its whole height is not a door, it is a
+   * missing wall -- reported as *"missing doors and stuff"* the first time
+   * anybody looked at a finished room. A real opening is 2.1 m tall with the
+   * wall carrying on over it, and the lintel is most of what the eye reads: it
+   * is the thing that says "this is a way through" rather than "this partition
+   * stops here".
+   *
+   * Kept apart from `walls` rather than given a height, because `walls` is
+   * **collision** and a header must not be: you walk under it. Two lists, one
+   * of which the resolver never sees, is a smaller change than teaching
+   * `InteriorResolver` about a vertical extent it would then have to be trusted
+   * to ignore -- and it keeps `verifyInterior`'s walk-through-every-doorway
+   * check testing exactly what it tested before.
+   */
+  const headerSpans: Span[] = [];
   for (const span of merged) {
     let parts: Array<{ lo: number; hi: number }> = [{ lo: span.lo, hi: span.hi }];
     for (const gap of doorways) {
       if (gap.axis !== span.axis || Math.abs(gap.coord - span.coord) > 1e-3) continue;
+      // Where this gap actually cuts *this* wall is where a header goes. A
+      // doorway on a line with no wall along it needs none, and would be a
+      // lintel standing on nothing.
+      const lo = Math.max(gap.lo, span.lo);
+      const hi = Math.min(gap.hi, span.hi);
+      if (hi - lo > 0.05) headerSpans.push({ axis: span.axis, coord: span.coord, lo, hi });
       const next: Array<{ lo: number; hi: number }> = [];
       for (const part of parts) {
         if (gap.hi <= part.lo || gap.lo >= part.hi) {
@@ -661,6 +703,24 @@ export function buildInterior(
   centreX /= points.length / 2;
   centreZ /= points.length / 2;
 
+  // The headers, through the same conversion and the same clip as the walls.
+  const headers: InteriorWall[] = [];
+  for (const piece of headerSpans) {
+    const au = piece.axis === 0 ? piece.coord : piece.lo;
+    const av = piece.axis === 0 ? piece.lo : piece.coord;
+    const bu = piece.axis === 0 ? piece.coord : piece.hi;
+    const bv = piece.axis === 0 ? piece.hi : piece.coord;
+    const ax = au * box.ux - av * box.uz;
+    const az = au * box.uz + av * box.ux;
+    const bx = bu * box.ux - bv * box.uz;
+    const bz = bu * box.uz + bv * box.ux;
+    if (!clipToShell(planes, ax, az, bx, bz, clipped)) continue;
+    const dx = clipped.bx - clipped.ax;
+    const dz = clipped.bz - clipped.az;
+    if (dx * dx + dz * dz < 0.05 * 0.05) continue;
+    headers.push({ ax: clipped.ax, az: clipped.az, bx: clipped.bx, bz: clipped.bz });
+  }
+
   return {
     seed,
     base,
@@ -668,6 +728,7 @@ export function buildInterior(
     plan,
     rooms,
     walls,
+    headers,
     shell,
     planes,
     centreX,
@@ -1360,6 +1421,67 @@ export function interiorMesh(
     );
   }
 
+  // --- The wall over every opening, and the frame round it.
+  //
+  // What turns a hole into a door. Four pieces, and each is doing a job the eye
+  // actually uses: the **lintel** faces, which carry the wall on above the
+  // opening; the **soffit**, the underside of it, which is the surface that
+  // tells you the wall has thickness; the **architrave**, a darker band under
+  // the soffit, which is the line a person reads as a door frame; and the
+  // **jambs**, the two vertical returns at the ends. Without the last two an
+  // opening reads as a bite taken out of a wall.
+  for (const h of it.headers) {
+    let ex = h.bx - h.ax;
+    let ez = h.bz - h.az;
+    const len = Math.hypot(ex, ez);
+    if (!(len > 1e-6)) continue;
+    ex /= len;
+    ez /= len;
+    const nx = ez;
+    const nz = -ex;
+    const t = WALL_THICK_M / 2;
+    const head = floorY + DOOR_HEAD_M;
+    // The two faces of the wall above the opening.
+    wall(h.ax + nx * t, h.az + nz * t, h.bx + nx * t, h.bz + nz * t, nx, nz, 0.70, 0.80, head + 0.06, ceilY);
+    wall(h.bx - nx * t, h.bz - nz * t, h.ax - nx * t, h.az - nz * t, -nx, -nz, 0.70, 0.80, head + 0.06, ceilY);
+    // The architrave: a darker band under them, on both sides, which is the
+    // horizontal line that says "frame".
+    wall(h.ax + nx * t, h.az + nz * t, h.bx + nx * t, h.bz + nz * t, nx, nz, 0.44, 0.44, head, head + 0.06);
+    wall(h.bx - nx * t, h.bz - nz * t, h.ax - nx * t, h.az - nz * t, -nx, -nz, 0.44, 0.44, head, head + 0.06);
+    // The soffit: the underside of the opening, looking down.
+    tri(
+      h.ax - nx * t, head, h.az - nz * t,
+      h.bx - nx * t, head, h.bz - nz * t,
+      h.bx + nx * t, head, h.bz + nz * t,
+      0, -1, 0, 0.5,
+    );
+    tri(
+      h.ax - nx * t, head, h.az - nz * t,
+      h.bx + nx * t, head, h.bz + nz * t,
+      h.ax + nx * t, head, h.az + nz * t,
+      0, -1, 0, 0.5,
+    );
+    // And the two jambs: the reveal you see when you look through the opening
+    // side-on. The partitions each side already cap their own ends, but they
+    // stop at the head, so without these the frame has no sides above a
+    // player's shoulders.
+    wall(h.ax - nx * t, h.az - nz * t, h.ax + nx * t, h.az + nz * t, -ex, -ez, 0.5, 0.5, floorY, head);
+    wall(h.bx + nx * t, h.bz + nz * t, h.bx - nx * t, h.bz - nz * t, ex, ez, 0.5, 0.5, floorY, head);
+    // The top, so the header's own head is a surface rather than a hole.
+    tri(
+      h.ax - nx * t, ceilY, h.az - nz * t,
+      h.bx - nx * t, ceilY, h.bz - nz * t,
+      h.bx + nx * t, ceilY, h.bz + nz * t,
+      0, 1, 0, 0.5,
+    );
+    tri(
+      h.ax - nx * t, ceilY, h.az - nz * t,
+      h.bx + nx * t, ceilY, h.bz + nz * t,
+      h.ax + nx * t, ceilY, h.az + nz * t,
+      0, 1, 0, 0.5,
+    );
+  }
+
   return {
     positions: new Float32Array(pos),
     normals: new Float32Array(nor),
@@ -1834,6 +1956,53 @@ export function verifyInterior(): string[] {
         if (!onWall) adrift++;
       }
       if (adrift > 0) failures.push(`${adrift} window triangles are not on any outer wall.`);
+    }
+  }
+
+  // --- Every opening has a wall over it, and none of them is collision.
+  //
+  // *"missing doors and stuff"* -- the owner, looking at a finished room. A gap
+  // cut through a wall over its whole height is not a doorway, it is a missing
+  // wall, and nothing about that is visible in a number. Three properties, and
+  // the middle one is the one that would quietly wall the building up.
+  {
+    const it = southDoor(poly(0, 0, 26, 0, 26, 34, 0, 34), 0, 9, 31);
+    if (it === null) failures.push('a 26 x 34 m building generated no interior.');
+    else {
+      if (it.rooms.length > 1 && it.headers.length === 0) {
+        failures.push(`a building with ${it.rooms.length} rooms has no wall over any of its openings.`);
+      }
+      // **A header is not a wall.** If one ever reaches `walls`, the resolver
+      // puts a partition across every doorway in the building and a player is
+      // sealed into the room they arrived in.
+      for (const h of it.headers) {
+        for (const w of it.walls) {
+          if (
+            Math.abs(h.ax - w.ax) < 1e-6 && Math.abs(h.az - w.az) < 1e-6 &&
+            Math.abs(h.bx - w.bx) < 1e-6 && Math.abs(h.bz - w.bz) < 1e-6
+          ) {
+            failures.push('a doorway header is in the collision walls; every opening in the building is blocked.');
+            break;
+          }
+        }
+      }
+      // And a header stands over an opening rather than over solid wall: its
+      // midpoint must be somewhere the resolver lets a body stand.
+      let solid = 0;
+      for (const h of it.headers) {
+        const mx = (h.ax + h.bx) / 2;
+        const mz = (h.az + h.bz) / 2;
+        if (it.resolver.clearance(mx, mz) < 0) solid++;
+      }
+      if (solid > 0) failures.push(`${solid} headers stand over solid wall rather than over an opening.`);
+      // The drawn lintel sits between head height and the ceiling, nowhere else.
+      const mesh = interiorMesh(it, 13, 0, 0, -1);
+      let low = 0;
+      for (let i = 1; i < mesh.positions.length; i += 3) {
+        const y = mesh.positions[i];
+        if (y > it.base + CEILING_M + 0.02 || y < it.base - 0.02) low++;
+      }
+      if (low > 0) failures.push(`${low} vertices of the door frames fall outside the storey.`);
     }
   }
 
