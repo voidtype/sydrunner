@@ -215,13 +215,43 @@ export class TickProfile {
   private last = 0;
 
   /**
+   * The clock this profile reads. `performance.now` in the host; a counter in
+   * the self-check.
+   *
+   * `client/src/frameprofile.FrameProfile.clock`'s argument, applied to the
+   * server's twin of it, and the reason is the same failure seen from the other
+   * side. Everything `verifyProfile` asserts is bookkeeping -- that sections
+   * tile a tick, that `stop` closes the cursor, that a reader subtracts what it
+   * already reported -- and the only way to put a known duration into a profile
+   * that reads its own clock is to burn that long in a spin loop. Every one of
+   * those assertions was therefore also asserting that the OS did not
+   * deschedule this process for a fifth of a millisecond, and it does.
+   *
+   * The consequence here is worse than in the browser: `verifyProfile` is on
+   * the server's boot list, and a failure there does not spoil one player's
+   * session, it **refuses to start the host**. A busy minute on the box at the
+   * wrong moment during a deploy is the whole game down, for a stall in a check
+   * rather than a stall in the code.
+   *
+   * The hot path pays a monomorphic call in place of a direct one, and
+   * `overheadMs()` is measured against this file's own budget by the check
+   * below -- so a regression is caught by the number that would notice.
+   */
+  private readonly clock: () => number;
+
+  /** `performance.now` unless a caller says otherwise. See `clock`. */
+  constructor(clock?: () => number) {
+    this.clock = clock ?? (() => performance.now());
+  }
+
+  /**
    * Close the open section and open `sec`.
    *
    * The one hot-path function in this file: an array read, a subtract, an array
    * write and a clock read. No allocation, no strings, no map.
    */
   at(sec: number): void {
-    const now = performance.now();
+    const now = this.clock();
     if (this.cursor >= 0) this.acc[this.cursor] += now - this.last;
     this.cursor = sec;
     this.last = now;
@@ -238,7 +268,7 @@ export class TickProfile {
    */
   stop(): void {
     if (this.cursor < 0) return;
-    this.acc[this.cursor] += performance.now() - this.last;
+    this.acc[this.cursor] += this.clock() - this.last;
     this.cursor = -1;
     this.marks++;
   }
@@ -396,14 +426,18 @@ export function verifyProfile(): string[] {
   // over a measurable interval; the sum must be the interval, to the resolution
   // of the clock plus the four extra reads the check itself makes.
   {
-    const p = new TickProfile();
+    /*
+     * A counter, not `performance.now()`. See `TickProfile.clock`: everything
+     * below is bookkeeping, the spin loop it used to run on was also asserting
+     * that the OS did not deschedule this process mid-check, and a failure here
+     * does not spoil a session -- it refuses to boot the host.
+     */
+    let fake = 0;
     const spin = (ms: number): void => {
-      const until = performance.now() + ms;
-      let sink = 0;
-      while (performance.now() < until) sink++;
-      if (sink === -1) throw new Error('unreachable');
+      fake += ms;
     };
-    const began = performance.now();
+    const p = new TickProfile(() => fake);
+    const began = fake;
     p.at(SEC.advance);
     spin(2);
     p.at(SEC.powerups);
@@ -411,15 +445,19 @@ export function verifyProfile(): string[] {
     p.at(SEC.send);
     spin(2);
     p.stop();
-    const wall = performance.now() - began;
+    const wall = fake - began;
     const sum = p.total();
-    if (Math.abs(sum - wall) > 0.2) {
+    if (Math.abs(sum - wall) > 1e-9) {
       failures.push(
         `Three sections over ${wall.toFixed(3)} ms of wall clock accumulated ${sum.toFixed(3)} ms. ` +
           `The sections do not tile the tick, so the breakdown does not add up to the tick it is breaking down.`,
       );
     }
-    if (p.totalOf(SEC.advance) < 1 || p.totalOf(SEC.powerups) < 1 || p.totalOf(SEC.send) < 1) {
+    if (
+      Math.abs(p.totalOf(SEC.advance) - 2) > 1e-9 ||
+      Math.abs(p.totalOf(SEC.powerups) - 2) > 1e-9 ||
+      Math.abs(p.totalOf(SEC.send) - 2) > 1e-9
+    ) {
       failures.push(
         `A 2 ms section was charged advance=${p.totalOf(SEC.advance).toFixed(3)}, ` +
           `powerups=${p.totalOf(SEC.powerups).toFixed(3)}, send=${p.totalOf(SEC.send).toFixed(3)}. ` +
@@ -478,14 +516,14 @@ export function verifyProfile(): string[] {
   // reader: the host's breakdown is the *sum*, because the budget is one
   // 16.67 ms tick for every room together and not one each.
   {
+    // A counter again, for the block above's reason: this asserts that two
+    // rooms' numbers add up, which is arithmetic, not timing.
+    let fake = 0;
     const spin = (ms: number): void => {
-      const until = performance.now() + ms;
-      let sink = 0;
-      while (performance.now() < until) sink++;
-      if (sink === -1) throw new Error('unreachable');
+      fake += ms;
     };
-    const a = new TickProfile();
-    const b = new TickProfile();
+    const a = new TickProfile(() => fake);
+    const b = new TickProfile(() => fake);
     for (const p of [a, b]) {
       p.countTick();
       p.countTick();
@@ -499,7 +537,7 @@ export function verifyProfile(): string[] {
     new ProfileReader().take(a, both);
     new ProfileReader().take(b, both);
     const solo = new ProfileReader().take(a);
-    if (Math.abs(both.advance - solo.advance * 2) > 0.3) {
+    if (Math.abs(both.advance - solo.advance * 2) > 1e-9) {
       failures.push(
         `Two rooms of ${solo.advance.toFixed(3)} ms folded to ${both.advance.toFixed(3)}; ` +
           `take is not additive and a multi-room host would report one room's tick as the whole.`,

@@ -314,6 +314,46 @@ export class FrameProfile {
   private lastAt = 0;
 
   /**
+   * The clock this profiler reads. `performance.now` in the game; a counter in
+   * the self-check.
+   *
+   * ---------------------------------------------------------------------------
+   * **Injected so the self-check can stop measuring the machine.**
+   *
+   * Almost everything `verifyFrameProfile` asserts is *bookkeeping* -- that a
+   * row is zeroed before it is reused, that the sections of a frame add up to
+   * that frame, that a frame still being written is not in the window. None of
+   * it is about the clock. But the only way to put a known duration into a
+   * profiler that reads `performance.now()` itself is to burn that long in a
+   * spin loop, so every one of those assertions was really asserting *"and the
+   * browser did not deschedule this tab for two milliseconds in the middle"*.
+   *
+   * It does, and when it did the game refused to boot: `A hitch pushed 120
+   * frames into the past still reports as the worst frame (5.000 ms)`, reported
+   * by the owner against a build in which the ring was perfectly fine. A
+   * self-check that locks players out when a laptop hiccups is worse than the
+   * bug it is guarding, and loosening the tolerance only makes the flake rarer
+   * and the check weaker at the same time.
+   *
+   * With a counter the durations are exact and the tolerances go from 0.3 ms to
+   * a rounding error, so the check is both unbreakable by the scheduler and
+   * *stricter* than it was. What genuinely needs the real clock -- the grain
+   * measurement and the per-boundary overhead -- still uses it, and says so.
+   *
+   * **The hot path pays a monomorphic call** in place of a direct one. It is
+   * one call site with one implementation for the life of the process, which is
+   * the shape every JIT inlines, and `overheadUs()` is measured against a 30 us
+   * budget by this file's own check -- so a regression here is caught by the
+   * one number that would notice.
+   */
+  private readonly clock: () => number;
+
+  /** `performance.now` unless a caller says otherwise. See `clock`. */
+  constructor(clock?: () => number) {
+    this.clock = clock ?? (() => performance.now());
+  }
+
+  /**
    * Open a frame. Zeroes the row about to be written and arms the cursor.
    *
    * The zeroing is nineteen stores and it has to happen *here* rather than at
@@ -336,7 +376,7 @@ export class FrameProfile {
     const base = this.row * FRAME_SECTION_COUNT;
     for (let i = 0; i < FRAME_SECTION_COUNT; i++) this.ring[base + i] = 0;
     this.cursor = -1;
-    this.lastAt = performance.now();
+    this.lastAt = this.clock();
     this.marks++;
   }
 
@@ -347,7 +387,7 @@ export class FrameProfile {
    * array write and a clock read. No allocation, no strings, no map.
    */
   at(sec: number): void {
-    const now = performance.now();
+    const now = this.clock();
     if (this.cursor >= 0) this.ring[this.row * FRAME_SECTION_COUNT + this.cursor] += now - this.lastAt;
     this.cursor = sec;
     this.lastAt = now;
@@ -365,7 +405,7 @@ export class FrameProfile {
    * `TickProfile.stop`'s lesson and it is the same one here.
    */
   stop(): void {
-    const now = performance.now();
+    const now = this.clock();
     const base = this.row * FRAME_SECTION_COUNT;
     if (this.cursor >= 0) this.ring[base + this.cursor] += now - this.lastAt;
     this.cursor = -1;
@@ -648,40 +688,51 @@ export function verifyFrameProfile(): string[] {
   }
 
   /**
-   * Busy-work rather than a sleep, because `performance.now()` is the thing
-   * being tested and a timer would be testing the event loop instead. Same
-   * helper `verifyProfile` uses.
+   * The clock the bookkeeping checks below run on: a counter, in milliseconds.
+   *
+   * **Not `performance.now()`, and that is the whole point.** See
+   * `FrameProfile.clock`: every assertion from here to the overhead
+   * measurement is about the *ring* -- rows zeroed before reuse, sections that
+   * add up to their frame, an open frame kept out of the window -- and none of
+   * them is about time. Driving them with a spin loop meant every one of them
+   * also asserted that the browser did not deschedule the tab in the middle,
+   * which it does, and which locked the owner out of the game with `A hitch
+   * pushed 120 frames into the past still reports as the worst frame (5.000
+   * ms)` on a build whose ring was perfectly correct.
+   *
+   * On a counter the durations are exact, so the tolerances below are rounding
+   * errors rather than the third of a millisecond a spin loop needed. The
+   * check is unbreakable by the scheduler *and* stricter than it was.
    */
-  const spin = (ms: number): void => {
-    const until = performance.now() + ms;
-    let sink = 0;
-    while (performance.now() < until) sink++;
-    if (sink === -1) throw new Error('unreachable');
+  let fake = 0;
+  const burn = (ms: number): void => {
+    fake += ms;
   };
+  const profiler = (): FrameProfile => new FrameProfile(() => fake);
 
   // --- The sections tile the frame they cover.
   {
-    const p = new FrameProfile();
-    const began = performance.now();
+    const p = profiler();
+    const began = fake;
     p.begin();
     p.at(FSEC.sim);
-    spin(2);
+    burn(2);
     p.at(FSEC.traffic);
-    spin(2);
+    burn(2);
     p.at(FSEC.render);
-    spin(2);
+    burn(2);
     p.stop();
-    const wall = performance.now() - began;
+    const wall = fake - began;
     const r = p.report();
     const sum = r.sections.reduce((a, s) => a + s.meanMs, 0);
-    if (Math.abs(sum - wall) > 0.3) {
+    if (Math.abs(sum - wall) > 1e-9) {
       failures.push(
-        `Three sections over ${wall.toFixed(3)} ms of wall clock accumulated ${sum.toFixed(3)} ms. ` +
+        `Three sections over ${wall.toFixed(3)} ms accumulated ${sum.toFixed(3)} ms. ` +
           `The sections do not tile the frame, so the breakdown does not add up to the frame it is breaking down.`,
       );
     }
     const of = (name: string): number => r.sections.find((s) => s.name === name)?.meanMs ?? -1;
-    if (of('sim') < 1 || of('traffic') < 1 || of('render') < 1) {
+    if (Math.abs(of('sim') - 2) > 1e-9 || Math.abs(of('traffic') - 2) > 1e-9 || Math.abs(of('render') - 2) > 1e-9) {
       failures.push(
         `A 2 ms section was charged sim=${of('sim').toFixed(3)}, traffic=${of('traffic').toFixed(3)}, ` +
           `render=${of('render').toFixed(3)}. \`at\` is charging the section it opens rather than the one it closes.`,
@@ -694,7 +745,7 @@ export function verifyFrameProfile(): string[] {
 
     // --- Nothing accrues between frames.
     const parked = p.totalOf(FSEC.render);
-    spin(3);
+    burn(3);
     if (p.totalOf(FSEC.render) !== parked) {
       failures.push('`stop` left the cursor open; the gap between frames is being charged to a section.');
     }
@@ -716,25 +767,25 @@ export function verifyFrameProfile(): string[] {
     // The assertion is the invariant that actually failed, not a frame count:
     // a breakdown must add up to the total it is breaking down.
     {
-      const q = new FrameProfile();
+      const q = profiler();
       // The heavy frame goes in row 0, which is the row the wrap lands on.
       q.begin();
       q.at(FSEC.render);
-      spin(4);
+      burn(4);
       q.stop();
       for (let i = 1; i < WINDOW; i++) {
         q.begin();
         q.at(FSEC.sim);
         // One honest peak inside the window, so the fixed path has a real frame
         // to report rather than passing on a window of zeroes.
-        if (i === 5) spin(1);
+        if (i === 5) burn(1);
         q.stop();
       }
       q.begin();
       q.at(FSEC.hud);
       const mid = q.report();
       const breakdown = mid.sections.reduce((a, sec) => a + sec.worstMs, 0);
-      if (Math.abs(breakdown - mid.worstMs) > 0.3) {
+      if (Math.abs(breakdown - mid.worstMs) > 1e-9) {
         failures.push(
           `Mid-frame, \`report\` called the worst frame ${mid.worstMs.toFixed(3)} ms and broke it down ` +
             `into ${breakdown.toFixed(3)} ms. The frame still being written is in the window, so its ` +
@@ -762,32 +813,33 @@ export function verifyFrameProfile(): string[] {
   // reporting the hitch forever, which is the exact bug that would make a
   // profiler lie about a stutter that has already been fixed.
   {
-    const p = new FrameProfile();
+    const p = profiler();
     const cheap = (): void => {
       p.begin();
       p.at(FSEC.sim);
-      spin(0.2);
+      burn(0.2);
       p.stop();
     };
     for (let i = 0; i < 5; i++) cheap();
     p.begin();
     p.at(FSEC.plates);
-    spin(4);
+    burn(4);
     p.stop();
     for (let i = 0; i < 5; i++) cheap();
 
     const hit = p.report();
-    if (hit.worstMs < 3.5) {
+    if (Math.abs(hit.worstMs - 4) > 1e-9) {
       failures.push(`A 4 ms frame among 0.2 ms frames reported a worst of ${hit.worstMs.toFixed(3)} ms; the ring is not keeping per-frame rows.`);
     }
     const plates = hit.sections.find((s) => s.name === 'plates');
-    if (!plates || plates.worstMs < 3.5) {
+    if (!plates || Math.abs(plates.worstMs - 4) > 1e-9) {
       failures.push(
         `The worst frame's breakdown charged plates ${(plates?.worstMs ?? -1).toFixed(3)} ms; ` +
           `the worst-frame column is not that frame's own row.`,
       );
     }
-    if (hit.meanMs > 1.5) {
+    // Eleven frames: ten at 0.2 and one at 4, which is 6.0 over 11.
+    if (Math.abs(hit.meanMs - 6 / 11) > 1e-9) {
       failures.push(`Eleven frames, one of them 4 ms, reported a mean of ${hit.meanMs.toFixed(3)} ms; the mean is not dividing by the window.`);
     }
 
@@ -798,14 +850,14 @@ export function verifyFrameProfile(): string[] {
     if (after.frames !== WINDOW) {
       failures.push(`After ${WINDOW + 11} frames the window holds ${after.frames}; the ring is not capping at ${WINDOW}.`);
     }
-    if (after.worstMs > 2) {
+    if (Math.abs(after.worstMs - 0.2) > 1e-9) {
       failures.push(
         `A hitch pushed ${WINDOW} frames into the past still reports as the worst frame (${after.worstMs.toFixed(3)} ms). ` +
           `The ring is not being cleared before a row is reused, so the report can never show a fix.`,
       );
     }
     const stalePlates = after.sections.find((s) => s.name === 'plates');
-    if (stalePlates && stalePlates.meanMs > 0.05) {
+    if (stalePlates && stalePlates.meanMs !== 0) {
       failures.push(`A section idle for ${WINDOW} frames still reports ${stalePlates.meanMs.toFixed(3)} ms/frame; rows are accumulating across wraps.`);
     }
     if (!after.sections.some((s) => s.name === 'plates')) {
