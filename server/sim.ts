@@ -164,6 +164,7 @@ import {
   type SnapshotAboard,
   type SnapshotNpc,
   type SnapshotPlayer,
+  type SpaceFrame,
   TEAM_EVENT_KIND,
   type TeamEventKind,
 } from '../client/src/net/protocol.ts';
@@ -253,7 +254,18 @@ import { PositionHistory, createBounds, rewindInto, resolveLiveById, type Rewoun
 // header.
 import { SpatialHash } from '../client/src/game/spatialhash.ts';
 import { eyeAt, groundFor, layOutBikes, type ServerWorld } from './world.ts';
-import { CollisionWorld } from '../client/src/player/collision.ts';
+import { CollisionWorld, type Prism } from '../client/src/player/collision.ts';
+// --- Interiors. Three pure modules and a wire constant; see INTERIORS.md.
+//
+// `doorway` answers which building a body is standing at, from the same prisms
+// the browser has. `interior` turns that building's plan into walls and a
+// resolver. `spaces` says what a space id is. All three run on this end for
+// real rather than for a check: **the server owns your position**, so which
+// building a door belongs to and where its walls are have to be answered here
+// or an interior is a room only its occupant can see.
+import { DOOR_REACH_M, buildingSeed, doorAt, type DoorPrism } from '../client/src/world/doorway.ts';
+import { arrivalAt, buildInterior, type Interior } from '../client/src/world/interior.ts';
+import { CITY_SPACE, spaceForBuilding } from '../client/src/net/spaces.ts';
 import { TerrainField } from '../client/src/world/terrain.ts';
 import { WaterLevels } from '../client/src/world/wading.ts';
 import { PowerupField } from '../client/src/game/powerups.ts';
@@ -602,6 +614,50 @@ export interface Participant {
   abilityRHeld: boolean;
   /** Set when the socket closes; the combatant leaves on the next tick. */
   gone: boolean;
+
+  // --- Interiors. See `client/src/net/spaces.ts` and INTERIORS.md.
+  /**
+   * Which world this body is in. `spaces.CITY_SPACE` for the street.
+   *
+   * **The one field that makes an interior more than a room only its occupant
+   * can see.** The server owns your position -- `net/client.reconcile` runs
+   * against a server-simulated body every tick -- so an instance cannot be a
+   * client trick: this process has to know which space you are in and simulate
+   * you there. Everything else about interiors on this end hangs off this
+   * number: interest is filtered by it before any distance is measured, a swing
+   * cannot land across it, and it is saved beside the position it belongs to.
+   *
+   * Zero for every bot, every guest and every account that logged off outdoors,
+   * which is very nearly everybody at any moment.
+   */
+  space: number;
+  /**
+   * The rooms this body is standing in, or null in the city.
+   *
+   * Borrowed from `Simulation.interiors`, not owned: one building has one inside
+   * for everybody in this room, which is the owner's first decision about the
+   * feature. Two participants in the same pub hold the same object.
+   */
+  interior: Interior | null;
+  /**
+   * The `CombatWorld` `advance` steps this body against while it is inside.
+   *
+   * Borrowed from the same cache and for the same reason. Null in the city,
+   * where `Participant.world` is the answer instead.
+   */
+  interiorWorld: CombatWorld | null;
+  /**
+   * The door this body came in by, in world metres, with its outward normal.
+   *
+   * Per participant rather than per interior, because the space is shared and
+   * the door is not: two people walk into the same corner pub from George
+   * Street and from the lane behind it, and the owner's rule is that *"u leave
+   * thru the door u came in"*. Meaningless while `space` is the city.
+   */
+  doorX: number;
+  doorZ: number;
+  doorNX: number;
+  doorNZ: number;
 
   // --- Money. See `client/src/game/cash.ts`.
   /**
@@ -1659,9 +1715,27 @@ export class Simulation {
      */
     let remembered: { x: number; z: number; yaw: number } | null = null;
     let lostSpot = false;
+    /*
+     * --- And the fourth thing that can refuse a spot: it was indoors.
+     *
+     * A spot with a building on it does not go through `restoreSpawnPoint` at
+     * all, and must not: that function's whole job is to refuse a position with
+     * a building over it, which is *every* interior. The building itself is the
+     * test instead, and it is applied after the participant exists, because
+     * putting a body inside needs the interior cache. See `restoreInterior`.
+     *
+     * `remembered` is still filled here so the body starts at those coordinates
+     * -- they are inside the footprint, and the ordinary spawn machinery has no
+     * opinion about that until something asks the collision world. Nothing does
+     * before `restoreInterior` runs a few lines below.
+     */
+    let indoors = 0;
     if (account !== null && bot === null && this.accounts !== null) {
       const saved = this.accounts.spotFor(account);
-      if (saved !== null) {
+      if (saved !== null && saved.building !== 0) {
+        indoors = saved.building;
+        remembered = { x: saved.x, z: saved.z, yaw: saved.yaw };
+      } else if (saved !== null) {
         const here = restoreSpawnPoint(saved, world);
         if (here !== null) remembered = { x: here.x, z: here.z, yaw: saved.yaw };
         else {
@@ -1724,6 +1798,16 @@ export class Simulation {
       abilityTHeld: false,
       abilityRHeld: false,
       gone: false,
+      // Outdoors, always, at this point -- including for an account that logged
+      // off inside. The restore happens below, after the participant exists,
+      // because it needs the interior cache and a body to put in it.
+      space: CITY_SPACE,
+      interior: null,
+      interiorWorld: null,
+      doorX: 0,
+      doorZ: 0,
+      doorNX: 0,
+      doorNZ: 0,
       // **The wallet is opened here and only here**, by name, and only for a
       // person. `WalletStore.for` creates on first sight, so a new name's first
       // `WALLET` frame carries `STARTING_BALANCE` rather than a zero that is
@@ -1795,6 +1879,41 @@ export class Simulation {
     // rather than a fact about the position: the spawn in the welcome is a
     // perfectly ordinary spawn and the only thing wrong with it is that it is
     // not where they left. Forty characters, in the pill, once.
+    /*
+     * --- Back inside, if that is where they logged off.
+     *
+     * *"if u log out inside u log in there"* -- the owner. After the
+     * participant exists, because this needs a body to move and the interior
+     * cache to move it into.
+     *
+     * A refusal is silent and lands them on the coordinates `join` already
+     * chose, which are inside the footprint -- so the note says so and the
+     * spot is forgotten rather than re-tried on every join for the rest of the
+     * week, which is `clearSpot`'s own rule applied to the one case it did not
+     * cover. `unstuckTo` is not called: the body is standing in a building and
+     * pressing the unstuck key is exactly the tool for that, which is a better
+     * answer than this function guessing a pavement.
+     */
+    if (indoors !== 0) {
+      const back = this.restoreInterior(
+        participant,
+        indoors,
+        participant.combat.body.position.x,
+        participant.combat.body.position.z,
+      );
+      if (!back) {
+        lostSpot = true;
+        if (account !== null && this.accounts !== null) this.accounts.clearSpot(account);
+        // And **out of the building**, which is the half that cannot be left
+        // undone: the coordinates they are standing on are inside a footprint,
+        // and a body left there is a body inside a solid with the city's
+        // collision switched back on. The disc, on the ordinary terms.
+        const fallback = this.joinSpot();
+        this.moveInto(participant, fallback.x, eyeAt(world, fallback.x, fallback.z), fallback.z);
+        participant.combat.body.yaw = fallback.yaw;
+        participant.restored = false;
+      }
+    }
     if (lostSpot) this.note(id, 'your spot was gone; back at the park');
     return participant;
   }
@@ -1826,7 +1945,34 @@ export class Simulation {
   carryOf(p: Participant): LiveSpot {
     const x = p.combat.body.position.x;
     const z = p.combat.body.position.z;
-    return { name: p.name, kills: p.kos, x, y: spawnGround(p.world, x, z), z, yaw: p.combat.body.yaw };
+    // **Indoors saves the floor and the building, not the terrain under it.**
+    //
+    // `spawnGround` deliberately takes the roofs out, which is the right answer
+    // for a body on a warehouse roof and exactly the wrong one for a body on the
+    // ground floor *inside* the warehouse: it would save the pavement outside,
+    // and the restore -- which puts them back in the building the seed names --
+    // would drop them through the floor. The interior's own base is the floor
+    // they are standing on and is the only height that means anything in here.
+    if (p.interior !== null) {
+      return {
+        name: p.name,
+        kills: p.kos,
+        x,
+        y: p.interior.base,
+        z,
+        yaw: p.combat.body.yaw,
+        building: p.interior.seed,
+      };
+    }
+    return {
+      name: p.name,
+      kills: p.kos,
+      x,
+      y: spawnGround(p.world, x, z),
+      z,
+      yaw: p.combat.body.yaw,
+      building: 0,
+    };
   }
 
   /**
@@ -2893,6 +3039,14 @@ export class Simulation {
       // knows about. The player keeps their movement and their look; the pip is
       // charged once, by `stepTalents`, on the tick the window closed.
       if (abilityPenaltyRunning(p.id, fxNow())) p.input.punch = false;
+      // **No footballs indoors**, and the same trick: the button is cleared on
+      // the input the authority is about to run. A ball is an object in the
+      // world with its own physics against the *city's* collision -- see
+      // `game/footy.ts` -- so one thrown in a pub would sail through the wall
+      // and land in George Street, visible to nobody in either world. Punching
+      // works normally, which is the half that matters: a pub brawl is the
+      // point. See INTERIORS.md.
+      if (p.space !== CITY_SPACE) p.input.throwBall = false;
       const events = advance(p.combat, p.input, FIXED_DT, this.enterCarriage(p));
       this.exitCarriage(p);
 
@@ -2920,9 +3074,21 @@ export class Simulation {
         // on the spot has no interest in what `pickRespawn` would have found,
         // and the ask *consumes* the cooldown -- see `fxTakeRespawnInPlace`.
         const inPlace = fxTakeRespawnInPlace(p.id, fxNow());
-        const spot = inPlace
-          ? null
-          : pickRespawn(p.combat.body.position.x, p.combat.body.position.z, p.world);
+        // **Knocked out indoors, you get up indoors.** `pickRespawn` searches
+        // the city's terrain and prisms and would answer with a pavement,
+        // which for a body in a pub is a respawn that walks through a wall --
+        // and would leave `space` saying otherwise. The interior's own arrival
+        // is the answer instead: it is the one point in the building that is
+        // known to be clear.
+        const inside = p.interior;
+        const spot = inside !== null
+          ? (() => {
+              const at = arrivalAt(inside, p.doorX, p.doorZ, p.doorNX, p.doorNZ);
+              return { x: at.x, y: inside.base, z: at.z };
+            })()
+          : inPlace
+            ? null
+            : pickRespawn(p.combat.body.position.x, p.combat.body.position.z, p.world);
         if (spot) {
           respawnAt(p.combat, spot.x, spot.y, spot.z, p.combat.body.yaw);
         } else {
@@ -3900,6 +4066,10 @@ export class Simulation {
     if (!rising) return;
     const c = p.combat;
     if (c.phase === 'ko') return;
+    // Nothing to get on inside a building. Without this a player standing at a
+    // front window would mount the e-bike parked on the pavement a metre away,
+    // through the wall, and ride it around the lounge room.
+    if (p.space !== CITY_SPACE) return;
 
     // --- The train, ahead of the bike, and one key for both.
     //
@@ -5497,9 +5667,334 @@ export class Simulation {
    * a respawn, an unstuck, a teleport, a hard reconciliation snap. See
    * `riding.enterLocal`, which is where that last one is argued out.
    */
+  // --- Interiors ---------------------------------------------------------------
+  //
+  // The server half of INTERIORS.md. Three questions live here and nowhere
+  // else: *which building is this door on* (answered from the prisms this
+  // process already holds, by the same pure `doorAt` the browser runs), *what
+  // is inside it* (`buildInterior`, cached per space so that one building has
+  // one inside for everybody), and *where does a body stand when it goes in and
+  // when it comes out*.
+  //
+  // None of it is taken from the client. `MSG.DOOR` is one byte with no
+  // payload, on `MSG.SUN_PRESS`' argument: a client that sent which building it
+  // was at would be a client that could name any building in Sydney.
+
+  /**
+   * How far from a body to look for a wall with a door in it, metres.
+   *
+   * `main.ts` uses the same number for the prompt. It is a search radius and
+   * not a reach -- `DOOR_REACH_M` is the reach -- so it only has to be
+   * comfortably larger than that.
+   */
+  private static readonly DOOR_SCAN_M = 12;
+
+  /**
+   * The reach and the facing this end enforces, against the browser's 2.6 m and
+   * 0.35.
+   *
+   * Deliberately slacker, which is `MSG.SUN_PRESS`' arrangement exactly and for
+   * its reason: the half-metre between the client's prompt radius and the
+   * server's is what absorbs the tick of walking the two ends can disagree
+   * about, and it is a far better place to spend the slack than a field the
+   * sender controls. The facing is slacker too because this end has no prompt
+   * to keep steady -- the tight test exists so a door does not flicker between
+   * six houses as you run down a terrace, which is a drawing problem.
+   */
+  private static readonly DOOR_REACH_SLACK_M = DOOR_REACH_M + 0.6;
+  private static readonly DOOR_FACING_SLACK = 0.15;
+
+  /** The prisms near a body, for the door search. Reused; allocation-free. */
+  private readonly doorPrisms: Prism[] = [];
+
+  /**
+   * Every inside anybody in this room is standing in, by space id.
+   *
+   * **One building, one inside, for everybody** -- the owner's first decision --
+   * so this is a cache and not a per-player construction: two people in the same
+   * pub hold the same `Interior` object and are stepped against the same walls.
+   *
+   * Per *room* rather than per host, and that is the honest consequence of what
+   * a room already is: two rooms are two worlds that cannot see each other, and
+   * the same building's inside in each of them is the same rooms generated from
+   * the same seed with no one in common. `ROOM_COUNT` is 1 on the box.
+   *
+   * Never pruned. An interior is a few hundred numbers, `MAX_PLAYERS` is 100,
+   * and a room in which a hundred people have each opened a different door is
+   * holding a hundred of them -- which is less than one tick's snapshot garbage
+   * used to be before PERFORMANCE.md phase 1.
+   */
+  private readonly interiors = new Map<number, { it: Interior; world: CombatWorld }>();
+
+  /**
+   * The inside of this building, generated once and then handed out.
+   *
+   * Null when there is nothing worth generating -- a fence, a light well, a
+   * 0.8 m sliver between two terraces. `interiorAdmits` inside `buildInterior`
+   * is the rule, and `main.ts` gates the prompt on the same function so that a
+   * building with no inside offers no door rather than a door that does nothing.
+   */
+  private interiorFor(prism: DoorPrism, seed: number): { it: Interior; world: CombatWorld } | null {
+    const space = spaceForBuilding(seed);
+    const held = this.interiors.get(space);
+    if (held !== undefined) return held;
+    const it = buildInterior(prism.points, prism.base, prism.height, seed);
+    if (it === null) return null;
+    /*
+     * The world a body inside is stepped against, and the whole of what makes
+     * an interior a place rather than a decal.
+     *
+     * **`collision` is null and `mover` is the interior's own resolver**, which
+     * is `game/riding.ts`'s arrangement for a train carriage, reached
+     * independently and for the same reason: a body in a carriage is stepped
+     * against the carriage and not against Sydney. Here it means the building's
+     * own prism -- the solid this body is standing *inside* -- never pushes
+     * back, so nothing has to be carved and there is no facade to open. That
+     * was the owner's objection to the earlier design and it is now not a
+     * question anybody has to answer.
+     *
+     * `groundHeight` is a constant: one storey is walkable, its floor is the
+     * building's own pad, and `feetY` is ignored. The second storey is where
+     * that stops being true -- see `world/interior.ts`'s header.
+     */
+    const world: CombatWorld = {
+      collision: null,
+      mover: it.resolver,
+      groundHeight: () => it.base,
+    };
+    const made = { it, world };
+    this.interiors.set(space, made);
+    return made;
+  }
+
+  /**
+   * A door press. In, or out, depending on which side of it this body is.
+   *
+   * Returns the frame to send that client, or null if the press found nothing --
+   * which is the ordinary answer, because `E` is pressed at doors that are not
+   * there. **No discriminator crosses the wire**: this process knows which space
+   * the presser is in, so an inside press can only mean out. See `MSG.DOOR`.
+   */
+  doorPress(id: number): SpaceFrame | null {
+    const p = this.participants.get(id);
+    if (!p || p.gone || p.bot !== null) return null;
+    return p.space === CITY_SPACE ? this.enterInterior(p) : this.leaveInterior(p);
+  }
+
+  /** The frame that tells a client where it is. See `protocol.SpaceFrame`. */
+  spaceFrameFor(p: Participant): SpaceFrame {
+    const b = p.combat.body;
+    return {
+      space: p.space,
+      building: p.interior === null ? 0 : p.interior.seed,
+      x: b.position.x,
+      y: b.position.y,
+      z: b.position.z,
+      yaw: b.yaw,
+      doorX: p.doorX,
+      doorZ: p.doorZ,
+      doorNX: p.doorNX,
+      doorNZ: p.doorNZ,
+    };
+  }
+
+  /**
+   * Through the door, into the building this body is standing at.
+   *
+   * The four refusals above the search are all "you are already doing something
+   * else with this key": `E` is take a car, board a train, get off a bike, talk
+   * to a giver, and only then a door -- which is the order `main.ts` puts the
+   * prompts in and the order this end has to agree with. Walking a car into a
+   * pub would also be a car that never comes out.
+   */
+  private enterInterior(p: Participant): SpaceFrame | null {
+    const c = p.combat;
+    if (c.ridingBike !== 0 || c.drivingCar !== 0 || isAboard(c.aboard)) return null;
+    // Not while knocked out. A body on the pavement has no business opening a
+    // door, and `respawnDue` three seconds later would be a respawn resolved
+    // against a world it was never in.
+    if (c.health <= 0) return null;
+    const collision = this.world.collision;
+    if (collision === null) return null;
+
+    const x = c.body.position.x;
+    const z = c.body.position.z;
+    this.doorPrisms.length = 0;
+    collision.prismsWithin(x, z, Simulation.DOOR_SCAN_M, this.doorPrisms);
+    // Where they are looking, on the ground plane. Three's camera looks down
+    // -Z, so forward is (-sin yaw, -cos yaw) -- `player/controller.step`'s own
+    // basis, restated here rather than imported because that function computes
+    // it inside a movement step this code is not in.
+    const site = doorAt(
+      this.doorPrisms,
+      x,
+      z,
+      -Math.sin(c.body.yaw),
+      -Math.cos(c.body.yaw),
+      Simulation.DOOR_REACH_SLACK_M,
+      Simulation.DOOR_FACING_SLACK,
+    );
+    if (site === null) return null;
+
+    const seed = buildingSeed(site.prism);
+    const made = this.interiorFor(site.prism, seed);
+    if (made === null) return null;
+    const at = arrivalAt(made.it, site.x, site.z, site.nx, site.nz);
+    p.space = spaceForBuilding(seed);
+    p.interior = made.it;
+    p.interiorWorld = made.world;
+    p.doorX = site.x;
+    p.doorZ = site.z;
+    p.doorNX = site.nx;
+    p.doorNZ = site.nz;
+    this.moveInto(p, at.x, made.it.base + EYE_HEIGHT, at.z);
+    return this.spaceFrameFor(p);
+  }
+
+  /**
+   * Back out through the door they came in by.
+   *
+   * *"yeah u leave thru the door u came in"* -- the owner, and the reason the
+   * door is on the participant rather than on the shared interior.
+   *
+   * A metre and a bit along the outward normal, which clears the wall's own
+   * thickness and the body's radius. The height comes from the **city**, not
+   * from the interior: the pad a building sits on and the pavement outside it
+   * are not the same number, and stepping out onto the pad's level at the foot
+   * of a hill is a body that then falls or climbs.
+   */
+  private leaveInterior(p: Participant): SpaceFrame | null {
+    const x = p.doorX + p.doorNX * 1.3;
+    const z = p.doorZ + p.doorNZ * 1.3;
+    p.space = CITY_SPACE;
+    p.interior = null;
+    p.interiorWorld = null;
+    p.doorX = 0;
+    p.doorZ = 0;
+    p.doorNX = 0;
+    p.doorNZ = 0;
+    this.moveInto(p, x, eyeAt(p.world, x, z), z);
+    return this.spaceFrameFor(p);
+  }
+
+  /**
+   * Put a body somewhere, in whichever world it is now in.
+   *
+   * `unstuckTo`'s three lines plus the history seed, and the seed is the point:
+   * for the next 250 ms an unseeded ring would rewind this body to the other
+   * side of a wall, and a punch thrown at that spot would land on somebody in a
+   * different world. Not `respawnAt`, which would also refill the health --
+   * walking into a pub is not a respawn.
+   */
+  private moveInto(p: Participant, x: number, y: number, z: number): void {
+    const c = p.combat;
+    c.body.position.set(x, y, z);
+    c.body.velocity.set(0, 0, 0);
+    c.body.onGround = true;
+    // Off the bike and off the train, on `unstuckTo`'s argument: the bike stays
+    // where it was and riding one through a wall would teleport it indoors.
+    c.ridingBike = 0;
+    clearAboard(c.aboard);
+    p.history.seed(this.tick, x, y, z, c.body.yaw);
+    this.dirty = true;
+  }
+
+  /**
+   * Put a returning player back inside the building they logged off in.
+   *
+   * Called from `join`, after the participant exists, because it needs the
+   * interior cache and a body to put in it. Returns false -- and leaves them
+   * outdoors, wherever `join` already put them -- for every ordinary reason:
+   * the building's hexagon is not resident on this host, the footprint has
+   * changed shape since (a rebake, a new extract), or it no longer has an
+   * inside worth generating. All three fall through to the street, which is the
+   * safe direction: a player who wanted to be in the pub and is on the pavement
+   * outside it can open the door again.
+   *
+   * The **door** is not stored, only the building -- so a returning player is
+   * given the door nearest to where they were standing. That is right rather
+   * than a compromise: after a week away the door you happened to come in by is
+   * not a fact anybody remembers, and the nearest one is the one you would
+   * walk out of anyway.
+   */
+  private restoreInterior(p: Participant, seed: number, x: number, z: number): boolean {
+    const collision = this.world.collision;
+    if (collision === null) return false;
+    this.doorPrisms.length = 0;
+    collision.prismsWithin(x, z, Simulation.DOOR_SCAN_M, this.doorPrisms);
+    let found: Prism | null = null;
+    for (const prism of this.doorPrisms) {
+      if (buildingSeed(prism) === seed) {
+        found = prism;
+        break;
+      }
+    }
+    if (found === null) return false;
+    const made = this.interiorFor(found, seed);
+    if (made === null) return false;
+    // The nearest point on the footprint's perimeter, which is where the door
+    // is. `doorAt` cannot be asked -- it wants a body standing outside looking
+    // in, and this body is inside -- so the two lines it would have run are
+    // here: closest point on the outline, normal away from the centre.
+    const pts = found.points;
+    const n = pts.length >> 1;
+    let bestD2 = Infinity;
+    let dx = 0;
+    let dz = 0;
+    for (let i = 0, j = n - 1; i < n; j = i++) {
+      const ax = pts[j * 2];
+      const az = pts[j * 2 + 1];
+      const bx = pts[i * 2];
+      const bz = pts[i * 2 + 1];
+      const ex = bx - ax;
+      const ez = bz - az;
+      const len2 = ex * ex + ez * ez;
+      const t = len2 > 1e-9 ? Math.max(0, Math.min(1, ((x - ax) * ex + (z - az) * ez) / len2)) : 0;
+      const cxp = ax + ex * t;
+      const czp = az + ez * t;
+      const d2 = (x - cxp) * (x - cxp) + (z - czp) * (z - czp);
+      if (d2 < bestD2) {
+        bestD2 = d2;
+        dx = cxp;
+        dz = czp;
+      }
+    }
+    if (!Number.isFinite(bestD2)) return false;
+    let nx = dx - made.it.centreX;
+    let nz = dz - made.it.centreZ;
+    const len = Math.sqrt(nx * nx + nz * nz);
+    if (!(len > 1e-6)) return false;
+    nx /= len;
+    nz /= len;
+
+    p.space = spaceForBuilding(seed);
+    p.interior = made.it;
+    p.interiorWorld = made.world;
+    p.doorX = dx;
+    p.doorZ = dz;
+    p.doorNX = nx;
+    p.doorNZ = nz;
+    // Where they were standing, settled -- not the arrival, which would put
+    // everybody who comes back to a pub in its doorway. `arrivalAt`'s settle is
+    // reused through the resolver so a spot that has since become a wall (a
+    // rebake that moved a partition) still lands somebody clear.
+    const home = made.it.resolver.resolve(x, z, x, z, PLAYER_RADIUS, made.it.base);
+    const inside = made.it.resolver.clearance(home.x, home.z) >= 0
+      ? home
+      : arrivalAt(made.it, dx, dz, nx, nz);
+    this.moveInto(p, inside.x, made.it.base + EYE_HEIGHT, inside.z);
+    return true;
+  }
+
   private enterCarriage(p: Participant): CombatWorld {
     this.carriageFrame = null;
     const c = p.combat;
+    // **Indoors, before anything else.** The one line that makes an interior a
+    // place a body is simulated in rather than a drawing: `advance` steps this
+    // player against the building's walls and its floor, and against nothing in
+    // Sydney at all. A body inside is never aboard -- `moveInto` clears it on
+    // the way in -- so this is not competing with the carriage below it.
+    if (p.interiorWorld !== null) return p.interiorWorld;
     const a = c.aboard;
     if (!isAboard(a)) return p.world;
 
@@ -5613,6 +6108,29 @@ export class Simulation {
       REACH,
       this.strikeCandidates,
     );
+    /*
+     * --- And out of that set, everybody in a different world.
+     *
+     * Interiors sit at the building's own coordinates, so a body inside a
+     * terrace and a body on the pavement outside it are a metre and a half
+     * apart with a wall between them -- which is inside `REACH`. Without this
+     * the two of them punch each other through the wall, each swinging at a
+     * proxy the other cannot see.
+     *
+     * Filtered here rather than after `hitTest`, so a swing that finds only
+     * out-of-world targets does no rewind work at all. In the city this is one
+     * integer comparison per candidate over a set that is almost always empty.
+     * See `net/spaces.ts` and `server/aoi.ts`, which asks the same question one
+     * layer up and for the same reason.
+     */
+    if (candidates.length > 0) {
+      let kept = 0;
+      for (let i = 0; i < candidates.length; i++) {
+        const other = this.participants.get(candidates[i].id);
+        if (other !== undefined && other.space === p.space) candidates[kept++] = candidates[i];
+      }
+      candidates.length = kept;
+    }
     this.rewindPool.length = 0;
     const targets = rewindInto(
       p.combat,
@@ -5678,8 +6196,17 @@ export class Simulation {
     // police officer on a beat is the same function. There is nothing to be late
     // about, so rewinding them would move a body away from where the attacker
     // actually saw it.
-    this.strikeBystanders(p);
-    this.strikeOfficers(p);
+    //
+    // **And neither runs indoors.** A pedestrian is a pure function of the tick
+    // evaluated over the city's footpaths and an officer walks a beat on them;
+    // there are none of either inside a building, and both tests measure from
+    // the swinger's world position -- which for a body in a pub is a position
+    // the crowd outside is walking past. Without this, a punch thrown at a
+    // wall knocks over whoever happens to be on the pavement behind it.
+    if (p.space === CITY_SPACE) {
+      this.strikeBystanders(p);
+      this.strikeOfficers(p);
+    }
     // The whole swing, players and bystanders and officers, in one number, and
     // the caller's section put back. Charged per strike rather than per tick
     // because a swing is rare -- `advance` already carries the cost of

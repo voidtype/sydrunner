@@ -101,6 +101,13 @@ function closestOnSegment(
  * `yawX`/`yawZ` is the direction the player is looking, as a unit vector on the
  * ground plane. Null means "no door here", which is the answer almost everywhere
  * and has to be cheap: the loop is over prisms the caller already found nearby.
+ *
+ * **`reach` and `facingMin` are arguments so the server can be slacker than the
+ * browser**, which is `protocol.MSG.SUN_PRESS`' arrangement exactly: the client
+ * draws the prompt at 2.6 m and the server honours the press at 3.2, and the
+ * difference absorbs the tick of walking the two ends can disagree about. That
+ * slack has to live somewhere, and a reach the sender controls is the one place
+ * it must not. The defaults are the browser's.
  */
 export function doorAt(
   prisms: readonly DoorPrism[],
@@ -108,12 +115,21 @@ export function doorAt(
   pz: number,
   yawX: number,
   yawZ: number,
+  reach = DOOR_REACH_M,
+  facingMin = FACING_MIN,
 ): DoorSite | null {
   let best: DoorSite | null = null;
-  let bestD2 = DOOR_REACH_M * DOOR_REACH_M;
+  let bestD2 = reach * reach;
 
   for (const prism of prisms) {
     if (prism.height < MIN_BUILDING_H) continue;
+    // **Not a viaduct.** `Prism.structural` is true for the deck, bridge and
+    // overpass volumes the pipeline writes with their `base` at the soffit --
+    // the Cahill, Anzac Bridge, the Bradfield approaches -- and false for
+    // buildings, which are solid from their pad down to the terrain. A door on
+    // the underside of the Western Distributor is not a door, and the flag that
+    // says so is already on the record.
+    if (prism.structural) continue;
     const pts = prism.points;
     const n = pts.length >> 1;
     if (n < 3) continue;
@@ -151,7 +167,7 @@ export function doorAt(
       // Looking at the wall, not past it: the player's gaze must oppose the
       // outward normal. Without this a door offers itself as you sprint along a
       // terrace row, and the prompt flickers between six houses.
-      if (yawX * nx + yawZ * nz > -FACING_MIN) continue;
+      if (yawX * nx + yawZ * nz > -facingMin) continue;
       bestD2 = hit.d2;
       best = { x: hit.x, z: hit.z, nx, nz, prism, distance: Math.sqrt(hit.d2) };
     }
@@ -187,7 +203,11 @@ export function buildingSeed(prism: DoorPrism): number {
 export function verifyDoorway(): string[] {
   const failures: string[] = [];
   const square = (s: number): Float32Array => new Float32Array([0, 0, s, 0, s, s, 0, s]);
-  const house = (h = 7): DoorPrism => ({ points: square(10), base: 0, height: h, structural: true });
+  // `structural` is **false** for a building: the flag marks the deck and
+  // viaduct volumes whose `base` is a soffit, not the ordinary solids that run
+  // from a pad down to the terrain. See `player/collision.Prism.structural`,
+  // whose name reads the other way round to how it behaves.
+  const house = (h = 7): DoorPrism => ({ points: square(10), base: 0, height: h, structural: false });
 
   // --- Standing at the south wall, looking north at it.
   {
@@ -217,6 +237,16 @@ export function verifyDoorway(): string[] {
     if (doorAt([p], 5, -DOOR_REACH_M + 0.3, 0, 1) === null) failures.push('a door was refused from inside the reach.');
   }
 
+  // --- Neither are viaducts.
+  //
+  // A deck volume is tall, wide and everywhere along the foreshore, and its
+  // `base` is a soffit over your head rather than a pad under your feet. See
+  // `player/collision.Prism.structural`.
+  {
+    const deck: DoorPrism = { points: square(40), base: 6, height: 3, structural: true };
+    if (doorAt([deck], 20, -1, 0, 1) !== null) failures.push('the underside of a viaduct offered a door.');
+  }
+
   // --- Low things are not buildings.
   {
     const fence: DoorPrism = { points: square(10), base: 0, height: 1.1, structural: false };
@@ -225,8 +255,8 @@ export function verifyDoorway(): string[] {
 
   // --- The nearest building wins, not the first in the list.
   {
-    const far: DoorPrism = { points: new Float32Array([0, 0, 10, 0, 10, 10, 0, 10]), base: 0, height: 7, structural: true };
-    const near: DoorPrism = { points: new Float32Array([0, -6, 10, -6, 10, -4, 0, -4]), base: 0, height: 7, structural: true };
+    const far: DoorPrism = { points: new Float32Array([0, 0, 10, 0, 10, 10, 0, 10]), base: 0, height: 7, structural: false };
+    const near: DoorPrism = { points: new Float32Array([0, -6, 10, -6, 10, -4, 0, -4]), base: 0, height: 7, structural: false };
     const site = doorAt([far, near], 5, -3.2, 0, -1);
     if (site === null) failures.push('two buildings and no door at all.');
     else if (site.prism !== near) failures.push('a further building won over a nearer one.');
@@ -235,9 +265,9 @@ export function verifyDoorway(): string[] {
   // --- Degenerate footprints are refused rather than crashing.
   {
     const bad: DoorPrism[] = [
-      { points: new Float32Array([]), base: 0, height: 7, structural: true },
-      { points: new Float32Array([1, 1]), base: 0, height: 7, structural: true },
-      { points: new Float32Array([1, 1, 1, 1, 1, 1]), base: 0, height: 7, structural: true },
+      { points: new Float32Array([]), base: 0, height: 7, structural: false },
+      { points: new Float32Array([1, 1]), base: 0, height: 7, structural: false },
+      { points: new Float32Array([1, 1, 1, 1, 1, 1]), base: 0, height: 7, structural: false },
     ];
     let threw = false;
     try {
@@ -253,7 +283,7 @@ export function verifyDoorway(): string[] {
     const a = buildingSeed(house());
     const b = buildingSeed(house());
     if (a !== b) failures.push('the same building hashed to two different seeds; two players would see two houses.');
-    const other = buildingSeed({ points: square(11), base: 0, height: 7, structural: true });
+    const other = buildingSeed({ points: square(11), base: 0, height: 7, structural: false });
     if (a === other) failures.push('two different buildings share a seed; every house would be the same house.');
     const taller = buildingSeed(house(9));
     if (a === taller) failures.push('height does not change the seed; a shop and the flat above it would be identical.');

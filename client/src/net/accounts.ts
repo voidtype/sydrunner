@@ -362,6 +362,25 @@ export interface LastPos {
   y: number;
   z: number;
   yaw: number;
+  /**
+   * The building this position is *inside*, or 0 for the street.
+   *
+   * `world/doorway.buildingSeed` -- the building's own name, hashed out of its
+   * footprint -- rather than `net/spaces.ts`'s space id, and the two are not
+   * interchangeable here: the space is derived from the seed and not the other
+   * way round, and the server needs the seed to find the building again among
+   * the prisms near this position and rebuild the same rooms. The space falls
+   * out of it in one call.
+   *
+   * **Zero is the street, and absence is zero.** Every account written before
+   * interiors has no such field, and the missing value has to mean outside --
+   * the same rule `spaces.CITY_SPACE` is zero for. A row that meant "in an
+   * unknown building" would be a returning player in a room that may not exist.
+   *
+   * The owner's decision: *"if u log out inside u log in there"*. This is the
+   * whole of that feature's storage.
+   */
+  building: number;
   /** `Date.now()` when this was written. The week rule reads this and nothing else. */
   savedMs: number;
 }
@@ -404,7 +423,16 @@ export function sanitiseLastPos(value: unknown): LastPos | null {
   if (Math.abs(x) > LAST_POS_LIMIT_M || Math.abs(z) > LAST_POS_LIMIT_M || Math.abs(y) > LAST_POS_LIMIT_M) {
     return null;
   }
-  return { x, y, z, yaw, savedMs };
+  // **A bad building is the street, not a refusal.** The rest of this parser
+  // returns null on a value it cannot trust, because a position with a NaN in it
+  // is not a position -- but a spot whose building field is missing, absent or
+  // rubbish is a perfectly good spot that happens to be outdoors, and refusing
+  // the whole row would throw away the position too. Every account on the box
+  // takes this branch on the deploy that introduces the field.
+  const raw2 = raw as { building?: unknown };
+  const b = Number(raw2.building);
+  const building = Number.isFinite(b) && b > 0 && b <= 0xffffffff ? Math.trunc(b) >>> 0 : 0;
+  return { x, y, z, yaw, building, savedMs };
 }
 
 /**
@@ -1406,6 +1434,28 @@ export function verifyAccounts(): string[] {
     for (const [row, why] of bad) {
       if (sanitiseLastPos(row) !== null) failures.push(`A saved spot with ${why} was accepted off disk.`);
     }
+    // --- The building, and its one rule: bad is the street, not a refusal.
+    //
+    // Every account on the box takes the "absent" branch on the deploy that
+    // introduces the field, and a parser that refused those rows would have
+    // thrown away every saved position in Sydney to add a feature about two of
+    // them. See `LastPos.building`.
+    {
+      const outside = sanitiseLastPos({ x: 1, y: 2, z: 3, yaw: 0, savedMs: now });
+      if (outside === null || outside.building !== 0) {
+        failures.push('a spot saved before interiors did not come back as being outdoors.');
+      }
+      for (const bad of [-1, 0, 1e12, Number.NaN, 'pub', null, {}]) {
+        const got = sanitiseLastPos({ x: 1, y: 2, z: 3, yaw: 0, building: bad, savedMs: now });
+        if (got === null) failures.push(`a spot with a building of ${String(bad)} was refused entirely; its position went with it.`);
+        else if (got.building !== 0) failures.push(`a building of ${String(bad)} survived as ${got.building}; a player would log in inside a room that does not exist.`);
+      }
+      const inside = sanitiseLastPos({ x: 1, y: 2, z: 3, yaw: 0, building: 0xdeadbeef, savedMs: now });
+      if (inside === null || inside.building !== 0xdeadbeef) {
+        failures.push('a spot saved indoors did not survive; logging off inside would not bring you back.');
+      }
+    }
+
     const spot = sanitiseLastPos({ x: -2236.4, y: 12.5, z: 4543.3, yaw: 1.25, savedMs: now });
     if (!spot) {
       failures.push('A well-formed saved spot was refused off disk.');
@@ -1441,7 +1491,7 @@ export function verifyAccounts(): string[] {
 
     // And the reset drops it, in the same call that zeroes the ladder.
     const record = fakeAccount(now);
-    record.lastPos = { x: 10, y: 0, z: 20, yaw: 0, savedMs: now };
+    record.lastPos = { x: 10, y: 0, z: 20, yaw: 0, building: 0, savedMs: now };
     if (resetIfNewWeek(record, now)) failures.push('A record already in the current week was reset.');
     if (record.lastPos === null) failures.push('A same-week reset dropped the saved spot anyway.');
     record.levelWeek = '2020-W01';

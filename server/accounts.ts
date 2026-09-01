@@ -193,6 +193,12 @@ export interface LiveSpot {
   y: number;
   z: number;
   yaw: number;
+  /**
+   * The building this body is inside, or 0 for the street. See
+   * `accounts.LastPos.building` -- this is the live half of the same field, and
+   * it is what makes "log off inside, log in inside" true.
+   */
+  building: number;
 }
 
 /**
@@ -431,7 +437,9 @@ export class AccountStore {
     // participant can leave during those tens of milliseconds, and a `LiveSpot`
     // is already a copy rather than a live reference for exactly that reason.
     const kills = carry === null ? 0 : Math.max(0, Math.min(1e9, Math.trunc(carry.kills)));
-    const spot = carry === null ? null : sanitiseLastPos({ x: carry.x, y: carry.y, z: carry.z, yaw: carry.yaw, savedMs: now });
+    const spot = carry === null
+      ? null
+      : sanitiseLastPos({ x: carry.x, y: carry.y, z: carry.z, yaw: carry.yaw, building: carry.building, savedMs: now });
 
     const record: AccountRecord = {
       id: crypto.randomUUID(),
@@ -566,7 +574,7 @@ export class AccountStore {
     // on Monday belongs to the new week, and stamping it before the roll would
     // have `resetIfNewWeek` throw it away a millisecond later.
     if (resetIfNewWeek(record, now)) this.touch();
-    const parsed = sanitiseLastPos({ x: spot.x, y: spot.y, z: spot.z, yaw: spot.yaw, savedMs: now });
+    const parsed = sanitiseLastPos({ x: spot.x, y: spot.y, z: spot.z, yaw: spot.yaw, building: spot.building, savedMs: now });
     if (parsed === null) return false;
     record.lastPos = parsed;
     record.lastSeenMs = now;

@@ -132,6 +132,9 @@ import {
   type SnapshotPlayer,
 } from '../client/src/net/protocol.ts';
 import { SpatialHash } from '../client/src/game/spatialhash.ts';
+// Interiors. **The first question this file asks, before any distance.** See
+// `sameSpace`'s own note there, and INTERIORS.md.
+import { CITY_SPACE } from '../client/src/net/spaces.ts';
 
 /**
  * The AOI grid's cell edge, metres. See the header, and `game/spatialhash.ts`'s
@@ -248,6 +251,16 @@ export class InterestIndex {
    * per client, per snapshot.
    */
   private readonly bySlot = new Map<number, number>();
+  /**
+   * Which world each slot's player is in, by slot. See `begin`.
+   *
+   * A parallel array rather than a field on `SnapshotPlayer`, because the space
+   * is deliberately **not on the wire** (`PROTOCOL_VERSION`'s v23 note): a
+   * record is what goes out, and this is a fact about the sender that never
+   * does. Grown to a high-water mark and rewritten in place, on this file's own
+   * allocation rule.
+   */
+  private readonly spaces: number[] = [];
 
   /** Distances and ids of the current selection, kept sorted nearest-first. */
   private readonly selD2: number[] = [];
@@ -270,15 +283,20 @@ export class InterestIndex {
     players: readonly SnapshotPlayer[],
     balls: readonly SnapshotBall[],
     npcs: readonly SnapshotNpc[],
+    spaceOf: ((id: number) => number) | null = null,
   ): void {
     this.players = players;
     this.balls = balls;
     this.npcs = npcs;
     this.hash.clear();
     this.bySlot.clear();
+    this.spaces.length = players.length;
     for (let i = 0; i < players.length; i++) {
       this.hash.insert(i, players[i].x, players[i].z);
       this.bySlot.set(players[i].id, i);
+      // Null means a world with no interiors in it, which is what every check
+      // below runs against and what this file did before there were any.
+      this.spaces[i] = spaceOf === null ? CITY_SPACE : spaceOf(players[i].id);
     }
   }
 
@@ -310,7 +328,7 @@ export class InterestIndex {
    * reconciles against its own record in every snapshot, and a set that could
    * omit you would be a client that stopped being able to reconcile in a crowd.
    */
-  select(x: number, z: number, held: InterestSet, out: number[]): number[] {
+  select(x: number, z: number, space: number, held: InterestSet, out: number[]): number[] {
     const d2s = this.selD2;
     const ids = this.selId;
     d2s.length = 0;
@@ -319,6 +337,20 @@ export class InterestIndex {
 
     this.hash.forEachWithin(x, z, AOI_LEAVE_RADIUS, (slot) => {
       seen++;
+      // **The space, before the distance, and it is not a refinement of it.**
+      //
+      // An interior sits at its building's own coordinates (see
+      // `world/interior.ts`), so somebody standing in a terrace and somebody on
+      // the pavement outside are a metre and a half apart in two different
+      // worlds. Every radius in this file contains that, and no radius could
+      // ever exclude it -- distance is simply not the question across a space
+      // boundary. Without this line the two of them draw each other through the
+      // wall, and `server/sim.ts` lets them punch each other through it.
+      //
+      // Asked here rather than by filtering the records in `begin`, because the
+      // index is built once per snapshot tick and consulted once per client:
+      // one array lookup per candidate against a second index per space.
+      if (this.spaces[slot] !== space) return;
       const p = this.players[slot];
       const dx = p.x - x;
       const dz = p.z - z;
@@ -425,11 +457,18 @@ export class InterestIndex {
    * `ownId !== 0 &&` rather than a bare comparison: without it, every orphaned
    * ball in the room would be hidden from everybody.
    */
-  selectBalls(x: number, z: number, ownId: number, out: number[]): number[] {
+  selectBalls(x: number, z: number, ownId: number, space: number, out: number[]): number[] {
     const d2s = this.ballD2;
     const idx = this.ballIdx;
     d2s.length = 0;
     idx.length = 0;
+    out.length = 0;
+    // Indoors sees no footballs, because there are none: `server/sim.ts` clears
+    // the throw button for a body in a building, on the grounds that a ball is
+    // an object with its own physics against the *city's* collision and one
+    // thrown in a pub would sail through the wall. Every ball in the room is
+    // therefore in the city, and the sender is not.
+    if (space !== CITY_SPACE) return out;
     for (let i = 0; i < this.balls.length; i++) {
       const b = this.balls[i];
       if (ownId !== 0 && b.thrower === ownId) continue;
@@ -487,8 +526,12 @@ export class InterestIndex {
    * hash to accelerate a 24-element scan would be more code, more rebuild cost,
    * and slower.
    */
-  selectNpcs(x: number, z: number, out: number[]): number[] {
+  selectNpcs(x: number, z: number, space: number, out: number[]): number[] {
     out.length = 0;
+    // And no police indoors, on the balls' argument: an officer walks a beat on
+    // the city's footpaths, so an actor within 220 m of somebody in a building
+    // is an actor on the other side of its wall.
+    if (space !== CITY_SPACE) return out;
     for (let i = 0; i < this.npcs.length; i++) {
       const n = this.npcs[i];
       const dx = n.x - x;
@@ -732,7 +775,7 @@ export function verifyAoi(): string[] {
         held.update(seeded);
         const heldIds = new Set(seeded);
 
-        index.select(qx, qz, held, out);
+        index.select(qx, qz, CITY_SPACE, held, out);
         const want = brute(players, qx, qz, heldIds);
         trials++;
         if (want.length === AOI_MAX_PLAYERS) cappedTrials++;
@@ -767,7 +810,7 @@ export function verifyAoi(): string[] {
     index.begin(players, [], []);
     const held = new InterestSet();
     const out: number[] = [];
-    index.select(players[0].x, players[0].z, held, out);
+    index.select(players[0].x, players[0].z, CITY_SPACE, held, out);
     for (let i = 1; i < out.length; i++) {
       if (out[i - 1] >= out[i]) {
         failures.push(`The working set came back as ${out.join(',')}; it must ascend, or the dedup key is unstable.`);
@@ -797,7 +840,7 @@ export function verifyAoi(): string[] {
     const walk = (d: number): void => {
       them.z = d;
       index.begin([me, them], [], []);
-      index.select(0, 0, held, out);
+      index.select(0, 0, CITY_SPACE, held, out);
       held.update(out);
       enters += held.entered.length;
       leaves += held.left.length;
@@ -845,13 +888,13 @@ export function verifyAoi(): string[] {
     // Seed the set with all of them by placing them inside 180 for one tick.
     for (const p of players) if (p.id !== 1) { p.x *= 0.8; p.z *= 0.8; }
     index.begin(players, [], []);
-    index.select(0, 0, held, out);
+    index.select(0, 0, CITY_SPACE, held, out);
     held.update(out);
     for (const p of players) if (p.id !== 1) { p.x /= 0.8; p.z /= 0.8; }
     // Now a newcomer, at arm's length.
     players.push(player(999, 1, 0));
     index.begin(players, [], []);
-    index.select(0, 0, held, out);
+    index.select(0, 0, CITY_SPACE, held, out);
     if (out.length !== AOI_MAX_PLAYERS) {
       failures.push(`A crowded selection returned ${out.length} members, not the ${AOI_MAX_PLAYERS} cap.`);
     }
@@ -935,11 +978,11 @@ export function verifyAoi(): string[] {
     ];
     index.begin([player(1, 0, 0)], balls, npcs);
     const out: number[] = [];
-    index.selectBalls(0, 0, 1, out);
+    index.selectBalls(0, 0, 1, CITY_SPACE, out);
     if (out.length !== 1 || out[0] !== 0) {
       failures.push(`A ball 400 m away was carried (got ${out.length} of 2). Interest is by the ball's own position.`);
     }
-    index.selectNpcs(0, 0, out);
+    index.selectNpcs(0, 0, CITY_SPACE, out);
     if (out.length !== 1 || out[0] !== 0) {
       failures.push(`An officer 900 m away was carried (got ${out.length} of 2).`);
     }
@@ -948,7 +991,7 @@ export function verifyAoi(): string[] {
     // 28 m/s launch that is three and a half seconds of warning.
     balls[1].x = 100;
     index.begin([player(1, 0, 0)], balls, npcs);
-    index.selectBalls(0, 0, 1, out);
+    index.selectBalls(0, 0, 1, CITY_SPACE, out);
     if (out.length !== 2) failures.push('A ball 100 m away was not carried; it arrives before it can be reacted to.');
   }
 
@@ -974,7 +1017,7 @@ export function verifyAoi(): string[] {
         balls.push(ball(i + 1, 500 + i, Math.cos(a) * (5 + (i % 20)), Math.sin(a) * (5 + (i % 20))));
       }
       index.begin([player(1, 0, 0)], balls, []);
-      index.selectBalls(0, 0, 1, out);
+      index.selectBalls(0, 0, 1, CITY_SPACE, out);
       if (out.length !== AOI_MAX_BALLS) {
         failures.push(
           `A hundred balls inside forty metres put ${out.length} on the wire, not the ${AOI_MAX_BALLS} ` +
@@ -1010,7 +1053,7 @@ export function verifyAoi(): string[] {
         ball(2, 500, AOI_BALL_RADIUS + 1, 0),
       ];
       index.begin([player(1, 0, 0)], balls, []);
-      index.selectBalls(0, 0, 1, out);
+      index.selectBalls(0, 0, 1, CITY_SPACE, out);
       if (out.length !== 1 || out[0] !== 0) {
         failures.push(
           `The ball radius is ${AOI_BALL_RADIUS} m and a ball at ${AOI_BALL_RADIUS + 1} m ` +
@@ -1027,7 +1070,7 @@ export function verifyAoi(): string[] {
         ball(3, 0, 7, 0),      // thrown by somebody who has since left
       ];
       index.begin([player(7, 0, 0)], balls, []);
-      index.selectBalls(0, 0, 7, out);
+      index.selectBalls(0, 0, 7, CITY_SPACE, out);
       if (out.includes(0)) {
         failures.push(
           'A client was sent a ball it threw itself. `net/client.interpolateBalls` discards those on ' +
@@ -1042,9 +1085,76 @@ export function verifyAoi(): string[] {
         );
       }
       // And a viewer with no id of its own still sees all three.
-      index.selectBalls(0, 0, 0, out);
+      index.selectBalls(0, 0, 0, CITY_SPACE, out);
       if (out.length !== 3) failures.push(`A client with no id was sent ${out.length} of 3 balls.`);
     }
+  }
+
+  // --- Interiors: the space, asked before the distance. Protocol v23.
+  //
+  // The case that makes this necessary rather than tidy: an interior sits at
+  // its building's own coordinates, so a body inside a terrace and a body on
+  // the pavement outside it are **a metre and a half apart** in two different
+  // worlds. Every radius in this file contains that. Four assertions, and each
+  // of them is a different way for the feature to be broken --
+  //
+  //   - two people in one pub see each other (an interior that is not shared is
+  //     not what was asked for),
+  //   - somebody indoors and somebody outdoors do not, at any distance,
+  //   - two people in *different* buildings do not, however close their
+  //     coordinates,
+  //   - and everybody still sees themselves, which prediction depends on:
+  //     `net/client.reconcile` reconciles against its own record in every
+  //     snapshot, and a set that could omit you is a client that stops being
+  //     able to reconcile the moment it walks through a door.
+  {
+    const PUB = 4242;
+    const SHOP = 99;
+    const index = new InterestIndex();
+    const held = new InterestSet();
+    const out: number[] = [];
+    // Four bodies within two metres of each other, which is what a terrace row
+    // with two people inside it actually looks like.
+    const bodies = [player(1, 0, 0), player(2, 1, 0), player(3, 2, 0), player(4, 0, 1)];
+    const spaceOf = (id: number): number =>
+      id === 1 || id === 2 ? PUB : id === 3 ? SHOP : CITY_SPACE;
+    index.begin(bodies, [], [], spaceOf);
+
+    index.select(0, 0, PUB, held, out);
+    if (!out.includes(1)) failures.push('a player indoors could not see themselves; prediction would stop reconciling.');
+    if (!out.includes(2)) failures.push('two players in one pub could not see each other; the interior is not shared.');
+    if (out.includes(3)) failures.push('somebody in a shop was drawn into a pub two metres away.');
+    if (out.includes(4)) failures.push('somebody on the pavement was drawn inside the pub they were leaning on.');
+
+    index.select(0, 1, CITY_SPACE, held, out);
+    if (!out.includes(4)) failures.push('a player in the street could not see themselves.');
+    if (out.includes(1) || out.includes(2) || out.includes(3)) {
+      failures.push('somebody in the street was sent the people inside the building beside them.');
+    }
+
+    // And the two sections that are city-only by construction, because nothing
+    // puts a ball or an officer in a building. See `selectBalls`.
+    const balls = [{ id: 1, thrower: 9, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, bounces: 0 }];
+    const npcs = [{ id: 1, kind: 0, x: 0, y: 0, z: 0, yaw: 0, state: 0 }];
+    index.begin(bodies, balls, npcs, spaceOf);
+    index.selectBalls(0, 0, 1, PUB, out);
+    if (out.length !== 0) failures.push(`a player indoors was sent ${out.length} footballs from the street.`);
+    index.selectNpcs(0, 0, PUB, out);
+    if (out.length !== 0) failures.push(`a player indoors was sent ${out.length} police officers from the street.`);
+    // Own id 4 -- the one body in the street -- and the ball was thrown by 9,
+    // who is nobody here: `selectBalls` drops your own throws, so asking as the
+    // thrower would have measured that rule instead of this one.
+    index.selectBalls(0, 0, 4, CITY_SPACE, out);
+    if (out.length !== 1) failures.push('the city stopped getting its own footballs.');
+    index.selectNpcs(0, 0, CITY_SPACE, out);
+    if (out.length !== 1) failures.push('the city stopped getting its own officers.');
+
+    // A world with no interiors in it is the one every check above this line
+    // runs in, and it has to keep behaving exactly as it did: `begin` with no
+    // space function means everybody is outdoors.
+    index.begin(bodies, [], []);
+    index.select(0, 0, CITY_SPACE, held, out);
+    if (out.length !== 4) failures.push(`with no interiors anywhere, a client saw ${out.length} of 4 players.`);
   }
 
   return failures;

@@ -136,6 +136,7 @@ import {
   decodeHello,
   decodePing,
   decodeSunPress,
+  decodeDoor,
   encodeBye,
   encodePong,
   frameType,
@@ -1933,6 +1934,25 @@ const server = Bun.serve<Conn>({
           if (!decodeSunPress(frame)) return;
           const room = conn.room >= 0 ? host.get(conn.room) : undefined;
           room?.sunPress(ws);
+          return;
+        }
+        /**
+         * A door. `MSG.DOOR`, one byte, and the same shape as the press above
+         * for the same reasons: no payload, the room adjudicates it against the
+         * body it is simulating, and there is no flood guard because there is
+         * nothing to flood -- a press that finds no door does one prism query
+         * and sends nothing at all.
+         *
+         * The prism query is the one cost worth naming: `prismsWithin` over a
+         * 12 m radius, which is the same call `main.ts` makes every frame a
+         * player is near a wall. A client hammering `E` at 60 Hz pays for sixty
+         * of those a second, against the sixty `MSG.INPUT` frames it is already
+         * sending on the same socket.
+         */
+        case MSG.DOOR: {
+          if (!decodeDoor(frame)) return;
+          const room = conn.room >= 0 ? host.get(conn.room) : undefined;
+          room?.doorPress(ws);
           return;
         }
         /**

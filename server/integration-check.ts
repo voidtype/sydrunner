@@ -222,7 +222,12 @@ import {
   decodeInterest,
   type RoomInfo,
 } from '../client/src/net/protocol.ts';
-import { verifyAoi } from './aoi.ts';
+import { InterestIndex, InterestSet, verifyAoi } from './aoi.ts';
+// Interiors, protocol v23. See `checkInteriors`.
+import { buildingSeed, verifyDoorway } from '../client/src/world/doorway.ts';
+import { interiorAdmits, verifyInterior } from '../client/src/world/interior.ts';
+import { CITY_SPACE, spaceForBuilding, verifySpaces } from '../client/src/net/spaces.ts';
+import { AccountStore } from './accounts.ts';
 // Global chat. See `checkChat` at the foot of this file: cross-room delivery over
 // real sockets, which is the one claim in this server that contradicts
 // `checkRooms`' isolation on purpose.
@@ -1817,6 +1822,13 @@ async function main(): Promise<void> {
   // on the other side of the city. See `checkAoi`.
   say('');
   await checkAoi();
+
+  // --- 18b. Interiors, protocol v23. The door round trip over the real bake,
+  // in the real authority: a body let in, held by the walls, put back out at
+  // the door it used, and an insider who cannot see the pavement two metres
+  // away through the wall. See `checkInteriors`.
+  say('');
+  await checkInteriors();
 
   // --- 19. PERFORMANCE.md phase 3: rooms and the gateway. Isolation over real
   // sockets, the least-full join, a full room refused by name, and the one
@@ -5627,6 +5639,11 @@ if (only === 'police') {
   process.exit(failures.length === 0 ? 0 : 1);
 } else if (only === 'ridingOnline') {
   await checkRidingOnline();
+  for (const f of failures) say(`  - ${f}`);
+  say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
+  process.exit(failures.length === 0 ? 0 : 1);
+} else if (only === 'interiors') {
+  await checkInteriors();
   for (const f of failures) say(`  - ${f}`);
   say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
   process.exit(failures.length === 0 ? 0 : 1);
@@ -10783,6 +10800,318 @@ class FakeSocket {
  *      filtered along with everything else would have removed it without
  *      anybody noticing until a player asked why the feed had gone quiet.
  */
+/**
+ * Interiors: the door round trip, over the real world, in the real authority.
+ *
+ * `verifyInterior` and `verifyDoorway` already assert the geometry, and they do
+ * it against sixteen footprints somebody typed. This asserts the **feature**:
+ * one `Simulation` built over the shipped bake, a real building picked out of
+ * the real prisms near the spawn, and a body driven through its door and back
+ * out again by the same call the websocket handler makes.
+ *
+ * What only this can catch, and every one of them is invisible to a self-check:
+ *
+ *   - a door press that finds a building the browser would have found and the
+ *     server would not, because the two reaches or the two gaze bases disagree,
+ *   - a body placed inside a building it is then pushed out of by the *city's*
+ *     collision, which is the single line (`CombatWorld.mover`) that makes an
+ *     interior a place,
+ *   - an exit that lands on the wrong side of the wall, or at the wrong height
+ *     because the pad and the pavement are not the same number,
+ *   - two people in one pub who are given two different insides,
+ *   - and the working set: a body indoors and a body on the pavement a metre
+ *     away drawing each other through the wall.
+ *
+ * It is offline on `checkRiding` section 0e's argument: what it needs is the
+ * authority's own `enterCarriage`, `advance` and `doorPress` over a real bake,
+ * and the WebSocket framing adds nothing to any of the five.
+ */
+async function checkInteriors(): Promise<void> {
+  say('interiors (protocol v23): a door, what is behind it, and the way back out');
+
+  {
+    const f = verifyInterior();
+    check(f.length === 0, `verifyInterior passes${f.length ? ` -- ${f[0]}` : ''}`);
+  }
+  {
+    const f = verifyDoorway();
+    check(f.length === 0, `verifyDoorway passes${f.length ? ` -- ${f[0]}` : ''}`);
+  }
+  {
+    const f = verifySpaces();
+    check(f.length === 0, `verifySpaces passes${f.length ? ` -- ${f[0]}` : ''}`);
+  }
+
+  const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+  const world = await loadWorld(root);
+  if (world.collision === null) {
+    check(false, 'the world has collision prisms to find a building in');
+    return;
+  }
+
+  // --- 1. A real building, out of the real bake.
+  //
+  // Widening rings rather than one big query, so the building found is the one
+  // nearest the spawn: a check that walks 400 m to a warehouse is a check whose
+  // failure says nothing about the terrace next door.
+  const nearby: Prism[] = [];
+  let target: Prism | null = null;
+  for (const radius of [60, 120, 250, 500, 1000]) {
+    nearby.length = 0;
+    world.collision.prismsWithin(world.spawn.x, world.spawn.z, radius, nearby);
+    for (const prism of nearby) {
+      // Not a viaduct: `Prism.structural` is true for the deck and bridge
+      // volumes and **false for buildings**, which is the opposite of what the
+      // name suggests and is worth being explicit about here. `doorAt` refuses
+      // them for the same reason.
+      if (prism.structural) continue;
+      if (!interiorAdmits(prism.points, prism.height)) continue;
+      target = prism;
+      break;
+    }
+    if (target !== null) break;
+  }
+  if (target === null) {
+    check(false, 'a building with an inside worth generating exists within a kilometre of the spawn');
+    return;
+  }
+  const seed = buildingSeed(target);
+  const space = spaceForBuilding(seed);
+  check(space !== CITY_SPACE, `the building at the spawn hashes to a space that is not the city (0x${space.toString(16)})`);
+
+  // The longest wall of it, which is where a door would be knocked on, and a
+  // body standing a metre off it looking straight at it.
+  let bestLen = -1;
+  let doorX = 0;
+  let doorZ = 0;
+  let outX = 0;
+  let outZ = 0;
+  {
+    const pts = target.points;
+    const n = pts.length >> 1;
+    let cx = 0;
+    let cz = 0;
+    for (let i = 0; i < n; i++) {
+      cx += pts[i * 2];
+      cz += pts[i * 2 + 1];
+    }
+    cx /= n;
+    cz /= n;
+    for (let i = 0, j = n - 1; i < n; j = i++) {
+      const ax = pts[j * 2];
+      const az = pts[j * 2 + 1];
+      const bx = pts[i * 2];
+      const bz = pts[i * 2 + 1];
+      const len = Math.hypot(bx - ax, bz - az);
+      if (len <= bestLen) continue;
+      bestLen = len;
+      doorX = (ax + bx) / 2;
+      doorZ = (az + bz) / 2;
+      let nx = (bz - az) / len;
+      let nz = -(bx - ax) / len;
+      if ((doorX - cx) * nx + (doorZ - cz) * nz < 0) {
+        nx = -nx;
+        nz = -nz;
+      }
+      outX = nx;
+      outZ = nz;
+    }
+  }
+  say(
+    `  note: the building is ${target.points.length >> 1} corners, ${target.height.toFixed(1)} m tall, pad at ` +
+      `${target.base.toFixed(1)} m; its longest wall is ${bestLen.toFixed(1)} m at (${doorX.toFixed(0)}, ${doorZ.toFixed(0)}).`,
+  );
+
+  const sim = new Simulation(world);
+  const tick: TickOutput = { tick: 0, events: [], snapshot: null };
+  const p = sim.join(0, null, 'Doorman');
+
+  /** Stand this body a metre off the wall, looking square at it. */
+  const standAtDoor = (who: Participant): void => {
+    const x = doorX + outX * 1.0;
+    const z = doorZ + outZ * 1.0;
+    who.combat.body.position.set(x, eyeAt(groundFor(world), x, z), z);
+    who.combat.body.velocity.set(0, 0, 0);
+    // Looking *along* the inward direction. Three's camera looks down -Z, so
+    // forward is (-sin yaw, -cos yaw); this inverts that for the wall's inward
+    // normal, which is the same basis `Simulation.enterInterior` reads.
+    who.combat.body.yaw = Math.atan2(outX, outZ);
+  };
+
+  // --- 2. The press, and what comes back.
+  standAtDoor(p);
+  const entered = sim.doorPress(p.id);
+  check(entered !== null, 'a body standing at a wall and facing it is let in');
+  if (entered === null) return;
+  check(entered.space === space, `the frame names the building's own space (0x${entered.space.toString(16)})`);
+  check(entered.building === seed, 'and the building seed the client needs to pick its own copy of the footprint');
+  check(p.space === space, 'the participant is in that space on this end too');
+  check(p.interior !== null && p.interiorWorld !== null, 'and has an inside to be stepped against');
+  const inside = p.interior;
+  if (inside === null) return;
+  check(
+    Math.abs(p.combat.body.position.y - (inside.base + EYE_HEIGHT)) < 0.01,
+    `the body stands on the interior floor (${p.combat.body.position.y.toFixed(2)} m against a ${inside.base.toFixed(2)} m pad)`,
+  );
+  check(
+    inside.resolver.clearance(p.combat.body.position.x, p.combat.body.position.z) >= PLAYER_RADIUS,
+    'and stands clear of every wall in it, rather than merely legally',
+  );
+  // **The one that makes it a place rather than a drawing.** The city's
+  // collision is not consulted for a body inside, so the building's own prism --
+  // the solid this body is standing in the middle of -- never pushes back.
+  check(
+    p.interiorWorld?.collision === null && p.interiorWorld?.mover === inside.resolver,
+    'the body is stepped against the interior and against nothing in Sydney',
+  );
+
+  // --- 3. Walking into the walls, hard, for a second.
+  //
+  // Sixty ticks of full-speed input in eight directions through the authority's
+  // own `step`, which is `advance` through `enterCarriage` through the
+  // interior's resolver. A body that leaves the shell is a body that walked out
+  // through a wall into the middle of a solid building.
+  {
+    let escaped = 0;
+    let worst = Infinity;
+    for (let dir = 0; dir < 8; dir++) {
+      p.combat.body.yaw = (dir / 8) * Math.PI * 2;
+      p.input.forward = 1;
+      p.input.right = 0;
+      p.input.sprint = true;
+      p.input.yaw = p.combat.body.yaw;
+      for (let t = 0; t < 60; t++) sim.step(tick);
+      const clear = inside.resolver.clearance(p.combat.body.position.x, p.combat.body.position.z);
+      if (clear < worst) worst = clear;
+      if (clear < PLAYER_RADIUS - 0.05) escaped++;
+      if (Math.abs(p.combat.body.position.y - (inside.base + EYE_HEIGHT)) > 0.2) escaped++;
+    }
+    p.input.forward = 0;
+    p.input.sprint = false;
+    check(escaped === 0, `eight seconds of sprinting at the walls leaves the body inside (worst clearance ${worst.toFixed(2)} m)`);
+  }
+
+  // --- 4. Out again, by the door it came in by.
+  const left = sim.doorPress(p.id);
+  check(left !== null, 'pressing the door from the inside lets the body out');
+  if (left === null) return;
+  check(left.space === CITY_SPACE, 'and puts it back in the city');
+  check(p.interior === null && p.interiorWorld === null, 'and takes the interior away with it');
+  {
+    const gap = Math.hypot(p.combat.body.position.x - doorX, p.combat.body.position.z - doorZ);
+    check(gap > 0.5 && gap < 3, `it steps out at the door it came in by, not somewhere else (${gap.toFixed(2)} m from it)`);
+    // Outside the footprint, which is the half a wrong sign would get wrong --
+    // and would put the body inside the solid with the city's collision back on.
+    const back: Prism[] = [];
+    world.collision.prismsWithin(p.combat.body.position.x, p.combat.body.position.z, 2, back);
+    let insideSolid = false;
+    for (const prism of back) {
+      if (prism !== target) continue;
+      const hit = world.collision.resolve(
+        p.combat.body.position.x,
+        p.combat.body.position.z,
+        p.combat.body.position.x,
+        p.combat.body.position.z,
+        PLAYER_RADIUS,
+        p.combat.body.position.y - EYE_HEIGHT,
+      );
+      insideSolid = hit.hit;
+    }
+    check(!insideSolid, 'and stands on the pavement rather than inside the wall it just came through');
+    // The height comes from the city, not from the pad: a building at the foot
+    // of a hill has a floor that is not its pavement.
+    const ground = eyeAt(groundFor(world), p.combat.body.position.x, p.combat.body.position.z);
+    check(
+      Math.abs(p.combat.body.position.y - ground) < 0.6,
+      `at the city's own ground rather than the building's pad (${p.combat.body.position.y.toFixed(2)} against ${ground.toFixed(2)})`,
+    );
+  }
+
+  // --- 5. One building, one inside, for everybody.
+  {
+    const q = sim.join(0, null, 'Sheila');
+    standAtDoor(p);
+    standAtDoor(q);
+    const a = sim.doorPress(p.id);
+    const b = sim.doorPress(q.id);
+    check(a !== null && b !== null, 'two people can walk into the same building');
+    check(a?.space === b?.space, 'and are put in the same space');
+    check(p.interior === q.interior, 'and are handed the same rooms, not two copies of them');
+
+    // --- 6. And the working set: the wall is opaque, at a metre and a half.
+    //
+    // The case interest management could not have handled with a radius, ever:
+    // `r` stands on the pavement outside, two metres from `p`, in a different
+    // world.
+    const r = sim.join(0, null, 'Bystander');
+    r.combat.body.position.set(doorX + outX * 1.5, p.combat.body.position.y, doorZ + outZ * 1.5);
+    sim.step(tick);
+
+    const index = new InterestIndex();
+    const held = new InterestSet();
+    const out: number[] = [];
+    const snap = sim.snapshot([]);
+    index.begin(snap, [], [], (id) => sim.participants.get(id)?.space ?? CITY_SPACE);
+    index.select(p.combat.body.position.x, p.combat.body.position.z, p.space, held, out);
+    check(out.includes(p.id), 'somebody indoors is in their own working set, so prediction can still reconcile');
+    check(out.includes(q.id), 'and sees the other person in the pub with them');
+    check(!out.includes(r.id), 'and not the bystander standing two metres away through the wall');
+
+    const heldOut = new InterestSet();
+    index.select(r.combat.body.position.x, r.combat.body.position.z, r.space, heldOut, out);
+    check(out.includes(r.id), 'the bystander is in their own working set');
+    check(!out.includes(p.id) && !out.includes(q.id), 'and is sent nobody from inside the building');
+
+    sim.leave(q.id);
+    sim.leave(r.id);
+  }
+
+  // --- 7. Log off inside, log in inside.
+  //
+  // Through the store, on the same two calls a disconnect and a join make, so
+  // what is asserted is the round trip through `sanitiseLastPos` and disk's
+  // shape -- not a field copied from one object to another.
+  {
+    const dir = process.env.SYDNEY_STATE_DIR ?? '/tmp';
+    const accountPath = `${dir}/interiors-check-accounts.json`;
+    await Bun.$`rm -f ${accountPath}`.quiet().nothrow();
+    const accounts = new AccountStore(accountPath);
+    await accounts.load();
+    const signed = await accounts.signup('Doorman', 'hunter2hunter2', 'Doorman', null);
+    const record = accounts.byHandle('doorman');
+    if (!signed.ok || !record) {
+      check(false, 'the interiors fixture signed up');
+      return;
+    }
+
+    const home = new Simulation(world, { accounts });
+    const who = home.join(0, null, 'Doorman', record);
+    standAtDoor(who);
+    const wentIn = home.doorPress(who.id);
+    check(wentIn !== null, 'the fixture walks into the building');
+    const wasAt = { x: who.combat.body.position.x, z: who.combat.body.position.z };
+    home.leave(who.id);
+    check(record.lastPos?.building === seed, 'and the building is saved beside the position when they disconnect');
+    check(
+      Math.abs((record.lastPos?.y ?? -1) - (who.interior?.base ?? -2)) < 0.01,
+      'with the interior floor as the height, not the terrain outside',
+    );
+
+    const back = new Simulation(world, { accounts });
+    const again = back.join(0, null, 'Doorman', record);
+    check(again.space === space, 'and they log back in inside the same building');
+    check(again.interior !== null, 'with an inside to stand in');
+    const drift = Math.hypot(again.combat.body.position.x - wasAt.x, again.combat.body.position.z - wasAt.z);
+    check(drift < 1.5, `standing where they logged off, not in the doorway (${drift.toFixed(2)} m)`);
+    check(again.restored, 'and are told it was a restore rather than an ordinary spawn');
+    // And out through a door they were never told about, which is the case the
+    // saved spot cannot answer: the building is stored and the door is not.
+    const outAgain = back.doorPress(again.id);
+    check(outAgain !== null && outAgain.space === CITY_SPACE, 'and can walk back out of a door they did not come in by');
+    await Bun.$`rm -f ${accountPath}`.quiet().nothrow();
+  }
+}
+
 async function checkAoi(): Promise<void> {
   say('interest management (protocol v8): working sets, the band, the cap, the dedup');
 

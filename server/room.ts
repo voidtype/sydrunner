@@ -93,6 +93,7 @@ import {
   encodePowerups,
   encodeRoster,
   encodeSnapshotInto,
+  encodeSpace,
   encodeSun,
   encodeWelcome,
   investigationBytes,
@@ -124,6 +125,7 @@ import type { WalletStore } from './wallets.ts';
 import type { AccountRecord, AccountStore } from './accounts.ts';
 import { botName } from './bots.ts';
 import { FrameGroups, InterestIndex, InterestSet } from './aoi.ts';
+import { CITY_SPACE } from '../client/src/net/spaces.ts';
 import { Simulation, applyButtons, type Participant, type TickOutput } from './sim.ts';
 import { groundFor, roomWorld, type ServerWorld } from './world.ts';
 import {
@@ -678,6 +680,17 @@ export class Room {
 
   // --- Interest management, phase 2.
   private readonly interest = new InterestIndex();
+  /**
+   * Which world a player id is in, for the interest index. See `sendSnapshots`.
+   *
+   * A bound arrow held on the room rather than made per tick, because it is
+   * handed to `InterestIndex.begin` twenty times a second forever and a closure
+   * allocated there would be the one allocation PERFORMANCE.md phase 1 left in
+   * this path. An id that is not a participant reads as the city, which is the
+   * safe direction and is only reachable for a body that left between the
+   * snapshot and the send.
+   */
+  private readonly spaceOf = (id: number): number => this.sim.participants.get(id)?.space ?? CITY_SPACE;
   private readonly groups = new FrameGroups();
   /** Per-client scratch: the ids and record indices this client is being sent. */
   private readonly setIds: number[] = [];
@@ -1005,6 +1018,59 @@ export class Room {
     // The investigation channel is likewise left to the next tick: the filter is
     // "suspects you can see, plus always your own", and a client with no working
     // set yet can see nobody. Its own is impossible on the join tick.
+    //
+    // --- And, last, which world they are in. Protocol v23.
+    //
+    // Only when it is not the city, which is very nearly every join: this is the
+    // *"if u log out inside u log in there"* case and nothing else. Sent as an
+    // ordinary `SPACE` frame rather than as a field on the welcome, which is
+    // the whole argument for that message existing -- see `protocol.MSG.SPACE`.
+    // The client runs the identical transition it runs on opening a door, so
+    // the restore path is exercised by every door press in the game rather than
+    // only by the case nobody would have tested.
+    //
+    // After the roster and the wallet, because it is the frame that moves the
+    // camera and there is no reason for it to arrive before the HUD it lands
+    // in. `WELCOME` already carried the position, so a client that ignored this
+    // message entirely would be standing in the right place with the wrong
+    // walls -- which is why it is sent rather than assumed.
+    if (p.space !== CITY_SPACE) ws.send(encodeSpace(this.sim.spaceFrameFor(p)));
+  }
+
+  /**
+   * Somebody pressed the door they are standing at. `MSG.DOOR`.
+   *
+   * `sunPress`' shape and every one of its arguments. The frame carries nothing
+   * -- the position tested is the one this room integrated, so a client cannot
+   * ask to be let into a building it is nowhere near -- and the reply goes only
+   * to the presser, because nobody else's world changed.
+   *
+   * A press that finds nothing is answered with **silence** rather than with a
+   * refusal frame, which is where this differs from the sun and the difference
+   * is real: the sun's client writes optimistic state on the key-down and needs
+   * contradicting, and a door's does not. Walking into a building is a teleport
+   * this end owns outright, so the browser waits to be told and there is nothing
+   * to take back. See `net/client.ts`'s `MSG.SPACE` handler.
+   *
+   * **Bots never reach here**: a bot has no socket and this is only ever called
+   * from the websocket handler in `server/index.ts`. `Simulation.doorPress`
+   * refuses one anyway, on the grounds that the absence of a check is
+   * indistinguishable from a missing one.
+   */
+  doorPress(ws: Socket): void {
+    const p = ws.data.participant;
+    if (!p) return;
+    const frame = this.sim.doorPress(p.id);
+    if (frame === null) return;
+    ws.send(encodeSpace(frame));
+    // The working set is now wrong in a way one snapshot cannot fix: everybody
+    // this client could see a moment ago is in a different world, and everybody
+    // in the building is new. Cleared rather than left to the delta, because the
+    // delta would otherwise send `INTEREST` leaves for a set the client has
+    // already been told to forget -- and because a body that was in view on
+    // both sides of the door (there is none, but the code should not depend on
+    // that) must be re-entered rather than silently kept.
+    ws.data.interest.clear();
   }
 
   /**
@@ -1613,7 +1679,11 @@ export class Room {
     const balls = sim.ballSnapshot();
     const npcs = sim.npcSnapshot();
     const aboard = sim.aboardSnapshot();
-    this.interest.begin(players, balls, npcs);
+    // The fourth argument is protocol v23's: which world each body is in, asked
+    // by `InterestIndex.select` before it measures a single distance. A closure
+    // rather than a field on the record, because the space is deliberately not
+    // on the wire -- see `PROTOCOL_VERSION`'s v23 note and `server/aoi.ts`.
+    this.interest.begin(players, balls, npcs, this.spaceOf);
     this.groups.begin();
     // WORKSTREAM AD: what the cap is capping, sampled here rather than counted
     // per client, because it is a property of the room and not of a viewer.
@@ -1627,12 +1697,12 @@ export class Room {
       prof.at(SEC.aoi);
       const x = p.combat.body.position.x;
       const z = p.combat.body.position.z;
-      this.interest.select(x, z, conn.interest, this.setIds);
+      this.interest.select(x, z, p.space, conn.interest, this.setIds);
       // WORKSTREAM AD: the ball selection takes this client's own id now, so it
       // can drop the throws `net/client.interpolateBalls` would discard anyway.
       // See `InterestIndex.selectBalls` for that rule and for the cap beside it.
-      this.interest.selectBalls(x, z, p.id, this.setBalls);
-      this.interest.selectNpcs(x, z, this.setNpcs);
+      this.interest.selectBalls(x, z, p.id, p.space, this.setBalls);
+      this.interest.selectNpcs(x, z, p.space, this.setNpcs);
       const group = this.groups.intern(this.setIds, this.setBalls, this.setNpcs);
 
       // --- The delta, before the bodies it identifies.
