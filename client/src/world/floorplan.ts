@@ -48,6 +48,20 @@ export interface Room {
   /** Half-extents along the building's own axes, metres. */
   ex: number;
   ez: number;
+  /**
+   * The same centre in the building's own frame -- `u` along `OrientedBox.ux`,
+   * `v` along the perpendicular -- as an absolute coordinate, not an offset
+   * from the box centre. `worldFromLocal` is the pair of lines that converts.
+   *
+   * Carried rather than recomputed because every room in one building is
+   * axis-aligned *in this frame and only in this frame*, and that is the whole
+   * of what makes `world/interior.ts` able to say "these two rooms share a
+   * wall" with a comparison instead of a polygon intersection. A reader that
+   * derived it would be deriving it in a loop, and a reader that forgot to
+   * would be asking about world-axis rectangles that do not exist.
+   */
+  u: number;
+  v: number;
   /** Which storey, 0 at the pad. */
   storey: number;
 }
@@ -230,10 +244,23 @@ export function floorPlan(points: Float32Array, height: number, seed: number): F
   const box = orientedBox(points);
   const storeys = storeysFor(height);
   const rooms: Room[] = [];
+  // The box centre in the box's own frame. Everything below subdivides in
+  // *this* frame and converts back per cell.
+  //
+  // **It used to subdivide in world x and z**, using the oriented box's
+  // extents, which is only right for a building whose walls happen to run
+  // north-south. Every other building -- which is most of Sydney, and all of
+  // the Rocks -- got a lattice of world-axis rectangles laid over a rotated
+  // outline: rooms that poke through two walls and stop short of a third, and
+  // `insidePolygon` culling the corners into a staircase. Nothing downstream
+  // could have straightened that out, because `Room.ex`'s own documentation
+  // says the extents are along the building's axes and they were not.
+  const cu = box.x * box.ux + box.z * box.uz;
+  const cv = -box.x * box.uz + box.z * box.ux;
 
   for (let storey = 0; storey < storeys; storey++) {
     const cells: Array<{ x: number; z: number; ex: number; ez: number; depth: number }> = [
-      { x: box.x, z: box.z, ex: box.ex, ez: box.ez, depth: 0 },
+      { x: cu, z: cv, ex: box.ex, ez: box.ez, depth: 0 },
     ];
     let head = 0;
     let made = 0;
@@ -245,11 +272,15 @@ export function floorPlan(points: Float32Array, height: number, seed: number): F
         area > SPLIT_AREA_M2 &&
         Math.min(cell.ex, cell.ez) * 2 > MIN_ROOM_M * 2;
       if (!splittable) {
+        // Back to world, because the polygon is in world metres and so is
+        // everything that will draw this room.
+        const wx = cell.x * box.ux - cell.z * box.uz;
+        const wz = cell.x * box.uz + cell.z * box.ux;
         // Keep it only if it is actually inside the building. This one clause
         // is what makes an L-shape, a courtyard and a horseshoe all work with
         // no special case anywhere: the cells in the notch simply fail it.
-        if (insidePolygon(points, cell.x, cell.z)) {
-          rooms.push({ x: cell.x, z: cell.z, ex: cell.ex, ez: cell.ez, storey });
+        if (insidePolygon(points, wx, wz)) {
+          rooms.push({ x: wx, z: wz, ex: cell.ex, ez: cell.ez, u: cell.x, v: cell.z, storey });
           made++;
         }
         continue;
@@ -285,7 +316,15 @@ export function floorPlan(points: Float32Array, height: number, seed: number): F
     // outside the polygon -- a thin diagonal, a crescent -- would otherwise
     // produce an empty floor, which is a door that opens onto a void.
     if (!rooms.some((room) => room.storey === storey)) {
-      rooms.push({ x: box.x, z: box.z, ex: Math.max(1, box.ex * 0.4), ez: Math.max(1, box.ez * 0.4), storey });
+      rooms.push({
+        x: box.x,
+        z: box.z,
+        ex: Math.max(1, box.ex * 0.4),
+        ez: Math.max(1, box.ez * 0.4),
+        u: cu,
+        v: cv,
+        storey,
+      });
     }
   }
 
@@ -411,6 +450,42 @@ export function verifyFloorPlan(): string[] {
     }
     const len = Math.sqrt(box.ux * box.ux + box.uz * box.uz);
     if (Math.abs(len - 1) > 1e-6) failures.push(`the box axis is not a unit vector (${len}).`);
+  }
+
+  // --- **The rooms are in the building's frame, not the compass's.**
+  //
+  // The one property `Room.u`/`Room.v` exists to make checkable, and the bug it
+  // was written for: the subdivision ran in world x and z while claiming its
+  // extents were along the building's own axes, so a rotated terrace got a
+  // lattice of north-aligned rectangles laid over a diagonal outline. Two
+  // assertions, because either alone passes on the broken version -- the local
+  // centre must convert back to the world one, and the room's own corners in
+  // the local frame must lie inside the oriented box.
+  {
+    const diag = poly(0, 0, 4.2, 4.2, 16, -7.6, 11.8, -11.8);
+    const plan = floorPlan(diag, 6.5, 4242);
+    const b = plan.box;
+    const minU = b.x * b.ux + b.z * b.uz - b.ex;
+    const maxU = b.x * b.ux + b.z * b.uz + b.ex;
+    const minV = -b.x * b.uz + b.z * b.ux - b.ez;
+    const maxV = -b.x * b.uz + b.z * b.ux + b.ez;
+    let strayed = 0;
+    let mismatched = 0;
+    for (const r of plan.rooms) {
+      const wx = r.u * b.ux - r.v * b.uz;
+      const wz = r.u * b.uz + r.v * b.ux;
+      if (Math.abs(wx - r.x) > 1e-3 || Math.abs(wz - r.z) > 1e-3) mismatched++;
+      if (
+        r.u - r.ex < minU - 1e-3 || r.u + r.ex > maxU + 1e-3 ||
+        r.v - r.ez < minV - 1e-3 || r.v + r.ez > maxV + 1e-3
+      ) {
+        strayed++;
+      }
+    }
+    if (mismatched > 0) failures.push(`${mismatched} rooms' local centres do not convert back to their world ones.`);
+    if (strayed > 0) {
+      failures.push(`${strayed} rooms of a diagonal terrace fall outside its own box; the plan is laid out on the compass.`);
+    }
   }
 
   // --- Big buildings terminate.

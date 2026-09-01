@@ -115,6 +115,7 @@ import { verifyRangeAlloc } from './world/rangealloc.ts';
 import { verifyFloorPlan } from './world/floorplan.ts';
 import { doorAt, verifyDoorway, type DoorSite } from './world/doorway.ts';
 import { verifySpaces } from './net/spaces.ts';
+import { verifyInterior } from './world/interior.ts';
 import { lostMessage, lostPlan, verifyDeviceLost } from './devicelost.ts';
 import { verifyIndexDom } from './domcheck.ts';
 import { verifyTilePriority } from './world/tilepriority.ts';
@@ -5236,6 +5237,15 @@ async function main(): Promise<void> {
      * walking. See `world/doorway.ts`.
      */
     ...verifyDoorway(),
+    /*
+     * And what is behind it: walls with doorways in them, a shell you cannot
+     * walk out of, and the resolver both ends step a body against. The check
+     * that matters most here is the one that drives a body through every
+     * opening -- a wall that meets in the middle of a doorway is a player who
+     * walks into a house and can never leave the first room, and nothing about
+     * that is visible in a screenshot. See `world/interior.ts`.
+     */
+    ...verifyInterior(),
     /*
      * And which world a participant is standing in. Shared with the server
      * because both ends must agree exactly: the browser predicts your position

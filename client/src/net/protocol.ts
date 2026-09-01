@@ -358,6 +358,31 @@ export const MSG = {
    * cross here. See `net/quests.ts`' header for the whole argument.
    */
   QUEST: 0x15,
+  /**
+   * "I am standing at a door and I have pressed it."
+   *
+   * One byte, and it carries **no building, no position and no space** --
+   * `SUN_PRESS`' rule, and here it is load-bearing rather than tidy. The server
+   * already owns the presser's body; it holds the same collision prisms the
+   * browser does (`server/world.ts`), and `world/doorway.doorAt` is pure and
+   * runs identically on both ends. So the server answers *which building* from
+   * the position it is already simulating, and a client cannot ask to be let
+   * into a building it is nowhere near -- which it could, if the seed were a
+   * field. See `net/spaces.ts` for what a space id is and why it is derived
+   * from geometry rather than allocated.
+   *
+   * **No enter/leave discriminator either**, for the same reason: the server
+   * knows which space this participant is in, so an inside press can only mean
+   * out and an outside press can only mean in. A bit would be a second opinion
+   * about a fact with one owner.
+   *
+   * **A message rather than a bit on `INPUT`**, on `SUN_PRESS`' argument
+   * exactly -- `INPUT` is a 60 Hz level-triggered ring that deliberately drops
+   * frames, which is right for movement and wrong for a door.
+   *
+   * 0x16, paired with `SPACE` at 0x96 under the halves convention.
+   */
+  DOOR: 0x16,
 
   WELCOME: 0x81,
   SNAPSHOT: 0x82,
@@ -635,6 +660,24 @@ export const MSG = {
    * exact player at this exact moment. See `net/quests.QuestStateFrame.line`.
    */
   QUEST_STATE: 0x95,
+  /**
+   * "You are now in this world, standing here." See `net/spaces.ts`.
+   *
+   * The reply to `DOOR` (0x16 -> 0x96, the halves convention), and also sent
+   * **unprompted right after `WELCOME`** to a player whose account logged off
+   * indoors. That second sender is why the space is not a field on `WELCOME`:
+   * every join would carry ten bytes of city to say nothing, the welcome's
+   * layout would move for a case that is rare by construction, and the
+   * transition the client runs on arriving inside is the same one it runs on
+   * opening a door -- one message, one handler, one code path that is
+   * exercised every time anybody opens any door rather than only on the
+   * restore, which is the path nobody would have tested.
+   *
+   * It is a **teleport, not a correction**: the client stops predicting, takes
+   * the position whole, and rebuilds the world around it. See
+   * `net/client.ts`'s handler.
+   */
+  SPACE: 0x96,
 } as const;
 
 /**
@@ -864,7 +907,28 @@ export const MSG = {
  * drawn over a quest the server refuses. One byte wider, one version up. The
  * codecs live in `net/quests.ts`; `verifyQuestWire` round-trips 300 flags.
  */
-export const PROTOCOL_VERSION = 22;
+/*
+ * v23: interiors -- a participant is somewhere, and now also in *something*.
+ *
+ * Two new messages, a matched pair under the halves convention: `DOOR` (0x16,
+ * client -> server, one byte, "I pressed the door I am standing at") and
+ * `SPACE` (0x96, server -> client, "you are now in this world, here"). No
+ * existing layout moves and no existing field changes width.
+ *
+ * **The space is deliberately not in the snapshot.** The obvious design puts a
+ * space id on every player record so a receiver can tell who is in the room
+ * with it, and it would be four bytes per player per snapshot -- 25 kbit/s at a
+ * full working set -- to send a number that is *already known to be equal*:
+ * `server/aoi.ts` filters the working set by space before it measures a single
+ * distance, so everybody in a snapshot is by construction in the sender's own
+ * space. The only space a client needs is its own, it changes a handful of
+ * times an hour, and 0x96 is how it learns it.
+ *
+ * Additive, and a v22 client never sends 0x16 -- but a server that answers a
+ * message a client cannot parse is exactly the disagreement this number exists
+ * to refuse, so it moves.
+ */
+export const PROTOCOL_VERSION = 23;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;
@@ -3608,6 +3672,108 @@ export function decodeInvestigations(buffer: ArrayBuffer): InvestigationRecord[]
   return out;
 }
 
+// --- Doors, and which world you are in -----------------------------------------
+
+/**
+ * `MSG.DOOR`, one byte.
+ *
+ * `encodeSunPress`' ceremony and its argument: this file is the only place in
+ * the repo that writes a message id, so a caller that hand-rolled
+ * `new Uint8Array([0x16])` would be a second definition of the wire and the one
+ * place a renumbering would not reach.
+ *
+ * There is nothing in it on purpose. See `MSG.DOOR`.
+ */
+export function encodeDoor(buffer = new ArrayBuffer(1)): ArrayBuffer {
+  new DataView(buffer).setUint8(0, MSG.DOOR);
+  return buffer;
+}
+
+/** True if this frame is a well-formed `DOOR`. There is nothing else to say. */
+export function decodeDoor(buffer: ArrayBuffer): boolean {
+  return buffer.byteLength >= 1 && new DataView(buffer).getUint8(0) === MSG.DOOR;
+}
+
+/** `MSG.SPACE`'s width. See `encodeSpace`. */
+export const SPACE_BYTES = 41;
+
+/**
+ * Which world this client is now in, and where in it. See `net/spaces.ts`.
+ *
+ *     u8   type = MSG.SPACE
+ *     u32  space        `spaces.CITY_SPACE` for the street
+ *     u32  building     the seed the interior was generated from; 0 in the city
+ *     f32  x, y, z      the body, taken whole -- y is the eye, as `WELCOME`'s is
+ *     f32  yaw
+ *     f32  doorX, doorZ the door this space was entered by
+ *     f32  doorNX, doorNZ  its outward normal, unit length
+ *
+ * **`f32` rather than `quantisePos`' fixed point, which every other position in
+ * this file uses.** The centimetre grid is right for a body that moves every
+ * tick and wrong for these two pairs: the door is the *anchor* an interior is
+ * generated around and the normal is a unit vector, and a normal rounded to a
+ * centimetre is not a unit vector any more. Nothing is saved by being clever
+ * about a message that arrives twice an hour.
+ *
+ * **Both the space and the building, which look redundant and are not.** The
+ * space is what the server filters interest by; the building is what *generates*
+ * the rooms (`world/floorplan.ts`), and `spaces.spaceForBuilding` runs one way
+ * only. The client needs the seed to pick its own copy of the footprint out of
+ * the prisms it has already streamed -- it matches on `doorway.buildingSeed`,
+ * which is exactly the check that two ends generated the same house.
+ *
+ * In the city both are zero and the door pair is zero, and that frame means
+ * "you are outside, standing here" -- the exit, and the only thing a client that
+ * never opens a door will ever see on this id.
+ */
+export interface SpaceFrame {
+  space: number;
+  /** The building's seed, or 0 in the city. See `world/doorway.buildingSeed`. */
+  building: number;
+  x: number;
+  y: number;
+  z: number;
+  yaw: number;
+  doorX: number;
+  doorZ: number;
+  doorNX: number;
+  doorNZ: number;
+}
+
+export function encodeSpace(f: SpaceFrame, buffer = new ArrayBuffer(SPACE_BYTES)): ArrayBuffer {
+  const v = new DataView(buffer);
+  v.setUint8(0, MSG.SPACE);
+  v.setUint32(1, f.space >>> 0, true);
+  v.setUint32(5, f.building >>> 0, true);
+  v.setFloat32(9, f.x, true);
+  v.setFloat32(13, f.y, true);
+  v.setFloat32(17, f.z, true);
+  v.setFloat32(21, f.yaw, true);
+  v.setFloat32(25, f.doorX, true);
+  v.setFloat32(29, f.doorZ, true);
+  v.setFloat32(33, f.doorNX, true);
+  v.setFloat32(37, f.doorNZ, true);
+  return buffer;
+}
+
+export function decodeSpace(buffer: ArrayBuffer): SpaceFrame | null {
+  if (buffer.byteLength < SPACE_BYTES) return null;
+  const v = new DataView(buffer);
+  if (v.getUint8(0) !== MSG.SPACE) return null;
+  return {
+    space: v.getUint32(1, true),
+    building: v.getUint32(5, true),
+    x: v.getFloat32(9, true),
+    y: v.getFloat32(13, true),
+    z: v.getFloat32(17, true),
+    yaw: v.getFloat32(21, true),
+    doorX: v.getFloat32(25, true),
+    doorZ: v.getFloat32(29, true),
+    doorNX: v.getFloat32(33, true),
+    doorNZ: v.getFloat32(37, true),
+  };
+}
+
 // --- The screaming sun ---------------------------------------------------------
 
 /**
@@ -5224,6 +5390,77 @@ export function verifyNet(): string[] {
     if (decodeSunPress(new ArrayBuffer(0))) failures.push('An empty frame decoded as a SUN_PRESS.');
   }
 
+  // --- Doors, and the space frame they answer with. v23.
+  //
+  // What this catches, and each of them is a player standing in the wrong world
+  // rather than a rendering fault:
+  //
+  //   - **A `DOOR` that is not told apart from every other one-byte frame.** It
+  //     is one byte with no payload, exactly as `SUN_PRESS` is, so the type byte
+  //     is the entire message and a decoder that ignored it would let an INPUT
+  //     open a door.
+  //   - **A space that does not survive the round trip.** The space is what
+  //     `server/aoi.ts` filters interest by; a mangled one is a player in a room
+  //     nobody else is in, with everybody else's bodies drawn through the wall.
+  //   - **A building seed that does not survive.** It is a `u32` and the top bit
+  //     is set for half of all buildings, so a signed read would rename them --
+  //     and the client picks its footprint by matching this number against
+  //     `doorway.buildingSeed`. A rename is a house that fails to generate.
+  //   - **A door normal that stops being a unit vector**, which is why these are
+  //     floats and not this file's centimetre fixed point. The exit places a
+  //     body along this normal; a normal of the wrong length puts them in the
+  //     wall or two metres off the kerb.
+  {
+    if (!decodeDoor(encodeDoor())) failures.push('A DOOR did not decode as one.');
+    if (decodeDoor(encodeSunPress())) failures.push('A SUN_PRESS decoded as a DOOR. The type byte is not being read.');
+    if (decodeDoor(new ArrayBuffer(0))) failures.push('An empty frame decoded as a DOOR.');
+
+    // A real interior: a big seed with the top bit set, a door on a wall facing
+    // roughly south-west, and a position with a fraction in it.
+    const sent: SpaceFrame = {
+      space: 0xdeadbeef,
+      building: 0xdeadbeef,
+      x: -812.34,
+      y: 15.5,
+      z: 1420.99,
+      yaw: 4.2,
+      doorX: -810.125,
+      doorZ: 1418.5,
+      doorNX: -0.6,
+      doorNZ: -0.8,
+    };
+    const got = decodeSpace(encodeSpace(sent));
+    if (got === null) failures.push('A SPACE frame did not decode.');
+    else {
+      if (got.space !== sent.space) failures.push(`the space came back as ${got.space}, not ${sent.space}.`);
+      if (got.building !== sent.building) {
+        failures.push(`the building seed came back as ${got.building}, not ${sent.building} -- a u32 read as signed renames half the city.`);
+      }
+      // f32 holds these exactly at Sydney's magnitudes; the tolerance is for
+      // the ones that do not land on a binary fraction.
+      for (const [what, a, b] of [
+        ['x', got.x, sent.x], ['y', got.y, sent.y], ['z', got.z, sent.z], ['yaw', got.yaw, sent.yaw],
+        ['doorX', got.doorX, sent.doorX], ['doorZ', got.doorZ, sent.doorZ],
+        ['doorNX', got.doorNX, sent.doorNX], ['doorNZ', got.doorNZ, sent.doorNZ],
+      ] as Array<[string, number, number]>) {
+        if (Math.abs(a - b) > 0.01) failures.push(`SPACE.${what} came back as ${a}, not ${b}.`);
+      }
+      const len = Math.sqrt(got.doorNX * got.doorNX + got.doorNZ * got.doorNZ);
+      if (Math.abs(len - 1) > 1e-3) failures.push(`the door normal came back ${len} long; the exit would place a body inside the wall.`);
+    }
+
+    // The city frame -- all zeros but the type byte -- is the exit, and is the
+    // only SPACE a client that never opens a door will see.
+    const city = decodeSpace(encodeSpace({ space: 0, building: 0, x: 1, y: 2, z: 3, yaw: 0, doorX: 0, doorZ: 0, doorNX: 0, doorNZ: 0 }));
+    if (city === null || city.space !== 0 || city.building !== 0) {
+      failures.push('the city SPACE frame did not survive; nobody could get back out of a building.');
+    }
+    if (decodeSpace(encodeSpace(sent).slice(0, SPACE_BYTES - 1)) !== null) {
+      failures.push('A truncated SPACE decoded rather than being refused.');
+    }
+    if (decodeSpace(encodeSun(0, 0)) !== null) failures.push('A SUN frame decoded as a SPACE.');
+  }
+
   // --- The driven cars, this pass's new message.
   //
   // What this catches, and every one of them renders rather than throws:
@@ -5918,7 +6155,7 @@ export function verifyNet(): string[] {
     }
     // Which half each one belongs in, named here rather than inferred from a
     // prefix: a list is checkable and a naming convention is not.
-    const clientToServer = ['HELLO', 'INPUT', 'PING', 'CHAT_SAY', 'SUGGEST', 'SUN_PRESS', 'PHONE', 'TEAM', 'QUEST'];
+    const clientToServer = ['HELLO', 'INPUT', 'PING', 'CHAT_SAY', 'SUGGEST', 'SUN_PRESS', 'PHONE', 'TEAM', 'QUEST', 'DOOR'];
     for (const [name, id] of Object.entries(MSG)) {
       const wantsLow = clientToServer.includes(name);
       if (wantsLow && id >= 0x80) {

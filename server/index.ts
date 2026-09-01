@@ -174,6 +174,8 @@ import { verifyAsyncPipes } from '../client/src/world/asyncpipes.ts';
 import { verifyPipeReclaim } from '../client/src/world/pipereclaim.ts';
 import { verifyRangeAlloc } from '../client/src/world/rangealloc.ts';
 import { verifyFloorPlan } from '../client/src/world/floorplan.ts';
+import { verifyDoorway } from '../client/src/world/doorway.ts';
+import { verifyInterior } from '../client/src/world/interior.ts';
 import { verifySpaces } from '../client/src/net/spaces.ts';
 import { verifyDeviceLost } from '../client/src/devicelost.ts';
 // --- Workstream E. Three self-checks, all three of them shared modules being
@@ -474,6 +476,13 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     ['verifyPipeReclaim', verifyPipeReclaim()],
     ['verifyRangeAlloc', verifyRangeAlloc()],
     ['verifyFloorPlan', verifyFloorPlan()],
+    // The other two thirds of interiors, and both belong here rather than only
+    // in the browser for this list's own reason: they are pure, the server runs
+    // them for real -- it is the end that decides which building a door belongs
+    // to and stops a body at its walls -- and a check the deploy gate cannot
+    // see is a check that goes green on a broken build.
+    ['verifyDoorway', verifyDoorway()],
+    ['verifyInterior', verifyInterior()],
     ['verifySpaces', verifySpaces()],
     ['verifyDeviceLost', verifyDeviceLost()],
     // --- WORKSTREAM V. `verifyTeams` is the contract's own and is here for a
