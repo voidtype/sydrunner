@@ -264,13 +264,26 @@ export function floorPlan(points: Float32Array, height: number, seed: number): F
     ];
     let head = 0;
     let made = 0;
-    while (head < cells.length && made < MAX_ROOMS_PER_FLOOR) {
+    while (head < cells.length) {
       const cell = cells[head++];
       const area = cell.ex * 2 * (cell.ez * 2);
+      // **The cap stops the splitting, not the walk.**
+      //
+      // It used to end the loop -- `made < MAX_ROOMS_PER_FLOOR` in the while --
+      // which left whatever was still queued as no room at all. A 30 m block
+      // came out as twenty-four rooms with holes between them where the queue
+      // had been cut off, and `world/interior.ts` then found four rooms with no
+      // neighbour to put a doorway to: islands in a floor that was never
+      // finished. Splitting stops when keeping *everything still queued* would
+      // breach the cap, so the plan is always a complete tiling of the box and a
+      // building too big to subdivide finely gets larger rooms rather than a
+      // partial floor.
+      const ifKeptAll = made + 1 + (cells.length - head);
       const splittable =
         cell.depth < MAX_DEPTH &&
         area > SPLIT_AREA_M2 &&
-        Math.min(cell.ex, cell.ez) * 2 > MIN_ROOM_M * 2;
+        Math.min(cell.ex, cell.ez) * 2 > MIN_ROOM_M * 2 &&
+        ifKeptAll + 1 <= MAX_ROOMS_PER_FLOOR;
       if (!splittable) {
         // Back to world, because the polygon is in world metres and so is
         // everything that will draw this room.
@@ -450,6 +463,44 @@ export function verifyFloorPlan(): string[] {
     }
     const len = Math.sqrt(box.ux * box.ux + box.uz * box.uz);
     if (Math.abs(len - 1) > 1e-6) failures.push(`the box axis is not a unit vector (${len}).`);
+  }
+
+  // --- **A storey is a complete tiling of the box.**
+  //
+  // The property the room cap used to break: it ended the subdivision walk, so
+  // whatever was still queued became no room at all and a 30 m block came out
+  // with holes in it. Two assertions over a rectangle, where the polygon culls
+  // nothing: the rooms' areas add up to the box's, and no two of them overlap.
+  // Either alone passes on a plan with a hole *and* a double-covered cell.
+  {
+    for (const [what, pts, height] of [
+      ['a 30 m block', poly(0, 0, 30, 0, 30, 30, 0, 30), 6],
+      ['a warehouse', poly(0, 0, 400, 0, 400, 260, 0, 260), 6],
+      ['a terrace', poly(0, 0, 6, 0, 6, 18, 0, 18), 6],
+    ] as Array<[string, Float32Array, number]>) {
+      const plan = floorPlan(pts, height, 31337);
+      const floor = plan.rooms.filter((r) => r.storey === 0);
+      let area = 0;
+      for (const r of floor) area += r.ex * 2 * (r.ez * 2);
+      const boxArea = plan.box.ex * 2 * (plan.box.ez * 2);
+      if (Math.abs(area - boxArea) > boxArea * 0.001) {
+        failures.push(`${what}'s ground floor covers ${area.toFixed(0)} m2 of a ${boxArea.toFixed(0)} m2 box; the plan has holes in it.`);
+      }
+      let overlaps = 0;
+      for (let i = 0; i < floor.length; i++) {
+        for (let j = i + 1; j < floor.length; j++) {
+          const a = floor[i];
+          const b = floor[j];
+          const du = Math.abs(a.u - b.u) - (a.ex + b.ex);
+          const dv = Math.abs(a.v - b.v) - (a.ez + b.ez);
+          if (du < -1e-3 && dv < -1e-3) overlaps++;
+        }
+      }
+      if (overlaps > 0) failures.push(`${what} has ${overlaps} pairs of rooms standing in each other.`);
+      if (floor.length > MAX_ROOMS_PER_FLOOR) {
+        failures.push(`${what} produced ${floor.length} rooms on one floor; the cap is ${MAX_ROOMS_PER_FLOOR}.`);
+      }
+    }
   }
 
   // --- **The rooms are in the building's frame, not the compass's.**

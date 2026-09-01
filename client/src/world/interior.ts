@@ -40,6 +40,16 @@
  *     pavement is a metre from somebody standing inside, and without the filter
  *     they would draw each other through the wall.
  *
+ * ## The door is not part of the interior
+ *
+ * One building, one inside, for everybody -- so the rooms are cached per space
+ * and the *door* is not among them. Two players can walk into the same corner
+ * pub from George Street and from the lane behind it, and each has to arrive
+ * just inside the door they used and leave by it again ("you leave by the one
+ * you came in", INTERIORS.md). So `buildInterior` takes no door and `arrivalAt`
+ * is a separate question asked per entrant, which is also what stops the first
+ * person through the door deciding where everybody else comes in.
+ *
  * ## The ground floor, and what is not built yet
  *
  * One storey is walkable: the one you come in at. `floorPlan` generates every
@@ -126,15 +136,6 @@ export interface ShellPlane {
   d: number;
 }
 
-/** The door, from the inside. */
-export interface InteriorDoor {
-  x: number;
-  z: number;
-  /** Outward normal -- away from the building. Leaving walks along it. */
-  nx: number;
-  nz: number;
-}
-
 export interface Interior {
   /** `doorway.buildingSeed`. The building's name, and the plan's seed. */
   seed: number;
@@ -152,10 +153,9 @@ export interface Interior {
   shell: Float32Array;
   /** The same shell as half-planes, which is what the resolver actually reads. */
   planes: readonly ShellPlane[];
-  door: InteriorDoor;
-  /** Where a body arrives, just inside the door. */
-  spawnX: number;
-  spawnZ: number;
+  /** The footprint's centre. `arrivalAt` walks toward it; the view looks at it. */
+  centreX: number;
+  centreZ: number;
   /** What `CombatWorld.mover` is set to while a body is in here. */
   resolver: InteriorResolver;
 }
@@ -402,6 +402,36 @@ export class InteriorResolver {
     private readonly walls: readonly InteriorWall[],
   ) {}
 
+  /**
+   * How much room a body of zero radius has at this point, metres.
+   *
+   * Negative inside a wall or outside the shell. Separate from `resolve`
+   * because a *push* and a *measurement* are different questions and only one
+   * of them can be trusted to answer the other: `resolve` runs a fixed three
+   * passes, and in the corner of a forty-sided outline the pushes can cycle to
+   * a fixed point that is still inside something. `arrivalAt` asks this instead
+   * of asking `resolve` twice and comparing, which is the version that shipped
+   * for an hour and quietly let one door in forty land in a wall.
+   */
+  clearance(x: number, z: number): number {
+    let least = Infinity;
+    for (const p of this.planes) {
+      const s = p.nx * x + p.nz * z - p.d;
+      if (s < least) least = s;
+    }
+    for (const w of this.walls) {
+      const dx = w.bx - w.ax;
+      const dz = w.bz - w.az;
+      const len2 = dx * dx + dz * dz;
+      const t = len2 > 1e-9 ? Math.max(0, Math.min(1, ((x - w.ax) * dx + (z - w.az) * dz) / len2)) : 0;
+      const ex = x - (w.ax + dx * t);
+      const ez = z - (w.az + dz * t);
+      const s = Math.sqrt(ex * ex + ez * ez) - WALL_THICK_M / 2;
+      if (s < least) least = s;
+    }
+    return least;
+  }
+
   resolve(
     fromX: number,
     fromZ: number,
@@ -481,18 +511,14 @@ export class InteriorResolver {
  * same four arguments off the same prism and must get the same rooms, which is
  * the whole reason nothing in here reads a clock, a random, or a `Math.sin`.
  *
- * `doorX`/`doorZ`/`doorNX`/`doorNZ` come from `doorway.doorAt` -- the point on
- * the real wall the player knocked on, and its outward normal.
+ * No door: see the header. `arrivalAt` below is where one is used, once per
+ * person who walks in.
  */
 export function buildInterior(
   points: Float32Array,
   base: number,
   height: number,
   seed: number,
-  doorX: number,
-  doorZ: number,
-  doorNX: number,
-  doorNZ: number,
 ): Interior | null {
   if (!interiorAdmits(points, height)) return null;
   if (!Number.isFinite(base)) return null;
@@ -504,105 +530,46 @@ export function buildInterior(
 
   const plan = floorPlan(points, height, seed);
   const box = plan.box;
-  const ground = plan.rooms.filter((r) => r.storey === 0);
-  if (ground.length === 0) return null;
+  // The ground floor, and only the part of it inside the shell.
+  //
+  // Two culls rather than one, because they answer different questions.
+  // `floorPlan` already dropped the cells whose centres fall outside the
+  // *polygon*, which is what makes an L-shape work. This drops the ones outside
+  // the **walkable shell** -- the intersection of the outline's half-planes,
+  // which for a convex hull is the outline inset by a wall and for anything
+  // else is its convex core. Without it a concave footprint keeps rooms whose
+  // walls are then clipped away to nothing, and the plan describes partitions
+  // that do not exist.
+  const ground = plan.rooms.filter((r) => {
+    if (r.storey !== 0) return false;
+    for (const pl of planes) {
+      if (pl.nx * r.x + pl.nz * r.z - pl.d < 0.05) return false;
+    }
+    return true;
+  });
 
   // --- Which rooms connect to which, and where the openings go.
   const contacts = contactsBetween(ground);
   const doorways: Span[] = [];
-  const adjacency: number[][] = ground.map(() => []);
   for (const c of contacts) {
-    const width = Math.min(DOOR_GAP_M, c.hi - c.lo - 0.2);
-    if (width < 0.9) continue;
+    // **Every contact becomes a doorway**, which is what makes connectivity a
+    // property of the generator rather than something to check for afterwards:
+    // two rooms that share a metre of wall share a way through it, so the room
+    // graph *is* the contact graph and no part of a house can be sealed off.
+    // `MIN_CONTACT_M` and the jamb below are sized so that this is always an
+    // opening a body fits through -- see `contactsBetween`.
+    const width = Math.min(DOOR_GAP_M, c.hi - c.lo - 0.1);
     const mid = (c.lo + c.hi) / 2;
     doorways.push({ axis: c.axis, coord: c.coord, lo: mid - width / 2, hi: mid + width / 2 });
-    adjacency[c.a].push(c.b);
-    adjacency[c.b].push(c.a);
   }
 
-  // --- Where a body arrives, and which room that is.
-  //
-  // A metre in from the wall it knocked on, which clears the wall's own
-  // thickness and the body's radius with room to spare. If that lands outside
-  // the shell -- a door on the short side of something barely wide enough --
-  // it is walked toward the footprint's centroid until it is inside, rather
-  // than refused: the alternative is a door that opens onto a refusal.
-  let cx = 0;
-  let cz = 0;
-  for (let i = 0; i < points.length; i += 2) {
-    cx += points[i];
-    cz += points[i + 1];
-  }
-  cx /= points.length / 2;
-  cz /= points.length / 2;
-  let spawnX = doorX - doorNX * 1.0;
-  let spawnZ = doorZ - doorNZ * 1.0;
-  for (let tries = 0; tries < 12; tries++) {
-    let worst = Infinity;
-    for (const p of planes) {
-      const s = p.nx * spawnX + p.nz * spawnZ - p.d;
-      if (s < worst) worst = s;
-    }
-    if (worst >= 0.4) break;
-    spawnX += (cx - spawnX) * 0.25;
-    spawnZ += (cz - spawnZ) * 0.25;
-  }
-  // Still not inside after walking almost the whole way to the centroid: the
-  // half-planes bound nothing a body fits in. `interiorAdmits` above rules this
-  // out for every footprint the bake can produce -- 3.2 m across leaves 2.88 m
-  // between the insets and a body is 0.7 -- so reaching here means the polygon
-  // was not the convex outline this file is promised. Refused rather than
-  // spawned somewhere arbitrary, which would be a player inside a wall.
-  {
-    let worst = Infinity;
-    for (const p of planes) {
-      const s = p.nx * spawnX + p.nz * spawnZ - p.d;
-      if (s < worst) worst = s;
-    }
-    if (!(worst >= 0.4)) return null;
-  }
+  // Every ground-floor room is kept. Nothing is dropped for being unreachable,
+  // because nothing can be: every contact above opened a doorway, so the room
+  // graph is the contact graph and it is connected wherever the subdivision was.
+  const rooms = ground;
 
-  // The room the arrival is standing in, in the plan's own frame; the nearest
-  // one if the spawn fell in a gap the subdivision dropped.
-  const su = spawnX * box.ux + spawnZ * box.uz;
-  const sv = -spawnX * box.uz + spawnZ * box.ux;
-  let entry = 0;
-  let bestD2 = Infinity;
-  for (let i = 0; i < ground.length; i++) {
-    const r = ground[i];
-    const du = Math.max(Math.abs(su - r.u) - r.ex, 0);
-    const dv = Math.max(Math.abs(sv - r.v) - r.ez, 0);
-    const d2 = du * du + dv * dv;
-    if (d2 < bestD2) {
-      bestD2 = d2;
-      entry = i;
-    }
-  }
-
-  // --- Only what the arrival can walk to.
-  //
-  // A footprint with a notch in it -- a horseshoe, a courtyard block -- can have
-  // its subdivision cut in two by the cells the polygon test dropped, and the
-  // half without the door is a set of rooms nobody will ever stand in. They are
-  // dropped rather than walled off and left, so that "every room in an interior
-  // is reachable from its door" is true by construction and `verifyInterior` can
-  // say so with a search. The floor is drawn from the shell rather than from the
-  // rooms, so dropping them leaves no hole -- just a stretch of floor behind a
-  // wall, which is what a locked room looks like.
-  const reached = new Set<number>([entry]);
-  const queue = [entry];
-  while (queue.length > 0) {
-    const at = queue.pop() as number;
-    for (const next of adjacency[at]) {
-      if (reached.has(next)) continue;
-      reached.add(next);
-      queue.push(next);
-    }
-  }
-  const rooms = ground.filter((_, i) => reached.has(i));
-
-  // --- The walls: every edge of every reachable room, unioned per line, with
-  // the doorways cut out of the union.
+  // --- The walls: every edge of every room, unioned per line, with the
+  // doorways cut out of the union.
   const edges: Span[] = [];
   for (const r of rooms) {
     edges.push({ axis: 0, coord: r.u - r.ex, lo: r.v - r.ez, hi: r.v + r.ez });
@@ -655,21 +622,18 @@ export function buildInterior(
     walls.push({ ax: clipped.ax, az: clipped.az, bx: clipped.bx, bz: clipped.bz });
   }
 
-  // --- And the arrival, settled.
-  //
-  // The loop above put the body inside the *shell*; the partitions did not
-  // exist yet. A door a metre in from the wall lands on a party wall often
-  // enough -- the plan's outermost partition runs parallel to the outer wall by
-  // construction -- and a body that starts inside a wall is a body the first
-  // resolve of the first tick shoves through it. So the finished resolver is
-  // asked where that point really is, with a radius wider than a player's, so
-  // that the arrival is clear rather than merely legal.
-  const resolver = new InteriorResolver(planes, walls);
-  {
-    const settled = resolver.resolve(spawnX, spawnZ, spawnX, spawnZ, BODY_CLEARANCE_M, base);
-    spawnX = settled.x;
-    spawnZ = settled.z;
+  // The footprint's centre, for `arrivalAt` to walk toward and for a camera to
+  // look at. The vertex mean rather than the area centroid: the outlines are
+  // hulls with no long thin tails, the two agree to within a fraction of a
+  // metre on every one of them, and this cannot divide by a zero area.
+  let centreX = 0;
+  let centreZ = 0;
+  for (let i = 0; i < points.length; i += 2) {
+    centreX += points[i];
+    centreZ += points[i + 1];
   }
+  centreX /= points.length / 2;
+  centreZ /= points.length / 2;
 
   return {
     seed,
@@ -680,11 +644,56 @@ export function buildInterior(
     walls,
     shell,
     planes,
-    door: { x: doorX, z: doorZ, nx: doorNX, nz: doorNZ },
-    spawnX,
-    spawnZ,
-    resolver,
+    centreX,
+    centreZ,
+    resolver: new InteriorResolver(planes, walls),
   };
+}
+
+/**
+ * Where a body arrives when it comes in by this door.
+ *
+ * Asked once per entrant rather than baked into the interior, because the
+ * interior is shared and the door is not: two people walk into the same pub
+ * from two streets and each arrives inside their own doorway.
+ *
+ * A metre in from the wall they knocked on, then **settled by the interior's
+ * own resolver** with a radius wider than a player's. That second step is not
+ * belt-and-braces: the plan's outermost partition runs parallel to the outer
+ * wall by construction, so a point a metre inside the front door lands in a
+ * party wall often, and a body that starts inside a wall is a body the first
+ * tick shoves through it. Settling with 0.5 m rather than 0.35 means the
+ * arrival is *clear* rather than merely legal, so it does not shudder.
+ *
+ * If a metre in is somehow still outside the shell -- a door on the short side
+ * of something barely wide enough -- the point is walked toward the footprint's
+ * centre until it is inside, rather than refused. A door that opens onto a
+ * refusal is worse than a door that opens a foot further in than it should.
+ */
+export function arrivalAt(
+  it: Interior,
+  doorX: number,
+  doorZ: number,
+  doorNX: number,
+  doorNZ: number,
+): { x: number; z: number } {
+  let x = doorX - doorNX * 1.0;
+  let z = doorZ - doorNZ * 1.0;
+  // Settle, test, and walk further in if it did not take. The resolver runs a
+  // fixed three passes, which is enough for a body against a wall and not
+  // always enough for one wedged into the corner of a forty-sided outline where
+  // pushing out of one plane pushes into the next -- so the convergence is
+  // here, in the one place that can afford to iterate, rather than in the
+  // resolver, which runs sixty times a second per body.
+  for (let tries = 0; tries < 20; tries++) {
+    const settled = it.resolver.resolve(x, z, x, z, BODY_CLEARANCE_M, it.base);
+    x = settled.x;
+    z = settled.z;
+    if (it.resolver.clearance(x, z) >= BODY_CLEARANCE_M) break;
+    x += (it.centreX - x) * 0.2;
+    z += (it.centreZ - z) * 0.2;
+  }
+  return { x, z };
 }
 
 /** Self-check. On both boot lists: geometry, and the only import is the plan. */
@@ -692,18 +701,8 @@ export function verifyInterior(): string[] {
   const failures: string[] = [];
   const poly = (...xz: number[]): Float32Array => new Float32Array(xz);
 
-  /** A door on the south wall of a footprint, looking in. */
-  const southDoor = (points: Float32Array, base = 0, height = 7, seed = 4242): Interior | null => {
-    let minZ = Infinity;
-    let atX = 0;
-    for (let i = 0; i < points.length; i += 2) {
-      if (points[i + 1] < minZ) {
-        minZ = points[i + 1];
-        atX = points[i];
-      }
-    }
-    return buildInterior(points, base, height, seed, atX + 0.5, minZ, 0, -1);
-  };
+  const southDoor = (points: Float32Array, base = 0, height = 7, seed = 4242): Interior | null =>
+    buildInterior(points, base, height, seed);
 
   const cases: Array<{ name: string; points: Float32Array; height: number; inside: boolean }> = [
     { name: 'a terrace', points: poly(0, 0, 6, 0, 6, 18, 0, 18), height: 7.4, inside: true },
@@ -784,10 +783,36 @@ export function verifyInterior(): string[] {
     if (!c.inside) continue;
     const it = southDoor(c.points, 12.5, c.height);
     if (it === null) continue;
-    const still = it.resolver.resolve(it.spawnX, it.spawnZ, it.spawnX, it.spawnZ, 0.35, it.base);
-    const moved = Math.hypot(still.x - it.spawnX, still.z - it.spawnZ);
-    if (moved > 1e-3) {
-      failures.push(`${c.name} spawns a body ${moved.toFixed(2)} m inside its own geometry.`);
+    // Every wall of the footprint, not just the south one: any of them can be
+    // knocked on, and an arrival is computed per door.
+    const n = c.points.length >> 1;
+    for (let i = 0, j = n - 1; i < n; j = i++) {
+      const ax = c.points[j * 2];
+      const az = c.points[j * 2 + 1];
+      const bx = c.points[i * 2];
+      const bz = c.points[i * 2 + 1];
+      let ex = bx - ax;
+      let ez = bz - az;
+      const len = Math.hypot(ex, ez);
+      if (!(len > 1e-6)) continue;
+      ex /= len;
+      ez /= len;
+      // Outward, away from the centre.
+      let nx = ez;
+      let nz = -ex;
+      const mx = (ax + bx) / 2;
+      const mz = (az + bz) / 2;
+      if ((mx - it.centreX) * nx + (mz - it.centreZ) * nz < 0) {
+        nx = -nx;
+        nz = -nz;
+      }
+      const at = arrivalAt(it, mx, mz, nx, nz);
+      const still = it.resolver.resolve(at.x, at.z, at.x, at.z, 0.35, it.base);
+      const moved = Math.hypot(still.x - at.x, still.z - at.z);
+      if (moved > 1e-3) {
+        failures.push(`${c.name} lands a body ${moved.toFixed(2)} m inside its own geometry at one of its doors.`);
+        break;
+      }
     }
     if (it.base !== 12.5) failures.push(`${c.name} put its floor at ${it.base}, not at the building's pad.`);
   }
