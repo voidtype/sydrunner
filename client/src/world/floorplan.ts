@@ -99,11 +99,33 @@ export interface FloorPlan {
  */
 export const STOREY_M = 3.1;
 
-/** The smallest room worth generating; below this it is a cupboard. */
-const MIN_ROOM_M = 2.2;
+/**
+ * The smallest room worth generating, metres across.
+ *
+ * **4.5, and it was 2.2, which was the size of a real box room and the wrong
+ * number entirely.** This is not an architecture generator: it is the floor of
+ * a game in which a body is 0.7 m wide, sprints at seven metres a second and
+ * swings a bat. A 2.2 m room is a cupboard you cannot turn around in, and a
+ * house of them is a maze of cupboards — which is exactly what the owner
+ * reported the first time he walked into one ("i need to be able to move around
+ * inside"). Measured over 859 buildings near the spawn, the old numbers gave a
+ * median room of 21 m² with a 3.8 m short side and 18% of rooms under 3 m
+ * across.
+ *
+ * Real terraces do have 2.2 m rooms. They are not worth generating, because
+ * nothing happens in them.
+ */
+const MIN_ROOM_M = 4.5;
 
-/** How big a room wants to be before it splits again, square metres. */
-const SPLIT_AREA_M2 = 26;
+/**
+ * How big a room wants to be before it splits again, square metres.
+ *
+ * **110, and it was 26.** Same argument as `MIN_ROOM_M` above and the same
+ * report: 26 m² splits a front room into two boxes. At 110 the split stops
+ * while rooms are still 55–110 m², which is a bar, a lounge, a shop floor —
+ * spaces two people can actually fight in.
+ */
+const SPLIT_AREA_M2 = 110;
 
 /**
  * A bound on subdivision depth.
@@ -412,8 +434,13 @@ export function verifyFloorPlan(): string[] {
   }
 
   // --- Deterministic, which is what lets two players share a kitchen for free.
+  //
+  // A building big enough to *have* a choice in it: the fixture used to be
+  // 9 x 14 m, which was two rooms under the old `SPLIT_AREA_M2` and is one room
+  // under the new one -- and one room is the same room whatever the seed, so
+  // the check passed the first half and failed the second by measuring nothing.
   {
-    const pts = poly(0, 0, 9, 0, 9, 14, 0, 14);
+    const pts = poly(0, 0, 24, 0, 24, 30, 0, 30);
     const a = floorPlan(pts, 9.3, 777);
     const b = floorPlan(pts, 9.3, 777);
     if (JSON.stringify(a.rooms) !== JSON.stringify(b.rooms)) {

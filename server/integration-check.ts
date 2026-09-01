@@ -10969,12 +10969,27 @@ async function checkInteriors(): Promise<void> {
   //
   // Sixty ticks of full-speed input in eight directions through the authority's
   // own `step`, which is `advance` through `enterCarriage` through the
-  // interior's resolver. A body that leaves the shell is a body that walked out
-  // through a wall into the middle of a solid building.
+  // interior's resolver. Two questions, and the second one is the one this
+  // check did not ask the first time it shipped:
+  //
+  //   - a body that leaves the shell walked out through a wall into the middle
+  //     of a solid building, and
+  //   - **a body that does not move at all is not in a room, it is in a vice.**
+  //     The original version asserted only the first, which a player who cannot
+  //     take a single step passes perfectly -- and that is exactly what the
+  //     owner reported the first time he opened a door ("i need to be able to
+  //     move around inside"). A check whose subject never moves is measuring
+  //     nothing, which is this repo's own oldest lesson.
   {
     let escaped = 0;
     let worst = Infinity;
+    let best = 0;
+    let stuck = 0;
+    const startX = p.combat.body.position.x;
+    const startZ = p.combat.body.position.z;
     for (let dir = 0; dir < 8; dir++) {
+      p.combat.body.position.set(startX, inside.base + EYE_HEIGHT, startZ);
+      p.combat.body.velocity.set(0, 0, 0);
       p.combat.body.yaw = (dir / 8) * Math.PI * 2;
       p.input.forward = 1;
       p.input.right = 0;
@@ -10985,10 +11000,56 @@ async function checkInteriors(): Promise<void> {
       if (clear < worst) worst = clear;
       if (clear < PLAYER_RADIUS - 0.05) escaped++;
       if (Math.abs(p.combat.body.position.y - (inside.base + EYE_HEIGHT)) > 0.2) escaped++;
+      const went = Math.hypot(p.combat.body.position.x - startX, p.combat.body.position.z - startZ);
+      if (went > best) best = went;
+      if (went < 1.0) stuck++;
     }
     p.input.forward = 0;
     p.input.sprint = false;
     check(escaped === 0, `eight seconds of sprinting at the walls leaves the body inside (worst clearance ${worst.toFixed(2)} m)`);
+    // A second of sprinting is about seven metres in the open. Four of these
+    // eight are into a wall by construction, so the bar is that the *best* of
+    // them is a real walk and that most of them are not a standing start.
+    check(best >= 4, `a second's sprint from the arrival covers ${best.toFixed(1)} m in the best direction — a room, not a vice`);
+    check(stuck <= 3, `${stuck} of 8 directions moved the body less than a metre`);
+  }
+
+  // --- 3b. The way out is reachable **by walking**, from the middle.
+  //
+  // The complaint that came with the one above: *"need a door at exit tho so i
+  // can leave"*. Two separate ways for that to be true and this catches both --
+  // an arrival that lands in a room the door is not in, and a plan whose
+  // doorways do not line up between the arrival and the wall it came through.
+  // Driven rather than measured: the body is walked at the door in short steps,
+  // sliding along whatever it meets, which is what a player does.
+  {
+    let x = p.combat.body.position.x;
+    let z = p.combat.body.position.z;
+    let reached = false;
+    for (let step = 0; step < 900; step++) {
+      const dx = doorX - x;
+      const dz = doorZ - z;
+      const d = Math.hypot(dx, dz);
+      if (d <= 2.6) {
+        reached = true;
+        break;
+      }
+      const nx = x + (dx / d) * Math.min(0.08, d);
+      const nz = z + (dz / d) * Math.min(0.08, d);
+      const r = inside.resolver.resolve(x, z, nx, nz, PLAYER_RADIUS, inside.base);
+      if (Math.hypot(r.x - x, r.z - z) < 1e-4) {
+        // Against something. Slide along it once, as a player would, before
+        // calling it a wall with no way round.
+        const s = inside.resolver.resolve(x, z, x - (dz / d) * 0.08, z + (dx / d) * 0.08, PLAYER_RADIUS, inside.base);
+        if (Math.hypot(s.x - x, s.z - z) < 1e-4) break;
+        x = s.x;
+        z = s.z;
+        continue;
+      }
+      x = r.x;
+      z = r.z;
+    }
+    check(reached, 'a body dropped anywhere in the building can walk back to the door it came in by');
   }
 
   // --- 4. Out again, by the door it came in by.

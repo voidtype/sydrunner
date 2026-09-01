@@ -113,7 +113,7 @@ import { AsyncPipelines, budgetFor, verifyAsyncPipes } from './world/asyncpipes.
 import { PipelineReclaim, setActiveReclaim, verifyPipeReclaim } from './world/pipereclaim.ts';
 import { verifyRangeAlloc } from './world/rangealloc.ts';
 import { verifyFloorPlan } from './world/floorplan.ts';
-import { DOOR_REACH_M, buildingSeed, doorAt, verifyDoorway, type DoorSite } from './world/doorway.ts';
+import { buildingSeed, doorAt, verifyDoorway, type DoorSite } from './world/doorway.ts';
 import { CITY_SPACE, spaceForBuilding, verifySpaces } from './net/spaces.ts';
 import { arrivalAt, buildInterior, interiorAdmits, interiorLine, verifyInterior, type Interior } from './world/interior.ts';
 import { INTERIOR_LAYER, InteriorView } from './world/interiorview.ts';
@@ -6223,6 +6223,15 @@ async function main(): Promise<void> {
   let interiorDoorZ = 0;
   let interiorDoorNX = 0;
   let interiorDoorNZ = 0;
+  /**
+   * How close to the door you have to be, inside, for it to offer itself.
+   *
+   * Far more generous than the 2.6 m at the front step, and see the prompt for
+   * why: outside, a tight reach stops the prompt flickering between six houses
+   * in a terrace row; inside there is one door in the entire world, and the
+   * only thing a tight reach buys is a player who cannot find the way out.
+   */
+  const EXIT_REACH_M = 5;
   /** Is the body within reach of that door right now? Recomputed per frame. */
   let atExit = false;
   const takeScratch = createDrivingScratch();
@@ -7718,16 +7727,60 @@ async function main(): Promise<void> {
       }
     }
     if (found === null) {
+      /*
+       * --- No seed matched. Take the building the door is standing on.
+       *
+       * The seed is the strong match and it is the one that proves the two ends
+       * hashed byte-identical footprints. It can still miss for a reason that is
+       * nobody's fault: `CollisionWorld` carves prisms against the rail
+       * envelope, this end adopts corridors as the rail bake streams in while
+       * the server adopts all 23,388 of them before its first prism, and a
+       * building over a railway is therefore a different polygon on the two ends
+       * for as long as that lasts.
+       *
+       * A miss used to mean four seconds pinned in place and then no room at all
+       * -- no walls, no exit prompt, and a body predicted against the city's own
+       * collision from inside a solid building, which is a player who cannot
+       * move and cannot leave. Falling back to the prism whose perimeter the
+       * server's door point lies on is exact enough to always find *a* building
+       * and is strictly better than that: the rooms may differ from the
+       * server's by whatever the carve took out, which is a correction, where
+       * the alternative is a trap.
+       */
+      let bestD2 = 1.5 * 1.5;
+      for (const prism of doorPrisms) {
+        if (prism.structural || prism.height < 2.4) continue;
+        const pts = prism.points;
+        const n = pts.length >> 1;
+        for (let i = 0, j = n - 1; i < n; j = i++) {
+          const ax = pts[j * 2];
+          const az = pts[j * 2 + 1];
+          const ex = pts[i * 2] - ax;
+          const ez = pts[i * 2 + 1] - az;
+          const len2 = ex * ex + ez * ez;
+          const t = len2 > 1e-9 ? Math.max(0, Math.min(1, ((f.doorX - ax) * ex + (f.doorZ - az) * ez) / len2)) : 0;
+          const qx = f.doorX - (ax + ex * t);
+          const qz = f.doorZ - (az + ez * t);
+          const d2 = qx * qx + qz * qz;
+          if (d2 < bestD2) {
+            bestD2 = d2;
+            found = prism;
+          }
+        }
+      }
+    }
+    if (found === null) {
+      // The body goes where the server put it **once**, on the first attempt,
+      // and not again on the retries. Teleporting it every frame for four
+      // seconds is a player pinned to one spot who cannot move -- which looks
+      // exactly like the interior being broken, and is worse than the thing it
+      // was guarding against.
+      if (wantSpaceTries === 0) placeBody(f);
       wantSpaceTries++;
       if (wantSpaceTries > SPACE_BUILD_TRIES) {
         wantSpace = null;
         hud.notice('that building has not loaded — press E to come back out');
       }
-      // The body still goes where the server put it, whether or not the room
-      // can be drawn yet: the alternative is a browser predicting a position
-      // outside the building while the authority simulates one inside it, which
-      // is a correction every tick until the tile arrives.
-      placeBody(f);
       return;
     }
 
@@ -9919,13 +9972,18 @@ async function main(): Promise<void> {
        *
        * Measured against the door's own point rather than by searching the
        * prisms, because the prisms describe the *outside* of this building and
-       * a body standing in the middle of it is inside every one of them. The
-       * reach is the browser's 2.6 m against the server's 3.2, which is the
-       * same half-metre of slack the sun button spends and for the same reason.
+       * a body standing in the middle of it is inside every one of them.
+       *
+       * `EXIT_REACH_M` rather than the 2.6 m used at the front step, and the
+       * asymmetry is deliberate. Outside there are doors everywhere and the
+       * tight reach is what stops the prompt flickering between six houses;
+       * inside there is exactly one door in the whole world and the only thing
+       * a tight reach buys is a player standing in a room they cannot leave.
+       * The server does not test the reach at all -- see `sim.leaveInterior`.
        */
       const dx = player.position.x - interiorDoorX;
       const dz = player.position.z - interiorDoorZ;
-      atExit = dx * dx + dz * dz <= DOOR_REACH_M * DOOR_REACH_M;
+      atExit = dx * dx + dz * dz <= EXIT_REACH_M * EXIT_REACH_M;
     } else if (playerCombat.drivingCar === 0 && playerCombat.ridingBike === 0 && !isAboard(playerCombat.aboard)) {
       camera.getWorldDirection(doorGaze);
       const gazeLen = Math.hypot(doorGaze.x, doorGaze.z);

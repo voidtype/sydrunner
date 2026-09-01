@@ -78,21 +78,23 @@ export const WALL_THICK_M = 0.16;
 /**
  * A doorway's clear width, metres.
  *
- * 1.4 rather than a real 0.82 m door leaf. A player is a 0.35 m radius capsule
- * driven at 5 m/s by somebody who is looking somewhere else, and a doorway they
- * have to aim at is a doorway they bounce off. The same argument
- * `riding.GANGWAY_HALF_WIDTH_M` makes about a carriage ring.
+ * 2.0 rather than a real 0.82 m door leaf, and it was 1.4. A player is a 0.35 m
+ * radius capsule driven at seven metres a second by somebody who is looking
+ * somewhere else, and a doorway they have to aim at is a doorway they bounce
+ * off. The same argument `riding.GANGWAY_HALF_WIDTH_M` makes about a carriage
+ * ring, and the same report that widened the rooms.
  */
-export const DOOR_GAP_M = 1.4;
+export const DOOR_GAP_M = 2.0;
 
 /**
  * The narrowest contact between two rooms that can still become a doorway.
  *
- * Below this there is no opening a body fits through, so the two rooms are
- * simply not connected -- and `buildInterior` then drops whichever of them the
- * spawn cannot reach, rather than shipping a room with no way in.
+ * Sized against `DOOR_GAP_M` plus a jamb each side, so that **every** contact
+ * this admits becomes an opening a body fits through -- which is what makes
+ * connectivity a property of the generator rather than something to check for
+ * afterwards. Below it the two rooms are simply not adjacent.
  */
-const MIN_CONTACT_M = 1.0;
+const MIN_CONTACT_M = 2.2;
 
 /** Headroom, floor to ceiling slab. Under `floorplan.STOREY_M` by the slab's own depth. */
 export const CEILING_M = 2.7;
@@ -847,17 +849,27 @@ export function interiorMesh(
   const floorY = it.base;
   const ceilY = it.base + CEILING_M;
 
-  /** One triangle, with a flat normal and a flat colour. */
+  /**
+   * One triangle, with a flat normal and a flat colour.
+   *
+   * `shade` multiplies the building's own tint, which is how every surface in
+   * the room is coloured. `rgb`, when given, replaces it outright — used by the
+   * door, which must not be a shade of the plaster it is set into.
+   */
   const tri = (
     ax: number, ay: number, az: number,
     bx: number, by: number, bz: number,
     cx: number, cy: number, cz: number,
     nx: number, ny: number, nz: number,
     shade: number,
+    rgb: { r: number; g: number; b: number } | null = null,
   ): void => {
     pos.push(ax, ay, az, bx, by, bz, cx, cy, cz);
     for (let i = 0; i < 3; i++) nor.push(nx, ny, nz);
-    for (let i = 0; i < 3; i++) col.push(tint.r * shade, tint.g * shade, tint.b * shade);
+    const r = rgb === null ? tint.r * shade : rgb.r;
+    const g = rgb === null ? tint.g * shade : rgb.g;
+    const b = rgb === null ? tint.b * shade : rgb.b;
+    for (let i = 0; i < 3; i++) col.push(r, g, b);
   };
 
   /**
@@ -870,12 +882,13 @@ export function interiorMesh(
     ax: number, az: number, bx: number, bz: number,
     nx: number, nz: number, lo: number, hi: number,
     y0 = floorY, y1 = ceilY,
+    rgb: { r: number; g: number; b: number } | null = null,
   ): void => {
     // Split into two triangles that each carry one shade, rather than a real
     // gradient: the material is unlit and per-vertex colour would need the two
     // triangles to share vertices, which a flat-normal buffer cannot do.
-    tri(ax, y0, az, bx, y0, bz, bx, y1, bz, nx, 0, nz, lo);
-    tri(ax, y0, az, bx, y1, bz, ax, y1, az, nx, 0, nz, hi);
+    tri(ax, y0, az, bx, y0, bz, bx, y1, bz, nx, 0, nz, lo, rgb);
+    tri(ax, y0, az, bx, y1, bz, ax, y1, az, nx, 0, nz, hi, rgb);
   };
 
   // --- The floor and the ceiling, as fans over the shell.
@@ -929,22 +942,47 @@ export function interiorMesh(
   //
   // A player in a windowless room has no other way to learn which of eight
   // identical walls they came through, and the alternative -- a HUD arrow --
-  // would be a second thing to build and a worse answer. Inset a hand's breadth
-  // off the wall so it cannot z-fight with it.
+  // would be a second thing to build and a worse answer. The owner's first
+  // report from inside a building was *"need a door at exit tho so i can
+  // leave"*, so this is deliberately not subtle:
+  //
+  //   - A **frame** behind a **panel**, at two depths, so it reads as a doorway
+  //     rather than as a stain on the plaster.
+  //   - An **explicit colour** rather than a shade of the building's own tint.
+  //     The tint is the whole room; a door that is a darker shade of it is a
+  //     door you have to already know about to find. This one is warm and light
+  //     against plaster that is neither.
+  //   - **Two metres twenty tall and as wide as the doorways inside**, so it is
+  //     the largest single feature of any wall in the building.
+  //
+  // Inset off the wall in two steps so neither piece can z-fight with the wall
+  // or with the other.
   {
     const inX = -doorNX;
     const inZ = -doorNZ;
-    const px = doorX + inX * 0.06;
-    const pz = doorZ + inZ * 0.06;
     // Along the wall: the door's normal turned a quarter.
     const tx = -inZ;
     const tz = inX;
     const half = DOOR_GAP_M / 2;
+    const frame = { r: 0.16, g: 0.13, b: 0.10 };
+    const leaf = { r: 0.93, g: 0.78, b: 0.42 };
+    const fx = doorX + inX * 0.05;
+    const fz = doorZ + inZ * 0.05;
+    wall(
+      fx - tx * (half + 0.18), fz - tz * (half + 0.18),
+      fx + tx * (half + 0.18), fz + tz * (half + 0.18),
+      inX, inZ, 1, 1,
+      floorY + 0.005, floorY + 2.4,
+      frame,
+    );
+    const px = doorX + inX * 0.1;
+    const pz = doorZ + inZ * 0.1;
     wall(
       px - tx * half, pz - tz * half,
       px + tx * half, pz + tz * half,
-      inX, inZ, 0.30, 0.34,
-      floorY + 0.01, floorY + 2.1,
+      inX, inZ, 1, 1,
+      floorY + 0.01, floorY + 2.2,
+      leaf,
     );
   }
 
@@ -1167,6 +1205,10 @@ export function verifyInterior(): string[] {
     for (const pts of cases2) {
       const it = southDoor(pts, 0, 9);
       if (it === null) continue;
+      // A building whose plan fell entirely outside the walkable shell is one
+      // open hall with no partitions, which is a perfectly good interior and
+      // has no graph to search.
+      if (it.rooms.length === 0) continue;
       const seen = new Set<number>([0]);
       const q = [0];
       const cs = contactsBetween(it.rooms);
