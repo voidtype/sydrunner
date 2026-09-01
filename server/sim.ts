@@ -5862,6 +5862,14 @@ export class Simulation {
    * from the interior: the pad a building sits on and the pavement outside it
    * are not the same number, and stepping out onto the pad's level at the foot
    * of a hill is a body that then falls or climbs.
+   *
+   * **No reach test, deliberately**, where going *in* has one. The browser only
+   * sends a press when it is at the door, so in the ordinary case this is
+   * already the door; what the missing test buys is that there is no state a
+   * player can reach in which they cannot get out. A door that refused would be
+   * a bug report with no workaround, and the worst it permits is somebody
+   * leaving from the middle of the room -- through the door they came in by,
+   * which is where they were going anyway.
    */
   private leaveInterior(p: Participant): SpaceFrame | null {
     const x = p.doorX + p.doorNX * 1.3;
