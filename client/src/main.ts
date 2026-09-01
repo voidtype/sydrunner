@@ -7624,6 +7624,37 @@ async function main(): Promise<void> {
   // once is enough. Interest already decides who is in the list, and indoors
   // that means the people in the room with you.
   showIndoors(nameplates.mesh);
+  // And the three viewmodels, which are parented to the camera and are the
+  // player's own hands, bat and football. They are on layer 0 like everything
+  // else, so without this a player walks into a pub and their arms vanish --
+  // which is the first thing anybody would notice and the last thing anybody
+  // would guess was a layer. Traversed, not enabled once, for the reason
+  // `showIndoors` gives: a bat swaps its mesh when it is drawn or put away.
+  showIndoors(viewmodel.group);
+  showIndoors(handsViewmodel.group);
+  showIndoors(footyViewmodel.group);
+  /*
+   * And the four lights, which is the part of this that is not obvious.
+   *
+   * three collects lights during the same walk it collects meshes, and tests
+   * each one against the camera's layers -- so a camera pointed at the interior
+   * layer alone would gather **no lights at all**, and every lit material in the
+   * room would render black. The interior's own walls would not notice (their
+   * material is unlit, which is why it is unlit), and the people in the room
+   * with you would be four silhouettes.
+   *
+   * The *same* four lights rather than a light of the interior's own, and that
+   * is the important half: a different light set is a different node graph is a
+   * different WGSL, so an interior light would recompile every character
+   * material on the frame somebody opens a door -- the exact hitch
+   * `world/asyncpipes.ts` exists to bound. Sharing them costs a room lit by
+   * whatever the sky is doing outside, which reads as light through windows
+   * this generator has not modelled yet, and costs nothing at all to draw.
+   */
+  showIndoors(sky.sun);
+  showIndoors(sky.ambient);
+  showIndoors(sky.bounce);
+  showIndoors(sky.moonLight);
 
   const interiorView = new InteriorView(scene);
 
@@ -9860,7 +9891,15 @@ async function main(): Promise<void> {
       // And everybody in the room with us, every frame, for `showIndoors`'
       // reason: a bat parented to a bone this frame is a bat the layer was
       // never enabled on.
-      if (interior !== null) for (const entry of remotes.values()) showIndoors(entry.actor.mesh);
+      if (interior !== null) {
+        for (const entry of remotes.values()) showIndoors(entry.actor.mesh);
+        // And the player's own hands, for the same reason and on the same
+        // schedule: a viewmodel swaps its mesh when a bat is drawn or a
+        // football is thrown, and the new one is born on layer 0.
+        showIndoors(viewmodel.group);
+        showIndoors(handsViewmodel.group);
+        showIndoors(footyViewmodel.group);
+      }
     }
 
     doorSite = null;

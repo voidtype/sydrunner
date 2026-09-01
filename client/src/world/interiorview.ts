@@ -43,11 +43,18 @@ import { interiorMesh, type Interior } from './interior.ts';
 /**
  * The layer an interior is drawn on, and the city is not.
  *
- * 1 rather than 0, because 0 is what every object in three is born on and is
- * therefore the city by definition. Nothing else in this project uses a layer,
- * which is what makes this safe: the switch is total.
+ * **2, and the two numbers below it are both taken.** 0 is what every object in
+ * three is born on and is therefore the city by definition. 1 is
+ * `player/character.SELF_SHADOW_LAYER` -- the player's own body and its props,
+ * moved off the view camera so you do not have your own head in your face, and
+ * kept on the shadow camera so you still cast one. Using it here would put a
+ * player's own skull in front of them the moment they walked into a pub, and
+ * would render the whole interior into the shadow map.
+ *
+ * 2 is otherwise unused, and the shadow camera does not have it enabled, so an
+ * interior casts no shadow -- which is right, because it is unlit.
  */
-export const INTERIOR_LAYER = 1;
+export const INTERIOR_LAYER = 2;
 
 /**
  * Every interior in the game, drawn with this.
