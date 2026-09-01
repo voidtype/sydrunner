@@ -619,6 +619,30 @@ export function buildInterior(
     const dx = clipped.bx - clipped.ax;
     const dz = clipped.bz - clipped.az;
     if (dx * dx + dz * dz < 0.05 * 0.05) continue;
+    // And not the outer wall again. The plan is laid out on a box that
+    // circumscribes the footprint, so the outermost partition runs along the
+    // outside wall by construction; clipped to the shell it lands on it or a
+    // few centimetres inside it. Kept, that is a second wall over the first --
+    // two surfaces at the same depth, which is z-fighting, and one of its two
+    // faces points out of the room -- and it walls off a slot no body could
+    // stand in anyway. The shell already stops a body there and already draws
+    // it.
+    //
+    // The threshold is a **whole** wall thickness rather than the half that
+    // would be exactly enough, because a partition is drawn as two faces offset
+    // half a thickness off its centre line: a line 8 cm inside the shell puts a
+    // face exactly on it, which is what this was written for.
+    let onShell = false;
+    for (const pl of planes) {
+      if (
+        Math.abs(pl.nx * clipped.ax + pl.nz * clipped.az - pl.d) < WALL_THICK_M &&
+        Math.abs(pl.nx * clipped.bx + pl.nz * clipped.bz - pl.d) < WALL_THICK_M
+      ) {
+        onShell = true;
+        break;
+      }
+    }
+    if (onShell) continue;
     walls.push({ ax: clipped.ax, az: clipped.az, bx: clipped.bx, bz: clipped.bz });
   }
 
@@ -694,6 +718,240 @@ export function arrivalAt(
     z += (it.centreZ - z) * 0.2;
   }
   return { x, z };
+}
+
+// --- Drawing it ----------------------------------------------------------------
+
+/**
+ * The interior as triangles: positions, normals and vertex colours.
+ *
+ * Data rather than a mesh, so this file stays three-free and the server can
+ * import it -- and so the one thing worth checking about the geometry (that it
+ * is closed, finite, and the right way round) is checkable without a GPU.
+ * `world/interiorview.ts` is the twenty lines that make a `Mesh` of it.
+ *
+ * ## One material, and why the shading is in the vertices
+ *
+ * INTERIORS.md's constraint: **one shared material** for every interior in the
+ * game. Per-building materials would rebuild exactly the pipeline explosion
+ * `world/instancepool.ts` was written to fix -- three's `RenderObject` keys its
+ * node graph and its WGSL on the material, so a hundred buildings would be a
+ * hundred compiles.
+ *
+ * So the shading is baked into the vertex colours and the material is
+ * unlit. That is not a compromise made for the budget; it is the cheaper and
+ * *more* controllable of the two, because an interior is a windowless box and a
+ * real light in it would have to be a real light per room. A floor lighter than
+ * its walls and walls darker at the skirting is what reads as a room, and both
+ * are one multiply here.
+ *
+ * The hue comes from the building's own seed, so a warehouse and the terrace
+ * next door are not the same grey -- deterministically, from the same integer
+ * hash everything else in this feature uses, so two people in one pub see one
+ * room.
+ */
+export interface InteriorMesh {
+  positions: Float32Array;
+  normals: Float32Array;
+  colors: Float32Array;
+  /** Triangles. `positions.length / 9`. */
+  triangles: number;
+}
+
+/** Is this point on the outer wall rather than in the middle of the room? */
+function onShell(it: Interior, x: number, z: number): boolean {
+  for (const pl of it.planes) {
+    if (Math.abs(pl.nx * x + pl.nz * z - pl.d) < 0.03) return true;
+  }
+  return false;
+}
+
+/** The tint of one building's plaster, from its own seed. */
+function shadeOf(seed: number): { r: number; g: number; b: number } {
+  // FNV-ish, the integer hash this project uses everywhere. Three bytes out of
+  // one word, kept in a narrow band: an interior is plaster and floorboards,
+  // and a building that came out lime green would read as a bug.
+  let h = Math.imul(seed ^ 0x9e3779b9, 0x85ebca6b) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0;
+  const r = 0.62 + ((h & 0xff) / 255) * 0.18;
+  const g = 0.60 + (((h >>> 8) & 0xff) / 255) * 0.18;
+  const b = 0.56 + (((h >>> 16) & 0xff) / 255) * 0.18;
+  return { r, g, b };
+}
+
+/**
+ * Build the triangles.
+ *
+ * The door is passed in rather than taken off the interior, for the reason the
+ * interior has no door: it is per entrant. It is drawn as a panel on the wall
+ * so that *the way out is visible from inside*, which is the one thing a player
+ * in a windowless room has no other way to learn.
+ */
+export function interiorMesh(
+  it: Interior,
+  doorX: number,
+  doorZ: number,
+  doorNX: number,
+  doorNZ: number,
+): InteriorMesh {
+  const pos: number[] = [];
+  const nor: number[] = [];
+  const col: number[] = [];
+  const tint = shadeOf(it.seed);
+  const floorY = it.base;
+  const ceilY = it.base + CEILING_M;
+
+  /** One triangle, with a flat normal and a flat colour. */
+  const tri = (
+    ax: number, ay: number, az: number,
+    bx: number, by: number, bz: number,
+    cx: number, cy: number, cz: number,
+    nx: number, ny: number, nz: number,
+    shade: number,
+  ): void => {
+    pos.push(ax, ay, az, bx, by, bz, cx, cy, cz);
+    for (let i = 0; i < 3; i++) nor.push(nx, ny, nz);
+    for (let i = 0; i < 3; i++) col.push(tint.r * shade, tint.g * shade, tint.b * shade);
+  };
+
+  /**
+   * A quad standing on the ground, from `a` to `b`, facing `(nx, nz)`.
+   *
+   * Two triangles with the skirting darker than the picture rail, which is the
+   * whole of the "lighting". `lo`/`hi` are the shades at floor and ceiling.
+   */
+  const wall = (
+    ax: number, az: number, bx: number, bz: number,
+    nx: number, nz: number, lo: number, hi: number,
+    y0 = floorY, y1 = ceilY,
+  ): void => {
+    // Split into two triangles that each carry one shade, rather than a real
+    // gradient: the material is unlit and per-vertex colour would need the two
+    // triangles to share vertices, which a flat-normal buffer cannot do.
+    tri(ax, y0, az, bx, y0, bz, bx, y1, bz, nx, 0, nz, lo);
+    tri(ax, y0, az, bx, y1, bz, ax, y1, az, nx, 0, nz, hi);
+  };
+
+  // --- The floor and the ceiling, as fans over the shell.
+  //
+  // A fan is exact here and only here: the shell is an intersection of
+  // half-planes and so is convex by construction. Nothing else in this file
+  // relies on that; this does, and it is the reason the shell is built the way
+  // it is rather than as a polygon offset.
+  {
+    const n = it.shell.length >> 1;
+    const ox = it.shell[0];
+    const oz = it.shell[1];
+    for (let i = 1; i + 1 < n; i++) {
+      const ax = it.shell[i * 2];
+      const az = it.shell[i * 2 + 1];
+      const bx = it.shell[(i + 1) * 2];
+      const bz = it.shell[(i + 1) * 2 + 1];
+      // Floorboards are the lightest surface in the room, and the ceiling is
+      // the darkest: that ordering is what makes an unlit box read as a room
+      // rather than as a flat wash.
+      tri(ox, floorY, oz, ax, floorY, az, bx, floorY, bz, 0, 1, 0, 1.0);
+      tri(ox, ceilY, oz, bx, ceilY, bz, ax, ceilY, az, 0, -1, 0, 0.45);
+    }
+  }
+
+  // --- The outer wall, inward-facing, and the door panel in it.
+  {
+    const n = it.shell.length >> 1;
+    for (let i = 0, j = n - 1; i < n; j = i++) {
+      const ax = it.shell[j * 2];
+      const az = it.shell[j * 2 + 1];
+      const bx = it.shell[i * 2];
+      const bz = it.shell[i * 2 + 1];
+      let ex = bx - ax;
+      let ez = bz - az;
+      const len = Math.hypot(ex, ez);
+      if (!(len > 1e-6)) continue;
+      ex /= len;
+      ez /= len;
+      // **`planes[j]`, not `planes[i]`.** `shellPolygon` makes vertex `k` the
+      // intersection of planes `k-1` and `k`, so the edge running from vertex
+      // `j` to vertex `i` is the one lying on plane `j`. Getting that off by one
+      // points every outer wall out of the room, which is a building rendered
+      // entirely by its backfaces -- and therefore not rendered at all.
+      const pl = it.planes[j] ?? it.planes[0];
+      wall(ax, az, bx, bz, pl.nx, pl.nz, 0.72, 0.86);
+    }
+  }
+
+  // --- The way out, drawn on the wall it is in.
+  //
+  // A player in a windowless room has no other way to learn which of eight
+  // identical walls they came through, and the alternative -- a HUD arrow --
+  // would be a second thing to build and a worse answer. Inset a hand's breadth
+  // off the wall so it cannot z-fight with it.
+  {
+    const inX = -doorNX;
+    const inZ = -doorNZ;
+    const px = doorX + inX * 0.06;
+    const pz = doorZ + inZ * 0.06;
+    // Along the wall: the door's normal turned a quarter.
+    const tx = -inZ;
+    const tz = inX;
+    const half = DOOR_GAP_M / 2;
+    wall(
+      px - tx * half, pz - tz * half,
+      px + tx * half, pz + tz * half,
+      inX, inZ, 0.30, 0.34,
+      floorY + 0.01, floorY + 2.1,
+    );
+  }
+
+  // --- The partitions, from both sides, with their ends capped.
+  for (const w of it.walls) {
+    let ex = w.bx - w.ax;
+    let ez = w.bz - w.az;
+    const len = Math.hypot(ex, ez);
+    if (!(len > 1e-6)) continue;
+    ex /= len;
+    ez /= len;
+    const nx = ez;
+    const nz = -ex;
+    const h = WALL_THICK_M / 2;
+    // The two faces, each offset half a thickness off the centre line and each
+    // facing outward from it.
+    wall(w.ax + nx * h, w.az + nz * h, w.bx + nx * h, w.bz + nz * h, nx, nz, 0.66, 0.80);
+    wall(w.bx - nx * h, w.bz - nz * h, w.ax - nx * h, w.az - nz * h, -nx, -nz, 0.66, 0.80);
+    // And the two ends, which are what a doorway's reveal is: without them a
+    // partition is a sheet of paper and every opening in the building shows it.
+    //
+    // **Except where the end is the outer wall.** A partition clipped to the
+    // shell ends exactly on it, and a cap there is coplanar with the outside
+    // wall and faces the opposite way -- two surfaces at one depth, one of them
+    // pointing out of the room. There is nothing to reveal at that end: it is
+    // buried in the wall. Collision is untouched, because a cap is drawing.
+    if (!onShell(it, w.ax, w.az)) {
+      wall(w.ax - nx * h, w.az - nz * h, w.ax + nx * h, w.az + nz * h, -ex, -ez, 0.58, 0.62);
+    }
+    if (!onShell(it, w.bx, w.bz)) {
+      wall(w.bx + nx * h, w.bz + nz * h, w.bx - nx * h, w.bz - nz * h, ex, ez, 0.58, 0.62);
+    }
+    // And the top, so a doorway's head is a surface rather than a hole.
+    tri(
+      w.ax - nx * h, ceilY, w.az - nz * h,
+      w.bx - nx * h, ceilY, w.bz - nz * h,
+      w.bx + nx * h, ceilY, w.bz + nz * h,
+      0, 1, 0, 0.5,
+    );
+    tri(
+      w.ax - nx * h, ceilY, w.az - nz * h,
+      w.bx + nx * h, ceilY, w.bz + nz * h,
+      w.ax + nx * h, ceilY, w.az + nz * h,
+      0, 1, 0, 0.5,
+    );
+  }
+
+  return {
+    positions: new Float32Array(pos),
+    normals: new Float32Array(nor),
+    colors: new Float32Array(col),
+    triangles: pos.length / 9,
+  };
 }
 
 /** Self-check. On both boot lists: geometry, and the only import is the plan. */
@@ -949,6 +1207,97 @@ export function verifyInterior(): string[] {
       if (JSON.stringify(a.walls) === JSON.stringify(c.walls)) {
         failures.push('two buildings generated the same inside; the seed is doing nothing.');
       }
+    }
+  }
+
+  // --- The triangles: finite, closed over the room, and the right way round.
+  //
+  // Only the pure half of the drawing can be checked -- CLAUDE.md's rule, and
+  // the honest scope of it. What that still catches is every way this has
+  // actually gone wrong: a NaN in the buffer (one bad vertex takes the whole
+  // draw call with it, and the symptom is an empty screen rather than a wrong
+  // one), a floor that is not under the arrival, and normals that point out of
+  // the room instead of into it -- which is a building whose every surface is
+  // backface-culled and which therefore renders as nothing at all.
+  {
+    for (const pts of [poly(0, 0, 12, 0, 12, 20, 0, 20), poly(0, 0, 14, 0, 7, 12)]) {
+      const it = southDoor(pts, 4.5, 9);
+      if (it === null) {
+        failures.push('a plain building generated no interior to draw.');
+        continue;
+      }
+      const at = arrivalAt(it, 6, 0, 0, -1);
+      const mesh = interiorMesh(it, 6, 0, 0, -1);
+      if (mesh.triangles < 12) failures.push(`an interior drew ${mesh.triangles} triangles; it is not a room.`);
+      let bad = 0;
+      let above = 0;
+      let below = 0;
+      for (let i = 0; i < mesh.positions.length; i++) {
+        if (!Number.isFinite(mesh.positions[i])) bad++;
+      }
+      for (let i = 0; i < mesh.normals.length; i++) if (!Number.isFinite(mesh.normals[i])) bad++;
+      for (let i = 0; i < mesh.colors.length; i++) {
+        const c = mesh.colors[i];
+        if (!Number.isFinite(c) || c < 0 || c > 1) bad++;
+      }
+      if (bad > 0) failures.push(`${bad} non-finite or out-of-range numbers in an interior's buffers; the draw call would render nothing.`);
+      for (let i = 1; i < mesh.positions.length; i += 3) {
+        if (mesh.positions[i] > it.base + CEILING_M + 0.02) above++;
+        if (mesh.positions[i] < it.base - 0.02) below++;
+      }
+      if (above > 0 || below > 0) {
+        failures.push(`${above + below} vertices fall outside the storey they belong to (${it.base.toFixed(1)} to ${(it.base + CEILING_M).toFixed(1)} m).`);
+      }
+      // The floor is under the arrival and the ceiling is over it: a room the
+      // player stands beside rather than in is a wrong origin, and the plan's
+      // frame is the one place that has bitten this feature already.
+      let floorUnder = false;
+      for (let t = 0; t < mesh.triangles; t++) {
+        const i = t * 9;
+        if (mesh.normals[t * 9 + 1] < 0.9) continue;
+        if (Math.abs(mesh.positions[i + 1] - it.base) > 0.02) continue;
+        const ax = mesh.positions[i];
+        const az = mesh.positions[i + 2];
+        const bx = mesh.positions[i + 3];
+        const bz = mesh.positions[i + 5];
+        const cx = mesh.positions[i + 6];
+        const cz = mesh.positions[i + 8];
+        // Barycentric sign test, which is exact for a triangle.
+        const d1 = (at.x - bx) * (az - bz) - (ax - bx) * (at.z - bz);
+        const d2 = (at.x - cx) * (bz - cz) - (bx - cx) * (at.z - cz);
+        const d3 = (at.x - ax) * (cz - az) - (cx - ax) * (at.z - az);
+        const neg = d1 < 0 || d2 < 0 || d3 < 0;
+        const pos2 = d1 > 0 || d2 > 0 || d3 > 0;
+        if (!(neg && pos2)) {
+          floorUnder = true;
+          break;
+        }
+      }
+      if (!floorUnder) failures.push('there is no floor under the point a body arrives at.');
+      // And the outer wall faces in. Each shell quad's normal must point toward
+      // the middle of the room, or the whole building is culled away.
+      let outward = 0;
+      for (let t = 0; t < mesh.triangles; t++) {
+        const i = t * 9;
+        const ny = mesh.normals[i + 1];
+        if (Math.abs(ny) > 0.01) continue;
+        const cxp = (mesh.positions[i] + mesh.positions[i + 3] + mesh.positions[i + 6]) / 3;
+        const czp = (mesh.positions[i + 2] + mesh.positions[i + 5] + mesh.positions[i + 8]) / 3;
+        // Only the shell's own faces, and told apart by their normal rather
+        // than by their position: a partition clipped to the shell has its end
+        // cap *on* the shell, facing along it, and a cap is neither in nor out.
+        // So a triangle lying on a plane counts only when its normal is that
+        // plane's own, one way or the other -- and the wrong way is the failure.
+        for (const pl of it.planes) {
+          if (Math.abs(pl.nx * cxp + pl.nz * czp - pl.d) > 0.05) continue;
+          const along = pl.nx * mesh.normals[i] + pl.nz * mesh.normals[i + 2];
+          // The plane's normal points *into* the room, so this is the outward
+          // face of an outer wall: a building drawn entirely by its backfaces.
+          if (along < -0.9) outward++;
+          break;
+        }
+      }
+      if (outward > 0) failures.push(`${outward} outer-wall triangles face out of the room; the building would render as nothing.`);
     }
   }
 
