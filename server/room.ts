@@ -1021,20 +1021,25 @@ export class Room {
     //
     // --- And, last, which world they are in. Protocol v23.
     //
-    // Only when it is not the city, which is very nearly every join: this is the
-    // *"if u log out inside u log in there"* case and nothing else. Sent as an
-    // ordinary `SPACE` frame rather than as a field on the welcome, which is
-    // the whole argument for that message existing -- see `protocol.MSG.SPACE`.
-    // The client runs the identical transition it runs on opening a door, so
-    // the restore path is exercised by every door press in the game rather than
-    // only by the case nobody would have tested.
+    // Sent as an ordinary `SPACE` frame rather than as a field on the welcome,
+    // which is the whole argument for that message existing -- see
+    // `protocol.MSG.SPACE`. The client runs the identical transition it runs on
+    // opening a door, so the restore path is exercised by every door press in
+    // the game rather than only by the case nobody would have tested.
+    //
+    // **Unconditionally, including the city**, which is forty-one bytes to say
+    // "you are outside" on very nearly every join. It is worth them: a socket
+    // that drops while a player is in a pub and reconnects into a session whose
+    // spot has since expired would otherwise get no frame at all, and a browser
+    // still drawing the pub it was in is a browser whose walls and whose
+    // authority disagree with nothing to resolve it. Absence is not a message.
     //
     // After the roster and the wallet, because it is the frame that moves the
     // camera and there is no reason for it to arrive before the HUD it lands
     // in. `WELCOME` already carried the position, so a client that ignored this
     // message entirely would be standing in the right place with the wrong
     // walls -- which is why it is sent rather than assumed.
-    if (p.space !== CITY_SPACE) ws.send(encodeSpace(this.sim.spaceFrameFor(p)));
+    ws.send(encodeSpace(this.sim.spaceFrameFor(p)));
   }
 
   /**

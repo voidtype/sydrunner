@@ -113,9 +113,10 @@ import { AsyncPipelines, budgetFor, verifyAsyncPipes } from './world/asyncpipes.
 import { PipelineReclaim, setActiveReclaim, verifyPipeReclaim } from './world/pipereclaim.ts';
 import { verifyRangeAlloc } from './world/rangealloc.ts';
 import { verifyFloorPlan } from './world/floorplan.ts';
-import { doorAt, verifyDoorway, type DoorSite } from './world/doorway.ts';
-import { verifySpaces } from './net/spaces.ts';
-import { verifyInterior } from './world/interior.ts';
+import { DOOR_REACH_M, buildingSeed, doorAt, verifyDoorway, type DoorSite } from './world/doorway.ts';
+import { CITY_SPACE, spaceForBuilding, verifySpaces } from './net/spaces.ts';
+import { arrivalAt, buildInterior, interiorAdmits, interiorLine, verifyInterior, type Interior } from './world/interior.ts';
+import { INTERIOR_LAYER, InteriorView } from './world/interiorview.ts';
 import { lostMessage, lostPlan, verifyDeviceLost } from './devicelost.ts';
 import { verifyIndexDom } from './domcheck.ts';
 import { verifyTilePriority } from './world/tilepriority.ts';
@@ -360,7 +361,7 @@ import { BugReportForm, FrameGrabber, verifyBugReport } from './bugreport.ts';
 // compute a level, and the whole arrangement only works if the two runs agree.
 import { JoinGate } from './accounts.ts';
 import { verifyAccounts } from './net/accounts.ts';
-import { ANIM, PROTOCOL_VERSION, SNAPSHOT_INTERVAL, TEAM_EVENT_KIND, sanitiseName, suggestName, verifyNames, verifyNet } from './net/protocol.ts';
+import { ANIM, PROTOCOL_VERSION, SNAPSHOT_INTERVAL, TEAM_EVENT_KIND, sanitiseName, suggestName, verifyNames, verifyNet, type SpaceFrame } from './net/protocol.ts';
 import { verifySnapshotRate } from './net/snapshotrate.ts';
 import {
   FootyAssets,
@@ -6192,6 +6193,38 @@ async function main(): Promise<void> {
   const doorPrisms: Prism[] = [];
   const doorGaze = new Vector3();
   let doorSite: DoorSite | null = null;
+  /**
+   * The building this browser is currently inside, or null in the city.
+   *
+   * Generated here, from the prisms this client already streamed, and never
+   * sent: `world/interior.ts` is a pure function of the footprint and the seed,
+   * so two players who walk into one pub build the same rooms with nothing
+   * about them on the wire. The server builds its own copy off the same call
+   * and steps bodies against it -- see `Simulation.interiorFor`.
+   */
+  let interior: Interior | null = null;
+  /**
+   * The world the local body is predicted against while indoors.
+   *
+   * `server/sim.ts`'s twin, field for field: `collision` null so the building's
+   * own prism -- the solid this body is standing inside -- never pushes back,
+   * `mover` the interior's resolver, and a floor that is a constant. The two
+   * ends must construct this identically or every step is a correction.
+   */
+  let interiorWorld: CombatWorld | null = null;
+  /**
+   * The door this body came in by. Drawn on the wall, and the way out.
+   *
+   * The point is what the exit prompt measures against. The normal is read by
+   * exactly one thing -- the offline door, which has no server to ask where the
+   * pavement is and so has to step along it itself.
+   */
+  let interiorDoorX = 0;
+  let interiorDoorZ = 0;
+  let interiorDoorNX = 0;
+  let interiorDoorNZ = 0;
+  /** Is the body within reach of that door right now? Recomputed per frame. */
+  let atExit = false;
   const takeScratch = createDrivingScratch();
   /** Whether there is a car within reach this frame. Recomputed, never stored. */
   let takeableNear = false;
@@ -6444,6 +6477,8 @@ async function main(): Promise<void> {
       const actor = new CharacterActor(characters, r.colourway);
       actor.mesh.name = `character:remote:${r.id}`;
       scene.add(actor.mesh);
+      // Visible indoors too. See `showIndoors`.
+      showIndoors(actor.mesh);
       entry = {
         actor,
         footy: new FootyProp(footies, actor),
@@ -7549,7 +7584,239 @@ async function main(): Promise<void> {
    * Put the body into its carriage for one step, and say which world to step it
    * against. `sim.enterCarriage`, client side, argument for argument.
    */
+  /**
+   * The scene that draws whatever building this browser is standing in.
+   *
+   * One mesh, one material, one layer -- see `world/interiorview.ts`. The layer
+   * is what hides the city: an interior sits at the *same coordinates* as the
+   * building it is inside, so the terrace's own walls, the street, the traffic
+   * and the sky are all standing in it, and pointing the camera at a layer
+   * nothing else is on is exact where hiding a few dozen scene children by hand
+   * would not be.
+   */
+  /**
+   * Draw this object in an interior as well as in the city.
+   *
+   * The city is hidden indoors by pointing the camera at a layer nothing else
+   * is on -- see `world/interiorview.ts` -- and that is exact, which is the
+   * point of it and also the one thing it gets wrong: **other players are not
+   * the city**. A pub whose drinkers are invisible is the failure the owner
+   * ruled out first ("a pub with one drinker in it is a worse pub"), and it
+   * would look exactly like the interior working.
+   *
+   * So the handful of objects that belong to *people* are on both layers. The
+   * traverse is what makes it hold: a remote is a rig with bones, and a bat, a
+   * football and a bike get parented to those bones minutes after the body is
+   * built. Enabling the layer on the mesh alone would put a player in the room
+   * holding an invisible bat.
+   *
+   * Called on every remote as it is created, and again on every remote every
+   * frame a player is indoors -- forty rigs of a couple of dozen nodes, each
+   * costing one bitwise or, which is nothing next to what drawing them costs.
+   * Cheaper than the alternative, which is remembering which props exist.
+   */
+  const showIndoors = (root: Object3D): void => {
+    root.traverse((o) => {
+      o.layers.enable(INTERIOR_LAYER);
+    });
+  };
+  // The nameplates are one mesh for the whole game and gain no children, so
+  // once is enough. Interest already decides who is in the list, and indoors
+  // that means the people in the room with you.
+  showIndoors(nameplates.mesh);
+
+  const interiorView = new InteriorView(scene);
+
+  /**
+   * A space the server has put us in that has not been built yet.
+   *
+   * Held rather than acted on once, because building the rooms needs the
+   * building's **prism**, and a prism is streamed: a player let into a pub on
+   * the frame its tile was evicted has a position in a world this browser
+   * cannot draw yet. So the frame is kept and retried, which turns a hard
+   * failure into a few frames of the city.
+   */
+  let wantSpace: SpaceFrame | null = null;
+  let wantSpaceTries = 0;
+  /**
+   * How long to keep looking for the building before giving up, in frames.
+   *
+   * About four seconds at 60 Hz, which is far longer than a tile takes to
+   * arrive and short enough that a player is not staring at a frozen street.
+   * Giving up leaves them in the city visually while the server has them
+   * indoors -- wrong, but wrong in the direction that can be walked out of,
+   * because pressing `E` again asks the server for the door and it answers with
+   * the way out.
+   */
+  const SPACE_BUILD_TRIES = 240;
+
+  /**
+   * Move this browser into the world the server says it is in.
+   *
+   * **A teleport, taken whole.** The position in the frame is adopted rather
+   * than corrected, because it is a position in a world the local body was not
+   * in a moment ago and there is no distance between the two worth easing over.
+   * `net/client.ts` has already thrown away the outstanding correction and any
+   * snapshot record waiting to be reconciled, for the same reason.
+   *
+   * The **yaw is deliberately not taken**, though the frame carries it. The
+   * server's copy is whatever the last input frame told it, and the browser's
+   * is the mouse accumulator this player is currently holding: adopting it
+   * would yank the view a few degrees at the exact moment a door opens. The
+   * position is the server's to own and the look is not -- which is the same
+   * split `net/client.reconcile` has always made.
+   */
+  const applySpace = (f: SpaceFrame): void => {
+    if (f.space === CITY_SPACE) {
+      wantSpace = null;
+      interior = null;
+      interiorWorld = null;
+      interiorView.hide(camera);
+      placeBody(f);
+      return;
+    }
+
+    // The building, out of the prisms this client already holds. Matched on the
+    // seed the server sent rather than by position, which is what makes "the
+    // two ends generated the same house" a fact rather than a hope: the seed is
+    // `doorway.buildingSeed` over the footprint, so a match means the footprint
+    // is byte-identical to the one the server hashed.
+    doorPrisms.length = 0;
+    collision.prismsWithin(f.x, f.z, DOOR_SCAN_M, doorPrisms);
+    let found: Prism | null = null;
+    for (const prism of doorPrisms) {
+      if (buildingSeed(prism) === f.building) {
+        found = prism;
+        break;
+      }
+    }
+    if (found === null) {
+      wantSpaceTries++;
+      if (wantSpaceTries > SPACE_BUILD_TRIES) {
+        wantSpace = null;
+        hud.notice('that building has not loaded — press E to come back out');
+      }
+      // The body still goes where the server put it, whether or not the room
+      // can be drawn yet: the alternative is a browser predicting a position
+      // outside the building while the authority simulates one inside it, which
+      // is a correction every tick until the tile arrives.
+      placeBody(f);
+      return;
+    }
+
+    const built = buildInterior(found.points, found.base, found.height, f.building);
+    if (built === null) {
+      wantSpace = null;
+      placeBody(f);
+      return;
+    }
+    wantSpace = null;
+    interior = built;
+    /* `server/sim.interiorFor`'s world, field for field, and it has to be:
+     * `collision` null so the building's own prism -- the solid this body is
+     * standing inside -- never pushes back, `mover` the interior's resolver, and
+     * a floor that is the pad rather than the terrain. Any difference between
+     * the two constructions is a correction on every tick a player walks. */
+    interiorWorld = {
+      collision: null,
+      mover: built.resolver,
+      groundHeight: () => built.base,
+    };
+    interiorDoorX = f.doorX;
+    interiorDoorZ = f.doorZ;
+    interiorDoorNX = f.doorNX;
+    interiorDoorNZ = f.doorNZ;
+    interiorView.show(camera, built, f.doorX, f.doorZ, f.doorNX, f.doorNZ);
+    placeBody(f);
+    // And one line about the room, which is what the loading screen the owner
+    // allowed was really for -- the moment landing. There are no phases to
+    // describe: generating this took a few hundred microseconds over a
+    // footprint the browser already had. See `interior.interiorLine`.
+    hud.notice(interiorLine(built));
+  };
+
+  /**
+   * The door, with no server to ask. `?offline` only.
+   *
+   * The offline stub is the authority, exactly as it is for mounting a bike and
+   * taking a car -- which is what makes `?offline` a real test of a feature
+   * rather than a second implementation of one. Every decision here is the one
+   * `server/sim.ts` makes, in the same order, out of the same three pure
+   * functions: `doorAt` found the wall, `buildInterior` generates the rooms,
+   * `arrivalAt` places the body. What it skips is the wire, which is the only
+   * thing offline does not have.
+   */
+  const pressDoorOffline = (): void => {
+    if (interior !== null) {
+      // Out, along the door's outward normal, at the city's own ground -- the
+      // pad a building sits on and the pavement outside it are not the same
+      // number. `sim.leaveInterior`'s two lines.
+      const x = interiorDoorX + interiorDoorNX * 1.3;
+      const z = interiorDoorZ + interiorDoorNZ * 1.3;
+      applySpace({
+        space: CITY_SPACE,
+        building: 0,
+        x,
+        y: groundHeightAt(x, z, Infinity) + EYE_HEIGHT,
+        z,
+        yaw: player.yaw,
+        doorX: 0,
+        doorZ: 0,
+        doorNX: 0,
+        doorNZ: 0,
+      });
+      return;
+    }
+    const site = doorSite;
+    if (site === null) return;
+    const seed = buildingSeed(site.prism);
+    const built = buildInterior(site.prism.points, site.prism.base, site.prism.height, seed);
+    if (built === null) return;
+    const at = arrivalAt(built, site.x, site.z, site.nx, site.nz);
+    applySpace({
+      space: spaceForBuilding(seed),
+      building: seed,
+      x: at.x,
+      y: built.base + EYE_HEIGHT,
+      z: at.z,
+      yaw: player.yaw,
+      doorX: site.x,
+      doorZ: site.z,
+      doorNX: site.nx,
+      doorNZ: site.nz,
+    });
+  };
+
+  /**
+   * Put the local body exactly where the server says, and stop it moving.  /**
+   * Put the local body exactly where the server says, and stop it moving.
+   *
+   * `sim.moveInto`'s three lines. The velocity matters as much as the position:
+   * a body that walked into a wall at 5 m/s and was then let through the door
+   * would carry that speed into the room and be pushed straight back out of the
+   * far wall by the first resolve.
+   */
+  const placeBody = (f: SpaceFrame): void => {
+    player.position.set(f.x, f.y, f.z);
+    player.velocity.set(0, 0, 0);
+    player.onGround = true;
+    playerCombat.ridingBike = 0;
+    playerCombat.drivingCar = 0;
+    clearAboard(playerCombat.aboard);
+    rideActive = false;
+  };
+
   const enterCarriage = (): CombatWorld => {
+    // **Indoors, before anything else**, and this is `sim.enterCarriage`'s own
+    // first line: the local body is predicted against the building's walls and
+    // its floor, and against nothing in Sydney. Constructing the same world the
+    // server does is what makes walking around a room prediction rather than a
+    // stream of corrections. A body inside is never aboard -- the transition
+    // clears it -- so this is not competing with the carriage below.
+    if (interiorWorld !== null) {
+      rideActive = false;
+      return interiorWorld;
+    }
     // `riding.rideEnter` is the sequence, shared with `server/sim.ts` and with
     // the online check. What is left here is this end's policy, and it is one
     // line: any ending at all puts the body back in the city. The trip running
@@ -9577,8 +9844,41 @@ async function main(): Promise<void> {
      * prisms already within two and a half metres, which the collision grid
      * hands back without a search. See `world/doorway.doorAt`.
      */
+    // --- Which world we are in, if the server has just changed its mind.
+    //
+    // Consumed here, in the frame loop, rather than in the socket callback that
+    // decoded it: what has to happen next is generating a building's rooms,
+    // building a mesh and moving a camera, and none of that belongs between two
+    // lines of the renderer. See `net/client.takeSpace`.
+    {
+      const frame = net?.takeSpace() ?? null;
+      if (frame !== null) {
+        wantSpace = frame;
+        wantSpaceTries = 0;
+      }
+      if (wantSpace !== null) applySpace(wantSpace);
+      // And everybody in the room with us, every frame, for `showIndoors`'
+      // reason: a bat parented to a bone this frame is a bat the layer was
+      // never enabled on.
+      if (interior !== null) for (const entry of remotes.values()) showIndoors(entry.actor.mesh);
+    }
+
     doorSite = null;
-    if (playerCombat.drivingCar === 0 && playerCombat.ridingBike === 0 && !isAboard(playerCombat.aboard)) {
+    atExit = false;
+    if (interior !== null) {
+      /*
+       * --- Indoors, the only door that exists is the one you came in by.
+       *
+       * Measured against the door's own point rather than by searching the
+       * prisms, because the prisms describe the *outside* of this building and
+       * a body standing in the middle of it is inside every one of them. The
+       * reach is the browser's 2.6 m against the server's 3.2, which is the
+       * same half-metre of slack the sun button spends and for the same reason.
+       */
+      const dx = player.position.x - interiorDoorX;
+      const dz = player.position.z - interiorDoorZ;
+      atExit = dx * dx + dz * dz <= DOOR_REACH_M * DOOR_REACH_M;
+    } else if (playerCombat.drivingCar === 0 && playerCombat.ridingBike === 0 && !isAboard(playerCombat.aboard)) {
       camera.getWorldDirection(doorGaze);
       const gazeLen = Math.hypot(doorGaze.x, doorGaze.z);
       if (gazeLen > 1e-4) {
@@ -9591,6 +9891,20 @@ async function main(): Promise<void> {
           doorGaze.x / gazeLen,
           doorGaze.z / gazeLen,
         );
+        /*
+         * And a building with no inside offers no door.
+         *
+         * `interiorAdmits` is the same call the server makes before it lets
+         * anybody in (`Simulation.interiorFor`), so the two ends agree about
+         * which walls are worth knocking on. Without it a player walks up to a
+         * light well or one of the 0.8 m slivers OSM records between terraces,
+         * is offered a door, presses it and nothing happens -- which reads as
+         * the whole feature being broken rather than as that not being a
+         * building.
+         */
+        if (doorSite !== null && !interiorAdmits(doorSite.prism.points, doorSite.prism.height)) {
+          doorSite = null;
+        }
       }
     }
     hud.derived(
@@ -9598,6 +9912,7 @@ async function main(): Promise<void> {
         trainPill ||
         ridePrompt(playerCombat, playerCombat.phase, rideNudgeT, rideNudgeText) ||
         takePrompt(takeableNear, playerCombat.drivingCar !== 0, playerCombat.phase) ||
+        (atExit ? 'E — back outside' : '') ||
         (doorSite !== null ? 'E — go inside' : ''),
     );
 
@@ -9609,7 +9924,12 @@ async function main(): Promise<void> {
     // for one frame and the simulation then moves away from, which is a
     // one-frame jitter at 20 Hz -- the exact artefact the 80 ms ease exists to
     // remove, reintroduced by ordering.
-    if (net) net.reconcile(playerCombat, combatWorld, netCorrection);
+    // `interiorWorld ?? combatWorld`, which is `enterCarriage`'s first line said
+    // again: the replay inside `reconcile` re-runs the frames since the last
+    // snapshot and has to resolve them against the world those frames were
+    // actually stepped in. Reconciling a body in a pub against Sydney's prisms
+    // would replay it out through the wall on every snapshot.
+    if (net) net.reconcile(playerCombat, interiorWorld ?? combatWorld, netCorrection);
 
     // --- The bike, after reconciliation and before the step.
     //
@@ -9632,7 +9952,24 @@ async function main(): Promise<void> {
       // **One key, one thing.** Mount first -- `dialog.tryOpen`'s header asks
       // for exactly this order so a giver beside a bike cannot make the bike
       // unmountable -- and only talk when the press found nothing to take.
-      if (!pressMount()) dialog.tryOpen();
+      // And the door, **last of all**: after the mount chain and after the
+      // conversation, because `E` already means four things and every one of
+      // them is a better answer than a door when both are in reach. A player at
+      // a pub's front door with a ute parked across it wants the ute; a player
+      // being talked to wants the conversation. The prompt chain twenty screens
+      // up ranks them in exactly this order, and the two have to agree or the
+      // line on screen is not the thing the key does.
+      //
+      // **Nothing is predicted.** The press goes out as one byte and the server
+      // answers with a `SPACE` frame or with silence -- see
+      // `protocol.MSG.DOOR`. Walking into a building moves a body, changes
+      // which world it is simulated in and changes what it can see, and a
+      // browser that guessed at any of that would be a browser that has to be
+      // dragged back out again when it guessed wrong.
+      if (!pressMount() && !dialog.tryOpen() && (doorSite !== null || atExit)) {
+        if (net) net.pressDoor();
+        else pressDoorOffline();
+      }
     }
     mountHeld = input.mount;
 

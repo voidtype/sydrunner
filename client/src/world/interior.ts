@@ -720,6 +720,52 @@ export function arrivalAt(
   return { x, z };
 }
 
+// --- Saying what it is ---------------------------------------------------------
+
+/**
+ * One line about the building you have just walked into.
+ *
+ * The owner allowed a loading screen on first entry *"as long as it
+ * interestingly describes the phases"*. There are no phases to describe:
+ * generating an interior is a few hundred microseconds of integer arithmetic
+ * over a footprint the browser already had, so a progress bar would be a
+ * fabricated wait -- and the reason WoW's works is that something is genuinely
+ * happening behind it.
+ *
+ * What the permission was really for is the moment landing: a hard cut from a
+ * sunlit street into a dim room, with nothing said about where you are. So this
+ * is the honest version of it -- one line, on the pill the HUD already has,
+ * describing the room the generator just made out of this particular building.
+ *
+ * It is a pure function of the plan, so two people in one pub read the same
+ * sentence, and it **says what is not there**: the storeys above you exist in
+ * the plan and are not walkable yet, and a player who is told that is a player
+ * who has been told the truth rather than one who spends five minutes looking
+ * for the stairs.
+ */
+export function interiorLine(it: Interior): string {
+  const rooms = it.rooms.length;
+  const above = Math.max(0, it.plan.storeys - 1);
+  // How big the floor is, from the plan's own box rather than from the rooms:
+  // the box is the building and the rooms are what was fitted into it.
+  const w = Math.round(it.plan.box.ex * 2);
+  const d = Math.round(it.plan.box.ez * 2);
+  const long = Math.max(w, d);
+  const short = Math.min(w, d);
+  const shape =
+    long >= 60 ? 'A shed the size of a street' :
+    long >= 30 ? 'A big floor' :
+    short <= 6 ? 'A narrow terrace' :
+    long / Math.max(1, short) >= 2.4 ? 'A long room' :
+    'Inside';
+  const count = rooms === 1 ? 'one room' : `${rooms} rooms`;
+  const upstairs =
+    above === 0 ? 'and no way up' :
+    above === 1 ? 'with a floor above you, shut' :
+    `with ${above} floors above you, shut`;
+  return `${shape}: ${count}, ${upstairs}.`;
+}
+
 // --- Drawing it ----------------------------------------------------------------
 
 /**
@@ -1207,6 +1253,25 @@ export function verifyInterior(): string[] {
       if (JSON.stringify(a.walls) === JSON.stringify(c.walls)) {
         failures.push('two buildings generated the same inside; the seed is doing nothing.');
       }
+    }
+  }
+
+  // --- The line a player is shown on the way in.
+  //
+  // Cheap to check and worth checking: it is the one string in this feature a
+  // player reads, it is generated from numbers that can be degenerate, and a
+  // sentence saying "0 rooms" or "NaN rooms" is the whole feature looking
+  // broken at the exact moment somebody first sees it.
+  {
+    for (const c of cases) {
+      if (!c.inside) continue;
+      const it = southDoor(c.points, 0, c.height);
+      if (it === null) continue;
+      const line = interiorLine(it);
+      if (line.length < 12 || line.length > 90) failures.push(`${c.name}'s line is ${line.length} characters: "${line}"`);
+      if (/NaN|undefined|Infinity/.test(line)) failures.push(`${c.name}'s line reads "${line}".`);
+      if (/\b0 rooms\b/.test(line)) failures.push(`${c.name} announced a room with nothing in it.`);
+      if (interiorLine(it) !== line) failures.push(`${c.name} described itself two different ways.`);
     }
   }
 

@@ -118,6 +118,9 @@ import {
   decodeWelcome,
   encodeHello,
   encodeSunPress,
+  encodeDoor,
+  decodeSpace,
+  type SpaceFrame,
   encodeInput,
   encodeEvents,
   encodeInterest,
@@ -141,6 +144,9 @@ import {
   type SnapshotPlayer,
 } from './protocol.ts';
 import { InterpDelay } from './interpdelay.ts';
+// Interiors, protocol v23. `spaces.ts` imports nothing and is the shared
+// definition both ends run; see INTERIORS.md.
+import { CITY_SPACE, sanitiseSpace } from './spaces.ts';
 // Teams and talents. Workstream V: the contract, the aura fold, and the wire.
 import {
   EMPTY_MASK,
@@ -1387,6 +1393,49 @@ export class NetClient {
     return true;
   }
 
+  // --- Interiors. See `net/spaces.ts` and INTERIORS.md. -------------------------
+
+  /**
+   * Which world this client is in. `spaces.CITY_SPACE` until told otherwise.
+   *
+   * Read by `main.ts` for the things that behave differently indoors -- the
+   * prompt, the streamer, the sky. It is **told**, never predicted: the server
+   * owns the position, so which building you are standing in is not a thing a
+   * browser is entitled to an opinion about. See `MSG.SPACE`.
+   */
+  space = CITY_SPACE;
+
+  /**
+   * The last `SPACE` frame, waiting to be acted on. `takeSpace` consumes it.
+   *
+   * Queued rather than dispatched through a callback, on `pendingSelf`'s
+   * argument exactly: this arrives on a socket callback and what has to happen
+   * next -- generate a building's rooms, build a mesh, move a camera -- belongs
+   * in the frame loop, at a point where `main.ts` owns the scene. A callback
+   * here would be that work running between two lines of the renderer.
+   */
+  private pendingSpace: SpaceFrame | null = null;
+
+  /**
+   * Ask to open the door in front of us. One byte; the server decides.
+   *
+   * `pressSun`'s shape, and one difference: nothing is predicted, so there is
+   * no optimistic state to be contradicted. A press that finds no door is
+   * answered with silence and the game carries on -- see `server/room.doorPress`.
+   */
+  pressDoor(): boolean {
+    if (this.status !== 'online') return false;
+    this.transport.send(encodeDoor());
+    return true;
+  }
+
+  /** The pending space change, once. Null when nothing has changed. */
+  takeSpace(): SpaceFrame | null {
+    const frame = this.pendingSpace;
+    this.pendingSpace = null;
+    return frame;
+  }
+
   // --- Money. See `net/cash.ts`. -----------------------------------------------
 
   /**
@@ -1818,6 +1867,28 @@ export class NetClient {
         const state = decodeQuestState(frame, MSG.QUEST_STATE);
         if (!state) return;
         this.quests = state;
+        return;
+      }
+      /*
+       * v23: which world this client is now in, and where in it.
+       *
+       * **A teleport, not a correction**, and the three lines below are what
+       * that means. The outstanding correction is thrown away rather than
+       * decayed -- it describes a distance in a world this body is no longer in
+       * -- and any snapshot record already waiting for `reconcile` is dropped
+       * with it, because it is a position in the same dead world and applying it
+       * would drag the body back out of the building for one frame.
+       *
+       * The actual move is `main.ts`'s: it owns the body, the scene and the
+       * streamer, and all three change together. See `takeSpace`.
+       */
+      case MSG.SPACE: {
+        const f = decodeSpace(frame);
+        if (!f) return;
+        this.space = sanitiseSpace(f.space);
+        this.pendingSpace = f;
+        this.correction.set(0, 0, 0);
+        this.pendingSelf = null;
         return;
       }
       case MSG.BYE: {
@@ -2428,7 +2499,20 @@ export class NetClient {
       // five more times per snapshot on this end and once on the server. See
       // `driving.shapeDriveInput`'s header for the bounded error that leaves.
       shapeDriveInput(local, input);
-      step(body, input, FIXED_DT, world.collision, (x, z, feet) => world.groundHeight(x, z, feet));
+      // **`mover ?? collision`, which is `combat.moverOf`'s line.** A replayed
+      // frame has to be resolved against whatever the *live* step is resolved
+      // against, or the replay walks through walls the tick before it did not:
+      // indoors that is the interior's own resolver, and `collision` there is
+      // deliberately null so the building's prism cannot push a body out of the
+      // room it is standing in. Every frame replayed here is a frame `advance`
+      // already ran; this is the same call with the same world.
+      step(
+        body,
+        input,
+        FIXED_DT,
+        world.mover ?? world.collision,
+        (x, z, feet) => world.groundHeight(x, z, feet),
+      );
     }
 
     const error = body.position.distanceTo(local.body.position);
