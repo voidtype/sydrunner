@@ -7704,11 +7704,17 @@ async function main(): Promise<void> {
    */
   const applySpace = (f: SpaceFrame): void => {
     if (f.space === CITY_SPACE) {
+      // The door on the way out, and only when there was an inside to come out
+      // of: this frame is also sent on **every** join (see `Room.welcome`), and
+      // a door closing behind a player who has just arrived at the spawn disc
+      // is a sound with nothing behind it.
+      const wasInside = interior !== null;
       wantSpace = null;
       interior = null;
       interiorWorld = null;
       interiorView.hide(camera);
       placeBody(f);
+      if (wasInside) audio.door();
       return;
     }
 
@@ -7808,6 +7814,7 @@ async function main(): Promise<void> {
     interiorDoorNZ = f.doorNZ;
     interiorView.show(camera, built, f.doorX, f.doorZ, f.doorNX, f.doorNZ);
     placeBody(f);
+    audio.door();
     // And one line about the room, which is what the loading screen the owner
     // allowed was really for -- the moment landing. There are no phases to
     // describe: generating this took a few hundred microseconds over a
@@ -10027,6 +10034,10 @@ async function main(): Promise<void> {
         if (doorSite !== null && !interiorAdmits(doorSite.prism.points, doorSite.prism.height)) {
           doorSite = null;
         }
+        // Standing at a door: fetch the sound now rather than on the key press,
+        // so the first door anybody opens is the one that tells them there is a
+        // sound. Idempotent; see `AudioEngine.doorNear`.
+        if (doorSite !== null) audio.doorNear();
       }
     }
     /*

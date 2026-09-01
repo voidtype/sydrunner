@@ -3051,6 +3051,61 @@ export class CombatAudio {
     return pick;
   }
 
+  // --- The door ------------------------------------------------------------------
+
+  /**
+   * A door opening, on the way in and on the way out. See INTERIORS.md.
+   *
+   * **A recording rather than synthesis**, which is this file's one standing
+   * exception and it applies here for the reason it applies to a police
+   * officer's voice: a latch, a hinge and a swinging slab of timber is not two
+   * oscillators and an envelope.
+   *
+   * **Not `bark`**, though it is the same three nodes, and the difference is the
+   * cooldown. `bark` refuses to replay a clip inside its own duration -- right
+   * for an officer, who would otherwise shout over himself in a crowd, and wrong
+   * for a door: walking in and straight back out again is a normal thing to do
+   * and takes less time than this clip runs, so the second press would be silent
+   * and read as the door not working.
+   *
+   * Not distance-attenuated, because the only door you can ever open is the one
+   * you are standing at.
+   */
+  door(): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    if (!ctx || !master) return;
+    const buffer = this.clips.get(DOOR_CLIP);
+    if (!buffer) {
+      // Start it, so the next one lands. `doorNear` is what makes this branch
+      // almost unreachable in practice.
+      this.loadClip(DOOR_CLIP);
+      return;
+    }
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    const g = ctx.createGain();
+    g.gain.value = DOOR_GAIN;
+    source.connect(g).connect(master);
+    source.start(ctx.currentTime);
+  }
+
+  /**
+   * "There is a door in front of this player." Fetches the clip, once.
+   *
+   * Called every frame the door prompt is up, which is the point: a clip
+   * fetched when the key goes down is a door whose *first* open in a session is
+   * silent -- and the first one is the one that tells a player the feature has a
+   * sound at all. By the time anybody has read the prompt and pressed `E` this
+   * has been decoded for a second or more.
+   *
+   * `loadClip` is idempotent and returns on its first line once the clip is in
+   * hand, so calling it sixty times a second costs a map lookup.
+   */
+  doorNear(): void {
+    this.loadClip(DOOR_CLIP);
+  }
+
   /**
    * Play one scream clip at `at`, at `SUN_SCREAM_GAIN × level`.
    *
@@ -3995,6 +4050,25 @@ const SUN_SCREAM_RELEASE_S = 0.12;
  * The four scream clips, by URL. Loaded lazily on the first frame a scream is
  * wanted, through `loadClip`, and nothing is fetched until the sun is screaming.
  */
+/**
+ * The door, one recording, fetched the first time a player stands at one.
+ *
+ * 51 kB, which is why it is fetched on the prompt rather than at boot: nobody
+ * who never opens a door pays for it, and everybody who does has it decoded
+ * before their hand reaches the key.
+ */
+const DOOR_CLIP = '/audio/door/open.mp3';
+
+/**
+ * How loud a door is.
+ *
+ * Under 1 because it is a close, dry recording played at zero distance, and it
+ * is the only sound in the game that is guaranteed to be right beside your
+ * head -- the football, the bat and the engines all reach the ear through a
+ * falloff.
+ */
+const DOOR_GAIN = 0.55;
+
 const SUN_SCREAM_CLIPS: readonly string[] = [
   '/audio/sun/scream_1.mp3',
   '/audio/sun/scream_2.mp3',

@@ -10842,6 +10842,21 @@ async function checkInteriors(): Promise<void> {
     check(f.length === 0, `verifySpaces passes${f.length ? ` -- ${f[0]}` : ''}`);
   }
 
+  // --- 0. The door sound is actually in the build.
+  //
+  // `AudioEngine.loadClip` swallows every failure by design -- a missing clip is
+  // a police force that shouts nothing and is otherwise a working game -- which
+  // is right, and means a door whose mp3 never shipped is **completely silent
+  // about being broken**. Nothing else in this repo would notice: the bundle
+  // builds, the boot checks pass, and the feature just has no sound. So the file
+  // is asserted here, by the one thing that reads the shipped tree.
+  {
+    const clip = new URL('../client/public/audio/door/open.mp3', import.meta.url).pathname;
+    const file = Bun.file(clip);
+    const size = (await file.exists()) ? file.size : 0;
+    check(size > 4096, `the door sound ships with the client (${size} bytes at public/audio/door/open.mp3)`);
+  }
+
   const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
   const world = await loadWorld(root);
   if (world.collision === null) {
