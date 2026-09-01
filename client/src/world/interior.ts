@@ -1357,8 +1357,24 @@ export function interiorMesh(
     const half = DOOR_GAP_M / 2;
     const frame = { r: 0.16, g: 0.13, b: 0.10 };
     const leaf = { r: 0.93, g: 0.78, b: 0.42 };
-    const fx = doorX + inX * 0.05;
-    const fz = doorZ + inZ * 0.05;
+    /*
+     * --- Off the **shell**, not off the footprint. Reported invisible.
+     *
+     * The door point the server sends is on the building's real outline, and
+     * the wall the player is looking at is the *walkable shell* -- the same
+     * outline inset by `WALL_THICK_M`. Drawing the door five centimetres in
+     * from the outline therefore put it eleven centimetres **behind** the wall
+     * surface, inside the wall, where it was hidden by the very wall it was
+     * meant to be set into. It was there the whole time and nobody could see
+     * it: *"door still not showing inside (its there but invisible)"*.
+     *
+     * Everything else on a wall is drawn from the shell's own planes and none
+     * of them had this problem, which is exactly why it survived a check that
+     * asserts every window is within 25 cm of a plane -- the door was never in
+     * that test.
+     */
+    const fx = doorX + inX * (WALL_THICK_M + 0.02);
+    const fz = doorZ + inZ * (WALL_THICK_M + 0.02);
     wall(
       fx - tx * (half + 0.18), fz - tz * (half + 0.18),
       fx + tx * (half + 0.18), fz + tz * (half + 0.18),
@@ -1366,8 +1382,8 @@ export function interiorMesh(
       floorY + 0.005, floorY + 2.4,
       frame,
     );
-    const px = doorX + inX * 0.1;
-    const pz = doorZ + inZ * 0.1;
+    const px = doorX + inX * (WALL_THICK_M + 0.06);
+    const pz = doorZ + inZ * (WALL_THICK_M + 0.06);
     wall(
       px - tx * half, pz - tz * half,
       px + tx * half, pz + tz * half,
@@ -2003,6 +2019,64 @@ export function verifyInterior(): string[] {
         if (y > it.base + CEILING_M + 0.02 || y < it.base - 0.02) low++;
       }
       if (low > 0) failures.push(`${low} vertices of the door frames fall outside the storey.`);
+    }
+  }
+
+  // --- The way out is drawn **in front of** the wall, not inside it.
+  //
+  // The bug this exists for shipped and was reported from the room: the door
+  // point is on the building's real outline and the wall a player sees is the
+  // shell, inset by a wall's thickness, so a panel drawn five centimetres in
+  // from the outline sat eleven centimetres *behind* the surface it was meant
+  // to be set into. Invisible, and completely silent about it -- the window
+  // check could not catch it because the door is not a window, and the geometry
+  // was otherwise perfect.
+  //
+  // The assertion is signed: **inside** the shell, and close to it. A panel
+  // floating in the middle of the room would be as wrong as one buried in the
+  // wall, and only one of the two has ever happened.
+  {
+    for (const pts of [poly(0, 0, 14, 0, 14, 22, 0, 22), poly(0, 0, 4.2, 4.2, 16, -7.6, 11.8, -11.8)]) {
+      const it = southDoor(pts, 0, 8, 5);
+      if (it === null) continue;
+      // The door on the first edge, which is where `southArrival` would knock.
+      const ax = pts[0];
+      const az = pts[1];
+      const bx = pts[2];
+      const bz = pts[3];
+      const mx = (ax + bx) / 2;
+      const mz = (az + bz) / 2;
+      const len = Math.hypot(bx - ax, bz - az) || 1;
+      let nx = (bz - az) / len;
+      let nz = -(bx - ax) / len;
+      if ((mx - it.centreX) * nx + (mz - it.centreZ) * nz < 0) {
+        nx = -nx;
+        nz = -nz;
+      }
+      const mesh = interiorMesh(it, mx, mz, nx, nz);
+      // The leaf has a colour nothing else in the building has: warm, and the
+      // only surface whose red channel is over 0.9 while its blue is under 0.5.
+      let leaf = 0;
+      let buried = 0;
+      let adrift = 0;
+      for (let t = 0; t < mesh.triangles; t++) {
+        const c = t * 9;
+        if (!(mesh.colors[c] > 0.9 && mesh.colors[c + 2] < 0.5)) continue;
+        leaf++;
+        const i = t * 9;
+        const cx = (mesh.positions[i] + mesh.positions[i + 3] + mesh.positions[i + 6]) / 3;
+        const cz = (mesh.positions[i + 2] + mesh.positions[i + 5] + mesh.positions[i + 8]) / 3;
+        let least = Infinity;
+        for (const pl of it.planes) {
+          const d = pl.nx * cx + pl.nz * cz - pl.d;
+          if (d < least) least = d;
+        }
+        if (least < 0) buried++;
+        else if (least > 0.5) adrift++;
+      }
+      if (leaf === 0) failures.push('the way out is not drawn at all.');
+      if (buried > 0) failures.push(`${buried} triangles of the exit door are behind the wall they are set into; it is invisible.`);
+      if (adrift > 0) failures.push(`${adrift} triangles of the exit door float ${'>'}0.5 m off the wall.`);
     }
   }
 
