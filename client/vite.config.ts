@@ -62,6 +62,18 @@ export default defineConfig({
   build: {
     target: 'esnext', // top-level await, and WebGPU is only in modern engines anyway
     sourcemap: true,
+    // three.js in its own chunk. The app was one 3.3 MB script (1 MB brotli),
+    // and every deploy -- several a day -- made every returning player fetch
+    // all of it again. three is the larger half and changes with a package
+    // bump, not a commit, so split out it stays in the browser cache across
+    // deploys and a code push costs the app's own half.
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          return id.includes('/node_modules/three/') ? 'three' : undefined;
+        },
+      },
+    },
   },
   // Tile payloads are fetched at runtime, never bundled.
   assetsInclude: ['**/*.glb', '**/*.bin'],

@@ -1867,8 +1867,12 @@ export function accessWorldFrom(
   return {
     baseAt: (x, z) => {
       if (collision === null) return Number.NaN;
+      // A metre, not a search radius: `prismsWithin` measures to a prism's
+      // bounding box, so the tower standing on the point is at distance zero
+      // whatever its size, and the CBD's other hundred within thirty metres
+      // were a polygon test each for nothing.
       scratch.length = 0;
-      collision.prismsWithin(x, z, 30, scratch);
+      collision.prismsWithin(x, z, 1, scratch);
       let base = Number.NaN;
       for (const q of scratch) {
         if (q.structural || !pointInPolygon(q.points, x, z)) continue;
