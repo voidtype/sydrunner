@@ -225,7 +225,7 @@ import {
 import { InterestIndex, InterestSet, verifyAoi } from './aoi.ts';
 // Interiors, protocol v23. See `checkInteriors`.
 import { buildingSeed, verifyDoorway } from '../client/src/world/doorway.ts';
-import { arrivalAt, interiorAdmits, verifyInterior } from '../client/src/world/interior.ts';
+import { arrivalAt, buildInterior, interiorAdmits, verifyInterior } from '../client/src/world/interior.ts';
 import { BODY_RADIUS_M, MAX_PER_SPACE, boxClearance, boxOf, verifyPlaceables } from '../client/src/world/placeables.ts';
 import { InteriorStore, verifyInteriorStore } from './interiors.ts';
 import { FURNISH_OP } from '../client/src/net/protocol.ts';
@@ -10944,6 +10944,52 @@ async function checkInteriors(): Promise<void> {
   if (world.collision === null) {
     check(false, 'the world has collision prisms to find a building in');
     return;
+  }
+
+  // --- 0c. Every building near the spawn that offers a door can be stood in.
+  //
+  // The owner logged off in a 26-corner shed in Erskineville and could not
+  // take a step: the outline was concave, the shell built from its own
+  // half-planes was empty, and every point inside measured thirty metres
+  // outside. `verifyInterior` now carries that footprint, but a fixture is one
+  // building; this is all of them. Measured before the hull: 107 of 1,182.
+  {
+    const around: Prism[] = [];
+    world.collision.prismsWithin(world.spawn.x, world.spawn.z, 800, around);
+    let admitted = 0;
+    let stuck = 0;
+    let concave = 0;
+    const examples: string[] = [];
+    for (const q of around) {
+      if (q.structural || !interiorAdmits(q.points, q.height)) continue;
+      admitted++;
+      const m = q.points.length >> 1;
+      let left = 0;
+      let right = 0;
+      for (let i = 0; i < m; i++) {
+        const a = i;
+        const b = (i + 1) % m;
+        const c = (i + 2) % m;
+        const cr =
+          (q.points[b * 2] - q.points[a * 2]) * (q.points[c * 2 + 1] - q.points[b * 2 + 1]) -
+          (q.points[b * 2 + 1] - q.points[a * 2 + 1]) * (q.points[c * 2] - q.points[b * 2]);
+        if (cr > 1e-6) left++;
+        else if (cr < -1e-6) right++;
+      }
+      if (left > 0 && right > 0) concave++;
+      const it = buildInterior(q.points, q.base, q.height, buildingSeed(q));
+      if (it === null) continue;
+      const at = arrivalAt(it);
+      if (at.stuck || it.resolver.clearance(at.x, at.z) < PLAYER_RADIUS) {
+        stuck++;
+        if (examples.length < 3) examples.push(`${m} corners at (${q.points[0].toFixed(0)}, ${q.points[1].toFixed(0)})`);
+      }
+    }
+    check(
+      stuck === 0,
+      `every one of the ${admitted} enterable buildings within 800 m (${concave} concave) has an arrival a body can stand in` +
+        (stuck ? ` — ${stuck} do not, e.g. ${examples.join('; ')}` : ''),
+    );
   }
 
   // --- 1. A real building, out of the real bake.

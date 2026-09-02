@@ -8068,6 +8068,7 @@ async function main(): Promise<void> {
     // The arrival is the building's door, not the wall that was knocked on:
     // one building, one inside, one door. See `world/interior.ts`'s header.
     const at = arrivalAt(built);
+    if (at.stuck) return;
     applySpace({
       space: spaceForBuilding(seed),
       building: seed,

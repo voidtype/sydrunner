@@ -5880,6 +5880,12 @@ export class Simulation {
     // else in it is looking. See `world/interior.ts`'s header for why the door
     // stopped being per entrant.
     const at = arrivalAt(made.it);
+    // `buildInterior` already refused anything with no clear arrival, so this
+    // is the furniture: somebody may have put a couch where the door lands
+    // since the room was built. A refusal is a door that does nothing, which
+    // is bad; a body placed inside a couch is a body shoved every tick, which
+    // is the thing the owner reported.
+    if (at.stuck) return null;
     p.space = spaceForBuilding(seed);
     p.interior = made.it;
     p.interiorWorld = made.world;
@@ -6075,9 +6081,13 @@ export class Simulation {
     // reused through the resolver so a spot that has since become a wall (a
     // rebake that moved a partition) still lands somebody clear.
     const home = made.it.resolver.resolve(x, z, x, z, PLAYER_RADIUS, made.it.base);
-    const inside = made.it.resolver.clearance(home.x, home.z) >= 0
+    const inside = made.it.resolver.clearance(home.x, home.z) >= PLAYER_RADIUS
       ? home
       : arrivalAt(made.it);
+    // Neither the spot they logged off on nor the door is clear: the street,
+    // on `join`'s ordinary refusal path, rather than a body the resolver will
+    // push every tick. This is the branch the Erskineville shed took.
+    if ('stuck' in inside && inside.stuck) return false;
     this.moveInto(p, inside.x, made.it.base + EYE_HEIGHT, inside.z);
     return true;
   }

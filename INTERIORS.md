@@ -50,10 +50,15 @@ structural: boolean;   // TRUE for viaduct decks, FALSE for buildings
 Plus `prismsWithin(x, z, radius, out)`. So an interior needs **no new asset, no
 bake and no egress**, which matters against the 20 GB/month cap (DEPLOY.md).
 
-The prisms are **convex hulls**. That is load-bearing three times: the
-minimum-area enclosing rectangle is exact over the polygon's own edges, "closest
-point on the perimeter" is exact rather than sampled, and the walkable shell can
-be an intersection of half-planes.
+The prisms are **not** convex, whatever an earlier version of this file said:
+of the 1,182 enterable buildings within 800 m of the spawn, 441 are concave.
+So the room is built on the footprint's **convex hull** (`interior.convexHull`,
+monotone chain, no trig), which is what makes the half-plane shell, the fan floor
+and the door on the longest edge exact. The plan's rooms are still culled
+against the real outline, so a notch is open floor rather than a room somebody
+could be put in. Before this, a concave outline's own half-planes intersected in
+nothing and a player restored into one could not take a step -- 107 of those
+buildings did that.
 
 `Prism.structural` reads the opposite way to its name and cost an hour: it is
 **true** for the deck, viaduct and bridge volumes whose `base` is a soffit, and

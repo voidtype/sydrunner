@@ -282,6 +282,66 @@ export function interiorAdmits(points: Float32Array, height: number): boolean {
   return bestShort >= INTERIOR_MIN_SPAN_M;
 }
 
+// --- The hull ------------------------------------------------------------------
+
+/**
+ * The convex hull of a footprint, as x,z pairs, counter-clockwise.
+ *
+ * Andrew's monotone chain: a sort and two sweeps, integer-exact cross products,
+ * no trig. `n log n` over polygons that are at most a few dozen corners.
+ *
+ * ## Why the room is built on the hull and not on the outline
+ *
+ * INTERIORS.md said the prisms were convex hulls. They are not: measured over
+ * the 1,182 enterable buildings within 800 m of the spawn, **441 are concave**,
+ * and for 107 of those the old shell -- the intersection of the outline's own
+ * edge half-planes -- was *empty*. Not a smaller room, as the comment claimed;
+ * no room at all. Every point inside the building measured thirty metres
+ * "outside", the resolver pushed the body thirty metres every tick, and the
+ * player could not take a step. That was the owner, in a 26-corner shed in
+ * Erskineville, reporting "I can't move inside the room".
+ *
+ * The hull is the smallest convex shape the outline fits in, so every piece of
+ * this file that needs convexity -- the half-planes, the fan floor, the door on
+ * the longest edge -- is exact again. What it costs is fidelity in the notches:
+ * a U-shaped building gets a room across the mouth of the U. Nobody can see
+ * that from inside, because the city is on another layer, and the plan's
+ * rooms are still culled against the *real* outline, so the notch is open
+ * floor rather than a room somebody could be put in.
+ */
+export function convexHull(points: Float32Array): Float32Array {
+  const n = points.length >> 1;
+  const idx: number[] = [];
+  for (let i = 0; i < n; i++) {
+    if (Number.isFinite(points[i * 2]) && Number.isFinite(points[i * 2 + 1])) idx.push(i);
+  }
+  if (idx.length < 3) return new Float32Array(0);
+  idx.sort((a, b) => points[a * 2] - points[b * 2] || points[a * 2 + 1] - points[b * 2 + 1]);
+  const cross = (o: number, a: number, b: number): number =>
+    (points[a * 2] - points[o * 2]) * (points[b * 2 + 1] - points[o * 2 + 1]) -
+    (points[a * 2 + 1] - points[o * 2 + 1]) * (points[b * 2] - points[o * 2]);
+  const lower: number[] = [];
+  for (const i of idx) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], i) <= 0) lower.pop();
+    lower.push(i);
+  }
+  const upper: number[] = [];
+  for (let k = idx.length - 1; k >= 0; k--) {
+    const i = idx[k];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], i) <= 0) upper.pop();
+    upper.push(i);
+  }
+  lower.pop();
+  upper.pop();
+  const ring = lower.concat(upper);
+  const out = new Float32Array(ring.length * 2);
+  for (let k = 0; k < ring.length; k++) {
+    out[k * 2] = points[ring[k] * 2];
+    out[k * 2 + 1] = points[ring[k] * 2 + 1];
+  }
+  return out;
+}
+
 // --- The shell -----------------------------------------------------------------
 
 /**
@@ -616,10 +676,25 @@ export function buildInterior(
   if (!interiorAdmits(points, height)) return null;
   if (!Number.isFinite(base)) return null;
 
-  const planes = shellPlanes(points, WALL_THICK_M);
+  // The hull, for the shell, the floor and the door. See `convexHull`. The
+  // plan below still reads the real outline, which is what keeps rooms out of
+  // the notches.
+  const hull = convexHull(points);
+  if (hull.length < 6) return null;
+  const planes = shellPlanes(hull, WALL_THICK_M);
   if (planes.length < 3) return null;
   const shell = shellPolygon(planes);
   if (shell.length < 6) return null;
+  // **The shell is consistent**, or there is no room. Every vertex of it must
+  // satisfy every plane; a half-plane intersection that is empty produces
+  // vertices that violate the others by metres, and a body placed in it is
+  // pushed every tick. This cannot happen on a hull. It is checked anyway,
+  // because the last comment that said "cannot happen" here was wrong.
+  for (let i = 0; i < shell.length; i += 2) {
+    for (const pl of planes) {
+      if (pl.nx * shell[i] + pl.nz * shell[i + 1] - pl.d < -0.05) return null;
+    }
+  }
 
   const plan = floorPlan(points, height, seed);
   const box = plan.box;
@@ -791,13 +866,17 @@ export function buildInterior(
    */
   let door: InteriorDoor = { x: centreX, z: centreZ, nx: 0, nz: -1 };
   {
-    const n = points.length >> 1;
+    // On the **hull**, not the outline: the longest edge of a concave outline
+    // can be the side of a notch, and a door there steps "out" into the
+    // building's own collision on the city side. A hull edge is either a real
+    // wall or the air across a notch, and both are outside the room.
+    const n = hull.length >> 1;
     let bestLen = -1;
     for (let i = 0, j = n - 1; i < n; j = i++) {
-      const ax = points[j * 2];
-      const az = points[j * 2 + 1];
-      const bx = points[i * 2];
-      const bz = points[i * 2 + 1];
+      const ax = hull[j * 2];
+      const az = hull[j * 2 + 1];
+      const bx = hull[i * 2];
+      const bz = hull[i * 2 + 1];
       const len = Math.sqrt((bx - ax) * (bx - ax) + (bz - az) * (bz - az));
       if (!(len > bestLen)) continue;
       const mx = (ax + bx) / 2;
@@ -831,7 +910,7 @@ export function buildInterior(
     headers.push({ ax: clipped.ax, az: clipped.az, bx: clipped.bx, bz: clipped.bz });
   }
 
-  return {
+  const it: Interior = {
     seed,
     base,
     ceilingY: base + CEILING_M,
@@ -847,6 +926,15 @@ export function buildInterior(
     placedBoxes: [],
     resolver: new InteriorResolver(planes, walls),
   };
+  // **And a body can stand in it.** Both ends run this same line before either
+  // offers a door, so a building the generator cannot make a clear arrival in
+  // has no prompt on the client and no entry on the server -- the same
+  // agreement `interiorAdmits` already gives, one step later and against the
+  // finished geometry rather than the footprint. Before the hull this refused
+  // 107 of the 1,182 buildings near the spawn; now it should refuse none, and
+  // it stays because the last time this file said "cannot happen" it could.
+  if (arrivalAt(it).stuck) return null;
+  return it;
 }
 
 /**
@@ -869,7 +957,7 @@ export function buildInterior(
  * centre until it is inside, rather than refused. A door that opens onto a
  * refusal is worse than a door that opens a foot further in than it should.
  */
-export function arrivalAt(it: Interior): { x: number; z: number } {
+export function arrivalAt(it: Interior): { x: number; z: number; stuck?: boolean } {
   let x = it.door.x - it.door.nx * 1.0;
   let z = it.door.z - it.door.nz * 1.0;
   // Settle, test, and walk further in if it did not take. The resolver runs a
@@ -882,11 +970,14 @@ export function arrivalAt(it: Interior): { x: number; z: number } {
     const settled = it.resolver.resolve(x, z, x, z, BODY_CLEARANCE_M, it.base);
     x = settled.x;
     z = settled.z;
-    if (it.resolver.clearance(x, z) >= BODY_CLEARANCE_M) break;
+    if (it.resolver.clearance(x, z) >= BODY_CLEARANCE_M) return { x, z };
     x += (it.centreX - x) * 0.2;
     z += (it.centreZ - z) * 0.2;
   }
-  return { x, z };
+  // Never clear, even at the centre. Say so rather than hand back a point the
+  // resolver will push every tick: the caller refuses the door, which is a
+  // building you cannot enter instead of one you cannot leave.
+  return { x, z, stuck: true };
 }
 
 // --- What people put in it -----------------------------------------------------
@@ -1873,6 +1964,20 @@ export function verifyInterior(): string[] {
         }
         return new Float32Array(out);
       })(), height: 18, inside: true },
+    // A real one: the 26-corner shed in Erskineville the owner logged off in
+    // and could not take a step inside. Concave -- eleven left turns and
+    // fifteen right -- and the outline's own half-planes intersect in nothing,
+    // so the old shell measured every point inside it as thirty metres
+    // outside. Kept verbatim, to two centimetres, as the regression it was.
+    { name: "the Erskineville shed", points: poly(
+        0, 0, -0.75, 6.06, -5.36, 5.65, -7.37, 17.66, 43.77, 26.64, 44.79, 21.06, 46.65, 21.27, 50.73, -0.9,
+        49.61, -1, 56.98, -40.02, 50.5, -41.27, 51.3, -45.36, 36.13, -47.81, 35.07, -44.08, 29.97, -44.86,
+        29.4, -41.89, 28.16, -42.11, 26.93, -34.68, 39.13, -32.19, 38.92, -29.83, 42.41, -29.15, 40.82, -21.1,
+        38.58, -21.31, 36.26, -5.46, 39.87, -4.65, 38.07, 6.24,
+      ), height: 9.5, inside: true },
+    // And a horseshoe, which is the shape whose outline half-planes are most
+    // obviously contradictory: the mouth's two inner walls face each other.
+    { name: 'a horseshoe', points: poly(0, 0, 30, 0, 30, 24, 20, 24, 20, 8, 10, 8, 10, 24, 0, 24), height: 7, inside: true },
     // And the ones with no inside. Each of these is a thing a player can walk
     // up to, so each has to be refused rather than crash.
     { name: 'a sliver', points: poly(0, 0, 40, 0.4, 40, 1.2, 0, 0.8), height: 4, inside: false },
@@ -1957,6 +2062,43 @@ export function verifyInterior(): string[] {
       }
     }
     if (it.base !== 12.5) failures.push(`${c.name} put its floor at ${it.base}, not at the building's pad.`);
+  }
+
+  // --- **Every building with an inside has an arrival a body can stand in and
+  //     walk from.** The property the Erskineville shed broke: the shell was
+  //     empty, so the arrival had negative clearance and the resolver pushed
+  //     the body thirty metres a tick. Driven, not measured -- sixty resolves
+  //     forward from the arrival must go somewhere.
+  for (const c of cases) {
+    if (!c.inside) continue;
+    const it = southDoor(c.points, 0, c.height);
+    if (it === null) continue;
+    const at = arrivalAt(it);
+    if (at.stuck) {
+      failures.push(`${c.name} has no arrival a body can stand in; buildInterior should have refused it.`);
+      continue;
+    }
+    if (it.resolver.clearance(at.x, at.z) < 0.34) {
+      failures.push(`${c.name}'s arrival is ${it.resolver.clearance(at.x, at.z).toFixed(2)} m clear; a body there is shoved every tick.`);
+    }
+    // Sixty 10 cm steps in the direction with the most room, sliding.
+    let best = 0;
+    for (let dir = 0; dir < 8; dir++) {
+      const q = dir / 8;
+      const dx = q < 0.5 ? 1 - q * 4 : q * 4 - 3;
+      const dz = q < 0.25 ? q * 4 : q < 0.75 ? 2 - q * 4 : q * 4 - 4;
+      const len = Math.sqrt(dx * dx + dz * dz) || 1;
+      let x = at.x;
+      let z = at.z;
+      for (let step = 0; step < 60; step++) {
+        const r = it.resolver.resolve(x, z, x + (dx / len) * 0.1, z + (dz / len) * 0.1, 0.34, it.base);
+        x = r.x;
+        z = r.z;
+      }
+      const went = Math.sqrt((x - at.x) * (x - at.x) + (z - at.z) * (z - at.z));
+      if (went > best) best = went;
+    }
+    if (best < 2) failures.push(`${c.name}: sixty steps from the arrival went ${best.toFixed(2)} m in the best direction; the room is a vice.`);
   }
 
   // --- You cannot walk out through a wall.
