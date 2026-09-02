@@ -786,6 +786,7 @@ import { verifyTileLifecycle } from './world/tile-lifecycle.ts';
 import {
   GROUND_REVEAL_DEADLINE_MS,
   GROUND_REVEAL_RADIUS_M,
+  GROUND_REVEAL_STALL_MS,
   groundProgressLine,
   revealReason,
   verifyGroundFirst,
@@ -3187,6 +3188,14 @@ async function main(): Promise<void> {
   {
     const revealFirstVisit = firstVisit();
     let armedAt = -1;
+    /**
+     * When this loop started, for the bound on a boot that never draws.
+     *
+     * `armedAt` is the first *drawn frame* and is what the ground deadline is
+     * measured from -- so a client that never draws one had no bound at all and
+     * sat here for ever. See `revealReason` and `GROUND_REVEAL_STALL_MS`.
+     */
+    const startedAt = performance.now();
     const tick = (): void => {
       const drawing = streamer.frames > 0;
       if (drawing && armedAt < 0) armedAt = performance.now();
@@ -3196,6 +3205,8 @@ async function main(): Promise<void> {
         ground: cover.ready,
         elapsedMs: armedAt < 0 ? 0 : performance.now() - armedAt,
         deadlineMs: GROUND_REVEAL_DEADLINE_MS,
+        sinceStartMs: performance.now() - startedAt,
+        stallMs: GROUND_REVEAL_STALL_MS,
       });
       if (why === 'waiting') {
         // Only once frames are happening. Before that the ring is empty of
@@ -3205,7 +3216,26 @@ async function main(): Promise<void> {
         requestAnimationFrame(tick);
         return;
       }
-      if (why === 'deadline') {
+      if (why === 'stalled') {
+        /*
+         * Nothing has been drawn at all in three quarters of a minute.
+         *
+         * At `error`, not `warn`, and with everything a bug report needs in one
+         * line: this is the boot that used to hang, and the player's whole
+         * experience of it was an overlay that said "Getting Sydney ready"
+         * until they gave up. What they get instead is a world made of the
+         * coarse far sheet -- `groundHeightAt` answers an unloaded tile with the
+         * last height it knew -- which is a game they can stand in while the
+         * streaming carries on behind them.
+         */
+        console.error(
+          `[boot] nothing drew in ${(GROUND_REVEAL_STALL_MS / 1000).toFixed(0)} s — revealing anyway. ` +
+            `The world is not reaching this browser: streamer frames ${streamer.frames}, ` +
+            `${cover.built} of ${cover.total} tiles built within ${GROUND_REVEAL_RADIUS_M} m. ` +
+            `Check the network tab for ${index.cdn?.base ?? 'the world host'}.`,
+        );
+        hud.notice('the city is loading slowly — it will fill in as it arrives');
+      } else if (why === 'deadline') {
         // At `warn`, and naming the tiles, because this is the one outcome
         // nobody can see: the game starts, it looks fine, and the ground under
         // the first minute of it is the coarse far sheet three metres low. The

@@ -180,6 +180,25 @@ export const GROUND_FETCH_AHEAD = 16;
 export const GROUND_REVEAL_DEADLINE_MS = 9000;
 
 /**
+ * The bound on a boot that never draws anything at all, milliseconds.
+ *
+ * Forty-five seconds, and it is long on purpose: this is not a target, it is
+ * the point at which waiting has stopped being a strategy. Every network
+ * deadline in `main.ts` has expired by 25 s, the shader warm-up gives up at 25,
+ * and a cold first visit on a slow link legitimately spends tens of seconds
+ * before the first tile is drawable. Giving up sooner would show a coarse world
+ * to somebody who was two seconds from a real one.
+ *
+ * What makes giving up correct rather than a surrender is that the world is
+ * *already* optional: `groundHeightAt` answers an unloaded tile with the last
+ * height it knew, and the render loop goes on streaming forever. So the player
+ * gets a game they can stand in and a line in the console naming what never
+ * arrived, instead of an overlay that says "Getting Sydney ready" until they
+ * close the tab.
+ */
+export const GROUND_REVEAL_STALL_MS = 45_000;
+
+/**
  * Plan distance from a point to a tile's rectangle, metres; zero inside it.
  *
  * `streamer.distanceToBounds` with the `Vector3` taken apart, and the two must
@@ -268,7 +287,7 @@ export function groundProgressLine(cover: GroundCoverage): string {
 }
 
 /** Why the curtain went up, or why it has not. */
-export type RevealReason = 'waiting' | 'ground' | 'deadline';
+export type RevealReason = 'waiting' | 'ground' | 'deadline' | 'stalled';
 
 export interface RevealState {
   /**
@@ -291,6 +310,28 @@ export interface RevealState {
   /** Milliseconds since the first drawn frame. */
   elapsedMs: number;
   deadlineMs: number;
+  /**
+   * Milliseconds since the reveal loop started, whether or not anything has
+   * been drawn.
+   *
+   * **The bound that was missing.** `drawing` cannot be overridden -- revealing
+   * before a frame exists shows a black canvas -- and the deadline above is
+   * measured from the *first* drawn frame, so a client that never draws one had
+   * no bound at all: `waiting` forever, an overlay that never clears, and not a
+   * word in the console about it. That is not a hypothetical. It was reported
+   * from a cold first load on which every network deadline in `main.ts` expired
+   * -- the ground, the rail bake, the far layer, the landmarks, the car and
+   * train models, the warm-up -- and the page simply sat there.
+   *
+   * So there are two clocks: this one bounds *"nothing has happened at all"*
+   * and `elapsedMs` bounds *"drawing, but the ground is late"*. They are
+   * separate because they describe different failures and want very different
+   * numbers -- a few seconds of a late tile against most of a minute of a
+   * client that cannot reach the world.
+   */
+  sinceStartMs: number;
+  /** The bound on `sinceStartMs`. See it. */
+  stallMs: number;
 }
 
 /**
@@ -305,7 +346,16 @@ export interface RevealState {
  * here to delete.
  */
 export function revealReason(s: RevealState): RevealReason {
-  if (!s.drawing) return 'waiting';
+  if (!s.drawing) {
+    // The one case that used to have no bound at all. A client that never draws
+    // a frame -- a wedged CDN, a saturated link, a world it cannot reach --
+    // waited here forever behind an overlay that said "Getting Sydney ready".
+    // Giving up is strictly better than that: `groundHeightAt` answers an
+    // unloaded tile with the last height it knew, so what the player gets is a
+    // coarse world they can stand in and a console line naming why, rather than
+    // a screen that never changes. See `RevealState.sinceStartMs`.
+    return s.sinceStartMs >= s.stallMs ? 'stalled' : 'waiting';
+  }
   if (s.ground) return 'ground';
   if (s.elapsedMs >= s.deadlineMs) return 'deadline';
   return 'waiting';
@@ -469,7 +519,14 @@ export function verifyGroundFirst(): string[] {
   );
 
   // --- The reveal rule.
-  const base = { drawing: true, ground: false, elapsedMs: 0, deadlineMs: GROUND_REVEAL_DEADLINE_MS };
+  const base = {
+    drawing: true,
+    ground: false,
+    elapsedMs: 0,
+    deadlineMs: GROUND_REVEAL_DEADLINE_MS,
+    sinceStartMs: 0,
+    stallMs: GROUND_REVEAL_STALL_MS,
+  };
   fail(revealReason({ ...base, ground: true }) === 'ground', 'settled ground reveals');
   fail(revealReason(base) === 'waiting', 'unsettled ground inside the deadline waits');
   fail(
@@ -490,6 +547,30 @@ export function verifyGroundFirst(): string[] {
   fail(
     revealReason({ ...base, drawing: false, ground: true }) === 'waiting',
     'ground with nothing drawn is still not a reveal',
+  );
+  // --- And the bound on a boot that never draws anything, which is the case
+  //     that had none. Reported from a cold first load: every network deadline
+  //     in `main.ts` expired and the page sat on the overlay indefinitely,
+  //     because `elapsedMs` is measured from a first frame that never came.
+  fail(
+    revealReason({ ...base, drawing: false, sinceStartMs: GROUND_REVEAL_STALL_MS }) === 'stalled',
+    'a boot that has drawn nothing at all gives up rather than waiting forever',
+  );
+  fail(
+    revealReason({ ...base, drawing: false, sinceStartMs: GROUND_REVEAL_STALL_MS - 1 }) === 'waiting',
+    'and waits right up until it does',
+  );
+  fail(
+    revealReason({ ...base, sinceStartMs: GROUND_REVEAL_STALL_MS * 10 }) === 'waiting',
+    'the stall bound says nothing about a client that is drawing; that is the other clock',
+  );
+  fail(
+    GROUND_REVEAL_STALL_MS > GROUND_REVEAL_DEADLINE_MS * 2,
+    'the stall bound must outlast the ground deadline, or a slow first tile reads as a dead client',
+  );
+  fail(
+    GROUND_REVEAL_STALL_MS >= 25_000,
+    'the stall bound must outlast every boot deadline in main.ts, or it gives up on a load still in flight',
   );
   fail(
     GROUND_REVEAL_DEADLINE_MS >= 8000,
