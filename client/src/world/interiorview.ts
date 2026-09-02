@@ -103,20 +103,12 @@ export class InteriorView {
   /**
    * Draw this building's inside, and point the camera at it alone.
    *
-   * The door is passed rather than taken off the interior, for the reason the
-   * interior has no door: it is per entrant, and it is drawn on the wall so the
-   * way out is visible from inside.
+   * The door comes off the interior, so everybody in the building sees the way
+   * out on the same wall.
    */
-  show(
-    camera: Camera,
-    it: Interior,
-    doorX: number,
-    doorZ: number,
-    doorNX: number,
-    doorNZ: number,
-  ): void {
+  show(camera: Camera, it: Interior): void {
     this.hide(camera);
-    this.rebuild(it, doorX, doorZ, doorNX, doorNZ);
+    this.rebuild(it);
     camera.layers.set(INTERIOR_LAYER);
   }
 
@@ -128,20 +120,14 @@ export class InteriorView {
    * again every time a couch lands would be a layer switch per placement for no
    * reason -- and would fight anything that had legitimately changed it.
    */
-  rebuild(
-    it: Interior,
-    doorX: number,
-    doorZ: number,
-    doorNX: number,
-    doorNZ: number,
-  ): void {
+  rebuild(it: Interior): void {
     const old = this.mesh;
     if (old !== null) {
       this.scene.remove(old);
       old.geometry.dispose();
       this.mesh = null;
     }
-    const built = interiorMesh(it, doorX, doorZ, doorNX, doorNZ);
+    const built = interiorMesh(it);
     const geometry = new BufferGeometry();
     geometry.setAttribute('position', new BufferAttribute(built.positions, 3));
     geometry.setAttribute('normal', new BufferAttribute(built.normals, 3));

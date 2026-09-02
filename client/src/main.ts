@@ -7855,7 +7855,7 @@ async function main(): Promise<void> {
     ghostAt = want;
     ghostOk =
       placedHere.length < MAX_PER_SPACE &&
-      placementFits(it, placedHere, want, interiorDoorX, interiorDoorZ) &&
+      placementFits(it, placedHere, want) &&
       // And not on top of the person placing it, which is the one rule the
       // server applies that `placementFits` does not know about -- it is a
       // question about who is in the room rather than about the room.
@@ -7875,7 +7875,7 @@ async function main(): Promise<void> {
     if (net.placedSpace !== net.space) return;
     placedHere = net.placed.map((i) => ({ kind: i.kind, x: i.x, z: i.z, turn: i.turn }));
     setPlacements(it, placedHere);
-    interiorView.rebuild(it, interiorDoorX, interiorDoorZ, interiorDoorNX, interiorDoorNZ);
+    interiorView.rebuild(it);
   };
 
   const applySpace = (f: SpaceFrame): void => {
@@ -7993,7 +7993,7 @@ async function main(): Promise<void> {
     interiorDoorZ = f.doorZ;
     interiorDoorNX = f.doorNX;
     interiorDoorNZ = f.doorNZ;
-    interiorView.show(camera, built, f.doorX, f.doorZ, f.doorNX, f.doorNZ);
+    interiorView.show(camera, built);
     placeBody(f);
     audio.door();
     // And one line about the room, which is what the loading screen the owner
@@ -8047,7 +8047,9 @@ async function main(): Promise<void> {
     const seed = buildingSeed(site.prism);
     const built = buildInterior(site.prism.points, site.prism.base, site.prism.height, seed);
     if (built === null) return;
-    const at = arrivalAt(built, site.x, site.z, site.nx, site.nz);
+    // The arrival is the building's door, not the wall that was knocked on:
+    // one building, one inside, one door. See `world/interior.ts`'s header.
+    const at = arrivalAt(built);
     applySpace({
       space: spaceForBuilding(seed),
       building: seed,
@@ -8055,10 +8057,10 @@ async function main(): Promise<void> {
       y: built.base + EYE_HEIGHT,
       z: at.z,
       yaw: player.yaw,
-      doorX: site.x,
-      doorZ: site.z,
-      doorNX: site.nx,
-      doorNZ: site.nz,
+      doorX: built.door.x,
+      doorZ: built.door.z,
+      doorNX: built.door.nx,
+      doorNZ: built.door.nz,
     });
   };
 
@@ -12442,6 +12444,15 @@ async function main(): Promise<void> {
     // numbers and touches the DOM only when the marker has moved a third of a
     // pixel or the game minute has rolled over. See `sky/clock.ts`.
     clockHud.update(sky.now);
+    /*
+     * The render loop ran, and the boot gate is entitled to know that whether
+     * or not the world was updated. **Outside the gate below**, which is where
+     * this has to be: it used to be the first line of `streamer.update`, so
+     * gating the city gated the counter with it and anybody who started inside
+     * a building sat on the loading screen until the stall bound gave up on
+     * their behalf. See `TileStreamer.noteFrame`.
+     */
+    streamer.noteFrame();
     /*
      * --- Indoors, the streamer has nothing to do and the city has nobody in
      *     it worth moving.

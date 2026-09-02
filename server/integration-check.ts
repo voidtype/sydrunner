@@ -11239,7 +11239,7 @@ async function checkInteriors(): Promise<void> {
     check(home.placedIn(space).length === 0, 'a building nobody has furnished is empty');
 
     // Somewhere clear, found the way a player finds one: out in front of them.
-    const spot = arrivalAt(inside, who.doorX, who.doorZ, who.doorNX, who.doorNZ);
+    const spot = arrivalAt(inside);
     let put = -1;
     let atX = 0;
     let atZ = 0;

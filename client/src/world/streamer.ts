@@ -3101,15 +3101,32 @@ export class TileStreamer implements LampSource {
     updateRegions(x, z);
   }
 
+  /**
+   * "The render loop ran." Counts the frame and does nothing else.
+   *
+   * Split out of `update` because the count is about the **loop**, not about
+   * the world -- `update`'s own comment said so, right above the line -- and
+   * because `main.ts` now has a frame in which the world is deliberately not
+   * updated at all: a player standing inside a building, where the whole city
+   * section of the loop is skipped.
+   *
+   * That was a hang. The boot gate reads this counter to find out whether
+   * frames are happening at all, so a player who **starts** inside a building
+   * -- which anybody who logs off indoors does -- gated the counter along with
+   * the streamer, never satisfied `drawing`, and sat on the loading screen
+   * until the stall bound rescued them three quarters of a minute later. The
+   * counter has to be outside every gate there is, and the only way to be sure
+   * of that is for it not to live inside the thing being gated.
+   */
+  noteFrame(): void {
+    this.framesSeen++;
+  }
+
   update(
     camera: Camera,
     shadowVolume: Frustum | null = null,
     sunAltitudeDeg: number = REFERENCE_ALTITUDE_DEG,
   ): void {
-    // WORKSTREAM AJ: before the index test, deliberately. The count is about the
-    // *loop*, not about the world, and the boot gate reads it to find out
-    // whether frames are happening at all.
-    this.framesSeen++;
     if (!this.index) return;
 
     // Phase 3, before anything else this frame.

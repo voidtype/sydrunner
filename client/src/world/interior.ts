@@ -40,15 +40,24 @@
  *     pavement is a metre from somebody standing inside, and without the filter
  *     they would draw each other through the wall.
  *
- * ## The door is not part of the interior
+ * ## The door belongs to the building
  *
- * One building, one inside, for everybody -- so the rooms are cached per space
- * and the *door* is not among them. Two players can walk into the same corner
- * pub from George Street and from the lane behind it, and each has to arrive
- * just inside the door they used and leave by it again ("you leave by the one
- * you came in", INTERIORS.md). So `buildInterior` takes no door and `arrivalAt`
- * is a separate question asked per entrant, which is also what stops the first
- * person through the door deciding where everybody else comes in.
+ * One building, one inside, **one door**, and the door is derived from the
+ * footprint exactly as the rooms are: the midpoint of the longest edge, which
+ * is a building's frontage often enough to be a good guess and is deterministic
+ * always. Everybody who walks in arrives at it, everybody leaves by it, and
+ * everybody sees the same panel on the same wall.
+ *
+ * It was per entrant to begin with -- you arrived at whichever wall you had
+ * knocked on -- and that was wrong in two ways the owner found immediately. Two
+ * people in one pub saw the exit in two different places, which contradicts the
+ * first thing decided about interiors; and a player restored into a building
+ * they had logged off in got a door beside wherever they happened to be
+ * standing, because the restore had nothing else to derive one from. A door
+ * that moves depending on who is looking is not a door.
+ *
+ * You can still knock on **any** wall -- that part of the brief is untouched --
+ * you simply come out on the inside at the building's own door.
  *
  * ## The ground floor, and what is not built yet
  *
@@ -154,6 +163,16 @@ export interface InteriorWall {
   bz: number;
 }
 
+/** A building's one door, derived from its footprint. See the header. */
+export interface InteriorDoor {
+  /** On the outline, world metres. */
+  x: number;
+  z: number;
+  /** Outward normal, unit length: the way out. */
+  nx: number;
+  nz: number;
+}
+
 /** Half-plane of the walkable shell: inside is `nx * x + nz * z >= d`. */
 export interface ShellPlane {
   nx: number;
@@ -189,6 +208,8 @@ export interface Interior {
   /** The footprint's centre. `arrivalAt` walks toward it; the view looks at it. */
   centreX: number;
   centreZ: number;
+  /** The one door. Derived from the footprint; see the header. */
+  door: InteriorDoor;
   /**
    * What people have put in the room, as boxes, for the mesh to draw.
    *
@@ -755,6 +776,43 @@ export function buildInterior(
   centreX /= points.length / 2;
   centreZ /= points.length / 2;
 
+  /*
+   * --- The door: the midpoint of the longest edge, facing out.
+   *
+   * Derived from the footprint, so it is the same door on every machine, in
+   * every session, for everybody in the building -- which is the property the
+   * rooms already have and the door did not. The longest edge is a frontage
+   * often enough to be a good guess and is unambiguous always; ties go to the
+   * earlier edge so a perfectly square building still has exactly one door.
+   *
+   * The normal is flipped away from the centre rather than trusted from the
+   * winding, which is `doorway.doorAt`'s rule and is right for a convex hull
+   * however it was wound.
+   */
+  let door: InteriorDoor = { x: centreX, z: centreZ, nx: 0, nz: -1 };
+  {
+    const n = points.length >> 1;
+    let bestLen = -1;
+    for (let i = 0, j = n - 1; i < n; j = i++) {
+      const ax = points[j * 2];
+      const az = points[j * 2 + 1];
+      const bx = points[i * 2];
+      const bz = points[i * 2 + 1];
+      const len = Math.hypot(bx - ax, bz - az);
+      if (!(len > bestLen)) continue;
+      const mx = (ax + bx) / 2;
+      const mz = (az + bz) / 2;
+      let nx = (bz - az) / len;
+      let nz = -(bx - ax) / len;
+      if ((mx - centreX) * nx + (mz - centreZ) * nz < 0) {
+        nx = -nx;
+        nz = -nz;
+      }
+      bestLen = len;
+      door = { x: mx, z: mz, nx, nz };
+    }
+  }
+
   // The headers, through the same conversion and the same clip as the walls.
   const headers: InteriorWall[] = [];
   for (const piece of headerSpans) {
@@ -785,6 +843,7 @@ export function buildInterior(
     planes,
     centreX,
     centreZ,
+    door,
     placedBoxes: [],
     resolver: new InteriorResolver(planes, walls),
   };
@@ -793,9 +852,9 @@ export function buildInterior(
 /**
  * Where a body arrives when it comes in by this door.
  *
- * Asked once per entrant rather than baked into the interior, because the
- * interior is shared and the door is not: two people walk into the same pub
- * from two streets and each arrives inside their own doorway.
+ * One door, so one arrival: everybody who walks into a building comes out on
+ * the inside in the same place. See the header for why the door stopped being
+ * per entrant.
  *
  * A metre in from the wall they knocked on, then **settled by the interior's
  * own resolver** with a radius wider than a player's. That second step is not
@@ -810,15 +869,9 @@ export function buildInterior(
  * centre until it is inside, rather than refused. A door that opens onto a
  * refusal is worse than a door that opens a foot further in than it should.
  */
-export function arrivalAt(
-  it: Interior,
-  doorX: number,
-  doorZ: number,
-  doorNX: number,
-  doorNZ: number,
-): { x: number; z: number } {
-  let x = doorX - doorNX * 1.0;
-  let z = doorZ - doorNZ * 1.0;
+export function arrivalAt(it: Interior): { x: number; z: number } {
+  let x = it.door.x - it.door.nx * 1.0;
+  let z = it.door.z - it.door.nz * 1.0;
   // Settle, test, and walk further in if it did not take. The resolver runs a
   // fixed three passes, which is enough for a body against a wall and not
   // always enough for one wedged into the corner of a forty-sided outline where
@@ -907,8 +960,6 @@ export function placementFits(
   it: Interior,
   existing: readonly Placement[],
   p: Placement,
-  doorX: number,
-  doorZ: number,
 ): boolean {
   const kind = PLACEABLES[p.kind];
   if (kind === undefined) return false;
@@ -930,7 +981,7 @@ export function placementFits(
   for (const h of it.headers) {
     if (!clearOfSegment(box, h.ax, h.az, h.bx, h.bz, OPENING_CLEAR_M)) return false;
   }
-  if (boxClearance(box, doorX, doorZ) < DOOR_CLEAR_M) return false;
+  if (boxClearance(box, it.door.x, it.door.z) < DOOR_CLEAR_M) return false;
   // And clear of everything already in the room.
   for (const other of existing) {
     if (boxesOverlap(box, boxOf(other, it.plan.box.ux, it.plan.box.uz))) return false;
@@ -1227,18 +1278,13 @@ function shadeOf(seed: number): { r: number; g: number; b: number } {
 /**
  * Build the triangles.
  *
- * The door is passed in rather than taken off the interior, for the reason the
- * interior has no door: it is per entrant. It is drawn as a panel on the wall
- * so that *the way out is visible from inside*, which is the one thing a player
- * in a windowless room has no other way to learn.
+ * The door comes off the interior, so every player in the building sees the
+ * panel on the same wall. It is drawn at all because *the way out has to be
+ * visible from inside*, which is the one thing a player in a windowless room
+ * has no other way to learn.
  */
-export function interiorMesh(
-  it: Interior,
-  doorX: number,
-  doorZ: number,
-  doorNX: number,
-  doorNZ: number,
-): InteriorMesh {
+export function interiorMesh(it: Interior): InteriorMesh {
+  const { x: doorX, z: doorZ, nx: doorNX, nz: doorNZ } = it.door;
   const pos: number[] = [];
   const nor: number[] = [];
   const col: number[] = [];
@@ -1902,7 +1948,7 @@ export function verifyInterior(): string[] {
         nx = -nx;
         nz = -nz;
       }
-      const at = arrivalAt(it, mx, mz, nx, nz);
+      const at = arrivalAt(it);
       const still = it.resolver.resolve(at.x, at.z, at.x, at.z, 0.35, it.base);
       const moved = Math.hypot(still.x - at.x, still.z - at.z);
       if (moved > 1e-3) {
@@ -2087,8 +2133,8 @@ export function verifyInterior(): string[] {
         failures.push('a plain building generated no interior to draw.');
         continue;
       }
-      const at = arrivalAt(it, 6, 0, 0, -1);
-      const mesh = interiorMesh(it, 6, 0, 0, -1);
+      const at = arrivalAt(it);
+      const mesh = interiorMesh(it);
       if (mesh.triangles < 12) failures.push(`an interior drew ${mesh.triangles} triangles; it is not a room.`);
       let bad = 0;
       let above = 0;
@@ -2175,8 +2221,8 @@ export function verifyInterior(): string[] {
     const b = southDoor(pts, 0, 9, 111);
     if (a === null || b === null) failures.push('a plain building generated nothing to finish.');
     else {
-      const ma = interiorMesh(a, 8, 0, 0, -1);
-      const mb = interiorMesh(b, 8, 0, 0, -1);
+      const ma = interiorMesh(a);
+      const mb = interiorMesh(b);
       if (ma.colors.length !== mb.colors.length) failures.push('one building generated two different meshes.');
       else {
         let differs = 0;
@@ -2207,7 +2253,7 @@ export function verifyInterior(): string[] {
     ] as Array<[string, Float32Array, number]>) {
       const it = southDoor(pts, 0, height, 9);
       if (it === null) continue;
-      const mesh = interiorMesh(it, 3, 0, 0, -1);
+      const mesh = interiorMesh(it);
       // The floor is the only unbounded thing in here; everything else is a
       // constant per wall. Twice the quad budget, in triangles, plus room for
       // the walls and their courses.
@@ -2224,7 +2270,7 @@ export function verifyInterior(): string[] {
     const it = southDoor(pts, 6, 9, 7);
     if (it === null) failures.push('an 18 x 26 m building generated no interior.');
     else {
-      const mesh = interiorMesh(it, 9, 0, 0, -1);
+      const mesh = interiorMesh(it);
       // The glass is the one deliberately bright surface in the building, and
       // that is how it is counted: nothing else is over 0.78 on all three
       // channels. If this ever finds none, the windows have stopped being drawn.
@@ -2298,13 +2344,62 @@ export function verifyInterior(): string[] {
       }
       if (solid > 0) failures.push(`${solid} headers stand over solid wall rather than over an opening.`);
       // The drawn lintel sits between head height and the ceiling, nowhere else.
-      const mesh = interiorMesh(it, 13, 0, 0, -1);
+      const mesh = interiorMesh(it);
       let low = 0;
       for (let i = 1; i < mesh.positions.length; i += 3) {
         const y = mesh.positions[i];
         if (y > it.base + CEILING_M + 0.02 || y < it.base - 0.02) low++;
       }
       if (low > 0) failures.push(`${low} vertices of the door frames fall outside the storey.`);
+    }
+  }
+
+  // --- One building, one door, and it is the building's.
+  //
+  // The owner's report from a restore: *"the door incorrectly rendered where i
+  // spawned, but door should be on fixed position"*. It was per entrant, so a
+  // player put back into a building they had logged off in got a door beside
+  // wherever they happened to be standing -- and two people in one pub saw the
+  // way out on two different walls, which contradicts the first thing decided
+  // about interiors.
+  {
+    for (const pts of [
+      poly(0, 0, 14, 0, 14, 22, 0, 22),
+      poly(0, 0, 4.2, 4.2, 16, -7.6, 11.8, -11.8),
+      poly(0, 0, 30, 0, 30, 30, 0, 30),
+    ]) {
+      const a = southDoor(pts, 0, 8, 5);
+      const b = southDoor(pts, 0, 8, 5);
+      if (a === null || b === null) continue;
+      // Two builds of one building put the door in the same place. Nothing
+      // about it depends on who asked, which is the whole of the fix.
+      if (a.door.x !== b.door.x || a.door.z !== b.door.z || a.door.nx !== b.door.nx) {
+        failures.push('one building produced two doors; two people in it would leave by different walls.');
+      }
+      // It is on the outline, and it faces out of the room.
+      let onEdge = false;
+      const n = pts.length >> 1;
+      for (let i = 0, j = n - 1; i < n; j = i++) {
+        const ax = pts[j * 2];
+        const az = pts[j * 2 + 1];
+        const bx = pts[i * 2];
+        const bz = pts[i * 2 + 1];
+        const ex = bx - ax;
+        const ez = bz - az;
+        const len2 = ex * ex + ez * ez;
+        const t = len2 > 1e-9 ? Math.max(0, Math.min(1, ((a.door.x - ax) * ex + (a.door.z - az) * ez) / len2)) : 0;
+        if (Math.hypot(a.door.x - (ax + ex * t), a.door.z - (az + ez * t)) < 1e-6) onEdge = true;
+      }
+      if (!onEdge) failures.push('the door is not on the building.');
+      if (Math.abs(Math.hypot(a.door.nx, a.door.nz) - 1) > 1e-9) failures.push('the door normal is not a unit vector.');
+      if ((a.door.x - a.centreX) * a.door.nx + (a.door.z - a.centreZ) * a.door.nz <= 0) {
+        failures.push('the door faces into the building; leaving would step further in.');
+      }
+      // And the arrival is inside, at that door, for everybody.
+      const at = arrivalAt(a);
+      if (a.resolver.clearance(at.x, at.z) < 0.35) failures.push('the arrival at the building door is not clear.');
+      const back = Math.hypot(at.x - a.door.x, at.z - a.door.z);
+      if (back > 3) failures.push(`the arrival is ${back.toFixed(1)} m from the door it is supposed to be just inside.`);
     }
   }
 
@@ -2339,7 +2434,7 @@ export function verifyInterior(): string[] {
         nx = -nx;
         nz = -nz;
       }
-      const mesh = interiorMesh(it, mx, mz, nx, nz);
+      const mesh = interiorMesh(it);
       // The leaf has a colour nothing else in the building has: warm, and the
       // only surface whose red channel is over 0.9 while its blue is under 0.5.
       let leaf = 0;
@@ -2378,9 +2473,7 @@ export function verifyInterior(): string[] {
     const it = southDoor(pts, 0, 8, 77);
     if (it === null) failures.push('a 16 x 22 m building generated no interior to furnish.');
     else {
-      const doorX = 8;
-      const doorZ = 0;
-      const at = arrivalAt(it, doorX, doorZ, 0, -1);
+      const at = arrivalAt(it);
 
       // **Nothing goes outside the room.** A couch pushed at the far wall must
       // be refused rather than left hanging over the street.
@@ -2388,7 +2481,7 @@ export function verifyInterior(): string[] {
       for (let i = 0; i < 24; i++) {
         const t = i / 24;
         const p: Placement = { kind: PLACEABLE.COUCH, x: -2 + t * 22, z: -2 + t * 28, turn: i & 3 };
-        if (!placementFits(it, [], p, doorX, doorZ)) continue;
+        if (!placementFits(it, [], p)) continue;
         const box = boxOf(p, it.plan.box.ux, it.plan.box.uz);
         const corners = cornersOf(box);
         for (let c = 0; c < corners.length; c += 2) {
@@ -2401,7 +2494,14 @@ export function verifyInterior(): string[] {
 
       // **The way out stays visible**, which is the rule that matters most to
       // somebody who has just walked in.
-      if (placementFits(it, [], { kind: PLACEABLE.COUCH, x: doorX, z: doorZ + 0.8, turn: 0 }, doorX, doorZ)) {
+      if (
+        placementFits(it, [], {
+          kind: PLACEABLE.COUCH,
+          x: it.door.x - it.door.nx * 0.8,
+          z: it.door.z - it.door.nz * 0.8,
+          turn: 0,
+        })
+      ) {
         failures.push('a couch was allowed in front of the way out.');
       }
 
@@ -2412,19 +2512,42 @@ export function verifyInterior(): string[] {
       for (const h of it.headers) {
         const mx = (h.ax + h.bx) / 2;
         const mz = (h.az + h.bz) / 2;
-        if (placementFits(it, [], { kind: PLACEABLE.COUCH, x: mx, z: mz, turn: 0 }, doorX, doorZ)) blocked++;
-        if (placementFits(it, [], { kind: PLACEABLE.COUCH, x: mx, z: mz, turn: 1 }, doorX, doorZ)) blocked++;
+        if (placementFits(it, [], { kind: PLACEABLE.COUCH, x: mx, z: mz, turn: 0 })) blocked++;
+        if (placementFits(it, [], { kind: PLACEABLE.COUCH, x: mx, z: mz, turn: 1 })) blocked++;
       }
       if (blocked > 0) failures.push(`${blocked} couches were allowed to stand in a doorway.`);
 
       // **Two things cannot share a spot**, whichever order they arrive in.
-      const first: Placement = { kind: PLACEABLE.COUCH, x: at.x + 3, z: at.z + 3, turn: 0 };
-      if (!placementFits(it, [], first, doorX, doorZ)) failures.push('a couch in the middle of an empty room was refused.');
-      if (placementFits(it, [first], { ...first }, doorX, doorZ)) failures.push('two couches were allowed in the same spot.');
-      if (placementFits(it, [first], { ...first, x: first.x + 0.4 }, doorX, doorZ)) {
+      // Well away from the door, so this is testing the overlap rule rather
+      // than the door clearance one.
+      // Somewhere clear, found the way a player finds one: a ring out from the
+      // arrival. Fixing on the centre would be fixing on whatever the plan put
+      // there, which as often as not is a partition.
+      let first: Placement | null = null;
+      for (let ring = 1; ring <= 12 && first === null; ring++) {
+        for (let dir = 0; dir < 8 && first === null; dir++) {
+          const q = dir / 8;
+          const dx = q < 0.5 ? 1 - q * 4 : q * 4 - 3;
+          const dz = q < 0.25 ? q * 4 : q < 0.75 ? 2 - q * 4 : q * 4 - 4;
+          const len = Math.hypot(dx, dz) || 1;
+          const want: Placement = {
+            kind: PLACEABLE.COUCH,
+            x: at.x + (dx / len) * ring * 0.9,
+            z: at.z + (dz / len) * ring * 0.9,
+            turn: 0,
+          };
+          if (placementFits(it, [], want)) first = want;
+        }
+      }
+      if (first === null) {
+        failures.push('no couch could be placed anywhere in an empty 16 x 22 m room.');
+        return failures;
+      }
+      if (placementFits(it, [first], { ...first })) failures.push('two couches were allowed in the same spot.');
+      if (placementFits(it, [first], { ...first, x: first.x + 0.4 })) {
         failures.push('a couch was allowed 40 cm inside another one.');
       }
-      if (!placementFits(it, [first], { ...first, x: first.x + 2.2 }, doorX, doorZ)) {
+      if (!placementFits(it, [first], { ...first, x: first.x + 2.2 })) {
         failures.push('a couch was refused beside another one with clear air between them.');
       }
 
@@ -2440,9 +2563,9 @@ export function verifyInterior(): string[] {
       }
       if (it.placedBoxes.length !== 1) failures.push('the drawing and the collision hold different rooms.');
       // And it is drawn.
-      const bare = interiorMesh(it, doorX, doorZ, 0, -1).triangles;
+      const bare = interiorMesh(it).triangles;
       setPlacements(it, [first, { ...first, x: first.x + 2.4 }]);
-      const furnished = interiorMesh(it, doorX, doorZ, 0, -1).triangles;
+      const furnished = interiorMesh(it).triangles;
       if (furnished <= bare) failures.push('adding a couch drew no more triangles; furniture is invisible.');
       setPlacements(it, []);
       if (it.resolver.clearance(first.x, first.z) < 0) failures.push('a removed couch is still in the collision.');

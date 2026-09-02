@@ -3114,7 +3114,7 @@ export class Simulation {
         const inside = p.interior;
         const spot = inside !== null
           ? (() => {
-              const at = arrivalAt(inside, p.doorX, p.doorZ, p.doorNX, p.doorNZ);
+              const at = arrivalAt(inside);
               return { x: at.x, y: inside.base, z: at.z };
             })()
           : inPlace
@@ -5874,14 +5874,19 @@ export class Simulation {
     const seed = buildingSeed(site.prism);
     const made = this.interiorFor(site.prism, seed);
     if (made === null) return null;
-    const at = arrivalAt(made.it, site.x, site.z, site.nx, site.nz);
+    // **The building's door, not the wall that was knocked on.** You may knock
+    // on any wall -- that part of the brief is untouched -- and you come out on
+    // the inside at the one door the building has, which is where everybody
+    // else in it is looking. See `world/interior.ts`'s header for why the door
+    // stopped being per entrant.
+    const at = arrivalAt(made.it);
     p.space = spaceForBuilding(seed);
     p.interior = made.it;
     p.interiorWorld = made.world;
-    p.doorX = site.x;
-    p.doorZ = site.z;
-    p.doorNX = site.nx;
-    p.doorNZ = site.nz;
+    p.doorX = made.it.door.x;
+    p.doorZ = made.it.door.z;
+    p.doorNX = made.it.door.nx;
+    p.doorNZ = made.it.door.nz;
     this.moveInto(p, at.x, made.it.base + EYE_HEIGHT, at.z);
     return this.spaceFrameFor(p);
   }
@@ -6020,7 +6025,7 @@ export class Simulation {
       const b = other.combat.body.position;
       if (boxClearance(box, b.x, b.z) < PLAYER_RADIUS + 0.05) return null;
     }
-    if (!placementFits(inside, held, want, p.doorX, p.doorZ)) return null;
+    if (!placementFits(inside, held, want)) return null;
     const next = held.slice();
     next.push(want);
     if (!store.set(p.space, next)) return null;
@@ -6061,48 +6066,18 @@ export class Simulation {
     if (found === null) return false;
     const made = this.interiorFor(found, seed);
     if (made === null) return false;
-    // The nearest point on the footprint's perimeter, which is where the door
-    // is. `doorAt` cannot be asked -- it wants a body standing outside looking
-    // in, and this body is inside -- so the two lines it would have run are
-    // here: closest point on the outline, normal away from the centre.
-    const pts = found.points;
-    const n = pts.length >> 1;
-    let bestD2 = Infinity;
-    let dx = 0;
-    let dz = 0;
-    for (let i = 0, j = n - 1; i < n; j = i++) {
-      const ax = pts[j * 2];
-      const az = pts[j * 2 + 1];
-      const bx = pts[i * 2];
-      const bz = pts[i * 2 + 1];
-      const ex = bx - ax;
-      const ez = bz - az;
-      const len2 = ex * ex + ez * ez;
-      const t = len2 > 1e-9 ? Math.max(0, Math.min(1, ((x - ax) * ex + (z - az) * ez) / len2)) : 0;
-      const cxp = ax + ex * t;
-      const czp = az + ez * t;
-      const d2 = (x - cxp) * (x - cxp) + (z - czp) * (z - czp);
-      if (d2 < bestD2) {
-        bestD2 = d2;
-        dx = cxp;
-        dz = czp;
-      }
-    }
-    if (!Number.isFinite(bestD2)) return false;
-    let nx = dx - made.it.centreX;
-    let nz = dz - made.it.centreZ;
-    const len = Math.sqrt(nx * nx + nz * nz);
-    if (!(len > 1e-6)) return false;
-    nx /= len;
-    nz /= len;
-
+    // The door is the building's own -- see `world/interior.ts`. The restore
+    // used to derive one from wherever the returning player happened to be
+    // standing, which put the way out beside them and in a different place for
+    // everybody else in the room. That was the owner's report: *"the door
+    // incorrectly rendered where i spawned"*.
     p.space = spaceForBuilding(seed);
     p.interior = made.it;
     p.interiorWorld = made.world;
-    p.doorX = dx;
-    p.doorZ = dz;
-    p.doorNX = nx;
-    p.doorNZ = nz;
+    p.doorX = made.it.door.x;
+    p.doorZ = made.it.door.z;
+    p.doorNX = made.it.door.nx;
+    p.doorNZ = made.it.door.nz;
     // Where they were standing, settled -- not the arrival, which would put
     // everybody who comes back to a pub in its doorway. `arrivalAt`'s settle is
     // reused through the resolver so a spot that has since become a wall (a
@@ -6110,7 +6085,7 @@ export class Simulation {
     const home = made.it.resolver.resolve(x, z, x, z, PLAYER_RADIUS, made.it.base);
     const inside = made.it.resolver.clearance(home.x, home.z) >= 0
       ? home
-      : arrivalAt(made.it, dx, dz, nx, nz);
+      : arrivalAt(made.it);
     this.moveInto(p, inside.x, made.it.base + EYE_HEIGHT, inside.z);
     return true;
   }
