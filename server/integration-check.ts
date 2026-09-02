@@ -10830,7 +10830,7 @@ class FakeSocket {
  * and the WebSocket framing adds nothing to any of the five.
  */
 async function checkInteriors(): Promise<void> {
-  say('interiors (protocol v23): a door, what is behind it, and the way back out');
+  say('interiors (protocol v25): a door, what is behind it, what people put in it, and the way back out');
 
   {
     const f = verifyInterior();
@@ -10866,6 +10866,68 @@ async function checkInteriors(): Promise<void> {
     const file = Bun.file(clip);
     const size = (await file.exists()) ? file.size : 0;
     check(size > 4096, `the door sound ships with the client (${size} bytes at public/audio/door/open.mp3)`);
+  }
+
+  // --- 0b. The two worlds do not spend each other's frame.
+  //
+  // An interior is its own instance, and the whole value of that is that
+  // neither costs the other. Half of it is structural and cannot regress: the
+  // camera sits on the interior's own layer, so the city draws nothing. The
+  // other half is a **gate in the frame loop**, and a gate is exactly the kind
+  // of thing that rots -- the next ambient system somebody adds will be written
+  // outside it, run every frame in a room nobody can see it from, and say
+  // nothing about it.
+  //
+  // So the gate is asserted against the source. That is an unusual shape for a
+  // check in this repo and it earns it: there is no run-time symptom to test
+  // for -- a client that simulates the whole city while standing in a pub looks
+  // completely correct, it is merely paying for it -- and this is the only
+  // place the property is written down.
+  //
+  // If a section here is deliberately ungated, add it to `runsIndoors` with the
+  // reason. That list is the argument, and the failure message asks for it.
+  {
+    const mainPath = new URL('../client/src/main.ts', import.meta.url).pathname;
+    const text = await Bun.file(mainPath).text();
+    const lines = text.split('\n');
+    /** Sections that must keep running indoors, and why. */
+    const runsIndoors = new Map<string, string>([
+      ['input', 'the keyboard is yours'],
+      ['sim', 'your body'],
+      ['camera', 'your eyes'],
+      ['hud', 'your HUD'],
+      ['sky', 'it drives the four lights that light the room you are in'],
+      ['heat', 'it writes the wanted stars, which must not freeze while you are inside'],
+      ['plates', 'the nameplates indoors are the people in the room with you'],
+      ['teams', 'players come inside'],
+      ['render', 'the room'],
+      ['present', 'the frame'],
+    ]);
+    const marks: Array<{ name: string; at: number }> = [];
+    for (let i = 0; i < lines.length; i++) {
+      const m = /frameProfile\.at\(FSEC\.(\w+)\)/.exec(lines[i]);
+      if (m) marks.push({ name: m[1], at: i });
+    }
+    check(marks.length > 12, `the frame loop still has its profiler sections (${marks.length})`);
+    const leaked: string[] = [];
+    let gated = 0;
+    for (let i = 0; i < marks.length; i++) {
+      const end = i + 1 < marks.length ? marks[i + 1].at : marks[i].at + 1;
+      const body = lines.slice(marks[i].at, end).join('\n');
+      const isGated = body.includes('if (!indoors) {');
+      if (isGated) gated++;
+      if (!isGated && !runsIndoors.has(marks[i].name)) leaked.push(marks[i].name);
+      if (isGated && runsIndoors.has(marks[i].name)) {
+        leaked.push(`${marks[i].name} (gated, but listed as running: ${runsIndoors.get(marks[i].name)})`);
+      }
+    }
+    check(
+      leaked.length === 0,
+      leaked.length === 0
+        ? `${gated} of ${marks.length} frame sections are skipped indoors; the city does not run while you are in a room`
+        : `these frame sections run indoors and are not on the list that says why: ${leaked.join(', ')} ` +
+          `— gate them, or add them to \`runsIndoors\` with the reason`,
+    );
   }
 
   const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;

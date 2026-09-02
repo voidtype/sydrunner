@@ -156,7 +156,8 @@ same room.
   stair, a ramp in `groundHeight`, and walls selected by the body's own height —
   all of which the design admits (`InteriorResolver.resolve` is handed `feetY`
   already) and none of which is written. `interiorLine` says so to the player.
-- **Nothing in the rooms.** No furniture, no givers, no quests, no loot.
+- **Almost nothing in the rooms.** One couch, placed by anyone, and no givers,
+  quests or loot. See "Furnishing" below.
 - **No footballs indoors.** A ball is an object with its own physics against the
   *city's* collision, so one thrown in a pub would sail through the wall.
   `server/sim.ts` clears the throw button for a body inside. Punching works
@@ -164,9 +165,53 @@ same room.
 - **No pedestrians or police indoors**, for the same reason, and no mounting:
   without that a player at a front window would ride the e-bike on the pavement
   through the wall.
-- The streamer keeps running while you are indoors. Nothing is drawn (the camera
-  is on the interior's own layer), so this costs bandwidth and not frames, and
-  it is what makes walking back out instant.
+- **The city is neither drawn nor simulated while you are indoors**, which is
+  the whole value of an instance and was only half true for a while. The camera
+  sits on the interior's own layer, so the city costs zero draw calls; and nine
+  of the frame loop's nineteen sections — the streamer, the trains, the street
+  lights, the traffic, the crowd, the police, the barks, the faction actors and
+  the bikes — are skipped outright. That gate is free rather than a trade
+  because those systems are pure functions of `(anchor, index, tick)` and say so
+  in their own headers: skipping frames is exact, and walking back out resumes
+  with everything where it would have been, with no catch-up.
+
+  What still runs indoors is you and the room: input, the simulation, the
+  camera, the HUD, the sky (it drives the four lights the room is lit by), the
+  heat (it writes the wanted stars, which must not freeze while you are inside),
+  the nameplates and the team rings (indoors those are the people in the room
+  with you), and the render. `checkInteriors` asserts the gate **against the
+  source**, because a client that simulates a city it cannot see looks perfectly
+  correct and merely costs more.
+
+## Furnishing
+
+The rooms are derived and cost nothing to store. **Furniture is the exception**
+and is the first thing about an interior that cannot be recomputed from a
+footprint, so it is the first thing that is written down and sent:
+
+- `client/src/world/placeables.ts` — the catalogue (one row: a couch), oriented
+  boxes, quarter turns in the building's own frame, and the arithmetic both ends
+  run. Named `placeables` because `world/furniture.ts` is the *street's*.
+- `server/interiors.ts` — space id to placements, on disk, `server/wallets.ts`'
+  shape down to the debounce. 64 things a building, 10,000 buildings a box.
+- Protocol v25: `FURNISH` (0x17) up, `PLACED` (0x97) down — the whole list every
+  time, because a room is not a tick.
+
+`X` opens the customiser indoors; the wheel or `R` turns the couch; left click
+places, right click removes the nearest. Both mouse buttons belong to the mode
+while it is open, which is why it is a mode: in a game whose only verb is
+hitting people, a click that sometimes puts a couch down instead is the worst
+ambiguity available.
+
+`Simulation.furnish` decides everything and the browser runs the same
+`placementFits` only so the ghost is red on the frames the server would refuse.
+Nothing outside the walls, inside a partition, on top of a person, or **across a
+doorway** — that last is the one piece of griefing a room has no answer to,
+because unlike a couch on a floor it cannot be walked around.
+
+**Anyone can furnish anything**, by the owner's decision, with a $20,000 claim
+to come. When it lands it is one test on one line in `Simulation.furnish` and a
+field on the store's record; nothing else about that code changes.
 
 ## Deploy notes
 

@@ -12340,6 +12340,48 @@ async function main(): Promise<void> {
       if (said !== null) hud.notice(said);
     }
 
+    /*
+     * --- Is this browser in a building? Read once, used ten times below.
+     *
+     * **The two worlds must not spend each other's frame.** An interior is its
+     * own instance and the whole point of that is that neither costs the other:
+     * a room full of furniture is invisible to everybody in the street, and the
+     * street should be invisible to anybody in the room. Until this line, only
+     * half of that was true -- the camera sits on the interior's own layer, so
+     * the city drew nothing, but the client went on *simulating* all of it
+     * every frame. Full CPU for a city nobody could see.
+     *
+     * What makes the gate free rather than a trade is a property those systems
+     * already had and stated for another reason. `game/traffic.ts`: *"no clock
+     * of its own -- a backgrounded tab costs nothing and comes back with the
+     * whole city's traffic where it would have been, with no catch-up step"*.
+     * The crowd says the same, and both are pure functions of `(anchor, index,
+     * tick)` by DESIGN.md rule 5. Skipping frames is therefore **exact**: walk
+     * back out and everything is where it would have been, with nothing to
+     * replay.
+     *
+     * What is deliberately *not* gated, and why:
+     *
+     *   - `sky`, because the four lights it drives are the ones lighting the
+     *     room you are standing in -- see `showIndoors`.
+     *   - `plates`, because the nameplates indoors are the people in the room
+     *     with you.
+     *   - `teams`, on the same argument: it is about players, and players come
+     *     inside.
+     *   - `heat`, which is the one gate I took back out. It writes `hud.heat`
+     *     and `hud.investigation`, so gating it freezes the wanted stars at
+     *     whatever they were when you walked in while the server goes on
+     *     cooling them down -- a display that lies for as long as you are
+     *     indoors, to save a sweep that has nothing to find in an empty room
+     *     anyway. Correctness over the saving.
+     *   - `input`, `sim`, `camera`, `hud`, `render` -- you.
+     *
+     * The ambient *chatter* in `police` and `npcvoice` is gated and that is a
+     * feature rather than a cost: a bystander's line arriving from the street
+     * while you are standing in somebody's front room was always wrong.
+     */
+    const indoors = interior !== null;
+
     frameProfile.at(FSEC.sky);
     // Night factor drives the lit-window shader. Ramps across civil twilight.
     //
@@ -12370,709 +12412,739 @@ async function main(): Promise<void> {
     // numbers and touches the DOM only when the marker has moved a third of a
     // pixel or the game minute has rolled over. See `sky/clock.ts`.
     clockHud.update(sky.now);
-    // The altitude goes with the frustum, and it is not a duplicate of it: the
-    // frustum says where the shadow *volume* is, and the altitude is what turns
-    // that box into the patch of ground it covers -- which stretches along the
-    // sun's bearing by 1/sin(altitude) and is what decides which tiles are told
-    // to receive. See `streamer.sunReceiveRange`.
-    streamer.update(camera, sky.shadowVolume, alt);
-    // One group per frame, once, as soon as the shadow rig is known: the tiles
-    // that were already standing when the first shadow render happened never
-    // went past `precompileGroup` with a rig to bind. One per frame because a
-    // sweep of the whole scene in a single tick is the stall it prevents,
-    // moved. See `ShadowSweep`.
-    {
-      // **Only on a frame that had room for it.** The sweep is warm-up work
-      // with no deadline, and the frames it was landing on during boot were
-      // already 200 ms and worse -- so it was adding its compile to the frames
-      // least able to carry one, which is the stall it exists to remove, moved.
-      // Below the threshold it does nothing and waits; the queue is one-time
-      // and keeps until the client is idle enough to pay for it.
-      const roomy = frameDt < SWEEP_FRAME_BUDGET_S;
-      // The templates that are not in the scene, once, as soon as there is a rig
-      // to bind. See `trainsShadowWarmed`.
-      if (shadowWarm.ready && !trainsShadowWarmed) {
-        trainsShadowWarmed = true;
-        void trains.warm(precompileGroup);
-      }
-      const catchUp = shadowSweep.next(shadowWarm.ready, scene.children, roomy);
-      if (catchUp !== null) {
-        void shadowWarm.warmInto(renderer, scene, () =>
-          warmGroupOffCamera(renderer, catchUp as Object3D, camera, scene),
-        );
-      }
-    }
-    // --- And, for a rider, where they will be rather than where they are.
-    //
-    // TRAINS.md's deterministic prefetch. The radial guess `update` just made is
-    // sized against a bike: 1,800 m of load radius at 39.4 m/s is 46 s of lead,
-    // and the hex manifests reach 2,200 m past that. At 44.4 m/s on an express
-    // those become 40 s and a shrinking margin -- but the margin is not the
-    // point. The *route* is known, in closed form, so a guess of any radius is
-    // strictly worse than the answer: a train on the Bankstown line is not going
-    // to be 1,800 m north of here in forty seconds, it is going to be 1,780 m
-    // west of here, and half of every disc fetched around a rider is bytes for a
-    // suburb they will never enter.
-    //
-    // Sixty seconds ahead, sampled *along the arc* rather than extrapolated from
-    // a heading -- so the lead follows the curve at Redfern and the line through
-    // Sydenham instead of leaving the corridor at the first bend. Two samples,
-    // at 30 s and 60 s, because one at the far end skips the hexagon in the
-    // middle when the streamer's own cell test says nothing changed.
-    //
-    // Tunnels are the cheap case and get it for free: `poseTrain` puts the
-    // sample under the hill, the hexagon there is fetched, and there is nothing
-    // in it to build because the city above is untouched.
-    if (railBake && isAboard(playerCombat.aboard)) {
-      const dir = dirOf(railBake, playerCombat.aboard.line, playerCombat.aboard.dir);
-      const pose = dir === null ? null : aboardPose(railBake, playerCombat.aboard, railNow);
-      if (dir !== null && pose !== null) {
-        for (const lead of [30, 60]) {
-          const ahead = poseAheadOnLine(railBake, dir, playerCombat.aboard.trip, railNow + lead);
-          if (ahead !== null) streamer.prefetchAt(ahead.x, ahead.z);
+    /*
+     * --- Indoors, the streamer has nothing to do and the city has nobody in
+     *     it worth moving.
+     *
+     * The camera matrix, the sky and the clock above **stay**: the sky drives
+     * the four lights that light the room you are standing in (see
+     * `showIndoors`) and the clock is the HUD. Everything from here down is the
+     * street, and a body standing in a building is not moving through it -- the
+     * streamer's own answer every frame would be "nothing has changed".
+     */
+    if (!indoors) {
+      // The altitude goes with the frustum, and it is not a duplicate of it: the
+      // frustum says where the shadow *volume* is, and the altitude is what turns
+      // that box into the patch of ground it covers -- which stretches along the
+      // sun's bearing by 1/sin(altitude) and is what decides which tiles are told
+      // to receive. See `streamer.sunReceiveRange`.
+      streamer.update(camera, sky.shadowVolume, alt);
+      // One group per frame, once, as soon as the shadow rig is known: the tiles
+      // that were already standing when the first shadow render happened never
+      // went past `precompileGroup` with a rig to bind. One per frame because a
+      // sweep of the whole scene in a single tick is the stall it prevents,
+      // moved. See `ShadowSweep`.
+      {
+        // **Only on a frame that had room for it.** The sweep is warm-up work
+        // with no deadline, and the frames it was landing on during boot were
+        // already 200 ms and worse -- so it was adding its compile to the frames
+        // least able to carry one, which is the stall it exists to remove, moved.
+        // Below the threshold it does nothing and waits; the queue is one-time
+        // and keeps until the client is idle enough to pay for it.
+        const roomy = frameDt < SWEEP_FRAME_BUDGET_S;
+        // The templates that are not in the scene, once, as soon as there is a rig
+        // to bind. See `trainsShadowWarmed`.
+        if (shadowWarm.ready && !trainsShadowWarmed) {
+          trainsShadowWarmed = true;
+          void trains.warm(precompileGroup);
+        }
+        const catchUp = shadowSweep.next(shadowWarm.ready, scene.children, roomy);
+        if (catchUp !== null) {
+          void shadowWarm.warmInto(renderer, scene, () =>
+            warmGroupOffCamera(renderer, catchUp as Object3D, camera, scene),
+          );
         }
       }
-    }
-    // The skyline, on its own much wider radius. `streamer.update` has just
-    // moved the hex manifests along on `approach_m` = 4 km; this moves the far
-    // slabs along on `far_cut_m` = 20 km, because a hexagon is visible from
-    // five times further away than it is worth knowing the tile list of. Only
-    // on a segmented world; `far.hexes` is null on every other. See `FarHexes`.
-    if (far.hexes) far.hexes.update(hexesNear(camera.position.x, camera.position.z, far.hexes.cutM));
-    // Ambient life, after the streamer so a tile that arrived this frame has its
-    // birds in it, and before the render so their matrices are current. It takes
-    // `frameDt` rather than reading a clock of its own, which is what makes a
-    // backgrounded tab free: no animation frames means no delta, and the clamp
-    // above means the frame the tab comes back advances the birds by one step
-    // rather than by however long the browser was not drawing.
-    streamer.updateLife(frameDt, camera);
-
-    frameProfile.at(FSEC.rail);
-    // --- The railway, after the streamer for the same reason everything else
-    // is: a tile that arrived this frame has terrain under it, so a viaduct
-    // pier built now stands on the ground rather than on the fallback depth.
-    //
-    // `update` is free on every frame but the two transitions -- crossing a
-    // 512 m chunk boundary rebuilds the ring, crossing a 64 m one refills the
-    // sleepers -- and there is no clock in it at all. See `world/rail-geo.ts`.
-    railWorld?.update(player.position.x, player.position.z);
-    // WORKSTREAM AI: and the lamps on the wall of whatever bore is nearby. Free
-    // on every frame but the one that crosses a 128 m cell -- under two seconds
-    // apart at line speed -- and there is no clock in it either: the set is a
-    // pure function of arc length and the player's position, so two riders in
-    // the same carriage see the same lights go past at the same instant.
-    tunnelLights?.update(player.position.x, player.position.z);
-    // And the trains, on the traffic's own contract one line up from it: no
-    // frame delta, no state, and the wall clock read through `railSeconds` so a
-    // backgrounded tab costs nothing and comes back with every train in the
-    // city exactly where it would have been. `poseTrain` is the same function
-    // the server evaluates, so what is drawn here is what the server says.
-    if (railBake) {
-      trains.update(railBake, railNow, player.position.x, player.position.z);
-      // And what those trains are saying, on the identical contract: one call,
-      // the same `railNow` the carriages were placed from, and no state on
-      // either side of it. `game/rail-audio.ts` turns the timetable into "which
-      // sentence, how far in, and how far away"; `game/audio.railAnnounce`
-      // turns that into sound. The split, and the single unconditional call
-      // per frame, is `raveUpdate`'s two hundred lines down.
+      // --- And, for a rider, where they will be rather than where they are.
       //
-      // Aboard, the mix collapses to the player's own train and comes through
-      // at full clarity -- see section 6 of `game/rail-audio.ts` -- which is
-      // also why the aboard slot is handed over rather than just a position.
-      railAnnounceMix(
-        railBake,
-        railNow,
+      // TRAINS.md's deterministic prefetch. The radial guess `update` just made is
+      // sized against a bike: 1,800 m of load radius at 39.4 m/s is 46 s of lead,
+      // and the hex manifests reach 2,200 m past that. At 44.4 m/s on an express
+      // those become 40 s and a shrinking margin -- but the margin is not the
+      // point. The *route* is known, in closed form, so a guess of any radius is
+      // strictly worse than the answer: a train on the Bankstown line is not going
+      // to be 1,800 m north of here in forty seconds, it is going to be 1,780 m
+      // west of here, and half of every disc fetched around a rider is bytes for a
+      // suburb they will never enter.
+      //
+      // Sixty seconds ahead, sampled *along the arc* rather than extrapolated from
+      // a heading -- so the lead follows the curve at Redfern and the line through
+      // Sydenham instead of leaving the corridor at the first bend. Two samples,
+      // at 30 s and 60 s, because one at the far end skips the hexagon in the
+      // middle when the streamer's own cell test says nothing changed.
+      //
+      // Tunnels are the cheap case and get it for free: `poseTrain` puts the
+      // sample under the hill, the hexagon there is fetched, and there is nothing
+      // in it to build because the city above is untouched.
+      if (railBake && isAboard(playerCombat.aboard)) {
+        const dir = dirOf(railBake, playerCombat.aboard.line, playerCombat.aboard.dir);
+        const pose = dir === null ? null : aboardPose(railBake, playerCombat.aboard, railNow);
+        if (dir !== null && pose !== null) {
+          for (const lead of [30, 60]) {
+            const ahead = poseAheadOnLine(railBake, dir, playerCombat.aboard.trip, railNow + lead);
+            if (ahead !== null) streamer.prefetchAt(ahead.x, ahead.z);
+          }
+        }
+      }
+      // The skyline, on its own much wider radius. `streamer.update` has just
+      // moved the hex manifests along on `approach_m` = 4 km; this moves the far
+      // slabs along on `far_cut_m` = 20 km, because a hexagon is visible from
+      // five times further away than it is worth knowing the tile list of. Only
+      // on a segmented world; `far.hexes` is null on every other. See `FarHexes`.
+      if (far.hexes) far.hexes.update(hexesNear(camera.position.x, camera.position.z, far.hexes.cutM));
+      // Ambient life, after the streamer so a tile that arrived this frame has its
+      // birds in it, and before the render so their matrices are current. It takes
+      // `frameDt` rather than reading a clock of its own, which is what makes a
+      // backgrounded tab free: no animation frames means no delta, and the clamp
+      // above means the frame the tab comes back advances the birds by one step
+      // rather than by however long the browser was not drawing.
+      streamer.updateLife(frameDt, camera);
+
+    }
+    // Indoors: the trains and the tunnel lights. See `indoors`.
+    frameProfile.at(FSEC.rail);
+    if (!indoors) {
+      // --- The railway, after the streamer for the same reason everything else
+      // is: a tile that arrived this frame has terrain under it, so a viaduct
+      // pier built now stands on the ground rather than on the fallback depth.
+      //
+      // `update` is free on every frame but the two transitions -- crossing a
+      // 512 m chunk boundary rebuilds the ring, crossing a 64 m one refills the
+      // sleepers -- and there is no clock in it at all. See `world/rail-geo.ts`.
+      railWorld?.update(player.position.x, player.position.z);
+      // WORKSTREAM AI: and the lamps on the wall of whatever bore is nearby. Free
+      // on every frame but the one that crosses a 128 m cell -- under two seconds
+      // apart at line speed -- and there is no clock in it either: the set is a
+      // pure function of arc length and the player's position, so two riders in
+      // the same carriage see the same lights go past at the same instant.
+      tunnelLights?.update(player.position.x, player.position.z);
+      // And the trains, on the traffic's own contract one line up from it: no
+      // frame delta, no state, and the wall clock read through `railSeconds` so a
+      // backgrounded tab costs nothing and comes back with every train in the
+      // city exactly where it would have been. `poseTrain` is the same function
+      // the server evaluates, so what is drawn here is what the server says.
+      if (railBake) {
+        trains.update(railBake, railNow, player.position.x, player.position.z);
+        // And what those trains are saying, on the identical contract: one call,
+        // the same `railNow` the carriages were placed from, and no state on
+        // either side of it. `game/rail-audio.ts` turns the timetable into "which
+        // sentence, how far in, and how far away"; `game/audio.railAnnounce`
+        // turns that into sound. The split, and the single unconditional call
+        // per frame, is `raveUpdate`'s two hundred lines down.
+        //
+        // Aboard, the mix collapses to the player's own train and comes through
+        // at full clarity -- see section 6 of `game/rail-audio.ts` -- which is
+        // also why the aboard slot is handed over rather than just a position.
+        railAnnounceMix(
+          railBake,
+          railNow,
+          player.position.x,
+          player.position.z,
+          isAboard(playerCombat.aboard) ? playerCombat.aboard : null,
+          railAnnounce,
+        );
+        audio.railAnnounce(railAnnounce);
+      } else {
+        audio.railAnnounce(null);
+      }
+      // The boarding marker's own breathing. Aimed in `simulate` at the tick rate
+      // and animated here at the frame rate, which is the split every other
+      // overlay in this file makes.
+      doorMarker.update(frameDt);
+      // The button on the hill and the face in the sky, at the frame rate for the
+      // same reason: the plinth's ring breathes and the sun's jaw moves, and both
+      // are cosmetic. `sky.solar` is handed over rather than recomputed, on
+      // `MoonDisc.update`'s argument -- a face built from a second reading of the
+      // clock would sit beside the sun rather than on it.
+      sunButton.update(
+        frameDt,
+        camera,
+        sky.solar.direction,
+        sky.solar.altitude,
         player.position.x,
         player.position.z,
-        isAboard(playerCombat.aboard) ? playerCombat.aboard : null,
-        railAnnounce,
+        // The mouth follows the scream that is actually playing -- 0 between
+        // clips -- so the face mouths nothing while the sun is quiet.
+        audio.sunScreamLevel(),
       );
-      audio.railAnnounce(railAnnounce);
-    } else {
-      audio.railAnnounce(null);
+
     }
-    // The boarding marker's own breathing. Aimed in `simulate` at the tick rate
-    // and animated here at the frame rate, which is the split every other
-    // overlay in this file makes.
-    doorMarker.update(frameDt);
-    // The button on the hill and the face in the sky, at the frame rate for the
-    // same reason: the plinth's ring breathes and the sun's jaw moves, and both
-    // are cosmetic. `sky.solar` is handed over rather than recomputed, on
-    // `MoonDisc.update`'s argument -- a face built from a second reading of the
-    // clock would sit beside the sun rather than on it.
-    sunButton.update(
-      frameDt,
-      camera,
-      sky.solar.direction,
-      sky.solar.altitude,
-      player.position.x,
-      player.position.z,
-      // The mouth follows the scream that is actually playing -- 0 between
-      // clips -- so the face mouths nothing while the sun is quiet.
-      audio.sunScreamLevel(),
-    );
-
+    // Indoors: the street lamps, the fires and the torch. See `indoors`.
     frameProfile.at(FSEC.lights);
-    // The night rig, after the streamer -- so a tile that arrived this frame
-    // already has its luminaires in the set the four real lights are picked from
-    // -- and before the traffic, so `carLights.begin()` answers for this frame
-    // rather than the last one.
-    //
-    // `frameDt` unclamped by anything of its own: the only thing it integrates
-    // is the torch's lag toward the view and its sway clock, and a backgrounded
-    // tab coming back should find the beam where the view is rather than
-    // sweeping a second of catch-up across the street. The exponential chase in
-    // `NightLights.update` is written so a long delta simply lands on the
-    // target.
-    //
-    // The streamer is handed over as the `LampSource` it implements, so the
-    // lights follow the lamps of tiles that are actually resident and nothing
-    // here has to keep a second copy of where they are.
-    //
-    // --- And where the beam comes from, which is the only new thing here.
-    //
-    // Three cases, and `null` is the one that must not move: in first person the
-    // torch is the eye plus `TORCH_OFFSET` exactly as it has always been, and
-    // every display value in `sky/calibration.ts`'s torch table was measured
-    // that way. The other two are `world/nightlights.TorchMount`, which carries
-    // the whole argument for why one light does all three jobs.
-    //
-    // The **hand** mount is taken from the self body's own chest bone rather
-    // than from a constant, so the beam carries the walk bob, the run lean and
-    // the crumple of a knockout. Only the bone's *height above the actor's root*
-    // is used: `driver.update` places that root three hundred lines below this
-    // one, so the bone matrices here are last frame's, and taking x and z from
-    // the live `player.position` instead means the origin is never behind the
-    // body at speed. The pose is a frame old, which on a light that already lags
-    // the view by 0.075 s is not a thing that exists.
-    const torchMountNow =
-      playerCombat.ridingBike !== 0
-        ? torchBikeMount(
-            torchMount,
-            player.position.x,
-            player.position.y - EYE_HEIGHT,
-            player.position.z,
-            player.yaw,
-          )
-        : thirdPerson
-          ? (() => {
-              _chest.setFromMatrixPosition(self.bones[BONE.CHEST].matrixWorld);
-              return torchHandMount(
-                torchMount,
-                player.position.x,
-                player.position.y - EYE_HEIGHT + (_chest.y - self.mesh.position.y),
-                player.position.z,
-                player.yaw,
-              );
-            })()
-          : null;
-    nightLights.update(
-      frameDt,
-      camera,
-      alt,
-      Math.hypot(player.velocity.x, player.velocity.z),
-      // WORKSTREAM AP: the streamer's lamps **and** the hero giver's, through
-      // `world/giverlamp.lampsOver`. Sydney Park has no lights in it -- measured,
-      // the nearest is 256 m away -- so without this the Ladmaster stands under
-      // a pole that never comes on. No light was added to the scene to do it;
-      // see that file's header on why an eighth `PointLight` was refused.
-      lampSource,
-      torchMountNow,
-      // WORKSTREAM fire-look: which cars are alight, for the two real lights a
-      // burning car gets after dark. `CarSmoke` is the one thing in the client
-      // that already knows -- it is handed every driven car in view with its
-      // burn level once a frame -- and the answer it gives here is the previous
-      // frame's, because the driven cars are posed a hundred lines below this.
-      // See `nightlights.FireSource`; a frame of lag on a light being flickered
-      // at 9 Hz is not a thing that exists.
-      carSmoke,
-    );
-    // And the sprites, which are hidden all day for the fill they would
-    // otherwise cost. One comparison on every frame but the two a day where the
-    // answer changes; see `TileStreamer.setNightLightsVisible` for why this is
-    // a mesh flag and must never become a light one.
-    const lampsLit = nightLights.level > NIGHT_VISIBLE_LEVEL;
-    streamer.setNightLightsVisible(lampsLit);
-    // The hero's own luminaire, on the same boolean. A **mesh** flag and never a
-    // light one -- `TileStreamer.setNightLightsVisible`'s note is the reason.
-    giverLamps.setNightVisible(lampsLit);
+    if (!indoors) {
+      // The night rig, after the streamer -- so a tile that arrived this frame
+      // already has its luminaires in the set the four real lights are picked from
+      // -- and before the traffic, so `carLights.begin()` answers for this frame
+      // rather than the last one.
+      //
+      // `frameDt` unclamped by anything of its own: the only thing it integrates
+      // is the torch's lag toward the view and its sway clock, and a backgrounded
+      // tab coming back should find the beam where the view is rather than
+      // sweeping a second of catch-up across the street. The exponential chase in
+      // `NightLights.update` is written so a long delta simply lands on the
+      // target.
+      //
+      // The streamer is handed over as the `LampSource` it implements, so the
+      // lights follow the lamps of tiles that are actually resident and nothing
+      // here has to keep a second copy of where they are.
+      //
+      // --- And where the beam comes from, which is the only new thing here.
+      //
+      // Three cases, and `null` is the one that must not move: in first person the
+      // torch is the eye plus `TORCH_OFFSET` exactly as it has always been, and
+      // every display value in `sky/calibration.ts`'s torch table was measured
+      // that way. The other two are `world/nightlights.TorchMount`, which carries
+      // the whole argument for why one light does all three jobs.
+      //
+      // The **hand** mount is taken from the self body's own chest bone rather
+      // than from a constant, so the beam carries the walk bob, the run lean and
+      // the crumple of a knockout. Only the bone's *height above the actor's root*
+      // is used: `driver.update` places that root three hundred lines below this
+      // one, so the bone matrices here are last frame's, and taking x and z from
+      // the live `player.position` instead means the origin is never behind the
+      // body at speed. The pose is a frame old, which on a light that already lags
+      // the view by 0.075 s is not a thing that exists.
+      const torchMountNow =
+        playerCombat.ridingBike !== 0
+          ? torchBikeMount(
+              torchMount,
+              player.position.x,
+              player.position.y - EYE_HEIGHT,
+              player.position.z,
+              player.yaw,
+            )
+          : thirdPerson
+            ? (() => {
+                _chest.setFromMatrixPosition(self.bones[BONE.CHEST].matrixWorld);
+                return torchHandMount(
+                  torchMount,
+                  player.position.x,
+                  player.position.y - EYE_HEIGHT + (_chest.y - self.mesh.position.y),
+                  player.position.z,
+                  player.yaw,
+                );
+              })()
+            : null;
+      nightLights.update(
+        frameDt,
+        camera,
+        alt,
+        Math.hypot(player.velocity.x, player.velocity.z),
+        // WORKSTREAM AP: the streamer's lamps **and** the hero giver's, through
+        // `world/giverlamp.lampsOver`. Sydney Park has no lights in it -- measured,
+        // the nearest is 256 m away -- so without this the Ladmaster stands under
+        // a pole that never comes on. No light was added to the scene to do it;
+        // see that file's header on why an eighth `PointLight` was refused.
+        lampSource,
+        torchMountNow,
+        // WORKSTREAM fire-look: which cars are alight, for the two real lights a
+        // burning car gets after dark. `CarSmoke` is the one thing in the client
+        // that already knows -- it is handed every driven car in view with its
+        // burn level once a frame -- and the answer it gives here is the previous
+        // frame's, because the driven cars are posed a hundred lines below this.
+        // See `nightlights.FireSource`; a frame of lag on a light being flickered
+        // at 9 Hz is not a thing that exists.
+        carSmoke,
+      );
+      // And the sprites, which are hidden all day for the fill they would
+      // otherwise cost. One comparison on every frame but the two a day where the
+      // answer changes; see `TileStreamer.setNightLightsVisible` for why this is
+      // a mesh flag and must never become a light one.
+      const lampsLit = nightLights.level > NIGHT_VISIBLE_LEVEL;
+      streamer.setNightLightsVisible(lampsLit);
+      // The hero's own luminaire, on the same boolean. A **mesh** flag and never a
+      // light one -- `TileStreamer.setNightLightsVisible`'s note is the reason.
+      giverLamps.setNightVisible(lampsLit);
 
+    }
+    // Indoors: the ambient fleet and the near-field models. See `indoors`.
     frameProfile.at(FSEC.traffic);
-    // The traffic, after the streamer so a tile that arrived this frame already
-    // has its routes in the field, and before the render so the matrices are
-    // current.
-    //
-    // The tick is **fractional here and whole in `simulate`**, and that split is
-    // the one place a non-integer tick is correct in this feature. The hit test
-    // runs on whole ticks so that this client and the server ask the identical
-    // question; the picture runs between them so a 144 Hz display does not watch
-    // 60 Hz cars. Both are the same lookup -- see `game/traffic.ts` -- so the
-    // car you are drawn being hit by is exactly the car that hit you.
-    //
-    // No frame delta and no clock of its own: `trafficTick` reads wall time, so
-    // a backgrounded tab costs nothing and comes back with the whole city's
-    // traffic where it would have been, with no catch-up step. That is what a
-    // position-by-lookup buys that an integrated fleet could not.
-    // Who is close enough to be a real car, at 5 Hz.
-    //
-    // **Before** the movers, not after: a claim taken this frame has to be
-    // visible to the box fleet on this frame, or the car is drawn twice -- once
-    // as a model and once as the box that did not know. The other order is a
-    // frame of double-draw every time a car crosses 90 m, which is exactly the
-    // artefact this feature must not have.
-    if (carModels && now - lastCarSweep >= 1000 / SWEEP_HZ) {
-      lastCarSweep = now;
-      carModels.sweep(
+    if (!indoors) {
+      // The traffic, after the streamer so a tile that arrived this frame already
+      // has its routes in the field, and before the render so the matrices are
+      // current.
+      //
+      // The tick is **fractional here and whole in `simulate`**, and that split is
+      // the one place a non-integer tick is correct in this feature. The hit test
+      // runs on whole ticks so that this client and the server ask the identical
+      // question; the picture runs between them so a 144 Hz display does not watch
+      // 60 Hz cars. Both are the same lookup -- see `game/traffic.ts` -- so the
+      // car you are drawn being hit by is exactly the car that hit you.
+      //
+      // No frame delta and no clock of its own: `trafficTick` reads wall time, so
+      // a backgrounded tab costs nothing and comes back with the whole city's
+      // traffic where it would have been, with no catch-up step. That is what a
+      // position-by-lookup buys that an integrated fleet could not.
+      // Who is close enough to be a real car, at 5 Hz.
+      //
+      // **Before** the movers, not after: a claim taken this frame has to be
+      // visible to the box fleet on this frame, or the car is drawn twice -- once
+      // as a model and once as the box that did not know. The other order is a
+      // frame of double-draw every time a car crosses 90 m, which is exactly the
+      // artefact this feature must not have.
+      if (carModels && now - lastCarSweep >= 1000 / SWEEP_HZ) {
+        lastCarSweep = now;
+        carModels.sweep(
+          traffic,
+          trafficTick(Date.now()) + accumulator / FIXED_DT,
+          player.position.x,
+          player.position.z,
+        );
+      }
+
+      // The brake lamps and the camera's lean, before the movers so the lamps are
+      // filled in the same frame the bodies they hang off are placed. `steer` is
+      // the wheel as a fraction of full lock, taken from the yaw the input builder
+      // produced this frame -- `RIDE_TURN_RATE` is the bike's own normaliser and is
+      // the right order of magnitude for a car's, which is all a cosmetic lean
+      // needs. See `world/drivencars.DrivenCarView.update`.
+      drivenCars.update(
+        nightLights.carLights,
+        playerCombat.drivingCar,
+        playerCombat.carSpeed,
+        frameDt > 1e-5 ? driveSteering.yawDelta / frameDt / RIDE_TURN_RATE : 0,
+        frameDt,
+        // --- Workstream H: the plume, fed from inside the walk that already poses
+        // every driven car this frame. `TrafficMovers.lights` is handed over the
+        // same way and for the same reason: the car you see smoking has to be the
+        // car that is there, and a second pass that had to agree with this one is
+        // how a plume ends up hanging over an empty parking space.
+        carSmoke,
+        camera.position.x,
+        camera.position.y,
+        camera.position.z,
+      );
+
+      trafficMovers.update(
         traffic,
         trafficTick(Date.now()) + accumulator / FIXED_DT,
         player.position.x,
         player.position.z,
+        // --- Workstream Q: where the camera is and which way it points, which is
+        // what the latch needs and what the draw radius above deliberately is not.
+        // The forward is read out of the camera's own world matrix rather than
+        // rebuilt from the yaw, so a cutscene, a vehicle camera or a shoulder cam
+        // all answer correctly without this line knowing they exist.
+        camera.position.x,
+        camera.position.z,
+        -camera.matrixWorld.elements[8],
+        -camera.matrixWorld.elements[10],
       );
+      // **After** the movers, and it is not optional: `claimed()` writes a claimed
+      // car's matrix into the instance buffer from inside that loop, and `end()`
+      // is the only thing in `carlod.ts` that raises `needsUpdate` on it. Without
+      // this line every claimed car draws with the matrix the GPU was last given
+      // -- which, for a mesh that has never uploaded one, is all zeroes, and a
+      // zero matrix collapses the car to a point. The box fleet has meanwhile
+      // suppressed it *because* it was claimed, so the car is not drawn at all.
+      // That shipped: "moving cars appear to be invisible", and every near-field
+      // car in the city was gone with them. The sibling per-frame fleets
+      // (`bikeLights`, `footyPool`, `nameplates`) all end here for the same
+      // reason; this one was simply missed.
+      carModels?.end();
+
     }
-
-    // The brake lamps and the camera's lean, before the movers so the lamps are
-    // filled in the same frame the bodies they hang off are placed. `steer` is
-    // the wheel as a fraction of full lock, taken from the yaw the input builder
-    // produced this frame -- `RIDE_TURN_RATE` is the bike's own normaliser and is
-    // the right order of magnitude for a car's, which is all a cosmetic lean
-    // needs. See `world/drivencars.DrivenCarView.update`.
-    drivenCars.update(
-      nightLights.carLights,
-      playerCombat.drivingCar,
-      playerCombat.carSpeed,
-      frameDt > 1e-5 ? driveSteering.yawDelta / frameDt / RIDE_TURN_RATE : 0,
-      frameDt,
-      // --- Workstream H: the plume, fed from inside the walk that already poses
-      // every driven car this frame. `TrafficMovers.lights` is handed over the
-      // same way and for the same reason: the car you see smoking has to be the
-      // car that is there, and a second pass that had to agree with this one is
-      // how a plume ends up hanging over an empty parking space.
-      carSmoke,
-      camera.position.x,
-      camera.position.y,
-      camera.position.z,
-    );
-
-    trafficMovers.update(
-      traffic,
-      trafficTick(Date.now()) + accumulator / FIXED_DT,
-      player.position.x,
-      player.position.z,
-      // --- Workstream Q: where the camera is and which way it points, which is
-      // what the latch needs and what the draw radius above deliberately is not.
-      // The forward is read out of the camera's own world matrix rather than
-      // rebuilt from the yaw, so a cutscene, a vehicle camera or a shoulder cam
-      // all answer correctly without this line knowing they exist.
-      camera.position.x,
-      camera.position.z,
-      -camera.matrixWorld.elements[8],
-      -camera.matrixWorld.elements[10],
-    );
-    // **After** the movers, and it is not optional: `claimed()` writes a claimed
-    // car's matrix into the instance buffer from inside that loop, and `end()`
-    // is the only thing in `carlod.ts` that raises `needsUpdate` on it. Without
-    // this line every claimed car draws with the matrix the GPU was last given
-    // -- which, for a mesh that has never uploaded one, is all zeroes, and a
-    // zero matrix collapses the car to a point. The box fleet has meanwhile
-    // suppressed it *because* it was claimed, so the car is not drawn at all.
-    // That shipped: "moving cars appear to be invisible", and every near-field
-    // car in the city was gone with them. The sibling per-frame fleets
-    // (`bikeLights`, `footyPool`, `nameplates`) all end here for the same
-    // reason; this one was simply missed.
-    carModels?.end();
-
+    // Indoors: the crowd, the rigs and the raves. See `indoors`.
     frameProfile.at(FSEC.crowd);
-    // And the crowd, on exactly the same terms and immediately after, because
-    // they come out of the same file and the same clock: the fractional tick so
-    // a 144 Hz display does not watch 60 Hz people, and no clock of its own so a
-    // backgrounded tab costs nothing and comes back with everybody where they
-    // would have been.
-    //
-    // The one thing it takes that the traffic does not is `frameDt`, and only
-    // the near tier reads it: fourteen `CharacterActor`s are animated on the
-    // frame delta for the reason every actor below is, and the far tier's gait
-    // is derived from the distance walked and has no clock at all.
-    crowd.update(
-      pedestrians,
-      trafficTick(Date.now()) + accumulator / FIXED_DT,
-      frameDt,
-      player.position.x,
-      player.position.z,
-    );
+    if (!indoors) {
+      // And the crowd, on exactly the same terms and immediately after, because
+      // they come out of the same file and the same clock: the fractional tick so
+      // a 144 Hz display does not watch 60 Hz people, and no clock of its own so a
+      // backgrounded tab costs nothing and comes back with everybody where they
+      // would have been.
+      //
+      // The one thing it takes that the traffic does not is `frameDt`, and only
+      // the near tier reads it: fourteen `CharacterActor`s are animated on the
+      // frame delta for the reason every actor below is, and the far tier's gait
+      // is derived from the distance walked and has no clock at all.
+      crowd.update(
+        pedestrians,
+        trafficTick(Date.now()) + accumulator / FIXED_DT,
+        frameDt,
+        player.position.x,
+        player.position.z,
+      );
 
-    // --- And the raves, immediately after the crowd because they are the same
-    // crowd: `world/rave.ts` draws its attendees out of `PedestrianAssets`'
-    // geometry and its dancers out of the same `CharacterActor` pool the street
-    // uses, so the two features share a budget as well as a rig.
-    //
-    // Fed `sky.now` rather than `Date.now()`, which is the one line that keeps
-    // this feature honest about the clock. `SkyClock.nowMs` carries the debug
-    // scrub, so pressing `[` back to two in the morning genuinely moves the
-    // raves with the sky rather than leaving an empty warehouse under a night
-    // sky; and `SkyClock.night` is the *same* darkness ramp the street lamps,
-    // the lit windows and the torch already share, so nothing here can glow at
-    // three in the afternoon even if the two clocks were ever rotated apart.
-    // See `game/rave.ts` section 6 and `sky/cycle.ts`.
-    //
-    // `wildGround` rather than `groundHeightAt`: a rave stands on the ground,
-    // and a query that folded in a roof would put a truss on top of the shed it
-    // is parked beside the moment the two footprints overlapped. It is exactly
-    // the argument that function's own comment makes for a bush turkey.
-    raves.update({
-      nowMs: sky.now.nowMs,
-      dt: frameDt,
-      x: player.position.x,
-      z: player.position.z,
-      night: sky.now.night,
-      ground: wildGround,
-      solid: raveSolid,
-      bag,
-    });
-
-    // The sound system. One call, unconditionally, with whatever was nearest --
-    // so there is exactly one place in the build that decides what a rave sounds
-    // like and no audio state anywhere else. `game/audio.ts`'s own header sets
-    // out the low-pass, the streaming decks and the synthesised set; what is
-    // here is the translation from "the nearest rave" to "the mix".
-    //
-    // The record is chosen for the *nearest* venue only. A second rave inside
-    // earshot would be a second `MediaElementAudioSourceNode` and a second
-    // stream for something the first one is already drowning out; what a player
-    // between two raves hears is the nearer one, which is what a player between
-    // two raves hears.
-    const near = raves.nearest;
-    // What the map is allowed to remember. One test, in one place: you have to
-    // have been close enough to hear it, with the music actually on. See the
-    // marker source for why that single condition is the entire design of this
-    // feature's UI.
-    {
-      const tonight = raveNight(sky.now.nowMs).index;
-      if (tonight !== heardNight) {
-        heardNight = tonight;
-        heardRaves.clear();
-      }
-      if (near && near.playing && near.distance <= RAVE_AUDIBLE_RANGE) heardRaves.add(near.venue.site.id);
-    }
-    if (near && near.playing && near.distance <= RAVE_AUDIBLE_RANGE) {
-      const track = near.position.track >= 0 ? bag.tracks[near.position.track] : undefined;
-      const nextTrack = near.position.next >= 0 ? bag.tracks[near.position.next] : undefined;
-      audio.raveUpdate({
-        // The venue *and* the night, so a rave that runs over into a second
-        // evening rebuilds rather than carrying yesterday's deck state.
-        key: near.venue.site.id * 4096 + (near.venue.night & 0xfff),
-        distance: near.distance,
-        url: track ? `audio/dj/${encodeURIComponent(track.file)}` : null,
-        offset: near.position.offset,
-        nextUrl: nextTrack ? `audio/dj/${encodeURIComponent(nextTrack.file)}` : null,
-        remaining: near.position.remaining,
-        bpm: near.bpm,
-        beat: beatAt(sky.now.nowMs, near.bpm),
-        // Under a viaduct, and nowhere else. A concrete soffit over a hard apron
-        // is the most recognisable acoustic in the city and it costs one
-        // convolver; see `game/audio.ts`'s `raveImpulse`.
-        reverb: near.venue.site.kind === 1,
-        playing: true,
+      // --- And the raves, immediately after the crowd because they are the same
+      // crowd: `world/rave.ts` draws its attendees out of `PedestrianAssets`'
+      // geometry and its dancers out of the same `CharacterActor` pool the street
+      // uses, so the two features share a budget as well as a rig.
+      //
+      // Fed `sky.now` rather than `Date.now()`, which is the one line that keeps
+      // this feature honest about the clock. `SkyClock.nowMs` carries the debug
+      // scrub, so pressing `[` back to two in the morning genuinely moves the
+      // raves with the sky rather than leaving an empty warehouse under a night
+      // sky; and `SkyClock.night` is the *same* darkness ramp the street lamps,
+      // the lit windows and the torch already share, so nothing here can glow at
+      // three in the afternoon even if the two clocks were ever rotated apart.
+      // See `game/rave.ts` section 6 and `sky/cycle.ts`.
+      //
+      // `wildGround` rather than `groundHeightAt`: a rave stands on the ground,
+      // and a query that folded in a roof would put a truss on top of the shed it
+      // is parked beside the moment the two footprints overlapped. It is exactly
+      // the argument that function's own comment makes for a bush turkey.
+      raves.update({
+        nowMs: sky.now.nowMs,
+        dt: frameDt,
+        x: player.position.x,
+        z: player.position.z,
+        night: sky.now.night,
+        ground: wildGround,
+        solid: raveSolid,
+        bag,
       });
-    } else {
-      audio.raveUpdate(null);
-    }
 
-    // And the police arriving, which is the *local* half of a shared event. The
-    // bust itself is a pure function of the night and the site -- every client
-    // agrees about it to the millisecond, and a player cannot cause it, for the
-    // reason `game/rave.ts` section 5 gives at length. What a client owns is
-    // what it feels like to be standing there when it happens: one bark from
-    // whoever is nearest, on the edge rather than every frame.
-    if (near && near.busted && near.distance < 90) {
-      if (bustedVenue !== near.venue.site.id) {
-        bustedVenue = near.venue.site.id;
-        audio.bark(POLICE_CLIPS[near.venue.site.id % POLICE_CLIPS.length], near.distance, 8);
+      // The sound system. One call, unconditionally, with whatever was nearest --
+      // so there is exactly one place in the build that decides what a rave sounds
+      // like and no audio state anywhere else. `game/audio.ts`'s own header sets
+      // out the low-pass, the streaming decks and the synthesised set; what is
+      // here is the translation from "the nearest rave" to "the mix".
+      //
+      // The record is chosen for the *nearest* venue only. A second rave inside
+      // earshot would be a second `MediaElementAudioSourceNode` and a second
+      // stream for something the first one is already drowning out; what a player
+      // between two raves hears is the nearer one, which is what a player between
+      // two raves hears.
+      const near = raves.nearest;
+      // What the map is allowed to remember. One test, in one place: you have to
+      // have been close enough to hear it, with the music actually on. See the
+      // marker source for why that single condition is the entire design of this
+      // feature's UI.
+      {
+        const tonight = raveNight(sky.now.nowMs).index;
+        if (tonight !== heardNight) {
+          heardNight = tonight;
+          heardRaves.clear();
+        }
+        if (near && near.playing && near.distance <= RAVE_AUDIBLE_RANGE) heardRaves.add(near.venue.site.id);
       }
-    } else if (!near || !near.busted) {
-      bustedVenue = -1;
-    }
-
-    frameProfile.at(FSEC.police);
-    // --- The police, both tiers, from whichever authority is running.
-    //
-    // The fractional tick is `TrafficMovers.update`'s split, for the same
-    // reason: the witness test runs on whole ticks so this client and the server
-    // ask the identical question, and the picture runs between them so a 144 Hz
-    // display does not watch 60 Hz people.
-    squad.update(
-      pedestrians,
-      policeField(),
-      trafficTick(Date.now()) + accumulator / FIXED_DT,
-      frameDt,
-      player.position.x,
-      player.position.z,
-    );
-
-    // --- And the street, both tiers, out of the same authority. Same fractional
-    // tick, same reason, same `policeField()` -- which is not a police-only
-    // accessor despite the name: it is "wherever the promoted actors are", and
-    // `StreetCrowd.gather` filters the kinds it draws itself.
-    streetCrowd.update(
-      pedestrians,
-      policeField(),
-      trafficTick(Date.now()) + accumulator / FIXED_DT,
-      frameDt,
-      player.position.x,
-      player.position.z,
-    );
-
-    // --- And the birds, on the same terms again. No frame delta: a bird has no
-    // animation clock of its own, because every part of its pose is derived from
-    // the fractional tick and the state byte -- which is what makes a
-    // backgrounded tab cost nothing and come back with the whole park where it
-    // would have been.
-    flock.update(
-      pedestrians,
-      policeField(),
-      trafficTick(Date.now()) + accumulator / FIXED_DT,
-      player.position.x,
-      player.position.z,
-      wildGround,
-    );
-
-    // --- Workstream E: the five characters, both tiers, out of the same
-    // authority and on the same fractional tick as everybody above.
-    characterCrowd.update(
-      pedestrians,
-      policeField(),
-      trafficTick(Date.now()) + accumulator / FIXED_DT,
-      frameDt,
-      player.position.x,
-      player.position.z,
-    );
-    // Whatever the nearest one of them is saying. `hud.notice` rather than
-    // audio, because there is no audio for these five and handing an eshay the
-    // drunk's recording would be worse than silence -- see `game/characters.ts`
-    // section 4. The crowd clears its own queue at the top of every update, so a
-    // frame that skipped this drops lines rather than accumulating them.
-    for (const line of characterCrowd.lines) hud.notice(line.text);
-
-    // --- And the ambient events. `wildGround` rather than `groundHeightAt`:
-    // this wants the *raw* terrain height, because a queue of twenty-five
-    // commuters placed against the player's last known ground would float
-    // whenever the player was on a station platform. The wildlife's ground query
-    // already makes exactly this distinction and its header argues it.
-    eventScene.update(
-      trafficTick(Date.now()) + accumulator / FIXED_DT,
-      player.position.x,
-      player.position.z,
-      wildGround,
-      // The footpaths, so a site is snapped onto a kerb rather than drawn where
-      // the hash put it -- which the first cut of this feature demonstrated was
-      // sometimes the roof of a terrace. See `events.SNAP_REACH`.
-      pedestrians,
-    );
-
-    // --- Standing in a queue for a bus that is not coming.
-    //
-    // The clock is here rather than in `world/events.ts` because a clock is
-    // state and that object is a renderer -- `inTrackworkQueue` is a predicate
-    // and this is the twenty seconds. Reset on leaving, and told once: the line
-    // lands the first time and never again for the same queue, because the
-    // second time it is not deadpan, it is nagging.
-    {
-      const queue = inTrackworkQueue(eventScene.live, player.position.x, player.position.z);
-      if (queue === null) {
-        queueSince = -1;
-        queueTold = false;
+      if (near && near.playing && near.distance <= RAVE_AUDIBLE_RANGE) {
+        const track = near.position.track >= 0 ? bag.tracks[near.position.track] : undefined;
+        const nextTrack = near.position.next >= 0 ? bag.tracks[near.position.next] : undefined;
+        audio.raveUpdate({
+          // The venue *and* the night, so a rave that runs over into a second
+          // evening rebuilds rather than carrying yesterday's deck state.
+          key: near.venue.site.id * 4096 + (near.venue.night & 0xfff),
+          distance: near.distance,
+          url: track ? `audio/dj/${encodeURIComponent(track.file)}` : null,
+          offset: near.position.offset,
+          nextUrl: nextTrack ? `audio/dj/${encodeURIComponent(nextTrack.file)}` : null,
+          remaining: near.position.remaining,
+          bpm: near.bpm,
+          beat: beatAt(sky.now.nowMs, near.bpm),
+          // Under a viaduct, and nowhere else. A concrete soffit over a hard apron
+          // is the most recognisable acoustic in the city and it costs one
+          // convolver; see `game/audio.ts`'s `raveImpulse`.
+          reverb: near.venue.site.kind === 1,
+          playing: true,
+        });
       } else {
-        const nowS = performance.now() / 1000;
-        if (queueSince < 0) queueSince = nowS;
-        else if (!queueTold && nowS - queueSince >= 20) {
-          queueTold = true;
-          hud.notice('the bus is not coming');
+        audio.raveUpdate(null);
+      }
+
+      // And the police arriving, which is the *local* half of a shared event. The
+      // bust itself is a pure function of the night and the site -- every client
+      // agrees about it to the millisecond, and a player cannot cause it, for the
+      // reason `game/rave.ts` section 5 gives at length. What a client owns is
+      // what it feels like to be standing there when it happens: one bark from
+      // whoever is nearest, on the edge rather than every frame.
+      if (near && near.busted && near.distance < 90) {
+        if (bustedVenue !== near.venue.site.id) {
+          bustedVenue = near.venue.site.id;
+          audio.bark(POLICE_CLIPS[near.venue.site.id % POLICE_CLIPS.length], near.distance, 8);
+        }
+      } else if (!near || !near.busted) {
+        bustedVenue = -1;
+      }
+
+    }
+    // Indoors: the patrol fleet. `server/aoi.ts` sends none of them indoors. See `indoors`.
+    frameProfile.at(FSEC.police);
+    if (!indoors) {
+      // --- The police, both tiers, from whichever authority is running.
+      //
+      // The fractional tick is `TrafficMovers.update`'s split, for the same
+      // reason: the witness test runs on whole ticks so this client and the server
+      // ask the identical question, and the picture runs between them so a 144 Hz
+      // display does not watch 60 Hz people.
+      squad.update(
+        pedestrians,
+        policeField(),
+        trafficTick(Date.now()) + accumulator / FIXED_DT,
+        frameDt,
+        player.position.x,
+        player.position.z,
+      );
+
+      // --- And the street, both tiers, out of the same authority. Same fractional
+      // tick, same reason, same `policeField()` -- which is not a police-only
+      // accessor despite the name: it is "wherever the promoted actors are", and
+      // `StreetCrowd.gather` filters the kinds it draws itself.
+      streetCrowd.update(
+        pedestrians,
+        policeField(),
+        trafficTick(Date.now()) + accumulator / FIXED_DT,
+        frameDt,
+        player.position.x,
+        player.position.z,
+      );
+
+      // --- And the birds, on the same terms again. No frame delta: a bird has no
+      // animation clock of its own, because every part of its pose is derived from
+      // the fractional tick and the state byte -- which is what makes a
+      // backgrounded tab cost nothing and come back with the whole park where it
+      // would have been.
+      flock.update(
+        pedestrians,
+        policeField(),
+        trafficTick(Date.now()) + accumulator / FIXED_DT,
+        player.position.x,
+        player.position.z,
+        wildGround,
+      );
+
+      // --- Workstream E: the five characters, both tiers, out of the same
+      // authority and on the same fractional tick as everybody above.
+      characterCrowd.update(
+        pedestrians,
+        policeField(),
+        trafficTick(Date.now()) + accumulator / FIXED_DT,
+        frameDt,
+        player.position.x,
+        player.position.z,
+      );
+      // Whatever the nearest one of them is saying. `hud.notice` rather than
+      // audio, because there is no audio for these five and handing an eshay the
+      // drunk's recording would be worse than silence -- see `game/characters.ts`
+      // section 4. The crowd clears its own queue at the top of every update, so a
+      // frame that skipped this drops lines rather than accumulating them.
+      for (const line of characterCrowd.lines) hud.notice(line.text);
+
+      // --- And the ambient events. `wildGround` rather than `groundHeightAt`:
+      // this wants the *raw* terrain height, because a queue of twenty-five
+      // commuters placed against the player's last known ground would float
+      // whenever the player was on a station platform. The wildlife's ground query
+      // already makes exactly this distinction and its header argues it.
+      eventScene.update(
+        trafficTick(Date.now()) + accumulator / FIXED_DT,
+        player.position.x,
+        player.position.z,
+        wildGround,
+        // The footpaths, so a site is snapped onto a kerb rather than drawn where
+        // the hash put it -- which the first cut of this feature demonstrated was
+        // sometimes the roof of a terrace. See `events.SNAP_REACH`.
+        pedestrians,
+      );
+
+      // --- Standing in a queue for a bus that is not coming.
+      //
+      // The clock is here rather than in `world/events.ts` because a clock is
+      // state and that object is a renderer -- `inTrackworkQueue` is a predicate
+      // and this is the twenty seconds. Reset on leaving, and told once: the line
+      // lands the first time and never again for the same queue, because the
+      // second time it is not deadpan, it is nagging.
+      {
+        const queue = inTrackworkQueue(eventScene.live, player.position.x, player.position.z);
+        if (queue === null) {
+          queueSince = -1;
+          queueTold = false;
+        } else {
+          const nowS = performance.now() / 1000;
+          if (queueSince < 0) queueSince = nowS;
+          else if (!queueTold && nowS - queueSince >= 20) {
+            queueTold = true;
+            hud.notice('the bus is not coming');
+          }
         }
       }
-    }
 
+    }
+    // Indoors: the pedestrians who speak, and the barks they choose. See `indoors`.
     frameProfile.at(FSEC.npcvoice);
-    // --- What a shot sounds and looks like.
-    //
-    // Read off the state byte rather than off an event, which is the whole
-    // reason `NPC_STATE.FIRE` is held for one snapshot period rather than one
-    // tick -- see `factions.FIRE_STATE_TICKS`. There is no shot message on the
-    // wire and none is needed: the state arrives in a snapshot every client is
-    // already decoding, exactly as a football's existence is its own
-    // announcement.
-    //
-    // The **rising edge**, because offline the state is read at 60 Hz where
-    // online it is sampled at 20 -- a level test would play three cracks a shot
-    // in `?offline` and one online, which is precisely the sort of difference
-    // that makes the offline path stop being a real test of the feature.
-    //
-    // `NPC_STATE.FIRE` is the framework's "an attack just left this actor" and
-    // is **not police-only**: a meth head's swipe and a drunk's shove are
-    // carried in the same byte, for the same reason and with the same one-
-    // snapshot hold. So the kind decides what it sounds like -- a round and a
-    // tracer for an officer, an impact for a fist -- and a loop that did not ask
-    // would give a shirtless bloke in a beanie a service pistol.
-    for (const actor of policeField().actors) {
-      const wasFiring = firing.has(actor.id);
-      if (actor.state === NPC_STATE.FIRE) {
-        if (!wasFiring) {
-          firing.add(actor.id);
+    if (!indoors) {
+      // --- What a shot sounds and looks like.
+      //
+      // Read off the state byte rather than off an event, which is the whole
+      // reason `NPC_STATE.FIRE` is held for one snapshot period rather than one
+      // tick -- see `factions.FIRE_STATE_TICKS`. There is no shot message on the
+      // wire and none is needed: the state arrives in a snapshot every client is
+      // already decoding, exactly as a football's existence is its own
+      // announcement.
+      //
+      // The **rising edge**, because offline the state is read at 60 Hz where
+      // online it is sampled at 20 -- a level test would play three cracks a shot
+      // in `?offline` and one online, which is precisely the sort of difference
+      // that makes the offline path stop being a real test of the feature.
+      //
+      // `NPC_STATE.FIRE` is the framework's "an attack just left this actor" and
+      // is **not police-only**: a meth head's swipe and a drunk's shove are
+      // carried in the same byte, for the same reason and with the same one-
+      // snapshot hold. So the kind decides what it sounds like -- a round and a
+      // tracer for an officer, an impact for a fist -- and a loop that did not ask
+      // would give a shirtless bloke in a beanie a service pistol.
+      for (const actor of policeField().actors) {
+        const wasFiring = firing.has(actor.id);
+        if (actor.state === NPC_STATE.FIRE) {
+          if (!wasFiring) {
+            firing.add(actor.id);
+            const range = Math.hypot(actor.x - player.position.x, actor.z - player.position.z);
+            if (actor.kind === NPC_KIND.POLICE) {
+              policeStats.shots++;
+              audio.gunshot(range);
+              tracers.fire(actor, player.position, range);
+            } else if (isStreetKind(actor.kind) && range < 6) {
+              // Close only. A swipe is a sound you hear because it happened to
+              // you, and one audible from 40 m would be a city of invisible
+              // punching. `thwack(false)` is the bat's own body layer, which is
+              // the same class of event and already tuned against it.
+              audio.thwack(false);
+            }
+          }
+        } else if (wasFiring) {
+          firing.delete(actor.id);
+        }
+      }
+
+      // --- Workstream E, off the same state bytes and the same rising-edge rule.
+      //
+      // Two lines, and both of them are things you find out by *watching* rather
+      // than by doing:
+      //
+      //   - an **influencer going down** within `POSTED_RANGE`. The client that
+      //     swung already said the version with your name in it, at the swing;
+      //     this is what everybody else gets, and it is impersonal because the
+      //     snapshot carries no attacker for an NPC knockdown. See the swing path.
+      //   - a **tradie helping somebody up**, which he signals by entering
+      //     `NPC_STATE.IDLE` beside a downed player -- there is no state byte for
+      //     "helping" and adding one would be a protocol change for a line, so the
+      //     range test is the signal. It fires at most once per tradie per session
+      //     through the same `posted` set, which is what stops it repeating on
+      //     every frame he stands there.
+      for (const actor of policeField().actors) {
+        if (!isCharacterKind(actor.kind)) continue;
+        const range = Math.hypot(actor.x - player.position.x, actor.z - player.position.z);
+        if (actor.kind === NPC_KIND.INFLUENCER) {
+          const wasDown = posted.has(actor.id);
+          if (actor.state === NPC_STATE.DOWN) {
+            if (!wasDown) {
+              posted.add(actor.id);
+              if (range < POSTED_RANGE) hud.notice(POSTED_LINE_BYSTANDER);
+            }
+          } else if (wasDown) {
+            posted.delete(actor.id);
+          }
+        } else if (actor.kind === NPC_KIND.TRADIE) {
+          if (posted.has(actor.id)) continue;
+          if (playerCombat.phase !== 'ko') continue;
+          if (range > 5) continue;
+          posted.add(actor.id);
+          hud.notice(TRADIE_HELP_LINE);
+        }
+      }
+
+      tracers.update(frameDt);
+
+      // --- And what the birds sound like, off the same state bytes.
+      //
+      // A whole transition table rather than the single `FIRE` edge above it,
+      // because a bird's voice is not tied to its attack: a turkey gobbles when it
+      // *decides* to come at you (the entry into CHASE, which is the thing you
+      // need to hear behind you), a magpie announces the dive it has already
+      // started, and an ibis grumbles at being moved on. All three are synthesised
+      // -- see `game/audio.ts` -- because there are no wildlife WAVs in this build
+      // and a bird call is what a synthesiser is *for*.
+      //
+      // Driven off the state byte rather than off a faction event for the reason
+      // the police bark is: the wire deliberately carries no aggro event, so a
+      // cue that needed one would exist offline and be silent online. This works
+      // in both, and `NPC_STATE.FIRE`'s one-snapshot hold is what guarantees the
+      // edge is never sampled away.
+      wildSeen.clear();
+      for (const actor of policeField().actors) {
+        if (!isProtected(actor.kind)) continue;
+        wildSeen.add(actor.id);
+        const was = wildStates.get(actor.id);
+        if (was === actor.state) continue;
+        wildStates.set(actor.id, actor.state);
+        // A newly promoted bird has no previous state and must not be treated as
+        // having just changed into this one -- otherwise every turkey in the park
+        // gobbles the instant it wakes up, which is the whole flock announcing
+        // itself at once.
+        if (was === undefined) continue;
+        const range = Math.hypot(actor.x - player.position.x, actor.z - player.position.z);
+        if (actor.state === NPC_STATE.FIRE) {
+          audio.birdStrike(range);
+        } else if (actor.state === NPC_STATE.AIM && actor.kind === NPC_KIND.MAGPIE) {
+          // **The alarm leads the dive.** `NPC_STATE.AIM` on a magpie is
+          // `wildlife.TELEGRAPH_TICKS` of it screaming from the branch *before*
+          // it leaves -- so this warble arrives 0.83 s ahead of the swoop below,
+          // which is the entire read-and-react window the feature has. The two
+          // cues used to fire on the same edge, which is a warning that arrives
+          // with the thing it is warning about.
+          audio.magpieWarble(range, true);
+        } else if (actor.state === NPC_STATE.CHASE) {
+          if (actor.kind === NPC_KIND.TURKEY) audio.turkeyCall(range, true);
+          else if (actor.kind === NPC_KIND.MAGPIE) audio.magpieSwoop(range);
+        } else if (actor.state === NPC_STATE.RETURN && actor.kind === NPC_KIND.IBIS) {
+          audio.ibisHonk(range);
+        }
+      }
+      for (const id of wildStates.keys()) if (!wildSeen.has(id)) wildStates.delete(id);
+      // The ambient half: an occasional call from a bird nobody is bothering, at a
+      // rate the flock itself picks. Deliberately *very* sparse -- a park in which
+      // every turkey called would be a soundboard, and the whole effect of one
+      // gobble from somewhere behind a fig depends on it being rare.
+      {
+        const idle = flock.idleCall(frameDt);
+        if (idle !== null) {
+          if (idle.kind === NPC_KIND.TURKEY) audio.turkeyCall(idle.distance, false);
+          else if (idle.kind === NPC_KIND.IBIS) audio.ibisHonk(idle.distance);
+          else audio.magpieWarble(idle.distance, false);
+        }
+      }
+
+      // --- And the bark, online.
+      //
+      // Offline it is drained inside `simulate`, off the faction field's own event
+      // list, for the reason stated there. Online there is no such list -- the wire
+      // deliberately carries no aggro event -- so the cue comes from the state
+      // instead: an officer who has just entered `NPC_STATE.AIM` is an officer who
+      // has just shouted at you. Adding a reliable message for it would be a second
+      // way to say a thing an idempotent state byte already says, which is the
+      // argument `protocol.EVENT` makes about the retired beam.
+      if (net) {
+        for (const actor of net.actors.values()) {
+          if (actor.kind !== NPC_KIND.POLICE || actor.state !== NPC_STATE.AIM) continue;
+          if (aiming.has(actor.id)) continue;
+          aiming.add(actor.id);
           const range = Math.hypot(actor.x - player.position.x, actor.z - player.position.z);
-          if (actor.kind === NPC_KIND.POLICE) {
-            policeStats.shots++;
-            audio.gunshot(range);
-            tracers.fire(actor, player.position, range);
-          } else if (isStreetKind(actor.kind) && range < 6) {
-            // Close only. A swipe is a sound you hear because it happened to
-            // you, and one audible from 40 m would be a city of invisible
-            // punching. `thwack(false)` is the bat's own body layer, which is
-            // the same class of event and already tuned against it.
-            audio.thwack(false);
-          }
+          audio.bark(POLICE_CLIPS[actor.id % POLICE_CLIPS.length], range, 6);
         }
-      } else if (wasFiring) {
-        firing.delete(actor.id);
-      }
-    }
-
-    // --- Workstream E, off the same state bytes and the same rising-edge rule.
-    //
-    // Two lines, and both of them are things you find out by *watching* rather
-    // than by doing:
-    //
-    //   - an **influencer going down** within `POSTED_RANGE`. The client that
-    //     swung already said the version with your name in it, at the swing;
-    //     this is what everybody else gets, and it is impersonal because the
-    //     snapshot carries no attacker for an NPC knockdown. See the swing path.
-    //   - a **tradie helping somebody up**, which he signals by entering
-    //     `NPC_STATE.IDLE` beside a downed player -- there is no state byte for
-    //     "helping" and adding one would be a protocol change for a line, so the
-    //     range test is the signal. It fires at most once per tradie per session
-    //     through the same `posted` set, which is what stops it repeating on
-    //     every frame he stands there.
-    for (const actor of policeField().actors) {
-      if (!isCharacterKind(actor.kind)) continue;
-      const range = Math.hypot(actor.x - player.position.x, actor.z - player.position.z);
-      if (actor.kind === NPC_KIND.INFLUENCER) {
-        const wasDown = posted.has(actor.id);
-        if (actor.state === NPC_STATE.DOWN) {
-          if (!wasDown) {
-            posted.add(actor.id);
-            if (range < POSTED_RANGE) hud.notice(POSTED_LINE_BYSTANDER);
-          }
-        } else if (wasDown) {
-          posted.delete(actor.id);
+        for (const id of [...aiming]) {
+          const a = net.actors.get(id);
+          if (!a || a.state === NPC_STATE.CHASE || a.state === NPC_STATE.RETURN) aiming.delete(id);
         }
-      } else if (actor.kind === NPC_KIND.TRADIE) {
-        if (posted.has(actor.id)) continue;
-        if (playerCombat.phase !== 'ko') continue;
-        if (range > 5) continue;
-        posted.add(actor.id);
-        hud.notice(TRADIE_HELP_LINE);
+        // The street factions' own, off the same idea and a different state. An
+        // officer shouts when the weapon comes up; a meth head shouts when they
+        // start running, and `NPC_STATE.CHASE` is the byte that says so. The clip
+        // is chosen off the actor id rather than off a hash of the tick, because
+        // online the tick this client sees is a snapshot's rather than the
+        // authority's -- an id is the one thing both ends agree about exactly.
+        for (const actor of net.actors.values()) {
+          if (!isStreetKind(actor.kind) || actor.state !== NPC_STATE.CHASE) continue;
+          if (charging.has(actor.id)) continue;
+          charging.add(actor.id);
+          const clips = actor.kind === NPC_KIND.METHHEAD ? METHHEAD_CLIPS : DRUNK_CLIPS;
+          const range = Math.hypot(actor.x - player.position.x, actor.z - player.position.z);
+          audio.bark(clips[actor.id % clips.length], range, 5);
+        }
+        for (const id of [...charging]) {
+          const a = net.actors.get(id);
+          if (!a || a.state === NPC_STATE.RETURN || a.state === NPC_STATE.WALK) charging.delete(id);
+        }
       }
-    }
 
-    tracers.update(frameDt);
-
-    // --- And what the birds sound like, off the same state bytes.
-    //
-    // A whole transition table rather than the single `FIRE` edge above it,
-    // because a bird's voice is not tied to its attack: a turkey gobbles when it
-    // *decides* to come at you (the entry into CHASE, which is the thing you
-    // need to hear behind you), a magpie announces the dive it has already
-    // started, and an ibis grumbles at being moved on. All three are synthesised
-    // -- see `game/audio.ts` -- because there are no wildlife WAVs in this build
-    // and a bird call is what a synthesiser is *for*.
-    //
-    // Driven off the state byte rather than off a faction event for the reason
-    // the police bark is: the wire deliberately carries no aggro event, so a
-    // cue that needed one would exist offline and be silent online. This works
-    // in both, and `NPC_STATE.FIRE`'s one-snapshot hold is what guarantees the
-    // edge is never sampled away.
-    wildSeen.clear();
-    for (const actor of policeField().actors) {
-      if (!isProtected(actor.kind)) continue;
-      wildSeen.add(actor.id);
-      const was = wildStates.get(actor.id);
-      if (was === actor.state) continue;
-      wildStates.set(actor.id, actor.state);
-      // A newly promoted bird has no previous state and must not be treated as
-      // having just changed into this one -- otherwise every turkey in the park
-      // gobbles the instant it wakes up, which is the whole flock announcing
-      // itself at once.
-      if (was === undefined) continue;
-      const range = Math.hypot(actor.x - player.position.x, actor.z - player.position.z);
-      if (actor.state === NPC_STATE.FIRE) {
-        audio.birdStrike(range);
-      } else if (actor.state === NPC_STATE.AIM && actor.kind === NPC_KIND.MAGPIE) {
-        // **The alarm leads the dive.** `NPC_STATE.AIM` on a magpie is
-        // `wildlife.TELEGRAPH_TICKS` of it screaming from the branch *before*
-        // it leaves -- so this warble arrives 0.83 s ahead of the swoop below,
-        // which is the entire read-and-react window the feature has. The two
-        // cues used to fire on the same edge, which is a warning that arrives
-        // with the thing it is warning about.
-        audio.magpieWarble(range, true);
-      } else if (actor.state === NPC_STATE.CHASE) {
-        if (actor.kind === NPC_KIND.TURKEY) audio.turkeyCall(range, true);
-        else if (actor.kind === NPC_KIND.MAGPIE) audio.magpieSwoop(range);
-      } else if (actor.state === NPC_STATE.RETURN && actor.kind === NPC_KIND.IBIS) {
-        audio.ibisHonk(range);
-      }
     }
-    for (const id of wildStates.keys()) if (!wildSeen.has(id)) wildStates.delete(id);
-    // The ambient half: an occasional call from a bird nobody is bothering, at a
-    // rate the flock itself picks. Deliberately *very* sparse -- a park in which
-    // every turkey called would be a soundboard, and the whole effect of one
-    // gobble from somewhere behind a fig depends on it being rare.
-    {
-      const idle = flock.idleCall(frameDt);
-      if (idle !== null) {
-        if (idle.kind === NPC_KIND.TURKEY) audio.turkeyCall(idle.distance, false);
-        else if (idle.kind === NPC_KIND.IBIS) audio.ibisHonk(idle.distance);
-        else audio.magpieWarble(idle.distance, false);
-      }
-    }
-
-    // --- And the bark, online.
-    //
-    // Offline it is drained inside `simulate`, off the faction field's own event
-    // list, for the reason stated there. Online there is no such list -- the wire
-    // deliberately carries no aggro event -- so the cue comes from the state
-    // instead: an officer who has just entered `NPC_STATE.AIM` is an officer who
-    // has just shouted at you. Adding a reliable message for it would be a second
-    // way to say a thing an idempotent state byte already says, which is the
-    // argument `protocol.EVENT` makes about the retired beam.
-    if (net) {
-      for (const actor of net.actors.values()) {
-        if (actor.kind !== NPC_KIND.POLICE || actor.state !== NPC_STATE.AIM) continue;
-        if (aiming.has(actor.id)) continue;
-        aiming.add(actor.id);
-        const range = Math.hypot(actor.x - player.position.x, actor.z - player.position.z);
-        audio.bark(POLICE_CLIPS[actor.id % POLICE_CLIPS.length], range, 6);
-      }
-      for (const id of [...aiming]) {
-        const a = net.actors.get(id);
-        if (!a || a.state === NPC_STATE.CHASE || a.state === NPC_STATE.RETURN) aiming.delete(id);
-      }
-      // The street factions' own, off the same idea and a different state. An
-      // officer shouts when the weapon comes up; a meth head shouts when they
-      // start running, and `NPC_STATE.CHASE` is the byte that says so. The clip
-      // is chosen off the actor id rather than off a hash of the tick, because
-      // online the tick this client sees is a snapshot's rather than the
-      // authority's -- an id is the one thing both ends agree about exactly.
-      for (const actor of net.actors.values()) {
-        if (!isStreetKind(actor.kind) || actor.state !== NPC_STATE.CHASE) continue;
-        if (charging.has(actor.id)) continue;
-        charging.add(actor.id);
-        const clips = actor.kind === NPC_KIND.METHHEAD ? METHHEAD_CLIPS : DRUNK_CLIPS;
-        const range = Math.hypot(actor.x - player.position.x, actor.z - player.position.z);
-        audio.bark(clips[actor.id % clips.length], range, 5);
-      }
-      for (const id of [...charging]) {
-        const a = net.actors.get(id);
-        if (!a || a.state === NPC_STATE.RETURN || a.state === NPC_STATE.WALK) charging.delete(id);
-      }
-    }
-
     frameProfile.at(FSEC.heat);
     // --- The banner.
     //
@@ -13236,229 +13308,235 @@ async function main(): Promise<void> {
     // is already being spoken to, and it is free when the audio is off.
     audio.cityBedUpdate();
 
+    // Indoors: the faction actors. None of them is ever in a building. See `indoors`.
     frameProfile.at(FSEC.actors);
-    // Every actor -- three dummies and the player's own body -- on the frame
-    // delta rather than the fixed step. Deliberate, and the opposite of the
-    // choice `simulate` makes above: the simulation is fixed so that prediction
-    // and rewind produce the same trajectory, where animation is presentation
-    // and has to be smooth at whatever rate the display runs. Stepping the poses
-    // inside the accumulator loop would quantise a 100 ms swing to six positions
-    // on a 144 Hz display for no benefit at all.
-    //
-    // The self body stands at the player's feet facing where they walk, with
-    // pitch deliberately not applied, because a body does not lean back when you
-    // look up. It is invisible to the camera, so what it contributes to a frame
-    // is a shadow -- and that shadow is the whole of this pass's first-person
-    // feedback: your own arm throwing on the footpath in front of you, and your
-    // own crumple when you go down.
-    for (const f of fighters) f.driver.update(f.combat, frameDt);
-    // Your own body's football, which the camera excludes -- so what this
-    // contributes to a frame is a ball-shaped shadow beside your bat's, and its
-    // absence while one is in the air.
-    //
-    // Workstream O: `throwT` rather than `ballT`, here and on the three lines
-    // below. `ballT` is consumed by the refill, so it read as a fresh throw every
-    // 1.6 s while the bar was filling -- and this line is one of the four that
-    // believed it. The shadow of the ball blinked out of your own hand twice per
-    // ball you threw. See `combat.throwT`.
-    selfFooty.set(playerCombat.ballCharges > 0 && playerCombat.throwT >= THROW_SECONDS);
-    // And every dummy's, on exactly the rule `poseRemote` applies to a remote:
-    // in hand while they have one and are not mid-throw. Offline this is the
-    // only place the "somebody else is carrying" read can be seen at all.
-    for (const [dummy, prop] of dummyFooties) {
-      prop.set(dummy.combat.ballCharges > 0 && dummy.combat.throwT >= THROW_SECONDS);
-    }
-    // And the bat in front of the eye, on the frame delta for the same reason
-    // every actor is: the simulation is fixed so prediction and rewind agree,
-    // and a viewmodel is presentation and has to be smooth at whatever rate the
-    // display runs.
-    //
-    // The phase comes off the **predicted** local combatant rather than off a
-    // server event, which is what makes the swing start on the frame the button
-    // goes down instead of on the next round trip -- the same argument
-    // `simulate` makes about predicting the phase machine online. `player.yaw`
-    // rather than `input.yaw` for the sway, because the body's is what
-    // `applyToCamera` drew with and taking the other would sway the bat a
-    // fraction of a step ahead of the view.
-    viewmodel.update(frameDt, {
-      phase: playerCombat.phase,
-      phaseT: playerCombat.phaseT,
-      speed: Math.hypot(player.velocity.x, player.velocity.z),
-      yaw: player.yaw,
-      pitch: player.pitch,
-      hitstop: playerCombat.hitstopT > 0,
-      // The bat dips out of the way while the other hand throws. See
-      // `BatViewmodel.update`: it is one number, and without it the bat sits
-      // rock-steady in the corner of the frame through a throw that is visibly
-      // a whole-body action, which reads as two unrelated animations.
-      // Workstream O: the animation clock, not the supply's. See `combat.throwT`
-      // -- read off `ballT` this dipped the bat out of the way of a throw that was
-      // not happening, every 1.6 s, for as long as the bag was refilling.
-      throwT: playerCombat.throwT,
-    });
-    // --- Workstream I: and your hands, on the same frame delta and the same
-    // predicted phase. Posed **unconditionally**, whether or not fists are
-    // equipped: the pose is two vector writes and four Euler writes off a pure
-    // function, and the alternative -- skipping the update while the bat is out
-    // -- means the hands come back on screen holding whatever pose they were in
-    // when you last switched away, which is a fist frozen mid-jab on the frame
-    // you press 4. Visibility is `setWeaponVisible`'s, above.
-    handsViewmodel.update(frameDt, {
-      phase: playerCombat.phase,
-      phaseT: playerCombat.phaseT,
-      speed: Math.hypot(player.velocity.x, player.velocity.z),
-      yaw: player.yaw,
-      pitch: player.pitch,
-      hitstop: playerCombat.hitstopT > 0,
-    });
-    // And the ball in the other hand, on the same frame delta and off the same
-    // predicted clock -- so the release starts on the frame the button goes down
-    // rather than on the next round trip.
-    footyViewmodel.update(frameDt, {
-      // Workstream O: `throwT`, which counts from a throw and is never consumed by
-      // the refill. This one line is the "recharge animation" the owner asked to
-      // have removed -- see `FootyViewmodel.update`.
-      sinceThrow: playerCombat.throwT,
-      charges: playerCombat.ballCharges,
-      speed: Math.hypot(player.velocity.x, player.velocity.z),
-      down: playerCombat.phase === 'ko',
-      hitstop: playerCombat.hitstopT > 0,
-    });
-    // Remotes, on the frame delta like every other actor and for the same
-    // reason: the simulation is fixed so prediction and rewind agree, and
-    // animation is presentation and has to be smooth at whatever rate the
-    // display runs. Their *positions* come from the interpolation clock, which
-    // `net.update` advanced above.
-    if (net) {
-      for (const r of net.remotes.values()) {
-        const entry = ensureRemoteActor(r);
-        // A remote is created by its JOIN event and placed by its first
-        // snapshot, and between the two its position is the ENU origin -- which
-        // is Circular Quay, and up to four kilometres from wherever the fight
-        // is. Hidden rather than posed until it has been told where it stands.
-        entry.actor.mesh.visible = !r.fresh;
-        if (!r.fresh) poseRemote(entry, r, frameDt);
+    if (!indoors) {
+      // Every actor -- three dummies and the player's own body -- on the frame
+      // delta rather than the fixed step. Deliberate, and the opposite of the
+      // choice `simulate` makes above: the simulation is fixed so that prediction
+      // and rewind produce the same trajectory, where animation is presentation
+      // and has to be smooth at whatever rate the display runs. Stepping the poses
+      // inside the accumulator loop would quantise a 100 ms swing to six positions
+      // on a 144 Hz display for no benefit at all.
+      //
+      // The self body stands at the player's feet facing where they walk, with
+      // pitch deliberately not applied, because a body does not lean back when you
+      // look up. It is invisible to the camera, so what it contributes to a frame
+      // is a shadow -- and that shadow is the whole of this pass's first-person
+      // feedback: your own arm throwing on the footpath in front of you, and your
+      // own crumple when you go down.
+      for (const f of fighters) f.driver.update(f.combat, frameDt);
+      // Your own body's football, which the camera excludes -- so what this
+      // contributes to a frame is a ball-shaped shadow beside your bat's, and its
+      // absence while one is in the air.
+      //
+      // Workstream O: `throwT` rather than `ballT`, here and on the three lines
+      // below. `ballT` is consumed by the refill, so it read as a fresh throw every
+      // 1.6 s while the bar was filling -- and this line is one of the four that
+      // believed it. The shadow of the ball blinked out of your own hand twice per
+      // ball you threw. See `combat.throwT`.
+      selfFooty.set(playerCombat.ballCharges > 0 && playerCombat.throwT >= THROW_SECONDS);
+      // And every dummy's, on exactly the rule `poseRemote` applies to a remote:
+      // in hand while they have one and are not mid-throw. Offline this is the
+      // only place the "somebody else is carrying" read can be seen at all.
+      for (const [dummy, prop] of dummyFooties) {
+        prop.set(dummy.combat.ballCharges > 0 && dummy.combat.throwT >= THROW_SECONDS);
       }
-    }
-
-    frameProfile.at(FSEC.bikes);
-    // --- The lime e-bikes, after every actor is posed.
-    //
-    // Three sources, one geometry, three draws:
-    //
-    //   1. The **parked** set, instanced, culled by range. Ridden bikes are
-    //      skipped here -- they are drawn at their riders below, from the
-    //      interpolated positions this class does not have.
-    //   2. The **local player's**, at the predicted feet position, so it moves
-    //      on the frame the input does rather than on the next snapshot. Exactly
-    //      the argument `main.ts` already makes about the local player's own
-    //      footballs.
-    //   3. **Each riding remote's**, at their interpolated feet, so the bike and
-    //      the body drawn on it are on the same 100 ms clock. Drawing one of
-    //      them at present time would slide the rider along a bike a third of a
-    //      metre behind them.
-    placeResidentBikes();
-    maybeBuildStall();
-    bikeMeshes.update(bikeWorld().all(), player.position.x, player.position.z, isRiddenLocally);
-    // And the headlight on every one of those, from the same three numbers and
-    // in the same two places, so a bike that is drawn is a bike that is lit and
-    // there is no fourth list to keep in step. `begin` is false all day, which
-    // makes this two comparisons outside the night. See `world/nightlights.BikeLights`.
-    const bikeLit = nightLights.bikeLights.begin();
-    if (playerCombat.ridingBike !== 0) {
-      // With the lean, which only the local rider gets: the wire carries a yaw
-      // and not a yaw *rate*, so a remote's steering is not knowable here and a
-      // guessed lean would be a bike rocking on other people's screens for
-      // reasons nobody could see. See `world/bike.RiddenBike.set`.
-      selfBike.set(player.position.x, player.position.y - EYE_HEIGHT, player.position.z, player.yaw, rideLean);
-      if (bikeLit) {
-        nightLights.bikeLights.add(
-          player.position.x,
-          player.position.y - EYE_HEIGHT,
-          player.position.z,
-          player.yaw,
-        );
-      }
-    } else {
-      selfBike.hide();
-    }
-    if (net) {
-      for (const r of net.remotes.values()) {
-        const entry = remotes.get(r.id);
-        if (!entry) continue;
-        // `FLAG.RIDING` is set for a driver too -- that is the contract, see
-        // `protocol.ENTER_FLAG.DRIVING` -- so the bike is drawn only for the
-        // remotes who are actually on one. Without this clause every driver in
-        // the room has a lime bike welded under their car.
-        if (r.riding && !r.fresh && !isDriving(r.id)) {
-          if (!entry.bike) {
-            entry.bike = new RiddenBike(bikes);
-            scene.add(entry.bike.mesh);
-          }
-          entry.bike.set(r.position.x, r.position.y - EYE_HEIGHT, r.position.z, r.yaw);
-          if (bikeLit) {
-            nightLights.bikeLights.add(r.position.x, r.position.y - EYE_HEIGHT, r.position.z, r.yaw);
-          }
-        } else if (entry.bike) {
-          entry.bike.hide();
+      // And the bat in front of the eye, on the frame delta for the same reason
+      // every actor is: the simulation is fixed so prediction and rewind agree,
+      // and a viewmodel is presentation and has to be smooth at whatever rate the
+      // display runs.
+      //
+      // The phase comes off the **predicted** local combatant rather than off a
+      // server event, which is what makes the swing start on the frame the button
+      // goes down instead of on the next round trip -- the same argument
+      // `simulate` makes about predicting the phase machine online. `player.yaw`
+      // rather than `input.yaw` for the sway, because the body's is what
+      // `applyToCamera` drew with and taking the other would sway the bat a
+      // fraction of a step ahead of the view.
+      viewmodel.update(frameDt, {
+        phase: playerCombat.phase,
+        phaseT: playerCombat.phaseT,
+        speed: Math.hypot(player.velocity.x, player.velocity.z),
+        yaw: player.yaw,
+        pitch: player.pitch,
+        hitstop: playerCombat.hitstopT > 0,
+        // The bat dips out of the way while the other hand throws. See
+        // `BatViewmodel.update`: it is one number, and without it the bat sits
+        // rock-steady in the corner of the frame through a throw that is visibly
+        // a whole-body action, which reads as two unrelated animations.
+        // Workstream O: the animation clock, not the supply's. See `combat.throwT`
+        // -- read off `ballT` this dipped the bat out of the way of a throw that was
+        // not happening, every 1.6 s, for as long as the bag was refilling.
+        throwT: playerCombat.throwT,
+      });
+      // --- Workstream I: and your hands, on the same frame delta and the same
+      // predicted phase. Posed **unconditionally**, whether or not fists are
+      // equipped: the pose is two vector writes and four Euler writes off a pure
+      // function, and the alternative -- skipping the update while the bat is out
+      // -- means the hands come back on screen holding whatever pose they were in
+      // when you last switched away, which is a fist frozen mid-jab on the frame
+      // you press 4. Visibility is `setWeaponVisible`'s, above.
+      handsViewmodel.update(frameDt, {
+        phase: playerCombat.phase,
+        phaseT: playerCombat.phaseT,
+        speed: Math.hypot(player.velocity.x, player.velocity.z),
+        yaw: player.yaw,
+        pitch: player.pitch,
+        hitstop: playerCombat.hitstopT > 0,
+      });
+      // And the ball in the other hand, on the same frame delta and off the same
+      // predicted clock -- so the release starts on the frame the button goes down
+      // rather than on the next round trip.
+      footyViewmodel.update(frameDt, {
+        // Workstream O: `throwT`, which counts from a throw and is never consumed by
+        // the refill. This one line is the "recharge animation" the owner asked to
+        // have removed -- see `FootyViewmodel.update`.
+        sinceThrow: playerCombat.throwT,
+        charges: playerCombat.ballCharges,
+        speed: Math.hypot(player.velocity.x, player.velocity.z),
+        down: playerCombat.phase === 'ko',
+        hitstop: playerCombat.hitstopT > 0,
+      });
+      // Remotes, on the frame delta like every other actor and for the same
+      // reason: the simulation is fixed so prediction and rewind agree, and
+      // animation is presentation and has to be smooth at whatever rate the
+      // display runs. Their *positions* come from the interpolation clock, which
+      // `net.update` advanced above.
+      if (net) {
+        for (const r of net.remotes.values()) {
+          const entry = ensureRemoteActor(r);
+          // A remote is created by its JOIN event and placed by its first
+          // snapshot, and between the two its position is the ENU origin -- which
+          // is Circular Quay, and up to four kilometres from wherever the fight
+          // is. Hidden rather than posed until it has been told where it stands.
+          entry.actor.mesh.visible = !r.fresh;
+          if (!r.fresh) poseRemote(entry, r, frameDt);
         }
       }
-    }
-    nightLights.bikeLights.end();
 
-    // --- Every football in the air, from both sources, into one pool.
-    //
-    // The pool is fed declaratively each frame rather than keyed by id, which is
-    // what lets these two lists share it without agreeing about identity -- and
-    // they deliberately do not. `localBalls` is this process's own simulation,
-    // at present time; `net.balls` is everybody else's, interpolated 100 ms into
-    // the past with their throwers. Offline the second is empty and the first
-    // holds the lot. See `world/footyball.ts` and `net/client.ts`.
-    footyPool.begin();
-    for (const b of localBalls.balls) {
-      footyPool.add(b.x, b.y, b.z, b.vx, b.vy, b.vz, b.age);
     }
-    if (net) {
-      for (const b of net.balls.values()) {
-        footyPool.add(
-          b.position.x, b.position.y, b.position.z,
-          b.velocity.x, b.velocity.y, b.velocity.z,
-          b.age,
-        );
+    // Indoors: the bikes and their lights. Nobody rides a bike indoors. See `indoors`.
+    frameProfile.at(FSEC.bikes);
+    if (!indoors) {
+      // --- The lime e-bikes, after every actor is posed.
+      //
+      // Three sources, one geometry, three draws:
+      //
+      //   1. The **parked** set, instanced, culled by range. Ridden bikes are
+      //      skipped here -- they are drawn at their riders below, from the
+      //      interpolated positions this class does not have.
+      //   2. The **local player's**, at the predicted feet position, so it moves
+      //      on the frame the input does rather than on the next snapshot. Exactly
+      //      the argument `main.ts` already makes about the local player's own
+      //      footballs.
+      //   3. **Each riding remote's**, at their interpolated feet, so the bike and
+      //      the body drawn on it are on the same 100 ms clock. Drawing one of
+      //      them at present time would slide the rider along a bike a third of a
+      //      metre behind them.
+      placeResidentBikes();
+      maybeBuildStall();
+      bikeMeshes.update(bikeWorld().all(), player.position.x, player.position.z, isRiddenLocally);
+      // And the headlight on every one of those, from the same three numbers and
+      // in the same two places, so a bike that is drawn is a bike that is lit and
+      // there is no fourth list to keep in step. `begin` is false all day, which
+      // makes this two comparisons outside the night. See `world/nightlights.BikeLights`.
+      const bikeLit = nightLights.bikeLights.begin();
+      if (playerCombat.ridingBike !== 0) {
+        // With the lean, which only the local rider gets: the wire carries a yaw
+        // and not a yaw *rate*, so a remote's steering is not knowable here and a
+        // guessed lean would be a bike rocking on other people's screens for
+        // reasons nobody could see. See `world/bike.RiddenBike.set`.
+        selfBike.set(player.position.x, player.position.y - EYE_HEIGHT, player.position.z, player.yaw, rideLean);
+        if (bikeLit) {
+          nightLights.bikeLights.add(
+            player.position.x,
+            player.position.y - EYE_HEIGHT,
+            player.position.z,
+            player.yaw,
+          );
+        }
+      } else {
+        selfBike.hide();
       }
-    }
-    footyPool.end();
+      if (net) {
+        for (const r of net.remotes.values()) {
+          const entry = remotes.get(r.id);
+          if (!entry) continue;
+          // `FLAG.RIDING` is set for a driver too -- that is the contract, see
+          // `protocol.ENTER_FLAG.DRIVING` -- so the bike is drawn only for the
+          // remotes who are actually on one. Without this clause every driver in
+          // the room has a lime bike welded under their car.
+          if (r.riding && !r.fresh && !isDriving(r.id)) {
+            if (!entry.bike) {
+              entry.bike = new RiddenBike(bikes);
+              scene.add(entry.bike.mesh);
+            }
+            entry.bike.set(r.position.x, r.position.y - EYE_HEIGHT, r.position.z, r.yaw);
+            if (bikeLit) {
+              nightLights.bikeLights.add(r.position.x, r.position.y - EYE_HEIGHT, r.position.z, r.yaw);
+            }
+          } else if (entry.bike) {
+            entry.bike.hide();
+          }
+        }
+      }
+      nightLights.bikeLights.end();
 
-    // Spec 8.3's already-taken points, from the server's join message.
-    //
-    // Drained here rather than on arrival because a point cannot be marked
-    // before its tile has streamed in, and at join almost none of them have. It
-    // retries every frame and gives up after thirty seconds -- by which time
-    // anything still unresolved is a tile the player has not been near, whose
-    // respawn will have elapsed long before they get there.
-    if (net?.powerupsDown && powerupDrainT < 30) {
-      powerupDrainT += frameDt;
-      const remaining = net.powerupsDown.filter((d) => {
-        const point = powerups.find(`${d.tileKey}:${d.index}`);
-        if (!point) return true;
-        point.active = false;
-        point.respawnT = d.respawnT;
-        return false;
-      });
-      net.powerupsDown = remaining.length > 0 ? remaining : null;
-    }
+      // --- Every football in the air, from both sources, into one pool.
+      //
+      // The pool is fed declaratively each frame rather than keyed by id, which is
+      // what lets these two lists share it without agreeing about identity -- and
+      // they deliberately do not. `localBalls` is this process's own simulation,
+      // at present time; `net.balls` is everybody else's, interpolated 100 ms into
+      // the past with their throwers. Offline the second is empty and the first
+      // holds the lot. See `world/footyball.ts` and `net/client.ts`.
+      footyPool.begin();
+      for (const b of localBalls.balls) {
+        footyPool.add(b.x, b.y, b.z, b.vx, b.vy, b.vz, b.age);
+      }
+      if (net) {
+        for (const b of net.balls.values()) {
+          footyPool.add(
+            b.position.x, b.position.y, b.position.z,
+            b.velocity.x, b.velocity.y, b.velocity.z,
+            b.age,
+          );
+        }
+      }
+      footyPool.end();
 
-    collisionClock += frameDt;
-    if (collisionClock > 0.5) {
-      collisionClock = 0;
-      void ensureGround(player.position.x, player.position.z);
-      // On the same half-second and behind the same reasoning: the corridor can
-      // only be swept where the DEM is, and the DEM arrives a tile at a time.
-      // A no-op unless `?vessels=1`, and a no-op after that unless a grid has
-      // landed since the last one. See `refreshVessels`.
-      refreshVessels();
-    }
+      // Spec 8.3's already-taken points, from the server's join message.
+      //
+      // Drained here rather than on arrival because a point cannot be marked
+      // before its tile has streamed in, and at join almost none of them have. It
+      // retries every frame and gives up after thirty seconds -- by which time
+      // anything still unresolved is a tile the player has not been near, whose
+      // respawn will have elapsed long before they get there.
+      if (net?.powerupsDown && powerupDrainT < 30) {
+        powerupDrainT += frameDt;
+        const remaining = net.powerupsDown.filter((d) => {
+          const point = powerups.find(`${d.tileKey}:${d.index}`);
+          if (!point) return true;
+          point.active = false;
+          point.respawnT = d.respawnT;
+          return false;
+        });
+        net.powerupsDown = remaining.length > 0 ? remaining : null;
+      }
 
+      collisionClock += frameDt;
+      if (collisionClock > 0.5) {
+        collisionClock = 0;
+        void ensureGround(player.position.x, player.position.z);
+        // On the same half-second and behind the same reasoning: the corridor can
+        // only be swept where the DEM is, and the DEM arrives a tile at a time.
+        // A no-op unless `?vessels=1`, and a no-op after that unless a grid has
+        // landed since the last one. See `refreshVessels`.
+        refreshVessels();
+      }
+
+    }
     frameProfile.at(FSEC.plates);
     // --- The nameplates, last, because they are the only thing in the frame
     // that reads *other* objects' final world transforms.
