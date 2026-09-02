@@ -90,7 +90,7 @@ import { BikeField, shapeRideInput } from '../game/bikes.ts';
 // ends. See `game/driving.ts`.
 import { CarField, shapeDriveInput } from '../game/driving.ts';
 import { EYE_HEIGHT, step, type InputSnapshot, type PlayerState } from '../player/controller.ts';
-import {
+import { decodeLiftRide, type LiftRideFrame,
   ANIM,
   BTN,
   ENTER_FLAG,
@@ -1445,6 +1445,15 @@ export class NetClient {
     return true;
   }
 
+  /** The last `LIFT_RIDE`, waiting for the renderer to adopt it. */
+  private pendingLift: LiftRideFrame | null = null;
+  /** The pending lift ride, once. */
+  takeLift(): LiftRideFrame | null {
+    const r = this.pendingLift;
+    this.pendingLift = null;
+    return r;
+  }
+
   /** The pending space change, once. Null when nothing has changed. */
   takeSpace(): SpaceFrame | null {
     const frame = this.pendingSpace;
@@ -1957,6 +1966,12 @@ export class NetClient {
        * The actual move is `main.ts`'s: it owns the body, the scene and the
        * streamer, and all three change together. See `takeSpace`.
        */
+      case MSG.LIFT_RIDE: {
+        const r = decodeLiftRide(frame);
+        if (!r) return;
+        this.pendingLift = r;
+        return;
+      }
       case MSG.SPACE: {
         const f = decodeSpace(frame);
         if (!f) return;

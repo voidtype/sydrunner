@@ -3077,7 +3077,7 @@ async function checkBikes(): Promise<void> {
   // the bump is one line the lead changes here and in `protocol.ts` together.
   // See `PROTOCOL_VERSION`'s v15 note. If this line is still reading 14 after
   // the batch has landed, that is the bug this check exists to catch.
-  check(PROTOCOL_VERSION === 26, `the protocol is at version ${PROTOCOL_VERSION}`);
+  check(PROTOCOL_VERSION === 27, `the protocol is at version ${PROTOCOL_VERSION}`);
   check(
     WELCOME_BYTES === 36,
     `  and a WELCOME is ${WELCOME_BYTES} bytes: 27 through v10, plus v11's f64 clock, plus v15's ` +
@@ -11587,19 +11587,33 @@ async function checkInteriors(): Promise<void> {
       who.combat.body.position.set(core.x, inside.levels[0].y + EYE_HEIGHT, core.z);
       const up = s2.liftPress(who.id, 1);
       check(
-        up !== null && up.space === who.space && Math.abs(up.y - (inside.levels[1].y + EYE_HEIGHT)) < 0.01,
-        `a press in the cab of a ${n}-level building goes up one level, in the same space (${up === null ? 'refused' : `${up.y.toFixed(2)} m`})`,
+        up !== null && up.building === inside.seed && up.from === 0 && up.to === 1 && up.durMs > 0,
+        `a press in the cab of a ${n}-level building starts a ride up one level (${up === null ? 'refused' : `${up.from} -> ${up.to}, ${up.durMs} ms`})`,
       );
+      check(s2.liftPress(who.id, 1) === null, 'a press during the ride is ignored');
+      // The floor under the feet is the cab: at the end of the ride it is level 1.
+      if (up !== null) {
+        const feetEnd = interiorGround(inside, core.x, core.z, inside.levels[1].y, up.startMs + up.durMs + 1);
+        check(Math.abs(feetEnd - inside.levels[1].y) < 0.01, `the cab floor rests at level 1 when the ride ends (${feetEnd.toFixed(2)} m)`);
+        // The body rides the floor, so its feet are wherever the cab is: asked
+        // from halfway up, halfway through, the answer is a height between.
+        const mid = interiorGround(inside, core.x, core.z, (inside.levels[0].y + inside.levels[1].y) / 2, up.startMs + up.durMs / 2);
+        check(mid > inside.levels[0].y && mid < inside.levels[1].y, `and is between the floors halfway through (${mid.toFixed(2)} m)`);
+      }
+      inside.lift = null;
+      who.combat.body.position.set(core.x, inside.levels[1].y + EYE_HEIGHT, core.z);
       const at = arrivalAt(inside);
       check(
         s2.furnish(who.id, { op: FURNISH_OP.PLACE, kind: 0, turn: 0, x: at.x, z: at.z }) === null,
         'and nothing can be furnished from a floor above the ground',
       );
       who.combat.body.position.set(core.x, inside.levels[n - 1].y + EYE_HEIGHT, core.z);
-      const wrap = s2.liftPress(who.id, 1);
-      check(wrap !== null && Math.abs(wrap.y - (inside.levels[0].y + EYE_HEIGHT)) < 0.01, 'past the top, the lift goes back to the ground');
+      check(s2.liftPress(who.id, 1) === null, 'at the top, up does nothing: the shaft has an end');
       const down = s2.liftPress(who.id, -1);
-      check(down !== null && Math.abs(down.y - (inside.levels[n - 1].y + EYE_HEIGHT)) < 0.01, 'and below the ground, to the top');
+      check(down !== null && down.from === n - 1 && down.to === n - 2, 'and down from the top goes one level down');
+      inside.lift = null;
+      who.combat.body.position.set(core.x, inside.levels[0].y + EYE_HEIGHT, core.z);
+      check(s2.liftPress(who.id, -1) === null, 'and at the ground, down does nothing');
       who.combat.body.position.set(core.x, inside.levels[2].y + EYE_HEIGHT, core.z);
       const out = s2.doorPress(who.id);
       check(out !== null && out.space === CITY_SPACE, 'and a body two floors up can still leave by the door');

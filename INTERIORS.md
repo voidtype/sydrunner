@@ -193,10 +193,29 @@ The pieces, all in `world/interior.ts`:
   nearest the feet by height, never by level, so a body that jumps on a flight
   lands on the flight it jumped from.
 - **A lift** (seven storeys and up, and any building with a deck) is a cab with
-  three walls and a floor at whichever level you are on. `E` in the cab goes up
-  a level, `Shift+E` down, wrapping at both ends: one button that always does
-  something. The server owns the move (`Simulation.liftPress`), as it owns the
-  door.
+  three walls and a floor, and **the cab rides**. `E` in the cab goes up a
+  level, `Shift+E` down, and the ends of the shaft are ends: a press at the
+  top does nothing and the prompt says so. The server owns the ride
+  (`Simulation.liftPress` → `LIFT_RIDE` to everyone in the building), but
+  nothing on either end moves the body: the ride is three numbers on the
+  `Interior` (`lift: { from, to, startMs, durMs }`), `interiorGround` answers
+  the cab floor's height at this instant to a body within a step of it
+  (`liftFloorY`, doors then smoothstep at `LIFT_SPEED_MPS`), and a body standing
+  on a floor that moves goes with it -- the same `advance` on both ends, no
+  per-tick message, no reconciliation fight. The cab you see is
+  `liftCabMesh`, one transform a frame. Arriving says the level through the
+  hero line (`AreaLine.announce`: *GROUND FLOOR*, *LEVEL 12*, *THE DECK*).
+  It was a teleport that wrapped at both ends, and the owner found it
+  *"just went jittery"* and *"completely stuck"*: nothing moved, every floor
+  looked the same, and `/kill` (an alias of `/unstuck`) moved the body to a
+  road while the server still had it in the building -- `Simulation.unstuck`
+  now leaves the building first and the chat sends the `SPACE` frame.
+- **The slab.** A building's ground floor is at the highest terrain under its
+  footprint (`slabFor`, capped `SLAB_MAX_M` over the prism base), not the
+  pipeline's lowest corner: on a sloping block the DEM rose through the floor
+  and the owner stood on a hillside indoors -- *"outdoor floor can overlay
+  indoor ground"*. Both ends sample the raw DEM; the door still puts a body
+  at `it.base`, so the step up into the house is the door's, not a walk.
 - **Centrepoint.** Sydney Tower is three landmark prisms, every one
   `structural`, so it has no street door; the building that does is the podium
   under it, keyed by its `buildingSeed` in `DECKS` to an extra level at the

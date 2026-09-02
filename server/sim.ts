@@ -145,7 +145,7 @@ import {
 } from '../client/src/game/bikes.ts';
 import { EYE_HEIGHT, PLAYER_RADIUS } from '../client/src/player/controller.ts';
 import { COLOURWAYS } from '../client/src/player/character.ts';
-import {
+import { type LiftRideFrame,
   ANIM,
   BTN,
   EVENT,
@@ -277,8 +277,7 @@ import {
   placementFits,
   setPlacements,
   type Interior,
-  type InteriorDoor,
-} from '../client/src/world/interior.ts';
+  type InteriorDoor, liftMoving, liftTarget, liftDurationMs, slabFor } from '../client/src/world/interior.ts';
 import {
   MAX_PER_SPACE,
   REMOVE_REACH_M,
@@ -5802,7 +5801,9 @@ export class Simulation {
     const space = spaceForBuilding(seed);
     const held = this.interiors.get(space);
     if (held !== undefined) return held;
-    const it = buildInterior(prism.points, prism.base, prism.height, seed);
+    // The slab at the footprint's high side, off the raw DEM. See `slabFor`.
+    const slab = slabFor(prism.points, prism.base, (x, z) => this.world.terrain.height(x, z));
+    const it = buildInterior(prism.points, slab, prism.height - (slab - prism.base), seed);
     if (it === null) return null;
     /*
      * The world a body inside is stepped against, and the whole of what makes
@@ -5861,7 +5862,18 @@ export class Simulation {
    * the top: one button, and it always does something. The body is moved to
    * the same spot in the cab a level up, which is where the cab is.
    */
-  liftPress(id: number, direction: 1 | -1): SpaceFrame | null {
+  /**
+   * A press in the cab starts a ride, and the ride is the reply.
+   *
+   * It was a teleport to the next level, wrapping at both ends, and the owner
+   * found it *"just went jittery"* and *"completely stuck"*: nothing moved, the
+   * cab looked the same on every floor, and a second press at the top put
+   * them in the basement. Now the cab rides (`interior.liftFloorY`), the body
+   * is carried by the floor it stands on through `interiorGround`, a press
+   * during a ride is ignored, and the ends of the shaft are ends
+   * (`liftTarget`). The frame goes to everyone in the building.
+   */
+  liftPress(id: number, direction: 1 | -1): LiftRideFrame | null {
     const p = this.participants.get(id);
     if (!p || p.gone || p.bot !== null) return null;
     const inside = p.interior;
@@ -5870,10 +5882,14 @@ export class Simulation {
     if (core === null || core.kind !== CORE.LIFT) return null;
     const b = p.combat.body;
     if (!inCore(core, b.position.x, b.position.z, 0.05)) return null;
-    const n = inside.levels.length;
-    const k = (levelIndex(inside.levels, b.position.y - EYE_HEIGHT) + direction + n) % n;
-    this.moveInto(p, b.position.x, inside.levels[k].y + EYE_HEIGHT, b.position.z);
-    return this.spaceFrameFor(p);
+    const now = Date.now();
+    if (liftMoving(inside, now)) return null;
+    const feet = b.position.y - EYE_HEIGHT;
+    const from = levelIndex(inside.levels, feet);
+    const to = liftTarget(inside, feet, direction);
+    if (to < 0) return null;
+    inside.lift = { from, to, startMs: now, durMs: liftDurationMs(inside.levels, from, to) };
+    return { building: inside.seed, ...inside.lift };
   }
 
   /** The frame that tells a client where it is. See `protocol.SpaceFrame`. */
@@ -7004,6 +7020,13 @@ export class Simulation {
     // Read out rather than aliased: `body.position` is written below, and a
     // search that read its origin off the object it is about to move would be a
     // search whose second rung started from its own first answer.
+    // Out of the building first. `/unstuck` (and `/kill`, which is the same
+    // command) moved a body inside a tower to a road while the server still
+    // had them in the building's space and the client still drew the rooms:
+    // a street position in an interior world, which is the one place
+    // nothing could rescue them from. Leaving is the door's own arithmetic,
+    // and the caller sends the `SPACE` frame that tells the client.
+    if (p.interior !== null) this.leaveInterior(p);
     const fromX = to ? to.x : p.combat.body.position.x;
     const fromZ = to ? to.z : p.combat.body.position.z;
     // A probe world rather than `p.world`, because `groundFor`'s closure carries

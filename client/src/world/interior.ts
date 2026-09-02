@@ -343,6 +343,14 @@ export interface Interior {
   levels: readonly Level[];
   /** The stair or the lift, or null for a building with one level. See `Core`. */
   core: Core | null;
+  /**
+   * The lift cab's ride, or null while it rests. Set by `Simulation.liftPress`
+   * on the server and by the client on `LIFT_RIDE`; read by `interiorGround`,
+   * which is how both ends carry a body up the shaft with one function and no
+   * per-tick message: the cab is a floor that moves, and a body standing on a
+   * floor that moves goes with it. See `liftFloorY`.
+   */
+  lift: LiftRide | null;
   /** The ground-floor rooms the spawn can actually reach. */
   rooms: readonly Room[];
   /** Partitions between those rooms, doorways already subtracted. */
@@ -849,6 +857,163 @@ export function inCore(core: Core, x: number, z: number, slack = 0): boolean {
   return Math.abs(r) <= core.hr + slack && Math.abs(w) <= core.hw + slack;
 }
 
+// --- The lift's ride ---------------------------------------------------------
+//
+// The owner, on the cab that teleported: *"i got in a lift and used it and it
+// wasnt working just went jittery ... lift should move between levels, and it
+// should say the level like suburb, and you shouldnt be able to keep going
+// thru levels by yourself past the top/bottom level."* A ride is three
+// numbers both ends hold -- from, to, when -- and a duration derived from
+// them, so the floor's height at any instant is the same arithmetic on the
+// server and in the browser, off the wall clock the traffic already runs on.
+
+/** One ride of the cab. `startMs` is epoch milliseconds; the doors take `LIFT_DOORS_MS` before it moves. */
+export interface LiftRide {
+  from: number;
+  to: number;
+  startMs: number;
+  durMs: number;
+}
+/** Metres a second, once the doors are shut. A hydraulic in a tower, not a Kone in a bank. */
+export const LIFT_SPEED_MPS = 1.6;
+/** Doors, before the cab moves and after it stops: the pause that makes a ride read as one. */
+export const LIFT_DOORS_MS = 900;
+/** How far off the cab floor a body may be and still be riding it. */
+export const LIFT_BAND_M = 1.2;
+
+export function liftDurationMs(levels: readonly Level[], from: number, to: number): number {
+  const dy = Math.abs(levels[to].y - levels[from].y);
+  return Math.round(LIFT_DOORS_MS + (dy / LIFT_SPEED_MPS) * 1000 + LIFT_DOORS_MS);
+}
+
+/** Smoothstep: the cab eases off the floor and eases in, and it is a polynomial, so both ends agree to the bit. */
+function ease(u: number): number {
+  const t = u < 0 ? 0 : u > 1 ? 1 : u;
+  return t * t * (3 - 2 * t);
+}
+
+/** Where the cab floor is now, or null when the cab rests. After the ride it rests at `to`. */
+export function liftFloorY(it: Interior, nowMs: number): number | null {
+  const ride = it.lift;
+  if (ride === null) return null;
+  const y0 = it.levels[ride.from].y;
+  const y1 = it.levels[ride.to].y;
+  const travel = ride.durMs - 2 * LIFT_DOORS_MS;
+  if (travel <= 0) return y1;
+  const u = (nowMs - ride.startMs - LIFT_DOORS_MS) / travel;
+  return y0 + (y1 - y0) * ease(u);
+}
+
+/** Is the cab between floors right now? A press during a ride is ignored, not queued. */
+export function liftMoving(it: Interior, nowMs: number): boolean {
+  const ride = it.lift;
+  return ride !== null && nowMs < ride.startMs + ride.durMs;
+}
+
+/**
+ * The level a press would take a body standing at `feetY` to, or -1 at the
+ * end of the shaft. Clamped, not wrapped: the owner's *"you shouldnt be able
+ * to keep going thru levels by yourself past the top/bottom level."*
+ */
+export function liftTarget(it: Interior, feetY: number, direction: 1 | -1): number {
+  const k = levelIndex(it.levels, feetY) + direction;
+  return k < 0 || k >= it.levels.length ? -1 : k;
+}
+
+/** The level's name, the way a lift's indicator and the hero line say it. */
+export function levelName(it: Interior, k: number): string {
+  if (k <= 0) return 'GROUND FLOOR';
+  const top = it.levels.length - 1;
+  if (k === top && it.levels[k].rooms.length === 0 && it.levels.length > 1) return 'THE DECK';
+  return `LEVEL ${k}`;
+}
+
+/**
+ * The ground-floor slab for a footprint: the highest terrain under it, capped.
+ *
+ * The owner: *"outdoor floor can overlay indoor ground."* The prism's `base`
+ * is the pipeline's lowest corner, so on a sloping block the DEM rose through
+ * the interior floor and a body stood on a hillside indoors. A building on a
+ * slope cuts and fills to a level slab at its high side, and that is the floor
+ * here: the highest of the footprint's corners and centre, a hair over the
+ * ground, never more than `SLAB_MAX_M` over the base (the exterior mesh's
+ * windows belong to the base, and a floor three storeys up the facade is a
+ * different building). `groundAt` is the raw DEM on both ends -- `NaN` where a
+ * tile is not resident yet, which counts for nothing.
+ */
+export const SLAB_MAX_M = 2.5;
+export function slabFor(points: Float32Array, base: number, groundAt: (x: number, z: number) => number): number {
+  let top = -Infinity;
+  let cx = 0;
+  let cz = 0;
+  const n = points.length >> 1;
+  for (let i = 0; i < n; i++) {
+    const x = points[i * 2];
+    const z = points[i * 2 + 1];
+    cx += x;
+    cz += z;
+    const g = groundAt(x, z);
+    if (Number.isFinite(g) && g > top) top = g;
+  }
+  if (n > 0) {
+    const g = groundAt(cx / n, cz / n);
+    if (Number.isFinite(g) && g > top) top = g;
+  }
+  if (!Number.isFinite(top)) return base;
+  return Math.max(base, Math.min(base + SLAB_MAX_M, top + 0.02));
+}
+
+/**
+ * The cab itself, as triangles about the core's centre with the floor at y=0:
+ * a floor, three walls and a ceiling in brushed steel, a lit panel, and the
+ * open side toward the corridor. `InteriorView` sets its height every frame
+ * from `liftFloorY`, so the thing a rider stands in is the thing that moves.
+ */
+export function liftCabMesh(core: Core): { positions: Float32Array; normals: Float32Array; colors: Float32Array } {
+  const pos: number[] = [];
+  const nor: number[] = [];
+  const col: number[] = [];
+  const steel = { r: 0.46, g: 0.47, b: 0.5 };
+  const floor = { r: 0.3, g: 0.3, b: 0.32 };
+  const panel = { r: 0.95, g: 0.85, b: 0.55 };
+  const H = 2.35;
+  const ax = -core.lz;
+  const az = core.lx;
+  const at = (r: number, w: number): [number, number] => [core.x + core.lx * r + ax * w, core.z + core.lz * r + az * w];
+  const tri = (a: [number, number, number], b: [number, number, number], c: [number, number, number], n: [number, number, number], rgb: { r: number; g: number; b: number }, shade: number): void => {
+    pos.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+    for (let i = 0; i < 3; i++) nor.push(n[0], n[1], n[2]);
+    for (let i = 0; i < 3; i++) col.push(rgb.r * shade, rgb.g * shade, rgb.b * shade);
+  };
+  const quad = (p0: [number, number], p1: [number, number], p2: [number, number], p3: [number, number], y0: number, y1: number, n: [number, number, number], rgb: { r: number; g: number; b: number }, shade: number): void => {
+    // p0->p1 along the bottom edge, y0 at the bottom, y1 at the top; a vertical wall when y0 !== y1.
+    tri([p0[0], y0, p0[1]], [p1[0], y0, p1[1]], [p2[0], y1, p2[1]], n, rgb, shade);
+    tri([p0[0], y0, p0[1]], [p2[0], y1, p2[1]], [p3[0], y1, p3[1]], n, rgb, shade);
+  };
+  const hr = core.hr - 0.05;
+  const hw = core.hw - 0.05;
+  const back = at(hr, 0);
+  const bl = at(hr, -hw);
+  const br = at(hr, hw);
+  const fl = at(-hr, -hw);
+  const fr = at(-hr, hw);
+  // Floor and ceiling, seen from inside.
+  tri([fl[0], 0.01, fl[1]], [fr[0], 0.01, fr[1]], [br[0], 0.01, br[1]], [0, 1, 0], floor, 1);
+  tri([fl[0], 0.01, fl[1]], [br[0], 0.01, br[1]], [bl[0], 0.01, bl[1]], [0, 1, 0], floor, 1);
+  tri([fl[0], H, fl[1]], [br[0], H, br[1]], [fr[0], H, fr[1]], [0, -1, 0], steel, 0.9);
+  tri([fl[0], H, fl[1]], [bl[0], H, bl[1]], [br[0], H, br[1]], [0, -1, 0], steel, 0.9);
+  // Back wall faces the corridor (-r); side walls face inward.
+  quad(bl, br, br, bl, 0, H, [-core.lx, 0, -core.lz], steel, 0.8);
+  quad(fl, bl, bl, fl, 0, H, [ax, 0, az], steel, 0.85);
+  quad(br, fr, fr, br, 0, H, [-ax, 0, -az], steel, 0.85);
+  // The panel: a lit strip on the back wall at hand height.
+  const pa = at(hr - 0.02, -0.18);
+  const pb = at(hr - 0.02, 0.18);
+  quad(pa, pb, pb, pa, 1.1, 1.5, [-core.lx, 0, -core.lz], panel, 1);
+  void back;
+  return { positions: new Float32Array(pos), normals: new Float32Array(nor), colors: new Float32Array(col) };
+}
+
 /** The end of the core level `k` opens onto, as the sign of the run. */
 export function coreOpenEnd(core: Core, k: number): -1 | 1 {
   if (core.kind === CORE.LIFT) return -1;
@@ -893,10 +1058,18 @@ function laneMeetsLevel(levels: readonly Level[], s: -1 | 1, k: number, e: -1 | 
  * below it. Nearest by height rather than by level, so a body that jumps on a
  * flight lands on the flight it jumped from and never on the one above.
  */
-export function interiorGround(it: Interior, x: number, z: number, feetY: number): number {
+export function interiorGround(it: Interior, x: number, z: number, feetY: number, nowMs = Date.now()): number {
   const levels = it.levels;
   const k = levelIndex(levels, feetY);
   const core = it.core;
+  // **In the cab, on a ride, the floor is where the cab is.** A body within a
+  // step of the cab floor rides with it; a body at another level standing in
+  // the shaft's lobby keeps that level, so nobody upstairs is handed a floor
+  // ten metres below their feet because somebody downstairs pressed a button.
+  if (core !== null && core.kind === CORE.LIFT && it.lift !== null && inCore(core, x, z, 0.05)) {
+    const cabY = liftFloorY(it, nowMs);
+    if (cabY !== null && Math.abs(feetY - cabY) <= LIFT_BAND_M) return cabY;
+  }
   if (core === null || core.kind !== CORE.STAIR || !inCore(core, x, z, 0.05)) return levels[k].y;
   const { r, w } = coreLocal(core, x, z);
   const t = Math.max(0, Math.min(1, (r + core.hr) / (2 * core.hr)));
@@ -1407,6 +1580,7 @@ export function buildInterior(
     base,
     ceilingY: base + CEILING_M,
     plan,
+    lift: null,
     rooms: levels[0].rooms,
     walls: levels[0].walls,
     headers: levels[0].headers,
@@ -3360,7 +3534,46 @@ export function verifyInterior(): string[] {
       const out = nudge(it, c.x, c.z, -c.lx, -c.lz, c.hr + 2, feet + 0.42);
       if (coreLocal(c, out.x, out.z).r > -c.hr - 0.5) failures.push('the lift cab cannot be walked out of.');
       if (!interiorLine(it).includes('lift')) failures.push('a tower does not mention its lift.');
+      // --- The ride: the floor moves, monotonically, from one level to the
+      // next, carries a body within a step of it, leaves a body upstairs
+      // alone, and the ends of the shaft are ends.
+      if (liftTarget(it, it.levels[11].y, 1) !== -1) failures.push('the lift wraps past the top floor.');
+      if (liftTarget(it, it.levels[0].y, -1) !== -1) failures.push('the lift wraps below the ground floor.');
+      if (liftTarget(it, it.levels[3].y, 1) !== 4 || liftTarget(it, it.levels[3].y, -1) !== 2) failures.push('the lift does not go one level at a time.');
+      const durMs = liftDurationMs(it.levels, 2, 3);
+      if (!(durMs > 2 * LIFT_DOORS_MS && durMs < 2 * LIFT_DOORS_MS + 5000)) failures.push(`a one-storey ride takes ${durMs} ms.`);
+      it.lift = { from: 2, to: 3, startMs: 1000, durMs };
+      const y2 = it.levels[2].y;
+      const y3 = it.levels[3].y;
+      let last = -Infinity;
+      let feetRide = y2;
+      for (let t = 0; t <= durMs; t += 40) {
+        const fy = interiorGround(it, c.x, c.z, feetRide, 1000 + t);
+        if (fy < last - 1e-6) failures.push(`the cab went down on the way up at ${t} ms.`);
+        if (fy > y3 + 1e-6 || fy < y2 - 1e-6) failures.push(`the cab left the shaft at ${t} ms: ${fy}.`);
+        last = fy;
+        feetRide = fy;
+      }
+      if (Math.abs(feetRide - y3) > 1e-6) failures.push(`the ride ended at ${feetRide}, not level 3 at ${y3}.`);
+      if (Math.abs(interiorGround(it, c.x, c.z, y2, 1000 + LIFT_DOORS_MS / 2) - y2) > 1e-6) failures.push('the cab moved before the doors shut.');
+      if (!liftMoving(it, 1000 + durMs - 1) || liftMoving(it, 1000 + durMs)) failures.push('liftMoving does not agree with the ride.');
+      const upstairs = interiorGround(it, c.x, c.z, it.levels[7].y, 1000 + durMs / 2);
+      if (Math.abs(upstairs - it.levels[7].y) > 1e-6) failures.push('a body in the lobby on level 7 was handed the riding cab.');
+      it.lift = null;
+      if (levelName(it, 0) !== 'GROUND FLOOR' || levelName(it, 5) !== 'LEVEL 5') failures.push('the levels are not named the way the indicator says them.');
+      const cab = liftCabMesh(c);
+      if (cab.positions.length < 9 * 12 || cab.positions.length !== cab.normals.length || cab.colors.length !== cab.positions.length) failures.push('the lift cab mesh is not a mesh.');
     }
+  }
+  // --- The slab: a footprint on a slope floors at its high side, capped.
+  {
+    const pts = new Float32Array([0, 0, 20, 0, 20, 20, 0, 20]);
+    const slope = (x: number): number => 10 + x * 0.1;
+    const slab = slabFor(pts, 10, slope);
+    if (Math.abs(slab - 12.02) > 1e-6) failures.push(`the slab on a 1:10 slope came out at ${slab}, not 12.02.`);
+    if (slabFor(pts, 10, (x) => 10 + x) !== 10 + SLAB_MAX_M) failures.push('the slab is not capped.');
+    if (slabFor(pts, 10, () => Number.NaN) !== 10) failures.push('a footprint with no terrain yet did not keep its base.');
+    if (slabFor(pts, 10, () => 4) !== 10) failures.push('a slab went under its base.');
   }
 
   // --- The deck: one more level, no rooms, dropped if it would be under the roof.

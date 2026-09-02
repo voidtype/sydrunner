@@ -70,7 +70,7 @@
  * behaviour for a victim who had not been drawn yet; AOI just made it common.
  */
 
-import {
+import { encodeLiftRide,
   AOI_MAX_PLAYERS,
   ENTER_FLAG,
   INTEREST_HEADER_BYTES,
@@ -1109,9 +1109,14 @@ export class Room {
   liftPress(ws: Socket, direction: 1 | -1): void {
     const p = ws.data.participant;
     if (!p) return;
-    const frame = this.sim.liftPress(p.id, direction);
-    if (frame === null) return;
-    ws.send(encodeSpace(frame));
+    const ride = this.sim.liftPress(p.id, direction);
+    if (ride === null) return;
+    // Everyone in the building watches the same cab.
+    const buf = encodeLiftRide(ride);
+    for (const other of this.conns) {
+      const q = other.data.participant;
+      if (q && q.space === p.space) other.send(buf);
+    }
   }
 
   doorPress(ws: Socket): void {

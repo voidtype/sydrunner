@@ -99,6 +99,19 @@ export class AreaLine {
    * Advance by `dt` seconds with the nearest suburb as the locator has it
    * (null when it has none yet). Returns what to draw.
    */
+  /** A line asked for outright -- a lift arriving at a level -- shown next, dwell and encore be damned. */
+  private forced: string | null = null;
+
+  /**
+   * Say this now: the lift's *"LEVEL 12"*, in the same device as the suburb.
+   * No dwell, no encore rule, and it does not disturb a suburb mid-fade: it
+   * follows the line that is up, or begins at once if none is.
+   */
+  announce(text: string): void {
+    if (this.showing === null) this.begin(text);
+    else if (this.showing !== text) this.forced = text;
+  }
+
   update(dt: number, nearest: string | null): AreaLineFrame {
     if (!(dt > 0)) dt = 0;
     this.clock += dt;
@@ -131,7 +144,11 @@ export class AreaLine {
       if (this.age >= total) {
         this.showing = null;
         this.age = 0;
-        if (this.queued !== null) {
+        if (this.forced !== null) {
+          const next = this.forced;
+          this.forced = null;
+          this.begin(next);
+        } else if (this.queued !== null) {
           const next = this.queued;
           this.queued = null;
           // Still the place we are in? Otherwise it was a road we crossed.
@@ -165,6 +182,20 @@ export class AreaLine {
 /** Self-check, on both boot lists. */
 export function verifyAreaLine(): string[] {
   const failures: string[] = [];
+  // --- An announcement shows at once, and a second one follows the first.
+  {
+    const line = new AreaLine();
+    line.announce('LEVEL 12');
+    const f0 = line.update(0.05, null);
+    if (f0.text !== 'LEVEL 12') failures.push('an announced line did not show at once.');
+    line.announce('LEVEL 13');
+    let seen13 = false;
+    for (let t = 0; t < 12; t += 0.05) {
+      const f = line.update(0.05, null);
+      if (f.text === 'LEVEL 13') seen13 = true;
+    }
+    if (!seen13) failures.push('a line announced during another was dropped.');
+  }
   const step = 1 / 60;
   const run = (line: AreaLine, seconds: number, nearest: string | null, onFrame?: (f: AreaLineFrame, t: number) => void): void => {
     for (let t = 0; t < seconds; t += step) {

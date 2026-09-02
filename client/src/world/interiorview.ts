@@ -38,7 +38,7 @@ import {
   MeshBasicNodeMaterial,
   type Scene,
 } from 'three/webgpu';
-import { ghostMesh, interiorMesh, type Interior, type InteriorDoor } from './interior.ts';
+import { liftCabMesh, CORE, ghostMesh, interiorMesh, type Interior, type InteriorDoor } from './interior.ts';
 import type { Placement } from './placeables.ts';
 
 /**
@@ -127,7 +127,39 @@ export class InteriorView {
    * again every time a couch lands would be a layer switch per placement for no
    * reason -- and would fight anything that had legitimately changed it.
    */
+  /** The lift cab, or null for a building without one. Its height follows `liftFloorY`. */
+  private cab: Mesh | null = null;
+
+  /** Put the cab floor at this height. Cheap: one transform. */
+  setCabY(y: number): void {
+    if (this.cab !== null) this.cab.position.y = y;
+  }
+
+  private rebuildCab(it: Interior): void {
+    const old = this.cab;
+    if (old !== null) {
+      this.scene.remove(old);
+      old.geometry.dispose();
+      this.cab = null;
+    }
+    const core = it.core;
+    if (core === null || core.kind !== CORE.LIFT) return;
+    const built = liftCabMesh(core);
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new BufferAttribute(built.positions, 3));
+    geometry.setAttribute('normal', new BufferAttribute(built.normals, 3));
+    geometry.setAttribute('color', new BufferAttribute(built.colors, 3));
+    const mesh = new Mesh(geometry, this.material);
+    mesh.layers.set(INTERIOR_LAYER);
+    mesh.frustumCulled = false;
+    mesh.renderOrder = 0;
+    mesh.position.y = it.levels[0].y;
+    this.scene.add(mesh);
+    this.cab = mesh;
+  }
+
   rebuild(it: Interior, door: InteriorDoor = it.door): void {
+    this.rebuildCab(it);
     const old = this.mesh;
     if (old !== null) {
       this.scene.remove(old);
@@ -188,6 +220,12 @@ export class InteriorView {
   hide(camera: Camera): void {
     camera.layers.set(0);
     this.setGhost(null, null, false);
+    const cab = this.cab;
+    if (cab !== null) {
+      this.scene.remove(cab);
+      cab.geometry.dispose();
+      this.cab = null;
+    }
     const mesh = this.mesh;
     if (mesh === null) return;
     this.scene.remove(mesh);

@@ -78,6 +78,7 @@
  * explicitly does not have.
  */
 
+import { encodeSpace } from '../client/src/net/protocol.ts';
 import {
   CHAT_FLAG,
   CHAT_ROOM_NONE,
@@ -352,7 +353,9 @@ export class ChatHub {
 
     const fromX = p.combat.body.position.x;
     const fromZ = p.combat.body.position.z;
+    const wasInside = p.interior !== null;
     const spot = room.sim.unstuck(p, Math.random, place);
+    if (spot && wasInside) ws.send(encodeSpace(room.sim.spaceFrameFor(p)));
     if (!spot) {
       this.unstuckRefused++;
       this.notify(ws, unstuckReply(null));
@@ -515,10 +518,13 @@ export class ChatHub {
       return 'command';
     }
 
+    const wasInside = p.interior !== null;
     const spot = room.sim.unstuck(p);
     if (spot) {
       this.unstuckAt.set(ws, now);
       this.unstuckServed++;
+      // The body left the building on the way out; the client has to hear so.
+      if (wasInside) ws.send(encodeSpace(room.sim.spaceFrameFor(p)));
     } else {
       this.unstuckRefused++;
     }

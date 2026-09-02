@@ -394,9 +394,11 @@ export const MSG = {
    * client already knows how to place a body from one of those, and a lift is
    * a teleport the server owns, exactly as a door is.
    *
-   * 0x18. Its reply is `SPACE`, so there is no 0x98.
+   * 0x18. Its reply is `LIFT_RIDE` (0x98), to everyone in the building.
    */
   LIFT: 0x18,
+  /** Server -> client: the cab is riding. See `LiftRideFrame`. */
+  LIFT_RIDE: 0x98,
   /**
    * "Put a couch here", or "take that one away". See `net/placeables.ts`... no:
    * `world/placeables.ts`, which is the shared definition of what a thing is.
@@ -1022,7 +1024,7 @@ export const MSG = {
  * the walls this server does. Two ends on different versions of a shared
  * computation is the failure the version exists to refuse.
  */
-export const PROTOCOL_VERSION = 26;
+export const PROTOCOL_VERSION = 27;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;
@@ -3792,6 +3794,52 @@ export function decodeDoor(buffer: ArrayBuffer): boolean {
 export const LIFT_BYTES = 2;
 
 /**
+ * `MSG.LIFT_RIDE` (0x98, server -> client): the cab in `building` is riding
+ * from level `from` to level `to`, doors shutting at `startMs` (epoch ms, the
+ * clock the traffic runs on), the whole ride `durMs` long. Sent to every
+ * socket in that building's space, so two people in one tower watch the same
+ * cab. The body is carried by `interior.interiorGround` reading the same
+ * numbers; nothing else moves it.
+ *
+ *     u8   type = MSG.LIFT_RIDE
+ *     u32  building seed
+ *     u8   from
+ *     u8   to
+ *     f64  startMs
+ *     u32  durMs
+ */
+export interface LiftRideFrame {
+  building: number;
+  from: number;
+  to: number;
+  startMs: number;
+  durMs: number;
+}
+export const LIFT_RIDE_BYTES = 1 + 4 + 1 + 1 + 8 + 4;
+export function encodeLiftRide(f: LiftRideFrame, buffer = new ArrayBuffer(LIFT_RIDE_BYTES)): ArrayBuffer {
+  const v = new DataView(buffer);
+  v.setUint8(0, MSG.LIFT_RIDE);
+  v.setUint32(1, f.building >>> 0, true);
+  v.setUint8(5, f.from & 0xff);
+  v.setUint8(6, f.to & 0xff);
+  v.setFloat64(7, f.startMs, true);
+  v.setUint32(15, f.durMs >>> 0, true);
+  return buffer;
+}
+export function decodeLiftRide(buffer: ArrayBuffer): LiftRideFrame | null {
+  if (buffer.byteLength < LIFT_RIDE_BYTES) return null;
+  const v = new DataView(buffer);
+  if (v.getUint8(0) !== MSG.LIFT_RIDE) return null;
+  return {
+    building: v.getUint32(1, true),
+    from: v.getUint8(5),
+    to: v.getUint8(6),
+    startMs: v.getFloat64(7, true),
+    durMs: v.getUint32(15, true),
+  };
+}
+
+/**
  * `MSG.LIFT`: a type byte and a direction, +1 for up and -1 for down.
  *
  *     u8   type = MSG.LIFT
@@ -5710,6 +5758,18 @@ export function verifyNet(): string[] {
     if (decodeSpace(encodeSpace(sent).slice(0, SPACE_BYTES - 1)) !== null) {
       failures.push('A truncated SPACE decoded rather than being refused.');
     }
+    // --- LIFT_RIDE, both ways, and the u32 seed and f64 clock survive.
+    const ride = { building: 0xfedcba98, from: 3, to: 12, startMs: 1787700000123.5, durMs: 6220 };
+    const gotRide = decodeLiftRide(encodeLiftRide(ride));
+    if (gotRide === null) failures.push('A LIFT_RIDE frame did not decode.');
+    else {
+      if (gotRide.building !== ride.building) failures.push('LIFT_RIDE lost the building seed.');
+      if (gotRide.from !== ride.from || gotRide.to !== ride.to) failures.push('LIFT_RIDE lost a level.');
+      if (gotRide.startMs !== ride.startMs) failures.push('LIFT_RIDE lost the clock; the cab would be at a different height on each end.');
+      if (gotRide.durMs !== ride.durMs) failures.push('LIFT_RIDE lost the duration.');
+    }
+    if (decodeLiftRide(encodeLiftRide(ride).slice(0, LIFT_RIDE_BYTES - 1)) !== null) failures.push('A truncated LIFT_RIDE decoded.');
+    if (decodeLiftRide(encodeSpace(sent)) !== null) failures.push('A SPACE frame decoded as a LIFT_RIDE.');
     if (decodeSpace(encodeSun(0, 0)) !== null) failures.push('A SUN frame decoded as a SPACE.');
   }
 

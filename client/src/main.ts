@@ -125,7 +125,7 @@ import {
   verifyPlaceables,
   type Placement,
 } from './world/placeables.ts';
-import { coreOpenEnd,
+import { liftFloorY, liftMoving, liftTarget, liftDurationMs, levelName, slabFor, coreOpenEnd,
   CORE,
   arrivalAt,
   buildInterior,
@@ -6372,6 +6372,19 @@ async function main(): Promise<void> {
    * only thing a tight reach buys is a player who cannot find the way out.
    */
   const EXIT_REACH_M = 5;
+  /** The cab's prompt: what a press would do from here, and nothing when it would do nothing. */
+  const liftPrompt = (): string => {
+    const it = interior;
+    if (it === null) return '';
+    if (liftMoving(it, Date.now())) return 'lift moving';
+    const feet = player.position.y - EYE_HEIGHT;
+    const up = liftTarget(it, feet, 1) >= 0;
+    const down = liftTarget(it, feet, -1) >= 0;
+    if (up && down) return 'E — lift up  ·  Shift+E — down';
+    if (up) return 'E — lift up  ·  ground floor';
+    if (down) return 'Shift+E — lift down  ·  top floor';
+    return '';
+  };
   /** Standing in a lift cab this frame. See `interior.Core`. */
   let atLift = false;
   /** Where the lift or the stairs are from here, in words, or nothing. */
@@ -8083,7 +8096,8 @@ async function main(): Promise<void> {
       return;
     }
 
-    const built = buildInterior(found.points, found.base, found.height, f.building);
+    const slab = slabFor(found.points, found.base, rawGroundAt);
+    const built = buildInterior(found.points, slab, found.height - (slab - found.base), f.building);
     if (built === null) {
       wantSpace = null;
       placeBody(f);
@@ -8140,11 +8154,17 @@ async function main(): Promise<void> {
   const pressLiftOffline = (direction: 1 | -1): void => {
     const it = interior;
     if (it === null || it.core === null || it.core.kind !== CORE.LIFT) return;
-    const n = it.levels.length;
-    const k = (levelIndex(it.levels, player.position.y - EYE_HEIGHT) + direction + n) % n;
-    player.position.y = it.levels[k].y + EYE_HEIGHT;
-    player.velocity.y = 0;
+    const now = Date.now();
+    if (liftMoving(it, now)) return;
+    const feet = player.position.y - EYE_HEIGHT;
+    const from = levelIndex(it.levels, feet);
+    const to = liftTarget(it, feet, direction);
+    if (to < 0) return;
+    it.lift = { from, to, startMs: now, durMs: liftDurationMs(it.levels, from, to) };
+    liftAnnounced = false;
   };
+  /** Whether the ride under way has had its level said. See the frame step below. */
+  let liftAnnounced = true;
   const pressDoorOffline = (): void => {
     if (interior !== null) {
       // Out, along the door's outward normal, at the city's own ground -- the
@@ -8170,7 +8190,8 @@ async function main(): Promise<void> {
     const site = doorSite;
     if (site === null) return;
     const seed = buildingSeed(site.prism);
-    const built = buildInterior(site.prism.points, site.prism.base, site.prism.height, seed);
+    const slab = slabFor(site.prism.points, site.prism.base, rawGroundAt);
+    const built = buildInterior(site.prism.points, slab, site.prism.height - (slab - site.prism.base), seed);
     if (built === null) return;
     // The arrival is the building's door, not the wall that was knocked on:
     // one building, one inside, one door. See `world/interior.ts`'s header.
@@ -10381,6 +10402,22 @@ async function main(): Promise<void> {
         wantSpaceTries = 0;
       }
       if (wantSpace !== null) applySpace(wantSpace);
+      // The cab, when the server says it rides. The floor under the feet does
+      // the carrying (`interiorGround`); this is only the bookkeeping.
+      const ride = net?.takeLift() ?? null;
+      if (ride !== null && interior !== null && interior.seed === ride.building) {
+        interior.lift = { from: ride.from, to: ride.to, startMs: ride.startMs, durMs: ride.durMs };
+        liftAnnounced = false;
+      }
+      if (interior !== null && interior.lift !== null) {
+        const nowMs = Date.now();
+        const cabY = liftFloorY(interior, nowMs);
+        if (cabY !== null) interiorView.setCabY(cabY);
+        if (!liftAnnounced && !liftMoving(interior, nowMs)) {
+          liftAnnounced = true;
+          areaLine.announce(levelName(interior, interior.lift.to));
+        }
+      }
       // What the room holds, when the server says it changed. Rebuilding the
       // mesh here rather than in the socket callback is `takeSpace`'s rule.
       if (net?.takePlaced() === true) adoptPlaced();
@@ -10506,7 +10543,7 @@ async function main(): Promise<void> {
     }
     const promptLine =
       interior !== null
-        ? (atLift ? 'E — lift up  ·  Shift+E — down' : atExit ? 'E — back outside' : coreHint)
+        ? (atLift ? liftPrompt() : atExit ? 'E — back outside' : coreHint)
         : sunButton.prompt(player.position.x, player.position.z) ||
           trainPill ||
           ridePrompt(playerCombat, playerCombat.phase, rideNudgeT, rideNudgeText) ||
