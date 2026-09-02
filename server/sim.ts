@@ -165,6 +165,9 @@ import {
   type SnapshotNpc,
   type SnapshotPlayer,
   type SpaceFrame,
+  FURNISH_OP,
+  type FurnishRequest,
+  type PlacedItem,
   TEAM_EVENT_KIND,
   type TeamEventKind,
 } from '../client/src/net/protocol.ts';
@@ -264,8 +267,17 @@ import { CollisionWorld, type Prism } from '../client/src/player/collision.ts';
 // building a door belongs to and where its walls are have to be answered here
 // or an interior is a room only its occupant can see.
 import { DOOR_REACH_M, buildingSeed, doorAt, type DoorPrism } from '../client/src/world/doorway.ts';
-import { arrivalAt, buildInterior, type Interior } from '../client/src/world/interior.ts';
+import { arrivalAt, buildInterior, placementFits, setPlacements, type Interior } from '../client/src/world/interior.ts';
+import {
+  MAX_PER_SPACE,
+  SAME_SPOT_M,
+  boxClearance,
+  boxOf,
+  knownKind,
+  sanitisePlacement,
+} from '../client/src/world/placeables.ts';
 import { CITY_SPACE, spaceForBuilding } from '../client/src/net/spaces.ts';
+import { InteriorStore } from './interiors.ts';
 import { TerrainField } from '../client/src/world/terrain.ts';
 import { WaterLevels } from '../client/src/world/wading.ts';
 import { PowerupField } from '../client/src/game/powerups.ts';
@@ -840,6 +852,9 @@ export interface TickOutput {
   snapshot: SnapshotPlayer[] | null;
 }
 
+/** What `placedIn` answers with outdoors. Shared; nothing mutates it. */
+const EMPTY_PLACED: readonly PlacedItem[] = [];
+
 export class Simulation {
   readonly world: ServerWorld;
   readonly participants = new Map<number, Participant>();
@@ -1294,6 +1309,16 @@ export class Simulation {
   private readonly accounts: AccountStore | null;
 
   /**
+   * What people have put in the buildings, or null.
+   *
+   * `accounts` and `wallets`' arrangement exactly: a host-wide store, shared by
+   * every room on the process, and null in a check that has no disk -- in which
+   * case a couch can still be placed and everybody in the room sees it, it just
+   * does not survive a restart. See `server/interiors.ts`.
+   */
+  private readonly interiorStore: InteriorStore | null;
+
+  /**
    * Who is driving what. See `client/src/game/driving-contract.ts`.
    *
    * `NO_DRIVING` by default, which reports every player on foot -- so a build
@@ -1410,7 +1435,12 @@ export class Simulation {
 
   constructor(
     world: ServerWorld,
-    options: { wallets?: WalletStore; driving?: DrivingLookup; accounts?: AccountStore } = {},
+    options: {
+      wallets?: WalletStore;
+      driving?: DrivingLookup;
+      accounts?: AccountStore;
+      interiors?: InteriorStore;
+    } = {},
   ) {
     this.world = world;
     this.wallets = options.wallets ?? null;
@@ -1418,6 +1448,7 @@ export class Simulation {
     // published: the two stores are the host's, shared across every room on it,
     // and are the only two things in this constructor that outlive the process.
     this.accounts = options.accounts ?? null;
+    this.interiorStore = options.interiors ?? null;
     // The real thing by default, now that the driving workstream has landed:
     // the fare loop asks `this.cars` who is driving what, and `NO_DRIVING`
     // survives only as the answer a caller gets when it explicitly asks for
@@ -5762,6 +5793,10 @@ export class Simulation {
       mover: it.resolver,
       groundHeight: () => it.base,
     };
+    // And whatever anybody has already put in it, before the first body is
+    // stepped against it: an interior built without its furniture would let the
+    // player who opened the door walk through a couch until the next change.
+    if (this.interiorStore !== null) setPlacements(it, this.interiorStore.for(space));
     const made = { it, world };
     this.interiors.set(space, made);
     return made;
@@ -5905,6 +5940,92 @@ export class Simulation {
     clearAboard(c.aboard);
     p.history.seed(this.tick, x, y, z, c.body.yaw);
     this.dirty = true;
+  }
+
+  /**
+   * Everything in the room this participant is standing in. For `MSG.PLACED`.
+   *
+   * Empty for anybody outdoors, which is the ordinary case and is also the
+   * right answer: the street is not a room and has nothing in it.
+   */
+  placedIn(space: number): readonly PlacedItem[] {
+    if (space === CITY_SPACE || this.interiorStore === null) return EMPTY_PLACED;
+    return this.interiorStore.for(space);
+  }
+
+  /**
+   * A player asked to put something down, or to take something away.
+   *
+   * Returns the room's new contents when anything changed, and null when
+   * nothing did -- which is the ordinary answer to a request that did not fit,
+   * and is what `Room.furnish` turns into "send this to everybody in the
+   * building" or "say nothing at all".
+   *
+   * ---------------------------------------------------------------------------
+   * **Every rule is enforced here and only here.** The browser runs the same
+   * `placementFits` so its ghost turns red on the frames this would refuse, but
+   * that is a courtesy to the player and not a check: a client that skipped it
+   * would simply get refusals. What this end owns is the room -- it generated
+   * the walls, it holds the list, and it is the only thing that can say whether
+   * a couch is inside them.
+   *
+   * The one thing not checked is *who*. The owner's call: **"for now just make
+   * it anyone can customise it"**, with a $20,000 claim to follow. When that
+   * lands it is a test on this line and a field on the store's record; nothing
+   * else about this function changes, which is why it is worth saying now that
+   * this is the line.
+   */
+  furnish(id: number, req: FurnishRequest): readonly PlacedItem[] | null {
+    const p = this.participants.get(id);
+    if (!p || p.gone || p.bot !== null) return null;
+    const inside = p.interior;
+    const store = this.interiorStore;
+    if (inside === null || store === null || p.space === CITY_SPACE) return null;
+
+    const held = store.for(p.space);
+    if (req.op === FURNISH_OP.REMOVE) {
+      // The nearest thing to the point, and nothing if there is not one close.
+      // A point rather than an index, because an index is into a list whose
+      // order changes the moment anything is removed from the middle of it --
+      // see `protocol.FurnishRequest`.
+      let best = -1;
+      let bestD = SAME_SPOT_M + 1.2;
+      for (let i = 0; i < held.length; i++) {
+        const d = boxClearance(boxOf(held[i], inside.plan.box.ux, inside.plan.box.uz), req.x, req.z);
+        if (d < bestD) {
+          bestD = d;
+          best = i;
+        }
+      }
+      if (best < 0) return null;
+      const next = held.slice();
+      next.splice(best, 1);
+      if (!store.set(p.space, next)) return null;
+      setPlacements(inside, next);
+      return next;
+    }
+
+    if (req.op !== FURNISH_OP.PLACE) return null;
+    if (!knownKind(req.kind)) return null;
+    if (held.length >= MAX_PER_SPACE) return null;
+    const want = sanitisePlacement({ kind: req.kind, x: req.x, z: req.z, turn: req.turn });
+    if (want === null) return null;
+    // **Not on top of a person**, which `placementFits` cannot know about: it is
+    // a question about the room and this is a question about who is in it. A
+    // couch dropped on somebody would push them somewhere on the next tick,
+    // which at a wall is through it.
+    const box = boxOf(want, inside.plan.box.ux, inside.plan.box.uz);
+    for (const other of this.ordered) {
+      if (other.space !== p.space) continue;
+      const b = other.combat.body.position;
+      if (boxClearance(box, b.x, b.z) < PLAYER_RADIUS + 0.05) return null;
+    }
+    if (!placementFits(inside, held, want, p.doorX, p.doorZ)) return null;
+    const next = held.slice();
+    next.push(want);
+    if (!store.set(p.space, next)) return null;
+    setPlacements(inside, next);
+    return next;
   }
 
   /**

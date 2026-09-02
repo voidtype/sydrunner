@@ -94,6 +94,7 @@ import {
   encodeRoster,
   encodeSnapshotInto,
   encodeSpace,
+  encodePlaced,
   encodeSun,
   encodeWelcome,
   investigationBytes,
@@ -126,6 +127,8 @@ import type { AccountRecord, AccountStore } from './accounts.ts';
 import { botName } from './bots.ts';
 import { FrameGroups, InterestIndex, InterestSet } from './aoi.ts';
 import { CITY_SPACE } from '../client/src/net/spaces.ts';
+import type { FurnishRequest } from '../client/src/net/protocol.ts';
+import type { InteriorStore } from './interiors.ts';
 import { Simulation, applyButtons, type Participant, type TickOutput } from './sim.ts';
 import { groundFor, roomWorld, type ServerWorld } from './world.ts';
 import {
@@ -878,6 +881,7 @@ export class Room {
     const sim: Simulation = new Simulation(roomWorld(shared), {
       wallets: money.wallets,
       accounts: money.accounts,
+      interiors: money.interiors,
       driving: money.fakeDriving
         ? fakeDriving({
             poseOf: (playerId) => {
@@ -1040,6 +1044,39 @@ export class Room {
     // message entirely would be standing in the right place with the wrong
     // walls -- which is why it is sent rather than assumed.
     ws.send(encodeSpace(this.sim.spaceFrameFor(p)));
+    // And the contents of whatever room that is, on `doorPress`' ordering.
+    ws.send(encodePlaced(p.space, this.sim.placedIn(p.space)));
+  }
+
+  /**
+   * Somebody put a couch down, or picked one up. `MSG.FURNISH`.
+   *
+   * `Simulation.furnish` owns every rule; this owns the delivery, and there is
+   * one decision in it: the new contents go to **everybody in that space**, not
+   * just to the person who asked. A room is shared -- the owner's first
+   * decision about interiors -- so a couch only its placer could see would be
+   * the feature failing in the quietest possible way.
+   *
+   * Nothing goes out when nothing changed. A refused placement is answered with
+   * silence, because the browser ran the same `placementFits` before it asked
+   * and has already drawn the ghost red; there is nothing to take back.
+   */
+  furnish(ws: Socket, req: FurnishRequest): void {
+    const p = ws.data.participant;
+    if (!p) return;
+    const items = this.sim.furnish(p.id, req);
+    if (items === null) return;
+    const frame = encodePlaced(p.space, items);
+    for (const other of this.conns) {
+      const who = other.data.participant;
+      // The space test is the whole of the addressing. Everybody outdoors and
+      // everybody in a different building gets nothing, which at a full room is
+      // one integer comparison each.
+      if (!who || who.space !== p.space) continue;
+      other.send(frame);
+      this.bytesSent += frame.byteLength;
+      this.logBytes += frame.byteLength;
+    }
   }
 
   /**
@@ -1068,6 +1105,12 @@ export class Room {
     const frame = this.sim.doorPress(p.id);
     if (frame === null) return;
     ws.send(encodeSpace(frame));
+    // And what is in the room they have just walked into -- or the empty frame
+    // for the street, which is what tells a client leaving a pub to forget the
+    // couches. Immediately after the space and before any snapshot, on
+    // `MSG.INTEREST`'s ordering rule: a frame that refers to a room must arrive
+    // after the frame that says which room you are in.
+    ws.send(encodePlaced(p.space, this.sim.placedIn(p.space)));
     // The working set is now wrong in a way one snapshot cannot fix: everybody
     // this client could see a moment ago is in a different world, and everybody
     // in the building is new. Cleared rather than left to the delta, because the
@@ -1911,6 +1954,15 @@ export interface RoomMoney {
    * participant a guest. See `server/accounts.ts`.
    */
   accounts?: AccountStore;
+  /**
+   * What people have put in the buildings, on `accounts`' terms exactly.
+   *
+   * Host-wide, because a building's inside is one room for everybody on the
+   * box, and optional so every existing construction in the checks and the load
+   * harness still compiles -- with a couch that everybody in the room sees and
+   * that does not survive a restart. See `server/interiors.ts`.
+   */
+  interiors?: InteriorStore;
 }
 
 /**

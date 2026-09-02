@@ -38,7 +38,8 @@ import {
   MeshBasicNodeMaterial,
   type Scene,
 } from 'three/webgpu';
-import { interiorMesh, type Interior } from './interior.ts';
+import { ghostMesh, interiorMesh, type Interior } from './interior.ts';
+import type { Placement } from './placeables.ts';
 
 /**
  * The layer an interior is drawn on, and the city is not.
@@ -81,6 +82,16 @@ function createInteriorMaterial(): MeshBasicNodeMaterial {
 export class InteriorView {
   private readonly material = createInteriorMaterial();
   private mesh: Mesh | null = null;
+  /**
+   * The customiser's preview, or none.
+   *
+   * A second mesh rather than part of the room's, because it changes every
+   * frame a player moves their head and the room's changes when somebody puts
+   * a couch down -- rebuilding a whole building's triangles sixty times a
+   * second to move one preview would be the one place this feature could cost
+   * anything.
+   */
+  private ghost: Mesh | null = null;
 
   constructor(private readonly scene: Scene) {}
 
@@ -105,6 +116,31 @@ export class InteriorView {
     doorNZ: number,
   ): void {
     this.hide(camera);
+    this.rebuild(it, doorX, doorZ, doorNX, doorNZ);
+    camera.layers.set(INTERIOR_LAYER);
+  }
+
+  /**
+   * Rebuild the room's triangles in place, keeping the camera where it is.
+   *
+   * Called when somebody furnishes the building. Separate from `show` because
+   * `show` is also the thing that takes the camera off the city, and doing that
+   * again every time a couch lands would be a layer switch per placement for no
+   * reason -- and would fight anything that had legitimately changed it.
+   */
+  rebuild(
+    it: Interior,
+    doorX: number,
+    doorZ: number,
+    doorNX: number,
+    doorNZ: number,
+  ): void {
+    const old = this.mesh;
+    if (old !== null) {
+      this.scene.remove(old);
+      old.geometry.dispose();
+      this.mesh = null;
+    }
     const built = interiorMesh(it, doorX, doorZ, doorNX, doorNZ);
     const geometry = new BufferGeometry();
     geometry.setAttribute('position', new BufferAttribute(built.positions, 3));
@@ -121,12 +157,44 @@ export class InteriorView {
     mesh.renderOrder = 0;
     this.scene.add(mesh);
     this.mesh = mesh;
-    camera.layers.set(INTERIOR_LAYER);
+  }
+
+  /**
+   * Show the customiser's preview here, or nowhere.
+   *
+   * Rebuilt rather than moved, because a couch is seven boxes whose *shape*
+   * changes with its quarter turn -- a transform on a mesh would have to carry
+   * the turn as a rotation and would then be a second place the turn is
+   * expressed. A hundred and twenty triangles a frame is nothing.
+   */
+  setGhost(it: Interior | null, at: Placement | null, ok: boolean): void {
+    const old = this.ghost;
+    if (old !== null) {
+      this.scene.remove(old);
+      old.geometry.dispose();
+      this.ghost = null;
+    }
+    if (it === null || at === null) return;
+    const built = ghostMesh(it, at, ok);
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new BufferAttribute(built.positions, 3));
+    geometry.setAttribute('normal', new BufferAttribute(built.normals, 3));
+    geometry.setAttribute('color', new BufferAttribute(built.colors, 3));
+    const mesh = new Mesh(geometry, this.material);
+    mesh.layers.set(INTERIOR_LAYER);
+    mesh.frustumCulled = false;
+    // Over the room, so a preview standing against a wall is not half-eaten by
+    // it: the two are millimetres apart and the depth test has no opinion worth
+    // having about which should win.
+    mesh.renderOrder = 1;
+    this.scene.add(mesh);
+    this.ghost = mesh;
   }
 
   /** Take it away, and put the camera back on the city. */
   hide(camera: Camera): void {
     camera.layers.set(0);
+    this.setGhost(null, null, false);
     const mesh = this.mesh;
     if (mesh === null) return;
     this.scene.remove(mesh);

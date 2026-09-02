@@ -71,6 +71,19 @@
  */
 
 import { floorPlan, type FloorPlan, type Room } from './floorplan.ts';
+// What people put in the room, as against what the generator put there. One
+// direction only: `placeables.ts` knows nothing about interiors.
+import {
+  PLACEABLE,
+  PLACEABLES,
+  boxClearance,
+  boxOf,
+  boxesOverlap,
+  cornersOf,
+  pushOutOfBox,
+  type PlacedBox,
+  type Placement,
+} from './placeables.ts';
 
 /** Wall thickness, metres. Also how far the walkable shell is inset from the footprint. */
 export const WALL_THICK_M = 0.16;
@@ -176,6 +189,14 @@ export interface Interior {
   /** The footprint's centre. `arrivalAt` walks toward it; the view looks at it. */
   centreX: number;
   centreZ: number;
+  /**
+   * What people have put in the room, as boxes, for the mesh to draw.
+   *
+   * The same list `InteriorResolver.setPlaced` holds, kept here as well so that
+   * the drawing and the collision cannot describe different rooms. `setPlacements`
+   * writes both in one call and is the only thing that writes either.
+   */
+  placedBoxes: readonly PlacedBox[];
   /** What `CombatWorld.mover` is set to while a body is in here. */
   resolver: InteriorResolver;
 }
@@ -417,10 +438,28 @@ function clipToShell(
  * which is where a second walkable storey will read them.
  */
 export class InteriorResolver {
+  /**
+   * What people have put in the room, as boxes.
+   *
+   * Mutable, where everything else in this class is fixed at construction, and
+   * that asymmetry is the feature: the *rooms* are derived and identical for
+   * everybody forever, and the couches are not -- they arrive on the wire, they
+   * change while a player is standing in the room, and both ends have to start
+   * stepping bodies around them on the same tick. Replaced wholesale rather
+   * than patched, because a placement list is at most 64 entries and the frame
+   * that carries it is the whole list.
+   */
+  private placed: readonly PlacedBox[] = [];
+
   constructor(
     private readonly planes: readonly ShellPlane[],
     private readonly walls: readonly InteriorWall[],
   ) {}
+
+  /** Adopt this room's furniture. See `placed`. */
+  setPlaced(boxes: readonly PlacedBox[]): void {
+    this.placed = boxes;
+  }
 
   /**
    * How much room a body of zero radius has at this point, metres.
@@ -447,6 +486,10 @@ export class InteriorResolver {
       const ex = x - (w.ax + dx * t);
       const ez = z - (w.az + dz * t);
       const s = Math.sqrt(ex * ex + ez * ez) - WALL_THICK_M / 2;
+      if (s < least) least = s;
+    }
+    for (const b of this.placed) {
+      const s = boxClearance(b, x, z);
       if (s < least) least = s;
     }
     return least;
@@ -512,6 +555,15 @@ export class InteriorResolver {
         const push = want - d;
         x += ex * push;
         z += ez * push;
+        moved = true;
+      }
+      // And the furniture, in the same pass as the walls so a body wedged
+      // between a couch and a wall is pushed out of both before the pass ends.
+      for (const b of this.placed) {
+        const r = pushOutOfBox(b, x, z, radius);
+        if (!r.hit) continue;
+        x = r.x;
+        z = r.z;
         moved = true;
       }
       if (!moved) break;
@@ -733,6 +785,7 @@ export function buildInterior(
     planes,
     centreX,
     centreZ,
+    placedBoxes: [],
     resolver: new InteriorResolver(planes, walls),
   };
 }
@@ -783,6 +836,122 @@ export function arrivalAt(
   return { x, z };
 }
 
+// --- What people put in it -----------------------------------------------------
+
+/**
+ * How much room a doorway keeps around itself, metres.
+ *
+ * Nothing may be placed within this of an opening. It is the one anti-grief
+ * rule in a feature that is otherwise wide open by the owner's decision --
+ * *"for now just make it anyone can customise it"* -- and it is the one worth
+ * having: a couch across a doorway is a room somebody else cannot get into, and
+ * unlike a couch in the middle of the floor it cannot be walked around.
+ */
+export const OPENING_CLEAR_M = 0.6;
+
+/**
+ * And the same for the way out, which is bigger because it matters more.
+ *
+ * Leaving does not test a reach (`sim.leaveInterior` says why), so a couch in
+ * front of the door cannot actually trap anybody. What it can do is hide the
+ * one panel in the building that says where the way out is, which for a new
+ * player is the same thing.
+ */
+export const DOOR_CLEAR_M = 1.4;
+
+/**
+ * How finely a wall is sampled when testing whether something fits against it.
+ *
+ * Segment-against-oriented-box is exact and fiddly; sampling a wall every
+ * 20 cm and asking the box how far away each sample is uses the distance
+ * function the collision already has, and 20 cm against a body 70 cm across
+ * cannot let anything through. Stated rather than hidden, because it is an
+ * approximation and the reader is entitled to know which way it errs: toward
+ * refusing a placement that would just have fitted.
+ */
+const WALL_SAMPLE_M = 0.2;
+
+/** Is this segment far enough from this box? Sampled; see `WALL_SAMPLE_M`. */
+function clearOfSegment(
+  b: PlacedBox,
+  ax: number, az: number, bx: number, bz: number,
+  want: number,
+): boolean {
+  const len = Math.hypot(bx - ax, bz - az);
+  const steps = Math.max(1, Math.ceil(len / WALL_SAMPLE_M));
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    if (boxClearance(b, ax + (bx - ax) * t, az + (bz - az) * t) < want) return false;
+  }
+  return true;
+}
+
+/**
+ * May this thing be put here?
+ *
+ * **The server's answer, and the browser runs it too** -- not because the
+ * browser is trusted, but so the ghost a player is aiming with turns red on
+ * exactly the frames the server would refuse. A rule enforced only on the
+ * authority is a rule a player discovers by being told no.
+ *
+ * Five questions, in the order that makes the cheap ones first:
+ *
+ *   1. Is it a thing at all, and is the room already full?
+ *   2. Is every corner of it inside the room? A couch half through the outside
+ *      wall is a couch hanging over the street.
+ *   3. Is it clear of the partitions?
+ *   4. Is it clear of the openings and of the way out? See `OPENING_CLEAR_M`.
+ *   5. Is it clear of everything already here?
+ */
+export function placementFits(
+  it: Interior,
+  existing: readonly Placement[],
+  p: Placement,
+  doorX: number,
+  doorZ: number,
+): boolean {
+  const kind = PLACEABLES[p.kind];
+  if (kind === undefined) return false;
+  const box = boxOf(p, it.plan.box.ux, it.plan.box.uz);
+
+  // Inside the room, corners and all.
+  const corners = cornersOf(box);
+  for (let i = 0; i < corners.length; i += 2) {
+    for (const pl of it.planes) {
+      if (pl.nx * corners[i] + pl.nz * corners[i + 1] - pl.d < 0.02) return false;
+    }
+  }
+  // Clear of the partitions, by half a wall so it stands against one rather
+  // than in one.
+  for (const w of it.walls) {
+    if (!clearOfSegment(box, w.ax, w.az, w.bx, w.bz, WALL_THICK_M / 2)) return false;
+  }
+  // Clear of every opening, which is the rule that keeps a building walkable.
+  for (const h of it.headers) {
+    if (!clearOfSegment(box, h.ax, h.az, h.bx, h.bz, OPENING_CLEAR_M)) return false;
+  }
+  if (boxClearance(box, doorX, doorZ) < DOOR_CLEAR_M) return false;
+  // And clear of everything already in the room.
+  for (const other of existing) {
+    if (boxesOverlap(box, boxOf(other, it.plan.box.ux, it.plan.box.uz))) return false;
+  }
+  return true;
+}
+
+/**
+ * Hand this room its furniture, so bodies start walking around it.
+ *
+ * One call rather than a setter per list, because the resolver and the mesh
+ * must never disagree about what is in the room: a body stepped around a couch
+ * nobody can see is worse than either of the two halves being wrong.
+ */
+export function setPlacements(it: Interior, list: readonly Placement[]): void {
+  const boxes: PlacedBox[] = [];
+  for (const p of list) boxes.push(boxOf(p, it.plan.box.ux, it.plan.box.uz));
+  it.resolver.setPlaced(boxes);
+  (it as { placedBoxes: readonly PlacedBox[] }).placedBoxes = boxes;
+}
+
 // --- Saying what it is ---------------------------------------------------------
 
 /**
@@ -830,6 +999,120 @@ export function interiorLine(it: Interior): string {
 }
 
 // --- Drawing it ----------------------------------------------------------------
+
+/**
+ * One couch, pushed into a triangle soup.
+ *
+ * A free function rather than a closure inside `interiorMesh`, because the
+ * **ghost** needs the same seven boxes: a preview drawn from different code
+ * than the thing it previews is a preview that lies, and the one place a player
+ * would notice is the one place it matters -- lining a couch up against a wall.
+ *
+ * Seven boxes rather than one, and it can afford to be: nothing in an interior
+ * is ever drawn by anybody in the street, which is the owner's own argument for
+ * why an inside is its own instance.
+ *
+ * `tint` overrides the cloth outright, which is what the ghost uses to be green
+ * or red. Null takes the colour from where the couch stands -- deterministic,
+ * so everybody in the building sees the same one, and derived from the position
+ * so a couch keeps its colour when it is nudged and forgets it when it is moved
+ * across the room, which is the honest behaviour for a thing with no identity
+ * of its own.
+ */
+export function couchInto(
+  pos: number[],
+  nor: number[],
+  col: number[],
+  b: PlacedBox,
+  floorY: number,
+  tint: { r: number; g: number; b: number } | null = null,
+): void {
+  const seat = 0.42;
+  const back = b.height;
+  const arm = 0.58;
+  const tone = 0.55 + hash2(Math.round(b.x * 4), Math.round(b.z * 4)) * 0.5;
+  const cloth = tint ?? {
+    r: Math.min(1, 0.34 * tone + 0.14),
+    g: Math.min(1, 0.30 * tone + 0.12),
+    b: Math.min(1, 0.36 * tone + 0.16),
+  };
+  const dark = { r: cloth.r * 0.62, g: cloth.g * 0.62, b: cloth.b * 0.62 };
+  const shade = (c: { r: number; g: number; b: number }, k: number): number[] => [
+    Math.min(1, c.r * k), Math.min(1, c.g * k), Math.min(1, c.b * k),
+  ];
+  const quad = (
+    ax: number, ay: number, az: number, bx: number, by: number, bz: number,
+    cx: number, cy: number, cz: number, dx: number, dy: number, dz: number,
+    nx: number, ny: number, nz: number, rgb: number[],
+  ): void => {
+    pos.push(ax, ay, az, bx, by, bz, cx, cy, cz, ax, ay, az, cx, cy, cz, dx, dy, dz);
+    for (let i = 0; i < 6; i++) nor.push(nx, ny, nz);
+    for (let i = 0; i < 6; i++) col.push(rgb[0], rgb[1], rgb[2]);
+  };
+  /** An upright box in the placement's own frame. `cu`/`cv` its centre, `hu`/`hv` its half-extents. */
+  const slab = (
+    cu: number, cv: number, hu: number, hv: number, y0: number, y1: number,
+    rgb: { r: number; g: number; b: number },
+  ): void => {
+    const px = (u: number, v: number): [number, number] => [
+      b.x + u * b.ax - v * b.az,
+      b.z + u * b.az + v * b.ax,
+    ];
+    const c0 = px(cu - hu, cv - hv);
+    const c1 = px(cu + hu, cv - hv);
+    const c2 = px(cu + hu, cv + hv);
+    const c3 = px(cu - hu, cv + hv);
+    const side = (p: [number, number], q: [number, number], k: number): void => {
+      let nx = q[1] - p[1];
+      let nz = -(q[0] - p[0]);
+      const l = Math.hypot(nx, nz) || 1;
+      nx /= l;
+      nz /= l;
+      quad(p[0], y0, p[1], q[0], y0, q[1], q[0], y1, q[1], p[0], y1, p[1], nx, 0, nz, shade(rgb, k));
+    };
+    side(c0, c1, 1);
+    side(c1, c2, 0.86);
+    side(c2, c3, 0.74);
+    side(c3, c0, 0.86);
+    // The top, which is the surface anybody actually looks at.
+    quad(
+      c0[0], y1, c0[1], c1[0], y1, c1[1], c2[0], y1, c2[1], c3[0], y1, c3[1],
+      0, 1, 0, shade(rgb, 1.12),
+    );
+  };
+  slab(0, 0, b.hx, b.hz, floorY, floorY + 0.16, dark);
+  slab(-b.hx * 0.45, 0.06, b.hx * 0.42, b.hz * 0.74, floorY + 0.16, floorY + seat, cloth);
+  slab(b.hx * 0.45, 0.06, b.hx * 0.42, b.hz * 0.74, floorY + 0.16, floorY + seat, cloth);
+  slab(0, -b.hz + 0.11, b.hx, 0.11, floorY + 0.16, floorY + back, cloth);
+  slab(-b.hx + 0.09, 0.09, 0.09, b.hz * 0.9, floorY + 0.16, floorY + arm, dark);
+  slab(b.hx - 0.09, 0.09, 0.09, b.hz * 0.9, floorY + 0.16, floorY + arm, dark);
+}
+
+/**
+ * One placement on its own, for the customiser's ghost.
+ *
+ * Green when the server would take it, red when it would not. The same
+ * `couchInto` the room is drawn with, which is the point -- see its note.
+ */
+export function ghostMesh(it: Interior, p: Placement, ok: boolean): InteriorMesh {
+  const pos: number[] = [];
+  const nor: number[] = [];
+  const col: number[] = [];
+  couchInto(
+    pos, nor, col,
+    boxOf(p, it.plan.box.ux, it.plan.box.uz),
+    it.base + 0.01,
+    ok ? { r: 0.35, g: 0.85, b: 0.45 } : { r: 0.9, g: 0.3, b: 0.28 },
+  );
+  return {
+    positions: new Float32Array(pos),
+    normals: new Float32Array(nor),
+    colors: new Float32Array(col),
+    triangles: pos.length / 9,
+  };
+}
+
+
 
 /**
  * The interior as triangles: positions, normals and vertex colours.
@@ -1436,6 +1719,9 @@ export function interiorMesh(
       0, 1, 0, 0.5,
     );
   }
+
+  // --- And what people have put in the room. See `couchInto`.
+  for (const b of it.placedBoxes) couchInto(pos, nor, col, b, floorY);
 
   // --- The wall over every opening, and the frame round it.
   //
@@ -2077,6 +2363,89 @@ export function verifyInterior(): string[] {
       if (leaf === 0) failures.push('the way out is not drawn at all.');
       if (buried > 0) failures.push(`${buried} triangles of the exit door are behind the wall they are set into; it is invisible.`);
       if (adrift > 0) failures.push(`${adrift} triangles of the exit door float ${'>'}0.5 m off the wall.`);
+    }
+  }
+
+  // --- Furniture: it fits where it is allowed to and nowhere else, and a body
+  //     walks round it rather than through it.
+  //
+  // The owner's first customisation, and the rules that keep an open sandbox
+  // from becoming a locked building. Everything here is driven rather than
+  // measured, because "may this couch go here" is a decision and the only
+  // honest test of a decision is to make it.
+  {
+    const pts = poly(0, 0, 16, 0, 16, 22, 0, 22);
+    const it = southDoor(pts, 0, 8, 77);
+    if (it === null) failures.push('a 16 x 22 m building generated no interior to furnish.');
+    else {
+      const doorX = 8;
+      const doorZ = 0;
+      const at = arrivalAt(it, doorX, doorZ, 0, -1);
+
+      // **Nothing goes outside the room.** A couch pushed at the far wall must
+      // be refused rather than left hanging over the street.
+      let outside = 0;
+      for (let i = 0; i < 24; i++) {
+        const t = i / 24;
+        const p: Placement = { kind: PLACEABLE.COUCH, x: -2 + t * 22, z: -2 + t * 28, turn: i & 3 };
+        if (!placementFits(it, [], p, doorX, doorZ)) continue;
+        const box = boxOf(p, it.plan.box.ux, it.plan.box.uz);
+        const corners = cornersOf(box);
+        for (let c = 0; c < corners.length; c += 2) {
+          for (const pl of it.planes) {
+            if (pl.nx * corners[c] + pl.nz * corners[c + 1] - pl.d < 0) outside++;
+          }
+        }
+      }
+      if (outside > 0) failures.push(`${outside} corners of accepted couches fall outside the building.`);
+
+      // **The way out stays visible**, which is the rule that matters most to
+      // somebody who has just walked in.
+      if (placementFits(it, [], { kind: PLACEABLE.COUCH, x: doorX, z: doorZ + 0.8, turn: 0 }, doorX, doorZ)) {
+        failures.push('a couch was allowed in front of the way out.');
+      }
+
+      // **Doorways stay walkable.** A couch across an opening is the one piece
+      // of griefing an open sandbox has no answer to, because unlike a couch in
+      // the middle of a floor it cannot be walked around.
+      let blocked = 0;
+      for (const h of it.headers) {
+        const mx = (h.ax + h.bx) / 2;
+        const mz = (h.az + h.bz) / 2;
+        if (placementFits(it, [], { kind: PLACEABLE.COUCH, x: mx, z: mz, turn: 0 }, doorX, doorZ)) blocked++;
+        if (placementFits(it, [], { kind: PLACEABLE.COUCH, x: mx, z: mz, turn: 1 }, doorX, doorZ)) blocked++;
+      }
+      if (blocked > 0) failures.push(`${blocked} couches were allowed to stand in a doorway.`);
+
+      // **Two things cannot share a spot**, whichever order they arrive in.
+      const first: Placement = { kind: PLACEABLE.COUCH, x: at.x + 3, z: at.z + 3, turn: 0 };
+      if (!placementFits(it, [], first, doorX, doorZ)) failures.push('a couch in the middle of an empty room was refused.');
+      if (placementFits(it, [first], { ...first }, doorX, doorZ)) failures.push('two couches were allowed in the same spot.');
+      if (placementFits(it, [first], { ...first, x: first.x + 0.4 }, doorX, doorZ)) {
+        failures.push('a couch was allowed 40 cm inside another one.');
+      }
+      if (!placementFits(it, [first], { ...first, x: first.x + 2.2 }, doorX, doorZ)) {
+        failures.push('a couch was refused beside another one with clear air between them.');
+      }
+
+      // **And a body walks round what is there.** The resolver has to start
+      // pushing on the tick the list arrives, or a placement is a decal.
+      setPlacements(it, [first]);
+      const into = it.resolver.resolve(
+        first.x + 3, first.z, first.x, first.z, 0.35, it.base,
+      );
+      if (!into.hit) failures.push('a body walked into a couch and was not stopped.');
+      if (it.resolver.clearance(into.x, into.z) < 0.35 - 1e-6) {
+        failures.push('a body stopped by a couch is standing inside it.');
+      }
+      if (it.placedBoxes.length !== 1) failures.push('the drawing and the collision hold different rooms.');
+      // And it is drawn.
+      const bare = interiorMesh(it, doorX, doorZ, 0, -1).triangles;
+      setPlacements(it, [first, { ...first, x: first.x + 2.4 }]);
+      const furnished = interiorMesh(it, doorX, doorZ, 0, -1).triangles;
+      if (furnished <= bare) failures.push('adding a couch drew no more triangles; furniture is invisible.');
+      setPlacements(it, []);
+      if (it.resolver.clearance(first.x, first.z) < 0) failures.push('a removed couch is still in the collision.');
     }
   }
 

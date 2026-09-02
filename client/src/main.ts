@@ -115,7 +115,24 @@ import { verifyRangeAlloc } from './world/rangealloc.ts';
 import { verifyFloorPlan } from './world/floorplan.ts';
 import { buildingSeed, doorAt, verifyDoorway, type DoorSite } from './world/doorway.ts';
 import { CITY_SPACE, spaceForBuilding, verifySpaces } from './net/spaces.ts';
-import { arrivalAt, buildInterior, interiorAdmits, interiorLine, verifyInterior, type Interior } from './world/interior.ts';
+import {
+  MAX_PER_SPACE,
+  PLACEABLE,
+  boxClearance,
+  boxOf,
+  verifyPlaceables,
+  type Placement,
+} from './world/placeables.ts';
+import {
+  arrivalAt,
+  buildInterior,
+  interiorAdmits,
+  interiorLine,
+  placementFits,
+  setPlacements,
+  verifyInterior,
+  type Interior,
+} from './world/interior.ts';
 import { INTERIOR_LAYER, InteriorView } from './world/interiorview.ts';
 import { lostMessage, lostPlan, verifyDeviceLost } from './devicelost.ts';
 import { verifyIndexDom } from './domcheck.ts';
@@ -514,6 +531,7 @@ import {
   CAMERA_MAX,
   CHASE_RADIUS,
   isThirdPerson,
+  CAMERA_FIRST_PERSON,
   liveCameraDistance,
   loadCameraDistance,
   marchCameraBoom,
@@ -5248,6 +5266,14 @@ async function main(): Promise<void> {
      */
     ...verifyInterior(),
     /*
+     * And what people put in the rooms. Shared with the server exactly as the
+     * spaces are, and for a sharper version of the same reason: the browser
+     * runs `placementFits` to colour the ghost a player is aiming with, and the
+     * server runs it to decide. Two answers that differed would be a player
+     * shown a green couch and told no.
+     */
+    ...verifyPlaceables(),
+    /*
      * And which world a participant is standing in. Shared with the server
      * because both ends must agree exactly: the browser predicts your position
      * in a space and the server adjudicates it in the same one, and a
@@ -6234,6 +6260,27 @@ async function main(): Promise<void> {
   const EXIT_REACH_M = 5;
   /** Is the body within reach of that door right now? Recomputed per frame. */
   let atExit = false;
+  /**
+   * The customiser: is it open, and what is it about to put down?
+   *
+   * *"Make it so inside gives a customiser, atm should just be able to place a
+   * couch (rotate 90 deg and click to place like in sims)"*.
+   *
+   * A **mode** rather than a key that places, and the reason is the left mouse
+   * button: it is the punch, and in a game whose whole verb is hitting people a
+   * click that sometimes furnishes a room instead would be the worst possible
+   * ambiguity. `B` opens the customiser, the click means *place* for as long as
+   * it is open, and `B` or `Escape` closes it. Indoors only, because there is
+   * nothing to furnish in the street.
+   */
+  let building = false;
+  /** Quarter turns from the building's own axis. `R` advances it. See `placeables.ts`. */
+  let buildTurn = 0;
+  /** Where the ghost is standing, and whether the server would allow it there. */
+  let ghostAt: Placement | null = null;
+  let ghostOk = false;
+  /** The room's contents, as the server last described them. */
+  let placedHere: Placement[] = [];
   const takeScratch = createDrivingScratch();
   /** Whether there is a car within reach this frame. Recomputed, never stored. */
   let takeableNear = false;
@@ -7702,6 +7749,105 @@ async function main(): Promise<void> {
    * position is the server's to own and the look is not -- which is the same
    * split `net/client.reconcile` has always made.
    */
+  /**
+   * How far in front of you the ghost can stand, metres.
+   *
+   * Far enough to furnish a room from where you are, near enough that you are
+   * putting a couch down rather than throwing it. Beyond this the ghost stops
+   * at the limit and stays visible, which is better than vanishing: a preview
+   * that disappears when you look at the far wall reads as broken.
+   */
+  const BUILD_REACH_M = 5;
+
+  /** The grid the ghost snaps to, metres. Quarter of a metre is a hand's width. */
+  const BUILD_GRID_M = 0.25;
+
+  /**
+   * Where the ghost should stand this frame, or null.
+   *
+   * The aim, dropped onto the floor. The camera looks down `-Z` in three's
+   * basis, so the ray is `getWorldDirection`; if it points up or level there is
+   * no floor to hit and the ghost goes to the reach limit ahead instead, which
+   * is what a player waving at a ceiling expects rather than a preview that
+   * blinks out.
+   *
+   * Snapped in the **building's own frame**, so a row of couches lines up with
+   * the walls rather than with north -- the same rule the turns obey and the
+   * same rule the floorboards obey.
+   */
+  const ghostSpot = (it: Interior): { x: number; z: number } => {
+    camera.getWorldDirection(doorGaze);
+    const eye = player.position;
+    const drop = eye.y - it.base;
+    let x: number;
+    let z: number;
+    const down = -doorGaze.y;
+    if (down > 0.05 && drop > 0.05) {
+      const t = Math.min(BUILD_REACH_M, drop / down);
+      x = eye.x + doorGaze.x * t;
+      z = eye.z + doorGaze.z * t;
+    } else {
+      const flat = Math.hypot(doorGaze.x, doorGaze.z) || 1;
+      x = eye.x + (doorGaze.x / flat) * BUILD_REACH_M;
+      z = eye.z + (doorGaze.z / flat) * BUILD_REACH_M;
+    }
+    // Never further than the reach, however the ray landed.
+    const dx = x - eye.x;
+    const dz = z - eye.z;
+    const d = Math.hypot(dx, dz);
+    if (d > BUILD_REACH_M) {
+      x = eye.x + (dx / d) * BUILD_REACH_M;
+      z = eye.z + (dz / d) * BUILD_REACH_M;
+    }
+    const box = it.plan.box;
+    const u = Math.round((x * box.ux + z * box.uz) / BUILD_GRID_M) * BUILD_GRID_M;
+    const v = Math.round((-x * box.uz + z * box.ux) / BUILD_GRID_M) * BUILD_GRID_M;
+    return { x: u * box.ux - v * box.uz, z: u * box.uz + v * box.ux };
+  };
+
+  /**
+   * The customiser's frame: where the ghost is and whether it may go there.
+   *
+   * **`placementFits` is the server's own function**, run here for one reason:
+   * so the ghost is red on exactly the frames the server would refuse. It is
+   * not a check -- a client that skipped it would simply get refusals -- it is
+   * the difference between a rule a player can see and a rule that tells them
+   * no after the fact.
+   */
+  const updateGhost = (): void => {
+    const it = interior;
+    if (!building || it === null) {
+      ghostAt = null;
+      return;
+    }
+    const at = ghostSpot(it);
+    const want: Placement = { kind: PLACEABLE.COUCH, x: at.x, z: at.z, turn: buildTurn };
+    ghostAt = want;
+    ghostOk =
+      placedHere.length < MAX_PER_SPACE &&
+      placementFits(it, placedHere, want, interiorDoorX, interiorDoorZ) &&
+      // And not on top of the person placing it, which is the one rule the
+      // server applies that `placementFits` does not know about -- it is a
+      // question about who is in the room rather than about the room.
+      boxClearance(boxOf(want, it.plan.box.ux, it.plan.box.uz), player.position.x, player.position.z) >=
+        PLAYER_RADIUS + 0.05;
+  };
+
+  /**
+   * Adopt the room's contents as the server describes them.
+   *
+   * One call writes the collision, the drawing and the copy the ghost tests
+   * against, because three lists that could disagree would be three rooms.
+   */
+  const adoptPlaced = (): void => {
+    const it = interior;
+    if (net === null || it === null) return;
+    if (net.placedSpace !== net.space) return;
+    placedHere = net.placed.map((i) => ({ kind: i.kind, x: i.x, z: i.z, turn: i.turn }));
+    setPlacements(it, placedHere);
+    interiorView.rebuild(it, interiorDoorX, interiorDoorZ, interiorDoorNX, interiorDoorNZ);
+  };
+
   const applySpace = (f: SpaceFrame): void => {
     if (f.space === CITY_SPACE) {
       // The door on the way out, and only when there was an inside to come out
@@ -7709,6 +7855,11 @@ async function main(): Promise<void> {
       // a door closing behind a player who has just arrived at the spawn disc
       // is a sound with nothing behind it.
       const wasInside = interior !== null;
+      // The customiser goes with the room. Left open, it would be a mode a
+      // player is still in while standing in the street, whose click no longer
+      // places anything and no longer swings either.
+      building = false;
+      placedHere = [];
       wantSpace = null;
       interior = null;
       interiorWorld = null;
@@ -7819,7 +7970,14 @@ async function main(): Promise<void> {
     // allowed was really for -- the moment landing. There are no phases to
     // describe: generating this took a few hundred microseconds over a
     // footprint the browser already had. See `interior.interiorLine`.
-    hud.notice(interiorLine(built));
+    hud.notice(`${interiorLine(built)}  X to furnish it.`);
+    // And whatever anybody has already put in it. The `PLACED` frame arrives
+    // immediately behind the `SPACE` one (see `Room.doorPress`), so this is
+    // usually a no-op that the line below repeats a frame later -- and it is
+    // what makes a re-entry with the frame already in hand draw the furniture
+    // on the first frame rather than the second.
+    placedHere = [];
+    adoptPlaced();
   };
 
   /**
@@ -8051,6 +8209,30 @@ async function main(): Promise<void> {
     // slot arrangement returns false here and the two lines below are exactly
     // what they always were. See `client/src/money.ts`.
     if (money.mousedown(e.button)) return;
+    /*
+     * --- The customiser eats the click, both buttons.
+     *
+     * Left places what the ghost is showing, right takes away whatever is
+     * nearest the aim. **Neither arms a swing**, and that is the whole reason
+     * furnishing is a mode rather than a key: in a game whose only verb is
+     * hitting people, a click that sometimes puts a couch down instead would be
+     * the worst ambiguity available. `B` says which of the two you meant.
+     *
+     * Nothing is predicted. A couch is shared, persistent, and standing in a
+     * room other people are in; a browser that drew one before the server
+     * agreed would have to take it away in front of everybody. The ghost is
+     * already green or red by then, so the answer is not a surprise.
+     */
+    if (building && interior !== null) {
+      if (e.button === 0) {
+        if (ghostAt !== null && ghostOk) net?.place(ghostAt.kind, ghostAt.turn, ghostAt.x, ghostAt.z);
+      } else if (e.button === 2) {
+        const it = interior;
+        const aim = ghostSpot(it);
+        net?.unplace(aim.x, aim.z);
+      }
+      return;
+    }
     if (e.button === 0) punchBuffer = PUNCH_BUFFER;
     // Right click throws a football. Under pointer lock the context menu does
     // not appear anyway, but the listener below covers the drag-to-look fallback
@@ -8180,6 +8362,22 @@ async function main(): Promise<void> {
         wheelCamera = 0;
         return;
       }
+      /*
+       * --- In the customiser, the wheel turns the couch.
+       *
+       * The Sims' binding, and free here because indoors the camera is pinned
+       * to first person (see the chase distance) so the wheel's usual job has
+       * nothing to do. Before the accumulator below, so a flick that would not
+       * yet have moved the camera a notch still turns the couch: a rotation is
+       * a discrete choice and wants one event, where a zoom is a distance and
+       * wants a threshold.
+       */
+      if (building && interior !== null) {
+        const dir = (e.deltaY !== 0 ? e.deltaY : e.deltaX) > 0 ? 1 : 3;
+        buildTurn = (buildTurn + dir) & 3;
+        wheelCamera = 0;
+        return;
+      }
       const scale = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1;
       /*
        * --- `deltaX` when Shift is down, and it is the browser's doing.
@@ -8262,6 +8460,54 @@ async function main(): Promise<void> {
      * would flip the torch at the repeat rate and would empty the stamina bar on
      * one press of the swing.
      */
+    /*
+     * --- `B` opens the customiser, `R` turns what is in it. Indoors only.
+     *
+     * *"Make it so inside gives a customiser, atm should just be able to place
+     * a couch (rotate 90 deg and click to place like in sims)"*.
+     *
+     * **`X`, and not `B`.** `B` is the obvious letter for "build" and it is
+     * already the talent sheet -- an interception there would have taken a
+     * panel away from every player in the game to add a key two of them are
+     * using, which is the trade this project does not make. `X` is one of the
+     * five letters this keyboard has left.
+     *
+     * Edge-triggered like every toggle in this listener; key repeat would
+     * flicker the mode at the repeat rate. It refuses outdoors and says so
+     * once, because a key that silently does nothing is a key a player decides
+     * is broken.
+     *
+     * **The wheel turns the couch**, which is the Sims' own binding and is free
+     * here for a reason worth stating: indoors the camera is pinned to first
+     * person, so the wheel's usual job -- the chase distance -- has nothing to
+     * do. `R` does it too, and is read *only* while the customiser is open,
+     * because `R` is a talent key everywhere else and a mode is exactly the
+     * thing that lets one key mean two things without ambiguity.
+     */
+    if (e.code === 'KeyX' && !held) {
+      if (interior === null) {
+        hud.notice('you can only furnish a room from inside one');
+      } else {
+        building = !building;
+        interiorView.setGhost(null, null, false);
+        hud.notice(
+          building
+            ? 'placing a couch — wheel or R turns it, click to put it down, right-click to take one away'
+            : 'done',
+        );
+      }
+      return;
+    }
+    if (e.code === 'KeyR' && !held && building && interior !== null) {
+      buildTurn = (buildTurn + 1) & 3;
+      return;
+    }
+    // And Escape closes it, which is where a player's hand goes first.
+    if (e.code === 'Escape' && building) {
+      building = false;
+      interiorView.setGhost(null, null, false);
+      return;
+    }
     if (e.code === 'KeyF' && !held) {
       // No audio unlock here, deliberately: this is the one binding in this
       // block that makes no sound, and `enableAudio` on it would have the first
@@ -9973,6 +10219,15 @@ async function main(): Promise<void> {
         wantSpaceTries = 0;
       }
       if (wantSpace !== null) applySpace(wantSpace);
+      // What the room holds, when the server says it changed. Rebuilding the
+      // mesh here rather than in the socket callback is `takeSpace`'s rule.
+      if (net?.takePlaced() === true) adoptPlaced();
+      // And the customiser's preview, every frame it is open, because it
+      // follows the head rather than the feet.
+      if (building && interior !== null) {
+        updateGhost();
+        interiorView.setGhost(interior, ghostAt, ghostOk);
+      }
       // And everybody in the room with us, every frame, for `showIndoors`'
       // reason: a bat parented to a bone this frame is a bat the layer was
       // never enabled on.
@@ -11556,7 +11811,18 @@ async function main(): Promise<void> {
     // one `Math.max` and is called every frame rather than on the mount event,
     // because a ride can end for reasons no event fires for. See
     // `game/camera.ts`.
-    let chosenDistance = liveCameraDistance(cameraDistance, playerCombat.ridingBike !== 0);
+    /*
+     * --- Indoors is first person, whatever the wheel says.
+     *
+     * The owner's call: *"first person only inside"*. It is not only taste --
+     * a chase camera in a 7 m room spends its whole time jammed against a wall
+     * behind you, and `marchCameraBoom` would be resolving a boom against
+     * geometry that is three metres away in every direction. The wheel keeps
+     * its setting: walking back out puts you where you were.
+     */
+    let chosenDistance = interior !== null
+      ? CAMERA_FIRST_PERSON
+      : liveCameraDistance(cameraDistance, playerCombat.ridingBike !== 0);
     // --- And a car, which is a bigger thing to look at than a bicycle.
     //
     // A **floor and never a ceiling**, exactly as `liveCameraDistance` treats the

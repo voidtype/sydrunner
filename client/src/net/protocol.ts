@@ -383,6 +383,27 @@ export const MSG = {
    * 0x16, paired with `SPACE` at 0x96 under the halves convention.
    */
   DOOR: 0x16,
+  /**
+   * "Put a couch here", or "take that one away". See `net/placeables.ts`... no:
+   * `world/placeables.ts`, which is the shared definition of what a thing is.
+   *
+   * **Unlike `DOOR`, this one carries a position**, and the difference is worth
+   * stating because the argument against a position on a door press was
+   * absolute. A door press asks *which building am I at*, and the server
+   * already knows: it is simulating the body. A placement asks *where in this
+   * room do you want it*, which is a number only the player has -- it comes off
+   * their aim, not off their feet, and there is no version of it the server
+   * could derive.
+   *
+   * What keeps it honest is that the position is a **request**: the server
+   * checks it against the room it generated (`interior.placementFits`) and
+   * refuses anything outside the walls, inside a partition, across a doorway or
+   * on top of something already there. A client can ask for a couch in the
+   * harbour; it will not get one.
+   *
+   * 0x17, paired with `PLACED` at 0x97 under the halves convention.
+   */
+  FURNISH: 0x17,
 
   WELCOME: 0x81,
   SNAPSHOT: 0x82,
@@ -678,6 +699,20 @@ export const MSG = {
    * `net/client.ts`'s handler.
    */
   SPACE: 0x96,
+  /**
+   * Everything in the room you are standing in. See `MSG.FURNISH`.
+   *
+   * **The whole list, every time**, rather than a delta. At most 64 things at
+   * ten bytes each is a 646-byte frame that a building sends when somebody
+   * furnishes it -- a handful of times an hour -- against a delta protocol with
+   * an ordering problem, an ack and a resync path. The snapshot rate does not
+   * come near this: a room is not a tick.
+   *
+   * Sent to everybody in that space on every change, and to a joiner as they
+   * walk in. A client holds exactly one of these at a time, because it is in
+   * exactly one room.
+   */
+  PLACED: 0x97,
 } as const;
 
 /**
@@ -950,7 +985,20 @@ export const MSG = {
  * If a later change makes a generator's output depend on a version, this note
  * is the precedent: move the number.
  */
-export const PROTOCOL_VERSION = 24;
+/*
+ * v25: people put things in the rooms.
+ *
+ * `FURNISH` (0x17, client -> server: place or remove, with a position) and
+ * `PLACED` (0x97, server -> client: everything in this room). A matched pair;
+ * no existing layout moves.
+ *
+ * This is the first thing about an interior that is **not derived**. The rooms
+ * are a pure function of a footprint and cross no wire at all; a couch somebody
+ * put in the corner cannot be recomputed from anything, so it is stored on the
+ * box and sent. The two halves of a room now have different natures and that is
+ * the honest shape of it -- see INTERIORS.md.
+ */
+export const PROTOCOL_VERSION = 25;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;
@@ -3796,6 +3844,130 @@ export function decodeSpace(buffer: ArrayBuffer): SpaceFrame | null {
   };
 }
 
+/** `MSG.FURNISH`'s two operations. */
+export const FURNISH_OP = { PLACE: 0, REMOVE: 1 } as const;
+
+/** `MSG.FURNISH`'s width. */
+export const FURNISH_BYTES = 12;
+
+/**
+ * "Put one of these here", or "take away the one nearest here".
+ *
+ *     u8   type = MSG.FURNISH
+ *     u8   op        `FURNISH_OP`
+ *     u8   kind      `placeables.PLACEABLE`
+ *     u8   turn      0..3 quarter turns from the building's own axis
+ *     f32  x, z      world metres, the centre of the footprint
+ *
+ * `f32` rather than this file's centimetre fixed point, on `SPACE`'s argument:
+ * a placement is a request sent a handful of times an hour, and the grid a
+ * client snaps to is its own business -- quantising here would put a second,
+ * coarser grid underneath it for no saving anybody can measure.
+ *
+ * **Removal carries a position rather than an index.** An index would be into a
+ * list the two ends have to agree the order of, and a list that reorders on the
+ * server -- which it does, the moment anything is removed from the middle --
+ * would delete the wrong couch. A point is unambiguous: the server takes the
+ * one nearest it, or nothing.
+ */
+export interface FurnishRequest {
+  op: number;
+  kind: number;
+  turn: number;
+  x: number;
+  z: number;
+}
+
+export function encodeFurnish(r: FurnishRequest, buffer = new ArrayBuffer(FURNISH_BYTES)): ArrayBuffer {
+  const v = new DataView(buffer);
+  v.setUint8(0, MSG.FURNISH);
+  v.setUint8(1, r.op & 0xff);
+  v.setUint8(2, r.kind & 0xff);
+  v.setUint8(3, r.turn & 3);
+  v.setFloat32(4, r.x, true);
+  v.setFloat32(8, r.z, true);
+  return buffer;
+}
+
+export function decodeFurnish(buffer: ArrayBuffer): FurnishRequest | null {
+  if (buffer.byteLength < FURNISH_BYTES) return null;
+  const v = new DataView(buffer);
+  if (v.getUint8(0) !== MSG.FURNISH) return null;
+  return {
+    op: v.getUint8(1),
+    kind: v.getUint8(2),
+    turn: v.getUint8(3) & 3,
+    x: v.getFloat32(4, true),
+    z: v.getFloat32(8, true),
+  };
+}
+
+/** One thing in a room, on the wire. `world/placeables.Placement`. */
+export interface PlacedItem {
+  kind: number;
+  turn: number;
+  x: number;
+  z: number;
+}
+
+/** `MSG.PLACED`'s header, and one entry. */
+export const PLACED_HEADER_BYTES = 6;
+export const PLACED_ENTRY_BYTES = 10;
+
+/**
+ * Everything in one room.
+ *
+ *     u8   type = MSG.PLACED
+ *     u32  space     which room this is about
+ *     u8   count
+ *     ... per entry: u8 kind, u8 turn, f32 x, f32 z
+ *
+ * **The space is in it**, which looks redundant -- a client is only ever in one
+ * room -- and is the one field that makes the frame safe to act on. A player
+ * who walks out of a pub as somebody inside it places a couch would otherwise
+ * take a frame about a room they have left and furnish the street with it. The
+ * receiver drops anything that is not about the space it is standing in.
+ */
+export function encodePlaced(space: number, items: readonly PlacedItem[]): ArrayBuffer {
+  const n = Math.min(items.length, 255);
+  const buffer = new ArrayBuffer(PLACED_HEADER_BYTES + n * PLACED_ENTRY_BYTES);
+  const v = new DataView(buffer);
+  v.setUint8(0, MSG.PLACED);
+  v.setUint32(1, space >>> 0, true);
+  v.setUint8(5, n);
+  let p = PLACED_HEADER_BYTES;
+  for (let i = 0; i < n; i++) {
+    const it = items[i];
+    v.setUint8(p, it.kind & 0xff);
+    v.setUint8(p + 1, it.turn & 3);
+    v.setFloat32(p + 2, it.x, true);
+    v.setFloat32(p + 6, it.z, true);
+    p += PLACED_ENTRY_BYTES;
+  }
+  return buffer;
+}
+
+export function decodePlaced(buffer: ArrayBuffer): { space: number; items: PlacedItem[] } | null {
+  if (buffer.byteLength < PLACED_HEADER_BYTES) return null;
+  const v = new DataView(buffer);
+  if (v.getUint8(0) !== MSG.PLACED) return null;
+  const space = v.getUint32(1, true);
+  const count = v.getUint8(5);
+  if (buffer.byteLength < PLACED_HEADER_BYTES + count * PLACED_ENTRY_BYTES) return null;
+  const items: PlacedItem[] = [];
+  let p = PLACED_HEADER_BYTES;
+  for (let i = 0; i < count; i++) {
+    items.push({
+      kind: v.getUint8(p),
+      turn: v.getUint8(p + 1) & 3,
+      x: v.getFloat32(p + 2, true),
+      z: v.getFloat32(p + 6, true),
+    });
+    p += PLACED_ENTRY_BYTES;
+  }
+  return { space, items };
+}
+
 // --- The screaming sun ---------------------------------------------------------
 
 /**
@@ -5483,6 +5655,74 @@ export function verifyNet(): string[] {
     if (decodeSpace(encodeSun(0, 0)) !== null) failures.push('A SUN frame decoded as a SPACE.');
   }
 
+  // --- Furniture, and the room it is in. v25.
+  //
+  // What this catches, and each of them is a couch in the wrong place rather
+  // than a frame that fails to parse:
+  //
+  //   - **A turn that does not survive.** It is two bits carrying a quarter
+  //     turn, and a couch a quarter turn out is a couch across the room it was
+  //     meant to sit along the wall of.
+  //   - **A position that does not survive.** These are `f32` on purpose (see
+  //     `encodeFurnish`) and Sydney's coordinates are five digits, so a naive
+  //     narrowing loses centimetres -- enough to fail the server's own
+  //     "does it fit" test that the client just passed.
+  //   - **A truncated list that decodes anyway**, which would furnish a room
+  //     out of whatever was after the buffer.
+  //   - **The space going missing from `PLACED`**, which is the field that stops
+  //     a player who has just left a pub furnishing the street with the frame
+  //     that was already in flight.
+  {
+    const sent: FurnishRequest = { op: FURNISH_OP.PLACE, kind: 0, turn: 3, x: -2236.375, z: 4543.25 };
+    const got = decodeFurnish(encodeFurnish(sent));
+    if (got === null) failures.push('A FURNISH did not decode.');
+    else {
+      if (got.op !== sent.op || got.kind !== sent.kind) failures.push('FURNISH lost its operation or its kind.');
+      if (got.turn !== sent.turn) failures.push(`the quarter turn came back as ${got.turn}, not ${sent.turn}.`);
+      if (got.x !== sent.x || got.z !== sent.z) failures.push(`the placement came back at ${got.x}, ${got.z}.`);
+    }
+    if (decodeFurnish(encodeDoor()) !== null) failures.push('A DOOR decoded as a FURNISH.');
+    if (decodeFurnish(encodeFurnish(sent).slice(0, FURNISH_BYTES - 1)) !== null) {
+      failures.push('A truncated FURNISH decoded rather than being refused.');
+    }
+    // Removal is the same frame with a different op, which is what keeps the
+    // two operations one id and one decoder.
+    const gone = decodeFurnish(encodeFurnish({ ...sent, op: FURNISH_OP.REMOVE }));
+    if (gone === null || gone.op !== FURNISH_OP.REMOVE) failures.push('a removal did not decode as one.');
+
+    const items: PlacedItem[] = [
+      { kind: 0, turn: 0, x: -2236.375, z: 4543.25 },
+      { kind: 0, turn: 2, x: -2230.5, z: 4547.75 },
+    ];
+    const room = decodePlaced(encodePlaced(0xdeadbeef, items));
+    if (room === null) failures.push('A PLACED frame did not decode.');
+    else {
+      if (room.space !== 0xdeadbeef) failures.push(`PLACED came back about space ${room.space}; a u32 read as signed loses half the city.`);
+      if (room.items.length !== items.length) failures.push(`${room.items.length} of ${items.length} things survived the room.`);
+      else {
+        for (let i = 0; i < items.length; i++) {
+          if (
+            room.items[i].kind !== items[i].kind || room.items[i].turn !== items[i].turn ||
+            room.items[i].x !== items[i].x || room.items[i].z !== items[i].z
+          ) {
+            failures.push(`item ${i} came back as ${JSON.stringify(room.items[i])}.`);
+          }
+        }
+      }
+    }
+    // An empty room is a real frame and is what a fresh building sends.
+    const empty = decodePlaced(encodePlaced(7, []));
+    if (empty === null || empty.items.length !== 0 || empty.space !== 7) {
+      failures.push('an empty room did not survive; a building nobody has furnished could not be described.');
+    }
+    if (decodePlaced(encodePlaced(7, items).slice(0, PLACED_HEADER_BYTES + PLACED_ENTRY_BYTES)) !== null) {
+      failures.push('a PLACED frame short of its own entries decoded rather than being refused.');
+    }
+    if (decodePlaced(encodeSpace({ space: 1, building: 1, x: 0, y: 0, z: 0, yaw: 0, doorX: 0, doorZ: 0, doorNX: 0, doorNZ: 0 })) !== null) {
+      failures.push('A SPACE frame decoded as a PLACED.');
+    }
+  }
+
   // --- The driven cars, this pass's new message.
   //
   // What this catches, and every one of them renders rather than throws:
@@ -6177,7 +6417,7 @@ export function verifyNet(): string[] {
     }
     // Which half each one belongs in, named here rather than inferred from a
     // prefix: a list is checkable and a naming convention is not.
-    const clientToServer = ['HELLO', 'INPUT', 'PING', 'CHAT_SAY', 'SUGGEST', 'SUN_PRESS', 'PHONE', 'TEAM', 'QUEST', 'DOOR'];
+    const clientToServer = ['HELLO', 'INPUT', 'PING', 'CHAT_SAY', 'SUGGEST', 'SUN_PRESS', 'PHONE', 'TEAM', 'QUEST', 'DOOR', 'FURNISH'];
     for (const [name, id] of Object.entries(MSG)) {
       const wantsLow = clientToServer.includes(name);
       if (wantsLow && id >= 0x80) {

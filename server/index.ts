@@ -137,6 +137,7 @@ import {
   decodePing,
   decodeSunPress,
   decodeDoor,
+  decodeFurnish,
   encodeBye,
   encodePong,
   frameType,
@@ -175,6 +176,8 @@ import { verifyAsyncPipes } from '../client/src/world/asyncpipes.ts';
 import { verifyPipeReclaim } from '../client/src/world/pipereclaim.ts';
 import { verifyRangeAlloc } from '../client/src/world/rangealloc.ts';
 import { verifyFloorPlan } from '../client/src/world/floorplan.ts';
+import { verifyPlaceables } from '../client/src/world/placeables.ts';
+import { InteriorStore, defaultInteriorPath, verifyInteriorStore } from './interiors.ts';
 import { verifyDoorway } from '../client/src/world/doorway.ts';
 import { verifyInterior } from '../client/src/world/interior.ts';
 import { verifySpaces } from '../client/src/net/spaces.ts';
@@ -484,6 +487,10 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // see is a check that goes green on a broken build.
     ['verifyDoorway', verifyDoorway()],
     ['verifyInterior', verifyInterior()],
+    // And what people put in the rooms. `verifyInteriorStore` is server-only of
+    // the two, because it is the only end with a disk.
+    ['verifyPlaceables', verifyPlaceables()],
+    ['verifyInteriorStore', verifyInteriorStore()],
     ['verifySpaces', verifySpaces()],
     ['verifyDeviceLost', verifyDeviceLost()],
     // --- WORKSTREAM V. `verifyTeams` is the contract's own and is here for a
@@ -970,6 +977,19 @@ const authGuards = new AuthGuards();
 console.log(`[sydney] accounts: ${accounts.describe()}`);
 
 /**
+ * What people have put in the buildings, host-wide, loaded before anybody joins.
+ *
+ * `wallets` and `accounts`' arrangement, and the third thing in this process
+ * that outlives it. See `server/interiors.ts` for why an interior's *rooms*
+ * need no such file and its furniture does.
+ */
+const interiors = new InteriorStore(defaultInteriorPath());
+await interiors.load();
+console.log(
+  `[sydney] interiors: ${interiors.items} thing(s) in ${interiors.size} building(s) in ${interiors.path}`,
+);
+
+/**
  * Who is driving what, for SydRide. See `client/src/game/driving-contract.ts`.
  *
  * `NO_DRIVING` unless `SYDNEY_FAKE_DRIVING=1`, because the driving workstream's
@@ -1002,6 +1022,7 @@ const tRooms = performance.now();
 const host = new RoomHost(world, ROOM_COUNT, ROOM_CAP, BOT_COUNT, ROOM_BASE, {
   wallets,
   accounts,
+  interiors,
   fakeDriving: FAKE_DRIVING,
 });
 if (FAKE_DRIVING) {
@@ -1953,6 +1974,22 @@ const server = Bun.serve<Conn>({
           if (!decodeDoor(frame)) return;
           const room = conn.room >= 0 ? host.get(conn.room) : undefined;
           room?.doorPress(ws);
+          return;
+        }
+        /**
+         * A couch. `MSG.FURNISH`, and the room adjudicates it.
+         *
+         * No flood guard, on `MSG.PHONE`'s argument: every refusal here is a
+         * handful of box comparisons against a room already in memory, and the
+         * one *write* it can cause is debounced five seconds inside
+         * `InteriorStore`. A client hammering this cannot make the box write
+         * any faster than it was going to.
+         */
+        case MSG.FURNISH: {
+          const req = decodeFurnish(frame);
+          if (!req) return;
+          const room = conn.room >= 0 ? host.get(conn.room) : undefined;
+          room?.furnish(ws, req);
           return;
         }
         /**

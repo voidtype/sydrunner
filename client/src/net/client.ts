@@ -120,6 +120,10 @@ import {
   encodeSunPress,
   encodeDoor,
   decodeSpace,
+  encodeFurnish,
+  decodePlaced,
+  FURNISH_OP,
+  type PlacedItem,
   type SpaceFrame,
   encodeInput,
   encodeEvents,
@@ -1436,6 +1440,65 @@ export class NetClient {
     return frame;
   }
 
+  /**
+   * Everything in the room this client is standing in. See `MSG.PLACED`.
+   *
+   * Replaced wholesale by every frame, because the frame is the whole list --
+   * a room is not a tick and 64 things at ten bytes is smaller than the delta
+   * protocol that would avoid sending them.
+   */
+  placed: PlacedItem[] = [];
+
+  /**
+   * The space `placed` is about.
+   *
+   * Kept beside the list rather than trusted from `space`, and it is what makes
+   * the frame safe to act on: a player who walks out of a pub as somebody
+   * inside it puts a couch down would otherwise take a frame about a room they
+   * have left. `main.ts` compares the two before it draws anything.
+   */
+  placedSpace = CITY_SPACE;
+
+  /** Set when `placed` changed; `takePlaced` clears it. */
+  private placedDirty = false;
+
+  /**
+   * Has the room's contents changed since this was last asked?
+   *
+   * A flag rather than a callback, on `takeSpace`'s argument: rebuilding a mesh
+   * belongs in the frame loop where `main.ts` owns the scene, not in the socket
+   * callback that decoded the bytes.
+   */
+  takePlaced(): boolean {
+    const changed = this.placedDirty;
+    this.placedDirty = false;
+    return changed;
+  }
+
+  /**
+   * Ask for something to be put down, or taken away.
+   *
+   * A request, and the server decides -- see `MSG.FURNISH`. Nothing is
+   * predicted: a couch is a shared, persistent object in a room other people
+   * are standing in, and a browser that drew one before the server agreed would
+   * have to take it away again in front of everybody.
+   */
+  furnish(op: number, kind: number, turn: number, x: number, z: number): boolean {
+    if (this.status !== 'online') return false;
+    this.transport.send(encodeFurnish({ op, kind, turn, x, z }));
+    return true;
+  }
+
+  /** Put one down. */
+  place(kind: number, turn: number, x: number, z: number): boolean {
+    return this.furnish(FURNISH_OP.PLACE, kind, turn, x, z);
+  }
+
+  /** Take away whatever is nearest this point. */
+  unplace(x: number, z: number): boolean {
+    return this.furnish(FURNISH_OP.REMOVE, 0, 0, x, z);
+  }
+
   // --- Money. See `net/cash.ts`. -----------------------------------------------
 
   /**
@@ -1889,6 +1952,28 @@ export class NetClient {
         this.pendingSpace = f;
         this.correction.set(0, 0, 0);
         this.pendingSelf = null;
+        // The room's contents belong to the room we just left. Cleared here
+        // rather than waiting for the `PLACED` that follows, so that a frame
+        // lost or reordered leaves an empty room rather than the last one's
+        // furniture standing in this one.
+        this.placed = [];
+        this.placedSpace = this.space;
+        this.placedDirty = true;
+        return;
+      }
+      /*
+       * v25: everything in the room this client is standing in.
+       *
+       * Taken whole, with no merge and no ordering to get wrong, because the
+       * frame is the whole list. The space is kept beside it rather than
+       * assumed -- see `placedSpace`.
+       */
+      case MSG.PLACED: {
+        const room = decodePlaced(frame);
+        if (!room) return;
+        this.placedSpace = sanitiseSpace(room.space);
+        this.placed = room.items;
+        this.placedDirty = true;
         return;
       }
       case MSG.BYE: {

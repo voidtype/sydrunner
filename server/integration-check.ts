@@ -225,7 +225,10 @@ import {
 import { InterestIndex, InterestSet, verifyAoi } from './aoi.ts';
 // Interiors, protocol v23. See `checkInteriors`.
 import { buildingSeed, verifyDoorway } from '../client/src/world/doorway.ts';
-import { interiorAdmits, verifyInterior } from '../client/src/world/interior.ts';
+import { arrivalAt, interiorAdmits, verifyInterior } from '../client/src/world/interior.ts';
+import { MAX_PER_SPACE, boxClearance, boxOf, verifyPlaceables } from '../client/src/world/placeables.ts';
+import { InteriorStore, verifyInteriorStore } from './interiors.ts';
+import { FURNISH_OP } from '../client/src/net/protocol.ts';
 import { CITY_SPACE, spaceForBuilding, verifySpaces } from '../client/src/net/spaces.ts';
 import { AccountStore } from './accounts.ts';
 // Global chat. See `checkChat` at the foot of this file: cross-room delivery over
@@ -3062,7 +3065,7 @@ async function checkBikes(): Promise<void> {
   // the bump is one line the lead changes here and in `protocol.ts` together.
   // See `PROTOCOL_VERSION`'s v15 note. If this line is still reading 14 after
   // the batch has landed, that is the bug this check exists to catch.
-  check(PROTOCOL_VERSION === 24, `the protocol is at version ${PROTOCOL_VERSION}`);
+  check(PROTOCOL_VERSION === 25, `the protocol is at version ${PROTOCOL_VERSION}`);
   check(
     WELCOME_BYTES === 36,
     `  and a WELCOME is ${WELCOME_BYTES} bytes: 27 through v10, plus v11's f64 clock, plus v15's ` +
@@ -10841,6 +10844,14 @@ async function checkInteriors(): Promise<void> {
     const f = verifySpaces();
     check(f.length === 0, `verifySpaces passes${f.length ? ` -- ${f[0]}` : ''}`);
   }
+  {
+    const f = verifyPlaceables();
+    check(f.length === 0, `verifyPlaceables passes${f.length ? ` -- ${f[0]}` : ''}`);
+  }
+  {
+    const f = verifyInteriorStore();
+    check(f.length === 0, `verifyInteriorStore passes${f.length ? ` -- ${f[0]}` : ''}`);
+  }
 
   // --- 0. The door sound is actually in the build.
   //
@@ -11140,6 +11151,138 @@ async function checkInteriors(): Promise<void> {
 
     sim.leave(q.id);
     sim.leave(r.id);
+  }
+
+  // --- 6b. Furnishing a room, over the real bake, through the real authority.
+  //
+  // The owner's first customisation: *"anyone can customise it ... just be able
+  // to place a couch"*. Everything here goes through `Simulation.furnish`,
+  // which is the one function that decides -- the browser runs the same
+  // `placementFits` only so its ghost is red on the frames this would refuse.
+  //
+  // What this really guards is an **open sandbox**: for now anybody can furnish
+  // anybody's building, so the rules that keep a building usable are the only
+  // thing between it and one player with an afternoon.
+  {
+    const store = new InteriorStore(`${process.env.SYDNEY_STATE_DIR ?? '/tmp'}/interiors-check.json`, false);
+    const home = new Simulation(world, { interiors: store });
+    const who = home.join(0, null, 'Furnisher');
+    standAtDoor(who);
+    const went = home.doorPress(who.id);
+    check(went !== null, 'the furnisher walks into the building');
+    const inside = who.interior;
+    if (went === null || inside === null) return;
+    const space = who.space;
+
+    check(home.placedIn(space).length === 0, 'a building nobody has furnished is empty');
+
+    // Somewhere clear, found the way a player finds one: out in front of them.
+    const spot = arrivalAt(inside, who.doorX, who.doorZ, who.doorNX, who.doorNZ);
+    let put = -1;
+    let atX = 0;
+    let atZ = 0;
+    for (let step = 1; step <= 12 && put < 0; step++) {
+      for (let dir = 0; dir < 8 && put < 0; dir++) {
+        const q = dir / 8;
+        const dx = q < 0.5 ? 1 - q * 4 : q * 4 - 3;
+        const dz = q < 0.25 ? q * 4 : q < 0.75 ? 2 - q * 4 : q * 4 - 4;
+        const len = Math.hypot(dx, dz) || 1;
+        const x = spot.x + (dx / len) * step * 0.8;
+        const z = spot.z + (dz / len) * step * 0.8;
+        const items = home.furnish(who.id, { op: FURNISH_OP.PLACE, kind: 0, turn: 0, x, z });
+        if (items !== null) {
+          put = items.length;
+          atX = x;
+          atZ = z;
+        }
+      }
+    }
+    check(put === 1, 'a couch goes down somewhere in an empty room');
+    check(home.placedIn(space).length === 1, 'and the room now holds it');
+
+    check(
+      home.furnish(who.id, { op: FURNISH_OP.PLACE, kind: 0, turn: 0, x: atX, z: atZ }) === null,
+      'a second couch cannot stand in the first',
+    );
+    // A doorway cannot be blocked, which is the one piece of griefing an open
+    // sandbox has no answer to: unlike a couch on a floor it cannot be walked
+    // around.
+    let intoDoorways = 0;
+    for (const h of inside.headers) {
+      const mx = (h.ax + h.bx) / 2;
+      const mz = (h.az + h.bz) / 2;
+      if (home.furnish(who.id, { op: FURNISH_OP.PLACE, kind: 0, turn: 0, x: mx, z: mz }) !== null) intoDoorways++;
+    }
+    check(intoDoorways === 0, 'no couch can be put in a doorway');
+    // Nor on top of somebody, which would shove them through a wall on the next
+    // tick. The one rule `placementFits` cannot know: it is a question about who
+    // is in the room rather than about the room.
+    check(
+      home.furnish(who.id, {
+        op: FURNISH_OP.PLACE, kind: 0, turn: 0,
+        x: who.combat.body.position.x, z: who.combat.body.position.z,
+      }) === null,
+      'no couch can be dropped on the person placing it',
+    );
+    // Nor outside the building, which is the request a client can make and a
+    // server must not honour.
+    check(
+      home.furnish(who.id, { op: FURNISH_OP.PLACE, kind: 0, turn: 0, x: atX + 500, z: atZ }) === null,
+      'a couch requested five hundred metres away is refused',
+    );
+    check(
+      home.furnish(who.id, { op: FURNISH_OP.PLACE, kind: 99, turn: 0, x: atX + 3, z: atZ }) === null,
+      'a kind that does not exist is refused',
+    );
+
+    // A body walks round it, from the tick it lands.
+    {
+      const box = boxOf({ kind: 0, x: atX, z: atZ, turn: 0 }, inside.plan.box.ux, inside.plan.box.uz);
+      const r = inside.resolver.resolve(atX + box.hx + 2, atZ, atX, atZ, PLAYER_RADIUS, inside.base);
+      check(r.hit, 'a body walking at a couch is stopped by it');
+      check(
+        boxClearance(box, r.x, r.z) >= PLAYER_RADIUS - 1e-6,
+        `and stops outside it (${boxClearance(box, r.x, r.z).toFixed(3)} m clear)`,
+      );
+    }
+
+    // The room is capped. For now anyone may furnish anything, so this is the
+    // only thing between a pub and somebody with an afternoon.
+    let placed = home.placedIn(space).length;
+    for (let i = 0; i < MAX_PER_SPACE * 2; i++) {
+      const items = home.furnish(who.id, {
+        op: FURNISH_OP.PLACE, kind: 0, turn: i & 3,
+        x: atX + ((i % 16) - 8) * 1.2, z: atZ + (Math.floor(i / 16) - 4) * 1.2,
+      });
+      if (items !== null) placed = items.length;
+    }
+    check(placed <= MAX_PER_SPACE, `a room holds at most ${MAX_PER_SPACE} things (${placed})`);
+
+    // Removal takes the one nearest the point, and nothing when there is none
+    // near. A point rather than an index; see `protocol.FurnishRequest`.
+    const before = home.placedIn(space).length;
+    const gone = home.furnish(who.id, { op: FURNISH_OP.REMOVE, kind: 0, turn: 0, x: atX, z: atZ });
+    check(gone !== null && gone.length === before - 1, 'a couch can be taken away again');
+    check(
+      home.furnish(who.id, { op: FURNISH_OP.REMOVE, kind: 0, turn: 0, x: atX + 400, z: atZ }) === null,
+      'a removal aimed at nothing removes nothing',
+    );
+
+    // And it is the room's, not the player's -- the whole of "one building, one
+    // inside". A second body walking in is stepped around the same furniture.
+    const other = new Simulation(world, { interiors: store });
+    const guest = other.join(0, null, 'Guest');
+    standAtDoor(guest);
+    other.doorPress(guest.id);
+    check(guest.space === space, 'a second player walks into the same building');
+    check(
+      other.placedIn(guest.space).length === home.placedIn(space).length,
+      `and finds the same ${home.placedIn(space).length} things in it`,
+    );
+    check(
+      (guest.interior?.placedBoxes.length ?? -1) === home.placedIn(space).length,
+      'and is stepped around them from the tick they walk in',
+    );
   }
 
   // --- 7. Log off inside, log in inside.
