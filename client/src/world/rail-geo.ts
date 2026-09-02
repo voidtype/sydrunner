@@ -107,13 +107,20 @@
  * player's position. `poseTrain` stays pure because nothing here can reach it.
  */
 
-import {
-  ACCESS_ALONG_M,
-  ACCESS_FAR_M,
+import { stationAccessPlan, ACCESS_OVERLAP_M, roomCeilY, concourseY, type AccessWorld,
   ACCESS_HALF_W,
   ACCESS_HEIGHT_M,
-  ACCESS_NEAR_M,
 } from '../game/riding.ts';
+
+/**
+ * The world the access plan is drawn in: the same prisms and ground
+ * `main.ts` hands `buildStationBoxes`, so the incline drawn and the floor stood
+ * on are the one plan. Empty until the client has a collision field.
+ */
+let accessWorld: AccessWorld = {};
+export function setAccessWorld(world: AccessWorld): void {
+  accessWorld = world;
+}
 import {
   BackSide,
   BufferAttribute,
@@ -1821,7 +1828,7 @@ export class RailWorld {
             for (const b of state.boxes) prisms.push(framePrism(b));
             return;
           case 1:
-            if (underground) writeUndergroundStation(concrete, lining, state.boxes, station);
+            if (underground) writeUndergroundStation(concrete, lining, signs, state.boxes, station);
             else writePlatforms(concrete, canopy, tactile, plan);
             return;
           case 2:
@@ -4151,6 +4158,7 @@ export function writeVesselWalls(
 function writeUndergroundStation(
   concrete: Solid,
   lining: Solid,
+  signs: Solid,
   /** This station's solids, from `rail-solids.undergroundSolids`. */
   _boxes: readonly FrameSolid[],
   station: RailStation & { ux: number; uz: number },
@@ -4159,8 +4167,16 @@ function writeUndergroundStation(
   const uz = station.uz;
   const px = -uz;
   const pz = ux;
-  const floor = station.trackY - 0.4;
-  const roof = floor + BOX_HEIGHT;
+  // **The floor is the concourse, at platform level, wall to wall.** It was
+  // the ballast, 0.4 m under the railhead, with the platforms as 1.45 m
+  // kerbs in it -- a step no body climbs, so a player who walked off a
+  // platform was in the room for good. `game/riding.concourseY` is the
+  // number the field stands a body on; this draws it. The trains sit with
+  // their wheels in the slab and their door sills at the floor, which is what
+  // a platform is.
+  const floor = concourseY(station as unknown as RailStation);
+  // The lid: under the street, whatever the bake said. See `riding.roomCeilY`.
+  const roof = Math.min(floor + BOX_HEIGHT, roomCeilY(station as unknown as RailStation, accessWorld));
   const corner = (t: number, o: number, cy: number): [number, number, number] => [
     station.x + ux * t + px * o, cy, station.z + uz * t + pz * o,
   ];
@@ -4191,96 +4207,80 @@ function writeUndergroundStation(
   concrete.quad(...corner(-L, W, roof), ...corner(L, W, roof), ...corner(L, -W, roof), ...corner(-L, -W, roof));
 
   // Two platforms inside it, on the same clearances the surface ones use.
-  const top = station.trackY + PLATFORM_HEIGHT;
+  // The platform strips, as a concrete band on the lining floor: a different
+  // material at the same height, so the edge reads without being a kerb. A
+  // hair above the floor so the two do not fight.
+  const top = floor + 0.02;
   for (const side of [-1, 1]) {
     const inner = PLATFORM_INNER * side;
     const outer = (PLATFORM_INNER + PLATFORM_WIDTH) * side;
     concrete.quad(...corner(-L + 6, inner, top), ...corner(L - 6, inner, top), ...corner(L - 6, outer, top), ...corner(-L + 6, outer, top));
-    concrete.quad(...corner(-L + 6, inner, floor), ...corner(L - 6, inner, floor), ...corner(L - 6, inner, top), ...corner(-L + 6, inner, top));
   }
 
-  // **The way in, and until this it did not exist.** `writeStationAccess` is
-  // only called for stations that are *not* underground, and a bore has no
-  // surface expression to carve -- so the terrain stayed sealed over the
-  // concourse and the entrance on the street was a box you could walk into
-  // that did nothing. The owner, at Macquarie Park: *"there is this station
-  // thing, blocking the road, but it does nothing even if i go in"*.
-  //
-  // His shape, and it is the better one: a standard entrance somewhere that
-  // makes sense, an incline down to a chamber, and a tunnel from there over to
-  // the excavation that already exists. Laid **across** the track rather than
-  // along it, which is what gets it off the road -- the road and the railway
-  // share an alignment here, and the old shaft went straight up through it.
-  //
-  // Every number below is imported from `game/riding.ts` rather than agreed
-  // with it. The geometry a player sees and the floor they stand on have to be
-  // two readings of one set of five numbers, or the seam between them is a
-  // place to fall through.
-  const street = station.groundY;
-  if (!Number.isFinite(street) || street <= top + 4) return;
-  const A = ACCESS_ALONG_M;
+  // **The way in, from the plan both ends read.** `game/riding.stationAccessPlan`
+  // decides where the mouth is (the real entrance), how long the incline is
+  // and where the tunnel turns; this draws exactly those numbers, so the shaft
+  // a player sees and the floor `StationBoxField` stands them on cannot
+  // disagree. The first design put the mouth 68 m along and 40 m across the
+  // site at the site's own height, which the owner found impassable and
+  // undrawn where the street there was a few metres higher.
+  const plan = stationAccessPlan(station as unknown as RailStation, accessWorld);
+  if (plan === null) return;
   const HW = ACCESS_HALF_W;
   const H = ACCESS_HEIGHT_M;
-  const FAR = ACCESS_FAR_M;
-  const NEAR = ACCESS_NEAR_M;
-  /** The incline's floor at an offset across the track. */
-  const rampY = (o: number): number => top + (street - top) * ((o - NEAR) / (FAR - NEAR));
-
-  // The incline: floor, ceiling and two side walls, all leaning together.
+  const nx = -plan.dirZ;
+  const nz = plan.dirX;
+  const at = (d: number, o: number, y: number): [number, number, number] => [
+    plan.mouthX + plan.dirX * d + nx * o, y, plan.mouthZ + plan.dirZ * d + nz * o,
+  ];
+  // Flat past the mouth: the field caps the lean there (`StationBox.riseMax`).
+  const yAt = (d: number): number => plan.mouthY - (plan.mouthY - plan.floorY) * (Math.max(d, 0) / plan.inclineM);
+  const d0 = -ACCESS_OVERLAP_M / 2;
+  const d1 = plan.inclineM + ACCESS_OVERLAP_M / 2;
+  // The incline: floor, ceiling and two side walls, all leaning together, on
+  // the lining -- the one BackSide material, for the player under it.
   for (const dy of [0, H]) {
-    lining.quad(
-      ...corner(A - HW, NEAR, rampY(NEAR) + dy), ...corner(A + HW, NEAR, rampY(NEAR) + dy),
-      ...corner(A + HW, FAR, rampY(FAR) + dy), ...corner(A - HW, FAR, rampY(FAR) + dy),
-    );
+    lining.quad(...at(d0, -HW, yAt(d0) + dy), ...at(d0, HW, yAt(d0) + dy), ...at(d1, HW, yAt(d1) + dy), ...at(d1, -HW, yAt(d1) + dy));
   }
   for (const sgn of [-1, 1]) {
-    lining.quad(
-      ...corner(A + HW * sgn, NEAR, rampY(NEAR)), ...corner(A + HW * sgn, FAR, rampY(FAR)),
-      ...corner(A + HW * sgn, FAR, rampY(FAR) + H), ...corner(A + HW * sgn, NEAR, rampY(NEAR) + H),
-    );
+    lining.quad(...at(d0, HW * sgn, yAt(d0)), ...at(d1, HW * sgn, yAt(d1)), ...at(d1, HW * sgn, yAt(d1) + H), ...at(d0, HW * sgn, yAt(d0) + H));
   }
-
-  // The same lid argument as the room's, for the passage: `lining` serves the
-  // player under it and nothing serves the street over it. Buried for most of
-  // its run and therefore usually invisible, which is exactly why it would have
-  // been found by somebody standing in the one cutting it daylights into.
-  concrete.quad(
-    ...corner(A - HW, FAR, rampY(FAR) + H), ...corner(A + HW, FAR, rampY(FAR) + H),
-    ...corner(A + HW, NEAR, rampY(NEAR) + H), ...corner(A - HW, NEAR, rampY(NEAR) + H),
-  );
-
-  // The tunnel from the foot of it into the room, flat at platform level. It
-  // runs two metres past the wall so the two floors overlap rather than meet.
-  const IN = 11;
+  // Its lid from above, on concrete, so the street over it is not a hole.
+  concrete.quad(...at(d0, -HW, yAt(d0) + H), ...at(d1, -HW, yAt(d1) + H), ...at(d1, HW, yAt(d1) + H), ...at(d0, HW, yAt(d0) + H));
+  // The tunnel from the foot into the room, flat at the floor.
+  const tx = -plan.tunDirZ;
+  const tz = plan.tunDirX;
+  const tat = (d: number, o: number, y: number): [number, number, number] => [
+    plan.footX + plan.tunDirX * d + tx * o, y, plan.footZ + plan.tunDirZ * d + tz * o,
+  ];
+  const t0 = -HW;
+  const t1 = plan.tunnelM;
   for (const dy of [0, H]) {
-    lining.quad(
-      ...corner(A - HW, IN, top + dy), ...corner(A + HW, IN, top + dy),
-      ...corner(A + HW, NEAR, top + dy), ...corner(A - HW, NEAR, top + dy),
-    );
+    lining.quad(...tat(t0, -HW, plan.floorY + dy), ...tat(t0, HW, plan.floorY + dy), ...tat(t1, HW, plan.floorY + dy), ...tat(t1, -HW, plan.floorY + dy));
   }
   for (const sgn of [-1, 1]) {
-    lining.quad(
-      ...corner(A + HW * sgn, IN, top), ...corner(A + HW * sgn, NEAR, top),
-      ...corner(A + HW * sgn, NEAR, top + H), ...corner(A + HW * sgn, IN, top + H),
-    );
+    lining.quad(...tat(t0, HW * sgn, plan.floorY), ...tat(t1, HW * sgn, plan.floorY), ...tat(t1, HW * sgn, plan.floorY + H), ...tat(t0, HW * sgn, plan.floorY + H));
   }
-
-  concrete.quad(
-    ...corner(A - HW, NEAR, top + H), ...corner(A + HW, NEAR, top + H),
-    ...corner(A + HW, IN, top + H), ...corner(A - HW, IN, top + H),
-  );
-
-  // The entrance on the street: three walls and a lid over the mouth of the
-  // incline, open on the outward side so it reads as a way in from a distance.
-  const ex = station.x + ux * A + px * FAR;
-  const ez = station.z + uz * A + pz * FAR;
-  const ax = Math.abs(px) > Math.abs(pz) ? 1 : 0;
+  concrete.quad(...tat(t0, -HW, plan.floorY + H), ...tat(t1, -HW, plan.floorY + H), ...tat(t1, HW, plan.floorY + H), ...tat(t0, HW, plan.floorY + H));
+  // The entrance on the street: a portal frame over the mouth, open toward
+  // the street and into the incline, and a totem beside it a player can see
+  // from a block away -- a 6 m post with a panel in the rail orange, which
+  // is the one colour every Sydneysider reads as "train".
   const w = HW + 0.6;
-  concrete.box(
-    ex - (ax ? 0.3 : w), street, ez - (ax ? w : 0.3),
-    ex + (ax ? 0.3 : w), street + 3.4, ez + (ax ? w : 0.3),
-  );
-  concrete.box(ex - w, street + 3.4, ez - w, ex + w, street + 3.7, ez + w);
+  const y = plan.mouthY;
+  for (const sgn of [-1, 1]) {
+    // a pier each side of the mouth
+    const c = at(0, (HW + 0.3) * sgn, y);
+    concrete.box(c[0] - 0.3, y, c[2] - 0.3, c[0] + 0.3, y + 3.4, c[2] + 0.3);
+  }
+  // the lintel, as a thin slab across the piers
+  const l0 = at(0, -w, y);
+  const l1 = at(0, w, y);
+  concrete.box(Math.min(l0[0], l1[0]) - 0.3, y + 3.4, Math.min(l0[2], l1[2]) - 0.3, Math.max(l0[0], l1[0]) + 0.3, y + 3.8, Math.max(l0[2], l1[2]) + 0.3);
+  // the totem
+  const tpost = at(-2.5, w + 1.2, y);
+  concrete.box(tpost[0] - 0.18, y, tpost[2] - 0.18, tpost[0] + 0.18, y + 6.2, tpost[2] + 0.18);
+  signs.box(tpost[0] - 0.9, y + 4.6, tpost[2] - 0.9, tpost[0] + 0.9, y + 6.2, tpost[2] + 0.9);
 }
 
 /** The station name on a blade, with two posts, at the platform's own end. */

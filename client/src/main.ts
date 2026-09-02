@@ -642,6 +642,7 @@ import {
   verifyRailChunkSteps,
   verifyRailGeometry,
   type RailNetwork,
+  setAccessWorld,
 } from './world/rail-geo.ts';
 // The arithmetic half of the railway, which the server evaluates too. See
 // `world/rail-solids.ts` for why the definition lives outside the renderer.
@@ -661,6 +662,7 @@ import {
   aboardPose,
   buildPlatforms,
   buildStationBoxes,
+  accessWorldFrom,
   callsAhead,
   dwellAt,
   dwellStand,
@@ -4580,7 +4582,9 @@ async function main(): Promise<void> {
       collision.roofHeight(x, z, feetY),
       rail === null ? -Infinity : rail.roofHeight(x, z, feetY),
     );
-    if (platform > -Infinity) return Math.max(platform, roof);
+    // The box floor lifts a platform under the concourse: see `RailStation.concourseY`.
+    const boxFloorEarly = stationBoxes === null ? -Infinity : stationBoxes.floorAt(x, z, feetY, sampled);
+    if (platform > -Infinity) return Math.max(platform, roof, boxFloorEarly);
     // **And the rest of the station, which is most of it.**
     //
     // A platform is 5.5 m wide and a station box is thirty, so one pace off the
@@ -4594,7 +4598,7 @@ async function main(): Promise<void> {
     // reason the platform above does, and `StationBoxField.floorAt` is a band
     // for the identical reason too: an answer means "you are inside the
     // station", and George Street over the top of it is not inside anything.
-    const boxFloor = stationBoxes === null ? -Infinity : stationBoxes.floorAt(x, z, feetY);
+    const boxFloor = boxFloorEarly;
     if (boxFloor > -Infinity) return Math.max(boxFloor, roof);
     // **Inside a carved cutting the terrain is not there**, and until this line
     // nothing on either end of the wire knew it. `terrain.buildTerrainMesh`
@@ -4759,6 +4763,38 @@ async function main(): Promise<void> {
    */
   const VESSEL_RECENTRE_M = 300;
   let vesselAt = { x: Infinity, z: Infinity };
+  /**
+   * The station boxes again, in the world as it is now. `buildStationBoxes`
+   * at boot had no tiles and no prisms, so every mouth sat where the bake put
+   * it -- inside Martin Place's towers, on a DEM the street disagreed with.
+   * Rebuilt whenever a tile lands or the player has moved a corridor's width,
+   * from the same prisms and ground the drawing reads through
+   * `setAccessWorld`, so what is drawn is what is stood on.
+   */
+  let boxTiles = -1;
+  let boxAt = { x: Infinity, z: Infinity };
+  const refreshStationBoxes = (): void => {
+    if (railBake === null || streamer.ground === null) return;
+    const resident = streamer.ground.loadedTiles;
+    const moved = Math.hypot(player.position.x - boxAt.x, player.position.z - boxAt.z);
+    if (resident === boxTiles && moved < VESSEL_RECENTRE_M) return;
+    boxTiles = resident;
+    boxAt = { x: player.position.x, z: player.position.z };
+    const world = accessWorldFrom(collision, rawGroundAt);
+    setAccessWorld(world);
+    const before = stationBoxes;
+    stationBoxes = buildStationBoxes(railBake, world);
+    // A mouth that moved is an incline the chunk drew somewhere else: drop
+    // the chunks over it so `rail-geo` draws the plan the field now stands
+    // bodies on. Rare -- a tile landing with a tower over the old mouth.
+    if (before !== null && railChunks !== null) {
+      for (const m of stationBoxes.mouths) {
+        const was = before.mouths.find((q) => q.name === m.name);
+        if (was !== undefined && Math.abs(was.x - m.x) < 0.01 && Math.abs(was.z - m.z) < 0.01 && Math.abs(was.y - m.y) < 0.01) continue;
+        railChunks.invalidate([m.x - 300, m.z - 300, m.x + 300, m.z + 300]);
+      }
+    }
+  };
   const refreshVessels = (): void => {
     if (!vesselsEnabled() || railBake === null || streamer.ground === null) return;
     const resident = streamer.ground.loadedTiles;
@@ -10445,6 +10481,29 @@ async function main(): Promise<void> {
      * building. Offering them would be offering four things `pressMount` has
      * just been taught to refuse.
      */
+    // The nearest station entrance, in words, while you are on the street near
+    // one and not already under it: the owner "cant reliably find entry".
+    let stationHint = '';
+    if (interior === null && stationBoxes !== null && !underground()) {
+      let best = null as null | { name: string; x: number; z: number; y: number };
+      let bestD = 170;
+      for (const m of stationBoxes.mouths) {
+        const d = Math.hypot(m.x - player.position.x, m.z - player.position.z);
+        if (d < bestD) { bestD = d; best = m; }
+      }
+      if (best !== null) {
+        camera.getWorldDirection(doorGaze);
+        const fl = Math.hypot(doorGaze.x, doorGaze.z) || 1;
+        const fx = doorGaze.x / fl;
+        const fz = doorGaze.z / fl;
+        const dx = best.x - player.position.x;
+        const dz = best.z - player.position.z;
+        const ahead = (dx * fx + dz * fz) / (bestD || 1);
+        const left = (dx * fz - dz * fx) / (bestD || 1);
+        const dir = ahead > 0.85 ? 'ahead' : ahead < -0.85 ? 'behind you' : left > 0 ? 'to your left' : 'to your right';
+        stationHint = bestD > 6 ? `${best.name} station · ${Math.round(bestD)} m ${dir}` : `${best.name} station · walk in`;
+      }
+    }
     const promptLine =
       interior !== null
         ? (atLift ? 'E — lift up  ·  Shift+E — down' : atExit ? 'E — back outside' : coreHint)
@@ -10452,7 +10511,7 @@ async function main(): Promise<void> {
           trainPill ||
           ridePrompt(playerCombat, playerCombat.phase, rideNudgeT, rideNudgeText) ||
           takePrompt(takeableNear, playerCombat.drivingCar !== 0, playerCombat.phase) ||
-          (doorSite !== null ? 'E — go inside' : '');
+          (doorSite !== null ? 'E — go inside' : stationHint);
     hud.derived(promptLine);
     touch?.setPrompt(promptLine);
 
@@ -13699,6 +13758,7 @@ async function main(): Promise<void> {
         // A no-op unless `?vessels=1`, and a no-op after that unless a grid has
         // landed since the last one. See `refreshVessels`.
         refreshVessels();
+        refreshStationBoxes();
       }
 
     }

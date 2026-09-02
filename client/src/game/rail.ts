@@ -150,6 +150,16 @@ export interface RailStation {
   x: number;
   z: number;
   trackY: number;
+  /**
+   * Derived at decode, on both ends: the highest calling platform's top at
+   * this station, `CONCOURSE_OVER_RAIL_M` over the route's own height at the
+   * stop. `siteY` is the *mean* of the anchors, and at North Ryde the two
+   * platforms are 0.9 m apart, so a floor at the mean was a 0.44 m kerb onto
+   * one and a 0.45 m drop onto the other -- a drop a body cannot climb back.
+   * The floor is midway between the calling levels (`deriveConcourse`), and
+   * a platform under it is under it. See `riding.concourseY` for who reads it.
+   */
+  concourseY?: number;
   groundY: number;
   vertical: 'surface' | 'elevated' | 'underground' | 'unknown';
   /**
@@ -344,12 +354,73 @@ const BUFFER_ORDER = [
 export const SPAN_TUNNEL = 1;
 export const SPAN_BRIDGE = 2;
 export const SPAN_CUTTING = 4;
+/**
+ * Derived at decode, never read from the bake: the track is buried deeper than
+ * `DEEP_M` at this vertex by the pipeline's own measurement, whatever OSM
+ * tagged the way. RAIL-VERTICAL.md's rule -- *measure the relationship, do not
+ * classify it* -- applied to the one classification the carve still trusted.
+ * Under Wynyard the ways carry no tunnel tag and the railhead is sixteen
+ * metres down, so the carve dug a trench through the CBD and drew the city
+ * from beneath. Both readers of a span's flags (`rail-cut.drawnAsTunnel` and
+ * `rail-geo`) see this bit, so they agree per segment, which is what the
+ * depth-free design was protecting.
+ */
+export const SPAN_DEEP = 64;
+export const DEEP_M = 8;
 export const SPAN_EMBANKMENT = 8;
 export const SPAN_ELECTRIFIED = 16;
 export const SPAN_SUBWAY = 32;
 
 function pad8(n: number): number {
   return (8 - (n % 8)) % 8;
+}
+
+/** The platform's height over the railhead: `rail-solids.PLATFORM_HEIGHT`, restated three-free. */
+export const CONCOURSE_OVER_RAIL_M = 1.05;
+/** The most a station's two levels are allowed to pull the concourse down from its highest railhead: half of this. */
+export const CONCOURSE_SPREAD_MAX_M = 3.6;
+
+/** The route's height at arc length `s` along a direction. */
+export function heightAlong(bake: RailBake, dir: RailDirection, s: number): number {
+  const c = bake.cum;
+  let lo = dir.vertexOff;
+  let hi = dir.vertexOff + dir.vertexCount - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (c[mid] <= s) lo = mid;
+    else hi = mid - 1;
+  }
+  if (lo >= dir.vertexOff + dir.vertexCount - 1) lo = dir.vertexOff + dir.vertexCount - 2;
+  const span = c[lo + 1] - c[lo];
+  const u = span > 0 ? (s - c[lo]) / span : 0;
+  const p = bake.vertices;
+  return p[lo * 3 + 1] + (p[(lo + 1) * 3 + 1] - p[lo * 3 + 1]) * u;
+}
+
+/** `RailStation.concourseY` for every station with a calling stop. Idempotent. */
+export function deriveConcourse(bake: RailBake): void {
+  for (const st of bake.stations) {
+    let top = -Infinity;
+    let low = Infinity;
+    for (const line of bake.lines) {
+      if (st.lines && st.lines.length && !st.lines.includes(line.name) && !st.lines.includes(line.id)) continue;
+      for (const dir of line.dirs) {
+        if (st.servedDirs && st.servedDirs.length && !st.servedDirs.includes(dir.index)) continue;
+        for (const stop of dir.stops) {
+          if (!stop.calls || stop.name !== st.name) continue;
+          const y = heightAlong(bake, dir, stop.s);
+          if (y > top) top = y;
+          if (y < low) low = y;
+        }
+      }
+    }
+    // One box, one floor, and Town Hall has two levels 2.7 m apart in it.
+    // The floor sits midway between the highest and lowest calling railhead
+    // (capped, so a station the bake gave one box and two very different
+    // levels does not sink its upper trains out of reach), which keeps every
+    // sill within `riding.BOARD_RISE_M` of a body on the concourse.
+    if (top > -Infinity) st.concourseY = top - Math.min(top - low, CONCOURSE_SPREAD_MAX_M) / 2 + CONCOURSE_OVER_RAIL_M;
+  }
 }
 
 export function decodeRail(buffer: ArrayBuffer): RailBake {
@@ -420,7 +491,7 @@ export function decodeRail(buffer: ArrayBuffer): RailBake {
     lines.push(line);
   }
 
-  return {
+  const bake: RailBake = {
     version,
     epochMs: meta.epochMs,
     cycleS: meta.solve?.cycle_s ?? 120,
@@ -435,7 +506,7 @@ export function decodeRail(buffer: ArrayBuffer): RailBake {
     phases: arrays.phases as Float64Array,
     stanchions: arrays.stanchions as Float32Array,
     stanchionKinds: arrays.stanchionKinds as Uint8Array,
-    vertexFlags: arrays.vertexFlags as Uint8Array,
+    vertexFlags: deepen(arrays.vertexFlags as Uint8Array, arrays.vertexClearance as Float32Array),
     vertexClearance: arrays.vertexClearance as Float32Array,
     paving: arrays.paving as Float32Array,
     physics: meta.physics,
@@ -443,6 +514,8 @@ export function decodeRail(buffer: ArrayBuffer): RailBake {
     degraded: meta.degraded ?? {},
     raw: meta,
   };
+  deriveConcourse(bake);
+  return bake;
 }
 
 // --- Where a train is ---------------------------------------------------------------
@@ -571,19 +644,74 @@ export const SHARED_STOP_M = 110;
  * shared. Every direction of every line is walked, so two lines sharing a
  * trunk agree. Integer keys and a `Map`, no trig, the same on both ends.
  */
+/** `SPAN_DEEP` on every vertex the pipeline measured as buried past `DEEP_M`. */
+export function deepen(flags: Uint8Array, clearance: Float32Array): Uint8Array {
+  const out = new Uint8Array(flags.length);
+  for (let i = 0; i < flags.length; i++) {
+    out[i] = flags[i] | (clearance[i] < -DEEP_M ? SPAN_DEEP : 0);
+  }
+  return out;
+}
+
 export function computeLateral(lines: readonly RailLine[], vertices: Float32Array, cum: Float64Array): Float32Array {
   const n = vertices.length / 3;
   const lateral = new Float32Array(n);
-  const key = (i: number, j: number): string => {
-    const ax = Math.round(vertices[i * 3] * 2), az = Math.round(vertices[i * 3 + 2] * 2);
-    const bx = Math.round(vertices[j * 3] * 2), bz = Math.round(vertices[j * 3 + 2] * 2);
-    return `${ax},${az}|${bx},${bz}`;
-  };
-  const seen = new Set<string>();
-  for (const line of lines) {
-    for (const dir of line.dirs) {
-      for (let i = dir.vertexOff; i + 1 < dir.vertexOff + dir.vertexCount; i++) seen.add(key(i, i + 1));
+  // Every segment's midpoint and unit heading, in a metre grid, so a segment
+  // can find the ones drawn on top of it whatever way their endpoints were
+  // rounded. Two OSM ways for one railway are rarely the same coordinates;
+  // they are the same *place*, within a metre, running the other way.
+  const CELL = 4;
+  const grid = new Map<string, number[]>();
+  const mids = new Float64Array(n * 2);
+  const heads = new Float64Array(n * 2);
+  const owner = new Int32Array(n).fill(-1);
+  let segIndex = 0;
+  const segs: Array<[number, number]> = []; // [vertex i, direction index]
+  lines.forEach((line, li) => {
+    line.dirs.forEach((dir, di) => {
+      for (let i = dir.vertexOff; i + 1 < dir.vertexOff + dir.vertexCount; i++) {
+        const ax = vertices[i * 3], az = vertices[i * 3 + 2];
+        const bx = vertices[(i + 1) * 3], bz = vertices[(i + 1) * 3 + 2];
+        const dx = bx - ax, dz = bz - az;
+        const len = Math.sqrt(dx * dx + dz * dz);
+        if (!(len > 1e-6)) continue;
+        mids[i * 2] = (ax + bx) / 2;
+        mids[i * 2 + 1] = (az + bz) / 2;
+        heads[i * 2] = dx / len;
+        heads[i * 2 + 1] = dz / len;
+        owner[i] = li * 2 + di;
+        const key = `${Math.floor(mids[i * 2] / CELL)},${Math.floor(mids[i * 2 + 1] / CELL)}`;
+        const list = grid.get(key);
+        if (list) list.push(i); else grid.set(key, [i]);
+        segs.push([i, li * 2 + di]);
+        segIndex++;
+      }
+    });
+  });
+  void segIndex;
+  const shared = new Uint8Array(n);
+  for (const [i] of segs) {
+    const mx = mids[i * 2], mz = mids[i * 2 + 1];
+    const hx = heads[i * 2], hz = heads[i * 2 + 1];
+    const cx = Math.floor(mx / CELL), cz = Math.floor(mz / CELL);
+    let hit = false;
+    for (let gx = cx - 1; gx <= cx + 1 && !hit; gx++) {
+      for (let gz = cz - 1; gz <= cz + 1 && !hit; gz++) {
+        const list = grid.get(`${gx},${gz}`);
+        if (!list) continue;
+        for (const j of list) {
+          if (j === i || owner[j] === owner[i]) continue;
+          // The same place, run the other way: within a track's width of each
+          // other and antiparallel.
+          const ox = mids[j * 2] - mx, oz = mids[j * 2 + 1] - mz;
+          if (ox * ox + oz * oz > 1.2 * 1.2) continue;
+          if (hx * heads[j * 2] + hz * heads[j * 2 + 1] > -0.9) continue;
+          hit = true;
+          break;
+        }
+      }
     }
+    if (hit) shared[i] = 1;
   }
   for (const line of lines) {
     for (const dir of line.dirs) {
@@ -594,8 +722,7 @@ export function computeLateral(lines: readonly RailLine[], vertices: Float32Arra
         return false;
       };
       for (let i = dir.vertexOff; i + 1 < end; i++) {
-        const shared = seen.has(key(i + 1, i));
-        if (!shared) continue;
+        if (!shared[i]) continue;
         if (nearStop(i) || nearStop(i + 1)) continue;
         lateral[i] = SHARED_OFFSET_M;
         lateral[i + 1] = SHARED_OFFSET_M;
@@ -863,6 +990,20 @@ export function railAt(dir: RailDirection, s: number): number {
  */
 export function verifyRail(bake: RailBake): string[] {
   const bad: string[] = [];
+  // --- The buried spans are marked, and every served bore has a concourse.
+  {
+    let deep = 0;
+    let marked = 0;
+    for (let i = 0; i < bake.vertexFlags.length; i++) {
+      if (bake.vertexClearance[i] < -DEEP_M) deep++;
+      if (bake.vertexFlags[i] & SPAN_DEEP) marked++;
+    }
+    if (deep > 0 && marked < deep) bad.push(`${deep} vertices are buried past ${DEEP_M} m and ${marked} carry SPAN_DEEP; decode marks them`);
+    for (const st of bake.stations) {
+      if (st.vertical !== 'underground' || !st.belowGrade || !st.servedDirs || st.servedDirs.length === 0) continue;
+      if (st.concourseY === undefined || !Number.isFinite(st.concourseY)) bad.push(`${st.name} is a served bore with no concourse height; deriveConcourse found no calling stop`);
+    }
+  }
   // --- Shared segments: two trains meeting on one centreline are a track
   // apart, and nobody is offset at a platform.
   {

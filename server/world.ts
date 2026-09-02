@@ -151,6 +151,8 @@ import { SPAN_TUNNEL } from '../client/src/game/rail.ts';
 import {
   buildPlatforms,
   buildStationBoxes,
+  accessWorldFrom,
+  type AccessWorld,
   type PlatformField,
   type StationBoxField,
 } from '../client/src/game/riding.ts';
@@ -2039,6 +2041,8 @@ export interface ServerWorld {
    * George Street at the correction rate. See `game/riding.StationBoxField`.
    */
   stationBoxes?: StationBoxField | null;
+  /** `collision.tileCount` when `stationBoxes` was last built; see `boxesOf`. */
+  stationBoxesTiles?: number;
 }
 
 /**
@@ -2309,7 +2313,8 @@ export async function loadWorld(
   };
   world.platforms = world.rail ? buildPlatforms(world.rail) : null;
   world.railCut = world.rail ? new RailCut(world.rail) : null;
-  world.stationBoxes = world.rail ? buildStationBoxes(world.rail) : null;
+  world.stationBoxes = world.rail ? buildStationBoxes(world.rail, accessWorldOf(world)) : null;
+  world.stationBoxesTiles = world.collision.tileCount;
   // **And the roads, which is where the carve stops.** `main.ts` writes the
   // identical line one statement after it builds its own `RailCut`, over a deck
   // built from the identical `.lanes.bin` bytes by the identical decoder. That
@@ -2709,10 +2714,30 @@ async function readOptional(path: string): Promise<ArrayBuffer | null> {
  * loaded, so the only place it fires is over the harbour -- where there is no
  * tile at all and never will be until something renders water.
  */
+/**
+ * The station boxes as of the collision tiles now resident. `loadWorld` builds
+ * them over the boot disc; a region that lands later brings the buildings a
+ * mouth has to be planned around, so the field is rebuilt the first time it
+ * is asked after the tile count changes. Cheap: twenty-eight stations.
+ */
+export function boxesOf(world: ServerWorld): StationBoxField | null {
+  if (!world.rail) return null;
+  const tiles = world.collision.tileCount;
+  if (world.stationBoxes === null || world.stationBoxes === undefined || world.stationBoxesTiles !== tiles) {
+    world.stationBoxes = buildStationBoxes(world.rail, accessWorldOf(world));
+    world.stationBoxesTiles = tiles;
+  }
+  return world.stationBoxes;
+}
+
+/** What `buildStationBoxes` asks the world; `main.ts` builds the same from the same prisms and grids. */
+export function accessWorldOf(world: ServerWorld): AccessWorld {
+  return accessWorldFrom(world.collision, (x, z) => world.terrain.height(x, z));
+}
+
 export function groundFor(world: ServerWorld): CombatWorld {
   let lastGround = 0;
   const platforms = world.platforms ?? null;
-  const boxes = world.stationBoxes ?? null;
   const cut = world.railCut ?? null;
   const vessels = world.vessels ?? null;
   const rails = world.railSolids ?? null;
@@ -2753,7 +2778,15 @@ export function groundFor(world: ServerWorld): CombatWorld {
         world.collision.roofHeight(x, z, feetY),
         rails === null ? -Infinity : rails.roofHeight(x, z, feetY),
       );
-      if (platform > -Infinity) return Math.max(platform, roof);
+      // The boxes, read live: `boxesOf` rebuilds them when a collision tile
+      // has landed since, because a mouth is planned around the buildings
+      // that are resident and the boot's disc is not the whole city.
+      const boxes = boxesOf(world);
+      const boxFloor = boxes === null ? -Infinity : boxes.floorAt(x, z, feetY, sampled);
+      // A platform under the concourse is under it: the lower of two
+      // platforms at North Ryde is 0.9 m below the higher, and the floor is
+      // the higher. See `RailStation.concourseY`.
+      if (platform > -Infinity) return Math.max(platform, roof, boxFloor);
       // **And the rest of the station.** `main.ts`'s `groundHeightAt` carries
       // the identical clause in the identical position, and this one is not a
       // second opinion: both call `StationBoxField.floorAt` over a field both
@@ -2763,7 +2796,6 @@ export function groundFor(world: ServerWorld): CombatWorld {
       // the street -- reported as *"moving anywhere on foot underground tps me
       // to surface"*. `cutAt` below cannot cover it: a bore is deliberately not
       // carved, because a tunnel has no surface expression to carve.
-      const boxFloor = boxes === null ? -Infinity : boxes.floorAt(x, z, feetY);
       if (boxFloor > -Infinity) return Math.max(boxFloor, roof);
       // **Inside a carved cutting the terrain is not there**, and until this
       // line nothing on either end knew it. `terrain.buildTerrainMesh` drops the

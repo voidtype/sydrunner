@@ -167,7 +167,7 @@
  * is: the roads live in their own module and this one only asks them a question.
  */
 
-import { SPAN_BRIDGE, SPAN_CUTTING, SPAN_TUNNEL, type RailBake } from '../game/rail.ts';
+import { SPAN_DEEP, SPAN_BRIDGE, SPAN_CUTTING, SPAN_TUNNEL, type RailBake } from '../game/rail.ts';
 
 /**
  * Half the width of the hole cut in the terrain, from the track centreline.
@@ -347,7 +347,7 @@ export const CUT_TAGGED_MIN_DEPTH = 0.15;
  * point, and the two cannot disagree.
  */
 export function drawnAsTunnel(flags: number, _depth?: number): boolean {
-  return (flags & SPAN_TUNNEL) !== 0;
+  return (flags & (SPAN_TUNNEL | SPAN_DEEP)) !== 0;
 }
 
 /**
@@ -477,6 +477,11 @@ export class RailCut {
   private roads: RoadCover | null = null;
 
   constructor(bake: RailBake) {
+    for (const st of bake.stations) {
+      if (st.vertical !== 'underground' || !st.belowGrade) continue;
+      if (!Number.isFinite(st.boxHalfLength) || !Number.isFinite(st.boxHalfWidth)) continue;
+      this.bores.push({ x: st.siteX, z: st.siteZ, ux: st.siteDx, uz: st.siteDz, hl: st.boxHalfLength + 30, hw: st.boxHalfWidth + STATION_HALF_WIDTH });
+    }
     const p = bake.vertices;
     const vf = bake.vertexFlags;
     const q = (v: number): number => Math.round(v * 4);
@@ -826,7 +831,28 @@ export class RailCut {
   }
 
   /** The corridor's own answer, before the road rule. See `cutAt`. */
+  /**
+   * The bore stations' boxes: never carved over. A station the bake measured
+   * as underground is a room under the street with the street still on top,
+   * whatever its approach spans' flags say; carving it opened a trench over
+   * Wynyard the owner looked down into.
+   */
+  private readonly bores: Array<{ x: number; z: number; ux: number; uz: number; hl: number; hw: number }> = [];
+
+  private overBore(x: number, z: number): boolean {
+    for (const b of this.bores) {
+      const dx = x - b.x;
+      const dz = z - b.z;
+      const along = Math.abs(dx * b.ux + dz * b.uz);
+      if (along > b.hl) continue;
+      const across = Math.abs(dx * -b.uz + dz * b.ux);
+      if (across <= b.hw) return true;
+    }
+    return false;
+  }
+
   private railCutAt(x: number, z: number, groundY: number): number {
+    if (this.overBore(x, z)) return Number.NaN;
     const list = this.cells.get(cellKey(Math.floor(x / CELL_M), Math.floor(z / CELL_M)));
     if (list === undefined) return Number.NaN;
     let best = Number.NaN;

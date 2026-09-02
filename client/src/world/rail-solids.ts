@@ -81,7 +81,6 @@
  * headless process cannot have.
  */
 
-import { ACCESS_ALONG_M, ACCESS_FAR_M, ACCESS_HALF_W } from '../game/riding.ts';
 import {
   SPAN_BRIDGE,
   SPAN_TUNNEL,
@@ -97,7 +96,7 @@ import {
 import { pointInPolygon } from '../player/collision.ts';
 import { DECK_THICKNESS_M } from './road-deck.ts';
 import { RAIL_HALF_M } from './envelope.ts';
-import { PLATFORM_OUTER_M, samePlatform } from '../game/riding.ts';
+import { concourseY, PLATFORM_OUTER_M, samePlatform } from '../game/riding.ts';
 import {
   frameAt,
   platformSlots,
@@ -1550,8 +1549,11 @@ export function undergroundSolids(
   station: PlacedStation,
   out: FrameSolid[],
 ): void {
-  const floor = station.trackY - 0.4;
-  const top = station.trackY + PLATFORM_HEIGHT;
+  // Flush with the concourse -- the room's floor is one level wall to wall
+  // (`riding.concourseY`), and a platform strip at its own anchor's height
+  // was a kerb onto the upper level's strips and a step off the lower's.
+  const top = concourseY(station);
+  const floor = top - 1.45;
   const L = BOX_HALF_LENGTH;
   for (const side of [-1, 1]) {
     out.push({
@@ -1562,26 +1564,11 @@ export function undergroundSolids(
       kind: SOLID_BOX_PLATFORM,
     });
   }
-  const street = station.groundY;
-  if (!Number.isFinite(street) || street <= top + 4) return;
-  // **The entrance moved across the track and this had to move with it.** The
-  // head slab used to sit `L - 14` along the alignment, which is over the road
-  // the railway runs under -- a lid at street + 3.2 m with nothing visible
-  // holding it up, in the middle of a carriageway. Now it caps the incline
-  // where the incline actually is, `ACCESS_FAR_M` to the side, and it is the
-  // one solid the access needs: the passage itself is bounded by the station
-  // box's own footprint, the way the room below it always has been.
-  const px = -station.uz;
-  const pz = station.ux;
-  const ex = station.x + station.ux * ACCESS_ALONG_M + px * ACCESS_FAR_M;
-  const ez = station.z + station.uz * ACCESS_ALONG_M + pz * ACCESS_FAR_M;
-  out.push({
-    f: { x: ex, z: ez, ux: 1, uz: 0 },
-    t0: -ACCESS_HALF_W - 0.6, t1: ACCESS_HALF_W + 0.6,
-    o0: -ACCESS_HALF_W - 0.6, o1: ACCESS_HALF_W + 0.6,
-    y0: street + 3.4, y1: street + 3.7,
-    kind: SOLID_SHAFT_HEAD,
-  });
+  // The head slab this once put over the generated mouth is gone with the
+  // generated mouth: the incline's lid is drawn by `rail-geo` from
+  // `stationAccessPlan`, and the passage is bounded by `StationBoxField`'s
+  // access box. A slab at street + 3.4 m over a mouth nobody uses was a roof
+  // in the middle of a footpath.
 }
 
 /**

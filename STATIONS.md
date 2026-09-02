@@ -1858,3 +1858,37 @@ no re-bake.
 **`holes` moved, and only just.** The previous round named this defect as sitting
 above all four hole mechanisms; on the measurement it is worth two stations, not
 two hundred. That is reported as it came out.
+
+
+## The way into a bore, walked
+
+Reported: *"cant reliably find entry, i just fall into the ground if i run
+over it, no space to navigate underground"* and *"the entrance to stations is
+impassible and also not really drawn properly"*. `server/underground-check.ts`
+is the acceptance: it walks every served bore from two metres outside the
+mouth to the far wall of the room on the server's own ground query, and it
+walked **1 of 28** before the following and **28 of 28** after.
+
+- **The mouth** is the OSM entrance, moved clear of any building over the pad,
+  the mouth, or the head of the incline (`riding.stationAccessPlan`, rings of
+  eight compass points, the least-intruded candidate if none is clear). Its
+  height is the terrain, not the bake's entrance DEM.
+- **The incline** is 1:1.33 -- an escalator's pitch -- because a 1:2 ramp to a
+  railhead thirty metres down is a sixty-metre strip no CBD block leaves free.
+  Its box overlaps the street as a *flat* pad (`StationBox.riseMax`).
+- **The floor** is one level wall to wall, midway between the highest and
+  lowest calling railhead plus the platform height (`RailStation.concourseY`,
+  derived at decode on both ends). Platform strips are flush with it; a train
+  on a lower level sits in the slab, a higher one floats, both within
+  `BOARD_RISE_M`. It was the ballast with 1.45 m kerbs.
+- **The lid** is under the street (`riding.roomCeilY`): the bake put Wynyard's
+  five metres above York Street.
+- **The street stays**: `rail.SPAN_DEEP` marks every vertex the pipeline
+  measured more than 8 m under the DEM, and the carve and the drawing both
+  treat it as a bore; `RailCut` also never carves over a served bore's box.
+- **A body on the street is not in the room**: `StationBoxField.floorAt` takes
+  the terrain and declines unless the floor is at the ground or the body is
+  already under it.
+- **The field follows the buildings**: `world.boxesOf` rebuilds when a
+  collision tile lands; `main.ts` rebuilds on the same tick as the vessels and
+  drops the rail chunks over a mouth that moved.

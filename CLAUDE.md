@@ -43,7 +43,7 @@ match that voice, and read the header of any file before changing it.
   test: a `verifyX(): string[]` self-check wired into *both* boot lists
   (`client/src/main.ts` and `server/index.ts`), or a scripted driver over the
   real server (`server/accounts-check.ts`, `server/cardamage-check.ts`,
-  `server/ride-acceptance.ts` are the pattern). Test rendering by its pure
+  `server/ride-acceptance.ts`, `server/underground-check.ts` are the pattern). Test rendering by its pure
   parts. If only eyes can judge something, say so in one sentence and let the
   owner look. Do not start vite, drive the browser pane, or build screenshot
   sinks.

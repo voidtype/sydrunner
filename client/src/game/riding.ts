@@ -166,7 +166,7 @@
  * labour the door leaves already have.
  */
 
-import {
+import { type RailStation, CONCOURSE_OVER_RAIL_M,
   createTrainPose,
   poseTrain,
   sampleAlong,
@@ -182,6 +182,7 @@ import {
 // deck's outer edge and the rim of the terrain carve have to be *the same
 // number*: see `PLATFORM_OUTER_M`, where their difference was the bug.
 import { STATION_HALF_WIDTH } from '../world/rail-cut.ts';
+import { pointInPolygon, type Prism } from '../player/collision.ts';
 // WORKSTREAM AG: how much of the corridor this platform's track may have. See
 // `PlatformSite.outer` -- both ends of the wire read this one answer.
 import { atlasFor } from '../world/track-atlas.ts';
@@ -1633,6 +1634,14 @@ export interface StationBox {
    * replacing the terrain carries over untouched.
    */
   slope?: number;
+  /**
+   * How far the lean may lift the floor over `floorY`, metres. An incline's
+   * box overlaps the street by `ACCESS_OVERLAP_M` so the two floors meet, and
+   * without a cap that overlap kept climbing: 1.25 m above the pavement at the
+   * mouth, a step no body makes. Capped, the overlap is a flat pad at the
+   * mouth's own height.
+   */
+  riseMax?: number;
 }
 
 /** How far to the side of the track the surface entrance stands. */
@@ -1647,6 +1656,8 @@ export const ACCESS_HEIGHT_M = 4.2;
 export const ACCESS_ALONG_M = 68;
 
 export class StationBoxField {
+  /** Every station entrance on the street, for the prompt that points at one. */
+  readonly mouths: Array<{ name: string; x: number; z: number; y: number }> = [];
   private readonly cells = new Map<number, StationBox[]>();
   readonly boxes: StationBox[] = [];
   /** Grid pitch. A box is at most ~400 m long, so a query touches a few cells. */
@@ -1688,7 +1699,22 @@ export class StationBoxField {
    * competing with it -- the same rule `PlatformField`'s answer gets, and the
    * same reason: the terrain grid here is the city twenty metres overhead.
    */
-  floorAt(x: number, z: number, feetY: number): number {
+  /** Is this exact box already in the field? For the checks that copy one. */
+  has(box: StationBox): boolean {
+    for (const list of this.cells.values()) if (list.includes(box)) return true;
+    return false;
+  }
+
+  /**
+   * `groundY`, when the caller has it, is the terrain at the point, and it is
+   * what keeps a body on the street from being handed the room under it: a
+   * box answers only when its floor is at the ground (the flat pad at a
+   * mouth) or the body is already under the ground (on the incline, in the
+   * tunnel, in the room). Without it, a room whose lid sat within a head's
+   * height of the pavement caught every body that walked over it -- the
+   * *"I fall into the ground if I run over it"* of Hills Showground.
+   */
+  floorAt(x: number, z: number, feetY: number, groundY = Number.NaN): number {
     const list = this.cells.get(
       StationBoxField.key(
         Math.floor(x / StationBoxField.CELL), Math.floor(z / StationBoxField.CELL),
@@ -1706,10 +1732,20 @@ export class StationBoxField {
       // The lean, if it has one. Floor and lid move together, so the band is
       // the same thickness everywhere on a ramp and a body walking down one is
       // never briefly outside it.
-      const rise = box.slope === undefined ? 0 : box.slope * along;
+      let rise = box.slope === undefined ? 0 : box.slope * along;
+      if (box.riseMax !== undefined && rise > box.riseMax) rise = box.riseMax;
       const floorY = box.floorY + rise;
       if (feetY < floorY - PLATFORM_STEP_M) continue;
       if (feetY > box.ceilY + rise - BOX_HEADROOM_M) continue;
+      // ...unless the body is already on this floor: a body walking down the
+      // incline is within a step of it at every sample, and the rule is about
+      // the body that is not, standing on the pavement.
+      if (
+        Number.isFinite(groundY) &&
+        floorY < groundY - UNDER_GROUND_M &&
+        feetY > groundY - UNDER_GROUND_M &&
+        feetY > floorY + PLATFORM_STEP_M
+      ) continue;
       if (floorY > best) best = floorY;
     }
     return best;
@@ -1752,7 +1788,244 @@ export class StationBoxField {
  * and `PlatformField` respectively already answer, and a lid over open sky
  * would have `floorAt` answering for bodies standing in the car park.
  */
-export function buildStationBoxes(bake: RailBake): StationBoxField {
+/** The steepest incline a body walks without it reading as a slide: one in two. */
+/**
+ * 0.75 -- thirty-seven degrees, an escalator's pitch rather than a ramp's. It
+ * was 1:2, and a 1:2 incline from a CBD pavement to a railhead thirty metres
+ * down is sixty metres long, which is a strip no city block leaves free: every
+ * candidate mouth within ninety metres of Wynyard's had a tower over some of
+ * it. At 1:1.33 the head is under a building's base six metres in, and the
+ * strip that has to be clear is the pad and those six metres.
+ */
+export const ACCESS_MAX_SLOPE = 0.75;
+/** The flat tunnel from the incline's foot into the room, and how far past the wall it runs. */
+export const ACCESS_TUNNEL_M = 8;
+export const ACCESS_OVERLAP_M = 2.5;
+/** A head over the incline floor; a building whose base is lower than this over any sample is in the way. */
+export const ACCESS_HEAD_M = 1.9;
+
+/**
+ * The way into an underground station, as one set of numbers both ends and the
+ * drawing read.
+ *
+ * **The mouth is the real entrance.** The bake carries the OSM entrance node
+ * (`entranceX/Z/Y`, `entranceSource: 'osm'`) for every bore station, and the
+ * first design ignored it: it stood a shaft 68 m along and 40 m across the
+ * site, at the site's own ground height, which put the mouth in somebody's
+ * yard and, where the street there was a few metres higher, under it. The
+ * owner: *"cant reliably find entry"*, *"the entrance to stations is
+ * impassible and also not really drawn properly"*. So the mouth is where the
+ * entrance is, at the height the entrance is, which is a point the pipeline
+ * measured against the DEM; the incline runs from it along the room's own
+ * axis, no steeper than `ACCESS_MAX_SLOPE`, and a flat tunnel turns from its
+ * foot into the room. The generated fallback stays for a bake with no
+ * entrance node.
+ */
+export interface AccessPlan {
+  /** The street end: where a player walks in, and the totem stands. */
+  mouthX: number;
+  mouthZ: number;
+  mouthY: number;
+  /** The incline's unit axis, from the mouth toward its foot, and its length. */
+  dirX: number;
+  dirZ: number;
+  inclineM: number;
+  /** The foot of the incline, at the room's floor height. */
+  footX: number;
+  footZ: number;
+  floorY: number;
+  /** The tunnel from the foot to the room, unit axis and length (into the wall by the overlap). */
+  tunDirX: number;
+  tunDirZ: number;
+  tunnelM: number;
+}
+
+/**
+ * What the world lends the plan: whether a point is inside a building, and
+ * the ground there. Both ends have both -- the server at boot, the client once
+ * the station's tile has landed -- and both are asked the same questions in
+ * the same order, so the two plans are the same plan.
+ */
+export interface AccessWorld {
+  /** The base of the lowest building standing on this point, or `NaN` for open ground. */
+  baseAt?: (x: number, z: number) => number;
+  groundAt?: (x: number, z: number) => number;
+}
+
+/**
+ * The world's answers from the one collision field and the one ground both
+ * ends hold. `server/world.ts` builds it at boot over the whole city; `main.ts`
+ * rebuilds it as tiles land, so a station's plan on the client settles to the
+ * server's once its tile is resident, and until then differs only in a mouth
+ * the player is too far from to reach.
+ */
+export function accessWorldFrom(
+  collision: { prismsWithin(x: number, z: number, r: number, out: Prism[]): void } | null,
+  groundAt: (x: number, z: number) => number,
+): AccessWorld {
+  const scratch: Prism[] = [];
+  return {
+    baseAt: (x, z) => {
+      if (collision === null) return Number.NaN;
+      scratch.length = 0;
+      collision.prismsWithin(x, z, 30, scratch);
+      let base = Number.NaN;
+      for (const q of scratch) {
+        if (q.structural || !pointInPolygon(q.points, x, z)) continue;
+        if (!(base <= q.base)) base = q.base;
+      }
+      return base;
+    },
+    groundAt,
+  };
+}
+
+export { CONCOURSE_OVER_RAIL_M };
+
+/**
+ * The room's lid: the bake's, unless the street over the site is lower, in
+ * which case a margin under the street. Wynyard's bake put the ceiling five
+ * metres *above* the DEM at the site, so the lid stood out of York Street as
+ * a slab and the box's band reached up through the pavement -- the fall-in
+ * the owner reported. Never lower than a standing height over the concourse.
+ */
+export function roomCeilY(st: RailStation, world: AccessWorld = {}): number {
+  let ceil = st.boxCeilY;
+  const g = world.groundAt ? world.groundAt(st.siteX, st.siteZ) : Number.NaN;
+  if (Number.isFinite(g) && g - ROOM_LID_UNDER_STREET_M < ceil) {
+    ceil = Math.max(g - ROOM_LID_UNDER_STREET_M, concourseY(st) + BOX_MIN_HEIGHT_M);
+  }
+  return ceil;
+}
+export const ROOM_LID_UNDER_STREET_M = 1.2;
+/** How far under the terrain a floor, or a body, has to be before a station box may answer. See `floorAt`. */
+export const UNDER_GROUND_M = 0.6;
+
+/**
+ * The concourse floor: platform level over the railhead the trains stand at.
+ * `siteY` is the mean of the calling anchors -- the route's own height at the
+ * stop, which is where `poseTrain` puts a door sill -- and `trackY` is the
+ * pipeline's older number at the node, which is a metre off at Town Hall and
+ * three at Wynyard. The bake's floor where neither was measured.
+ */
+export function concourseY(st: RailStation): number {
+  if (st.concourseY !== undefined && Number.isFinite(st.concourseY)) return st.concourseY;
+  if (Number.isFinite(st.siteY)) return st.siteY + CONCOURSE_OVER_RAIL_M;
+  return Number.isFinite(st.trackY) ? st.trackY + CONCOURSE_OVER_RAIL_M : st.boxFloorY;
+}
+
+export function stationAccessPlan(st: RailStation, world: AccessWorld = {}): AccessPlan | null {
+  if (st.vertical !== 'underground' || !st.belowGrade) return null;
+  if (!st.servedDirs || st.servedDirs.length === 0) return null;
+  if (!Number.isFinite(st.boxFloorY) || !Number.isFinite(st.boxCeilY)) return null;
+  if (!(st.boxCeilY - st.boxFloorY >= BOX_MIN_HEIGHT_M)) return null;
+  const ux = st.siteDx;
+  const uz = st.siteDz;
+  const px = -uz;
+  const pz = ux;
+  // The floor you walk on is the platform, not the ballast: a concourse at
+  // the railhead's level is a 1.45 m climb onto every platform, which a body
+  // cannot make. The trains sit `CONCOURSE_OVER_RAIL_M` below it, doors level.
+  const floorY = concourseY(st);
+  // The mouth: the OSM entrance if the bake has one within reach, else the
+  // generated one. `entranceY` is the DEM at that point.
+  const osm =
+    st.entranceSource === 'osm' &&
+    Number.isFinite(st.entranceX) && Number.isFinite(st.entranceZ) && Number.isFinite(st.entranceY) &&
+    Math.hypot(st.entranceX - st.siteX, st.entranceZ - st.siteZ) < 260;
+  let mouthX = osm ? st.entranceX : st.siteX + ux * ACCESS_ALONG_M + px * ACCESS_FAR_M;
+  let mouthZ = osm ? st.entranceZ : st.siteZ + uz * ACCESS_ALONG_M + pz * ACCESS_FAR_M;
+  // Out of the building it may stand in. Half the CBD's entrances are inside
+  // a tower's footprint, and a mouth inside a wall is a mouth nobody reaches.
+  // What has to be clear is the mouth, the pavement you step off, and the
+  // first few metres of the incline before it is under the building's floor
+  // -- `clear` walks those. Rings of eight compass points, nearest first,
+  // deterministic.
+  const inclineDir = (mx: number, mz: number): [number, number] => {
+    const a = (mx - st.siteX) * ux + (mz - st.siteZ) * uz;
+    const sgn = a > 0 ? -1 : 1;
+    return [ux * sgn, uz * sgn];
+  };
+  // `clear`: no building stands on the pad, the mouth, or any part of the
+  // incline a head would reach -- a body whose head is under a building's
+  // base passes beneath it (`collision.resolve` and `roofHeight` both honour
+  // the soffit); any higher, it is inside the walls. Checked against the
+  // building's own base rather than the terrain, because a base is the low
+  // corner of a footprint on a slope and can sit metres under the street.
+  // `intrusion`: metres by which a building's base cuts into the head over
+  // the incline, worst sample; 0 is clear. Sampled every metre, so a narrow
+  // wing is not stepped over.
+  const intrusion = (mx: number, mz: number): number => {
+    if (!world.baseAt) return 0;
+    const [dx, dz] = inclineDir(mx, mz);
+    const g0 = world.groundAt ? world.groundAt(mx, mz) : Number.NaN;
+    const top = Number.isFinite(g0) ? g0 : osm ? st.entranceY : st.boxCeilY;
+    const len = Math.max((top - floorY) / ACCESS_MAX_SLOPE, 12);
+    let worst = 0;
+    for (let d = -ACCESS_OVERLAP_M; d <= len; d += 1) {
+      // The pad is *behind* the mouth (negative `d`) at the mouth's height.
+      const sx = mx + dx * d;
+      const sz = mz + dz * d;
+      const fl = top - Math.max(d, 0) * ACCESS_MAX_SLOPE;
+      const base = world.baseAt(sx, sz);
+      if (Number.isFinite(base) && fl + ACCESS_HEAD_M - base > worst) worst = fl + ACCESS_HEAD_M - base;
+    }
+    return worst;
+  };
+  let best = intrusion(mouthX, mouthZ);
+  if (best > 0) {
+    // Rings of eight compass points, nearest first; the first clear candidate
+    // wins, and if none is clear within the reach, the least intruded upon.
+    const R = 0.7071;
+    const dirs: Array<[number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1], [R, R], [-R, R], [R, -R], [-R, -R]];
+    let bx = mouthX;
+    let bz = mouthZ;
+    search: for (let r = 4; r <= 90; r += 4) {
+      for (const [dx, dz] of dirs) {
+        const cx = mouthX + dx * r;
+        const cz = mouthZ + dz * r;
+        const here = intrusion(cx, cz);
+        if (here < best) {
+          best = here;
+          bx = cx;
+          bz = cz;
+          if (here === 0) break search;
+        }
+      }
+    }
+    mouthX = bx;
+    mouthZ = bz;
+  }
+  let mouthY = osm ? st.entranceY : st.boxCeilY;
+  if (world.groundAt) {
+    const g = world.groundAt(mouthX, mouthZ);
+    if (Number.isFinite(g)) mouthY = g;
+  }
+  const drop = mouthY - floorY;
+  if (!(drop > BOX_MIN_HEIGHT_M)) return null;
+  // Where the mouth is in the room's frame, and which way along the room the
+  // incline should run: toward the room's centre along its axis, so a mouth
+  // off one end descends back toward the platforms.
+  const rx = mouthX - st.siteX;
+  const rz = mouthZ - st.siteZ;
+  const across = rx * px + rz * pz;
+  const [dirX, dirZ] = inclineDir(mouthX, mouthZ);
+  const inclineM = Math.max(drop / ACCESS_MAX_SLOPE, 12);
+  const footX = mouthX + dirX * inclineM;
+  const footZ = mouthZ + dirZ * inclineM;
+  // The tunnel: from the foot, across toward the room's centreline, into the
+  // wall by the overlap. A foot already inside the room's plan still gets a
+  // short one so the two floors overlap rather than meet.
+  const side = across >= 0 ? 1 : -1;
+  const tunDirX = -px * side;
+  const tunDirZ = -pz * side;
+  const wall = st.boxHalfWidth;
+  const outside = Math.abs(across) - wall;
+  const tunnelM = Math.max(ACCESS_TUNNEL_M, outside + ACCESS_OVERLAP_M);
+  return { mouthX, mouthZ, mouthY, dirX, dirZ, inclineM, footX, footZ, floorY, tunDirX, tunDirZ, tunnelM };
+}
+
+export function buildStationBoxes(bake: RailBake, world: AccessWorld = {}): StationBoxField {
   const field = new StationBoxField();
   for (const st of bake.stations) {
     if (st.vertical !== 'underground' || !st.belowGrade) continue;
@@ -1776,55 +2049,44 @@ export function buildStationBoxes(bake: RailBake): StationBoxField {
       uz: st.siteDz,
       halfLength: st.boxHalfLength,
       halfWidth: st.boxHalfWidth,
-      floorY: st.boxFloorY,
-      ceilY: st.boxCeilY,
+      // The concourse is at platform level; see `stationAccessPlan`.
+      floorY: concourseY(st),
+      ceilY: roomCeilY(st, world),
     });
-    // **The way in.** Everything above builds the room; until this, nothing
-    // built a route to it, and `rail-geo` only ever called `writeStationAccess`
-    // for stations that were *not* underground. A bore has no surface
-    // expression to carve, so the terrain stayed sealed over the concourse and
-    // the entrance on the street was a box you could walk into that did
-    // nothing -- which is exactly how the owner found it at Macquarie Park.
-    //
-    // Three boxes, laid across the track rather than along it: the entrance
-    // stands `ACCESS_FAR_M` to the side, which is off the alignment the road
-    // usually shares with the railway, and the incline runs back in under it.
-    const street = st.boxCeilY;
-    const drop = street - st.boxFloorY;
-    if (drop > BOX_MIN_HEIGHT_M) {
-      const px = -st.siteDz;
-      const pz = st.siteDx;
-      const alongX = st.siteX + st.siteDx * ACCESS_ALONG_M;
-      const alongZ = st.siteZ + st.siteDz * ACCESS_ALONG_M;
-      const mid = (ACCESS_FAR_M + ACCESS_NEAR_M) / 2;
-      const half = (ACCESS_FAR_M - ACCESS_NEAR_M) / 2;
-      // The incline. Its own axis points *outward*, so the far end is the
-      // street and the near end is the concourse: a positive `along` is uphill.
+    // **The way in.** See `stationAccessPlan`: the mouth at the real entrance,
+    // an incline along the room's axis, a flat tunnel into it. The field and
+    // `rail-geo.writeUndergroundStation` read the same plan, so the floor a
+    // body stands on and the shaft it sees are one set of numbers.
+    const plan = stationAccessPlan(st, world);
+    if (plan !== null) {
+      const drop = plan.mouthY - plan.floorY;
+      const half = plan.inclineM / 2;
+      // The incline's own axis points *outward* (foot to mouth), so a positive
+      // `along` is uphill, which is the convention `floorAt`'s lean uses.
       field.add({
         name: `${st.name} access`,
-        x: alongX + px * mid,
-        z: alongZ + pz * mid,
-        ux: px, uz: pz,
-        halfLength: half,
+        x: (plan.mouthX + plan.footX) / 2,
+        z: (plan.mouthZ + plan.footZ) / 2,
+        ux: -plan.dirX, uz: -plan.dirZ,
+        halfLength: half + ACCESS_OVERLAP_M / 2,
         halfWidth: ACCESS_HALF_W,
-        floorY: (street + st.boxFloorY) / 2,
-        ceilY: (street + st.boxFloorY) / 2 + ACCESS_HEIGHT_M,
-        slope: drop / (2 * half),
+        floorY: (plan.mouthY + plan.floorY) / 2,
+        ceilY: (plan.mouthY + plan.floorY) / 2 + ACCESS_HEIGHT_M,
+        slope: drop / plan.inclineM,
+        riseMax: drop / 2,
       });
-      // The tunnel from the foot of it through the wall into the room. Flat,
-      // and it overlaps the room by a couple of metres so there is no seam
-      // between two boxes for a body to fall down.
-      const tunnelMid = (ACCESS_NEAR_M + 11) / 2;
+      const tMid = plan.tunnelM / 2;
       field.add({
         name: `${st.name} tunnel`,
-        x: alongX + px * tunnelMid,
-        z: alongZ + pz * tunnelMid,
-        ux: px, uz: pz,
-        halfLength: (ACCESS_NEAR_M - 11) / 2,
+        x: plan.footX + plan.tunDirX * tMid,
+        z: plan.footZ + plan.tunDirZ * tMid,
+        ux: plan.tunDirX, uz: plan.tunDirZ,
+        halfLength: tMid + ACCESS_HALF_W,
         halfWidth: ACCESS_HALF_W,
-        floorY: st.boxFloorY,
-        ceilY: st.boxFloorY + ACCESS_HEIGHT_M,
+        floorY: plan.floorY,
+        ceilY: plan.floorY + ACCESS_HEIGHT_M,
       });
+      field.mouths.push({ name: st.name, x: plan.mouthX, z: plan.mouthZ, y: plan.mouthY });
     }
   }
   return field;
@@ -3780,6 +4042,54 @@ export function verifyStationAccess(): string[] {
   }
   if (Math.abs(feet - floor) > 0.5) {
     failures.push(`the walk ended at ${feet.toFixed(1)} m rather than the concourse at ${floor} m.`);
+  }
+
+  // The plan, on three stations shaped like the real ones: an entrance off
+  // the end of the room, one beside it, and a deep one close by. Each is
+  // walked from the mouth to the platform floor in the controller's own
+  // steps, and the incline is never steeper than one in two.
+  const like = (over: Partial<RailStation>): RailStation => ({
+    name: 'X', x: 0, z: 0, trackY: -CONCOURSE_OVER_RAIL_M, groundY: 20, vertical: 'underground', depth: 20, clearance: 0, clearanceLo: 0, clearanceHi: 0,
+    structure: 'tunnel', conflict: false, approachShare: 1, approachWays: 1, promoted: false, orphaned: false, kind: 'station',
+    platforms: [], tunnelShare: 1, bridgeShare: 0, siteX: 0, siteZ: 0, siteDx: 1, siteDz: 0, siteY: 0, siteGroundY: 20, siteSpread: 0,
+    siteFaces: 0, servedDirs: [0, 1], lines: [], faces: 0, refs: [], islands: 1, sides: 0, platformLength: 160,
+    entranceX: 0, entranceZ: 0, entranceY: 20, entranceSource: 'osm', shaftDepth: 20, belowGrade: true,
+    boxFloorY: 0, boxCeilY: 20, boxHalfLength: 100, boxHalfWidth: 16,
+    ...over,
+  } as unknown as RailStation);
+  const cases: Array<[string, RailStation]> = [
+    ['off the end', like({ entranceX: 130, entranceZ: 30, entranceY: 22 })],
+    ['beside it', like({ entranceX: 10, entranceZ: 40, entranceY: 19 })],
+    ['deep and close', like({ entranceX: 20, entranceZ: 25, entranceY: 40, boxCeilY: 39, groundY: 40, siteGroundY: 40 })],
+  ];
+  for (const [what, st] of cases) {
+    const plan = stationAccessPlan(st);
+    if (plan === null) {
+      failures.push(`${what}: no plan.`);
+      continue;
+    }
+    if (Math.abs(plan.mouthX - st.entranceX) > 1e-9 || Math.abs(plan.mouthY - st.entranceY) > 1e-9) failures.push(`${what}: the mouth is not at the entrance.`);
+    if ((plan.mouthY - plan.floorY) / plan.inclineM > ACCESS_MAX_SLOPE + 1e-9) failures.push(`${what}: the incline is steeper than one in two.`);
+    const f = new StationBoxField();
+    for (const b of (() => { const fb = buildStationBoxes({ stations: [st] } as unknown as RailBake); return (fb as unknown as { cells: Map<string, StationBox[]> }).cells; })().values()) for (const box of b) if (!f.has(box)) f.add(box);
+    // Walk: mouth to foot along the incline, then along the tunnel into the room.
+    let feet = plan.mouthY;
+    let ok = true;
+    const stepTo = (nx: number, nz: number): void => {
+      const y = f.floorAt(nx, nz, feet);
+      if (y === -Infinity) { failures.push(`${what}: the floor stopped answering at (${nx.toFixed(1)}, ${nz.toFixed(1)}), ${feet.toFixed(1)} m.`); ok = false; return; }
+      if (Math.abs(y - feet) > PLATFORM_STEP_M) { failures.push(`${what}: the floor jumped ${(y - feet).toFixed(2)} m at (${nx.toFixed(1)}, ${nz.toFixed(1)}).`); ok = false; return; }
+      feet = y;
+    };
+    for (let d = 0.3; d < plan.inclineM - 0.3 && ok; d += 0.1) stepTo(plan.mouthX + plan.dirX * d, plan.mouthZ + plan.dirZ * d);
+    for (let d = 0; d < plan.tunnelM - 0.3 && ok; d += 0.1) stepTo(plan.footX + plan.tunDirX * d, plan.footZ + plan.tunDirZ * d);
+    if (ok && Math.abs(feet - plan.floorY) > 0.5) failures.push(`${what}: the walk ended at ${feet.toFixed(1)} m, not the floor at ${plan.floorY}.`);
+    // A mouth in a building is moved out of it, and lands on the ground it is given.
+    const nudged = stationAccessPlan(st, { baseAt: (x, z) => (Math.hypot(x - st.entranceX, z - st.entranceZ) < 6 ? 31 : Number.NaN), groundAt: () => 31 });
+    if (nudged === null || Math.hypot(nudged.mouthX - st.entranceX, nudged.mouthZ - st.entranceZ) < 6) failures.push(`${what}: a mouth inside a building was not moved out of it.`);
+    if (nudged !== null && nudged.mouthY !== 31) failures.push(`${what}: the mouth did not take the ground it was given.`);
+    // And a body on the street over the room is not in the room.
+    if (f.floorAt(st.siteX, st.siteZ, st.groundY) > -Infinity) failures.push(`${what}: a body on the street over the station is handed the concourse floor; it would fall in.`);
   }
 
   // A slope of zero is the room it always was.
