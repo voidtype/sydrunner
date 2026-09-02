@@ -503,6 +503,13 @@ outage would look like.
 
 ## The runbook, end to end (read this first)
 
+> **The boot gate must abort the chain.** A deploy script that runs the local
+> boot check and then carries on regardless shipped a server that refused to
+> start (a new `verify*` failed) and the box crash-looped for four minutes
+> until it was rolled back. Chain the steps with `&&` off a check that
+> `self-checks pass` was printed, and treat a `/health` poll that gives up as
+> a failure, not a warning.
+
 Everything above is the reasoning; this is the order of operations, written
 after a night in which every one of these steps was rediscovered the hard way.
 There are **three independent things** that can ship, and they ship

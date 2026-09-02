@@ -206,13 +206,19 @@ export function ferryPose(r: number, index: number, seconds: number, out: BoatPo
   // Each route has its own berth: a lateral offset off the route's end,
   // blended in over the last sixty metres so the approach still reads as the
   // route. Deterministic per route, and the same on every machine.
+  // Off the route's *forward* direction, not the boat's heading, so a boat
+  // that turns at the terminal swings its bow and stays on its berth: the
+  // heading flips at the turn and an offset taken from it would jump the
+  // hull fifty metres sideways, which is what the first cut did.
   const length = t.along[t.along.length - 1];
   const nearEnd = Math.min(m, length - m);
   if (nearEnd < BERTH_BLEND_M) {
     const k = 1 - nearEnd / BERTH_BLEND_M;
     const berth = (((r * 7) % 5) - 2) * BERTH_PITCH_M * k;
-    out.x += -out.hz * berth;
-    out.z += out.hx * berth;
+    const fx = forward ? out.hx : -out.hx;
+    const fz = forward ? out.hz : -out.hz;
+    out.x += -fz * berth;
+    out.z += fx * berth;
   }
   out.y = SEA_Y;
   out.kind = t.kind;
