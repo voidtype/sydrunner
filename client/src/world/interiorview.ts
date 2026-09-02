@@ -135,6 +135,25 @@ export class InteriorView {
     if (this.cab !== null) this.cab.position.y = y;
   }
 
+  /**
+   * While the rider is in it, the cab draws over everything: the level's
+   * ceiling slab sweeps down through a cab that is depth-tested against it,
+   * and a floor slab up through it, which is the shaft with no hole in it
+   * seen from inside. Drawn last without the depth test, the cab is the room
+   * the rider is in and the slabs pass behind. Off again when it rests, so a
+   * body in the corridor does not see the cab through the wall.
+   */
+  private cabRiding = false;
+  private readonly cabMaterial = createInteriorMaterial();
+  setCabRiding(riding: boolean): void {
+    if (riding === this.cabRiding) return;
+    this.cabRiding = riding;
+    this.cabMaterial.depthTest = !riding;
+    this.cabMaterial.depthWrite = !riding;
+    this.cabMaterial.needsUpdate = true;
+    if (this.cab !== null) this.cab.renderOrder = riding ? 3 : 0;
+  }
+
   private rebuildCab(it: Interior): void {
     const old = this.cab;
     if (old !== null) {
@@ -149,10 +168,10 @@ export class InteriorView {
     geometry.setAttribute('position', new BufferAttribute(built.positions, 3));
     geometry.setAttribute('normal', new BufferAttribute(built.normals, 3));
     geometry.setAttribute('color', new BufferAttribute(built.colors, 3));
-    const mesh = new Mesh(geometry, this.material);
+    const mesh = new Mesh(geometry, this.cabMaterial);
     mesh.layers.set(INTERIOR_LAYER);
     mesh.frustumCulled = false;
-    mesh.renderOrder = 0;
+    mesh.renderOrder = this.cabRiding ? 3 : 0;
     mesh.position.y = it.levels[0].y;
     this.scene.add(mesh);
     this.cab = mesh;

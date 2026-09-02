@@ -10413,6 +10413,8 @@ async function main(): Promise<void> {
         const nowMs = Date.now();
         const cabY = liftFloorY(interior, nowMs);
         if (cabY !== null) interiorView.setCabY(cabY);
+        // On top for the rider while it moves; see `InteriorView.setCabRiding`.
+        interiorView.setCabRiding(liftMoving(interior, nowMs) && atLift);
         if (!liftAnnounced && !liftMoving(interior, nowMs)) {
           liftAnnounced = true;
           areaLine.announce(levelName(interior, interior.lift.to));
