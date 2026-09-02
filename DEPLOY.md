@@ -426,6 +426,17 @@ contain it. `vite build` copies `public/` into `dist/`, so stamping `public/` is
 enough for any future build; `dist/` is stamped too when it exists, so an
 already-built tree does not need rebuilding before the next rsync.
 
+#### A few files ahead of the CDN: `cdn.except`
+
+A landmark rebake or one re-emitted collision tile is two files, and the
+bucket cannot be republished for them (the R2 pair is dead; see *The token*).
+`index.json`'s `cdn` block takes an `except` list of world paths the **origin
+serves itself**; the client never asks the CDN for those (`world/cdn.ts`,
+`verifyCdn` 1b). Stamp it beside the files you rsync, in both pivots and their
+sidecars, and the next full publish clears it. The Opera House stairs of
+2026-09-03 went out this way: `landmarks.glb` and the Bennelong Point collision
+tile, from a landmark-only refresh over the cached terrain rather than a build.
+
 #### Deploy the sidecars with the pivot, always
 
 Caddy serves `precompressed zstd br`, so a browser advertising `accept-encoding:

@@ -149,6 +149,17 @@ export interface CdnContract {
    * does not.
    */
   base?: string;
+  /**
+   * World paths the **origin serves itself**, whatever the CDN holds. A
+   * landmark rebake or a single collision tile re-emitted after a bug is two
+   * files; republishing the bucket for them is a 20 GB upload, and while the
+   * R2 credentials are dead (DEPLOY.md, *The token*) it is not possible at
+   * all. A path listed here is fetched from the origin, with its `?v=`, and
+   * the CDN copy is simply never asked. `scripts`-free: the refresh stamps it
+   * into `index.json` and `root.json` beside the files it rewrote, and the
+   * next full publish clears it.
+   */
+  except?: string[];
 }
 
 /** The index fields this reads. */
@@ -263,6 +274,7 @@ export function armCdn(index: CdnIndex | null | undefined): void {
   ref = '';
   repo = '';
   base = '';
+  excepted = new Set(contract?.except ?? []);
   if (contract?.base) {
     // A plain origin, checked rather than concatenated blind: an empty or
     // relative `base` would build URLs that resolve against the game's own
@@ -311,8 +323,12 @@ export function armCdn(index: CdnIndex | null | undefined): void {
  * The jsDelivr branch stays bare on purpose: `repo@ref` is content-addressed,
  * so the ref *is* the version and a suffix would only fragment its cache.
  */
+/** Paths the origin serves itself. See `CdnContract.except`. */
+let excepted = new Set<string>();
+
 export function cdnAssetUrl(path: string, version = ''): string | null {
   const clean = path.replace(/^\/+/, '');
+  if (excepted.has(clean)) return null;
   if (base) return `${base}/${clean}${version}`;
   if (!ref || !repo) return null;
   return `${JSDELIVR}/${repo}@${ref}/${clean}`;
@@ -619,6 +635,16 @@ export function verifyCdn(): string[] {
     if (got !== want) failures.push(`cdnAssetUrl(${path}): expected ${want}, got ${got}`);
   }
 
+  // --- 1b. An excepted path has no CDN URL, whichever branch is armed, and
+  // the paths beside it are untouched.
+  {
+    const savedExcept = excepted;
+    excepted = new Set(['landmarks.glb', 'collision/-5_9.bin']);
+    if (cdnAssetUrl('landmarks.glb') !== null) failures.push('an excepted path was given a CDN URL');
+    if (cdnAssetUrl('/collision/-5_9.bin') !== null) failures.push('an excepted path with a leading slash was given a CDN URL');
+    if (cdnAssetUrl('tiles/-5_9.glb') === null) failures.push('excepting two paths took the CDN away from a third');
+    excepted = savedExcept;
+  }
   // --- 2. A leading slash must not produce a double slash in the path.
   if (cdnAssetUrl('/tiles/1_1.glb') !== `${JSDELIVR}/${repo}@${ref}/tiles/1_1.glb`) {
     failures.push('cdnAssetUrl kept a leading slash');
