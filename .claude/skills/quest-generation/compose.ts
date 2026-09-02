@@ -28,17 +28,21 @@ const arg = (k: string, d: string): string => {
 };
 const COUNT = Number(arg('--count', '2000'));
 const SEED = Number(arg('--seed', '7'));
+/** A letter on every id, so two batches never share a quest id. */
+const BATCH = arg('--batch', '');
 const ONLY_LEVEL = Number(arg('--level', '0'));
 const ONLY_AREA = arg('--area', '');
 const OUT = arg('--out', join(REPO, 'scripts/content/drafts/quests.json'));
 const PACKS = arg('--packs', '');
+/** Earlier drafts to stay unique against, comma-separated: their titles, blurbs and givers join the ledger. */
+const LEDGERS = arg('--ledger', '').split(',').filter(Boolean);
 
 // --- rules the gates enforce, restated so this refuses first -------------------
 const BREADCRUMB_M = 600;
-const SHINGLE_MAX = 0.48; // the gate refuses at 0.5, measured the same way; the two points are margin
+const SHINGLE_MAX = 0.46; // the gate refuses at 0.5, measured the same way; the two points are margin
 const WALK_M = 2600;
 const PATTERN_SHARE = 0.6;
-const NAME_REACH_M = 2500;
+const NAME_REACH_M = 2700; // the gate says 2.5 km; place-clear can walk a giver 200 m
 const GIVER_SPACING_M = 30;
 const TRACK_CLEAR_M = 12; // the gate refuses under 6 m to a rail *segment*; measured that way below
 const MAX_TITLE = 60;
@@ -111,12 +115,14 @@ for (const a of AREAS) if (!STATION.has(a.station)) throw new Error(`areas.json:
 // --- the ledger: everything already shipped ------------------------------------
 interface Giver { first: string; x: number; z: number }
 const shippedTitles = new Set<string>();
+const fingerprintsShipped = new Set<string>();
 const shippedGivers: Giver[] = [];
 const shingleIndex = new Map<string, number[]>(); // shingle -> blurb ids
 const blurbCount: number[] = []; // id -> shingle count
 let blurbId = 0;
 function shinglesOf(text: string): string[] {
-  const w = text.toLowerCase().replace(/[^a-z0-9' ]+/g, ' ').split(/\s+/).filter(Boolean);
+  // The gate's own tokeniser, character for character: an apostrophe splits a word there too.
+  const w = text.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(Boolean);
   const out: string[] = [];
   for (let i = 0; i + 5 <= w.length; i++) out.push(w.slice(i, i + 5).join(' '));
   return out;
@@ -140,6 +146,15 @@ function worstOverlap(text: string): number {
   let worst = 0;
   for (const [id, n] of tally) worst = Math.max(worst, n / Math.min(sh.size, blurbCount[id]));
   return worst;
+}
+for (const path of LEDGERS) {
+  const d = JSON.parse(readFileSync(path, 'utf8'));
+  for (const e of d.entries ?? []) {
+    shippedTitles.add(e.quest.title);
+    indexBlurb(e.quest.blurb ?? '');
+    if (e.npc) shippedGivers.push({ first: String(e.npc.name).split(',')[0].trim(), x: e.npc.x, z: e.npc.z });
+    fingerprintsShipped.add(String(e.draft?.fingerprint ?? ''));
+  }
 }
 for (const dir of ['content/quests', 'content/dialog']) {
   for (const f of readdirSync(join(REPO, dir))) {
@@ -252,7 +267,7 @@ for (const area of wanted) {
     }
     if (first === '') { refuse('no free first name in reach'); giverN++; continue; }
     giverN++;
-    const giverId = `qg-${area.id}-${slug(first)}`.slice(0, 48);
+    const giverId = `qg${BATCH}-${area.id}-${slug(first)}`.slice(0, 48);
     const specific = area.sydney[specCursor % area.sydney.length];
     specCursor++;
     const m = { place: area.name.replace(/ and .*$/, ''), specific, first, next: next.name.replace(/ and .*$/, ''), station: area.station };
@@ -273,7 +288,7 @@ for (const area of wanted) {
         if (!crumb && g.cat === 'crumb') continue;
         spec = area.sydney[(specCursor + Math.floor(t / GOALS.length) + t) % area.sydney.length];
         const fp = `${area.id}|${level}|${g.key}|${spec}`;
-        if (fingerprints.has(fp)) continue;
+        if (fingerprints.has(fp) || fingerprintsShipped.has(fp)) continue;
         const pattern = g.steps.map((s) => s[0]).join('+');
         const share = ((patternCount.get(pattern) ?? 0) + 1) / (made + 1);
         if (made > 6 && share > PATTERN_SHARE) continue;
@@ -283,7 +298,7 @@ for (const area of wanted) {
       }
       if (goal === null) { refuse('no unique goal left for the area'); break; }
       const mm = { ...m, specific: spec, when: WHEN[(made * 7 + j * 3 + level) % WHEN.length], day: DAY[(made * 5 + j + level * 2) % DAY.length] };
-      const id = `qg-l${level}-${area.id}-${String(made + 1).padStart(3, '0')}`;
+      const id = `qg${BATCH}-l${level}-${area.id}-${String(made + 1).padStart(3, '0')}`;
       const title = trunc(cased(fill(goal.title, mm)), MAX_TITLE);
       if (titles.has(title) || shippedTitles.has(title)) { refuse('title collision'); fingerprints.delete(`${area.id}|${level}|${goal.key}|${spec}`); continue; }
       const core = fill(goal.core, mm);
@@ -460,7 +475,7 @@ if (PACKS) {
     for (const chunk of chunks) {
       n++;
       const ids = new Set(chunk.map((e) => (e.npc as any).id));
-      const pack = `area-${a.id}-${n}`;
+      const pack = `area${BATCH}-${a.id}-${n}`;
       mkdirSync(join(PACKS, 'content/quests'), { recursive: true });
       mkdirSync(join(PACKS, 'content/dialog'), { recursive: true });
       writeFileSync(join(PACKS, 'content/quests', `${pack}.json`), JSON.stringify({ pack, quests: chunk.map((e) => e.quest) }, null, 1));

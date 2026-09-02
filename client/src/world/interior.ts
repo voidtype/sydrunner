@@ -1903,7 +1903,6 @@ export function interiorMesh(it: Interior, door: InteriorDoor = it.door): Interi
   const col: number[] = [];
   const tint = shadeOf(it.seed);
   const finish = finishOf(it.seed);
-  const daylight = { r: 0.80, g: 0.88, b: 0.97 };
   const carpet = (() => {
     const pick = Math.floor(hash2(it.seed, 0x300) * 4);
     const v = 0.9 + hash2(it.seed, 0x301) * 0.25;
@@ -1984,13 +1983,6 @@ export function interiorMesh(it: Interior, door: InteriorDoor = it.door): Interi
     }
     band(skirt, height - 0.1, (lo + hi) / 2);
     band(height - 0.1, height, hi * 0.78);
-  };
-  const finishedFrame = (
-    ax: number, az: number, bx: number, bz: number,
-    nx: number, nz: number, y0: number, y1: number, inset: number,
-    rgb: { r: number; g: number; b: number },
-  ): void => {
-    wall(ax + nx * inset, az + nz * inset, bx + nx * inset, bz + nz * inset, nx, nz, 1, 1, y0, y1, rgb);
   };
   // A horizontal quad in the plan's frame, facing up or down.
   const box = it.plan.box;
@@ -2143,7 +2135,6 @@ export function interiorMesh(it: Interior, door: InteriorDoor = it.door): Interi
         ex /= len;
         ez /= len;
         const pl = it.planes[j] ?? it.planes[0];
-        finishedWall(ax, az, bx, bz, pl.nx, pl.nz, 0.72, 0.86);
         if (k < top) wall(ax, az, bx, bz, pl.nx, pl.nz, 0.5, 0.5, ceilY, levels[k + 1].y);
         // A window every few metres, clear of the door: a frame, the glass set
         // deeper, and a sill. Under the ground floor's door on that level only;
@@ -2152,6 +2143,13 @@ export function interiorMesh(it: Interior, door: InteriorDoor = it.door): Interi
         const WINDOW_W = 1.25;
         const WINDOW_H = 1.3;
         const SILL_M = 0.95;
+        // Windows are **holes**. The wall is drawn in pieces round each one --
+        // the piers between windows full height, the spandrel under the sill
+        // and the strip over the head -- and the opening is left open, with a
+        // frame and a sill drawn in it. Through it is the city, on its own
+        // layer; see `interiorview.show`. A wall with no room for a window
+        // is drawn whole.
+        const openings: number[] = [];
         if (len >= WINDOW_W + 1.6 && ceilY - floorY > SILL_M + WINDOW_H + 0.25) {
           const count = Math.max(1, Math.floor(len / WINDOW_EVERY_M));
           const pitch = len / count;
@@ -2165,27 +2163,38 @@ export function interiorMesh(it: Interior, door: InteriorDoor = it.door): Interi
             ) {
               continue;
             }
-            const half = WINDOW_W / 2;
-            finishedFrame(
-              wx - ex * (half + 0.09), wz - ez * (half + 0.09),
-              wx + ex * (half + 0.09), wz + ez * (half + 0.09),
-              pl.nx, pl.nz, floorY + SILL_M - 0.09, floorY + SILL_M + WINDOW_H + 0.09, 0.05,
-              { r: 0.20, g: 0.18, b: 0.15 },
-            );
-            finishedFrame(
-              wx - ex * half, wz - ez * half,
-              wx + ex * half, wz + ez * half,
-              pl.nx, pl.nz, floorY + SILL_M, floorY + SILL_M + WINDOW_H, 0.09,
-              daylight,
-            );
-            finishedFrame(
-              wx - ex * (half + 0.14), wz - ez * (half + 0.14),
-              wx + ex * (half + 0.14), wz + ez * (half + 0.14),
-              pl.nx, pl.nz, floorY + SILL_M - 0.14, floorY + SILL_M - 0.09, 0.14,
-              { r: 0.62, g: 0.60, b: 0.56 },
-            );
+            openings.push(t);
           }
         }
+        const half = WINDOW_W / 2;
+        let cursor = 0;
+        const pier = (t0: number, t1: number): void => {
+          if (t1 - t0 < 0.01) return;
+          finishedWall(ax + ex * t0, az + ez * t0, ax + ex * t1, az + ez * t1, pl.nx, pl.nz, 0.72, 0.86);
+        };
+        for (const t of openings) {
+          pier(cursor, t - half - 0.09);
+          const wx0 = ax + ex * (t - half - 0.09), wz0 = az + ez * (t - half - 0.09);
+          const wx1 = ax + ex * (t + half + 0.09), wz1 = az + ez * (t + half + 0.09);
+          // under the sill and over the head, in the wall's own finish
+          wall(wx0, wz0, wx1, wz1, pl.nx, pl.nz, 0.72 * 0.9, 0.72, floorY, floorY + SILL_M - 0.09);
+          wall(wx0, wz0, wx1, wz1, pl.nx, pl.nz, 0.8, 0.86 * 0.9, floorY + SILL_M + WINDOW_H + 0.09, ceilY);
+          // the frame: a dark surround set just inside the opening's edges, as
+          // four thin faces, and a pale sill
+          const frame = { r: 0.20, g: 0.18, b: 0.15 };
+          const y0 = floorY + SILL_M - 0.09, y1 = floorY + SILL_M + WINDOW_H + 0.09;
+          wall(wx0, wz0, ax + ex * (t - half), az + ez * (t - half), pl.nx, pl.nz, 1, 1, y0, y1, frame);
+          wall(ax + ex * (t + half), az + ez * (t + half), wx1, wz1, pl.nx, pl.nz, 1, 1, y0, y1, frame);
+          wall(wx0, wz0, wx1, wz1, pl.nx, pl.nz, 1, 1, y0, y0 + 0.09, frame);
+          wall(wx0, wz0, wx1, wz1, pl.nx, pl.nz, 1, 1, y1 - 0.09, y1, frame);
+          wall(
+            ax + ex * (t - half - 0.14), az + ez * (t - half - 0.14),
+            ax + ex * (t + half + 0.14), az + ez * (t + half + 0.14),
+            pl.nx, pl.nz, 1, 1, floorY + SILL_M - 0.14, floorY + SILL_M - 0.09, { r: 0.62, g: 0.60, b: 0.56 },
+          );
+          cursor = t + half + 0.09;
+        }
+        pier(cursor, len);
       }
     }
 
@@ -2305,6 +2314,39 @@ export function interiorMesh(it: Interior, door: InteriorDoor = it.door): Interi
       );
     }
 
+    // --- The core's mouth on this level: a sandstone frame round the open
+    // end and a green sign over it, so a player who has just walked into a
+    // 79-level tower can find the lift -- the owner could not. Drawn on every
+    // level, at the end that level opens onto.
+    if (core !== null) {
+      const ax = -core.lz;
+      const az = core.lx;
+      const open = coreOpenEnd(core, k);
+      const c = (r: number, w: number): [number, number] => [core.x + core.lx * r + ax * w, core.z + core.lz * r + az * w];
+      const ex = c(open * (core.hr + 0.02), -core.hw);
+      const fx = c(open * (core.hr + 0.02), core.hw);
+      const nx = open * core.lx;
+      const nz = open * core.lz;
+      const sand = { r: 0.85, g: 0.64, b: 0.25 };
+      const sign = { r: 0.12, g: 0.42, b: 0.23 };
+      const signInk = { r: 0.95, g: 0.92, b: 0.84 };
+      // the jambs, 0.12 m proud of the mouth, floor to head, and the head piece
+      const jamb = (a: [number, number], w: number): void => {
+        const j0: [number, number] = [a[0] + ax * (w * 0.06), a[1] + az * (w * 0.06)];
+        const j1: [number, number] = [a[0] + ax * (w * 0.18), a[1] + az * (w * 0.18)];
+        wall(j0[0] + nx * 0.02, j0[1] + nz * 0.02, j1[0] + nx * 0.02, j1[1] + nz * 0.02, nx, nz, 1, 1, floorY, floorY + 2.3, sand);
+      };
+      jamb(ex, 1);
+      jamb(fx, -1);
+      wall(ex[0] + nx * 0.02, ex[1] + nz * 0.02, fx[0] + nx * 0.02, fx[1] + nz * 0.02, nx, nz, 1, 1, floorY + 2.3, floorY + 2.42, sand);
+      // the sign: a green board over the head, a cream bar across it (the word
+      // is a shape at this size), on the level's ceiling side
+      const sx0 = ex[0] + nx * 0.03, sz0 = ex[1] + nz * 0.03, sx1 = fx[0] + nx * 0.03, sz1 = fx[1] + nz * 0.03;
+      wall(sx0, sz0, sx1, sz1, nx, nz, 1, 1, floorY + 2.42, ceilY - 0.02, sign);
+      const mid: [number, number] = [(sx0 + sx1) / 2 + nx * 0.01, (sz0 + sz1) / 2 + nz * 0.01];
+      const half = Math.min(0.55, core.hw * 0.5);
+      wall(mid[0] - ax * half, mid[1] - az * half, mid[0] + ax * half, mid[1] + az * half, nx, nz, 1, 1, floorY + 2.5, floorY + 2.5 + Math.max(0.08, (ceilY - floorY - 2.5) * 0.35), signInk);
+    }
     // --- The lift's floor at this level. The stair's flights are drawn once,
     // below, because a flight belongs to two levels.
     if (core !== null && core.kind === CORE.LIFT) {
@@ -2847,7 +2889,13 @@ export function verifyInterior(): string[] {
       // The floor is the only unbounded thing in here; everything else is a
       // constant per wall. Twice the quad budget, in triangles, plus room for
       // the walls and their courses.
-      if (mesh.triangles > (MAX_FLOOR_QUADS * 4 + 8000) * it.levels.length) {
+      // Plus the windows: a hole is fourteen faces of frame and wall where a
+      // pane was two, and a warehouse the size of a street has a lot of them.
+      let perimeter = 0;
+      for (let i = 0, n = it.shell.length >> 1, j = n - 1; i < n; j = i++) {
+        perimeter += Math.hypot(it.shell[i * 2] - it.shell[j * 2], it.shell[i * 2 + 1] - it.shell[j * 2 + 1]);
+      }
+      if (mesh.triangles > (MAX_FLOOR_QUADS * 4 + 8000 + (perimeter / 3.6) * 40) * it.levels.length) {
         failures.push(`${what} drew ${mesh.triangles} triangles; the floor covering is not bounded.`);
       }
       if (mesh.triangles < 40) failures.push(`${what} drew only ${mesh.triangles} triangles; it has no finish on it.`);
@@ -2861,15 +2909,16 @@ export function verifyInterior(): string[] {
     if (it === null) failures.push('an 18 x 26 m building generated no interior.');
     else {
       const mesh = interiorMesh(it);
-      // The glass is the one deliberately bright surface in the building, and
-      // that is how it is counted: nothing else is over 0.78 on all three
-      // channels. If this ever finds none, the windows have stopped being drawn.
+      // A window is a hole with a dark frame round it now, and the frame is
+      // the one surface in exactly that dark brown: nothing else is (0.20,
+      // 0.18, 0.15). If this ever finds none, the windows have stopped being
+      // drawn -- and a wall with no holes is a wall you cannot see out of.
       let glass = 0;
       let overDoor = 0;
       for (let t = 0; t < mesh.triangles; t++) {
         const i = t * 9;
         const c = t * 9;
-        if (mesh.colors[c] < 0.78 || mesh.colors[c + 1] < 0.85 || mesh.colors[c + 2] < 0.9) continue;
+        if (Math.abs(mesh.colors[c] - 0.20) > 0.01 || Math.abs(mesh.colors[c + 1] - 0.18) > 0.01 || Math.abs(mesh.colors[c + 2] - 0.15) > 0.01) continue;
         glass++;
         const cx = (mesh.positions[i] + mesh.positions[i + 3] + mesh.positions[i + 6]) / 3;
         const cz = (mesh.positions[i + 2] + mesh.positions[i + 5] + mesh.positions[i + 8]) / 3;

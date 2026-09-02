@@ -125,7 +125,7 @@ import {
   verifyPlaceables,
   type Placement,
 } from './world/placeables.ts';
-import {
+import { coreOpenEnd,
   CORE,
   arrivalAt,
   buildInterior,
@@ -6334,6 +6334,8 @@ async function main(): Promise<void> {
   const EXIT_REACH_M = 5;
   /** Standing in a lift cab this frame. See `interior.Core`. */
   let atLift = false;
+  /** Where the lift or the stairs are from here, in words, or nothing. */
+  let coreHint = '';
   /** Is the body within reach of that door right now? Recomputed per frame. */
   let atExit = false;
   /**
@@ -10365,6 +10367,27 @@ async function main(): Promise<void> {
       // And the lift, if the building has one and the body is in its cab.
       const core = interior.core;
       atLift = core !== null && core.kind === CORE.LIFT && inCore(core, player.position.x, player.position.z, 0.05);
+      // Where the way up is, in words, until you are standing in it. The
+      // owner walked into a 79-level tower and could not find the lift.
+      coreHint = '';
+      if (core !== null && !atLift) {
+        const k = levelIndex(interior.levels, player.position.y - EYE_HEIGHT);
+        const open = coreOpenEnd(core, k);
+        const mx = core.x + core.lx * open * (core.hr + 0.6);
+        const mz = core.z + core.lz * open * (core.hr + 0.6);
+        const dx = mx - player.position.x;
+        const dz = mz - player.position.z;
+        const dist = Math.hypot(dx, dz);
+        camera.getWorldDirection(doorGaze);
+        const fl = Math.hypot(doorGaze.x, doorGaze.z) || 1;
+        const fx = doorGaze.x / fl;
+        const fz = doorGaze.z / fl;
+        const ahead = (dx * fx + dz * fz) / (dist || 1);
+        const left = (dx * fz - dz * fx) / (dist || 1);
+        const dir = ahead > 0.85 ? 'ahead' : ahead < -0.85 ? 'behind you' : left > 0 ? (ahead > 0.3 ? 'ahead, left' : ahead < -0.3 ? 'behind, left' : 'to your left') : (ahead > 0.3 ? 'ahead, right' : ahead < -0.3 ? 'behind, right' : 'to your right');
+        const what = core.kind === CORE.LIFT ? 'lift' : 'stairs';
+        coreHint = dist > 4 ? `${what} · ${Math.round(dist)} m ${dir}` : `${what} · here`;
+      }
     } else if (playerCombat.drivingCar === 0 && playerCombat.ridingBike === 0 && !isAboard(playerCombat.aboard)) {
       camera.getWorldDirection(doorGaze);
       const gazeLen = Math.hypot(doorGaze.x, doorGaze.z);
@@ -10409,7 +10432,7 @@ async function main(): Promise<void> {
      */
     hud.derived(
       interior !== null
-        ? (atLift ? 'E — lift up  ·  Shift+E — down' : atExit ? 'E — back outside' : '')
+        ? (atLift ? 'E — lift up  ·  Shift+E — down' : atExit ? 'E — back outside' : coreHint)
         : sunButton.prompt(player.position.x, player.position.z) ||
           trainPill ||
           ridePrompt(playerCombat, playerCombat.phase, rideNudgeT, rideNudgeText) ||
@@ -12622,7 +12645,7 @@ async function main(): Promise<void> {
     }
     // Indoors: the trains and the tunnel lights. See `indoors`.
     frameProfile.at(FSEC.rail);
-    if (!indoors) {
+    { // runs indoors too: the windows look out on it (UI.md, INTERIORS.md)
       // --- The railway, after the streamer for the same reason everything else
       // is: a tile that arrived this frame has terrain under it, so a viaduct
       // pier built now stands on the ground rather than on the fallback depth.
@@ -12690,7 +12713,7 @@ async function main(): Promise<void> {
     }
     // Indoors: the street lamps, the fires and the torch. See `indoors`.
     frameProfile.at(FSEC.lights);
-    if (!indoors) {
+    { // runs indoors too: the windows look out on it (UI.md, INTERIORS.md)
       // The night rig, after the streamer -- so a tile that arrived this frame
       // already has its luminaires in the set the four real lights are picked from
       // -- and before the traffic, so `carLights.begin()` answers for this frame
@@ -12778,7 +12801,7 @@ async function main(): Promise<void> {
     }
     // Indoors: the ambient fleet and the near-field models. See `indoors`.
     frameProfile.at(FSEC.traffic);
-    if (!indoors) {
+    { // runs indoors too: the windows look out on it (UI.md, INTERIORS.md)
       // The traffic, after the streamer so a tile that arrived this frame already
       // has its routes in the field, and before the render so the matrices are
       // current.
@@ -12868,11 +12891,11 @@ async function main(): Promise<void> {
     // Gated indoors with the rest of the ambient city: a pure function of the
     // second, so skipping frames is exact and the ferry is where it would
     // have been when you come back out.
-    if (!indoors) {
+    { // runs indoors too: the windows look out on it (UI.md, INTERIORS.md)
       boats.update(trafficSeconds(trafficTick(Date.now())), camera.position.x, camera.position.z, streamer.terrain.sea_level_y);
     }
     frameProfile.at(FSEC.crowd);
-    if (!indoors) {
+    { // runs indoors too: the windows look out on it (UI.md, INTERIORS.md)
       // And the crowd, on exactly the same terms and immediately after, because
       // they come out of the same file and the same clock: the fractional tick so
       // a 144 Hz display does not watch 60 Hz people, and no clock of its own so a

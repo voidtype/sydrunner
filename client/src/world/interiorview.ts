@@ -109,7 +109,14 @@ export class InteriorView {
   show(camera: Camera, it: Interior, door: InteriorDoor = it.door): void {
     this.hide(camera);
     this.rebuild(it, door);
+    // The room's layer *and* the city's. The windows are holes in the shell
+    // now, and what is through them is the street: the owner, after a walk
+    // through the city, "it would be more immersive if i could look out of
+    // windows inside". The building's own exterior mesh is single-sided and
+    // faces out, so from inside its walls are back faces and are culled; the
+    // room's shell is what you see, and through its windows, Sydney.
     camera.layers.set(INTERIOR_LAYER);
+    camera.layers.enable(0);
   }
 
   /**
