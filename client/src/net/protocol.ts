@@ -384,6 +384,20 @@ export const MSG = {
    */
   DOOR: 0x16,
   /**
+   * The lift: up a level, or down one. Client to server, two bytes.
+   *
+   * `DOOR`'s shape with one byte of payload, the direction, because "which
+   * way" is the one fact the server cannot derive from the body: it knows the
+   * participant is standing in a lift cab (`interior.inCore`) and which level
+   * they are on (`interior.levelIndex`), and refuses the press otherwise. The
+   * reply is a `SPACE` frame, the same space, the body a level up -- the
+   * client already knows how to place a body from one of those, and a lift is
+   * a teleport the server owns, exactly as a door is.
+   *
+   * 0x18. Its reply is `SPACE`, so there is no 0x98.
+   */
+  LIFT: 0x18,
+  /**
    * "Put a couch here", or "take that one away". See `net/placeables.ts`... no:
    * `world/placeables.ts`, which is the shared definition of what a thing is.
    *
@@ -998,7 +1012,17 @@ export const MSG = {
  * box and sent. The two halves of a room now have different natures and that is
  * the honest shape of it -- see INTERIORS.md.
  */
-export const PROTOCOL_VERSION = 25;
+/*
+ * v26: upstairs.
+ *
+ * `LIFT` (0x18, client -> server: up or down a level; the reply is a `SPACE`).
+ * And a generator change, which is the other reason to move the number:
+ * `interior.buildInterior` now lays out every storey and puts a stair or a
+ * lift through them, so the walls a v25 client steps a body against are not
+ * the walls this server does. Two ends on different versions of a shared
+ * computation is the failure the version exists to refuse.
+ */
+export const PROTOCOL_VERSION = 26;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;
@@ -3764,6 +3788,31 @@ export function decodeDoor(buffer: ArrayBuffer): boolean {
   return buffer.byteLength >= 1 && new DataView(buffer).getUint8(0) === MSG.DOOR;
 }
 
+/** `MSG.LIFT`'s width. */
+export const LIFT_BYTES = 2;
+
+/**
+ * `MSG.LIFT`: a type byte and a direction, +1 for up and -1 for down.
+ *
+ *     u8   type = MSG.LIFT
+ *     i8   direction   +1 up, -1 down; anything else is not a LIFT
+ */
+export function encodeLift(direction: 1 | -1, buffer = new ArrayBuffer(LIFT_BYTES)): ArrayBuffer {
+  const v = new DataView(buffer);
+  v.setUint8(0, MSG.LIFT);
+  v.setInt8(1, direction);
+  return buffer;
+}
+
+/** The direction of a well-formed `LIFT`, or null. */
+export function decodeLift(buffer: ArrayBuffer): 1 | -1 | null {
+  if (buffer.byteLength < LIFT_BYTES) return null;
+  const v = new DataView(buffer);
+  if (v.getUint8(0) !== MSG.LIFT) return null;
+  const d = v.getInt8(1);
+  return d === 1 ? 1 : d === -1 ? -1 : null;
+}
+
 /** `MSG.SPACE`'s width. See `encodeSpace`. */
 export const SPACE_BYTES = 41;
 
@@ -5608,6 +5657,15 @@ export function verifyNet(): string[] {
     if (!decodeDoor(encodeDoor())) failures.push('A DOOR did not decode as one.');
     if (decodeDoor(encodeSunPress())) failures.push('A SUN_PRESS decoded as a DOOR. The type byte is not being read.');
     if (decodeDoor(new ArrayBuffer(0))) failures.push('An empty frame decoded as a DOOR.');
+    if (decodeLift(encodeLift(1)) !== 1) failures.push('A LIFT up did not decode as up.');
+    if (decodeLift(encodeLift(-1)) !== -1) failures.push('A LIFT down did not decode as down.');
+    if (decodeLift(encodeDoor()) !== null) failures.push('A DOOR decoded as a LIFT.');
+    {
+      const odd = encodeLift(1);
+      new DataView(odd).setInt8(1, 5);
+      if (decodeLift(odd) !== null) failures.push('A LIFT with a direction of 5 was accepted.');
+    }
+    if (decodeLift(encodeLift(1).slice(0, 1)) !== null) failures.push('A one-byte LIFT was accepted.');
 
     // A real interior: a big seed with the top bit set, a door on a wall facing
     // roughly south-west, and a position with a fraction in it.
@@ -6417,7 +6475,7 @@ export function verifyNet(): string[] {
     }
     // Which half each one belongs in, named here rather than inferred from a
     // prefix: a list is checkable and a naming convention is not.
-    const clientToServer = ['HELLO', 'INPUT', 'PING', 'CHAT_SAY', 'SUGGEST', 'SUN_PRESS', 'PHONE', 'TEAM', 'QUEST', 'DOOR', 'FURNISH'];
+    const clientToServer = ['HELLO', 'INPUT', 'PING', 'CHAT_SAY', 'SUGGEST', 'SUN_PRESS', 'PHONE', 'TEAM', 'QUEST', 'DOOR', 'FURNISH', 'LIFT'];
     for (const [name, id] of Object.entries(MSG)) {
       const wantsLow = clientToServer.includes(name);
       if (wantsLow && id >= 0x80) {

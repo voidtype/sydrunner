@@ -81,7 +81,7 @@
  * union. One wall per stretch, one doorway per opening, from either side.
  */
 
-import { floorPlan, type FloorPlan, type Room } from './floorplan.ts';
+import { floorPlan, STOREY_M, type FloorPlan, type OrientedBox, type Room } from './floorplan.ts';
 // What people put in the room, as against what the generator put there. One
 // direction only: `placeables.ts` knows nothing about interiors.
 import {
@@ -153,9 +153,11 @@ const MIN_BUILDING_H = 2.4;
  * Wider than `controller.PLAYER_RADIUS` (0.35) on purpose, and not imported
  * from it: this is not a collision radius, it is how much elbow room a body
  * gets on arrival so that the first tick's resolve has nothing to do. A spawn
- * that is merely *legal* is a spawn that shudders.
+ * that is merely *legal* is a spawn that shudders. It was 0.5, and is what
+ * it is so that a body fits the 0.82 m corridor a terrace keeps beside its
+ * stair (`CORE_SHELL_M`): 0.38 twice plus a wall's half thickness is 0.84.
  */
-const BODY_CLEARANCE_M = 0.5;
+const BODY_CLEARANCE_M = 0.38;
 
 /** A wall's centre line, in world metres. Thickness is `WALL_THICK_M`, height is a storey. */
 export interface InteriorWall {
@@ -182,15 +184,157 @@ export interface ShellPlane {
   d: number;
 }
 
+// --- Storeys -------------------------------------------------------------------
+
+/**
+ * The most storeys a stair serves. Above this a building gets a lift.
+ *
+ * Six because that is where the walk stops being a walk: a flight is a storey
+ * of ramp, and a body climbing eighteen metres of them to reach a room it
+ * could not see from the bottom has stopped playing a game about hitting
+ * people. Towers have cores with lifts and terraces have stairs -- the owner's
+ * own guess, and every building in Sydney agrees with it.
+ */
+export const STAIR_MAX_STOREYS = 6;
+
+/**
+ * The core's width across, metres: two stair lanes, or one lift cab.
+ *
+ * 2.2 so that each lane is 1.1 less a wall's half thickness either side --
+ * 1.02 m for a body 0.7 wide, a domestic stair -- and so that the core plus a
+ * corridor `CORE_MARGIN_M` wide each side fits the 4.5 m room
+ * `floorplan.MIN_ROOM_M` guarantees. A terrace is 4.5 m
+ * wide, and a terrace with no way upstairs is most of a suburb.
+ */
+export const CORE_WIDTH_M = 2.2;
+
+/** A flight's run, metres: a storey of rise over this. Never longer than the room leaves room around. */
+export const CORE_RUN_MIN_M = 5.0;
+export const CORE_RUN_MAX_M = 8.0;
+
+/**
+ * Room kept clear round the core on every level, metres.
+ *
+ * The core is placed this far from the room's walls and the shell on the
+ * ground floor, and on every floor above it the partitions are cut back to
+ * `CORE_CUT_M` of it -- so that the end a flight arrives at always opens onto a
+ * corridor a body fits down, whatever the plan drew up there. A stair that
+ * arrives in a 30 cm slot between its own wall and a partition is the one way
+ * this design could strand somebody, and this is the rule that closes it.
+ */
+const CORE_MARGIN_M = 1.1;
+const CORE_CUT_M = 1.0;
+
+/**
+ * The landing: room kept beyond each end of a flight, metres.
+ *
+ * More than `CORE_MARGIN_M`, because a body coming off the top of a flight
+ * at seven metres a second needs somewhere to be before it turns, and a
+ * corridor the width of the side margin is a wall in the face. Costs the
+ * stair in rooms under 7.8 m long, which get a lift's worth of nothing.
+ */
+const CORE_LANDING_M = 1.4;
+
+/**
+ * And the least the core keeps from the shell, metres.
+ *
+ * Less than `CORE_MARGIN_M` by the shell's inset from the outline: a room at
+ * the building's edge has its wall *on* the shell, and measuring the margin
+ * to the outline would refuse the stair a terrace has room for. A corridor
+ * this wide less a wall's half thickness is 0.82 m, and the arrival's elbow
+ * room `BODY_CLEARANCE_M` is sized to settle in it.
+ */
+const CORE_SHELL_M = 0.9;
+
+/**
+ * How far under the next floor a body already counts as being on it, metres.
+ *
+ * The feet are the one vertical fact both ends agree on, so the level is read
+ * from them. Most of the way up a flight a body is still "on" the lower
+ * storey -- that storey's walls apply, its shut stair end is ahead and its open
+ * end behind -- and past this much of the last part it is on the next, whose
+ * shut end is now behind it. 0.6 clears any jump's apex, so a body hopping on
+ * a landing never flickers between two storeys' walls.
+ */
+export const LEVEL_TOL_M = 0.6;
+
+export const CORE = { STAIR: 1, LIFT: 2 } as const;
+export type CoreKind = (typeof CORE)[keyof typeof CORE];
+
+/**
+ * The vertical core: one per building, on every level.
+ *
+ * A rectangle in world metres: a centre, the unit axis of its run, and two
+ * half-extents. Across is `(-lz, lx)`, a quarter turn, no trig.
+ *
+ * A **stair** is two lanes of ramp side by side with a wall between them.
+ * Flight `f` rises one storey along the run: even flights in the lane on the
+ * `-across` side from the `-run` end, odd flights in the other lane from the
+ * `+run` end. So storey `k` opens onto the core at the end the flight below
+ * arrives at, walks the lane up, and comes out the far end a storey higher --
+ * a dog-leg stair with the landing in the room, which is what a terrace has.
+ * The ends are walled where a lane at that level is not at that level's
+ * height, so nothing can step onto a flight two storeys up or into a hole.
+ *
+ * A **lift** is a cab: three walls and a floor at whichever level you are on.
+ * Stand in it and press `E`.
+ */
+export interface Core {
+  kind: CoreKind;
+  x: number;
+  z: number;
+  lx: number;
+  lz: number;
+  /** Half the run, metres. */
+  hr: number;
+  /** Half the width. */
+  hw: number;
+}
+
+/** One walkable level: its floor, and the walls a body on it is stepped against. */
+export interface Level {
+  /** Floor, world metres. */
+  y: number;
+  rooms: readonly Room[];
+  /** Everything a body on this level collides with: partitions and the core's own walls. */
+  walls: readonly InteriorWall[];
+  /** Drawing only; see `Interior.headers`. */
+  headers: readonly InteriorWall[];
+}
+
+/**
+ * Buildings with a level the plan does not know about: an observation deck.
+ *
+ * Keyed by `doorway.buildingSeed`, which is the building's own geometry, so a
+ * retile that moves one wall a centimetre renames it and the deck goes --
+ * `checkInteriors` asserts the seed still stands within a hundred metres of the
+ * landmark's anchor, so that is found by the gate and not by a player.
+ *
+ * Sydney Tower is three landmark prisms, every one `structural` (the shaft
+ * starts on the podium roof, 28 m up), so it has no street door of its own.
+ * The building that does is the podium under it. Its deck is at the turret's
+ * floor, 218.1 m in the bake, plus a metre so the deck is a floor and not the
+ * turret's underside; a lift with a stop at every podium floor and then that.
+ */
+export const DECKS: ReadonlyMap<number, number> = new Map([[2945680732, 219.1]]);
+
 export interface Interior {
   /** `doorway.buildingSeed`. The building's name, and the plan's seed. */
   seed: number;
-  /** Floor of the walkable storey, world metres. */
+  /** Floor of the ground storey, world metres. */
   base: number;
-  /** Where the ceiling slab starts. */
+  /** Where the ground storey's ceiling slab starts. */
   ceilingY: number;
-  /** The whole plan, every storey, as generated. Only `rooms` below is walkable. */
+  /** The whole plan, every storey, as generated. */
   plan: FloorPlan;
+  /**
+   * Every walkable level, ground first. `levels[0]` is what `rooms`, `walls`
+   * and `headers` below alias, kept because the ground floor is the one the
+   * door, the furniture and the arrival all belong to.
+   */
+  levels: readonly Level[];
+  /** The stair or the lift, or null for a building with one level. See `Core`. */
+  core: Core | null;
   /** The ground-floor rooms the spawn can actually reach. */
   rooms: readonly Room[];
   /** Partitions between those rooms, doorways already subtracted. */
@@ -520,6 +664,18 @@ function clipToShell(
  * shove a jumping body sideways. `feetY` and `headY` are taken and ignored,
  * which is where a second walkable storey will read them.
  */
+/** Which of these levels a body with its feet at `feetY` is on. See `LEVEL_TOL_M`. */
+export function levelIndex(levels: readonly Level[], feetY: number): number {
+  let k = 0;
+  for (let i = 1; i < levels.length; i++) {
+    if (levels[i].y <= feetY + LEVEL_TOL_M) k = i;
+    else break;
+  }
+  return k;
+}
+
+const NO_BOXES: readonly PlacedBox[] = [];
+
 export class InteriorResolver {
   /**
    * What people have put in the room, as boxes.
@@ -530,13 +686,13 @@ export class InteriorResolver {
    * change while a player is standing in the room, and both ends have to start
    * stepping bodies around them on the same tick. Replaced wholesale rather
    * than patched, because a placement list is at most 64 entries and the frame
-   * that carries it is the whole list.
+   * that carries it is the whole list. Ground floor only, as the furniture is.
    */
   private placed: readonly PlacedBox[] = [];
 
   constructor(
     private readonly planes: readonly ShellPlane[],
-    private readonly walls: readonly InteriorWall[],
+    private readonly levels: readonly Level[],
   ) {}
 
   /** Adopt this room's furniture. See `placed`. */
@@ -555,13 +711,14 @@ export class InteriorResolver {
    * of asking `resolve` twice and comparing, which is the version that shipped
    * for an hour and quietly let one door in forty land in a wall.
    */
-  clearance(x: number, z: number): number {
+  clearance(x: number, z: number, feetY = this.levels[0].y): number {
+    const k = levelIndex(this.levels, feetY);
     let least = Infinity;
     for (const p of this.planes) {
       const s = p.nx * x + p.nz * z - p.d;
       if (s < least) least = s;
     }
-    for (const w of this.walls) {
+    for (const w of this.levels[k].walls) {
       const dx = w.bx - w.ax;
       const dz = w.bz - w.az;
       const len2 = dx * dx + dz * dz;
@@ -571,22 +728,35 @@ export class InteriorResolver {
       const s = Math.sqrt(ex * ex + ez * ez) - WALL_THICK_M / 2;
       if (s < least) least = s;
     }
-    for (const b of this.placed) {
-      const s = boxClearance(b, x, z);
-      if (s < least) least = s;
+    if (k === 0) {
+      for (const b of this.placed) {
+        const s = boxClearance(b, x, z);
+        if (s < least) least = s;
+      }
     }
     return least;
   }
 
+  /**
+   * The walls are the level's. `feetY` arrives from the controller as the feet
+   * plus `STEP_HEIGHT`, which is fine: `LEVEL_TOL_M` is read against it, so a
+   * body most of the way up a flight is stepped against the storey it is
+   * about to arrive on -- whose shut end is behind it -- rather than the one
+   * it left, whose shut end is the wall it would otherwise walk into at the
+   * top. See `Core`.
+   */
   resolve(
     fromX: number,
     fromZ: number,
     toX: number,
     toZ: number,
     radius: number,
-    _feetY: number,
+    feetY: number,
     _headY?: number,
   ): { x: number; z: number; hit: boolean } {
+    const k = levelIndex(this.levels, feetY);
+    const walls = this.levels[k].walls;
+    const placed = k === 0 ? this.placed : NO_BOXES;
     let x = toX;
     let z = toZ;
     let hit = false;
@@ -605,7 +775,7 @@ export class InteriorResolver {
           moved = true;
         }
       }
-      for (const w of this.walls) {
+      for (const w of walls) {
         const dx = w.bx - w.ax;
         const dz = w.bz - w.az;
         const len2 = dx * dx + dz * dz;
@@ -642,7 +812,7 @@ export class InteriorResolver {
       }
       // And the furniture, in the same pass as the walls so a body wedged
       // between a couch and a wall is pushed out of both before the pass ends.
-      for (const b of this.placed) {
+      for (const b of placed) {
         const r = pushOutOfBox(b, x, z, radius);
         if (!r.hit) continue;
         x = r.x;
@@ -656,90 +826,128 @@ export class InteriorResolver {
   }
 }
 
-// --- The generator -------------------------------------------------------------
+// --- The core's arithmetic, shared by the resolver, the ground and the mesh ----
+
+/** Position along (`r`) and across (`w`) the core, metres from its centre. */
+export function coreLocal(core: Core, x: number, z: number): { r: number; w: number } {
+  const dx = x - core.x;
+  const dz = z - core.z;
+  return { r: dx * core.lx + dz * core.lz, w: -dx * core.lz + dz * core.lx };
+}
+
+/** Is this point in the core's rectangle, grown by `slack` all round? */
+export function inCore(core: Core, x: number, z: number, slack = 0): boolean {
+  const { r, w } = coreLocal(core, x, z);
+  return Math.abs(r) <= core.hr + slack && Math.abs(w) <= core.hw + slack;
+}
+
+/** The end of the core level `k` opens onto, as the sign of the run. */
+export function coreOpenEnd(core: Core, k: number): -1 | 1 {
+  if (core.kind === CORE.LIFT) return -1;
+  return k & 1 ? 1 : -1;
+}
+
+/** The end flight `f` starts from, as the sign of the run. Even flights climb from `-run`. */
+function flightStart(f: number): -1 | 1 {
+  return f & 1 ? 1 : -1;
+}
+
+/** The ramp's height on flight `f` at `t` in [0, 1] along the run from the `-run` end. */
+function flightY(levels: readonly Level[], f: number, t: number): number {
+  const rise = levels[f + 1].y - levels[f].y;
+  return levels[f].y + (f & 1 ? 1 - t : t) * rise;
+}
 
 /**
- * Build the inside of one building.
+ * Does the lane on side `s` of the core stand at level `k`'s floor at end `e`?
  *
- * Null when the building has no inside worth having (`interiorAdmits`) or when
- * the plan degenerates to nothing a body fits in. Both ends call this with the
- * same four arguments off the same prism and must get the same rooms, which is
- * the whole reason nothing in here reads a clock, a random, or a `Math.sin`.
- *
- * No door: see the header. `arrivalAt` below is where one is used, once per
- * person who walks in.
+ * True when some flight of that lane's parity starts or arrives there at that
+ * height. Where it is false, `buildInterior` walls that lane off at that end
+ * on that level: it is the mouth of a flight two storeys up, or of nothing.
  */
-export function buildInterior(
-  points: Float32Array,
-  base: number,
-  height: number,
-  seed: number,
-): Interior | null {
-  if (!interiorAdmits(points, height)) return null;
-  if (!Number.isFinite(base)) return null;
+function laneMeetsLevel(levels: readonly Level[], s: -1 | 1, k: number, e: -1 | 1): boolean {
+  const parity = s < 0 ? 0 : 1;
+  const y = levels[k].y;
+  for (let f = 0; f + 1 < levels.length; f++) {
+    if ((f & 1) !== parity) continue;
+    const start = flightStart(f);
+    if (start === e && levels[f].y === y) return true;
+    if (start === -e && levels[f + 1].y === y) return true;
+  }
+  return false;
+}
 
-  // The hull, for the shell, the floor and the door. See `convexHull`. The
-  // plan below still reads the real outline, which is what keeps rooms out of
-  // the notches.
-  const hull = convexHull(points);
-  if (hull.length < 6) return null;
-  const planes = shellPlanes(hull, WALL_THICK_M);
-  if (planes.length < 3) return null;
-  const shell = shellPolygon(planes);
-  if (shell.length < 6) return null;
-  // **The shell is consistent**, or there is no room. Every vertex of it must
-  // satisfy every plane; a half-plane intersection that is empty produces
-  // vertices that violate the others by metres, and a body placed in it is
-  // pushed every tick. This cannot happen on a hull. It is checked anyway,
-  // because the last comment that said "cannot happen" here was wrong.
-  for (let i = 0; i < shell.length; i += 2) {
-    for (const pl of planes) {
-      if (pl.nx * shell[i] + pl.nz * shell[i + 1] - pl.d < -0.05) return null;
+/**
+ * What `CombatWorld.groundHeight` is while a body is in here.
+ *
+ * The level's floor everywhere but on a stair, where it is the ramp of the one
+ * flight this lane carries between the level the feet are on and the one
+ * below it. Nearest by height rather than by level, so a body that jumps on a
+ * flight lands on the flight it jumped from and never on the one above.
+ */
+export function interiorGround(it: Interior, x: number, z: number, feetY: number): number {
+  const levels = it.levels;
+  const k = levelIndex(levels, feetY);
+  const core = it.core;
+  if (core === null || core.kind !== CORE.STAIR || !inCore(core, x, z, 0.05)) return levels[k].y;
+  const { r, w } = coreLocal(core, x, z);
+  const t = Math.max(0, Math.min(1, (r + core.hr) / (2 * core.hr)));
+  const parity = w < 0 ? 0 : 1;
+  const last = levels.length - 2;
+  let best = levels[k].y;
+  let bestD = Infinity;
+  for (let f = Math.max(0, k - 1); f <= Math.min(k, last); f++) {
+    if ((f & 1) !== parity) continue;
+    const y = flightY(levels, f, t);
+    const d = Math.abs(y - feetY);
+    if (d < bestD) {
+      bestD = d;
+      best = y;
     }
   }
+  return best;
+}
 
-  const plan = floorPlan(points, height, seed);
-  const box = plan.box;
-  // The ground floor, and only the part of it inside the shell.
-  //
-  // Two culls rather than one, because they answer different questions.
-  // `floorPlan` already dropped the cells whose centres fall outside the
-  // *polygon*, which is what makes an L-shape work. This drops the ones outside
-  // the **walkable shell** -- the intersection of the outline's half-planes,
-  // which for a convex hull is the outline inset by a wall and for anything
-  // else is its convex core. Without it a concave footprint keeps rooms whose
-  // walls are then clipped away to nothing, and the plan describes partitions
-  // that do not exist.
-  const ground = plan.rooms.filter((r) => {
-    if (r.storey !== 0) return false;
-    for (const pl of planes) {
-      if (pl.nx * r.x + pl.nz * r.z - pl.d < 0.05) return false;
-    }
-    return true;
-  });
+// --- The generator -------------------------------------------------------------
 
-  // --- Which rooms connect to which, and where the openings go.
-  const contacts = contactsBetween(ground);
+/** The core's rectangle in the plan's own frame, for cutting partitions. */
+interface CoreCut {
+  u0: number;
+  u1: number;
+  v0: number;
+  v1: number;
+}
+
+/**
+ * One level's partitions and lintels from its rooms.
+ *
+ * Every contact between two rooms becomes a doorway, which is what makes
+ * connectivity a property of the generator rather than something to check for
+ * afterwards: two rooms that share a metre of wall share a way through it, so
+ * the room graph *is* the contact graph and no part of a floor can be sealed
+ * off. `MIN_CONTACT_M` and the jamb are sized so that this is always an
+ * opening a body fits through -- see `contactsBetween`.
+ *
+ * The core's rectangle, grown by `CORE_CUT_M`, is cut out of every partition
+ * the way a doorway is, without the lintel: the core brings its own walls, and
+ * an apron round it is what guarantees a flight arrives into a corridor.
+ */
+function wallsFor(
+  rooms: readonly Room[],
+  box: OrientedBox,
+  planes: readonly ShellPlane[],
+  cut: CoreCut | null,
+): { walls: InteriorWall[]; headers: InteriorWall[] } {
+  const contacts = contactsBetween(rooms);
   const doorways: Span[] = [];
   for (const c of contacts) {
-    // **Every contact becomes a doorway**, which is what makes connectivity a
-    // property of the generator rather than something to check for afterwards:
-    // two rooms that share a metre of wall share a way through it, so the room
-    // graph *is* the contact graph and no part of a house can be sealed off.
-    // `MIN_CONTACT_M` and the jamb below are sized so that this is always an
-    // opening a body fits through -- see `contactsBetween`.
     const width = Math.min(DOOR_GAP_M, c.hi - c.lo - 0.1);
     const mid = (c.lo + c.hi) / 2;
     doorways.push({ axis: c.axis, coord: c.coord, lo: mid - width / 2, hi: mid + width / 2 });
   }
 
-  // Every ground-floor room is kept. Nothing is dropped for being unreachable,
-  // because nothing can be: every contact above opened a doorway, so the room
-  // graph is the contact graph and it is connected wherever the subdivision was.
-  const rooms = ground;
-
   // --- The walls: every edge of every room, unioned per line, with the
-  // doorways cut out of the union.
+  // doorways and the core cut out of the union.
   const edges: Span[] = [];
   for (const r of rooms) {
     edges.push({ axis: 0, coord: r.u - r.ex, lo: r.v - r.ez, hi: r.v + r.ez });
@@ -761,23 +969,43 @@ export function buildInterior(
    * stops here".
    *
    * Kept apart from `walls` rather than given a height, because `walls` is
-   * **collision** and a header must not be: you walk under it. Two lists, one
-   * of which the resolver never sees, is a smaller change than teaching
-   * `InteriorResolver` about a vertical extent it would then have to be trusted
-   * to ignore -- and it keeps `verifyInterior`'s walk-through-every-doorway
-   * check testing exactly what it tested before.
+   * **collision** and a header must not be: you walk under it.
    */
   const headerSpans: Span[] = [];
   for (const span of merged) {
     let parts: Array<{ lo: number; hi: number }> = [{ lo: span.lo, hi: span.hi }];
+    const gaps: Span[] = [];
     for (const gap of doorways) {
       if (gap.axis !== span.axis || Math.abs(gap.coord - span.coord) > 1e-3) continue;
       // Where this gap actually cuts *this* wall is where a header goes. A
       // doorway on a line with no wall along it needs none, and would be a
-      // lintel standing on nothing.
+      // lintel standing on nothing. Not over the core's apron, where the wall
+      // itself is about to be cut away.
       const lo = Math.max(gap.lo, span.lo);
       const hi = Math.min(gap.hi, span.hi);
-      if (hi - lo > 0.05) headerSpans.push({ axis: span.axis, coord: span.coord, lo, hi });
+      if (hi - lo > 0.05) {
+        const mid = (lo + hi) / 2;
+        const inCut =
+          cut !== null &&
+          (span.axis === 0
+            ? span.coord > cut.u0 - CORE_CUT_M && span.coord < cut.u1 + CORE_CUT_M && mid > cut.v0 - CORE_CUT_M && mid < cut.v1 + CORE_CUT_M
+            : span.coord > cut.v0 - CORE_CUT_M && span.coord < cut.v1 + CORE_CUT_M && mid > cut.u0 - CORE_CUT_M && mid < cut.u1 + CORE_CUT_M);
+        if (!inCut) headerSpans.push({ axis: span.axis, coord: span.coord, lo, hi });
+      }
+      gaps.push(gap);
+    }
+    if (cut !== null) {
+      const across = span.axis === 0 ? span.coord > cut.u0 - CORE_CUT_M && span.coord < cut.u1 + CORE_CUT_M
+        : span.coord > cut.v0 - CORE_CUT_M && span.coord < cut.v1 + CORE_CUT_M;
+      if (across) {
+        gaps.push(
+          span.axis === 0
+            ? { axis: 0, coord: span.coord, lo: cut.v0 - CORE_CUT_M, hi: cut.v1 + CORE_CUT_M }
+            : { axis: 1, coord: span.coord, lo: cut.u0 - CORE_CUT_M, hi: cut.u1 + CORE_CUT_M },
+        );
+      }
+    }
+    for (const gap of gaps) {
       const next: Array<{ lo: number; hi: number }> = [];
       for (const part of parts) {
         if (gap.hi <= part.lo || gap.lo >= part.hi) {
@@ -840,6 +1068,232 @@ export function buildInterior(
     walls.push({ ax: clipped.ax, az: clipped.az, bx: clipped.bx, bz: clipped.bz });
   }
 
+  // The headers, through the same conversion and the same clip as the walls.
+  const headers: InteriorWall[] = [];
+  for (const piece of headerSpans) {
+    const au = piece.axis === 0 ? piece.coord : piece.lo;
+    const av = piece.axis === 0 ? piece.lo : piece.coord;
+    const bu = piece.axis === 0 ? piece.coord : piece.hi;
+    const bv = piece.axis === 0 ? piece.hi : piece.coord;
+    const ax = au * box.ux - av * box.uz;
+    const az = au * box.uz + av * box.ux;
+    const bx = bu * box.ux - bv * box.uz;
+    const bz = bu * box.uz + bv * box.ux;
+    if (!clipToShell(planes, ax, az, bx, bz, clipped)) continue;
+    const dx = clipped.bx - clipped.ax;
+    const dz = clipped.bz - clipped.az;
+    if (dx * dx + dz * dz < 0.05 * 0.05) continue;
+    headers.push({ ax: clipped.ax, az: clipped.az, bx: clipped.bx, bz: clipped.bz });
+  }
+  return { walls, headers };
+}
+
+/**
+ * Where the core goes, or null for a building that gets no way up.
+ *
+ * In the biggest ground-floor room it fits, against one of that room's walls
+ * with `CORE_MARGIN_M` to spare, clear of the room's doorways and never
+ * nearer the shell than the margin -- the shell is where the doors are, and a
+ * door that opens onto a stairwell's side is a door `arrivalAt` has to walk
+ * somebody round. Candidates are tried in a fixed order and the first that
+ * passes is it, so both ends get the same core for the same building.
+ */
+function placeCore(
+  ground: readonly Room[],
+  box: OrientedBox,
+  planes: readonly ShellPlane[],
+  kind: CoreKind,
+): { core: Core; cut: CoreCut } | null {
+  const hw = CORE_WIDTH_M / 2;
+  const contacts = contactsBetween(ground);
+  const gates: Array<{ u: number; v: number; a: number; b: number }> = [];
+  for (const c of contacts) {
+    const mid = (c.lo + c.hi) / 2;
+    gates.push(c.axis === 0 ? { u: c.coord, v: mid, a: c.a, b: c.b } : { u: mid, v: c.coord, a: c.a, b: c.b });
+  }
+  // Does the segment from (u0,v0) to (u1,v1) cross the box grown by `pad`?
+  // Liang-Barsky, in the plan's own frame.
+  const crosses = (u0: number, v0: number, u1: number, v1: number, cut: CoreCut, pad: number): boolean => {
+    let t0 = 0;
+    let t1 = 1;
+    const du = u1 - u0;
+    const dv = v1 - v0;
+    const edges: Array<[number, number]> = [
+      [-du, u0 - (cut.u0 - pad)],
+      [du, cut.u1 + pad - u0],
+      [-dv, v0 - (cut.v0 - pad)],
+      [dv, cut.v1 + pad - v0],
+    ];
+    for (const [p, q] of edges) {
+      if (p === 0) {
+        if (q < 0) return false;
+        continue;
+      }
+      const t = q / p;
+      if (p < 0) {
+        if (t > t1) return false;
+        if (t > t0) t0 = t;
+      } else {
+        if (t < t0) return false;
+        if (t < t1) t1 = t;
+      }
+    }
+    return true;
+  };
+  // Biggest room first by its short side, then its long, then plan order --
+  // three keys so that two rooms of one size cannot tie.
+  const order = ground
+    .map((r, i) => ({ r, i }))
+    .sort((a, b) =>
+      Math.min(b.r.ex, b.r.ez) - Math.min(a.r.ex, a.r.ez) ||
+      Math.max(b.r.ex, b.r.ez) - Math.max(a.r.ex, a.r.ez) ||
+      a.i - b.i);
+  for (const { r, i: index } of order) {
+    const alongU = r.ex >= r.ez;
+    const longHalf = Math.max(r.ex, r.ez);
+    const shortHalf = Math.min(r.ex, r.ez);
+    if (shortHalf * 2 < CORE_WIDTH_M + 2 * CORE_MARGIN_M) continue;
+    const run = Math.min(CORE_RUN_MAX_M, longHalf * 2 - 2 * CORE_LANDING_M);
+    if (run < CORE_RUN_MIN_M) continue;
+    const hr = run / 2;
+    const acrossPlay = shortHalf - CORE_MARGIN_M - hw;
+    const runPlay = longHalf - CORE_LANDING_M - hr;
+    for (const across of [-acrossPlay, acrossPlay, 0]) {
+      for (const along of [0, -runPlay, runPlay]) {
+        const cu = alongU ? r.u + along : r.u + across;
+        const cv = alongU ? r.v + across : r.v + along;
+        const eu = alongU ? hr : hw;
+        const ev = alongU ? hw : hr;
+        const cut: CoreCut = { u0: cu - eu, u1: cu + eu, v0: cv - ev, v1: cv + ev };
+        // The margin to the shell, at the four corners grown by it. A convex
+        // shell makes the corner test exact.
+        let clear = true;
+        for (const [du, dv] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+          const u = cu + du * (eu + CORE_SHELL_M);
+          const v = cv + dv * (ev + CORE_SHELL_M);
+          const x = u * box.ux - v * box.uz;
+          const z = u * box.uz + v * box.ux;
+          for (const pl of planes) {
+            if (pl.nx * x + pl.nz * z - pl.d < 0) {
+              clear = false;
+              break;
+            }
+          }
+          if (!clear) break;
+        }
+        if (!clear) continue;
+        // And the doorways: none within a body's width of the core, and the
+        // core never between the middle of its room and any of that room's
+        // doors -- a stair you have to walk round to get to the next room is
+        // a stair in the wrong place.
+        for (const g of gates) {
+          if (g.u > cut.u0 - 1.2 && g.u < cut.u1 + 1.2 && g.v > cut.v0 - 1.2 && g.v < cut.v1 + 1.2) {
+            clear = false;
+            break;
+          }
+          if ((g.a === index || g.b === index) && crosses(r.u, r.v, g.u, g.v, cut, 0.5)) {
+            clear = false;
+            break;
+          }
+        }
+        if (!clear) continue;
+        const x = cu * box.ux - cv * box.uz;
+        const z = cu * box.uz + cv * box.ux;
+        const lx = alongU ? box.ux : -box.uz;
+        const lz = alongU ? box.uz : box.ux;
+        return { core: { kind, x, z, lx, lz, hr, hw }, cut };
+      }
+    }
+  }
+  return null;
+}
+
+/** The core's own walls on level `k`: its sides, its shut end, and any lane mouth shut at that level. */
+function coreWalls(core: Core, levels: readonly Level[], k: number, out: InteriorWall[]): void {
+  const ax = -core.lz;
+  const az = core.lx;
+  const at = (r: number, w: number): [number, number] => [
+    core.x + core.lx * r + ax * w,
+    core.z + core.lz * r + az * w,
+  ];
+  const seg = (a: [number, number], b: [number, number]): void => {
+    out.push({ ax: a[0], az: a[1], bx: b[0], bz: b[1] });
+  };
+  seg(at(-core.hr, -core.hw), at(core.hr, -core.hw));
+  seg(at(-core.hr, core.hw), at(core.hr, core.hw));
+  const open = coreOpenEnd(core, k);
+  seg(at(-open * core.hr, -core.hw), at(-open * core.hr, core.hw));
+  if (core.kind !== CORE.STAIR) return;
+  seg(at(-core.hr, 0), at(core.hr, 0));
+  for (const s of [-1, 1] as const) {
+    if (laneMeetsLevel(levels, s, k, open)) continue;
+    seg(at(open * core.hr, s < 0 ? -core.hw : 0), at(open * core.hr, s < 0 ? 0 : core.hw));
+  }
+}
+
+
+/**
+ * Build the inside of one building.
+ *
+ * Null when the building has no inside worth having (`interiorAdmits`) or when
+ * the plan degenerates to nothing a body fits in. Both ends call this with the
+ * same four arguments off the same prism and must get the same rooms, which is
+ * the whole reason nothing in here reads a clock, a random, or a `Math.sin`.
+ *
+ * No door: see the header. `arrivalAt` below is where one is used, once per
+ * person who walks in.
+ */
+export function buildInterior(
+  points: Float32Array,
+  base: number,
+  height: number,
+  seed: number,
+): Interior | null {
+  if (!interiorAdmits(points, height)) return null;
+  if (!Number.isFinite(base)) return null;
+
+  // The hull, for the shell, the floor and the door. See `convexHull`. The
+  // plan below still reads the real outline, which is what keeps rooms out of
+  // the notches.
+  const hull = convexHull(points);
+  if (hull.length < 6) return null;
+  const planes = shellPlanes(hull, WALL_THICK_M);
+  if (planes.length < 3) return null;
+  const shell = shellPolygon(planes);
+  if (shell.length < 6) return null;
+  // **The shell is consistent**, or there is no room. Every vertex of it must
+  // satisfy every plane; a half-plane intersection that is empty produces
+  // vertices that violate the others by metres, and a body placed in it is
+  // pushed every tick. This cannot happen on a hull. It is checked anyway,
+  // because the last comment that said "cannot happen" here was wrong.
+  for (let i = 0; i < shell.length; i += 2) {
+    for (const pl of planes) {
+      if (pl.nx * shell[i] + pl.nz * shell[i + 1] - pl.d < -0.05) return null;
+    }
+  }
+
+  const plan = floorPlan(points, height, seed);
+  const box = plan.box;
+  // One storey's rooms, and only the part of it inside the shell.
+  //
+  // Two culls rather than one, because they answer different questions.
+  // `floorPlan` already dropped the cells whose centres fall outside the
+  // *polygon*, which is what makes an L-shape work. This drops the ones outside
+  // the **walkable shell** -- the intersection of the outline's half-planes,
+  // which for a convex hull is the outline inset by a wall and for anything
+  // else is its convex core. Without it a concave footprint keeps rooms whose
+  // walls are then clipped away to nothing, and the plan describes partitions
+  // that do not exist.
+  const roomsOn = (storey: number): Room[] =>
+    plan.rooms.filter((r) => {
+      if (r.storey !== storey) return false;
+      for (const pl of planes) {
+        if (pl.nx * r.x + pl.nz * r.z - pl.d < 0.05) return false;
+      }
+      return true;
+    });
+  const ground = roomsOn(0);
+
   // The footprint's centre, for `arrivalAt` to walk toward and for a camera to
   // look at. The vertex mean rather than the area centroid: the outlines are
   // hulls with no long thin tails, the two agree to within a fraction of a
@@ -856,11 +1310,10 @@ export function buildInterior(
   /*
    * --- The door: the midpoint of the longest edge, facing out.
    *
-   * Derived from the footprint, so it is the same door on every machine, in
-   * every session, for everybody in the building -- which is the property the
-   * rooms already have and the door did not. The longest edge is a frontage
-   * often enough to be a good guess and is unambiguous always; ties go to the
-   * earlier edge so a perfectly square building still has exactly one door.
+   * The fallback door, for a body restored from a save made before doors were
+   * saved with the spot, and the door furniture keeps clear of when nobody is
+   * in the room to ask. Derived from the footprint, so it is the same on every
+   * machine. Ties go to the earlier edge so a square building still has one.
    *
    * The normal is flipped away from the centre rather than trusted from the
    * winding, which is `doorway.doorAt`'s rule and is right for a convex hull
@@ -894,22 +1347,46 @@ export function buildInterior(
     }
   }
 
-  // The headers, through the same conversion and the same clip as the walls.
-  const headers: InteriorWall[] = [];
-  for (const piece of headerSpans) {
-    const au = piece.axis === 0 ? piece.coord : piece.lo;
-    const av = piece.axis === 0 ? piece.lo : piece.coord;
-    const bu = piece.axis === 0 ? piece.coord : piece.hi;
-    const bv = piece.axis === 0 ? piece.hi : piece.coord;
-    const ax = au * box.ux - av * box.uz;
-    const az = au * box.uz + av * box.ux;
-    const bx = bu * box.ux - bv * box.uz;
-    const bz = bu * box.uz + bv * box.ux;
-    if (!clipToShell(planes, ax, az, bx, bz, clipped)) continue;
-    const dx = clipped.bx - clipped.ax;
-    const dz = clipped.bz - clipped.az;
-    if (dx * dx + dz * dz < 0.05 * 0.05) continue;
-    headers.push({ ax: clipped.ax, az: clipped.az, bx: clipped.bx, bz: clipped.bz });
+  /*
+   * --- The levels.
+   *
+   * Every storey the plan drew is a level, if there is a core to reach it by;
+   * a building the core will not fit in has its ground floor and nothing
+   * else, and says so in `interiorLine`. A deck (`DECKS`) is one more level
+   * above the top storey, with no rooms: the whole shell, windows all round.
+   * It is dropped if it would not clear the top storey's ceiling, which a
+   * retile that shortens the podium could do.
+   */
+  const deckY = DECKS.get(seed);
+  const deck =
+    deckY !== undefined && deckY > base + (plan.storeys - 1) * STOREY_M + CEILING_M ? deckY : undefined;
+  const wanted = plan.storeys + (deck !== undefined ? 1 : 0);
+  let core: Core | null = null;
+  let cut: CoreCut | null = null;
+  if (wanted >= 2) {
+    const kind = wanted > STAIR_MAX_STOREYS || deck !== undefined ? CORE.LIFT : CORE.STAIR;
+    const placed = placeCore(ground, box, planes, kind);
+    if (placed !== null) {
+      core = placed.core;
+      cut = placed.cut;
+    }
+  }
+  const count = core === null ? 1 : wanted;
+  const levels: Array<{ y: number; rooms: readonly Room[]; walls: InteriorWall[]; headers: InteriorWall[] }> = [];
+  for (let k = 0; k < count; k++) {
+    const isDeck = deck !== undefined && k === count - 1;
+    levels.push({
+      y: isDeck ? deck : base + k * STOREY_M,
+      rooms: k === 0 ? ground : isDeck ? [] : roomsOn(k),
+      walls: [],
+      headers: [],
+    });
+  }
+  for (let k = 0; k < count; k++) {
+    const made = wallsFor(levels[k].rooms, box, planes, cut);
+    levels[k].walls = made.walls;
+    levels[k].headers = made.headers;
+    if (core !== null) coreWalls(core, levels, k, levels[k].walls);
   }
 
   const it: Interior = {
@@ -917,16 +1394,18 @@ export function buildInterior(
     base,
     ceilingY: base + CEILING_M,
     plan,
-    rooms,
-    walls,
-    headers,
+    rooms: levels[0].rooms,
+    walls: levels[0].walls,
+    headers: levels[0].headers,
+    levels,
+    core,
     shell,
     planes,
     centreX,
     centreZ,
     door,
     placedBoxes: [],
-    resolver: new InteriorResolver(planes, walls),
+    resolver: new InteriorResolver(planes, levels),
   };
   // **And a body can stand in it.** Both ends run this same line before either
   // offers a door, so a building the generator cannot make a clear arrival in
@@ -972,6 +1451,19 @@ export function arrivalAt(it: Interior, door: InteriorDoor = it.door): { x: numb
     const settled = it.resolver.resolve(x, z, x, z, BODY_CLEARANCE_M, it.base);
     x = settled.x;
     z = settled.z;
+    const core = it.core;
+    if (core !== null && inCore(core, x, z, 0.25)) {
+      // In the stairwell, or in its wall. Out of it sideways, to the middle of
+      // the corridor the core keeps beside itself, rather than toward the
+      // centre -- which, in a terrace, is where the core is. The slack and the
+      // push are both under the corridor's half width, so a body settled in
+      // the corridor is not read as in the core and pushed back out of it.
+      const { w } = coreLocal(core, x, z);
+      const want = (w < 0 ? -1 : 1) * (core.hw + 0.5);
+      x += -core.lz * (want - w);
+      z += core.lx * (want - w);
+      continue;
+    }
     if (it.resolver.clearance(x, z) >= BODY_CLEARANCE_M) return { x, z };
     x += (it.centreX - x) * 0.2;
     z += (it.centreZ - z) * 0.2;
@@ -1068,6 +1560,9 @@ export function placementFits(
   }
   // Clear of the partitions, by half a wall so it stands against one rather
   // than in one.
+  // Not on the stairs, or in the lift, or in the apron round them that
+  // every level's partitions are cut back to.
+  if (it.core !== null && inCore(it.core, p.x, p.z, Math.max(kind.hx, kind.hz) + CORE_CUT_M)) return false;
   for (const w of it.walls) {
     if (!clearOfSegment(box, w.ax, w.az, w.bx, w.bz, WALL_THICK_M / 2)) return false;
   }
@@ -1127,7 +1622,8 @@ export function setPlacements(it: Interior, list: readonly Placement[]): void {
  */
 export function interiorLine(it: Interior): string {
   const rooms = it.rooms.length;
-  const above = Math.max(0, it.plan.storeys - 1);
+  const above = it.levels.length - 1;
+  const drawn = Math.max(0, it.plan.storeys - 1);
   // How big the floor is, from the plan's own box rather than from the rooms:
   // the box is the building and the rooms are what was fitted into it.
   const w = Math.round(it.plan.box.ex * 2);
@@ -1141,10 +1637,15 @@ export function interiorLine(it: Interior): string {
     long / Math.max(1, short) >= 2.4 ? 'A long room' :
     'Inside';
   const count = rooms === 1 ? 'one room' : `${rooms} rooms`;
+  const floors = (n: number): string => (n === 1 ? 'a floor' : `${n} floors`);
   const upstairs =
-    above === 0 ? 'and no way up' :
-    above === 1 ? 'with a floor above you, shut' :
-    `with ${above} floors above you, shut`;
+    it.core === null
+      ? drawn === 0 ? 'and no way up' : `with ${floors(drawn)} above you, shut`
+      : it.core.kind === CORE.STAIR
+        ? `with ${floors(above)} up the stairs`
+        : DECKS.has(it.seed)
+          ? `with a lift to ${floors(above - 1)} and the deck`
+          : `with a lift to ${floors(above)}`;
   return `${shape}: ${count}, ${upstairs}.`;
 }
 
@@ -1389,22 +1890,6 @@ export function interiorMesh(it: Interior, door: InteriorDoor = it.door): Interi
   const col: number[] = [];
   const tint = shadeOf(it.seed);
   const finish = finishOf(it.seed);
-  /**
-   * The carpet, which is the one surface that is not a shade of the plaster.
-   *
-   * A carpet the colour of the walls is not a carpet; it is a floor somebody
-   * forgot to finish. Four hues out of the seed -- the reds, greens and greys
-   * an Australian pub or office block is actually laid with -- and they are
-   * muted, because a saturated floor in an unlit room reads as a bug.
-   */
-  /**
-   * What a window is full of.
-   *
-   * The material is unlit, so this is not a reflection or a sky -- it is the
-   * one deliberately bright surface in the building, and its whole job is to be
-   * the brightest thing in the room so a player's eye goes to it. Slightly
-   * blue, because daylight is.
-   */
   const daylight = { r: 0.80, g: 0.88, b: 0.97 };
   const carpet = (() => {
     const pick = Math.floor(hash2(it.seed, 0x300) * 4);
@@ -1416,22 +1901,18 @@ export function interiorMesh(it: Interior, door: InteriorDoor = it.door): Interi
       { r: 0.34, g: 0.32, b: 0.28 };
     return { r: swatch.r * v, g: swatch.g * v, b: swatch.b * v };
   })();
-  /** A colour times a shade, clamped. The buffers must stay inside 0..1. */
   const scaled = (c: { r: number; g: number; b: number }, k: number): { r: number; g: number; b: number } => ({
     r: Math.min(1, c.r * k),
     g: Math.min(1, c.g * k),
     b: Math.min(1, c.b * k),
   });
-  const floorY = it.base;
-  const ceilY = it.base + CEILING_M;
-
-  /**
-   * One triangle, with a flat normal and a flat colour.
-   *
-   * `shade` multiplies the building's own tint, which is how every surface in
-   * the room is coloured. `rgb`, when given, replaces it outright — used by the
-   * door, which must not be a shade of the plaster it is set into.
-   */
+  const levels = it.levels;
+  const core = it.core;
+  const top = levels.length - 1;
+  // The level being drawn. Every helper below reads these, so the loop over
+  // the levels only has to set them.
+  let floorY = levels[0].y;
+  let ceilY = floorY + CEILING_M;
   const tri = (
     ax: number, ay: number, az: number,
     bx: number, by: number, bz: number,
@@ -1447,92 +1928,50 @@ export function interiorMesh(it: Interior, door: InteriorDoor = it.door): Interi
     const b = rgb === null ? tint.b * shade : rgb.b;
     for (let i = 0; i < 3; i++) col.push(r, g, b);
   };
-
-  /**
-   * A quad standing on the ground, from `a` to `b`, facing `(nx, nz)`.
-   *
-   * Two triangles with the skirting darker than the picture rail, which is the
-   * whole of the "lighting". `lo`/`hi` are the shades at floor and ceiling.
-   */
+  // A vertical quad from a to b, facing (nx, nz), shaded `lo` at the bottom
+  // edge's triangle and `hi` at the top's.
   const wall = (
     ax: number, az: number, bx: number, bz: number,
     nx: number, nz: number, lo: number, hi: number,
     y0 = floorY, y1 = ceilY,
     rgb: { r: number; g: number; b: number } | null = null,
   ): void => {
-    // Split into two triangles that each carry one shade, rather than a real
-    // gradient: the material is unlit and per-vertex colour would need the two
-    // triangles to share vertices, which a flat-normal buffer cannot do.
     tri(ax, y0, az, bx, y0, bz, bx, y1, bz, nx, 0, nz, lo, rgb);
     tri(ax, y0, az, bx, y1, bz, ax, y1, az, nx, 0, nz, hi, rgb);
   };
-
-  /**
-   * A wall with a finish on it: skirting, courses, a dado rail.
-   *
-   * The same two triangles as `wall` for every band, and the bands are the
-   * whole of the "texture" -- *"texture the inside ... walls"*. There is no
-   * image anywhere in this feature and there must not be: one unlit material
-   * with vertex colours is what keeps every interior in the game to a single
-   * pipeline (see the header), and a texture would mean an atlas, a fetch and a
-   * second material variant.
-   *
-   * What each finish is doing, and none of it is decoration:
-   *
-   *   - **A skirting board on every wall.** It is a dark band 14 cm tall at the
-   *     floor, and it is the single cheapest thing that makes a room read as a
-   *     room -- it gives the eye the floor/wall join, which an unlit box
-   *     otherwise has to infer from a shade change. It also hides the ragged
-   *     centimetres where the floor covering stops short of the shell.
-   *   - **Brick** is eight courses of alternating shade. Coarse for a brick, and
-   *     right for a warehouse or a pub's back wall at the distance anybody
-   *     stands from it.
-   *   - **Panel** puts a dado rail at a metre, which is the one horizontal line
-   *     a person's eye uses to judge how big a room is.
-   */
+  // A wall with its finish on: skirting, then paint, brick courses or panelling.
   const finishedWall = (
     ax: number, az: number, bx: number, bz: number,
     nx: number, nz: number, lo: number, hi: number,
   ): void => {
-    const top = ceilY - floorY;
+    const height = ceilY - floorY;
     const band = (y0: number, y1: number, shade: number): void => {
       if (y1 <= y0) return;
       wall(ax, az, bx, bz, nx, nz, shade, shade, floorY + y0, floorY + y1);
     };
-    const skirt = Math.min(0.14, top * 0.06);
+    const skirt = Math.min(0.14, height * 0.06);
     band(0, skirt, lo * 0.62);
     if (finish.walls === WALLS.BRICK) {
-      // Eight courses, alternating, over whatever is left above the skirting.
       const COURSES = 8;
-      const h = (top - skirt) / COURSES;
+      const h = (height - skirt) / COURSES;
       for (let i = 0; i < COURSES; i++) {
         const k = i & 1 ? 0.94 : 1.04;
-        // A hairline of variation per course, from the wall's own position, so
-        // two walls of one building are not the same eight stripes.
         const j = hash2(it.seed ^ Math.round(ax * 100), i * 37 + Math.round(az * 100)) * 0.06;
         band(skirt + i * h, skirt + (i + 1) * h, (lo + (hi - lo) * (i / COURSES)) * (k + j));
       }
       return;
     }
     if (finish.walls === WALLS.PANEL) {
-      const rail = Math.min(1.0, top * 0.42);
+      const rail = Math.min(1.0, height * 0.42);
       band(skirt, rail, lo * 0.9);
       band(rail, rail + 0.09, lo * 0.55);
-      band(rail + 0.09, top - 0.1, hi);
-      band(top - 0.1, top, hi * 0.72);
+      band(rail + 0.09, height - 0.1, hi);
+      band(height - 0.1, height, hi * 0.72);
       return;
     }
-    // Paint: body, and a cornice so the ceiling has an edge.
-    band(skirt, top - 0.1, (lo + hi) / 2);
-    band(top - 0.1, top, hi * 0.78);
+    band(skirt, height - 0.1, (lo + hi) / 2);
+    band(height - 0.1, height, hi * 0.78);
   };
-
-  /**
-   * A flat rectangle standing on a wall, inset off it. Frames, glass, sills.
-   *
-   * `wall` with an explicit colour and an explicit height, plus the inset that
-   * keeps three coplanar rectangles from fighting over the same depth.
-   */
   const finishedFrame = (
     ax: number, az: number, bx: number, bz: number,
     nx: number, nz: number, y0: number, y1: number, inset: number,
@@ -1540,393 +1979,381 @@ export function interiorMesh(it: Interior, door: InteriorDoor = it.door): Interi
   ): void => {
     wall(ax + nx * inset, az + nz * inset, bx + nx * inset, bz + nz * inset, nx, nz, 1, 1, y0, y1, rgb);
   };
+  // A horizontal quad in the plan's frame, facing up or down.
+  const box = it.plan.box;
+  const flat = (
+    u0: number, v0: number, u1: number, v1: number, y: number, up: boolean,
+    shade: number, rgb: { r: number; g: number; b: number } | null = null,
+  ): void => {
+    const p00x = u0 * box.ux - v0 * box.uz;
+    const p00z = u0 * box.uz + v0 * box.ux;
+    const p10x = u1 * box.ux - v0 * box.uz;
+    const p10z = u1 * box.uz + v0 * box.ux;
+    const p11x = u1 * box.ux - v1 * box.uz;
+    const p11z = u1 * box.uz + v1 * box.ux;
+    const p01x = u0 * box.ux - v1 * box.uz;
+    const p01z = u0 * box.uz + v1 * box.ux;
+    if (up) {
+      tri(p00x, y, p00z, p10x, y, p10z, p11x, y, p11z, 0, 1, 0, shade, rgb);
+      tri(p00x, y, p00z, p11x, y, p11z, p01x, y, p01z, 0, 1, 0, shade, rgb);
+    } else {
+      tri(p00x, y, p00z, p11x, y, p11z, p10x, y, p10z, 0, -1, 0, shade, rgb);
+      tri(p00x, y, p00z, p01x, y, p01z, p11x, y, p11z, 0, -1, 0, shade, rgb);
+    }
+  };
 
-  // --- The floor and the ceiling, as fans over the shell.
+  // --- The floor covering's grid, laid out once in the plan's frame.
   //
-  // A fan is exact here and only here: the shell is an intersection of
-  // half-planes and so is convex by construction. Nothing else in this file
-  // relies on that; this does, and it is the reason the shell is built the way
-  // it is rather than as a polygon offset.
-  {
-    const n = it.shell.length >> 1;
-    const ox = it.shell[0];
-    const oz = it.shell[1];
-    for (let i = 1; i + 1 < n; i++) {
-      const ax = it.shell[i * 2];
-      const az = it.shell[i * 2 + 1];
-      const bx = it.shell[(i + 1) * 2];
-      const bz = it.shell[(i + 1) * 2 + 1];
-      // Floorboards are the lightest surface in the room, and the ceiling is
-      // the darkest: that ordering is what makes an unlit box read as a room
-      // rather than as a flat wash.
-      tri(ox, floorY, oz, ax, floorY, az, bx, floorY, bz, 0, 1, 0, 1.0);
-      tri(ox, ceilY, oz, bx, ceilY, bz, ax, ceilY, az, 0, -1, 0, 0.45);
+  // Boards run along the building; carpet and tiles are square. The covering
+  // is one quad per board or tile, which is what makes it read as a floor
+  // rather than a colour -- bounded per building rather than per level so a
+  // tower does not draw eighty floors of parquet: a level's share shrinks as
+  // the levels go up, to a floor of 150 quads that still reads.
+  let minU = Infinity;
+  let maxU = -Infinity;
+  let minV = Infinity;
+  let maxV = -Infinity;
+  for (let i = 0; i < it.shell.length; i += 2) {
+    const u = it.shell[i] * box.ux + it.shell[i + 1] * box.uz;
+    const v = -it.shell[i] * box.uz + it.shell[i + 1] * box.ux;
+    if (u < minU) minU = u;
+    if (u > maxU) maxU = u;
+    if (v < minV) minV = v;
+    if (v > maxV) maxV = v;
+  }
+  const spanU = Math.max(0.5, maxU - minU);
+  const spanV = Math.max(0.5, maxV - minV);
+  const wide = finish.floor === FLOOR.BOARDS ? 0.16 : finish.floor === FLOOR.TILE ? 0.45 : 0.7;
+  const longM = finish.floor === FLOOR.BOARDS ? 1.9 : wide;
+  const budget = Math.min(MAX_FLOOR_QUADS, Math.max(150, Math.floor((MAX_FLOOR_QUADS * 3) / levels.length)));
+  let grow = 1;
+  while ((spanU / (wide * grow)) * (spanV / (longM * grow)) > budget) grow *= 1.25;
+  const cu = wide * grow;
+  const cv = longM * grow;
+  const nu = Math.ceil(spanU / cu);
+  const nv = Math.ceil(spanV / cv);
+  // The grid, as cells inside the shell with their world centres, so each
+  // level reads it rather than re-testing every cell against every plane.
+  const cells: Array<{ i: number; j: number; u0: number; v0: number; u1: number; v1: number; x: number; z: number }> = [];
+  for (let i = 0; i < nu; i++) {
+    for (let j = 0; j < nv; j++) {
+      const u0 = minU + i * cu;
+      const v0 = minV + j * cv;
+      const u1 = Math.min(u0 + cu, maxU);
+      const v1 = Math.min(v0 + cv, maxV);
+      const mu = (u0 + u1) / 2;
+      const mv = (v0 + v1) / 2;
+      const wx = mu * box.ux - mv * box.uz;
+      const wz = mu * box.uz + mv * box.ux;
+      let inside = true;
+      for (const pl of it.planes) {
+        if (pl.nx * wx + pl.nz * wz - pl.d < 0.02) {
+          inside = false;
+          break;
+        }
+      }
+      if (inside) cells.push({ i, j, u0, v0, u1, v1, x: wx, z: wz });
     }
   }
-
-  /*
-   * --- What the floor is finished in. Boards, carpet or tile.
-   *
-   * Laid as a grid of quads four millimetres over the fan above, **in the
-   * building's own frame** so the boards run with the walls rather than with
-   * the compass -- which is the same reason the rooms are laid out in that
-   * frame, and is the difference between a floor and a doormat.
-   *
-   * A quad is emitted only when its centre is inside the shell. That leaves a
-   * ragged few centimetres at the wall where the fan shows through, which is
-   * exactly what a skirting board covers in a real room and reads as one here.
-   * Clipping each quad properly would be a polygon clip per quad for a seam
-   * nobody can see.
-   *
-   * The cell size is chosen from the floor's own area against
-   * `MAX_FLOOR_QUADS`, so a terrace gets 130 mm boards and a warehouse gets
-   * planks -- and neither costs more than the other.
-   */
-  {
-    const box = it.plan.box;
-    // The floor's extent in its own frame, from the shell rather than the box:
-    // the box circumscribes the footprint and the shell is the footprint.
-    let minU = Infinity;
-    let maxU = -Infinity;
-    let minV = Infinity;
-    let maxV = -Infinity;
-    for (let i = 0; i < it.shell.length; i += 2) {
-      const u = it.shell[i] * box.ux + it.shell[i + 1] * box.uz;
-      const v = -it.shell[i] * box.uz + it.shell[i + 1] * box.ux;
-      if (u < minU) minU = u;
-      if (u > maxU) maxU = u;
-      if (v < minV) minV = v;
-      if (v > maxV) maxV = v;
+  const covering = (y: number, skipCore: boolean): void => {
+    for (const c of cells) {
+      if (skipCore && core !== null && inCore(core, c.x, c.z, 0.02)) continue;
+      let shade: number;
+      if (finish.floor === FLOOR.BOARDS) {
+        shade = 0.86 + hash2(it.seed ^ (c.i * 7919), c.j + ((c.i * 3) % 5)) * 0.28;
+      } else if (finish.floor === FLOOR.CARPET) {
+        shade = 0.70 + hash2(it.seed ^ (c.i * 131), c.j * 17) * 0.08;
+      } else {
+        shade = ((c.i + c.j) & 1 ? 0.98 : 0.86) + hash2(it.seed, c.i * 31 + c.j) * 0.04;
+      }
+      const gap = finish.floor === FLOOR.TILE ? 0.02 : finish.floor === FLOOR.BOARDS ? 0.012 : 0;
+      const a0 = c.u0 + gap;
+      const a1 = c.u1 - gap;
+      const b0 = c.v0 + gap;
+      const b1 = c.v1 - gap;
+      if (a1 <= a0 || b1 <= b0) continue;
+      const rgb = finish.floor === FLOOR.CARPET ? carpet : null;
+      flat(a0, b0, a1, b1, y, true, shade, rgb === null ? null : scaled(rgb, shade));
     }
-    const spanU = Math.max(0.5, maxU - minU);
-    const spanV = Math.max(0.5, maxV - minV);
-    // The natural size of one piece of this covering, and its aspect: a board
-    // is long and narrow, a carpet tile and a floor tile are square.
-    const wide = finish.floor === FLOOR.BOARDS ? 0.16 : finish.floor === FLOOR.TILE ? 0.45 : 0.7;
-    const longM = finish.floor === FLOOR.BOARDS ? 1.9 : wide;
-    // Grown together until the count fits the budget, which keeps the aspect.
-    let grow = 1;
-    while ((spanU / (wide * grow)) * (spanV / (longM * grow)) > MAX_FLOOR_QUADS) grow *= 1.25;
-    const cu = wide * grow;
-    const cv = longM * grow;
-    const y = floorY + 0.004;
-    const nu = Math.ceil(spanU / cu);
-    const nv = Math.ceil(spanV / cv);
-    for (let i = 0; i < nu; i++) {
-      for (let j = 0; j < nv; j++) {
-        const u0 = minU + i * cu;
-        const v0 = minV + j * cv;
-        const u1 = Math.min(u0 + cu, maxU);
-        const v1 = Math.min(v0 + cv, maxV);
-        const mu = (u0 + u1) / 2;
-        const mv = (v0 + v1) / 2;
-        const wx = mu * box.ux - mv * box.uz;
-        const wz = mu * box.uz + mv * box.ux;
-        let inside = true;
-        for (const pl of it.planes) {
-          if (pl.nx * wx + pl.nz * wz - pl.d < 0.02) {
-            inside = false;
-            break;
+  };
+  // A slab: the cells, with the core's cut through it or not, facing `up`.
+  const slab = (y: number, up: boolean, skipCore: boolean, shade: number): void => {
+    for (const c of cells) {
+      if (skipCore && core !== null && inCore(core, c.x, c.z, 0.02)) continue;
+      flat(c.u0, c.v0, c.u1, c.v1, y, up, shade);
+    }
+  };
+
+  for (let k = 0; k <= top; k++) {
+    floorY = levels[k].y;
+    ceilY = floorY + CEILING_M;
+    const level = levels[k];
+    const holed = core !== null && k < top;
+
+    // --- Floor and ceiling.
+    //
+    // The ground floor is a fan over the convex shell, which is exact and
+    // cheap. Every floor above it has the core cut through it, and a fan
+    // cannot have a hole, so those are the covering's own cells with the
+    // core's cells left out -- the covering is laid over both anyway. The
+    // ceiling is the underside of the slab above: cut wherever the floor
+    // above is, solid over the top level.
+    if (k === 0) {
+      const n = it.shell.length >> 1;
+      const ox = it.shell[0];
+      const oz = it.shell[1];
+      for (let i = 1; i + 1 < n; i++) {
+        const ax = it.shell[i * 2];
+        const az = it.shell[i * 2 + 1];
+        const bx = it.shell[(i + 1) * 2];
+        const bz = it.shell[(i + 1) * 2 + 1];
+        tri(ox, floorY, oz, ax, floorY, az, bx, floorY, bz, 0, 1, 0, 1.0);
+      }
+    } else {
+      slab(floorY, true, true, 1.0);
+    }
+    covering(floorY + 0.004, k > 0);
+    slab(ceilY, false, holed, 0.45);
+
+    // --- The shell's walls, with windows, and the slab's edge above them.
+    {
+      const n = it.shell.length >> 1;
+      for (let i = 0, j = n - 1; i < n; j = i++) {
+        const ax = it.shell[j * 2];
+        const az = it.shell[j * 2 + 1];
+        const bx = it.shell[i * 2];
+        const bz = it.shell[i * 2 + 1];
+        let ex = bx - ax;
+        let ez = bz - az;
+        const len = Math.sqrt(ex * ex + ez * ez);
+        if (!(len > 1e-6)) continue;
+        ex /= len;
+        ez /= len;
+        const pl = it.planes[j] ?? it.planes[0];
+        finishedWall(ax, az, bx, bz, pl.nx, pl.nz, 0.72, 0.86);
+        if (k < top) wall(ax, az, bx, bz, pl.nx, pl.nz, 0.5, 0.5, ceilY, levels[k + 1].y);
+        // A window every few metres, clear of the door: a frame, the glass set
+        // deeper, and a sill. Under the ground floor's door on that level only;
+        // the floors above have no door to keep clear of.
+        const WINDOW_EVERY_M = 3.6;
+        const WINDOW_W = 1.25;
+        const WINDOW_H = 1.3;
+        const SILL_M = 0.95;
+        if (len >= WINDOW_W + 1.6 && ceilY - floorY > SILL_M + WINDOW_H + 0.25) {
+          const count = Math.max(1, Math.floor(len / WINDOW_EVERY_M));
+          const pitch = len / count;
+          for (let w = 0; w < count; w++) {
+            const t = (w + 0.5) * pitch;
+            const wx = ax + ex * t;
+            const wz = az + ez * t;
+            if (
+              k === 0 &&
+              Math.sqrt((wx - doorX) * (wx - doorX) + (wz - doorZ) * (wz - doorZ)) < DOOR_GAP_M * 0.9 + WINDOW_W / 2
+            ) {
+              continue;
+            }
+            const half = WINDOW_W / 2;
+            finishedFrame(
+              wx - ex * (half + 0.09), wz - ez * (half + 0.09),
+              wx + ex * (half + 0.09), wz + ez * (half + 0.09),
+              pl.nx, pl.nz, floorY + SILL_M - 0.09, floorY + SILL_M + WINDOW_H + 0.09, 0.05,
+              { r: 0.20, g: 0.18, b: 0.15 },
+            );
+            finishedFrame(
+              wx - ex * half, wz - ez * half,
+              wx + ex * half, wz + ez * half,
+              pl.nx, pl.nz, floorY + SILL_M, floorY + SILL_M + WINDOW_H, 0.09,
+              daylight,
+            );
+            finishedFrame(
+              wx - ex * (half + 0.14), wz - ez * (half + 0.14),
+              wx + ex * (half + 0.14), wz + ez * (half + 0.14),
+              pl.nx, pl.nz, floorY + SILL_M - 0.14, floorY + SILL_M - 0.09, 0.14,
+              { r: 0.62, g: 0.60, b: 0.56 },
+            );
           }
         }
-        if (!inside) continue;
-        /*
-         * The shade of this one piece, and it is the whole of the "texture".
-         *
-         * Boards take a wide per-plank spread and **stagger their joins**: the
-         * row index is offset by the column, so the short ends do not line up
-         * across the floor, which is the single thing that makes a grid of
-         * quads read as a floor rather than as graph paper. Carpet takes a
-         * narrow spread, because a carpet with visible tiles is a carpet tile.
-         * Tile alternates two shades in a chequer and keeps a darker grout line
-         * by leaving the fan showing at every edge.
-         */
-        let shade: number;
-        if (finish.floor === FLOOR.BOARDS) {
-          shade = 0.86 + hash2(it.seed ^ (i * 7919), j + ((i * 3) % 5)) * 0.28;
-        } else if (finish.floor === FLOOR.CARPET) {
-          shade = 0.70 + hash2(it.seed ^ (i * 131), j * 17) * 0.08;
-        } else {
-          shade = ((i + j) & 1 ? 0.98 : 0.86) + hash2(it.seed, i * 31 + j) * 0.04;
-        }
-        // Tile keeps a grout line; boards keep a hairline join. Both are the
-        // fan below showing through, which costs no geometry at all.
-        const gap = finish.floor === FLOOR.TILE ? 0.02 : finish.floor === FLOOR.BOARDS ? 0.012 : 0;
-        const a0 = u0 + gap;
-        const a1 = u1 - gap;
-        const b0 = v0 + gap;
-        const b1 = v1 - gap;
-        if (a1 <= a0 || b1 <= b0) continue;
-        const p00x = a0 * box.ux - b0 * box.uz;
-        const p00z = a0 * box.uz + b0 * box.ux;
-        const p10x = a1 * box.ux - b0 * box.uz;
-        const p10z = a1 * box.uz + b0 * box.ux;
-        const p11x = a1 * box.ux - b1 * box.uz;
-        const p11z = a1 * box.uz + b1 * box.ux;
-        const p01x = a0 * box.ux - b1 * box.uz;
-        const p01z = a0 * box.uz + b1 * box.ux;
-        // Carpet is not the building's plaster tint. Boards and tile are, which
-        // is what keeps a room looking like one material rather than three.
-        const rgb = finish.floor === FLOOR.CARPET ? carpet : null;
-        tri(p00x, y, p00z, p10x, y, p10z, p11x, y, p11z, 0, 1, 0, shade, rgb === null ? null : scaled(rgb, shade));
-        tri(p00x, y, p00z, p11x, y, p11z, p01x, y, p01z, 0, 1, 0, shade, rgb === null ? null : scaled(rgb, shade));
       }
     }
-  }
 
-  // --- The outer wall, inward-facing, and the door panel in it.
-  {
-    const n = it.shell.length >> 1;
-    for (let i = 0, j = n - 1; i < n; j = i++) {
-      const ax = it.shell[j * 2];
-      const az = it.shell[j * 2 + 1];
-      const bx = it.shell[i * 2];
-      const bz = it.shell[i * 2 + 1];
-      let ex = bx - ax;
-      let ez = bz - az;
-      const len = Math.sqrt((ex) * (ex) + (ez) * (ez));
+    // --- The door, on the ground floor: a frame and a leaf, drawn just inside
+    // the wall so they are in front of it rather than in it.
+    if (k === 0) {
+      const inX = -doorNX;
+      const inZ = -doorNZ;
+      const tx = -inZ;
+      const tz = inX;
+      const half = DOOR_GAP_M / 2;
+      const frame = { r: 0.16, g: 0.13, b: 0.10 };
+      const leaf = { r: 0.93, g: 0.78, b: 0.42 };
+      const fx = doorX + inX * (WALL_THICK_M + 0.02);
+      const fz = doorZ + inZ * (WALL_THICK_M + 0.02);
+      wall(
+        fx - tx * (half + 0.18), fz - tz * (half + 0.18),
+        fx + tx * (half + 0.18), fz + tz * (half + 0.18),
+        inX, inZ, 1, 1,
+        floorY + 0.005, floorY + 2.4,
+        frame,
+      );
+      const px = doorX + inX * (WALL_THICK_M + 0.06);
+      const pz = doorZ + inZ * (WALL_THICK_M + 0.06);
+      wall(
+        px - tx * half, pz - tz * half,
+        px + tx * half, pz + tz * half,
+        inX, inZ, 1, 1,
+        floorY + 0.01, floorY + 2.2,
+        leaf,
+      );
+    }
+
+    // --- The partitions, and the core's walls, which are in the same list.
+    for (const w of level.walls) {
+      let ex = w.bx - w.ax;
+      let ez = w.bz - w.az;
+      const len = Math.sqrt(ex * ex + ez * ez);
       if (!(len > 1e-6)) continue;
       ex /= len;
       ez /= len;
-      // **`planes[j]`, not `planes[i]`.** `shellPolygon` makes vertex `k` the
-      // intersection of planes `k-1` and `k`, so the edge running from vertex
-      // `j` to vertex `i` is the one lying on plane `j`. Getting that off by one
-      // points every outer wall out of the room, which is a building rendered
-      // entirely by its backfaces -- and therefore not rendered at all.
-      const pl = it.planes[j] ?? it.planes[0];
-      finishedWall(ax, az, bx, bz, pl.nx, pl.nz, 0.72, 0.86);
+      const nx = ez;
+      const nz = -ex;
+      const h = WALL_THICK_M / 2;
+      finishedWall(w.ax + nx * h, w.az + nz * h, w.bx + nx * h, w.bz + nz * h, nx, nz, 0.66, 0.80);
+      finishedWall(w.bx - nx * h, w.bz - nz * h, w.ax - nx * h, w.az - nz * h, -nx, -nz, 0.66, 0.80);
+      // Through the slab above, so the core's walls read as one shaft rather
+      // than a stack of storeys with a gap at each floor.
+      if (k < top && core !== null) {
+        wall(w.ax + nx * h, w.az + nz * h, w.bx + nx * h, w.bz + nz * h, nx, nz, 0.5, 0.5, ceilY, levels[k + 1].y);
+        wall(w.bx - nx * h, w.bz - nz * h, w.ax - nx * h, w.az - nz * h, -nx, -nz, 0.5, 0.5, ceilY, levels[k + 1].y);
+      }
+      if (!onShell(it, w.ax, w.az)) {
+        wall(w.ax - nx * h, w.az - nz * h, w.ax + nx * h, w.az + nz * h, -ex, -ez, 0.58, 0.62);
+      }
+      if (!onShell(it, w.bx, w.bz)) {
+        wall(w.bx + nx * h, w.bz + nz * h, w.bx - nx * h, w.bz - nz * h, ex, ez, 0.58, 0.62);
+      }
+      tri(
+        w.ax - nx * h, ceilY, w.az - nz * h,
+        w.bx - nx * h, ceilY, w.bz - nz * h,
+        w.bx + nx * h, ceilY, w.bz + nz * h,
+        0, 1, 0, 0.5,
+      );
+      tri(
+        w.ax - nx * h, ceilY, w.az - nz * h,
+        w.bx + nx * h, ceilY, w.bz + nz * h,
+        w.ax + nx * h, ceilY, w.az + nz * h,
+        0, 1, 0, 0.5,
+      );
+    }
 
-      /*
-       * --- And the windows in it.
-       *
-       * *"walls and windows"* -- the owner, and they are worth more than the
-       * word suggests: an interior generated out of a footprint is by
-       * construction a windowless box, and a windowless box is the one shape
-       * that reads as unfinished however well it is finished. A bright rectangle
-       * at eye height is also the only thing in here that says which way is out.
-       *
-       * Spaced along the wall rather than placed, because there is nothing in
-       * the data that knows where a window goes -- the same reason the door is
-       * the nearest point on the perimeter. Every 3.6 m, centred in what the
-       * wall can hold, and **skipped wherever the door is**, which is the one
-       * place a window certainly is not.
-       *
-       * They are drawn, not cut. A hole would need the shell to stop being an
-       * intersection of half-planes, and there is nothing to see through it: the
-       * city is on another layer.
-       */
-      const WINDOW_EVERY_M = 3.6;
-      const WINDOW_W = 1.25;
-      const WINDOW_H = 1.3;
-      const SILL_M = 0.95;
-      // A metre and a half of wall each side, so a window is a window in a
-      // wall rather than a glass wall with a bit of brick round it.
-      if (len >= WINDOW_W + 1.6 && ceilY - floorY > SILL_M + WINDOW_H + 0.25) {
-        const count = Math.max(1, Math.floor(len / WINDOW_EVERY_M));
-        const pitch = len / count;
-        for (let w = 0; w < count; w++) {
-          const t = (w + 0.5) * pitch;
-          const wx = ax + ex * t;
-          const wz = az + ez * t;
-          // Not over the door, and not half over it either.
-          if (Math.sqrt((wx - doorX) * (wx - doorX) + (wz - doorZ) * (wz - doorZ)) < DOOR_GAP_M * 0.9 + WINDOW_W / 2) continue;
-          const half = WINDOW_W / 2;
-          // Frame first, then the glass a further two centimetres in, so
-          // neither can z-fight with the wall or with the other.
-          finishedFrame(
-            wx - ex * (half + 0.09), wz - ez * (half + 0.09),
-            wx + ex * (half + 0.09), wz + ez * (half + 0.09),
-            pl.nx, pl.nz, floorY + SILL_M - 0.09, floorY + SILL_M + WINDOW_H + 0.09, 0.05,
-            { r: 0.20, g: 0.18, b: 0.15 },
-          );
-          finishedFrame(
-            wx - ex * half, wz - ez * half,
-            wx + ex * half, wz + ez * half,
-            pl.nx, pl.nz, floorY + SILL_M, floorY + SILL_M + WINDOW_H, 0.09,
-            daylight,
-          );
-          // A sill, because a window with no sill is a poster of a window.
-          finishedFrame(
-            wx - ex * (half + 0.14), wz - ez * (half + 0.14),
-            wx + ex * (half + 0.14), wz + ez * (half + 0.14),
-            pl.nx, pl.nz, floorY + SILL_M - 0.14, floorY + SILL_M - 0.09, 0.14,
-            { r: 0.62, g: 0.60, b: 0.56 },
-          );
-        }
+    // --- The furniture, on the ground floor, which is where it is allowed.
+    if (k === 0) for (const b of it.placedBoxes) couchInto(pos, nor, col, b, floorY);
+
+    // --- The lintels: the wall over each doorway, with its underside.
+    for (const h of level.headers) {
+      let ex = h.bx - h.ax;
+      let ez = h.bz - h.az;
+      const len = Math.sqrt(ex * ex + ez * ez);
+      if (!(len > 1e-6)) continue;
+      ex /= len;
+      ez /= len;
+      const nx = ez;
+      const nz = -ex;
+      const t = WALL_THICK_M / 2;
+      const head = floorY + DOOR_HEAD_M;
+      wall(h.ax + nx * t, h.az + nz * t, h.bx + nx * t, h.bz + nz * t, nx, nz, 0.70, 0.80, head + 0.06, ceilY);
+      wall(h.bx - nx * t, h.bz - nz * t, h.ax - nx * t, h.az - nz * t, -nx, -nz, 0.70, 0.80, head + 0.06, ceilY);
+      wall(h.ax + nx * t, h.az + nz * t, h.bx + nx * t, h.bz + nz * t, nx, nz, 0.44, 0.44, head, head + 0.06);
+      wall(h.bx - nx * t, h.bz - nz * t, h.ax - nx * t, h.az - nz * t, -nx, -nz, 0.44, 0.44, head, head + 0.06);
+      tri(
+        h.ax - nx * t, head, h.az - nz * t,
+        h.bx - nx * t, head, h.bz - nz * t,
+        h.bx + nx * t, head, h.bz + nz * t,
+        0, -1, 0, 0.5,
+      );
+      tri(
+        h.ax - nx * t, head, h.az - nz * t,
+        h.bx + nx * t, head, h.bz + nz * t,
+        h.ax + nx * t, head, h.az + nz * t,
+        0, -1, 0, 0.5,
+      );
+      wall(h.ax - nx * t, h.az - nz * t, h.ax + nx * t, h.az + nz * t, -ex, -ez, 0.5, 0.5, floorY, head);
+      wall(h.bx + nx * t, h.bz + nz * t, h.bx - nx * t, h.bz - nz * t, ex, ez, 0.5, 0.5, floorY, head);
+      tri(
+        h.ax - nx * t, ceilY, h.az - nz * t,
+        h.bx - nx * t, ceilY, h.bz - nz * t,
+        h.bx + nx * t, ceilY, h.bz + nz * t,
+        0, 1, 0, 0.5,
+      );
+      tri(
+        h.ax - nx * t, ceilY, h.az - nz * t,
+        h.bx + nx * t, ceilY, h.bz + nz * t,
+        h.ax + nx * t, ceilY, h.az + nz * t,
+        0, 1, 0, 0.5,
+      );
+    }
+
+    // --- The lift's floor at this level. The stair's flights are drawn once,
+    // below, because a flight belongs to two levels.
+    if (core !== null && core.kind === CORE.LIFT) {
+      const ax = -core.lz;
+      const az = core.lx;
+      const c = (r: number, w: number): [number, number] => [core.x + core.lx * r + ax * w, core.z + core.lz * r + az * w];
+      const y = floorY + 0.006;
+      const p0 = c(-core.hr, -core.hw);
+      const p1 = c(core.hr, -core.hw);
+      const p2 = c(core.hr, core.hw);
+      const p3 = c(-core.hr, core.hw);
+      const cab = { r: 0.36, g: 0.36, b: 0.38 };
+      tri(p0[0], y, p0[1], p1[0], y, p1[1], p2[0], y, p2[1], 0, 1, 0, 1, cab);
+      tri(p0[0], y, p0[1], p2[0], y, p2[1], p3[0], y, p3[1], 0, 1, 0, 1, cab);
+    }
+  }
+
+  // --- The flights.
+  //
+  // Each is a strip of quads along its lane at the ramp's own height, with a
+  // skirt down each side so it reads as a solid stair rather than a floating
+  // plank -- the same seven-boxes argument `couchInto` makes: nothing in here
+  // is ever drawn from the street.
+  if (core !== null && core.kind === CORE.STAIR) {
+    const ax = -core.lz;
+    const az = core.lx;
+    const at = (r: number, w: number): [number, number] => [core.x + core.lx * r + ax * w, core.z + core.lz * r + az * w];
+    const tread = { r: 0.50, g: 0.42, b: 0.30 };
+    const SEGMENTS = 12;
+    const SKIRT = 0.32;
+    for (let f = 0; f + 1 < levels.length; f++) {
+      const lane = f & 1 ? core.hw / 2 : -core.hw / 2;
+      const w0 = lane - (core.hw / 2 - WALL_THICK_M / 2);
+      const w1 = lane + (core.hw / 2 - WALL_THICK_M / 2);
+      for (let s = 0; s < SEGMENTS; s++) {
+        const t0 = s / SEGMENTS;
+        const t1 = (s + 1) / SEGMENTS;
+        const r0 = -core.hr + t0 * 2 * core.hr;
+        const r1 = -core.hr + t1 * 2 * core.hr;
+        const y0 = flightY(levels, f, t0);
+        const y1 = flightY(levels, f, t1);
+        const a = at(r0, w0);
+        const b = at(r1, w0);
+        const c = at(r1, w1);
+        const d = at(r0, w1);
+        const shade = 1 - (s & 1) * 0.08;
+        tri(a[0], y0, a[1], b[0], y1, b[1], c[0], y1, c[1], 0, 1, 0, 1, scaled(tread, shade));
+        tri(a[0], y0, a[1], c[0], y1, c[1], d[0], y0, d[1], 0, 1, 0, 1, scaled(tread, shade));
+        // The skirts, facing out of the lane, and the underside so the flight
+        // is not see-through from below.
+        const dark = scaled(tread, 0.55);
+        // Never below the floor the flight starts from.
+        const s0 = Math.max(levels[f].y, y0 - SKIRT);
+        const s1 = Math.max(levels[f].y, y1 - SKIRT);
+        tri(a[0], y0, a[1], a[0], s0, a[1], b[0], s1, b[1], -ax, 0, -az, 1, dark);
+        tri(a[0], y0, a[1], b[0], s1, b[1], b[0], y1, b[1], -ax, 0, -az, 1, dark);
+        tri(d[0], y0, d[1], c[0], s1, c[1], d[0], s0, d[1], ax, 0, az, 1, dark);
+        tri(d[0], y0, d[1], c[0], y1, c[1], c[0], s1, c[1], ax, 0, az, 1, dark);
+        tri(a[0], s0, a[1], d[0], s0, d[1], c[0], s1, c[1], 0, -1, 0, 1, dark);
+        tri(a[0], s0, a[1], c[0], s1, c[1], b[0], s1, b[1], 0, -1, 0, 1, dark);
       }
     }
-  }
-
-  // --- The way out, drawn on the wall it is in.
-  //
-  // A player in a windowless room has no other way to learn which of eight
-  // identical walls they came through, and the alternative -- a HUD arrow --
-  // would be a second thing to build and a worse answer. The owner's first
-  // report from inside a building was *"need a door at exit tho so i can
-  // leave"*, so this is deliberately not subtle:
-  //
-  //   - A **frame** behind a **panel**, at two depths, so it reads as a doorway
-  //     rather than as a stain on the plaster.
-  //   - An **explicit colour** rather than a shade of the building's own tint.
-  //     The tint is the whole room; a door that is a darker shade of it is a
-  //     door you have to already know about to find. This one is warm and light
-  //     against plaster that is neither.
-  //   - **Two metres twenty tall and as wide as the doorways inside**, so it is
-  //     the largest single feature of any wall in the building.
-  //
-  // Inset off the wall in two steps so neither piece can z-fight with the wall
-  // or with the other.
-  {
-    const inX = -doorNX;
-    const inZ = -doorNZ;
-    // Along the wall: the door's normal turned a quarter.
-    const tx = -inZ;
-    const tz = inX;
-    const half = DOOR_GAP_M / 2;
-    const frame = { r: 0.16, g: 0.13, b: 0.10 };
-    const leaf = { r: 0.93, g: 0.78, b: 0.42 };
-    /*
-     * --- Off the **shell**, not off the footprint. Reported invisible.
-     *
-     * The door point the server sends is on the building's real outline, and
-     * the wall the player is looking at is the *walkable shell* -- the same
-     * outline inset by `WALL_THICK_M`. Drawing the door five centimetres in
-     * from the outline therefore put it eleven centimetres **behind** the wall
-     * surface, inside the wall, where it was hidden by the very wall it was
-     * meant to be set into. It was there the whole time and nobody could see
-     * it: *"door still not showing inside (its there but invisible)"*.
-     *
-     * Everything else on a wall is drawn from the shell's own planes and none
-     * of them had this problem, which is exactly why it survived a check that
-     * asserts every window is within 25 cm of a plane -- the door was never in
-     * that test.
-     */
-    const fx = doorX + inX * (WALL_THICK_M + 0.02);
-    const fz = doorZ + inZ * (WALL_THICK_M + 0.02);
-    wall(
-      fx - tx * (half + 0.18), fz - tz * (half + 0.18),
-      fx + tx * (half + 0.18), fz + tz * (half + 0.18),
-      inX, inZ, 1, 1,
-      floorY + 0.005, floorY + 2.4,
-      frame,
-    );
-    const px = doorX + inX * (WALL_THICK_M + 0.06);
-    const pz = doorZ + inZ * (WALL_THICK_M + 0.06);
-    wall(
-      px - tx * half, pz - tz * half,
-      px + tx * half, pz + tz * half,
-      inX, inZ, 1, 1,
-      floorY + 0.01, floorY + 2.2,
-      leaf,
-    );
-  }
-
-  // --- The partitions, from both sides, with their ends capped.
-  for (const w of it.walls) {
-    let ex = w.bx - w.ax;
-    let ez = w.bz - w.az;
-    const len = Math.sqrt((ex) * (ex) + (ez) * (ez));
-    if (!(len > 1e-6)) continue;
-    ex /= len;
-    ez /= len;
-    const nx = ez;
-    const nz = -ex;
-    const h = WALL_THICK_M / 2;
-    // The two faces, each offset half a thickness off the centre line and each
-    // facing outward from it.
-    finishedWall(w.ax + nx * h, w.az + nz * h, w.bx + nx * h, w.bz + nz * h, nx, nz, 0.66, 0.80);
-    finishedWall(w.bx - nx * h, w.bz - nz * h, w.ax - nx * h, w.az - nz * h, -nx, -nz, 0.66, 0.80);
-    // And the two ends, which are what a doorway's reveal is: without them a
-    // partition is a sheet of paper and every opening in the building shows it.
-    //
-    // **Except where the end is the outer wall.** A partition clipped to the
-    // shell ends exactly on it, and a cap there is coplanar with the outside
-    // wall and faces the opposite way -- two surfaces at one depth, one of them
-    // pointing out of the room. There is nothing to reveal at that end: it is
-    // buried in the wall. Collision is untouched, because a cap is drawing.
-    if (!onShell(it, w.ax, w.az)) {
-      wall(w.ax - nx * h, w.az - nz * h, w.ax + nx * h, w.az + nz * h, -ex, -ez, 0.58, 0.62);
-    }
-    if (!onShell(it, w.bx, w.bz)) {
-      wall(w.bx + nx * h, w.bz + nz * h, w.bx - nx * h, w.bz - nz * h, ex, ez, 0.58, 0.62);
-    }
-    // And the top, so a doorway's head is a surface rather than a hole.
-    tri(
-      w.ax - nx * h, ceilY, w.az - nz * h,
-      w.bx - nx * h, ceilY, w.bz - nz * h,
-      w.bx + nx * h, ceilY, w.bz + nz * h,
-      0, 1, 0, 0.5,
-    );
-    tri(
-      w.ax - nx * h, ceilY, w.az - nz * h,
-      w.bx + nx * h, ceilY, w.bz + nz * h,
-      w.ax + nx * h, ceilY, w.az + nz * h,
-      0, 1, 0, 0.5,
-    );
-  }
-
-  // --- And what people have put in the room. See `couchInto`.
-  for (const b of it.placedBoxes) couchInto(pos, nor, col, b, floorY);
-
-  // --- The wall over every opening, and the frame round it.
-  //
-  // What turns a hole into a door. Four pieces, and each is doing a job the eye
-  // actually uses: the **lintel** faces, which carry the wall on above the
-  // opening; the **soffit**, the underside of it, which is the surface that
-  // tells you the wall has thickness; the **architrave**, a darker band under
-  // the soffit, which is the line a person reads as a door frame; and the
-  // **jambs**, the two vertical returns at the ends. Without the last two an
-  // opening reads as a bite taken out of a wall.
-  for (const h of it.headers) {
-    let ex = h.bx - h.ax;
-    let ez = h.bz - h.az;
-    const len = Math.sqrt((ex) * (ex) + (ez) * (ez));
-    if (!(len > 1e-6)) continue;
-    ex /= len;
-    ez /= len;
-    const nx = ez;
-    const nz = -ex;
-    const t = WALL_THICK_M / 2;
-    const head = floorY + DOOR_HEAD_M;
-    // The two faces of the wall above the opening.
-    wall(h.ax + nx * t, h.az + nz * t, h.bx + nx * t, h.bz + nz * t, nx, nz, 0.70, 0.80, head + 0.06, ceilY);
-    wall(h.bx - nx * t, h.bz - nz * t, h.ax - nx * t, h.az - nz * t, -nx, -nz, 0.70, 0.80, head + 0.06, ceilY);
-    // The architrave: a darker band under them, on both sides, which is the
-    // horizontal line that says "frame".
-    wall(h.ax + nx * t, h.az + nz * t, h.bx + nx * t, h.bz + nz * t, nx, nz, 0.44, 0.44, head, head + 0.06);
-    wall(h.bx - nx * t, h.bz - nz * t, h.ax - nx * t, h.az - nz * t, -nx, -nz, 0.44, 0.44, head, head + 0.06);
-    // The soffit: the underside of the opening, looking down.
-    tri(
-      h.ax - nx * t, head, h.az - nz * t,
-      h.bx - nx * t, head, h.bz - nz * t,
-      h.bx + nx * t, head, h.bz + nz * t,
-      0, -1, 0, 0.5,
-    );
-    tri(
-      h.ax - nx * t, head, h.az - nz * t,
-      h.bx + nx * t, head, h.bz + nz * t,
-      h.ax + nx * t, head, h.az + nz * t,
-      0, -1, 0, 0.5,
-    );
-    // And the two jambs: the reveal you see when you look through the opening
-    // side-on. The partitions each side already cap their own ends, but they
-    // stop at the head, so without these the frame has no sides above a
-    // player's shoulders.
-    wall(h.ax - nx * t, h.az - nz * t, h.ax + nx * t, h.az + nz * t, -ex, -ez, 0.5, 0.5, floorY, head);
-    wall(h.bx + nx * t, h.bz + nz * t, h.bx - nx * t, h.bz - nz * t, ex, ez, 0.5, 0.5, floorY, head);
-    // The top, so the header's own head is a surface rather than a hole.
-    tri(
-      h.ax - nx * t, ceilY, h.az - nz * t,
-      h.bx - nx * t, ceilY, h.bz - nz * t,
-      h.bx + nx * t, ceilY, h.bz + nz * t,
-      0, 1, 0, 0.5,
-    );
-    tri(
-      h.ax - nx * t, ceilY, h.az - nz * t,
-      h.bx + nx * t, ceilY, h.bz + nz * t,
-      h.ax + nx * t, ceilY, h.az + nz * t,
-      0, 1, 0, 0.5,
-    );
   }
 
   return {
@@ -2299,11 +2726,11 @@ export function verifyInterior(): string[] {
       }
       if (bad > 0) failures.push(`${bad} non-finite or out-of-range numbers in an interior's buffers; the draw call would render nothing.`);
       for (let i = 1; i < mesh.positions.length; i += 3) {
-        if (mesh.positions[i] > it.base + CEILING_M + 0.02) above++;
+        if (mesh.positions[i] > it.levels[it.levels.length - 1].y + CEILING_M + 0.02) above++;
         if (mesh.positions[i] < it.base - 0.02) below++;
       }
       if (above > 0 || below > 0) {
-        failures.push(`${above + below} vertices fall outside the storey they belong to (${it.base.toFixed(1)} to ${(it.base + CEILING_M).toFixed(1)} m).`);
+        failures.push(`${above + below} vertices fall outside the building (${it.base.toFixed(1)} to ${(it.levels[it.levels.length - 1].y + CEILING_M).toFixed(1)} m).`);
       }
       // The floor is under the arrival and the ceiling is over it: a room the
       // player stands beside rather than in is a wrong origin, and the plan's
@@ -2407,7 +2834,7 @@ export function verifyInterior(): string[] {
       // The floor is the only unbounded thing in here; everything else is a
       // constant per wall. Twice the quad budget, in triangles, plus room for
       // the walls and their courses.
-      if (mesh.triangles > MAX_FLOOR_QUADS * 2 + 6000) {
+      if (mesh.triangles > (MAX_FLOOR_QUADS * 4 + 8000) * it.levels.length) {
         failures.push(`${what} drew ${mesh.triangles} triangles; the floor covering is not bounded.`);
       }
       if (mesh.triangles < 40) failures.push(`${what} drew only ${mesh.triangles} triangles; it has no finish on it.`);
@@ -2498,7 +2925,7 @@ export function verifyInterior(): string[] {
       let low = 0;
       for (let i = 1; i < mesh.positions.length; i += 3) {
         const y = mesh.positions[i];
-        if (y > it.base + CEILING_M + 0.02 || y < it.base - 0.02) low++;
+        if (y > it.levels[it.levels.length - 1].y + CEILING_M + 0.02 || y < it.base - 0.02) low++;
       }
       if (low > 0) failures.push(`${low} vertices of the door frames fall outside the storey.`);
     }
@@ -2622,7 +3049,9 @@ export function verifyInterior(): string[] {
   // honest test of a decision is to make it.
   {
     const pts = poly(0, 0, 16, 0, 16, 22, 0, 22);
-    const it = southDoor(pts, 0, 8, 77);
+    // One storey: this is the furniture's check, and a stair in the room would
+    // be one more thing for a couch to be refused for.
+    const it = southDoor(pts, 0, 3, 77);
     if (it === null) failures.push('a 16 x 22 m building generated no interior to furnish.');
     else {
       const at = arrivalAt(it);
@@ -2745,6 +3174,169 @@ export function verifyInterior(): string[] {
         }
       }
       if (outside > 0) failures.push(`${outside} wall ends of a non-rectangular building stand outside it.`);
+    }
+  }
+
+
+  // --- Upstairs.
+  //
+  // A four-storey building gets a stair, and every flight of it can be
+  // climbed by a body stepped the way the controller steps it: resolve against
+  // the level's walls, then snap the feet to the ground. That walk is the
+  // whole point of the core; a stair that looks right and cannot be walked is
+  // a hole in the ceiling.
+  // A body walked `dist` metres in a direction in the controller's own 8 cm
+  // steps, resolved each. A single long step would tunnel through a wall,
+  // which the controller never does and a check must not either.
+  const nudge = (it: Interior, x: number, z: number, dx: number, dz: number, dist: number, feetY: number): { x: number; z: number } => {
+    for (let gone = 0; gone < dist; gone += 0.08) {
+      const r = it.resolver.resolve(x, z, x + dx * 0.08, z + dz * 0.08, 0.35, feetY);
+      x = r.x;
+      z = r.z;
+    }
+    return { x, z };
+  };
+  {
+    const pts = poly(0, 0, 12, 0, 12, 20, 0, 20);
+    const it = southDoor(pts, 0, 14, 21);
+    if (it === null) failures.push('a 12 x 20 m, four-storey building generated no interior.');
+    else if (it.core === null) failures.push('a 12 x 20 m, four-storey building got no stair.');
+    else {
+      const core = it.core;
+      const ax = -core.lz;
+      const az = core.lx;
+      if (core.kind !== CORE.STAIR) failures.push('a four-storey building got a lift, not a stair.');
+      if (it.levels.length !== 4) failures.push(`a four-storey building has ${it.levels.length} levels.`);
+      const climb = (k: number): string => {
+        const e = coreOpenEnd(core, k);
+        const lane = k & 1 ? core.hw / 2 : -core.hw / 2;
+        let x = core.x + core.lx * (e * (core.hr + 0.8)) + ax * lane;
+        let z = core.z + core.lz * (e * (core.hr + 0.8)) + az * lane;
+        let feet = it.levels[k].y;
+        const dirX = -e * core.lx;
+        const dirZ = -e * core.lz;
+        for (let step = 0; step < 400; step++) {
+          const r = it.resolver.resolve(x, z, x + dirX * 0.08, z + dirZ * 0.08, 0.35, feet + 0.42);
+          x = r.x;
+          z = r.z;
+          feet = interiorGround(it, x, z, feet);
+          if (-e * coreLocal(core, x, z).r > core.hr + 0.5) break;
+        }
+        const along = -e * coreLocal(core, x, z).r;
+        if (along <= core.hr + 0.5) return `stopped ${along.toFixed(2)} m along the run`;
+        if (Math.abs(feet - it.levels[k + 1].y) > 0.05) {
+          return `came out at ${feet.toFixed(2)} m, not the next floor at ${it.levels[k + 1].y.toFixed(2)}`;
+        }
+        return '';
+      };
+      for (let k = 0; k + 1 < it.levels.length; k++) {
+        const why = climb(k);
+        if (why !== '') failures.push(`flight ${k} cannot be climbed: ${why}.`);
+      }
+      // The lanes are walled from each other.
+      {
+        const x = core.x + ax * (-core.hw / 2);
+        const z = core.z + az * (-core.hw / 2);
+        const feet = interiorGround(it, x, z, it.levels[0].y + 1.0);
+        const r = nudge(it, x, z, ax, az, 1.5, feet + 0.42);
+        if (coreLocal(core, r.x, r.z).w > -0.01) failures.push('a body stepped across the stair\'s divider mid-flight.');
+      }
+      // The other lane's mouth at the bottom is shut: it is the underside of a
+      // flight two storeys up.
+      {
+        const e = coreOpenEnd(core, 0);
+        const x0 = core.x + core.lx * (e * (core.hr + 0.6)) + ax * (core.hw / 2);
+        const z0 = core.z + core.lz * (e * (core.hr + 0.6)) + az * (core.hw / 2);
+        const r = nudge(it, x0, z0, -e * core.lx, -e * core.lz, 1.2, it.levels[0].y + 0.42);
+        if (e * coreLocal(core, r.x, r.z).r < core.hr - 0.05) {
+          failures.push('the bottom of the other lane is open; a body walked in under a flight two storeys up.');
+        }
+      }
+      // Off the stair, every level's ground is its own floor.
+      if (!inCore(core, it.centreX, it.centreZ, 0.5)) {
+        for (let k = 0; k < it.levels.length; k++) {
+          const g = interiorGround(it, it.centreX, it.centreZ, it.levels[k].y + 0.3);
+          if (Math.abs(g - it.levels[k].y) > 1e-9) failures.push(`level ${k}'s ground off the stair is ${g}, not ${it.levels[k].y}.`);
+        }
+      }
+      // Every landing is a corridor a body fits in.
+      for (let k = 1; k < it.levels.length; k++) {
+        const e = coreOpenEnd(core, k);
+        const lane = (k - 1) & 1 ? core.hw / 2 : -core.hw / 2;
+        const x = core.x + core.lx * (e * (core.hr + 0.7)) + ax * lane;
+        const z = core.z + core.lz * (e * (core.hr + 0.7)) + az * lane;
+        if (it.resolver.clearance(x, z, it.levels[k].y) < 0.35) failures.push(`level ${k}'s landing is not clear for a body.`);
+      }
+      if (placementFits(it, [], { kind: PLACEABLE.COUCH, x: core.x, z: core.z, turn: 0 })) {
+        failures.push('a couch can be put on the stairs.');
+      }
+      const mesh = interiorMesh(it);
+      let maxY = -Infinity;
+      for (let i = 1; i < mesh.positions.length; i += 3) if (mesh.positions[i] > maxY) maxY = mesh.positions[i];
+      if (maxY < it.levels[3].y + CEILING_M - 0.01) failures.push('the mesh stops below the top floor\'s ceiling.');
+      const line = interiorLine(it);
+      if (!line.includes('stairs')) failures.push(`"${line}" does not mention the stairs.`);
+    }
+  }
+
+  // --- A tower gets a lift: a cab with three walls and a floor at the level it was called to.
+  {
+    const it = southDoor(poly(0, 0, 30, 0, 30, 30, 0, 30), 0, 40, 22);
+    if (it === null || it.core === null) failures.push('a 30 x 30 m, 40 m building got no core.');
+    else {
+      const c = it.core;
+      if (c.kind !== CORE.LIFT) failures.push('a twelve-storey building got a stair, not a lift.');
+      if (it.levels.length !== 12) failures.push(`a twelve-storey building has ${it.levels.length} levels.`);
+      const ax = -c.lz;
+      const az = c.lx;
+      const feet = it.levels[7].y;
+      if (Math.abs(interiorGround(it, c.x, c.z, feet + 0.2) - feet) > 1e-9) failures.push('the lift cab is not at the level it was called to.');
+      const back = nudge(it, c.x, c.z, c.lx, c.lz, c.hr + 2, feet + 0.42);
+      if (coreLocal(c, back.x, back.z).r > c.hr - 0.3) failures.push('the lift cab has no back wall.');
+      const side = nudge(it, c.x, c.z, ax, az, c.hw + 2, feet + 0.42);
+      if (Math.abs(coreLocal(c, side.x, side.z).w) > c.hw - 0.3) failures.push('the lift cab has no side wall.');
+      const out = nudge(it, c.x, c.z, -c.lx, -c.lz, c.hr + 2, feet + 0.42);
+      if (coreLocal(c, out.x, out.z).r > -c.hr - 0.5) failures.push('the lift cab cannot be walked out of.');
+      if (!interiorLine(it).includes('lift')) failures.push('a tower does not mention its lift.');
+    }
+  }
+
+  // --- The deck: one more level, no rooms, dropped if it would be under the roof.
+  {
+    const seed = [...DECKS.keys()][0];
+    const deckY = DECKS.get(seed) ?? 0;
+    const it = buildInterior(poly(0, 0, 30, 0, 30, 30, 0, 30), -3.3, 33.4, seed);
+    if (it === null || it.core === null) failures.push('the podium under the tower got no core.');
+    else {
+      if (it.core.kind !== CORE.LIFT) failures.push('the deck is not reached by a lift.');
+      const last = it.levels[it.levels.length - 1];
+      if (last.y !== deckY) failures.push(`the top level is at ${last.y}, not the deck at ${deckY}.`);
+      if (last.rooms.length !== 0) failures.push('the deck has rooms on it.');
+      if (last.walls.length !== 3) failures.push(`the deck has ${last.walls.length} walls, not the lift's three.`);
+      if (!interiorLine(it).includes('deck')) failures.push('the podium does not mention the deck.');
+      const high = buildInterior(poly(0, 0, 30, 0, 30, 30, 0, 30), 300, 33.4, seed);
+      if (high !== null && high.levels[high.levels.length - 1].y === deckY) failures.push('a deck under the building\'s own roof was kept.');
+    }
+  }
+
+  // --- No room for a core: one level, and the line says the rest is shut.
+  {
+    const it = southDoor(poly(0, 0, 4, 0, 4, 5, 0, 5), 0, 7, 3);
+    if (it !== null) {
+      if (it.core !== null) failures.push('a 4 x 5 m building was given a stair.');
+      if (it.levels.length !== 1) failures.push('a 4 x 5 m building has more than one level.');
+      if (!interiorLine(it).includes('shut')) failures.push('a shut upstairs is not described as shut.');
+    }
+  }
+
+  // --- The same building twice has the same walls on every level.
+  {
+    const a = southDoor(poly(0, 0, 12, 0, 12, 20, 0, 20), 0, 14, 21);
+    const b = southDoor(poly(0, 0, 12, 0, 12, 20, 0, 20), 0, 14, 21);
+    if (a !== null && b !== null) {
+      for (let k = 0; k < a.levels.length; k++) {
+        if (JSON.stringify(a.levels[k].walls) !== JSON.stringify(b.levels[k].walls)) failures.push(`level ${k} came out differently twice.`);
+      }
     }
   }
 

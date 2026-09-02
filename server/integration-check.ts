@@ -225,7 +225,19 @@ import {
 import { InterestIndex, InterestSet, verifyAoi } from './aoi.ts';
 // Interiors, protocol v23. See `checkInteriors`.
 import { buildingSeed, verifyDoorway } from '../client/src/world/doorway.ts';
-import { arrivalAt, buildInterior, interiorAdmits, verifyInterior } from '../client/src/world/interior.ts';
+import {
+  CORE,
+  DECKS,
+  arrivalAt,
+  buildInterior,
+  coreLocal,
+  coreOpenEnd,
+  inCore,
+  interiorAdmits,
+  interiorGround,
+  verifyInterior,
+  type Interior,
+} from '../client/src/world/interior.ts';
 import { BODY_RADIUS_M, MAX_PER_SPACE, boxClearance, boxOf, verifyPlaceables } from '../client/src/world/placeables.ts';
 import { InteriorStore, verifyInteriorStore } from './interiors.ts';
 import { FURNISH_OP } from '../client/src/net/protocol.ts';
@@ -3065,7 +3077,7 @@ async function checkBikes(): Promise<void> {
   // the bump is one line the lead changes here and in `protocol.ts` together.
   // See `PROTOCOL_VERSION`'s v15 note. If this line is still reading 14 after
   // the batch has landed, that is the bug this check exists to catch.
-  check(PROTOCOL_VERSION === 25, `the protocol is at version ${PROTOCOL_VERSION}`);
+  check(PROTOCOL_VERSION === 26, `the protocol is at version ${PROTOCOL_VERSION}`);
   check(
     WELCOME_BYTES === 36,
     `  and a WELCOME is ${WELCOME_BYTES} bytes: 27 through v10, plus v11's f64 clock, plus v15's ` +
@@ -11478,6 +11490,135 @@ async function checkInteriors(): Promise<void> {
       'through the door they came in by, onto the pavement outside it',
     );
     await Bun.$`rm -f ${accountPath}`.quiet().nothrow();
+  }
+
+  // --- 6. Upstairs: stairs in the terraces, lifts in the towers, the deck.
+  //
+  // Over the real bake, because the core is placed by rules about rooms and
+  // shells and the only rooms that matter are the ones a footprint actually
+  // produces. Then a real lift ridden in a real `Simulation`, since the lift
+  // is the one piece of the design the server owns outright.
+  {
+    const around: Prism[] = [];
+    world.collision.prismsWithin(world.spawn.x, world.spawn.z, 800, around);
+    let multi = 0;
+    let stairs = 0;
+    let lifts = 0;
+    let none = 0;
+    let unclimbable = 0;
+    let cabsWrong = 0;
+    const bad: string[] = [];
+    const liftable: Array<{ q: Prism; it: Interior }> = [];
+    for (const q of around) {
+      if (q.structural || !interiorAdmits(q.points, q.height)) continue;
+      const seed = buildingSeed(q);
+      const it = buildInterior(q.points, q.base, q.height, seed);
+      if (it === null) continue;
+      if (it.plan.storeys >= 2) multi++;
+      const core = it.core;
+      if (core === null) {
+        if (it.plan.storeys >= 2) none++;
+        continue;
+      }
+      if (core.kind === CORE.STAIR) {
+        stairs++;
+        // Up the first flight the way the controller would: a small step
+        // resolved against the level's walls, then the feet to the ground.
+        const e = coreOpenEnd(core, 0);
+        const ax = -core.lz;
+        const az = core.lx;
+        let x = core.x + core.lx * (e * (core.hr + 0.8)) + ax * (-core.hw / 2);
+        let z = core.z + core.lz * (e * (core.hr + 0.8)) + az * (-core.hw / 2);
+        let feet = it.levels[0].y;
+        for (let step = 0; step < 400; step++) {
+          const r = it.resolver.resolve(x, z, x - e * core.lx * 0.08, z - e * core.lz * 0.08, PLAYER_RADIUS, feet + 0.42);
+          x = r.x;
+          z = r.z;
+          feet = interiorGround(it, x, z, feet);
+          if (-e * coreLocal(core, x, z).r > core.hr + 0.5) break;
+        }
+        if (-e * coreLocal(core, x, z).r <= core.hr + 0.5 || Math.abs(feet - it.levels[1].y) > 0.05) {
+          unclimbable++;
+          if (bad.length < 3) bad.push(`${q.points.length >> 1} corners at (${q.points[0].toFixed(0)}, ${q.points[1].toFixed(0)})`);
+        }
+      } else {
+        lifts++;
+        for (let k = 0; k < it.levels.length; k++) {
+          if (Math.abs(interiorGround(it, core.x, core.z, it.levels[k].y + 0.2) - it.levels[k].y) > 1e-6) cabsWrong++;
+        }
+        if (it.levels.length >= 3) liftable.push({ q, it });
+      }
+    }
+    check(
+      stairs > 0 && lifts > 0,
+      `${multi} of the enterable buildings within 800 m have more than one storey: ${stairs} got a stair, ${lifts} a lift, ${none} have no room for either`,
+    );
+    check(
+      unclimbable === 0,
+      `every stair's first flight can be climbed to the next floor` + (unclimbable ? ` — ${unclimbable} cannot, e.g. ${bad.join('; ')}` : ''),
+    );
+    check(cabsWrong === 0, 'every lift cab has a floor at every level it stops at');
+
+    // A ride. The first lift building whose fallback door lets a body in --
+    // the door is the hull's longest edge, which on a concave outline can be
+    // the air across a notch, so a few may refuse before one admits.
+    let rode = false;
+    for (const { it } of liftable) {
+      const store = new InteriorStore(`${process.env.SYDNEY_STATE_DIR ?? '/tmp'}/interiors-lift-check.json`, false);
+      const s2 = new Simulation(world, { interiors: store });
+      const who = s2.join(0, null, 'Lifty');
+      const d = it.door;
+      const sx = d.x + d.nx;
+      const sz = d.z + d.nz;
+      who.combat.body.position.set(sx, eyeAt(groundFor(world), sx, sz), sz);
+      who.combat.body.velocity.set(0, 0, 0);
+      who.combat.body.yaw = Math.atan2(d.nx, d.nz);
+      if (s2.doorPress(who.id) === null || who.interior === null) continue;
+      const inside = who.interior;
+      const core = inside.core;
+      if (core === null || core.kind !== CORE.LIFT) continue;
+      const n = inside.levels.length;
+      check(s2.liftPress(who.id, 1) === null, 'the lift does nothing for a body that is not standing in the cab');
+      who.combat.body.position.set(core.x, inside.levels[0].y + EYE_HEIGHT, core.z);
+      const up = s2.liftPress(who.id, 1);
+      check(
+        up !== null && up.space === who.space && Math.abs(up.y - (inside.levels[1].y + EYE_HEIGHT)) < 0.01,
+        `a press in the cab of a ${n}-level building goes up one level, in the same space (${up === null ? 'refused' : `${up.y.toFixed(2)} m`})`,
+      );
+      const at = arrivalAt(inside);
+      check(
+        s2.furnish(who.id, { op: FURNISH_OP.PLACE, kind: 0, turn: 0, x: at.x, z: at.z }) === null,
+        'and nothing can be furnished from a floor above the ground',
+      );
+      who.combat.body.position.set(core.x, inside.levels[n - 1].y + EYE_HEIGHT, core.z);
+      const wrap = s2.liftPress(who.id, 1);
+      check(wrap !== null && Math.abs(wrap.y - (inside.levels[0].y + EYE_HEIGHT)) < 0.01, 'past the top, the lift goes back to the ground');
+      const down = s2.liftPress(who.id, -1);
+      check(down !== null && Math.abs(down.y - (inside.levels[n - 1].y + EYE_HEIGHT)) < 0.01, 'and below the ground, to the top');
+      who.combat.body.position.set(core.x, inside.levels[2].y + EYE_HEIGHT, core.z);
+      const out = s2.doorPress(who.id);
+      check(out !== null && out.space === CITY_SPACE, 'and a body two floors up can still leave by the door');
+      rode = true;
+      break;
+    }
+    check(rode, `a lift was ridden in a real building (${liftable.length} candidates)`);
+
+    // Centrepoint. The seed the deck is keyed by is geometry, so a retile can
+    // rename it; this is where that is found.
+    const near: Prism[] = [];
+    world.collision.prismsWithin(-29.4, 188.6, 100, near);
+    const deckSeed = [...DECKS.keys()][0];
+    const podium = near.find((q) => buildingSeed(q) === deckSeed);
+    check(podium !== undefined, `the building under Sydney Tower still stands within 100 m of the tower with the seed the deck is keyed by (${deckSeed})`);
+    if (podium !== undefined) {
+      const it = buildInterior(podium.points, podium.base, podium.height, deckSeed);
+      const topY = it === null ? NaN : it.levels[it.levels.length - 1].y;
+      check(
+        it !== null && it.core !== null && it.core.kind === CORE.LIFT && topY === DECKS.get(deckSeed),
+        `and its lift stops at the deck, ${it === null ? 0 : it.levels.length} levels up at ${topY.toFixed(1)} m`,
+      );
+      check(it !== null && inCore(it.core as NonNullable<Interior['core']>, it.core?.x ?? 0, it.core?.z ?? 0), 'with a cab a body can stand in');
+    }
   }
 }
 

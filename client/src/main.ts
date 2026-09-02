@@ -126,10 +126,14 @@ import {
   type Placement,
 } from './world/placeables.ts';
 import {
+  CORE,
   arrivalAt,
   buildInterior,
+  inCore,
   interiorAdmits,
+  interiorGround,
   interiorLine,
+  levelIndex,
   placementFits,
   setPlacements,
   verifyInterior,
@@ -6310,6 +6314,8 @@ async function main(): Promise<void> {
    * only thing a tight reach buys is a player who cannot find the way out.
    */
   const EXIT_REACH_M = 5;
+  /** Standing in a lift cab this frame. See `interior.Core`. */
+  let atLift = false;
   /** Is the body within reach of that door right now? Recomputed per frame. */
   let atExit = false;
   /**
@@ -7886,6 +7892,8 @@ async function main(): Promise<void> {
     ghostAt = want;
     ghostOk =
       placedHere.length < MAX_PER_SPACE &&
+      // From the ground floor, which is the only floor furniture is on.
+      levelIndex(it.levels, player.position.y - EYE_HEIGHT) === 0 &&
       placementFits(it, placedHere, want, interiorDoor === null ? [it.door] : [it.door, interiorDoor]) &&
       // And not on top of the person placing it, which is the one rule the
       // server applies that `placementFits` does not know about -- it is a
@@ -7910,6 +7918,12 @@ async function main(): Promise<void> {
   };
 
   const applySpace = (f: SpaceFrame): void => {
+    // The same room: a lift, or a correction. A placement, not a new room --
+    // the door sound, the line and the furniture all belong to walking in.
+    if (f.space !== CITY_SPACE && interior !== null && interior.seed === f.building) {
+      placeBody(f);
+      return;
+    }
     if (f.space === CITY_SPACE) {
       // The door on the way out, and only when there was an inside to come out
       // of: this frame is also sent on **every** join (see `Room.welcome`), and
@@ -8019,7 +8033,7 @@ async function main(): Promise<void> {
     interiorWorld = {
       collision: null,
       mover: built.resolver,
-      groundHeight: () => built.base,
+      groundHeight: (x, z, feetY) => interiorGround(built, x, z, feetY),
     };
     // The frame's door is the wall you pressed `E` at (or the one saved with
     // your spot); zeros mean the server had none, which is a spot saved before
@@ -8056,6 +8070,15 @@ async function main(): Promise<void> {
    * `arrivalAt` places the body. What it skips is the wire, which is the only
    * thing offline does not have.
    */
+  // The lift with no server: the same arithmetic `Simulation.liftPress` runs.
+  const pressLiftOffline = (direction: 1 | -1): void => {
+    const it = interior;
+    if (it === null || it.core === null || it.core.kind !== CORE.LIFT) return;
+    const n = it.levels.length;
+    const k = (levelIndex(it.levels, player.position.y - EYE_HEIGHT) + direction + n) % n;
+    player.position.y = it.levels[k].y + EYE_HEIGHT;
+    player.velocity.y = 0;
+  };
   const pressDoorOffline = (): void => {
     if (interior !== null) {
       // Out, along the door's outward normal, at the city's own ground -- the
@@ -10298,6 +10321,7 @@ async function main(): Promise<void> {
 
     doorSite = null;
     atExit = false;
+    atLift = false;
     if (interior !== null) {
       /*
        * --- Indoors, the only door that exists is the one you came in by.
@@ -10317,6 +10341,9 @@ async function main(): Promise<void> {
       const dx = player.position.x - door.x;
       const dz = player.position.z - door.z;
       atExit = dx * dx + dz * dz <= EXIT_REACH_M * EXIT_REACH_M;
+      // And the lift, if the building has one and the body is in its cab.
+      const core = interior.core;
+      atLift = core !== null && core.kind === CORE.LIFT && inCore(core, player.position.x, player.position.z, 0.05);
     } else if (playerCombat.drivingCar === 0 && playerCombat.ridingBike === 0 && !isAboard(playerCombat.aboard)) {
       camera.getWorldDirection(doorGaze);
       const gazeLen = Math.hypot(doorGaze.x, doorGaze.z);
@@ -10361,7 +10388,7 @@ async function main(): Promise<void> {
      */
     hud.derived(
       interior !== null
-        ? (atExit ? 'E — back outside' : '')
+        ? (atLift ? 'E — lift up  ·  Shift+E — down' : atExit ? 'E — back outside' : '')
         : sunButton.prompt(player.position.x, player.position.z) ||
           trainPill ||
           ridePrompt(playerCombat, playerCombat.phase, rideNudgeT, rideNudgeText) ||
@@ -10419,9 +10446,15 @@ async function main(): Promise<void> {
       // which world it is simulated in and changes what it can see, and a
       // browser that guessed at any of that would be a browser that has to be
       // dragged back out again when it guessed wrong.
-      if (!pressMount() && !dialog.tryOpen() && (doorSite !== null || atExit)) {
-        if (net) net.pressDoor();
-        else pressDoorOffline();
+      if (!pressMount() && !dialog.tryOpen()) {
+        if (atLift) {
+          const direction: 1 | -1 = keys.has('ShiftLeft') || keys.has('ShiftRight') ? -1 : 1;
+          if (net) net.pressLift(direction);
+          else pressLiftOffline(direction);
+        } else if (doorSite !== null || atExit) {
+          if (net) net.pressDoor();
+          else pressDoorOffline();
+        }
       }
     }
     mountHeld = input.mount;

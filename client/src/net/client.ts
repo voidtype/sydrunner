@@ -119,6 +119,7 @@ import {
   encodeHello,
   encodeSunPress,
   encodeDoor,
+  encodeLift,
   decodeSpace,
   encodeFurnish,
   decodePlaced,
@@ -1430,6 +1431,17 @@ export class NetClient {
   pressDoor(): boolean {
     if (this.status !== 'online') return false;
     this.transport.send(encodeDoor());
+    return true;
+  }
+
+  /**
+   * Press the lift, up or down a level. `MSG.LIFT`; the reply is a `SPACE`
+   * frame for the space we are already in, which `main.ts` applies as a
+   * placement rather than a room change. Silence if we are not in a cab.
+   */
+  pressLift(direction: 1 | -1): boolean {
+    if (this.status !== 'online') return false;
+    this.transport.send(encodeLift(direction));
     return true;
   }
 

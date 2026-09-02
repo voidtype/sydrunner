@@ -100,9 +100,9 @@ Every one of those but `interiorview.ts` is three-free and runs on **both** boot
 lists (`client/src/main.ts` and `server/index.ts`), because a check that only
 runs in the browser is a check the deploy gate cannot see.
 
-## The wire — protocol v25
+## The wire — protocol v26
 
-Two messages, a matched pair under the halves convention:
+Three messages. Two are a matched pair under the halves convention:
 
 - **`MSG.DOOR` (0x16, client → server), one byte.** No building, no position, no
   enter/leave bit. The server holds the same prisms and runs the same pure
@@ -120,6 +120,13 @@ Two messages, a matched pair under the halves convention:
   say "you are outside" is worth it against a reconnect whose saved spot has
   expired leaving a browser drawing a pub the server has no record of. Absence
   is not a message.
+- **`MSG.LIFT` (0x18, client → server), two bytes.** `DOOR`'s shape with one
+  byte of payload, the direction, because which way is the one fact the server
+  cannot derive from the body. It checks the body is standing in a lift cab and
+  answers with a `SPACE` for the same space, the body a level up; the client
+  applies a same-space frame as a placement, not as a new room. v26 also moved
+  the number for a generator change: every storey is now laid out, and a v25
+  client would step a body against different walls.
 
 **The space is deliberately not in the snapshot.** Four bytes per player per
 snapshot — 25 kbit/s at a full working set — to send a number already known to
@@ -156,13 +163,65 @@ sprint, out at the door it used, two people handed one inside, a bystander two
 metres away who cannot see them, and a log-off/log-in that lands back in the
 same room.
 
+## Upstairs
+
+Every storey the plan draws is walkable, if there is a core to reach it by.
+The pieces, all in `world/interior.ts`:
+
+- **`Level`** — a floor height and the walls a body on it is stepped against.
+  `InteriorResolver` picks the level from the body's own feet (`levelIndex`,
+  `LEVEL_TOL_M`), which is the one vertical fact both ends agree on; the
+  controller hands it feet plus `STEP_HEIGHT`, and the tolerance is read
+  against that so a body most of the way up a flight is already on the storey
+  it is about to arrive on. `CombatWorld.groundHeight` is `interiorGround`: the
+  level's floor, or the ramp under the feet.
+- **`Core`** — one per building, placed by `placeCore` in the biggest
+  ground-floor room it fits, against one of that room's walls, clear of the
+  room's doorways and never between the middle of the room and any of its
+  doors; never nearer the shell than `CORE_SHELL_M`, because the shell is where
+  the doors are. On every level above, the partitions are cut back to
+  `CORE_CUT_M` of it so a flight always arrives into a corridor a body fits
+  down, whatever the plan drew up there. A building the core will not fit has
+  its ground floor and `interiorLine` says the rest is shut.
+- **A stair** (up to `STAIR_MAX_STOREYS`, six) is two lanes of ramp side by side
+  with a wall between them: even flights climb one lane from one end, odd
+  flights the other lane from the other end, so each storey opens onto the core
+  at the end the flight below arrives at — a dog-leg with the landing in the
+  room, which is what a terrace has. Where a lane at a level's open end is not
+  at that level's height it is walled (`laneMeetsLevel`), so nothing steps onto
+  a flight two storeys up or into a hole. `interiorGround` picks the flight
+  nearest the feet by height, never by level, so a body that jumps on a flight
+  lands on the flight it jumped from.
+- **A lift** (seven storeys and up, and any building with a deck) is a cab with
+  three walls and a floor at whichever level you are on. `E` in the cab goes up
+  a level, `Shift+E` down, wrapping at both ends: one button that always does
+  something. The server owns the move (`Simulation.liftPress`), as it owns the
+  door.
+- **Centrepoint.** Sydney Tower is three landmark prisms, every one
+  `structural`, so it has no street door; the building that does is the podium
+  under it, keyed by its `buildingSeed` in `DECKS` to an extra level at the
+  turret's floor — the whole shell, no rooms, windows all round. The seed is
+  geometry and a retile can rename it; `checkInteriors` asserts the podium still
+  stands within 100 m of the tower with that seed.
+- **Furniture stays on the ground floor.** A placement has no storey, so the
+  resolver applies couches on level 0 only, the server refuses a `FURNISH` from
+  any other level, and the ghost is red up there.
+- **A save remembers the level.** The eye height is already in `LastPos`;
+  `restoreInterior` reads the level from it and puts a body saved mid-flight on
+  the flight where it stood.
+
+`verifyInterior` climbs every flight of a four-storey building with the
+controller's own 8 cm steps, walks into the shut lane and off the divider,
+rides the lift of a twelve-storey one, and builds the deck. `checkInteriors`
+does the same over every stair within 800 m of the spawn, rides a real lift in
+a real `Simulation`, and finds the podium.
+
 ## What is not built
 
-- **One walkable storey**, the one you come in at. `floorPlan` generates every
-  storey of a 214 m tower and this uses the ground one. The next storey needs a
-  stair, a ramp in `groundHeight`, and walls selected by the body's own height —
-  all of which the design admits (`InteriorResolver.resolve` is handed `feetY`
-  already) and none of which is written. `interiorLine` says so to the player.
+- **Rooms on the upper floors are drawn and walled but empty**, and a level's
+  rooms can be cut off from each other by the core's apron on a floor the
+  plan did not know about it — unreachable, never a trap. Nothing is placed
+  up there, so nothing is lost.
 - **Almost nothing in the rooms.** One couch, placed by anyone, and no givers,
   quests or loot. See "Furnishing" below.
 - **No footballs indoors.** A ball is an object with its own physics against the
@@ -226,6 +285,7 @@ field on the store's record; nothing else about that code changes.
 `client/public/world` **absent**, boot-gate the server locally before shipping,
 and gate on `/health`.
 
-`PROTOCOL_VERSION` moved 22 → 23, so **every tab open across this deploy is
+`PROTOCOL_VERSION` moves with every batch that changes the wire or a shared
+generator (25 → 26 for upstairs), so **every tab open across the deploy is
 refused and must reload**. That is the version's whole job; it is not a
 regression.

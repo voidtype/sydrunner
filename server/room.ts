@@ -1099,6 +1099,21 @@ export class Room {
    * refuses one anyway, on the grounds that the absence of a check is
    * indistinguishable from a missing one.
    */
+  /**
+   * Somebody in a lift cab pressed the button. `MSG.LIFT`.
+   *
+   * `doorPress`'s shape without the furniture: the space does not change, so
+   * the `PLACED` that follows a door is not needed and the interest set is
+   * left alone. A press outside a cab is silence, as a press at no door is.
+   */
+  liftPress(ws: Socket, direction: 1 | -1): void {
+    const p = ws.data.participant;
+    if (!p) return;
+    const frame = this.sim.liftPress(p.id, direction);
+    if (frame === null) return;
+    ws.send(encodeSpace(frame));
+  }
+
   doorPress(ws: Socket): void {
     const p = ws.data.participant;
     if (!p) return;

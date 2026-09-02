@@ -137,6 +137,7 @@ import {
   decodePing,
   decodeSunPress,
   decodeDoor,
+  decodeLift,
   decodeFurnish,
   encodeBye,
   encodePong,
@@ -1998,6 +1999,18 @@ const server = Bun.serve<Conn>({
           if (!decodeDoor(frame)) return;
           const room = conn.room >= 0 ? host.get(conn.room) : undefined;
           room?.doorPress(ws);
+          return;
+        }
+        /**
+         * The lift. `MSG.LIFT`, two bytes, and `DOOR`'s shape: the room checks
+         * the body it is simulating is standing in a cab, and answers with a
+         * `SPACE` or with nothing.
+         */
+        case MSG.LIFT: {
+          const direction = decodeLift(frame);
+          if (direction === null) return;
+          const room = conn.room >= 0 ? host.get(conn.room) : undefined;
+          room?.liftPress(ws, direction);
           return;
         }
         /**

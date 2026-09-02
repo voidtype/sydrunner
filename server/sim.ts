@@ -268,8 +268,12 @@ import { CollisionWorld, type Prism } from '../client/src/player/collision.ts';
 // or an interior is a room only its occupant can see.
 import { DOOR_REACH_M, buildingSeed, doorAt, type DoorPrism } from '../client/src/world/doorway.ts';
 import {
+  CORE,
   arrivalAt,
   buildInterior,
+  inCore,
+  interiorGround,
+  levelIndex,
   placementFits,
   setPlacements,
   type Interior,
@@ -1935,6 +1939,7 @@ export class Simulation {
         participant,
         indoors,
         participant.combat.body.position.x,
+        participant.combat.body.position.y,
         participant.combat.body.position.z,
         savedDoor,
       );
@@ -5819,7 +5824,9 @@ export class Simulation {
     const world: CombatWorld = {
       collision: null,
       mover: it.resolver,
-      groundHeight: () => it.base,
+      // The level's floor, or the ramp of the flight the feet are on. See
+      // `interior.interiorGround`.
+      groundHeight: (x, z, feetY) => interiorGround(it, x, z, feetY),
     };
     // And whatever anybody has already put in it, before the first body is
     // stepped against it: an interior built without its furniture would let the
@@ -5842,6 +5849,31 @@ export class Simulation {
     const p = this.participants.get(id);
     if (!p || p.gone || p.bot !== null) return null;
     return p.space === CITY_SPACE ? this.enterInterior(p) : this.leaveInterior(p);
+  }
+
+  /**
+   * The lift: a level up or down, for a body standing in a lift cab.
+   *
+   * Refused unless the participant is indoors, the building has a lift, and
+   * the body is inside the cab -- `interior.inCore` on the same core the
+   * client drew, so a client cannot ride a lift from the far side of the
+   * room. Past the top it goes back to the ground, and below the ground to
+   * the top: one button, and it always does something. The body is moved to
+   * the same spot in the cab a level up, which is where the cab is.
+   */
+  liftPress(id: number, direction: 1 | -1): SpaceFrame | null {
+    const p = this.participants.get(id);
+    if (!p || p.gone || p.bot !== null) return null;
+    const inside = p.interior;
+    if (inside === null || p.space === CITY_SPACE) return null;
+    const core = inside.core;
+    if (core === null || core.kind !== CORE.LIFT) return null;
+    const b = p.combat.body;
+    if (!inCore(core, b.position.x, b.position.z, 0.05)) return null;
+    const n = inside.levels.length;
+    const k = (levelIndex(inside.levels, b.position.y - EYE_HEIGHT) + direction + n) % n;
+    this.moveInto(p, b.position.x, inside.levels[k].y + EYE_HEIGHT, b.position.z);
+    return this.spaceFrameFor(p);
   }
 
   /** The frame that tells a client where it is. See `protocol.SpaceFrame`. */
@@ -6053,6 +6085,8 @@ export class Simulation {
     if (req.op !== FURNISH_OP.PLACE) return null;
     if (!knownKind(req.kind)) return null;
     if (held.length >= MAX_PER_SPACE) return null;
+    // From the ground floor only, which is the only floor furniture is on.
+    if (levelIndex(inside.levels, p.combat.body.position.y - EYE_HEIGHT) !== 0) return null;
     const want = sanitisePlacement({ kind: req.kind, x: req.x, z: req.z, turn: req.turn });
     if (want === null) return null;
     // **Not on top of a person**, which `placementFits` cannot know about: it is
@@ -6101,6 +6135,7 @@ export class Simulation {
     p: Participant,
     seed: number,
     x: number,
+    y: number,
     z: number,
     savedDoor: InteriorDoor | null,
   ): boolean {
@@ -6135,14 +6170,20 @@ export class Simulation {
     // everybody who comes back to a pub in its doorway. `arrivalAt`'s settle is
     // reused through the resolver so a spot that has since become a wall (a
     // rebake that moved a partition) still lands somebody clear.
-    const home = made.it.resolver.resolve(x, z, x, z, PLAYER_RADIUS, made.it.base);
-    const inside = made.it.resolver.clearance(home.x, home.z) >= PLAYER_RADIUS
-      ? home
-      : arrivalAt(made.it, p.door);
-    // Neither the spot they logged off on nor the door is clear: the street,
-    // on `join`'s ordinary refusal path, rather than a body the resolver will
-    // push every tick. This is the branch the Erskineville shed took.
-    if ('stuck' in inside && inside.stuck) return false;
+    // The level they logged out on, read from the saved eye height the way
+    // the resolver reads it every tick; a save from before there were levels
+    // has the ground floor's height and lands on the ground floor. A body
+    // saved mid-flight is put on the flight where it stood.
+    const k = levelIndex(made.it.levels, y - EYE_HEIGHT);
+    const floorY = made.it.levels[k].y;
+    const home = made.it.resolver.resolve(x, z, x, z, PLAYER_RADIUS, floorY);
+    if (made.it.resolver.clearance(home.x, home.z, floorY) >= PLAYER_RADIUS) {
+      const ground = interiorGround(made.it, home.x, home.z, floorY);
+      this.moveInto(p, home.x, ground + EYE_HEIGHT, home.z);
+      return true;
+    }
+    const inside = arrivalAt(made.it, p.door);
+    if (inside.stuck) return false;
     this.moveInto(p, inside.x, made.it.base + EYE_HEIGHT, inside.z);
     return true;
   }
