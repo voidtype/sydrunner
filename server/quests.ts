@@ -708,6 +708,8 @@ export class ImprovCache {
   private readonly now: () => number;
 
   private readonly cache = new Map<string, CacheEntry>();
+  /** The week the cache currently holds. See `lineFor`. */
+  private cacheWeek = '';
   /** Nodes waiting for a turn. Single-flight; see `pump`. */
   private readonly queue: Array<{ key: string; node: DialogNode; week: string }> = [];
   private inFlight = false;
@@ -790,6 +792,16 @@ export class ImprovCache {
   lineFor(npcId: string, node: DialogNode, atMs = this.now()): string {
     if (node.improv === null || !this.enabled) return '';
     const week = weekKey(atMs);
+    // **Last week's lines go when this week's first one is asked for.** The key
+    // carries the week so a line is re-improvised weekly, which meant every
+    // week added a full set and never dropped the one before -- bounded per
+    // week by the content, unbounded across weeks by the uptime. One sweep on
+    // the week rolling over is cheaper than an eviction policy and is exactly
+    // as often as the cache is allowed to be wrong.
+    if (week !== this.cacheWeek) {
+      for (const [k, v] of this.cache) if (v.week !== week) this.cache.delete(k);
+      this.cacheWeek = week;
+    }
     const key = `${npcId}\x00${node.id}\x00${week}`;
     const hit = this.cache.get(key);
     if (hit) return hit.line;

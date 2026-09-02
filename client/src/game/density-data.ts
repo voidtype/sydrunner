@@ -731,7 +731,5 @@ export const DENSITY_PACKED =
   'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==';
 
 /** The percentile the curve pinned 1.2x to, residents/km^2. Provenance only. */
-export const DENSITY_PIN_HI = 7108.9;
 
 /** The exponent of the power law. Provenance only; the bytes already carry it. */
-export const DENSITY_GAMMA = 0.793252;

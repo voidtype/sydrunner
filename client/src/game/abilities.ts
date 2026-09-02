@@ -117,18 +117,6 @@ export type Ability = (typeof ABILITY)[keyof typeof ABILITY];
 export const ABILITY_COUNT = 11;
 
 /** The name the HUD says. Lower case, the game's voice. */
-export const ABILITY_NAME: Readonly<Record<number, string>> = {
-  [ABILITY.DASH]: 'bolt',
-  [ABILITY.CAR_BURST]: 'merge late',
-  [ABILITY.BERSERK]: 'off your face',
-  [ABILITY.BRACE]: 'sober up',
-  [ABILITY.MEGA_SLAM]: 'slam',
-  [ABILITY.EAT]: 'servo pie',
-  [ABILITY.SIZZLE]: 'sausage sizzle',
-  [ABILITY.MEGA_TELEPORT]: 'getaway',
-  [ABILITY.MEGA_SUMMON_RIDE]: 'summon a ride',
-  [ABILITY.MEGA_SIZZLE_TENT]: 'sizzle tent',
-};
 
 // --- The numbers ---------------------------------------------------------------------
 
@@ -254,9 +242,6 @@ export function forgetAbilities(playerId: number): void {
   rows.delete(playerId);
 }
 /** Everything back to boot. For the self-checks and for a room reset. */
-export function resetAbilities(): void {
-  rows.clear();
-}
 /** How many players have rows. Diagnostics and the self-check. */
 export function trackedAbilities(): number {
   return rows.size;
@@ -403,10 +388,6 @@ export function cooldownLeft(playerId: number, ability: Ability, nowMs: number):
   return left > 0 ? left : 0;
 }
 /** Has this player already spent a daily today? */
-export function usedToday(playerId: number, ability: Ability, dayIndex: number): boolean {
-  const r = rows.get(playerId);
-  return r !== undefined && r.dayUsed[ability] === dayIndex;
-}
 
 // --- The windows the rest of the game asks about --------------------------------------
 

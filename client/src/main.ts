@@ -80,6 +80,8 @@ import {
   verifyTraffic,
   type CarPose,
   type LaneRoute,
+  verifyLaneShare,
+  verifyResidency,
 } from './game/traffic.ts';
 import {
   IMPOSTOR_CAPACITY,
@@ -2958,14 +2960,30 @@ async function main(): Promise<void> {
   setTimeout(() => {
     const audit = auditNow();
     if (audit.failures.length) {
+      /*
+       * One line, and the detail on `sydney.warmup()`.
+       *
+       * This used to print every failure and then every one of some seventy
+       * material names, on every boot, into a console whose other lines are
+       * the ones a bug report is built from. A check whose output is too long
+       * to read is a check nobody reads. The number is what somebody scanning
+       * the log needs; the list is what somebody fixing it needs, and they can
+       * ask for it.
+       */
       console.warn(
-        '[warmup] frames stalled on shader compilation:\n  - ' +
-          audit.failures.join('\n  - ') +
-          '\n  materials with no boot-time stand-in: ' +
-          (audit.coldMaterials.join(', ') || 'none'),
+        `[warmup] ${audit.failures.length} warm-up gap(s), ${audit.coldMaterials.length} material(s) with no ` +
+          'boot-time stand-in — sydney.warmup() for the list',
       );
     }
   }, 20000);
+  dev.warmup = (): ReturnType<typeof auditWarmup> => {
+    const audit = auditNow();
+    console.warn(
+      '[warmup] ' + (audit.failures.join('\n  - ') || 'no gaps') +
+        '\n  materials with no boot-time stand-in: ' + (audit.coldMaterials.join(', ') || 'none'),
+    );
+    return audit;
+  };
 
   // --- And the half of the warm-up that a boot pass can never do.
   //
@@ -5320,6 +5338,9 @@ async function main(): Promise<void> {
      */
     ...verifyIndexDom(),
     ...verifyTilePriority(),
+    // The two traffic checks that had no caller. See `server/index.ts`.
+    ...verifyLaneShare(),
+    ...verifyResidency(),
     ...verifyPointable(),
     ...verifySuspension(),
     ...verifyRadio(),
@@ -5462,7 +5483,10 @@ async function main(): Promise<void> {
    * alt-tabbed away mid-conversation and the panel should not freeze holding a
    * stale gate state.
    */
-  window.setInterval(() => dialog.tick(0.25), 250);
+  const dialogTicker = window.setInterval(() => dialog.tick(0.25), 250);
+  // Owned, so the device-loss reload and a page teardown stop it rather than
+  // leaving a timer ticking a panel that no longer exists.
+  window.addEventListener('pagehide', () => window.clearInterval(dialogTicker), { once: true });
   /*
    * --- WORKSTREAM AN: the marks over the givers' heads.
    *
@@ -6269,17 +6293,6 @@ async function main(): Promise<void> {
    */
   let interiorWorld: CombatWorld | null = null;
   /**
-   * The door this body came in by. Drawn on the wall, and the way out.
-   *
-   * The point is what the exit prompt measures against. The normal is read by
-   * exactly one thing -- the offline door, which has no server to ask where the
-   * pavement is and so has to step along it itself.
-   */
-  let interiorDoorX = 0;
-  let interiorDoorZ = 0;
-  let interiorDoorNX = 0;
-  let interiorDoorNZ = 0;
-  /**
    * How close to the door you have to be, inside, for it to offer itself.
    *
    * Far more generous than the 2.6 m at the front step, and see the prompt for
@@ -6563,8 +6576,6 @@ async function main(): Promise<void> {
       const actor = new CharacterActor(characters, r.colourway);
       actor.mesh.name = `character:remote:${r.id}`;
       scene.add(actor.mesh);
-      // Visible indoors too. See `showIndoors`.
-      showIndoors(actor.mesh);
       entry = {
         actor,
         footy: new FootyProp(footies, actor),
@@ -6575,6 +6586,8 @@ async function main(): Promise<void> {
         lastRiding: false,
       };
       remotes.set(r.id, entry);
+      // Visible indoors too, body and props together, once. See `showIndoors`.
+      showIndoors(actor.mesh);
     }
     return entry;
   }
@@ -7692,6 +7705,15 @@ async function main(): Promise<void> {
       o.layers.enable(INTERIOR_LAYER);
     });
   };
+  /*
+   * Once per object, not once per frame. This used to be re-run over every
+   * remote and every viewmodel on every frame indoors, on the theory that a
+   * bat or a football parented to a bone later would be born on layer 0. It is
+   * not: `player/bat.ts` and `world/footyball.ts` build their meshes once and
+   * toggle `visible`, and a remote's props are made in `ensureRemoteActor`
+   * beside the body. So one traverse when the thing is made is exact, and the
+   * per-frame loop was a habit doing a one-time job forty times a second.
+   */
   // The nameplates are one mesh for the whole game and gain no children, so
   // once is enough. Interest already decides who is in the list, and indoors
   // that means the people in the room with you.
@@ -7989,10 +8011,6 @@ async function main(): Promise<void> {
       mover: built.resolver,
       groundHeight: () => built.base,
     };
-    interiorDoorX = f.doorX;
-    interiorDoorZ = f.doorZ;
-    interiorDoorNX = f.doorNX;
-    interiorDoorNZ = f.doorNZ;
     interiorView.show(camera, built);
     placeBody(f);
     audio.door();
@@ -8026,8 +8044,8 @@ async function main(): Promise<void> {
       // Out, along the door's outward normal, at the city's own ground -- the
       // pad a building sits on and the pavement outside it are not the same
       // number. `sim.leaveInterior`'s two lines.
-      const x = interiorDoorX + interiorDoorNX * 1.3;
-      const z = interiorDoorZ + interiorDoorNZ * 1.3;
+      const x = interior.door.x + interior.door.nx * 1.3;
+      const z = interior.door.z + interior.door.nz * 1.3;
       applySpace({
         space: CITY_SPACE,
         building: 0,
@@ -9074,7 +9092,7 @@ async function main(): Promise<void> {
    */
   function netHandlers(): ConstructorParameters<typeof NetClient>[1] {
     return {
-      onHit(attacker, victim, ko, footy, health, returned, ally) {
+      onHit(attacker, victim, ko, footy, _health, returned, ally) {
         // **An event whose attacker is its own victim is a car.**
         //
         // Nobody swung; the world did. There is no room in `net/protocol.ts`'s
@@ -9121,7 +9139,6 @@ async function main(): Promise<void> {
           if (ko) feedback.knockedOut();
           else feedback.hitTaken();
         }
-        void health;
         // Three verbs, and the third is the whole of the community suggestion
         // this pass implements: a ball that changed hands in the air and then
         // knocked somebody over is a *returned serve*, which is the most
@@ -9177,9 +9194,8 @@ async function main(): Promise<void> {
        * is the swatted one, and `SWAT_MATCH_M` is the slack that allows for the
        * half a round trip this event spent in the air.
        */
-      onSwat(swinger, ball, x, y, z, vx, vy, vz) {
+      onSwat(swinger, _ball, x, y, z, vx, vy, vz) {
         swatFeedback(net !== null && swinger === net.id, x, y, z);
-        void ball;
         let nearest: Footy | null = null;
         let best = SWAT_MATCH_M * SWAT_MATCH_M;
         for (const b of localBalls.balls) {
@@ -9206,10 +9222,9 @@ async function main(): Promise<void> {
         // both of which it draws.
         nearest.owner = swinger;
       },
-      onBounce(x, y, z, bounces) {
+      onBounce(x, _y, z, bounces) {
         const range = Math.hypot(x - player.position.x, z - player.position.z);
         if (range < BOUNCE_AUDIBLE) audio.footyBounce(range, bounces);
-        void y;
       },
       onPickup(combatant, kind, tileKey, index) {
         // Spec 8.3 is server-authoritative online, so the local field is a
@@ -9233,15 +9248,13 @@ async function main(): Promise<void> {
           else remotes.get(combatant)?.actor.setAction('run');
         }
       },
-      onJoin(id, colourway, bot) {
+      onJoin(id) {
         if (net && id === net.id) return;
         // The name is already here: the server sends the roster ahead of the
         // join events on purpose, so this line can be written with a name in it
         // rather than with the id of somebody the feed will be calling Shazza a
         // frame later. See `server/index.ts`'s `runTick`.
         pushKill(`${who(id)} joined`);
-        void colourway;
-        void bot;
       },
       onLeave(id) {
         dropRemoteActor(id);
@@ -10260,18 +10273,7 @@ async function main(): Promise<void> {
         updateGhost();
         interiorView.setGhost(interior, ghostAt, ghostOk);
       }
-      // And everybody in the room with us, every frame, for `showIndoors`'
-      // reason: a bat parented to a bone this frame is a bat the layer was
-      // never enabled on.
-      if (interior !== null) {
-        for (const entry of remotes.values()) showIndoors(entry.actor.mesh);
-        // And the player's own hands, for the same reason and on the same
-        // schedule: a viewmodel swaps its mesh when a bat is drawn or a
-        // football is thrown, and the new one is born on layer 0.
-        showIndoors(viewmodel.group);
-        showIndoors(handsViewmodel.group);
-        showIndoors(footyViewmodel.group);
-      }
+
     }
 
     doorSite = null;
@@ -10291,8 +10293,8 @@ async function main(): Promise<void> {
        * a tight reach buys is a player standing in a room they cannot leave.
        * The server does not test the reach at all -- see `sim.leaveInterior`.
        */
-      const dx = player.position.x - interiorDoorX;
-      const dz = player.position.z - interiorDoorZ;
+      const dx = player.position.x - interior.door.x;
+      const dz = player.position.z - interior.door.z;
       atExit = dx * dx + dz * dz <= EXIT_REACH_M * EXIT_REACH_M;
     } else if (playerCombat.drivingCar === 0 && playerCombat.ridingBike === 0 && !isAboard(playerCombat.aboard)) {
       camera.getWorldDirection(doorGaze);

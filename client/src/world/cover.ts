@@ -76,11 +76,6 @@
 /** Cover classes, in the order the pipeline's `vegetation.COVER_CODE` numbers them. */
 export const COVER_NONE = 0;
 export const COVER_MOWN = 1;
-export const COVER_ROUGH = 2;
-export const COVER_FOREST = 3;
-export const COVER_SCRUB = 4;
-export const COVER_HEATH = 5;
-export const COVER_WETLAND = 6;
 
 /** Names, for the debug overlay and for the self-check's messages. */
 export const COVER_NAME = [

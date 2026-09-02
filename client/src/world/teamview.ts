@@ -51,7 +51,6 @@ import {
   NODES,
   TEAM,
   hasNode,
-  type FxKey,
   type TalentMask,
   type Team,
 } from '../game/teams.ts';
@@ -158,26 +157,6 @@ export function groupSizeFor(playerId: number): number {
     need = need === 0 ? node.group : Math.min(need, node.group);
   }
   return need;
-}
-
-/**
- * Whether they hold a node carrying a given effect key.
- *
- * The renderer's version of `ownFlag`, and the reason it is here rather than a
- * call to that function is `teamOf`: a talent mask means nothing without the
- * side it was spent on, and reading a bit for a node belonging to the other team
- * would draw a DeFAULT's RBT markers off a Marita's mask. Used for
- * `FX.RBT_MINIMAP` and for anything else that is purely a drawing decision.
- */
-export function hasEffect(playerId: number, key: FxKey): boolean {
-  const team = teamOf(playerId);
-  if (team === TEAM.NONE) return false;
-  const mask = talentsOf(playerId);
-  for (const node of NODES) {
-    if (node.team !== team || !hasNode(mask, node.id)) continue;
-    for (const [k, v] of node.effects) if (k === key && v > 0) return true;
-  }
-  return false;
 }
 
 /**

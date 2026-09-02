@@ -226,7 +226,7 @@ import { InterestIndex, InterestSet, verifyAoi } from './aoi.ts';
 // Interiors, protocol v23. See `checkInteriors`.
 import { buildingSeed, verifyDoorway } from '../client/src/world/doorway.ts';
 import { arrivalAt, interiorAdmits, verifyInterior } from '../client/src/world/interior.ts';
-import { MAX_PER_SPACE, boxClearance, boxOf, verifyPlaceables } from '../client/src/world/placeables.ts';
+import { BODY_RADIUS_M, MAX_PER_SPACE, boxClearance, boxOf, verifyPlaceables } from '../client/src/world/placeables.ts';
 import { InteriorStore, verifyInteriorStore } from './interiors.ts';
 import { FURNISH_OP } from '../client/src/net/protocol.ts';
 import { CITY_SPACE, spaceForBuilding, verifySpaces } from '../client/src/net/spaces.ts';
@@ -10847,6 +10847,15 @@ async function checkInteriors(): Promise<void> {
   {
     const f = verifyPlaceables();
     check(f.length === 0, `verifyPlaceables passes${f.length ? ` -- ${f[0]}` : ''}`);
+    // The restated body radius, compared against the controller's real one --
+    // here, because `placeables.ts` may not import the controller and this is
+    // the one file that can see both. `checkSpawn` does the same for
+    // `SPAWN_PROBE_RADIUS`. It shipped at 0.35 against 0.34 with a comment
+    // claiming a check like this existed.
+    check(
+      BODY_RADIUS_M === PLAYER_RADIUS,
+      `placeables' body radius matches the controller's (${BODY_RADIUS_M} vs ${PLAYER_RADIUS})`,
+    );
   }
   {
     const f = verifyInteriorStore();

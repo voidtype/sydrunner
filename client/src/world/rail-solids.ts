@@ -208,7 +208,6 @@ export const CANOPY_OVERHANG = 0.7;
 export const BOX_HALF_LENGTH = 88;
 export const BOX_HALF_WIDTH = 13;
 export const BOX_HEIGHT = 7.5;
-export const SHAFT_HALF = 3.2;
 
 /** Sign blade, in the street-sign spirit: a small plate on two posts. */
 export const SIGN_WIDTH = 3.6;
@@ -1306,17 +1305,6 @@ export const OWN_TRACK_M = 2.0;
 
 // --- The solids, as one primitive ---------------------------------------------------
 
-/**
- * What kind of thing a solid is.
- *
- * Emitted where the box is written rather than recovered from its shape, on
- * `Vessel.faceEdge`'s argument: *"a drawer has to know which face is the floor
- * and which is the coping. It must not work that out from the geometry."* Here
- * the drawer needs to know which buffer a box belongs in -- brick, concrete,
- * canopy -- and *"the low flat ones are platforms"* would be a second
- * description of the cross-section.
- */
-export const SOLID_TRENCH_WALL = 0;
 export const SOLID_VIADUCT_DECK = 1;
 export const SOLID_VIADUCT_PIER = 2;
 export const SOLID_PLATFORM_DECK = 3;
@@ -1362,14 +1350,8 @@ export function framePrism(b: FrameSolid): SolidPrism {
 }
 
 /** The top of a solid, in world y. */
-export function solidTop(b: FrameSolid): number {
-  return Math.max(b.y0, b.y1);
-}
 
 /** The underside of a solid, in world y. */
-export function solidBase(b: FrameSolid): number {
-  return Math.min(b.y0, b.y1);
-}
 
 // --- The station kit, enumerated -----------------------------------------------------
 

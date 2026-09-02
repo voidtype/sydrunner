@@ -238,9 +238,6 @@ export function respawnSeconds(kind: PowerupKind): number {
 }
 
 /** How long its effect lasts. */
-export function effectSeconds(kind: PowerupKind): number {
-  return kind === TRAINING ? TRAINING_SECONDS : FLAT_WHITE_SECONDS;
-}
 
 // --- The modifiers ------------------------------------------------------------
 

@@ -3180,8 +3180,6 @@ export class NetClient {
       if (!a) continue;
       const b = newer ? newer.players.find((p) => p.id === r.id) ?? a : a;
 
-      const px = r.position.x;
-      const pz = r.position.z;
       r.position.set(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t);
       // Yaw the short way round, for `rewind.sampleAt`'s reason: lerping 6.2 to
       // 0.1 naively sweeps the long way and spins a remote through a full turn
@@ -3217,8 +3215,6 @@ export class NetClient {
         // Lightly smoothed, because the 1 cm quantisation is 0.2 m/s of noise at
         // 20 Hz and the walk/run crossfade sits at 4.6-7.4 m/s.
         r.speed = r.speed * 0.6 + measured * 0.4;
-        void px;
-        void pz;
       }
     }
 

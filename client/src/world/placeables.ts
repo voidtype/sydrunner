@@ -99,9 +99,14 @@ export const MAX_PER_SPACE = 64;
  *
  * `controller.PLAYER_RADIUS` restated rather than imported, on the terms
  * `game/spawn.ts` restates it: this file may not depend on the controller.
- * `verifyPlaceables` asserts the two agree, so the copy cannot drift.
+ *
+ * **0.34, and it said 0.35 with a comment claiming a check kept it honest.**
+ * No check did -- this file cannot import the controller to compare -- so the
+ * comparison lives where `spawn.ts`'s does: `server/integration-check.ts`,
+ * which can see both. The wrong value cost nothing (both ends used the same
+ * wrong number) and the comment cost more than the value did.
  */
-export const BODY_RADIUS_M = 0.35;
+export const BODY_RADIUS_M = 0.34;
 
 /** Is this a kind that exists? Everything off the wire goes through here. */
 export function knownKind(kind: number): boolean {
@@ -226,7 +231,9 @@ export function boxClearance(b: PlacedBox, x: number, z: number): number {
   const eu = Math.abs(u) - b.hx;
   const ev = Math.abs(v) - b.hz;
   if (eu <= 0 && ev <= 0) return Math.max(eu, ev);
-  return Math.hypot(Math.max(0, eu), Math.max(0, ev));
+  const pu = Math.max(0, eu);
+  const pv = Math.max(0, ev);
+  return Math.sqrt(pu * pu + pv * pv);
 }
 
 /** Do two placed boxes overlap? A separating axis over four; both are rectangles. */
@@ -273,6 +280,15 @@ export function cornersOf(b: PlacedBox, out: number[] = []): number[] {
  * wire yet.
  */
 export const SAME_SPOT_M = 0.35;
+
+/**
+ * How far from the aim a thing can be and still be the one taken away, metres.
+ *
+ * Generous, because the aim is a point on the floor and a couch is a box: a
+ * player pointing at the middle of a cushion is a metre from its edge. It was
+ * `SAME_SPOT_M + 1.2` inline, which is a named constant hiding a magic one.
+ */
+export const REMOVE_REACH_M = 1.55;
 
 /** Self-check. On both boot lists: it is arithmetic and imports nothing. */
 export function verifyPlaceables(): string[] {
@@ -338,13 +354,13 @@ export function verifyPlaceables(): string[] {
         const q = i / 16;
         const dx = q < 0.5 ? 1 - q * 4 : q * 4 - 3;
         const dz = q < 0.25 ? q * 4 : q < 0.75 ? 2 - q * 4 : q * 4 - 4;
-        const len = Math.hypot(dx, dz) || 1;
+        const len = Math.sqrt((dx) * (dx) + (dz) * (dz)) || 1;
         const far = pushOutOfBox(box, 10 + (dx / len) * 6, 20 + (dz / len) * 6, BODY_RADIUS_M);
         if (far.hit) failures.push(`a body six metres from a couch was pushed (turn ${turn}).`);
         const into = pushOutOfBox(box, 10 + (dx / len) * 0.05, 20 + (dz / len) * 0.05, BODY_RADIUS_M);
         if (!into.hit) failures.push(`a body standing in a couch was not pushed out (turn ${turn}).`);
         const after = pushOutOfBox(box, into.x, into.z, BODY_RADIUS_M);
-        if (Math.hypot(after.x - into.x, after.z - into.z) > 1e-6) {
+        if (Math.sqrt((after.x - into.x) * (after.x - into.x) + (after.z - into.z) * (after.z - into.z)) > 1e-6) {
           failures.push(`the push out of a couch did not settle in one pass (turn ${turn}).`);
         }
         if (boxClearance(box, into.x, into.z) < BODY_RADIUS_M - 1e-6) {

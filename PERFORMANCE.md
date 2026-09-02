@@ -1184,3 +1184,14 @@ same form on the unmodified suite. Twelve runs over this pass: nine clean at
 the wall clock those checks run against; not fixed here, because doing it
 properly means giving `trafficTick` an injectable clock and that is a change to
 a shared determinism path rather than to a test.
+
+## Two diagnostics that are scripts now
+
+Both lived as files nothing imported and no document named, which is how a
+tool disappears. They are `npm run` targets in `client/` so they cannot:
+
+- `npm run collision-window` — how long the city is solid before it is visible,
+  measured over the real bake (`src/world/collision-window-check.ts`; `--full`,
+  `--latency 60 --kbps 25000`).
+- `npm run perf-harness` — the frame profiler run under Bun over several scenes
+  (`src/perf-harness.ts`; `--coverage` lists the parts).

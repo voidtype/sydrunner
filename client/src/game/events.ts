@@ -189,7 +189,6 @@ export const EVENT_KIND = {
   BURNOUT: 3,
   TRACKWORK: 4,
 } as const;
-export type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND];
 
 export const EVENT_COUNT = 5;
 

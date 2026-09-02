@@ -106,7 +106,6 @@ export const BUFF_HOURS = 3;
 export const ORANGE_SLOW_MINUTES = 30;
 
 /** Pips an orange cap costs. */
-export const ORANGE_DAMAGE = 1;
 
 /** The most brown caps that can be live at once. Seven is the god room. */
 export const MAX_STACK = 7;

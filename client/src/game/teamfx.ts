@@ -188,9 +188,6 @@ export function fxFlag(playerId: number, key: FxKey): boolean {
   return lookup.flag(playerId, key);
 }
 /** Which side a player is on. `TEAM.NONE` for a guest, a bot, or an NPC. */
-export function fxTeamOf(playerId: number): Team {
-  return lookup.teamOf(playerId);
-}
 
 /**
  * An absolute key where the *bigger* number wins against the base, treating 0
@@ -468,10 +465,6 @@ export function fxSetDoubleHealth(playerId: number, on: boolean): void {
   else doubled.delete(playerId);
 }
 
-export function fxHasDoubleHealth(playerId: number): boolean {
-  return doubled.has(playerId);
-}
-
 export function fxSwingDamageScale(playerId: number): number {
   let scale = 1 + lookup.scalar(playerId, FX.SWING_DAMAGE);
   const perStar = lookup.scalar(playerId, FX.STAR_DAMAGE);
@@ -519,10 +512,6 @@ export function fxSwingUninterruptible(playerId: number): boolean {
 }
 
 /** Pips on respawn, `RESPAWN_PIPS` or the base 1. */
-export function fxRespawnPips(playerId: number, base: number): number {
-  const s = lookup.scalar(playerId, FX.RESPAWN_PIPS);
-  return s > base ? s : base;
-}
 
 /**
  * May this player get up where they fell, right now? Consumes the cooldown.
@@ -662,9 +651,6 @@ export function fxKoOfficerHeals(playerId: number): boolean {
   return lookup.flag(playerId, FX.KO_OFFICER_HEALS);
 }
 /** A real-estate agent within 10 m of your KO is worth a pip. `Karen Rapport`. */
-export function fxAgentCheer(playerId: number): boolean {
-  return lookup.flag(playerId, FX.AGENT_CHEER);
-}
 /** How far an agent has to be to cheer. Not a talent number; the node says 10 m. */
 export const AGENT_CHEER_M = 10;
 /** How many pips the applause is worth. The node's "+1 pip". */
@@ -924,9 +910,6 @@ export function fxPatrolCannotRam(playerId: number): boolean {
   return lookup.flag(playerId, FX.PATROL_CANNOT_RAM);
 }
 /** Do passengers in this driver's car take crash damage? `Convoy` / `Rat Run`. */
-export function fxPassengersSafe(driverId: number): boolean {
-  return lookup.flag(driverId, FX.PASSENGERS_SAFE);
-}
 
 /**
  * `RAM` (Northern Beaches Tunnel): the two halves of "your car is a battering
@@ -1090,9 +1073,6 @@ export function fxHeatTreatStars(playerId: number, stars: number): number {
 }
 
 /** Do Karens ever report this player? `Karen Rapport` says never. */
-export function fxKarenImmune(playerId: number): boolean {
-  return lookup.flag(playerId, FX.KAREN_IMMUNE);
-}
 /**
  * Does a Karen at `distance` metres report this player's car theft?
  *
@@ -1114,9 +1094,6 @@ export function fxTradieAlly(playerId: number): boolean {
   return lookup.flag(playerId, FX.TRADIE_ALLY);
 }
 /** Must every officer within 40 m shoot only this player? `Newtown Standoff`. */
-export function fxPoliceFocus(playerId: number): boolean {
-  return lookup.flag(playerId, FX.POLICE_FOCUS);
-}
 /** How far the focus reaches. The mega's tooltip; not a talent number. */
 export const POLICE_FOCUS_M = 40;
 /** The star count above which the two "while 3★+" megas are live. */
@@ -1234,9 +1211,6 @@ export function fxBoardMoving(playerId: number): boolean {
 }
 
 /** The fraction of a teammate's earnings this player is owed. `Tip Jar`'s 10%. */
-export function fxTeamTithe(playerId: number): number {
-  return lookup.scalar(playerId, FX.TEAM_TITHE);
-}
 
 // --- Self-check -------------------------------------------------------------------------------
 

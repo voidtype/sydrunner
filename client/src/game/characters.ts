@@ -3269,18 +3269,5 @@ export function verifyCharacters(): string[] {
   return failures;
 }
 
-/**
- * Every registered kind of ours, for a consumer that wants to iterate them.
- *
- * A function rather than a constant so that the registrations above have
- * certainly run by the time anything calls it -- the registrations are
- * module-load side effects and a constant defined here would be evaluated in
- * declaration order, which is fine today and is a trap the day somebody moves
- * one of them.
- */
-export function characterKinds(): readonly number[] {
-  return [NPC_KIND.ESHAY, NPC_KIND.KAREN, NPC_KIND.TRADIE, NPC_KIND.INFLUENCER, NPC_KIND.AGENT];
-}
-
 /** Keep the imports honest: `FactionField` is used only as a type in `karenWitness`. */
 export type { FactionField };

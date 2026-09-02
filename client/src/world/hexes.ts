@@ -244,17 +244,6 @@ const DISABLED =
     ? new URLSearchParams(location.search).has('nohex')
     : false;
 
-export function hexStats(): HexStats {
-  return {
-    enabled: armed,
-    resident: resident.size,
-    inFlight: inFlight.size,
-    tiles: tileCount,
-    failed: failures.size,
-    known: catalogue.size,
-  };
-}
-
 /** Is this world segmented at all? False for every build before this pass. */
 export function hexesArmed(): boolean {
   return armed;

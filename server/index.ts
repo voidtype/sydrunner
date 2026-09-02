@@ -92,7 +92,7 @@ import { verifyStaticCars } from '../client/src/game/staticcars.ts';
 // are driving leaving its own draw radius 460 m after you take it, because the
 // gate was asked about the kerb rather than about you. See its `near` argument.
 import { verifyDrivenCars } from '../client/src/world/drivencars.ts';
-import { verifyTraffic } from '../client/src/game/traffic.ts';
+import { verifyLaneShare, verifyResidency, verifyTraffic } from '../client/src/game/traffic.ts';
 // --- Workstream Q. A client presentation rule, checked here anyway: see the
 // header of `game/viewlatch.ts` for why a rule about what the *browser* draws is
 // tested in Bun, and `PREAMBLE`'s rule that a `verify*` runs in both boot lists.
@@ -525,6 +525,13 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // a plausible-looking wrong position, which renders perfectly and makes `E`
     // do nothing.
     ['verifyStaticCars', verifyStaticCars()],
+    // The two traffic checks that were written to run at boot -- their own
+    // comments say so -- and had no caller anywhere. `verifyLaneShare` is the
+    // one that asserts the lane rule is a pure function of the tick, which is
+    // the property that lets both ends agree with nothing on the wire. It had
+    // been silently unenforced. 14 ms and 54 ms.
+    ['verifyLaneShare', verifyLaneShare()],
+    ['verifyResidency', verifyResidency()],
     // And what the browser does with a car once somebody is in it. See the
     // import: three-free, so this end runs it too, and the property that matters
     // is that a driven car is drawn where its *driver* is rather than where its
@@ -1499,6 +1506,23 @@ const server = Bun.serve<Conn>({
      * turns gets an audience that closed at twelve.
      */
     if (url.pathname === '/god' && req.method === 'POST') {
+      /*
+       * --- Per-address limit, on the same bucket `/auth/check` uses.
+       *
+       * This route calls a paid model. The comment below says it is
+       * "rate-limited by the turn cap inside `Audience`", and that caps the
+       * turns in *one* conversation -- it says nothing about how many
+       * conversations one address can open a second. Every other write route
+       * in this file has a `FloodGuard`; this was the one that did not, and it
+       * was the one with a bill attached. `lightAllow` is `CHECK_PER_MIN` per
+       * address, which is far more god than anybody needs.
+       */
+      if (!authGuards.lightAllow(srv.requestIP(req)?.address ?? 'unknown')) {
+        return Response.json(
+          { text: '', verdict: 'open', quiet: true },
+          { status: 429, headers: { 'access-control-allow-origin': '*' } },
+        );
+      }
       try {
         const body = (await req.json()) as { turns?: Array<{ who?: string; text?: string }> };
         const audience = new Audience();

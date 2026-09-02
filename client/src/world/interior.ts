@@ -217,7 +217,7 @@ export interface Interior {
    * the drawing and the collision cannot describe different rooms. `setPlacements`
    * writes both in one call and is the only thing that writes either.
    */
-  placedBoxes: readonly PlacedBox[];
+  placedBoxes: PlacedBox[];
   /** What `CombatWorld.mover` is set to while a body is in here. */
   resolver: InteriorResolver;
 }
@@ -798,7 +798,7 @@ export function buildInterior(
       const az = points[j * 2 + 1];
       const bx = points[i * 2];
       const bz = points[i * 2 + 1];
-      const len = Math.hypot(bx - ax, bz - az);
+      const len = Math.sqrt((bx - ax) * (bx - ax) + (bz - az) * (bz - az));
       if (!(len > bestLen)) continue;
       const mx = (ax + bx) / 2;
       const mz = (az + bz) / 2;
@@ -930,7 +930,7 @@ function clearOfSegment(
   ax: number, az: number, bx: number, bz: number,
   want: number,
 ): boolean {
-  const len = Math.hypot(bx - ax, bz - az);
+  const len = Math.sqrt((bx - ax) * (bx - ax) + (bz - az) * (bz - az));
   const steps = Math.max(1, Math.ceil(len / WALL_SAMPLE_M));
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
@@ -1000,7 +1000,7 @@ export function setPlacements(it: Interior, list: readonly Placement[]): void {
   const boxes: PlacedBox[] = [];
   for (const p of list) boxes.push(boxOf(p, it.plan.box.ux, it.plan.box.uz));
   it.resolver.setPlaced(boxes);
-  (it as { placedBoxes: readonly PlacedBox[] }).placedBoxes = boxes;
+  it.placedBoxes = boxes;
 }
 
 // --- Saying what it is ---------------------------------------------------------
@@ -1116,7 +1116,7 @@ export function couchInto(
     const side = (p: [number, number], q: [number, number], k: number): void => {
       let nx = q[1] - p[1];
       let nz = -(q[0] - p[0]);
-      const l = Math.hypot(nx, nz) || 1;
+      const l = Math.sqrt((nx) * (nx) + (nz) * (nz)) || 1;
       nx /= l;
       nz /= l;
       quad(p[0], y0, p[1], q[0], y0, q[1], q[0], y1, q[1], p[0], y1, p[1], nx, 0, nz, shade(rgb, k));
@@ -1585,7 +1585,7 @@ export function interiorMesh(it: Interior): InteriorMesh {
       const bz = it.shell[i * 2 + 1];
       let ex = bx - ax;
       let ez = bz - az;
-      const len = Math.hypot(ex, ez);
+      const len = Math.sqrt((ex) * (ex) + (ez) * (ez));
       if (!(len > 1e-6)) continue;
       ex /= len;
       ez /= len;
@@ -1630,7 +1630,7 @@ export function interiorMesh(it: Interior): InteriorMesh {
           const wx = ax + ex * t;
           const wz = az + ez * t;
           // Not over the door, and not half over it either.
-          if (Math.hypot(wx - doorX, wz - doorZ) < DOOR_GAP_M * 0.9 + WINDOW_W / 2) continue;
+          if (Math.sqrt((wx - doorX) * (wx - doorX) + (wz - doorZ) * (wz - doorZ)) < DOOR_GAP_M * 0.9 + WINDOW_W / 2) continue;
           const half = WINDOW_W / 2;
           // Frame first, then the glass a further two centimetres in, so
           // neither can z-fight with the wall or with the other.
@@ -1726,7 +1726,7 @@ export function interiorMesh(it: Interior): InteriorMesh {
   for (const w of it.walls) {
     let ex = w.bx - w.ax;
     let ez = w.bz - w.az;
-    const len = Math.hypot(ex, ez);
+    const len = Math.sqrt((ex) * (ex) + (ez) * (ez));
     if (!(len > 1e-6)) continue;
     ex /= len;
     ez /= len;
@@ -1781,7 +1781,7 @@ export function interiorMesh(it: Interior): InteriorMesh {
   for (const h of it.headers) {
     let ex = h.bx - h.ax;
     let ez = h.bz - h.az;
-    const len = Math.hypot(ex, ez);
+    const len = Math.sqrt((ex) * (ex) + (ez) * (ez));
     if (!(len > 1e-6)) continue;
     ex /= len;
     ez /= len;
@@ -1935,7 +1935,7 @@ export function verifyInterior(): string[] {
       const bz = c.points[i * 2 + 1];
       let ex = bx - ax;
       let ez = bz - az;
-      const len = Math.hypot(ex, ez);
+      const len = Math.sqrt((ex) * (ex) + (ez) * (ez));
       if (!(len > 1e-6)) continue;
       ex /= len;
       ez /= len;
@@ -1950,7 +1950,7 @@ export function verifyInterior(): string[] {
       }
       const at = arrivalAt(it);
       const still = it.resolver.resolve(at.x, at.z, at.x, at.z, 0.35, it.base);
-      const moved = Math.hypot(still.x - at.x, still.z - at.z);
+      const moved = Math.sqrt((still.x - at.x) * (still.x - at.x) + (still.z - at.z) * (still.z - at.z));
       if (moved > 1e-3) {
         failures.push(`${c.name} lands a body ${moved.toFixed(2)} m inside its own geometry at one of its doors.`);
         break;
@@ -1977,7 +1977,7 @@ export function verifyInterior(): string[] {
         const q = a / 16;
         const dx = q < 0.5 ? 1 - q * 4 : q * 4 - 3;
         const dz = q < 0.25 ? q * 4 : q < 0.75 ? 2 - q * 4 : q * 4 - 4;
-        const len = Math.hypot(dx, dz) || 1;
+        const len = Math.sqrt((dx) * (dx) + (dz) * (dz)) || 1;
         const r = it.resolver.resolve(6, 10, 6 + (dx / len) * 400, 10 + (dz / len) * 400, 0.35, 0);
         for (const p of planes) {
           if (p.nx * r.x + p.nz * r.z - p.d < 0.35 - 1e-2) {
@@ -2062,18 +2062,18 @@ export function verifyInterior(): string[] {
           for (let step = 0; step < 400; step++) {
             const dx = tx - x;
             const dz = tz - z;
-            const d = Math.hypot(dx, dz);
+            const d = Math.sqrt((dx) * (dx) + (dz) * (dz));
             if (d < 0.35) break;
             const nx = x + (dx / d) * Math.min(0.1, d);
             const nz = z + (dz / d) * Math.min(0.1, d);
             const r = it.resolver.resolve(x, z, nx, nz, 0.35, it.base);
-            if (Math.hypot(r.x - x, r.z - z) < 1e-4) break;
+            if (Math.sqrt((r.x - x) * (r.x - x) + (r.z - z) * (r.z - z)) < 1e-4) break;
             x = r.x;
             z = r.z;
           }
         }
         const [bx, bz] = world(b.u, b.v);
-        if (Math.hypot(bx - x, bz - z) > 1.2) blocked++;
+        if (Math.sqrt((bx - x) * (bx - x) + (bz - z) * (bz - z)) > 1.2) blocked++;
       }
       if (tried === 0) failures.push('a 24 x 16 m building has no doorways between its rooms at all.');
       if (blocked > 0) failures.push(`${blocked} of ${tried} doorways cannot be walked through.`);
@@ -2283,7 +2283,7 @@ export function verifyInterior(): string[] {
         glass++;
         const cx = (mesh.positions[i] + mesh.positions[i + 3] + mesh.positions[i + 6]) / 3;
         const cz = (mesh.positions[i + 2] + mesh.positions[i + 5] + mesh.positions[i + 8]) / 3;
-        if (Math.hypot(cx - 9, cz - 0) < DOOR_GAP_M / 2) overDoor++;
+        if (Math.sqrt((cx - 9) * (cx - 9) + (cz - 0) * (cz - 0)) < DOOR_GAP_M / 2) overDoor++;
       }
       if (glass === 0) failures.push('a building with 26 m walls has no windows in it.');
       if (overDoor > 0) failures.push(`${overDoor} window triangles are drawn over the door.`);
@@ -2388,17 +2388,19 @@ export function verifyInterior(): string[] {
         const ez = bz - az;
         const len2 = ex * ex + ez * ez;
         const t = len2 > 1e-9 ? Math.max(0, Math.min(1, ((a.door.x - ax) * ex + (a.door.z - az) * ez) / len2)) : 0;
-        if (Math.hypot(a.door.x - (ax + ex * t), a.door.z - (az + ez * t)) < 1e-6) onEdge = true;
+        const gx = a.door.x - (ax + ex * t);
+        const gz = a.door.z - (az + ez * t);
+        if (Math.sqrt(gx * gx + gz * gz) < 1e-6) onEdge = true;
       }
       if (!onEdge) failures.push('the door is not on the building.');
-      if (Math.abs(Math.hypot(a.door.nx, a.door.nz) - 1) > 1e-9) failures.push('the door normal is not a unit vector.');
+      if (Math.abs(Math.sqrt((a.door.nx) * (a.door.nx) + (a.door.nz) * (a.door.nz)) - 1) > 1e-9) failures.push('the door normal is not a unit vector.');
       if ((a.door.x - a.centreX) * a.door.nx + (a.door.z - a.centreZ) * a.door.nz <= 0) {
         failures.push('the door faces into the building; leaving would step further in.');
       }
       // And the arrival is inside, at that door, for everybody.
       const at = arrivalAt(a);
       if (a.resolver.clearance(at.x, at.z) < 0.35) failures.push('the arrival at the building door is not clear.');
-      const back = Math.hypot(at.x - a.door.x, at.z - a.door.z);
+      const back = Math.sqrt((at.x - a.door.x) * (at.x - a.door.x) + (at.z - a.door.z) * (at.z - a.door.z));
       if (back > 3) failures.push(`the arrival is ${back.toFixed(1)} m from the door it is supposed to be just inside.`);
     }
   }
@@ -2427,7 +2429,7 @@ export function verifyInterior(): string[] {
       const bz = pts[3];
       const mx = (ax + bx) / 2;
       const mz = (az + bz) / 2;
-      const len = Math.hypot(bx - ax, bz - az) || 1;
+      const len = Math.sqrt((bx - ax) * (bx - ax) + (bz - az) * (bz - az)) || 1;
       let nx = (bz - az) / len;
       let nz = -(bx - ax) / len;
       if ((mx - it.centreX) * nx + (mz - it.centreZ) * nz < 0) {
@@ -2529,7 +2531,7 @@ export function verifyInterior(): string[] {
           const q = dir / 8;
           const dx = q < 0.5 ? 1 - q * 4 : q * 4 - 3;
           const dz = q < 0.25 ? q * 4 : q < 0.75 ? 2 - q * 4 : q * 4 - 4;
-          const len = Math.hypot(dx, dz) || 1;
+          const len = Math.sqrt((dx) * (dx) + (dz) * (dz)) || 1;
           const want: Placement = {
             kind: PLACEABLE.COUCH,
             x: at.x + (dx / len) * ring * 0.9,

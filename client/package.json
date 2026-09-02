@@ -9,7 +9,9 @@
     "prebuild": "node ../scripts/changelog.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "collision-window": "bun run src/world/collision-window-check.ts",
+    "perf-harness": "bun run src/perf-harness.ts"
   },
   "dependencies": {
     "three": "^0.185.1"

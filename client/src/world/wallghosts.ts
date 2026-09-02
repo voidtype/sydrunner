@@ -194,9 +194,6 @@ function inkColour(css: string): Color {
 }
 
 /** The slice of `TileStreamer` this needs, so a check can hand one in. */
-export interface GhostPhases {
-  tilePhase(key: string): 'built' | 'building' | 'loading' | 'failed' | 'missing' | 'absent';
-}
 
 /** The slice of `CollisionWorld` this needs. */
 export interface GhostPrisms {

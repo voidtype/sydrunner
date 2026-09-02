@@ -689,7 +689,12 @@ export function installTextureShim(renderer: unknown, report: GuardReport): stri
       const why =
         'renderer._textures.updateTexture was not found -- three has probably renamed it. ' +
         'The render guard is still in place, but a null-image texture will crash the frame before it can be named.';
-      console.warn('[render] texture shim NOT installed: ' + why);
+      // Returned, not logged. The caller logs the outcome once (`[boot] texture
+      // uploader shim: ...` in `main.ts`), and `verifyTextureAudit` deliberately
+      // installs against six broken stubs to prove this branch degrades -- so a
+      // `console.warn` here fired six times on every boot for every player,
+      // saying three had renamed something it had not. The self-check was the
+      // only thing that ever reached this line.
       return 'not installed: ' + why;
     }
     if (textures.__sydneyShimmed === true) return 'already installed';

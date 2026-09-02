@@ -1074,9 +1074,7 @@ export const DRIVE_CAM_DISTANCE = 7;
 /** And how far above the driver's eye. The brief's 2.5. */
 export const DRIVE_CAM_LIFT = 2.5;
 /** How far the body leans in a full-lock corner at speed, radians. About 5 degrees. */
-export const DRIVE_ROLL_MAX = 0.09;
 /** And how far it dives under full braking. About 3.5 degrees. */
-export const DRIVE_PITCH_MAX = 0.06;
 
 // --- The state ---------------------------------------------------------------------
 

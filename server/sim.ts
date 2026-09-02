@@ -270,7 +270,7 @@ import { DOOR_REACH_M, buildingSeed, doorAt, type DoorPrism } from '../client/sr
 import { arrivalAt, buildInterior, placementFits, setPlacements, type Interior } from '../client/src/world/interior.ts';
 import {
   MAX_PER_SPACE,
-  SAME_SPOT_M,
+  REMOVE_REACH_M,
   boxClearance,
   boxOf,
   knownKind,
@@ -658,18 +658,6 @@ export interface Participant {
    * where `Participant.world` is the answer instead.
    */
   interiorWorld: CombatWorld | null;
-  /**
-   * The door this body came in by, in world metres, with its outward normal.
-   *
-   * Per participant rather than per interior, because the space is shared and
-   * the door is not: two people walk into the same corner pub from George
-   * Street and from the lane behind it, and the owner's rule is that *"u leave
-   * thru the door u came in"*. Meaningless while `space` is the city.
-   */
-  doorX: number;
-  doorZ: number;
-  doorNX: number;
-  doorNZ: number;
 
   // --- Money. See `client/src/game/cash.ts`.
   /**
@@ -1835,10 +1823,6 @@ export class Simulation {
       space: CITY_SPACE,
       interior: null,
       interiorWorld: null,
-      doorX: 0,
-      doorZ: 0,
-      doorNX: 0,
-      doorNZ: 0,
       // **The wallet is opened here and only here**, by name, and only for a
       // person. `WalletStore.for` creates on first sight, so a new name's first
       // `WALLET` frame carries `STARTING_BALANCE` rather than a zero that is
@@ -2027,6 +2011,9 @@ export class Simulation {
       this.accounts.rememberSpot(p.account, this.carryOf(p));
     }
     p.gone = true;
+    // The room they were in, if they were the last in it. After `gone`, so the
+    // scan in `forgetInteriorIfEmpty` does not count them.
+    if (p.space !== CITY_SPACE) this.forgetInteriorIfEmpty(p.space);
   }
 
   /**
@@ -5750,12 +5737,22 @@ export class Simulation {
    * the same building's inside in each of them is the same rooms generated from
    * the same seed with no one in common. `ROOM_COUNT` is 1 on the box.
    *
-   * Never pruned. An interior is a few hundred numbers, `MAX_PLAYERS` is 100,
-   * and a room in which a hundred people have each opened a different door is
-   * holding a hundred of them -- which is less than one tick's snapshot garbage
-   * used to be before PERFORMANCE.md phase 1.
+   * Dropped when the last person leaves it. This used to say "never pruned,
+   * bounded by `MAX_PLAYERS`", which was wrong: a room lives for days and the
+   * map was bounded by the number of distinct buildings *anyone had ever
+   * entered*, not by who is in them now. An interior is cheap and rebuilding
+   * one is a few hundred microseconds, so there is nothing to keep.
    */
   private readonly interiors = new Map<number, { it: Interior; world: CombatWorld }>();
+
+  /** Drop a building's inside once nobody is standing in it. See `interiors`. */
+  private forgetInteriorIfEmpty(space: number): void {
+    if (space === CITY_SPACE) return;
+    for (const other of this.participants.values()) {
+      if (!other.gone && other.space === space) return;
+    }
+    this.interiors.delete(space);
+  }
 
   /**
    * The inside of this building, generated once and then handed out.
@@ -5826,10 +5823,13 @@ export class Simulation {
       y: b.position.y,
       z: b.position.z,
       yaw: b.yaw,
-      doorX: p.doorX,
-      doorZ: p.doorZ,
-      doorNX: p.doorNX,
-      doorNZ: p.doorNZ,
+      // The building's door, or zeros in the city. It is on the interior, and
+      // only there: the four per-participant copies this used to read were
+      // left over from when a door was where you happened to knock.
+      doorX: p.interior?.door.x ?? 0,
+      doorZ: p.interior?.door.z ?? 0,
+      doorNX: p.interior?.door.nx ?? 0,
+      doorNZ: p.interior?.door.nz ?? 0,
     };
   }
 
@@ -5883,10 +5883,6 @@ export class Simulation {
     p.space = spaceForBuilding(seed);
     p.interior = made.it;
     p.interiorWorld = made.world;
-    p.doorX = made.it.door.x;
-    p.doorZ = made.it.door.z;
-    p.doorNX = made.it.door.nx;
-    p.doorNZ = made.it.door.nz;
     this.moveInto(p, at.x, made.it.base + EYE_HEIGHT, at.z);
     return this.spaceFrameFor(p);
   }
@@ -5912,15 +5908,15 @@ export class Simulation {
    * which is where they were going anyway.
    */
   private leaveInterior(p: Participant): SpaceFrame | null {
-    const x = p.doorX + p.doorNX * 1.3;
-    const z = p.doorZ + p.doorNZ * 1.3;
+    const inside = p.interior;
+    if (inside === null) return null;
+    const x = inside.door.x + inside.door.nx * 1.3;
+    const z = inside.door.z + inside.door.nz * 1.3;
+    const space = p.space;
     p.space = CITY_SPACE;
     p.interior = null;
     p.interiorWorld = null;
-    p.doorX = 0;
-    p.doorZ = 0;
-    p.doorNX = 0;
-    p.doorNZ = 0;
+    this.forgetInteriorIfEmpty(space);
     this.moveInto(p, x, eyeAt(p.world, x, z), z);
     return this.spaceFrameFor(p);
   }
@@ -5994,7 +5990,7 @@ export class Simulation {
       // order changes the moment anything is removed from the middle of it --
       // see `protocol.FurnishRequest`.
       let best = -1;
-      let bestD = SAME_SPOT_M + 1.2;
+      let bestD = REMOVE_REACH_M;
       for (let i = 0; i < held.length; i++) {
         const d = boxClearance(boxOf(held[i], inside.plan.box.ux, inside.plan.box.uz), req.x, req.z);
         if (d < bestD) {
@@ -6074,10 +6070,6 @@ export class Simulation {
     p.space = spaceForBuilding(seed);
     p.interior = made.it;
     p.interiorWorld = made.world;
-    p.doorX = made.it.door.x;
-    p.doorZ = made.it.door.z;
-    p.doorNX = made.it.door.nx;
-    p.doorNZ = made.it.door.nz;
     // Where they were standing, settled -- not the arrival, which would put
     // everybody who comes back to a pub in its doorway. `arrivalAt`'s settle is
     // reused through the resolver so a spot that has since become a wall (a
@@ -7039,10 +7031,6 @@ const PHASES = ['idle', 'windup', 'active', 'recovery', 'flinch', 'ko'];
 function phaseIndex(phase: string): number {
   const i = PHASES.indexOf(phase);
   return i < 0 ? 0 : i;
-}
-
-export function phaseName(index: number): string {
-  return PHASES[index] ?? 'idle';
 }
 
 /** Decode `protocol.BTN` into the shared `CombatInput`. */

@@ -68,7 +68,6 @@
  * and is under the same hand. See `protocol.BTN.ABILITY_R` for the byte it cost.
  */
 
-import { EYE_HEIGHT } from '../player/controller.ts';
 import type { CombatInput, CombatantState } from './combat.ts';
 import {
   ABILITY,
@@ -76,9 +75,7 @@ import {
   G_RESULT,
   abilityForV,
   dashSpeedFor,
-  feedG,
   tryAbility,
-  type Ability,
 } from './abilities.ts';
 import { FX } from './teams.ts';
 import { fxNow, fxScalar } from './teamfx.ts';
@@ -88,14 +85,8 @@ export const LOCAL_ID = 0;
 
 /** `V` last frame, for the rising edge. `main.ts`'s `mountHeld`, one key over. */
 let vHeld = false;
-/** `T` last frame, the same. */
-let tHeld = false;
 
 /** Reset the edge latches. For a fresh session and for the self-checks. */
-export function resetTalentKeys(): void {
-  vHeld = false;
-  tHeld = false;
-}
 
 /**
  * Read the four keys into the input, and predict the dash.
@@ -128,7 +119,6 @@ export function tickTalentKeys(
 
   const rising = v && !vHeld;
   vHeld = v;
-  tHeld = t;
   if (!rising || c.phase === 'ko') return;
 
   // Only the dash and the on-foot slide are predicted. Everything else on `V`
@@ -183,24 +173,12 @@ export function applyDash(c: CombatantState, input: CombatInput, metres: number)
 }
 
 /** Feet, for a caller that has an eye. `combat.feetY` without the import cycle. */
-export function feetOf(c: CombatantState): number {
-  return c.body.position.y - EYE_HEIGHT;
-}
 
 /** Which ability `V` resolved to for this player. For the HUD's cooldown pip. */
-export function talentKeyV(playerId: number): Ability {
-  return abilityForV(playerId);
-}
 
 /** The `G` reader, exposed so the HUD can show a hold filling. */
-export function talentKeyG(playerId: number, down: boolean, nowMs: number): number {
-  return feedG(playerId, down, nowMs);
-}
 
 /** `T` last frame. Read by nothing yet; here so the latch is not write-only. */
-export function talentKeyTHeld(): boolean {
-  return tHeld;
-}
 
 /** The three constants a caller comparing against `feedG`'s answer needs. */
 export { G_RESULT };

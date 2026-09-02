@@ -198,29 +198,6 @@ export function structureGauge(offset: number, dy: number): boolean {
 }
 
 /**
- * How far inside the gauge a box reaching from `o0` to `o1` across the track and
- * `y0` to `y1` over its railhead reaches, metres. Zero when it is clear.
- *
- * The signed version of `structureGauge`, because an audit that could only say
- * *yes* would sort its offenders alphabetically. The depth is measured across
- * the corridor -- the direction the platform is wrong in -- and is zero whenever
- * the box misses the body's height band entirely.
- */
-export function gaugeIntrusion(o0: number, o1: number, y0: number, y1: number): number {
-  const lo = Math.min(y0, y1);
-  const hi = Math.max(y0, y1);
-  if (hi <= CAR_BODY_FLOOR_M || lo >= CAR_BODY_ROOF_M) return 0;
-  const a = Math.min(o0, o1);
-  const b = Math.max(o0, o1);
-  const limit = CAR_BODY_HALF_M + STRUCTURE_MARGIN_M;
-  // The box straddles the centreline: the train is inside it, and the depth is
-  // the whole half-gauge rather than an edge distance.
-  if (a < 0 && b > 0) return limit;
-  const near = a >= 0 ? a : -b;
-  return near < limit ? limit - near : 0;
-}
-
-/**
  * The clearance a road needs kept over it, metres.
  *
  * `pipeline/sydney/elevated.ROAD_CLEARANCE_M`, restated. Not re-derived and not
@@ -331,10 +308,6 @@ export interface CarveTally {
   dropped: number;
   /** Prisms cut down to nothing at all -- a footprint entirely inside a corridor. */
   emptied: number;
-}
-
-export function emptyTally(): CarveTally {
-  return { tested: 0, cut: 0, pieces: 0, dropped: 0, emptied: 0 };
 }
 
 const CELL_M = 64;

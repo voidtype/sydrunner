@@ -312,15 +312,6 @@ export const UPPER_BODY = /*#__PURE__*/ mask({
 });
 
 /** The legs and the root. The half of a locomotion clip a punch must not touch. */
-export const LOWER_BODY = /*#__PURE__*/ mask({
-  [BONE.HIPS]: 1,
-  [BONE.HIP_L]: 1,
-  [BONE.KNEE_L]: 1,
-  [BONE.ANKLE_L]: 1,
-  [BONE.HIP_R]: 1,
-  [BONE.KNEE_R]: 1,
-  [BONE.ANKLE_R]: 1,
-});
 
 /** Everything. A knockout takes the whole figure and nothing survives it. */
 export const WHOLE_BODY = /*#__PURE__*/ mask({}, 1);

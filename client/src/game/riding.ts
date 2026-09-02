@@ -2119,19 +2119,6 @@ export function clearAboard(a: AboardSlot): void {
 }
 
 /** Copy one slot's ride into another. `net/client.ts` adopts the server's this way. */
-export function copyAboard(from: AboardSlot, to: AboardSlot): void {
-  to.line = from.line;
-  to.dir = from.dir;
-  to.trip = from.trip;
-  to.car = from.car;
-  to.x = from.x;
-  to.y = from.y;
-  to.z = from.z;
-  to.yaw = from.yaw;
-  to.vx = from.vx;
-  to.vy = from.vy;
-  to.vz = from.vz;
-}
 
 /** Just the rotation, for a velocity or any other free vector. */
 export function localToWorldDir(
@@ -3614,8 +3601,16 @@ export function verifyRiding(eyeHeight: number, radius: number): string[] {
         boxHalfLength: 100, boxHalfWidth: 16, boxFloorY: FLOOR, boxCeilY: CEIL,
       }],
     } as unknown as RailBake);
-    if (bore.boxes.length !== 1) {
-      bad.push(`an underground station got ${bore.boxes.length} station boxes, expected 1`);
+    // **Three, not one.** A served bore gets the station box, the access ramp
+    // and the tunnel between them -- see `buildStationBoxes`, which grew the
+    // second and third when the way in was built. This line said `1` for as
+    // long as that had been true, and then went on saying it: the check failed
+    // on every boot for every player, at `warn`, and nobody read it. Asserted
+    // by name now, so a fourth box or a missing tunnel is a real failure.
+    const boxNames = bore.boxes.map((b) => b.name).sort();
+    const wantNames = ['A BORE', 'A BORE access', 'A BORE tunnel'];
+    if (boxNames.join('|') !== wantNames.join('|')) {
+      bad.push(`an underground station got station boxes [${boxNames.join(', ')}], expected [${wantNames.join(', ')}]`);
     } else if (bore.floorAt(0, 0, FLOOR) !== FLOOR) {
       bad.push(`the box built for an underground station does not answer its own floor`);
     }

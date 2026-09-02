@@ -33,7 +33,7 @@
  * See `world/tripview.ts` for the numbers and the check that holds their shape.
  */
 
-import { PostProcessing, type WebGPURenderer } from 'three/webgpu';
+import { RenderPipeline, type WebGPURenderer } from 'three/webgpu';
 import type { Camera, Scene } from 'three';
 import { CALM as CALM_LOOK, looksClear, type TripLook } from './tripview.ts';
 
@@ -55,7 +55,7 @@ const LAZY_BUILD_TRIES = 8;
 
 export class TripPass {
   private readonly deps: TripPassDeps;
-  private post: PostProcessing | null = null;
+  private post: RenderPipeline | null = null;
   /**
    * The scene pass node, kept for one reason: `warmInto`.
    *
@@ -73,7 +73,7 @@ export class TripPass {
   /**
    * The pass is compiled **off the frame**, and this is the state machine for it.
    *
-   * Building a `PostProcessing` is cheap; the expensive part is the pipeline the
+   * Building a `RenderPipeline` is cheap; the expensive part is the pipeline the
    * first `render()` compiles, and that is a synchronous stall of exactly the
    * kind this client is already fighting. The first mushroom paid it in one
    * frame and the owner reported the game blocking outright.
@@ -143,23 +143,21 @@ export class TripPass {
         // Compile off the frame. Until it lands the caller draws the world.
         if (!this.compiling) {
           this.compiling = true;
-          const p = this.post as unknown as { renderAsync?: () => Promise<void> };
-          if (typeof p.renderAsync === 'function') {
-            void p
-              .renderAsync()
-              .then(() => {
-                this.ready = true;
-              })
-              .catch((err: unknown) => {
-                this.failed = true;
-                this.post = null;
-                console.warn('[trip] the post pass failed to compile and has been dropped:', err);
-              });
-          } else {
-            // No async path on this three: compile on the frame after all, which
-            // is the old behaviour and still better than not drawing at all.
-            this.ready = true;
-          }
+          // `render()`, not `renderAsync()`: three deprecated the latter and
+          // logs it on every boot, and the renderer is initialised long before
+          // this pass is first built. Off the frame in a microtask so a
+          // compile that throws lands in the `.catch` rather than in the
+          // caller's frame, which is the shape the old async path had.
+          void Promise.resolve()
+            .then(() => {
+              this.post!.render();
+              this.ready = true;
+            })
+            .catch((err: unknown) => {
+              this.failed = true;
+              this.post = null;
+              console.warn('[trip] the post pass failed to compile and has been dropped:', err);
+            });
         }
         return false;
       }
@@ -189,9 +187,8 @@ export class TripPass {
     try {
       if (this.post === null) this.post = this.build();
       this.look = CALM_LOOK;
-      const p = this.post as unknown as { renderAsync?: () => Promise<void> };
-      if (typeof p.renderAsync === 'function') await p.renderAsync();
-      else this.post.render();
+      // See `render` above for why this is no longer `renderAsync`.
+      this.post.render();
       this.ready = true;
       this.compiling = true;
     } catch (err) {
@@ -282,7 +279,7 @@ export class TripPass {
     // correctness requirement rather than tidiness. Holding it across the await
     // leaves the renderer pointing at the pass's own texture for as long as a
     // compile takes, and a frame that lands in that window ends with
-    // `PostProcessing` drawing its output quad into the very texture it samples:
+    // `RenderPipeline` drawing its output quad into the very texture it samples:
     //
     //     [Texture "output"] usage (TextureBinding|RenderAttachment) includes
     //     writable usage and another usage in the same synchronization scope.
@@ -317,7 +314,7 @@ export class TripPass {
    * design is that it cannot break the boot. Anything missing throws here, which
    * `render` catches and latches.
    */
-  private build(): PostProcessing {
+  private build(): RenderPipeline {
     const tsl = tslApi();
     const { pass, uniform, vec2, vec3, float, uv, sin, cos, atan, length, mix, smoothstep, abs, floor } = tsl;
     const { renderer, scene, camera } = this.deps;
@@ -387,7 +384,7 @@ export class TripPass {
     const outward = smoothstep(uClear.mul(0.6), uClear, r);
     const finalRgb = mix(clean.rgb, psyched, outward);
 
-    const post = new PostProcessing(renderer);
+    const post = new RenderPipeline(renderer);
     post.outputNode = vec3(finalRgb.r, finalRgb.g, finalRgb.b);
 
     // The uniforms follow `this.look`, read at render time.

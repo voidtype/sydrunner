@@ -168,9 +168,6 @@ export { LAMP_COUNT, LID_COUNT, STYLE_COUNT, decodeFurniture };
 export type { TileFurniture };
 
 /** Must match `furniture.LAMP_*` in the pipeline. */
-export const LAMP_RED = 0;
-export const LAMP_AMBER = 1;
-export const LAMP_GREEN = 2;
 /** Must match `furniture.STYLE_*` in the pipeline. */
 export const STYLE_COS_GREEN = 0;
 export const STYLE_RMS_WHITE = 1;

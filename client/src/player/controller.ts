@@ -166,6 +166,15 @@ export function step(
   // rather than from the camera matrix so that looking at the sky cannot make the
   // player crawl. Three's default camera looks down -Z, so forward is
   // (-sin yaw, 0, -cos yaw).
+  //
+  // **This is the one place both ends deliberately run `Math.sin`/`cos`**, which
+  // DESIGN.md rule 5 otherwise forbids. Yaw is a continuous float off a mouse
+  // and there is no integer form of it. What makes it safe is not that Bun and
+  // V8 agree -- they may differ in the last bit -- but that the disagreement is
+  // bounded to that bit and `net/client.reconcile` has a deadzone
+  // (`CORRECTION_DEADZONE`) many orders of magnitude wider. The server wins;
+  // the client is corrected; the correction is invisible. If that deadzone is
+  // ever tightened below a micrometre, this comment is the reason it jitters.
   const sinY = Math.sin(state.yaw);
   const cosY = Math.cos(state.yaw);
   const forwardX = -sinY;

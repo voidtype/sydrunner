@@ -95,7 +95,7 @@ Every one of those but `interiorview.ts` is three-free and runs on **both** boot
 lists (`client/src/main.ts` and `server/index.ts`), because a check that only
 runs in the browser is a check the deploy gate cannot see.
 
-## The wire — protocol v23
+## The wire — protocol v25
 
 Two messages, a matched pair under the halves convention:
 
@@ -108,7 +108,9 @@ Two messages, a matched pair under the halves convention:
   prompt, which is `MSG.SUN_PRESS`' arrangement: the slack has to live
   somewhere, and a field the sender controls is the one place it must not.
 - **`MSG.SPACE` (0x96, server → client), 41 bytes.** Space, building seed,
-  position, yaw, and the door with its outward normal. Sent as the reply to a
+  position, yaw, and the building's door with its outward normal (the door is
+  the building's, derived from the footprint; the frame carries it so a client
+  can draw the exit before it has generated the rooms). Sent as the reply to a
   door press and **unconditionally after every welcome** — forty-one bytes to
   say "you are outside" is worth it against a reconnect whose saved spot has
   expired leaving a browser drawing a pub the server has no record of. Absence

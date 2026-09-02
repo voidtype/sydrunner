@@ -3097,11 +3097,6 @@ const PARK_GRID = (() => {
 })();
 
 /** How many (cell, park) pairs the grid holds. Reported by `verifyWildlife`. */
-export const PARK_GRID_ENTRIES = (() => {
-  let n = 0;
-  for (const cell of PARK_GRID.values()) n += cell.length;
-  return n;
-})();
 
 /**
  * How many distinct parks the grid can actually reach.

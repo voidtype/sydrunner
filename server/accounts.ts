@@ -234,6 +234,15 @@ export class AccountStore {
   private readonly idIndex = new Map<string, AccountRecord>();
   private dirty = false;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * Set when the file would not parse **and** could not be copied aside.
+   *
+   * While true, `save` refuses. The bytes on disk are then the only copy of
+   * whatever the parser rejected, and a debounced write of an empty store over
+   * them is the single most destructive thing this file can do. An operator
+   * moves the file and restarts; nothing here unfreezes.
+   */
+  private frozen = false;
   private swept = 0;
   private loaded = false;
 
@@ -294,12 +303,22 @@ export class AccountStore {
       if (this.swept > 0) this.dirty = true;
     } catch (err) {
       const aside = `${this.path}.broken-${Date.now()}`;
+      let asideOk = true;
       try {
         await Bun.write(aside, Bun.file(this.path));
-      } catch {
-        // Nothing further to try; the message below is the record.
-      }
-      console.error(`[sydney] accounts: ${this.path} would not parse (${String(err)}); moved to ${aside}`);
+      } catch (copyErr) {
+        // **The one failure this file must not shrug off.** The original will
+        // not parse and the copy of it just failed, so the only bytes anybody
+        // has are the ones on disk right now -- and the next debounced save
+        // would overwrite them with an empty store. Freezing writes is what
+        // turns "everybody's accounts is gone" into "the server needs a human".
+        asideOk = false;
+        this.frozen = true;
+        console.error(`[sydney] accounts: could NOT copy ${this.path} aside (${String(copyErr)}); writes are frozen until an operator moves it by hand.`);
+      }      console.error(
+        `[sydney] accounts: ${this.path} would not parse (${String(err)}); ` +
+          (asideOk ? `moved to ${aside}` : 'and it was NOT moved aside -- see the line above'),
+      );
       this.file = { version: 1, accounts: {} };
     }
   }
@@ -832,6 +851,13 @@ export class AccountStore {
       this.saveTimer = null;
     }
     if (!this.dirty) return;
+    if (this.frozen) {
+      // See `load`'s catch. The file on disk is the only copy of something the
+      // parser refused and the copy-aside failed; writing over it is the one
+      // thing this process must not do on its own.
+      console.error(`[sydney] accounts: not saving ${this.path}; writes are frozen after a failed copy-aside.`);
+      return;
+    }
     this.dirty = false;
     const tmp = `${this.path}.tmp-${process.pid}`;
     try {

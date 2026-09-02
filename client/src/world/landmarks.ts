@@ -67,8 +67,6 @@ export const LANDMARK_MATERIALS = [
   'landmark_asphalt',
 ] as const;
 
-export type LandmarkMaterialName = (typeof LANDMARK_MATERIALS)[number];
-
 /** What `index.json` carries about the landmark set. */
 export interface LandmarkItem {
   name: string;

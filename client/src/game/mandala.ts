@@ -118,7 +118,6 @@ export function breath(tSeconds: number): number {
  * about either.
  */
 export const HUE_CORE = 0.11;
-export const HUE_MID = 0.03;
 export const HUE_RIM = 0.94;
 export const HUE_EYE = 0.58;
 

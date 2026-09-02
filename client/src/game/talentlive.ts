@@ -97,17 +97,11 @@ export const ALLY_SECONDS = 10;
 const allies = new Map<number, { ownerId: number; untilMs: number }>();
 
 /** Everything back to boot. For the self-checks and for a room reset. */
-export function resetAllies(): void {
-  allies.clear();
-}
 /** How many actors are currently somebody's. Diagnostics and the check. */
 export function trackedAllies(): number {
   return allies.size;
 }
 /** Drop one. Called when an actor despawns. */
-export function forgetAlly(actorId: number): void {
-  allies.delete(actorId);
-}
 
 /** Is this a kind `Meth-adone` speaks to? Meth heads and drunks; **not** eshays. */
 export function alliableKind(kind: number): boolean {

@@ -928,26 +928,6 @@ export function maxHealthOf(c: CombatantState): number {
   return fxMaxPips(c.id, MAX_HEALTH);
 }
 
-/**
- * Top a combatant up to their (possibly new) maximum. True if it moved.
- *
- * Called on the tick a talent is spent, which is the brief's "heal to new max on
- * take": a player who buys Big Night mid-fight should see the fourth pip arrive
- * full rather than empty, because an empty new pip is a talent that made you
- * *look* healthier and did nothing until you next died.
- *
- * A no-op for a knocked-out body -- `respawnAt` will do it in three seconds and
- * healing a corpse to four pips while it is still ragdolling would put a live
- * health bar over a crumpled one.
- */
-export function refreshMaxHealth(c: CombatantState): boolean {
-  if (c.phase === 'ko' || c.health <= 0) return false;
-  const max = maxHealthOf(c);
-  if (c.health >= max) return false;
-  c.health = max;
-  return true;
-}
-
 /** Feet height, metres. The mesh origin, the capsule origin, and the ground query's argument. */
 export function feetY(c: CombatantState): number {
   return c.body.position.y - EYE_HEIGHT;

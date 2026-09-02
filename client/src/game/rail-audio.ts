@@ -185,7 +185,6 @@ export const ARRIVE_URL = '/audio/rail/25s_before_arrive.mp3';
 export const DEPART_URL = '/audio/rail/15s_before_leave.mp3';
 
 /** Both, in `ANNOUNCE_*` order, for the prefetch and for the check. */
-export const ANNOUNCE_URLS: readonly string[] = [ARRIVE_URL, DEPART_URL];
 
 /**
  * Inside a moving train, recorded by the owner on a Sydney train and handed
