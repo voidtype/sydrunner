@@ -116,6 +116,17 @@ Uppercase is a *transform on Jost labels and the hero*, and on nothing that
 carries a name: team names (`Marita`, `DeFAULT`) and player names are never
 transformed anywhere — the rule the talents panel already keeps.
 
+### The scale
+
+Every size is a base times `--ui`, and `--ui` steps with the viewport: 1 under
+1700 px wide, 1.2 at 1080p, 1.45 at 1440p, 1.7 and 2 above. A CSS pixel is the
+browser's reference angle and a HUD is read from the middle distance, so a
+2560-wide screen gets the laptop's interface at nearly one and a half times
+rather than the same pixels smaller — the owner's *"its too small still"*. The
+vitals cluster multiplies that by its own 3x. The legend is rows of keycaps
+that wrap and never ellipsise; the blade is `--t-lead`; every vitals row wears
+its name (health · puff · footy · car) the way the top-right column does.
+
 ### Surfaces and motion
 
 A panel is `--steel-2` with a 1 px `--edge` hairline and a 2 px `--sandstone`

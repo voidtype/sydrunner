@@ -64,22 +64,29 @@
         /* over-the-world text needs a shadow; one shadow, everywhere */
         --lift: 0 1px 2px rgba(0,0,0, .9);
         --lift-big: 0 2px 12px rgba(0,0,0, .8);
-        /* type */
-        --t-micro: 10px;
-        --t-small: 11px;
-        --t-body: 12px;
-        --t-mid: 13px;
-        --t-large: 14px;
-        --t-lead: 16px;
-        --t-title: 20px;
-        --t-display: 28px;
-        --t-hero: clamp(30px, 4.6vw, 52px);
-        --t-mark: 64px;
+        /* THE SCALE. A CSS pixel is the browser's reference angle and a HUD is
+           read from the middle distance, so every size below is a base times
+           `--ui`, and `--ui` steps with the viewport: a 1440-tall screen gets
+           the laptop's HUD at 1.45x, a 4K one at 2x. Owner-reported at 2560
+           wide: "its too small still". The vitals ladder below shares the
+           rungs. */
+        --ui: 1;
+        --t-micro: calc(11px * var(--ui));
+        --t-small: calc(12px * var(--ui));
+        --t-body: calc(13px * var(--ui));
+        --t-mid: calc(14px * var(--ui));
+        --t-large: calc(15px * var(--ui));
+        --t-lead: calc(17px * var(--ui));
+        --t-title: calc(22px * var(--ui));
+        --t-display: calc(30px * var(--ui));
+        --t-hero: clamp(34px, 5vw, 72px);
+        --t-mark: calc(64px * var(--ui));
         /* radii and space */
         --r-tight: 3px; --r-base: 6px; --r-panel: 12px; --r-pill: 999px;
         --s-1: 2px; --s-2: 4px; --s-3: 6px; --s-4: 8px; --s-5: 10px;
         --s-6: 12px; --s-7: 14px; --s-8: 18px; --s-9: 24px;
-        --gutter: 16px;
+        --gutter: calc(16px * var(--ui));
+        --disc: calc(200px * var(--ui));
         /* motion */
         --m-quick: .14s;
         --m-calm: .24s;
@@ -109,13 +116,17 @@
         font-family: var(--f-ui);
         -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
       }
+      @media (min-width: 1700px) and (min-height: 950px) { :root { --ui: 1.2; } }
+      @media (min-width: 2200px) and (min-height: 1150px) { :root { --ui: 1.45; } }
+      @media (min-width: 2900px) and (min-height: 1500px) { :root { --ui: 1.7; } }
+      @media (min-width: 3500px) and (min-height: 1900px) { :root { --ui: 2; } }
       html, body { height: 100%; overflow: hidden; background: var(--steel); color: var(--cream); margin: 0; }
       #viewport { display: block; width: 100vw; height: 100vh; cursor: crosshair; }
       button, input, textarea { font-family: inherit; }
       kbd {
-        display: inline-block; font: 600 var(--t-micro)/1 var(--f-ui); letter-spacing: .04em;
+        display: inline-block; font: 600 var(--t-small)/1 var(--f-ui); letter-spacing: .04em;
         color: var(--on-sandstone); background: var(--sandstone); border-radius: var(--r-tight);
-        padding: 3px 6px; vertical-align: baseline; text-transform: lowercase;
+        padding: 4px 7px; vertical-align: baseline; text-transform: lowercase;
       }
       /* The eyebrow: a Jost label in capitals. Used by every panel. Never on a name. */
       .eyebrow, #helpfull h1, #helpfull h2, #leaderboard h1, #leaderboard th, #questlog h1,
@@ -146,23 +157,25 @@
         text-align: center; z-index: 3;
       }
       #hint:empty { display: none; }
-      #hint kbd { font-size: var(--t-small); padding: 4px 7px; }
+      #hint kbd { font-size: var(--t-body); padding: 5px 8px; }
 
-      /* --- The controls, bottom right. Not GTA, not Skyrim: this game keeps a
-         legend on screen because its players arrive in a browser with no
-         manual. Compact, dim, keys in sandstone. */
+      /* --- The legend, bottom right. Not GTA, not Skyrim: this game keeps one
+         on screen because its players arrive in a browser with no manual. Rows
+         of keycaps and verbs in the top-right column's own language; it wraps
+         and never ellipsises, because a control you cannot read is not one. */
       #help {
         position: fixed; right: var(--gutter); bottom: var(--gutter);
-        max-width: min(390px, 44vw);
-        font-size: var(--t-body); line-height: 1.6; color: var(--cream-3);
+        max-width: min(calc(560px * var(--ui)), 46vw);
+        display: flex; flex-direction: column; align-items: flex-end; gap: calc(5px * var(--ui));
+        font-size: var(--t-mid); line-height: 1.5; color: var(--cream-2);
         text-shadow: var(--lift); text-align: right; pointer-events: none;
         transition: opacity var(--m-calm) var(--m-ease); z-index: 2;
       }
-      #help div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      #help .keys { color: var(--cream-2); }
-      #help .more { color: var(--cream-3); font-size: var(--t-small); }
-      #help b { color: var(--sandstone); font-weight: 600; }
-      #help .wrap { white-space: normal; }
+      #help .eyebrow { font-size: var(--t-micro); color: var(--cream-3); margin-bottom: 2px; }
+      #help div.keys, #help div.more { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px calc(12px * var(--ui)); white-space: normal; }
+      #help span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+      #help .more { color: var(--cream-3); font-size: var(--t-body); }
+      #help .more kbd { background: var(--steel-3); color: var(--cream); }
       #help.hidden { opacity: 0; }
       body.suggesting #help, body:has(#phone.shown) #help { opacity: 0; }
       @media (max-height: 460px) { #help .keys { display: none; } }
@@ -201,7 +214,7 @@
          disc grows up and to the right, into the screen. */
       #minimap {
         position: fixed; left: var(--gutter); bottom: var(--gutter);
-        width: 200px; height: 200px; border-radius: 50%;
+        width: var(--disc); height: var(--disc); border-radius: 50%;
         border: 2px solid rgba(241,233,214, .5); background: var(--wash);
         box-shadow: 0 0 0 1px rgba(6,9,13,.72), var(--lift);
         transition: transform var(--m-calm) var(--m-ease);
@@ -210,23 +223,22 @@
       #minimap.raised { transform: scale(1.55); transform-origin: 0 100%; }
       #minimap.mapoff, #locator.mapoff { display: none; }
       #locator {
-        position: fixed; left: var(--gutter); bottom: calc(var(--gutter) + 200px + 12px);
-        max-width: 240px; padding: 6px 10px 7px; border-radius: 2px;
+        position: fixed; left: var(--gutter); bottom: calc(var(--gutter) + var(--disc) + 12px);
+        max-width: calc(var(--disc) + 120px); padding: 8px 14px 9px; border-radius: 3px;
         background: var(--blade); color: var(--on-blade);
-        font-size: var(--t-body); font-weight: 600; line-height: 1.35; letter-spacing: .01em;
-        box-shadow: 0 0 0 1px rgba(255,255,255, .12) inset, var(--lift);
-        display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
-        overflow: hidden; overflow-wrap: break-word;
+        font: 600 var(--t-lead)/1.3 var(--f-ui); letter-spacing: .01em;
+        box-shadow: 0 0 0 2px rgba(255,255,255, .16) inset, var(--lift);
+        overflow-wrap: break-word; text-wrap: balance;
         transition: transform var(--m-calm) var(--m-ease);
         pointer-events: none; z-index: 2;
       }
       #locator:empty { display: none; }
-      #locator.raised { transform: translateY(-110px); }
+      #locator.raised { transform: translateY(calc(var(--disc) * -.55)); }
 
       /* --- Chat, above the blade, growing upward. */
       #chat {
         position: fixed; left: var(--gutter);
-        bottom: calc(var(--gutter) + 200px + 12px + 44px + 14px);
+        bottom: calc(var(--gutter) + var(--disc) + 12px + 52px + 14px);
         width: min(460px, 42vw); display: flex; flex-direction: column; gap: 6px;
         pointer-events: none; z-index: 3; font-size: var(--t-body); line-height: 1.5;
       }
@@ -255,27 +267,36 @@
       /* --- Vitals: the counted things, to the right of the disc. Every length
          is multiplied by `--vitals-scale`: a viewport rung (so a 4K screen is
          not a laptop's HUD at half size) times the owner's 3x. */
-      :root { --vitals-rung: 1; --vitals-boost: 3; --vitals-scale: calc(var(--vitals-rung) * var(--vitals-boost)); --vitals-line: 2px; }
-      @media (min-width: 1700px) and (min-height: 950px) { :root { --vitals-rung: 1.15; } }
-      @media (min-width: 2200px) and (min-height: 1150px) { :root { --vitals-rung: 1.35; } }
-      @media (min-width: 2900px) and (min-height: 1500px) { :root { --vitals-rung: 1.55; --vitals-line: 3px; } }
-      @media (min-width: 3500px) and (min-height: 1900px) { :root { --vitals-rung: 1.8; --vitals-line: 3px; } }
+      :root { --vitals-boost: 3; --vitals-scale: calc(var(--ui) * var(--vitals-boost)); --vitals-line: 2px; }
+      @media (min-width: 2900px) and (min-height: 1500px) { :root { --vitals-line: 3px; } }
       #vitals {
-        position: fixed; left: calc(var(--gutter) + 200px + 16px); bottom: var(--gutter);
+        position: fixed; left: calc(var(--gutter) + var(--disc) + 16px); bottom: var(--gutter);
         pointer-events: none; display: flex; flex-direction: column; gap: calc(6px * var(--vitals-scale)); z-index: 2;
       }
-      #pips { display: flex; gap: calc(6px * var(--vitals-scale)); }
+      /* Each row wears its name, the way the top-right column does. */
+      #pips, #stamina, #balls, #carhealth { position: relative; margin-left: calc(6.5em * var(--ui)); }
+      #pips::before, #stamina::before, #balls::before, #carhealth::before {
+        position: absolute; right: 100%; top: 50%; transform: translateY(-50%); margin-right: 12px;
+        font: 500 var(--t-micro)/1 var(--f-display); letter-spacing: .22em; text-transform: uppercase;
+        color: var(--cream-3); text-shadow: var(--lift); white-space: nowrap;
+      }
+      #pips::before { content: "health"; }
+      #stamina::before { content: "puff"; }
+      #balls::before { content: "footy"; }
+      #carhealth::before { content: "car"; }
+      #pips:empty::before, #stamina:empty::before, #balls:empty::before { display: none; }
+      #pips { display: flex; align-items: center; gap: calc(6px * var(--vitals-scale)); }
       #pips div {
-        width: calc(26px * var(--vitals-scale)); height: calc(12px * var(--vitals-scale));
+        width: calc(26px * var(--vitals-scale)); height: calc(7px * var(--vitals-scale));
         border: var(--vitals-line) solid rgba(241,233,214, .4); box-shadow: var(--lift);
       }
       #pips div.full { background: var(--cream); border-color: var(--cream); }
       #pips div.last { background: var(--alert); border-color: var(--alert); }
-      #stamina { display: flex; gap: calc(6px * var(--vitals-scale)); }
+      #stamina { display: flex; align-items: center; gap: calc(6px * var(--vitals-scale)); }
       #stamina div { width: calc(18px * var(--vitals-scale)); height: calc(3px * var(--vitals-scale)); background: rgba(241,233,214, .16); box-shadow: var(--lift); overflow: hidden; }
       #stamina div i { display: block; height: 100%; width: 0; background: var(--cream-2); }
       #stamina div.full i { width: 100%; background: var(--cream); }
-      #balls { display: flex; gap: calc(5px * var(--vitals-scale)); }
+      #balls { display: flex; align-items: center; gap: calc(5px * var(--vitals-scale)); }
       #balls div { width: calc(24px * var(--vitals-scale)); height: calc(2px * var(--vitals-scale)); background: rgba(196,84,52,.16); box-shadow: var(--lift); overflow: hidden; }
       #balls div i { display: block; height: 100%; width: 0; background: rgba(196,84,52,.55); }
       #balls div.full i { width: 100%; background: #c8563a; }
@@ -288,7 +309,7 @@
       #effects { display: flex; gap: calc(6px * var(--vitals-scale)); }
       #effects:empty { display: none; }
       #effects div {
-        font: 500 calc(9px * var(--vitals-scale))/1 var(--f-display); letter-spacing: .16em; text-transform: uppercase;
+        font: 500 calc(7px * var(--vitals-scale))/1 var(--f-display); letter-spacing: .16em; text-transform: uppercase;
         padding: calc(3px * var(--vitals-scale)) calc(6px * var(--vitals-scale));
         color: var(--cream); border: var(--vitals-line) solid rgba(241,233,214, .4);
         text-shadow: var(--lift); white-space: nowrap;
@@ -298,16 +319,16 @@
       #you {
         position: fixed; top: var(--gutter); right: var(--gutter);
         display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
-        width: 240px; pointer-events: none; z-index: 2; text-align: right;
+        width: calc(260px * var(--ui)); pointer-events: none; z-index: 2; text-align: right;
       }
       #money {
-        font: 600 26px/1 var(--f-display); letter-spacing: .02em; font-variant-numeric: tabular-nums;
+        font: 600 calc(28px * var(--ui))/1 var(--f-display); letter-spacing: .02em; font-variant-numeric: tabular-nums;
         color: var(--sandstone); text-shadow: var(--lift);
       }
       #money:empty { display: none; }
       #level { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
       #level-text { font-size: var(--t-micro); color: var(--cream-2); text-shadow: var(--lift); line-height: 1; }
-      #level-xp { width: 72px; height: 2px; background: rgba(241,233,214, .16); box-shadow: var(--lift); overflow: hidden; }
+      #level-xp { width: calc(80px * var(--ui)); height: 2px; background: rgba(241,233,214, .16); box-shadow: var(--lift); overflow: hidden; }
       #level-xp i { display: block; height: 100%; width: 0; background: var(--cream-2); }
       #level-team { text-transform: none; letter-spacing: .06em; display: none; margin-left: 6px; padding: 1px 5px; border-radius: var(--r-tight); font: 600 var(--t-micro)/1.3 var(--f-ui); }
       #level-team.shown { display: inline-block; }
@@ -316,7 +337,7 @@
       #level-spend.shown { display: inline; }
       #level-spend:hover { color: #ffffff; }
       #heat {
-        display: none; font-size: calc(11px * var(--vitals-rung) * 1.6); line-height: 1; letter-spacing: .1em;
+        display: none; font-size: calc(18px * var(--ui)); line-height: 1; letter-spacing: .1em;
         color: var(--alert); text-shadow: var(--lift); animation: investigating 2s ease-in-out infinite;
       }
       #heat.shown { display: block; }
@@ -934,49 +955,18 @@
          `main.ts`'s keydown listener and a list built at runtime would be the
          same eighteen strings with a loop around them. `hud.ts` only toggles a
          class on these two. -->
+    <!-- The legend. Rows of keycaps and verbs; `hud.ts` only toggles a class
+         on this block. The first three rows are the first minute; the rest
+         answer later questions a step quieter. `j` and `q` are one line
+         because they are one list. See UI.md. -->
     <div id="help">
-      <div class="keys"><b>wasd</b> move · <b>space</b> jump · <b>shift</b> sprint</div>
-      <div class="keys"><b>mouse</b> look · <b>left click</b> bat · <b>right click</b> footy</div>
-      <!-- The zoom is here, in the block nobody has to press anything to read,
-           because the report that produced it was a player who could not find
-           it: "cant zoom out anymore by scrolling". A control every game binds
-           to the wheel is a control people try before they read a list, so the
-           one line that says the wheel does something has to be on the screen.
-           See `main.ts`'s wheel listener. -->
-      <!-- `f` is on the always-visible block for the wheel's reason one line
-           up: it is a control every player uses every night, it is where every
-           game since Half-Life has put a torch, and it was asked for by name.
-           Sharing this line rather than taking its own, because the camera
-           bindings beside it are the same kind of thing — something in your
-           hand rather than a panel. See `main.ts`'s keydown listener. -->
-      <div class="keys"><b>wheel</b> zoom out · <b>c</b> third person · <b>f</b> torch · <b>b</b> your build · <b>x</b> furnish a room you are in</div>
-      <div class="more"><b>h</b> — all controls</div>
-      <!-- The box behind Escape grew two more tabs — what's new, and report a
-           bug — and this line still said "suggestions", so the one panel in the
-           game a player can file a bug from was named after a third of itself.
-           It was reported as exactly that: "make bug tooltip on at all times say
-           esc - suggestions / bug reports".
-
-           Its own line, because on the end of `h — all controls` it is 62
-           characters at 13px and `#help`'s 390px cap ellipsises the last third
-           of it — which is where "report a bug" is, so the one word the report
-           was about would have been the one word cut. Alone it is 44 characters
-           and 363px, and it fits. See `client/src/suggestions.ts` for the three
-           tabs it names and `#help.hidden` above for the two moments in a
-           session it is not on the screen. -->
-      <div class="more wrap"><b>esc</b> — suggestions · what's new · report a bug · talents</div>
-      <!-- The slots and the phone. Its own line for the same reason the escape
-           line has one: a player has no way to discover that the number row
-           does anything, and "3 phone" is the entry point to the wallet, the
-           Centrelink list and the rideshare job all at once. See
-           `client/src/phone.ts`. -->
-      <div class="more wrap"><b>1</b> bat · <b>2</b> footy · <b>4</b> fists · <b>shift+n</b> off hand</div>
-      <!-- `q` is on the always-on line rather than only in the full list,
-           because a quest log a player has to go looking for is the problem it
-           was added to solve. See `Phone.openObligations`. -->
-      <div class="more wrap"><b>j</b> — jobs · <b>q</b> — QuestBuddy · <b>m</b> — map</div>
+      <div class="eyebrow">controls · h for all of them</div>
+      <div class="keys"><span><kbd>wasd</kbd>move</span><span><kbd>space</kbd>jump</span><span><kbd>shift</kbd>sprint</span></div>
+      <div class="keys"><span><kbd>mouse</kbd>look</span><span><kbd>left click</kbd>bat</span><span><kbd>right click</kbd>footy</span></div>
+      <div class="keys"><span><kbd>wheel</kbd>zoom</span><span><kbd>c</kbd>third person</span><span><kbd>f</kbd>torch</span><span><kbd>e</kbd>doors, cars, bikes</span></div>
+      <div class="more"><span><kbd>1</kbd>bat</span><span><kbd>2</kbd>footy</span><span><kbd>4</kbd>fists</span><span><kbd>shift+n</kbd>off hand</span><span><kbd>b</kbd>your build</span><span><kbd>x</kbd>furnish a room</span></div>
+      <div class="more"><span><kbd>j</kbd>jobs</span><span><kbd>m</kbd>map</span><span><kbd>i</kbd>chat</span><span><kbd>tab</kbd>scores</span><span><kbd>esc</kbd>suggestions · what's new · report a bug · talents</span></div>
     </div>
-
     <div id="helpfull">
       <h1>controls</h1>
       <section>
@@ -1178,9 +1168,7 @@
         <div><kbd>shift+1..4</kbd>the same, in your off hand</div>
         <div><kbd>left click</kbd>use what is in your right hand</div>
         <div><kbd>right click</kbd>use what is in your off hand</div>
-        <div><kbd>j</kbd>the job list: what you are on, and where the rest of it is</div>
-        <div><kbd>q</kbd>opens the phone — the world keeps moving, and your hands keep the bat</div>
-        <div><kbd>q</kbd>QuestBuddy, which is the same job list</div>
+        <div><kbd>j</kbd>the job list: what you are on, and where the rest of it is · <kbd>q</kbd> is the same list</div>
         <div>the phone has QuestBuddy, your wallet, Centrelink, SydRide, the map and a camera</div>
         <!-- The compass moved onto the phone and then came back off it: the
              owner reversed the loadout rule the day he could not find a quest
