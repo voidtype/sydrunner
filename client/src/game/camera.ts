@@ -164,8 +164,13 @@ export function toggleCameraDistance(current: number, remembered: number): numbe
  * for reasons no event fires for -- knocked out, respawned, the bike claimed by
  * somebody else -- and one `Math.max` a frame cannot go stale.
  */
-export function liveCameraDistance(chosen: number, riding: boolean): number {
+export function liveCameraDistance(chosen: number, riding: boolean, underground = false): number {
   const d = clampCameraDistance(chosen);
+  // Below grade -- in a station box under the street -- the camera is first
+  // person whatever was chosen. A third-person camera in a 32 m wide cavity
+  // is a camera inside the tunnel wall, looking at the back of the city
+  // through it; the owner: "when underground it should be first person".
+  if (underground) return 0;
   return riding ? Math.max(d, RIDE_MIN) : d;
 }
 
@@ -277,6 +282,8 @@ export function marchCameraBoom(want: number, near: number, blocked: (d: number)
  */
 export function verifyCamera(): string[] {
   const failures: string[] = [];
+  if (liveCameraDistance(8, false, true) !== 0 || liveCameraDistance(8, true, true) !== 0) failures.push('underground, the camera is not first person.');
+  if (liveCameraDistance(8, false, false) === 0) failures.push('above ground, a chosen third person went first person.');
 
   // --- The constants agree with each other. `CAMERA_MAX` has to be a whole
   // number of notches past `CAMERA_MIN` or the last step out is a stub and the

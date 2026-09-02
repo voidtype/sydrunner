@@ -246,6 +246,16 @@ export interface RailBake {
   epochMs: number;
   cycleS: number;
   lines: RailLine[];
+  /**
+   * Metres each vertex's train sits to the left of its own travel, per
+   * direction vertex. Non-zero only on a **shared** segment -- one the bake
+   * runs in both compass directions on one centreline, which is a single OSM
+   * way carrying a double-track railway -- and zero within `SHARED_STOP_M` of
+   * any calling stop, where the platform was built on the centreline. See
+   * `computeLateral`: it is what stops opposite trains passing through each
+   * other, which the owner watched happen under the CBD.
+   */
+  lateral: Float32Array;
   stations: RailStation[];
   /** Per block section, indexed by block id. */
   blockLength: Float64Array;
@@ -420,6 +430,7 @@ export function decodeRail(buffer: ArrayBuffer): RailBake {
     blockJunction: Uint8Array.from((meta.blocks.junction as boolean[]).map((b) => (b ? 1 : 0))),
     blockTracks: Int32Array.from(meta.blocks.tracks as number[]),
     vertices: arrays.vertices as Float32Array,
+    lateral: computeLateral(lines, arrays.vertices as Float32Array, arrays.cum as Float64Array),
     cum: arrays.cum as Float64Array,
     phases: arrays.phases as Float64Array,
     stanchions: arrays.stanchions as Float32Array,
@@ -544,6 +555,56 @@ export function tripIndexAt(dir: RailDirection, t: number, j: number): number {
   return Math.floor((t - dir.offset) / dir.line.period) - j;
 }
 
+/** How far a train on a shared segment sits off the centreline, metres. Left-hand running, so half a track pitch. */
+export const SHARED_OFFSET_M = 2.0;
+/** No offset this close to a calling stop: the platform there was built on the centreline. */
+export const SHARED_STOP_M = 110;
+
+/**
+ * The lateral offsets: `SHARED_OFFSET_M` on every vertex whose outgoing segment
+ * the bake also runs the other way, ramped to zero over the segment before and
+ * after (the sampler interpolates between vertices) and held at zero near a
+ * calling stop.
+ *
+ * A segment is keyed by its two endpoints rounded to the half metre, unordered
+ * for identity and ordered for orientation; a key seen in both orientations is
+ * shared. Every direction of every line is walked, so two lines sharing a
+ * trunk agree. Integer keys and a `Map`, no trig, the same on both ends.
+ */
+export function computeLateral(lines: readonly RailLine[], vertices: Float32Array, cum: Float64Array): Float32Array {
+  const n = vertices.length / 3;
+  const lateral = new Float32Array(n);
+  const key = (i: number, j: number): string => {
+    const ax = Math.round(vertices[i * 3] * 2), az = Math.round(vertices[i * 3 + 2] * 2);
+    const bx = Math.round(vertices[j * 3] * 2), bz = Math.round(vertices[j * 3 + 2] * 2);
+    return `${ax},${az}|${bx},${bz}`;
+  };
+  const seen = new Set<string>();
+  for (const line of lines) {
+    for (const dir of line.dirs) {
+      for (let i = dir.vertexOff; i + 1 < dir.vertexOff + dir.vertexCount; i++) seen.add(key(i, i + 1));
+    }
+  }
+  for (const line of lines) {
+    for (const dir of line.dirs) {
+      const end = dir.vertexOff + dir.vertexCount;
+      const nearStop = (i: number): boolean => {
+        const s = cum[i];
+        for (const st of dir.stops) if (st.calls && Math.abs(st.s - s) < SHARED_STOP_M) return true;
+        return false;
+      };
+      for (let i = dir.vertexOff; i + 1 < end; i++) {
+        const shared = seen.has(key(i + 1, i));
+        if (!shared) continue;
+        if (nearStop(i) || nearStop(i + 1)) continue;
+        lateral[i] = SHARED_OFFSET_M;
+        lateral[i + 1] = SHARED_OFFSET_M;
+      }
+    }
+  }
+  return lateral;
+}
+
 /**
  * Where arc length `s` along a direction's polyline is, and which way it points.
  *
@@ -605,6 +666,15 @@ export function sampleAlong(
   out.dx = hx;
   out.dz = hz;
   out.s = s;
+  // Off the centreline on a shared segment: to the left of travel, blended
+  // between the two vertices' values. The one deliberate change to the
+  // arithmetic above, and it is additive after the heading is fixed, so the
+  // heading, the height and the arc length are the bits they always were.
+  const lat = bake.lateral[lo] + (bake.lateral[lo + 1] - bake.lateral[lo]) * u;
+  if (lat !== 0) {
+    out.x += -hz * lat;
+    out.z += hx * lat;
+  }
 }
 
 /**
@@ -787,6 +857,67 @@ export function railAt(dir: RailDirection, s: number): number {
  */
 export function verifyRail(bake: RailBake): string[] {
   const bad: string[] = [];
+  // --- Shared segments: two trains meeting on one centreline are a track
+  // apart, and nobody is offset at a platform.
+  {
+    let shared = 0;
+    let judged = 0;
+    let apart = 0;
+    let atStops = 0;
+    const a = createTrainPose();
+    const b = createTrainPose();
+    for (const line of bake.lines) {
+      const [d0, d1] = line.dirs;
+      if (!d0 || !d1) continue;
+      for (let i = d0.vertexOff; i + 1 < d0.vertexOff + d0.vertexCount; i++) {
+        if (bake.lateral[i] === 0 || bake.lateral[i + 1] === 0) continue;
+        shared++;
+        // The same world point on the other direction's polyline, if it has it.
+        const mx = (bake.vertices[i * 3] + bake.vertices[(i + 1) * 3]) / 2;
+        const mz = (bake.vertices[i * 3 + 2] + bake.vertices[(i + 1) * 3 + 2]) / 2;
+        // The other direction's segment on the same centreline, run the
+        // *other* way: a loop line runs both its directions round the loop
+        // the same way, and two trains going the same way on one rail are the
+        // block solver's problem, not this offset's.
+        let best = -1;
+        let bestD = 1;
+        const hx = bake.vertices[(i + 1) * 3] - bake.vertices[i * 3];
+        const hz = bake.vertices[(i + 1) * 3 + 2] - bake.vertices[i * 3 + 2];
+        for (let j = d1.vertexOff; j + 1 < d1.vertexOff + d1.vertexCount; j++) {
+          const jx = (bake.vertices[j * 3] + bake.vertices[(j + 1) * 3]) / 2;
+          const jz = (bake.vertices[j * 3 + 2] + bake.vertices[(j + 1) * 3 + 2]) / 2;
+          const d = Math.abs(jx - mx) + Math.abs(jz - mz);
+          if (d >= bestD) continue;
+          const kx = bake.vertices[(j + 1) * 3] - bake.vertices[j * 3];
+          const kz = bake.vertices[(j + 1) * 3 + 2] - bake.vertices[j * 3 + 2];
+          if (hx * kx + hz * kz >= 0) continue;
+          bestD = d;
+          best = j;
+        }
+        if (best < 0) continue;
+        judged++;
+        sampleAlong(bake, d0, (bake.cum[i] + bake.cum[i + 1]) / 2, a);
+        sampleAlong(bake, d1, (bake.cum[best] + bake.cum[best + 1]) / 2, b);
+        const gap = Math.sqrt((a.x - b.x) ** 2 + (a.z - b.z) ** 2);
+        if (gap >= 2 * SHARED_OFFSET_M - 0.2) apart++;
+        if (shared > 400) break;
+      }
+      // And at every calling stop, no offset: the platform is on the centreline.
+      for (const dir of line.dirs) {
+        for (const st of dir.stops) {
+          if (!st.calls) continue;
+          const c = bake.cum;
+          let k = dir.vertexOff;
+          while (k + 1 < dir.vertexOff + dir.vertexCount && c[k + 1] <= st.s) k++;
+          if (bake.lateral[k] !== 0 || bake.lateral[Math.min(k + 1, dir.vertexOff + dir.vertexCount - 1)] !== 0) atStops++;
+        }
+      }
+    }
+    if (atStops > 0) bad.push(`${atStops} calling stops sit on an offset segment; the platform there is on the centreline`);
+    if (judged > 0 && apart < judged * 0.9) {
+      bad.push(`on ${judged} of ${shared} shared segments met head-on only ${apart} keep the two directions a track apart`);
+    }
+  }
   if (bake.epochMs !== RAIL_EPOCH_MS) {
     bad.push(`the bake counts from ${bake.epochMs} and this module from ${RAIL_EPOCH_MS}`);
   }

@@ -1540,9 +1540,27 @@ def build_opera(anchors: dict[str, Anchor], terrain) -> Landmark:
         ],
         dtype=np.float64,
     )
-    prisms.append(
-        Prism(stair_ring, ground - 1.0, (ground + 1.0 + riser * 8) - (ground - 1.0), "podium")
-    )
+    # The stairs a body can climb. One prism the height of the flight is a
+    # wall -- the owner: "i cant actually go up its stairs" -- because
+    # `player/controller.STEP_HEIGHT` is 0.42 m. So the flight is a staircase
+    # of shallow prisms, two per real riser, each a slab from the ground to
+    # its own tread height and running from its own tread up to the podium:
+    # stacked, they are the stair in section, and every rise is under a step.
+    half_steps = OPERA_STAIR_STEPS * 2
+    tread = OPERA_STAIR_RUN / half_steps
+    for k in range(half_steps):
+        top = ground + 1.0 + riser * (k + 1) / 2.0
+        near = south - OPERA_STAIR_RUN + tread * k
+        ring = np.asarray(
+            [
+                centre + along * near + across * -stair_half,
+                centre + along * south + across * -stair_half,
+                centre + along * south + across * stair_half,
+                centre + along * near + across * stair_half,
+            ],
+            dtype=np.float64,
+        )
+        prisms.append(Prism(ring, ground - 1.0, top - (ground - 1.0), "podium"))
     del stair_mid
 
     # --- The shells. Three groups: the two auditoria side by side pointing

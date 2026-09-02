@@ -553,6 +553,7 @@ import { verifyBoats } from './game/boats.ts';
 import { BoatFleet } from './world/boats.ts';
 import { AreaLine, verifyAreaLine } from './game/arealine.ts';
 import { AreaLineView } from './arealine.ts';
+import { TouchControls, touchWanted, verifyTouch } from './touch.ts';
 // The drive, narrated sparingly, through the notice channel that already
 // exists. See `game/ticker.ts` -- the module is the rate limit, not the words.
 import { Ticker, verifyTicker } from './game/ticker.ts';
@@ -1056,6 +1057,7 @@ async function main(): Promise<void> {
   // The ferries: every route is water and every boat is somewhere on it at
   // every second, or the timetable is wrong in a way only a player would see.
   const boatFailures = timed('boats', verifyBoats);
+  const touchFailures = timed('touch', verifyTouch);
   // WORKSTREAM N (carry): the restore sentence, on the same criterion. A
   // dangling em dash in a pill and a suburb poll that never gives up are both
   // invisible to anything that only asks whether the player ended up in the
@@ -1584,6 +1586,7 @@ async function main(): Promise<void> {
     locatorFailures.length ||
     areaLineFailures.length ||
     boatFailures.length ||
+    touchFailures.length ||
     carryFailures.length ||
     trafficFailures.length ||
     viewLatchFailures.length ||
@@ -1674,6 +1677,7 @@ async function main(): Promise<void> {
           ...locatorFailures,
           ...areaLineFailures,
           ...boatFailures,
+          ...touchFailures,
           ...carryFailures,
           ...trafficFailures,
           ...viewLatchFailures,
@@ -7542,6 +7546,9 @@ async function main(): Promise<void> {
       selfBat.mesh.visible = !fists;
     },
   });
+  // A phone: the stick, the look pad and the four buttons drive the same
+  // keys and the same yaw the keyboard and mouse do. See `touch.ts`.
+  const touch = touchWanted() ? new TouchControls({ keys, input, mousedown: (b) => money.mousedown(b) }) : null;
 
   // --- Riding a train ----------------------------------------------------------
   //
@@ -8379,13 +8386,21 @@ async function main(): Promise<void> {
    * true while you are on, and the pill is derived every tick and comes down by
    * itself the moment you are not.
    */
+  /**
+   * Below the street, in a station box: the camera is first person there,
+   * whatever was chosen. `stationBoxes.floorAt` answers a floor only inside a
+   * box's plan and under its ceiling, which is the whole of "underground".
+   */
+  const underground = (): boolean =>
+    stationBoxes !== null &&
+    stationBoxes.floorAt(player.position.x, player.position.z, player.position.y - EYE_HEIGHT) > -Infinity;
   const setCameraDistance = (metres: number): void => {
     cameraDistance = metres;
     // Only a third-person distance is worth remembering: seeding this with zero
     // would make `V` a key that toggles first person with first person.
     if (isThirdPerson(cameraDistance)) lastThirdDistance = cameraDistance;
     saveCameraDistance(cameraDistance);
-    const live = liveCameraDistance(cameraDistance, playerCombat.ridingBike !== 0);
+    const live = liveCameraDistance(cameraDistance, playerCombat.ridingBike !== 0, underground());
     if (live !== cameraDistance) {
       rideNudgeText = `camera: first person when you get off — a bike needs ${live.toFixed(1)} m`;
       rideNudgeT = RIDE_NUDGE_SECONDS;
@@ -10430,15 +10445,16 @@ async function main(): Promise<void> {
      * building. Offering them would be offering four things `pressMount` has
      * just been taught to refuse.
      */
-    hud.derived(
+    const promptLine =
       interior !== null
         ? (atLift ? 'E — lift up  ·  Shift+E — down' : atExit ? 'E — back outside' : coreHint)
         : sunButton.prompt(player.position.x, player.position.z) ||
           trainPill ||
           ridePrompt(playerCombat, playerCombat.phase, rideNudgeT, rideNudgeText) ||
           takePrompt(takeableNear, playerCombat.drivingCar !== 0, playerCombat.phase) ||
-          (doorSite !== null ? 'E — go inside' : ''),
-    );
+          (doorSite !== null ? 'E — go inside' : '');
+    hud.derived(promptLine);
+    touch?.setPrompt(promptLine);
 
     // Reconciliation, at the top of the tick and before anything is advanced.
     //
@@ -11954,7 +11970,7 @@ async function main(): Promise<void> {
      */
     let chosenDistance = interior !== null
       ? CAMERA_FIRST_PERSON
-      : liveCameraDistance(cameraDistance, playerCombat.ridingBike !== 0);
+      : liveCameraDistance(cameraDistance, playerCombat.ridingBike !== 0, underground());
     // --- And a car, which is a bigger thing to look at than a bicycle.
     //
     // A **floor and never a ceiling**, exactly as `liveCameraDistance` treats the

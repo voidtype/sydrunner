@@ -78,6 +78,15 @@ const REQUIRED_IDS: readonly string[] = [
   'questtrack',
   'locator',
   'minimap',
+  'touch',
+  'touch-stick',
+  'touch-knob',
+  'touch-look',
+  'touch-context',
+  'touch-context-text',
+  'touch-bat',
+  'touch-footy',
+  'touch-jump',
 ];
 
 /** Self-check. Client boot list only: it reads the DOM. */
