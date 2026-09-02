@@ -366,7 +366,15 @@ export const SPAN_CUTTING = 4;
  * depth-free design was protecting.
  */
 export const SPAN_DEEP = 64;
-export const DEEP_M = 8;
+/**
+ * Twelve, not eight. Measured over the bake: 360 untagged vertices are more
+ * than 8 m under the DEM and 41 more than 12 m. The 8 m set is Newtown's
+ * cutting, the Wolli Creek and Chatswood portal approaches and Waverton --
+ * real open track that has to stay carved; the 12 m set is portals a few
+ * metres late and nothing a player stands beside. Every tagged bore sits
+ * deeper than 15 m and carries `SPAN_TUNNEL` anyway.
+ */
+export const DEEP_M = 12;
 export const SPAN_EMBANKMENT = 8;
 export const SPAN_ELECTRIFIED = 16;
 export const SPAN_SUBWAY = 32;
