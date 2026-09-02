@@ -514,7 +514,7 @@ export function decodeRail(buffer: ArrayBuffer): RailBake {
     phases: arrays.phases as Float64Array,
     stanchions: arrays.stanchions as Float32Array,
     stanchionKinds: arrays.stanchionKinds as Uint8Array,
-    vertexFlags: deepen(arrays.vertexFlags as Uint8Array, arrays.vertexClearance as Float32Array),
+    vertexFlags: deepen(arrays.vertexFlags as Uint8Array, arrays.vertexClearance as Float32Array, arrays.vertices as Float32Array, meta.stations as RailStation[]),
     vertexClearance: arrays.vertexClearance as Float32Array,
     paving: arrays.paving as Float32Array,
     physics: meta.physics,
@@ -652,14 +652,40 @@ export const SHARED_STOP_M = 110;
  * shared. Every direction of every line is walked, so two lines sharing a
  * trunk agree. Integer keys and a `Map`, no trig, the same on both ends.
  */
-/** `SPAN_DEEP` on every vertex the pipeline measured as buried past `DEEP_M`. */
-export function deepen(flags: Uint8Array, clearance: Float32Array): Uint8Array {
+/**
+ * `SPAN_DEEP` on every vertex the pipeline measured as buried past `DEEP_M`,
+ * and on every vertex inside a served underground station's box: a station
+ * the bake classed as underground is a bore whatever the depth -- Cherrybrook
+ * is a cut-and-cover room nine metres down, shallower than `DEEP_M` -- and a
+ * trench drawn through its room is a wall across the concourse. The same
+ * rectangle `world/rail-cut.RailCut` declines to carve over.
+ */
+export function deepen(flags: Uint8Array, clearance: Float32Array, vertices: Float32Array, stations: readonly RailStation[]): Uint8Array {
   const out = new Uint8Array(flags.length);
+  const bores = stations.filter(
+    (st) => st.vertical === 'underground' && st.belowGrade && st.servedDirs && st.servedDirs.length > 0 &&
+      Number.isFinite(st.boxHalfLength) && Number.isFinite(st.boxHalfWidth),
+  );
   for (let i = 0; i < flags.length; i++) {
-    out[i] = flags[i] | (clearance[i] < -DEEP_M ? SPAN_DEEP : 0);
+    let deep = clearance[i] < -DEEP_M;
+    if (!deep) {
+      const x = vertices[i * 3];
+      const z = vertices[i * 3 + 2];
+      for (const st of bores) {
+        const dx = x - st.siteX;
+        const dz = z - st.siteZ;
+        if (Math.abs(dx * st.siteDx + dz * st.siteDz) > st.boxHalfLength + BORE_APPROACH_M) continue;
+        if (Math.abs(dx * -st.siteDz + dz * st.siteDx) > st.boxHalfWidth) continue;
+        deep = true;
+        break;
+      }
+    }
+    out[i] = flags[i] | (deep ? SPAN_DEEP : 0);
   }
   return out;
 }
+/** How far past a bore station's box its approach spans count as the bore too; `RailCut` uses the same reach. */
+export const BORE_APPROACH_M = 30;
 
 export function computeLateral(lines: readonly RailLine[], vertices: Float32Array, cum: Float64Array): Float32Array {
   const n = vertices.length / 3;

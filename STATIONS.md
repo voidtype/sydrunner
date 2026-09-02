@@ -1892,3 +1892,24 @@ walked **1 of 28** before the following and **28 of 28** after.
 - **The field follows the buildings**: `world.boxesOf` rebuilds when a
   collision tile lands; `main.ts` rebuilds on the same tick as the vessels and
   drops the rail chunks over a mouth that moved.
+
+### What the deep sweep says after it, and what is still open
+
+`SYDNEY_CHECK_ONLY=stations SYDNEY_STATIONS_DEEP=1` on 2026-09-03, after the
+walk above: **0 of 190 served stations pass all eight checks**, unchanged as a
+headline, because the eight are dominated by surface-station work this pass
+did not touch (`stand` 45/190, `holes` 62/267, `drawn` 24/187). Two findings
+worth carrying forward:
+
+- **Trains through trains** (`ttt`, 101,232 carriage pairs) are almost all
+  within a hundred metres of a station: the shared-spine lateral offset
+  (`rail.computeLateral`) is switched off inside `SHARED_STOP_M` of a calling
+  stop so a train meets its platform, and where the bake gave both directions
+  one centreline the up and the down dwell on the same track. The fix is to
+  offset the *platform faces* of a shared site with the trains, on both ends
+  (`rail-solids`, `PlatformField`, `rail-geo.writePlatforms`), and it is a
+  station-suite-gated change rather than a night's.
+- **`SPAN_DEEP`** is set from the measured clearance past 12 m *and* inside a
+  served bore's box (`rail.deepen`): Cherrybrook is a cut-and-cover room nine
+  metres down, and at eight metres the flag also caught Newtown's cutting and
+  the Wolli Creek and Chatswood portal approaches, which have to stay carved.
