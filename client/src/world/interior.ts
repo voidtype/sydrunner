@@ -40,24 +40,26 @@
  *     pavement is a metre from somebody standing inside, and without the filter
  *     they would draw each other through the wall.
  *
- * ## The door belongs to the building
+ * ## The door is where you came in
  *
- * One building, one inside, **one door**, and the door is derived from the
- * footprint exactly as the rooms are: the midpoint of the longest edge, which
- * is a building's frontage often enough to be a good guess and is deterministic
- * always. Everybody who walks in arrives at it, everybody leaves by it, and
- * everybody sees the same panel on the same wall.
+ * *"ideally, where i enter is where the door goes"* -- the owner, and it is
+ * the third design for this door, so the history is worth keeping:
  *
- * It was per entrant to begin with -- you arrived at whichever wall you had
- * knocked on -- and that was wrong in two ways the owner found immediately. Two
- * people in one pub saw the exit in two different places, which contradicts the
- * first thing decided about interiors; and a player restored into a building
- * they had logged off in got a door beside wherever they happened to be
- * standing, because the restore had nothing else to derive one from. A door
- * that moves depending on who is looking is not a door.
+ * 1. **Per entrant, from the wall you knocked on.** Right, but a player restored
+ *    into a building had no wall to derive one from, so the restore put a door
+ *    beside wherever they were standing. Reported.
+ * 2. **The building's, from its footprint.** Fixed the restore and broke the
+ *    thing that mattered: the inside door was nowhere near where you had come
+ *    in -- and for a concave outline the hull's longest edge is the air across
+ *    a notch, 21 m from any wall. Reported.
+ * 3. **Per entrant, and saved with the spot.** The door you came in by travels
+ *    with your account beside your position (`accounts.LastPos`), so a restore
+ *    has the real one. That is this.
  *
- * You can still knock on **any** wall -- that part of the brief is untouched --
- * you simply come out on the inside at the building's own door.
+ * `Interior.door` still exists, derived from the footprint, as the **fallback**:
+ * the door for a spot saved before doors were, and the one furniture must keep
+ * clear of when nobody is in the room to ask. Everything drawn, entered or
+ * exited uses the entrant's own.
  *
  * ## The ground floor, and what is not built yet
  *
@@ -957,9 +959,9 @@ export function buildInterior(
  * centre until it is inside, rather than refused. A door that opens onto a
  * refusal is worse than a door that opens a foot further in than it should.
  */
-export function arrivalAt(it: Interior): { x: number; z: number; stuck?: boolean } {
-  let x = it.door.x - it.door.nx * 1.0;
-  let z = it.door.z - it.door.nz * 1.0;
+export function arrivalAt(it: Interior, door: InteriorDoor = it.door): { x: number; z: number; stuck?: boolean } {
+  let x = door.x - door.nx * 1.0;
+  let z = door.z - door.nz * 1.0;
   // Settle, test, and walk further in if it did not take. The resolver runs a
   // fixed three passes, which is enough for a body against a wall and not
   // always enough for one wedged into the corner of a forty-sided outline where
@@ -1051,6 +1053,7 @@ export function placementFits(
   it: Interior,
   existing: readonly Placement[],
   p: Placement,
+  doors: readonly InteriorDoor[] = [it.door],
 ): boolean {
   const kind = PLACEABLES[p.kind];
   if (kind === undefined) return false;
@@ -1072,7 +1075,12 @@ export function placementFits(
   for (const h of it.headers) {
     if (!clearOfSegment(box, h.ax, h.az, h.bx, h.bz, OPENING_CLEAR_M)) return false;
   }
-  if (boxClearance(box, it.door.x, it.door.z) < DOOR_CLEAR_M) return false;
+  // Every door anybody in the room came in by, not just the building's own:
+  // the door is per entrant (see the header), and a couch across the one you
+  // used is the one you cannot find.
+  for (const d of doors) {
+    if (boxClearance(box, d.x, d.z) < DOOR_CLEAR_M) return false;
+  }
   // And clear of everything already in the room.
   for (const other of existing) {
     if (boxesOverlap(box, boxOf(other, it.plan.box.ux, it.plan.box.uz))) return false;
@@ -1374,8 +1382,8 @@ function shadeOf(seed: number): { r: number; g: number; b: number } {
  * visible from inside*, which is the one thing a player in a windowless room
  * has no other way to learn.
  */
-export function interiorMesh(it: Interior): InteriorMesh {
-  const { x: doorX, z: doorZ, nx: doorNX, nz: doorNZ } = it.door;
+export function interiorMesh(it: Interior, door: InteriorDoor = it.door): InteriorMesh {
+  const { x: doorX, z: doorZ, nx: doorNX, nz: doorNZ } = door;
   const pos: number[] = [];
   const nor: number[] = [];
   const col: number[] = [];

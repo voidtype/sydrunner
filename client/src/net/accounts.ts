@@ -381,6 +381,17 @@ export interface LastPos {
    * whole of that feature's storage.
    */
   building: number;
+  /**
+   * The door this spot was entered by, when `building` is set. Zeros otherwise.
+   *
+   * *"where i enter is where the door goes"*, and a restore has no wall to
+   * derive it from, so it is saved. Zeros -- or a row written before this field
+   * -- mean "the building's own door", which `interior.Interior.door` supplies.
+   */
+  doorX: number;
+  doorZ: number;
+  doorNX: number;
+  doorNZ: number;
   /** `Date.now()` when this was written. The week rule reads this and nothing else. */
   savedMs: number;
 }
@@ -429,10 +440,27 @@ export function sanitiseLastPos(value: unknown): LastPos | null {
   // rubbish is a perfectly good spot that happens to be outdoors, and refusing
   // the whole row would throw away the position too. Every account on the box
   // takes this branch on the deploy that introduces the field.
-  const raw2 = raw as { building?: unknown };
+  const raw2 = raw as { building?: unknown; doorX?: unknown; doorZ?: unknown; doorNX?: unknown; doorNZ?: unknown };
   const b = Number(raw2.building);
   const building = Number.isFinite(b) && b > 0 && b <= 0xffffffff ? Math.trunc(b) >>> 0 : 0;
-  return { x, y, z, yaw, building, savedMs };
+  // The door, on the building's rule: rubbish is zeros, never a refusal. A
+  // normal that is not unit length is rubbish too -- the exit steps along it.
+  let doorX = Number(raw2.doorX);
+  let doorZ = Number(raw2.doorZ);
+  let doorNX = Number(raw2.doorNX);
+  let doorNZ = Number(raw2.doorNZ);
+  const len = Math.sqrt(doorNX * doorNX + doorNZ * doorNZ);
+  if (
+    building === 0 || !Number.isFinite(doorX) || !Number.isFinite(doorZ) ||
+    !Number.isFinite(len) || Math.abs(len - 1) > 0.01 ||
+    Math.abs(doorX) > LAST_POS_LIMIT_M || Math.abs(doorZ) > LAST_POS_LIMIT_M
+  ) {
+    doorX = 0;
+    doorZ = 0;
+    doorNX = 0;
+    doorNZ = 0;
+  }
+  return { x, y, z, yaw, building, doorX, doorZ, doorNX, doorNZ, savedMs };
 }
 
 /**
@@ -1454,6 +1482,16 @@ export function verifyAccounts(): string[] {
       if (inside === null || inside.building !== 0xdeadbeef) {
         failures.push('a spot saved indoors did not survive; logging off inside would not bring you back.');
       }
+      // And the door you came in by travels with it, or falls back to zeros.
+      const withDoor = sanitiseLastPos({ x: 1, y: 2, z: 3, yaw: 0, building: 7, doorX: 4, doorZ: 5, doorNX: 0.6, doorNZ: 0.8, savedMs: now });
+      if (withDoor === null || withDoor.doorX !== 4 || Math.abs(withDoor.doorNX - 0.6) > 1e-9) {
+        failures.push('the door a spot was entered by did not survive; a restore would put the exit somewhere else.');
+      }
+      const badDoor = sanitiseLastPos({ x: 1, y: 2, z: 3, yaw: 0, building: 7, doorX: 4, doorZ: 5, doorNX: 3, doorNZ: 4, savedMs: now });
+      if (badDoor === null || badDoor.doorX !== 0 || badDoor.doorNX !== 0) {
+        failures.push('a door with a five-metre normal was kept; the exit would step out into the road.');
+      }
+      if (inside !== null && (inside.doorX !== 0 || inside.doorNX !== 0)) failures.push('a spot with no door invented one.');
     }
 
     const spot = sanitiseLastPos({ x: -2236.4, y: 12.5, z: 4543.3, yaw: 1.25, savedMs: now });
@@ -1491,7 +1529,7 @@ export function verifyAccounts(): string[] {
 
     // And the reset drops it, in the same call that zeroes the ladder.
     const record = fakeAccount(now);
-    record.lastPos = { x: 10, y: 0, z: 20, yaw: 0, building: 0, savedMs: now };
+    record.lastPos = { x: 10, y: 0, z: 20, yaw: 0, building: 0, doorX: 0, doorZ: 0, doorNX: 0, doorNZ: 0, savedMs: now };
     if (resetIfNewWeek(record, now)) failures.push('A record already in the current week was reset.');
     if (record.lastPos === null) failures.push('A same-week reset dropped the saved spot anyway.');
     record.levelWeek = '2020-W01';

@@ -650,7 +650,7 @@ async function phaseC(): Promise<void> {
     // Saved honestly, through the same call a disconnect uses, and then a
     // warehouse is built on top of it.
     check(
-      store.rememberSpot(rec, { name: 'Bluey', kills: 0, x: LEAVE_X, y: 0, z: LEAVE_Z, yaw: 0, building: 0 }),
+      store.rememberSpot(rec, { name: 'Bluey', kills: 0, x: LEAVE_X, y: 0, z: LEAVE_Z, yaw: 0, building: 0, doorX: 0, doorZ: 0, doorNX: 0, doorNZ: 0 }),
       'the blocked fixture saved a spot first',
     );
     buildingAt(world, 'carry-check-warehouse', LEAVE_X, LEAVE_Z);

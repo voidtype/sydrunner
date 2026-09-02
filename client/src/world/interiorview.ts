@@ -38,7 +38,7 @@ import {
   MeshBasicNodeMaterial,
   type Scene,
 } from 'three/webgpu';
-import { ghostMesh, interiorMesh, type Interior } from './interior.ts';
+import { ghostMesh, interiorMesh, type Interior, type InteriorDoor } from './interior.ts';
 import type { Placement } from './placeables.ts';
 
 /**
@@ -106,9 +106,9 @@ export class InteriorView {
    * The door comes off the interior, so everybody in the building sees the way
    * out on the same wall.
    */
-  show(camera: Camera, it: Interior): void {
+  show(camera: Camera, it: Interior, door: InteriorDoor = it.door): void {
     this.hide(camera);
-    this.rebuild(it);
+    this.rebuild(it, door);
     camera.layers.set(INTERIOR_LAYER);
   }
 
@@ -120,14 +120,14 @@ export class InteriorView {
    * again every time a couch lands would be a layer switch per placement for no
    * reason -- and would fight anything that had legitimately changed it.
    */
-  rebuild(it: Interior): void {
+  rebuild(it: Interior, door: InteriorDoor = it.door): void {
     const old = this.mesh;
     if (old !== null) {
       this.scene.remove(old);
       old.geometry.dispose();
       this.mesh = null;
     }
-    const built = interiorMesh(it);
+    const built = interiorMesh(it, door);
     const geometry = new BufferGeometry();
     geometry.setAttribute('position', new BufferAttribute(built.positions, 3));
     geometry.setAttribute('normal', new BufferAttribute(built.normals, 3));

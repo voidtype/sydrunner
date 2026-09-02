@@ -11088,6 +11088,19 @@ async function checkInteriors(): Promise<void> {
   if (entered === null) return;
   check(entered.space === space, `the frame names the building's own space (0x${entered.space.toString(16)})`);
   check(entered.building === seed, 'and the building seed the client needs to pick its own copy of the footprint');
+  // **The door is where `E` was pressed.** The owner's rule, in his words:
+  // "the outdoor location i press e at should be where the door is inside".
+  // `standAtDoor` put the body a metre off the midpoint of the longest wall,
+  // so the door in the frame must be that point on that wall, not the
+  // building's own door and not the hull's.
+  check(
+    Math.hypot(entered.doorX - doorX, entered.doorZ - doorZ) < 0.6,
+    `the door in the frame is the wall that was knocked on (${Math.hypot(entered.doorX - doorX, entered.doorZ - doorZ).toFixed(2)} m from the E press)`,
+  );
+  check(
+    Math.abs(entered.doorNX - outX) < 0.05 && Math.abs(entered.doorNZ - outZ) < 0.05,
+    'and its normal points out through that wall',
+  );
   check(p.space === space, 'the participant is in that space on this end too');
   check(p.interior !== null && p.interiorWorld !== null, 'and has an inside to be stepped against');
   const inside = p.interior;
@@ -11440,10 +11453,30 @@ async function checkInteriors(): Promise<void> {
     const drift = Math.hypot(again.combat.body.position.x - wasAt.x, again.combat.body.position.z - wasAt.z);
     check(drift < 1.5, `standing where they logged off, not in the doorway (${drift.toFixed(2)} m)`);
     check(again.restored, 'and are told it was a restore rather than an ordinary spawn');
+    // And the door they came in by came back with them. Before this was saved,
+    // a restore invented a door beside wherever they were standing -- which was
+    // the first thing the owner reported about doors.
+    check(
+      record.lastPos?.doorX !== undefined && Math.hypot((record.lastPos?.doorX ?? 0) - doorX, (record.lastPos?.doorZ ?? 0) - doorZ) < 0.6,
+      'the door they came in by is saved beside the spot',
+    );
+    check(
+      again.door !== null && Math.hypot((again.door?.x ?? 0) - doorX, (again.door?.z ?? 0) - doorZ) < 0.6,
+      'and is the door they get back on logging in, not the building\'s own',
+    );
+    const outFrame = back.spaceFrameFor(again);
+    check(
+      Math.hypot(outFrame.doorX - doorX, outFrame.doorZ - doorZ) < 0.6,
+      'and is what the client is told to draw',
+    );
     // And out through a door they were never told about, which is the case the
     // saved spot cannot answer: the building is stored and the door is not.
     const outAgain = back.doorPress(again.id);
-    check(outAgain !== null && outAgain.space === CITY_SPACE, 'and can walk back out of a door they did not come in by');
+    check(outAgain !== null && outAgain.space === CITY_SPACE, 'and can walk back out');
+    check(
+      outAgain !== null && Math.hypot(outAgain.x - (doorX + outX * 1.3), outAgain.z - (doorZ + outZ * 1.3)) < 0.6,
+      'through the door they came in by, onto the pavement outside it',
+    );
     await Bun.$`rm -f ${accountPath}`.quiet().nothrow();
   }
 }

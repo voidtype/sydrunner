@@ -199,6 +199,11 @@ export interface LiveSpot {
    * it is what makes "log off inside, log in inside" true.
    */
   building: number;
+  /** The door the spot was entered by, when `building` is set. See `LastPos`. */
+  doorX: number;
+  doorZ: number;
+  doorNX: number;
+  doorNZ: number;
 }
 
 /**
@@ -458,7 +463,10 @@ export class AccountStore {
     const kills = carry === null ? 0 : Math.max(0, Math.min(1e9, Math.trunc(carry.kills)));
     const spot = carry === null
       ? null
-      : sanitiseLastPos({ x: carry.x, y: carry.y, z: carry.z, yaw: carry.yaw, building: carry.building, savedMs: now });
+      : sanitiseLastPos({
+          x: carry.x, y: carry.y, z: carry.z, yaw: carry.yaw, building: carry.building,
+          doorX: carry.doorX, doorZ: carry.doorZ, doorNX: carry.doorNX, doorNZ: carry.doorNZ, savedMs: now,
+        });
 
     const record: AccountRecord = {
       id: crypto.randomUUID(),
@@ -593,7 +601,10 @@ export class AccountStore {
     // on Monday belongs to the new week, and stamping it before the roll would
     // have `resetIfNewWeek` throw it away a millisecond later.
     if (resetIfNewWeek(record, now)) this.touch();
-    const parsed = sanitiseLastPos({ x: spot.x, y: spot.y, z: spot.z, yaw: spot.yaw, building: spot.building, savedMs: now });
+    const parsed = sanitiseLastPos({
+      x: spot.x, y: spot.y, z: spot.z, yaw: spot.yaw, building: spot.building,
+      doorX: spot.doorX, doorZ: spot.doorZ, doorNX: spot.doorNX, doorNZ: spot.doorNZ, savedMs: now,
+    });
     if (parsed === null) return false;
     record.lastPos = parsed;
     record.lastSeenMs = now;

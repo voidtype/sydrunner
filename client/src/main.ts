@@ -134,6 +134,7 @@ import {
   setPlacements,
   verifyInterior,
   type Interior,
+  type InteriorDoor,
 } from './world/interior.ts';
 import { INTERIOR_LAYER, InteriorView } from './world/interiorview.ts';
 import { lostMessage, lostPlan, verifyDeviceLost } from './devicelost.ts';
@@ -6293,6 +6294,14 @@ async function main(): Promise<void> {
    */
   let interiorWorld: CombatWorld | null = null;
   /**
+   * The door this browser came in by, off the `SPACE` frame. Null outdoors.
+   *
+   * Per entrant: the wall you pressed `E` at outside is where the door is
+   * inside, and a restore carries it in the saved spot. See
+   * `world/interior.ts`'s header for the two designs before this one.
+   */
+  let interiorDoor: InteriorDoor | null = null;
+  /**
    * How close to the door you have to be, inside, for it to offer itself.
    *
    * Far more generous than the 2.6 m at the front step, and see the prompt for
@@ -7877,7 +7886,7 @@ async function main(): Promise<void> {
     ghostAt = want;
     ghostOk =
       placedHere.length < MAX_PER_SPACE &&
-      placementFits(it, placedHere, want) &&
+      placementFits(it, placedHere, want, interiorDoor === null ? [it.door] : [it.door, interiorDoor]) &&
       // And not on top of the person placing it, which is the one rule the
       // server applies that `placementFits` does not know about -- it is a
       // question about who is in the room rather than about the room.
@@ -7897,7 +7906,7 @@ async function main(): Promise<void> {
     if (net.placedSpace !== net.space) return;
     placedHere = net.placed.map((i) => ({ kind: i.kind, x: i.x, z: i.z, turn: i.turn }));
     setPlacements(it, placedHere);
-    interiorView.rebuild(it);
+    interiorView.rebuild(it, interiorDoor ?? it.door);
   };
 
   const applySpace = (f: SpaceFrame): void => {
@@ -7914,6 +7923,7 @@ async function main(): Promise<void> {
       placedHere = [];
       wantSpace = null;
       interior = null;
+      interiorDoor = null;
       interiorWorld = null;
       interiorView.hide(camera);
       placeBody(f);
@@ -8011,7 +8021,14 @@ async function main(): Promise<void> {
       mover: built.resolver,
       groundHeight: () => built.base,
     };
-    interiorView.show(camera, built);
+    // The frame's door is the wall you pressed `E` at (or the one saved with
+    // your spot); zeros mean the server had none, which is a spot saved before
+    // doors were, and the building's own stands in.
+    interiorDoor =
+      f.doorNX !== 0 || f.doorNZ !== 0
+        ? { x: f.doorX, z: f.doorZ, nx: f.doorNX, nz: f.doorNZ }
+        : built.door;
+    interiorView.show(camera, built, interiorDoor);
     placeBody(f);
     audio.door();
     // And one line about the room, which is what the loading screen the owner
@@ -8044,8 +8061,9 @@ async function main(): Promise<void> {
       // Out, along the door's outward normal, at the city's own ground -- the
       // pad a building sits on and the pavement outside it are not the same
       // number. `sim.leaveInterior`'s two lines.
-      const x = interior.door.x + interior.door.nx * 1.3;
-      const z = interior.door.z + interior.door.nz * 1.3;
+      const door = interiorDoor ?? interior.door;
+      const x = door.x + door.nx * 1.3;
+      const z = door.z + door.nz * 1.3;
       applySpace({
         space: CITY_SPACE,
         building: 0,
@@ -8067,7 +8085,8 @@ async function main(): Promise<void> {
     if (built === null) return;
     // The arrival is the building's door, not the wall that was knocked on:
     // one building, one inside, one door. See `world/interior.ts`'s header.
-    const at = arrivalAt(built);
+    const door: InteriorDoor = { x: site.x, z: site.z, nx: site.nx, nz: site.nz };
+    const at = arrivalAt(built, door);
     if (at.stuck) return;
     applySpace({
       space: spaceForBuilding(seed),
@@ -8076,10 +8095,10 @@ async function main(): Promise<void> {
       y: built.base + EYE_HEIGHT,
       z: at.z,
       yaw: player.yaw,
-      doorX: built.door.x,
-      doorZ: built.door.z,
-      doorNX: built.door.nx,
-      doorNZ: built.door.nz,
+      doorX: door.x,
+      doorZ: door.z,
+      doorNX: door.nx,
+      doorNZ: door.nz,
     });
   };
 
@@ -10294,8 +10313,9 @@ async function main(): Promise<void> {
        * a tight reach buys is a player standing in a room they cannot leave.
        * The server does not test the reach at all -- see `sim.leaveInterior`.
        */
-      const dx = player.position.x - interior.door.x;
-      const dz = player.position.z - interior.door.z;
+      const door = interiorDoor ?? interior.door;
+      const dx = player.position.x - door.x;
+      const dz = player.position.z - door.z;
       atExit = dx * dx + dz * dz <= EXIT_REACH_M * EXIT_REACH_M;
     } else if (playerCombat.drivingCar === 0 && playerCombat.ridingBike === 0 && !isAboard(playerCombat.aboard)) {
       camera.getWorldDirection(doorGaze);

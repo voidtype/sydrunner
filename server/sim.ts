@@ -267,7 +267,14 @@ import { CollisionWorld, type Prism } from '../client/src/player/collision.ts';
 // building a door belongs to and where its walls are have to be answered here
 // or an interior is a room only its occupant can see.
 import { DOOR_REACH_M, buildingSeed, doorAt, type DoorPrism } from '../client/src/world/doorway.ts';
-import { arrivalAt, buildInterior, placementFits, setPlacements, type Interior } from '../client/src/world/interior.ts';
+import {
+  arrivalAt,
+  buildInterior,
+  placementFits,
+  setPlacements,
+  type Interior,
+  type InteriorDoor,
+} from '../client/src/world/interior.ts';
 import {
   MAX_PER_SPACE,
   REMOVE_REACH_M,
@@ -658,6 +665,14 @@ export interface Participant {
    * where `Participant.world` is the answer instead.
    */
   interiorWorld: CombatWorld | null;
+  /**
+   * The door this body came in by, or null outdoors.
+   *
+   * Per entrant, saved with the spot, and the thing the exit and the panel use.
+   * *"where i enter is where the door goes."* See `world/interior.ts`'s header
+   * for the two designs before this one and what each got wrong.
+   */
+  door: InteriorDoor | null;
 
   // --- Money. See `client/src/game/cash.ts`.
   /**
@@ -1749,11 +1764,16 @@ export class Simulation {
      * before `restoreInterior` runs a few lines below.
      */
     let indoors = 0;
+    let savedDoor: InteriorDoor | null = null;
     if (account !== null && bot === null && this.accounts !== null) {
       const saved = this.accounts.spotFor(account);
       if (saved !== null && saved.building !== 0) {
         indoors = saved.building;
         remembered = { x: saved.x, z: saved.z, yaw: saved.yaw };
+        // Zeros mean "no door was saved" -- see `accounts.LastPos.doorX`.
+        if (saved.doorNX !== 0 || saved.doorNZ !== 0) {
+          savedDoor = { x: saved.doorX, z: saved.doorZ, nx: saved.doorNX, nz: saved.doorNZ };
+        }
       } else if (saved !== null) {
         const here = restoreSpawnPoint(saved, world);
         if (here !== null) remembered = { x: here.x, z: here.z, yaw: saved.yaw };
@@ -1823,6 +1843,7 @@ export class Simulation {
       space: CITY_SPACE,
       interior: null,
       interiorWorld: null,
+      door: null,
       // **The wallet is opened here and only here**, by name, and only for a
       // person. `WalletStore.for` creates on first sight, so a new name's first
       // `WALLET` frame carries `STARTING_BALANCE` rather than a zero that is
@@ -1915,6 +1936,7 @@ export class Simulation {
         indoors,
         participant.combat.body.position.x,
         participant.combat.body.position.z,
+        savedDoor,
       );
       if (!back) {
         lostSpot = true;
@@ -1969,6 +1991,7 @@ export class Simulation {
     // would drop them through the floor. The interior's own base is the floor
     // they are standing on and is the only height that means anything in here.
     if (p.interior !== null) {
+      const d = p.door ?? p.interior.door;
       return {
         name: p.name,
         kills: p.kos,
@@ -1977,6 +2000,10 @@ export class Simulation {
         z,
         yaw: p.combat.body.yaw,
         building: p.interior.seed,
+        doorX: d.x,
+        doorZ: d.z,
+        doorNX: d.nx,
+        doorNZ: d.nz,
       };
     }
     return {
@@ -1987,6 +2014,10 @@ export class Simulation {
       z,
       yaw: p.combat.body.yaw,
       building: 0,
+      doorX: 0,
+      doorZ: 0,
+      doorNX: 0,
+      doorNZ: 0,
     };
   }
 
@@ -3101,7 +3132,7 @@ export class Simulation {
         const inside = p.interior;
         const spot = inside !== null
           ? (() => {
-              const at = arrivalAt(inside);
+              const at = arrivalAt(inside, p.door ?? inside.door);
               return { x: at.x, y: inside.base, z: at.z };
             })()
           : inPlace
@@ -5826,10 +5857,10 @@ export class Simulation {
       // The building's door, or zeros in the city. It is on the interior, and
       // only there: the four per-participant copies this used to read were
       // left over from when a door was where you happened to knock.
-      doorX: p.interior?.door.x ?? 0,
-      doorZ: p.interior?.door.z ?? 0,
-      doorNX: p.interior?.door.nx ?? 0,
-      doorNZ: p.interior?.door.nz ?? 0,
+      doorX: p.door?.x ?? 0,
+      doorZ: p.door?.z ?? 0,
+      doorNX: p.door?.nx ?? 0,
+      doorNZ: p.door?.nz ?? 0,
     };
   }
 
@@ -5879,16 +5910,21 @@ export class Simulation {
     // the inside at the one door the building has, which is where everybody
     // else in it is looking. See `world/interior.ts`'s header for why the door
     // stopped being per entrant.
-    const at = arrivalAt(made.it);
-    // `buildInterior` already refused anything with no clear arrival, so this
-    // is the furniture: somebody may have put a couch where the door lands
-    // since the room was built. A refusal is a door that does nothing, which
-    // is bad; a body placed inside a couch is a body shoved every tick, which
-    // is the thing the owner reported.
+    // **The wall you knocked on is your door.** Real, on the outline, and the
+    // one place inside and outside line up. `doorAt` found it on the real
+    // prism, so it is never the air across a notch.
+    const door: InteriorDoor = { x: site.x, z: site.z, nx: site.nx, nz: site.nz };
+    const at = arrivalAt(made.it, door);
+    // `buildInterior` already refused anything with no clear arrival at the
+    // building's own door; this one is yours, and it can be blocked by a couch
+    // somebody put down since. A refusal is a door that does nothing, which is
+    // bad; a body placed inside a couch is a body shoved every tick, which is
+    // the thing the owner reported.
     if (at.stuck) return null;
     p.space = spaceForBuilding(seed);
     p.interior = made.it;
     p.interiorWorld = made.world;
+    p.door = door;
     this.moveInto(p, at.x, made.it.base + EYE_HEIGHT, at.z);
     return this.spaceFrameFor(p);
   }
@@ -5916,12 +5952,14 @@ export class Simulation {
   private leaveInterior(p: Participant): SpaceFrame | null {
     const inside = p.interior;
     if (inside === null) return null;
-    const x = inside.door.x + inside.door.nx * 1.3;
-    const z = inside.door.z + inside.door.nz * 1.3;
+    const door = p.door ?? inside.door;
+    const x = door.x + door.nx * 1.3;
+    const z = door.z + door.nz * 1.3;
     const space = p.space;
     p.space = CITY_SPACE;
     p.interior = null;
     p.interiorWorld = null;
+    p.door = null;
     this.forgetInteriorIfEmpty(space);
     this.moveInto(p, x, eyeAt(p.world, x, z), z);
     return this.spaceFrameFor(p);
@@ -6027,7 +6065,13 @@ export class Simulation {
       const b = other.combat.body.position;
       if (boxClearance(box, b.x, b.z) < PLAYER_RADIUS + 0.05) return null;
     }
-    if (!placementFits(inside, held, want)) return null;
+    // Clear of every door anybody in the room came in by, and the building's
+    // own for whoever comes in next with no saved one.
+    const doors: InteriorDoor[] = [inside.door];
+    for (const other of this.ordered) {
+      if (other.space === p.space && other.door !== null) doors.push(other.door);
+    }
+    if (!placementFits(inside, held, want, doors)) return null;
     const next = held.slice();
     next.push(want);
     if (!store.set(p.space, next)) return null;
@@ -6053,7 +6097,13 @@ export class Simulation {
    * not a fact anybody remembers, and the nearest one is the one you would
    * walk out of anyway.
    */
-  private restoreInterior(p: Participant, seed: number, x: number, z: number): boolean {
+  private restoreInterior(
+    p: Participant,
+    seed: number,
+    x: number,
+    z: number,
+    savedDoor: InteriorDoor | null,
+  ): boolean {
     const collision = this.world.collision;
     if (collision === null) return false;
     this.doorPrisms.length = 0;
@@ -6076,6 +6126,11 @@ export class Simulation {
     p.space = spaceForBuilding(seed);
     p.interior = made.it;
     p.interiorWorld = made.world;
+    // The door they came in by, saved with the spot; the building's own for a
+    // spot saved before doors were. This is the whole of what the second
+    // design got wrong -- it had no saved door, so it invented one beside
+    // wherever they were standing.
+    p.door = savedDoor ?? made.it.door;
     // Where they were standing, settled -- not the arrival, which would put
     // everybody who comes back to a pub in its doorway. `arrivalAt`'s settle is
     // reused through the resolver so a spot that has since become a wall (a
@@ -6083,7 +6138,7 @@ export class Simulation {
     const home = made.it.resolver.resolve(x, z, x, z, PLAYER_RADIUS, made.it.base);
     const inside = made.it.resolver.clearance(home.x, home.z) >= PLAYER_RADIUS
       ? home
-      : arrivalAt(made.it);
+      : arrivalAt(made.it, p.door);
     // Neither the spot they logged off on nor the door is clear: the street,
     // on `join`'s ordinary refusal path, rather than a body the resolver will
     // push every tick. This is the branch the Erskineville shed took.
