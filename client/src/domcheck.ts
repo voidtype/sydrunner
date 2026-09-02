@@ -66,6 +66,18 @@ const REQUIRED_IDS: readonly string[] = [
   'account-note',
   'help',
   'helpfull',
+  // The hero line and the `you` column, this pass. See UI.md.
+  'hero',
+  'hero-text',
+  'hero-rule',
+  'you',
+  'money',
+  'level',
+  'heat',
+  'investigation',
+  'questtrack',
+  'locator',
+  'minimap',
 ];
 
 /** Self-check. Client boot list only: it reads the DOM. */

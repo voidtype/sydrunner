@@ -180,6 +180,7 @@ import { verifyFloorPlan } from '../client/src/world/floorplan.ts';
 import { verifyPlaceables } from '../client/src/world/placeables.ts';
 import { InteriorStore, defaultInteriorPath, verifyInteriorStore } from './interiors.ts';
 import { verifyDoorway } from '../client/src/world/doorway.ts';
+import { verifyAreaLine } from '../client/src/game/arealine.ts';
 import { verifyInterior } from '../client/src/world/interior.ts';
 import { verifySpaces } from '../client/src/net/spaces.ts';
 import { verifyDeviceLost } from '../client/src/devicelost.ts';
@@ -487,6 +488,7 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // to and stops a body at its walls -- and a check the deploy gate cannot
     // see is a check that goes green on a broken build.
     ['verifyDoorway', verifyDoorway()],
+    ['verifyAreaLine', verifyAreaLine()],
     ['verifyInterior', verifyInterior()],
     // And what people put in the rooms. `verifyInteriorStore` is server-only of
     // the two, because it is the only end with a disk.

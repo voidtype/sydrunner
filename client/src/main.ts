@@ -549,6 +549,8 @@ import {
 } from './game/camera.ts';
 import { FOV_BASE, Feedback } from './game/feedback.ts';
 import { Locator, verifyLocator } from './game/locator.ts';
+import { AreaLine, verifyAreaLine } from './game/arealine.ts';
+import { AreaLineView } from './arealine.ts';
 // The drive, narrated sparingly, through the notice channel that already
 // exists. See `game/ticker.ts` -- the module is the rate limit, not the words.
 import { Ticker, verifyTicker } from './game/ticker.ts';
@@ -1045,6 +1047,9 @@ async function main(): Promise<void> {
   // down a block, or "cnr Crown St & Crown St". None of them throws and none of
   // them has a frame that says otherwise -- see `verifyLocator`.
   const locatorFailures = timed('locator', verifyLocator);
+  // And the hero line's clock: the dwell, the encore rule and the fade's
+  // shape, none of which a screenshot could tell from a broken one.
+  const areaLineFailures = timed('area line', verifyAreaLine);
   // WORKSTREAM N (carry): the restore sentence, on the same criterion. A
   // dangling em dash in a pill and a suburb poll that never gives up are both
   // invisible to anything that only asks whether the player ended up in the
@@ -1571,6 +1576,7 @@ async function main(): Promise<void> {
     rateFailures.length ||
     nameFailures.length ||
     locatorFailures.length ||
+    areaLineFailures.length ||
     carryFailures.length ||
     trafficFailures.length ||
     viewLatchFailures.length ||
@@ -1659,6 +1665,7 @@ async function main(): Promise<void> {
           ...rateFailures,
           ...nameFailures,
           ...locatorFailures,
+          ...areaLineFailures,
           ...carryFailures,
           ...trafficFailures,
           ...viewLatchFailures,
@@ -7005,9 +7012,12 @@ async function main(): Promise<void> {
   // which is a better boot than a loading screen held open for a lookup table.
   const locator = new Locator(streamer, '/world', streamer.assetVersion);
   void locator.loadSuburbs();
-  // The drive's narration, and the suburb it last said. See the frame loop.
+  // The hero line reads the same nearest suburb the strip does, and decides
+  // for itself when it is worth saying. See UI.md.
+  const areaLine = new AreaLine();
+  const areaLineView = new AreaLineView();
+  // The drive's narration. See the frame loop; the suburb is the hero line's.
   const ticker = new Ticker();
-  let tickerSuburb: string | null = null;
 
   // WORKSTREAM N (carry): *"logging off should save my location till next log
   // in"*, said out loud. Here rather than beside the welcome eight hundred lines
@@ -12239,7 +12249,7 @@ async function main(): Promise<void> {
     // rewrite the pill every frame for the rest of the session.
     if (playerCombat.bikeTuned && !tunedAnnounced) {
       tunedAnnounced = true;
-      hud.notice(`bike tuning unlocked -- rides are now ${BIKE_TUNED_COFFEES}x a coffee run`);
+      hud.notice(`bike tuning unlocked — rides are now ${BIKE_TUNED_COFFEES}x a coffee run`);
       audio.pickupTraining();
     }
 
@@ -12419,11 +12429,10 @@ async function main(): Promise<void> {
      * not shout, and a line nobody reads should cost one fade.
      */
     {
-      const where = locator.stats().suburb ?? null;
-      if (where !== null && where !== tickerSuburb) {
-        tickerSuburb = where;
-        ticker.post(`suburb:${where}`, `entering ${where}`);
-      }
+      // The suburb is the hero line's now, not the ticker's: a place name said
+      // once, big, and gone, rather than a notice in the pill. Indoors there
+      // is no suburb to speak of and the line stays quiet.
+      areaLineView.update(areaLine.update(frameDt, interior === null ? locator.stats().suburb ?? null : null));
       const said = ticker.update(frameDt, Math.hypot(player.velocity.x, player.velocity.z));
       if (said !== null) hud.notice(said);
     }

@@ -677,7 +677,19 @@ export class Hud {
    * lives in the pill for a notice to have to restore.
    */
   notice(message: string): void {
-    this.hint.textContent = message;
+    // A leading key -- "E — go inside", "Shift+E — down" -- is drawn as a
+    // keycap. The dash is the em dash every prompt in `main.ts` is written
+    // with; a message with none is a sentence and is drawn as one.
+    const key = /^([A-Za-z0-9+]{1,9}) — (.+)$/.exec(message);
+    this.hint.textContent = '';
+    if (key === null) {
+      this.hint.textContent = message;
+    } else {
+      const cap = document.createElement('kbd');
+      cap.textContent = key[1];
+      this.hint.appendChild(cap);
+      this.hint.appendChild(document.createTextNode(key[2]));
+    }
     this.hint.style.opacity = '1';
   }
 
