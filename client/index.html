@@ -122,7 +122,7 @@
       #questlog .section, #panel-tabs .tab, #panel-tabs .taboff, #chatprefix, #buildsheet-foot,
       #nameprompt-place, #nameprompt-sub, #nameprompt-login label, #nameprompt-tabs button,
       #phone-bar, #phone-title, #dialog-who, #level-text, #questtrack-title, #investigation-title,
-      #ko, #talents .eyebrow, .tcard .ttag, .tnode .tk, #talents-who, .ttier .treq,
+      #ko, #talents .eyebrow, .tcard .ttag, .tnode .tk, .ttier .treq,
       #buildsheet .bkind, .chatline .room, #viewfinder b, #phone-foot, #talents-bar button {
         font-family: var(--f-display); font-weight: 500; letter-spacing: .22em; text-transform: uppercase;
       }
@@ -564,12 +564,13 @@
       .tcard .tname { text-transform: none; font: 700 34px/1 var(--f-display); letter-spacing: .02em; }
       .tcard .ttag { font-size: var(--t-micro); opacity: .85; margin-top: 6px; }
       .tcard p { margin: 10px 0 0; max-width: 44ch; opacity: .95; }
-      .tcard .tpick { display: inline-block; margin-top: 12px; font: 500 var(--t-micro)/1 var(--f-display); letter-spacing: .18em; text-transform: uppercase; border: 2px solid currentColor; padding: 7px 10px; border-radius: var(--r-tight); }
+      /* Carries a team name: no transform, ever. `verifyTeams` asks the browser. */
+      .tcard .tpick { display: inline-block; margin-top: 12px; font: 500 var(--t-micro)/1 var(--f-display); letter-spacing: .18em; text-transform: none; border: 2px solid currentColor; padding: 7px 10px; border-radius: var(--r-tight); }
       #talents-locknote { margin-top: 12px; font-size: var(--t-small); color: var(--rail); }
       #talents-bar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--edge); background: var(--steel-2); border-radius: var(--r-base); }
       #talents-bar .pts { font: 700 24px/1 var(--f-display); font-variant-numeric: tabular-nums; }
       #talents-bar .pts small { font: 500 var(--t-micro)/1 var(--f-display); letter-spacing: .14em; color: var(--cream-2); margin-left: 6px; }
-      #talents-who { font-size: var(--t-micro); padding: 6px 10px; border-radius: var(--r-tight); }
+      #talents-who { font: 600 var(--t-small)/1.4 var(--f-ui); letter-spacing: .04em; text-transform: none; padding: 6px 10px; border-radius: var(--r-tight); }
       #talents-who.none { border: 1px solid var(--edge); color: var(--cream-2); }
       #talents-bar .hint { color: var(--cream-2); font-size: var(--t-small); margin-left: auto; }
       #talents-bar button { background: none; border: 1px solid var(--edge-strong); color: var(--cream); font-size: var(--t-micro); padding: 6px 10px; cursor: pointer; border-radius: var(--r-tight); }
@@ -597,14 +598,14 @@
       .tnode.megan .tn { font-size: var(--t-large); }
       .tnode .tbest { position: absolute; bottom: 5px; right: 7px; font-size: 9px; letter-spacing: .08em; color: var(--rail); }
       #talents-summary { margin-top: 14px; border: 1px solid var(--edge); background: var(--steel-2); padding: 10px 12px; border-radius: var(--r-base); }
-      #talents-summary h4 { margin: 0 0 6px; font: 700 var(--t-large)/1.3 var(--f-display); text-transform: uppercase; letter-spacing: .06em; }
+      #talents-summary h4 { margin: 0 0 6px; font: 700 var(--t-large)/1.3 var(--f-display); text-transform: none; letter-spacing: .04em; }
       #talents-build { margin: 0; padding-left: 18px; font-size: var(--t-body); }
       #talents-build li { margin: 2px 0; }
       #talents-build .tmuted { color: var(--cream-2); }
       #talents-look { margin-top: 8px; font-size: var(--t-small); color: var(--rail); }
       #talents-tip { position: fixed; z-index: 47; pointer-events: none; width: 320px; display: none; padding: 10px 12px; font-size: var(--t-mid); line-height: 1.45; }
       #talents-tip .th { font-weight: 700; font-size: var(--t-large); line-height: 1.2; margin-bottom: 4px; }
-      #talents-tip .tchips { display: flex; gap: 6px; margin: 0 0 8px; font: 500 9px/1 var(--f-display); letter-spacing: .16em; text-transform: uppercase; }
+      #talents-tip .tchips { display: flex; gap: 6px; margin: 0 0 8px; font: 500 9px/1 var(--f-display); letter-spacing: .16em; text-transform: none; }
       #talents-tip .tchips span { padding: 3px 6px; border-radius: var(--r-tight); background: var(--steel-3); color: var(--cream-2); }
       #talents-tip .te { margin: 0 0 8px; }
       #talents-tip .tf { color: var(--cream-2); font-style: italic; margin: 0 0 6px; }
@@ -633,7 +634,7 @@
       #levelup { position: fixed; left: 0; right: 0; top: 34%; z-index: 55; display: none; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; text-align: center; }
       #levelup.shown { display: flex; }
       #levelup b { font: 700 48px/1 var(--f-display); letter-spacing: .1em; text-transform: uppercase; color: var(--sandstone); text-shadow: 0 2px 18px rgba(0,0,0, .75), 0 0 34px rgba(217,164,65, .35); animation: levelup-pop .22s ease-out forwards; }
-      #levelup span { font: 500 var(--t-body)/1.4 var(--f-display); letter-spacing: .24em; text-transform: uppercase; color: var(--cream); text-shadow: var(--lift-big); animation: levelup-sub .22s ease-out forwards; }
+      #levelup span { font: 500 var(--t-body)/1.4 var(--f-display); letter-spacing: .24em; text-transform: none; color: var(--cream); text-shadow: var(--lift-big); animation: levelup-sub .22s ease-out forwards; }
       #levelup b::after { content: ''; display: block; height: 2px; margin: 10px auto 0; background: linear-gradient(90deg, transparent, var(--sandstone), transparent); animation: levelup-rule .22s ease-out forwards; }
       @keyframes levelup-pop { 0% { opacity: 0; transform: scale(.86); } 12% { opacity: 1; transform: scale(1.04); } 24% { transform: scale(1); } 76% { opacity: 1; } 100% { opacity: 0; transform: scale(1.02); } }
       @keyframes levelup-sub { 0%, 18% { opacity: 0; } 34% { opacity: 1; } 78% { opacity: 1; } 100% { opacity: 0; } }
