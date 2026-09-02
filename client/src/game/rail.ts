@@ -670,10 +670,16 @@ export function sampleAlong(
   // between the two vertices' values. The one deliberate change to the
   // arithmetic above, and it is additive after the heading is fixed, so the
   // heading, the height and the arc length are the bits they always were.
-  const lat = bake.lateral[lo] + (bake.lateral[lo + 1] - bake.lateral[lo]) * u;
-  if (lat !== 0) {
-    out.x += -hz * lat;
-    out.z += hx * lat;
+  // Optional on the type because the riding module's own checks hand this a
+  // synthetic bake with no offsets, and a check that crashes the boot is a
+  // check nobody ran.
+  const L = bake.lateral;
+  if (L !== undefined) {
+    const lat = L[lo] + (L[lo + 1] - L[lo]) * u;
+    if (lat !== 0) {
+      out.x += -hz * lat;
+      out.z += hx * lat;
+    }
   }
 }
 
