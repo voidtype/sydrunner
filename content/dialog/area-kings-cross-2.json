@@ -1,0 +1,623 @@
+{
+ "pack": "area-kings-cross-2",
+ "npcs": [
+  {
+   "id": "qg-kings-cross-zeina",
+   "name": "Zeina, cabbie, twenty years",
+   "x": 873,
+   "z": 442,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Where to? Oh, you're not a fare. Fair enough. Kings Cross, I know every gutter.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Kings Cross like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twenty years on the rank. Uber took half of it and the tunnel took the rest. Darlinghurst Road is still cash, thank god.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the el alamein fountain float.",
+     "choices": [
+      {
+       "text": "The the El Alamein fountain Float",
+       "accept": "qg-l4-kings-cross-058",
+       "denyFlag": "w:qg-l4-kings-cross-058"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Zeina pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the el alamein fountain float.",
+       "turnin": "qg-l4-kings-cross-058"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never go via Darlinghurst Road after five. Never. I don't care what the app says.",
+     "improv": {
+      "persona": "Zeina, cabbie, twenty years in Kings Cross, Sydney. Dry, specific, local; never says g'day or crikey; talks about Darlinghurst Road like everyone knows it.",
+      "context": "Someone has asked what Kings Cross is like these days. You are standing near Darlinghurst Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Kings Cross would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-kings-cross-imogen-b",
+   "name": "Imogen B., real estate agent",
+   "x": 1073,
+   "z": 1033,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Kings Cross is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Kings Cross like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. the El Alamein fountain is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Tap On at Macleay Street",
+       "accept": "qg-l4-kings-cross-059",
+       "denyFlag": "w:qg-l4-kings-cross-059"
+      },
+      {
+       "text": "RBT on Macleay Street",
+       "accept": "qg-l4-kings-cross-060",
+       "denyFlag": "w:qg-l4-kings-cross-060",
+       "needFlag": "w:qg-l4-kings-cross-059"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Imogen B. looks it over the way Kings Cross looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About tap on at macleay street.",
+       "turnin": "qg-l4-kings-cross-059"
+      },
+      {
+       "text": "About rbt on macleay street.",
+       "turnin": "qg-l4-kings-cross-060"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. the El Alamein fountain means cosy.",
+     "improv": {
+      "persona": "Imogen B., real estate agent in Kings Cross, Sydney. Dry, specific, local; never says g'day or crikey; talks about the El Alamein fountain like everyone knows it.",
+      "context": "Someone has asked what Kings Cross is like these days. You are standing near the El Alamein fountain."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Imogen B. listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-kings-cross-fergus-a",
+   "name": "Fergus A., Wayside Chapel volunteer",
+   "x": 1186,
+   "z": 308,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Come in, there's soup. There's always soup. Kings Cross looks after its own.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Kings Cross like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Beds, showers, a cuppa, someone to talk to. Macleay Street gets busier every winter.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "One Stop From Fitzroy Gardens",
+       "accept": "qg-l4-kings-cross-061",
+       "denyFlag": "w:qg-l4-kings-cross-061"
+      },
+      {
+       "text": "Two From Fitzroy Gardens",
+       "accept": "qg-l4-kings-cross-062",
+       "denyFlag": "w:qg-l4-kings-cross-062",
+       "needFlag": "w:qg-l4-kings-cross-061"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Fergus A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About one stop from fitzroy gardens.",
+       "turnin": "qg-l4-kings-cross-061"
+      },
+      {
+       "text": "About two from fitzroy gardens.",
+       "turnin": "qg-l4-kings-cross-062"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Everyone's got a story at Macleay Street. Most of them are true. Some of them are better than true.",
+     "improv": {
+      "persona": "Fergus A., Wayside Chapel volunteer in Kings Cross, Sydney. Dry, specific, local; never says g'day or crikey; talks about Macleay Street like everyone knows it.",
+      "context": "Someone has asked what Kings Cross is like these days. You are standing near Macleay Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-kings-cross-salote-a",
+   "name": "Salote A., bouncer, the Cross",
+   "x": 1399,
+   "z": 197,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "ID. Nah, I'm joking, you're fine. Kings Cross, mate. Slow night.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Kings Cross like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Doors on Darlinghurst Road since the lockouts. Fitzroy Gardens used to be a war zone. Now it's brunch.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Probationary at the Bourbon",
+       "accept": "qg-l4-kings-cross-063",
+       "denyFlag": "w:qg-l4-kings-cross-063"
+      },
+      {
+       "text": "Cover at the Bourbon",
+       "accept": "qg-l4-kings-cross-064",
+       "denyFlag": "w:qg-l4-kings-cross-064",
+       "needFlag": "w:qg-l4-kings-cross-063"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Salote A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About probationary at the bourbon.",
+       "turnin": "qg-l4-kings-cross-063"
+      },
+      {
+       "text": "About cover at the bourbon.",
+       "turnin": "qg-l4-kings-cross-064"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Coke sign has watched me lose three girlfriends. It doesn't say anything. I appreciate that.",
+     "improv": {
+      "persona": "Salote A., bouncer, the Cross in Kings Cross, Sydney. Dry, specific, local; never says g'day or crikey; talks about Fitzroy Gardens like everyone knows it.",
+      "context": "Someone has asked what Kings Cross is like these days. You are standing near Fitzroy Gardens."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-kings-cross-eddie-a",
+   "name": "Eddie A., backpacker on a working visa",
+   "x": 743,
+   "z": 609,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Alright? Sorry, you're not the hostel guy. Kings Cross's wild, man.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Kings Cross like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Eighty-eight days of farm work done, now I'm pouring beers near the Bourbon and sleeping eight to a room.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Counting Kellett Street",
+       "accept": "qg-l4-kings-cross-065",
+       "denyFlag": "w:qg-l4-kings-cross-065"
+      },
+      {
+       "text": "The Kellett Street Order",
+       "accept": "qg-l4-kings-cross-066",
+       "denyFlag": "w:qg-l4-kings-cross-066",
+       "needFlag": "w:qg-l4-kings-cross-065"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Eddie A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About counting kellett street.",
+       "turnin": "qg-l4-kings-cross-065"
+      },
+      {
+       "text": "About the kellett street order.",
+       "turnin": "qg-l4-kings-cross-066"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a goon bag somewhere near the Bourbon that has my name on it, literally, I wrote it.",
+     "improv": {
+      "persona": "Eddie A., backpacker on a working visa in Kings Cross, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Bourbon like everyone knows it.",
+      "context": "Someone has asked what Kings Cross is like these days. You are standing near the Bourbon."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-kings-cross-kim",
+   "name": "Kim, night-shift nurse",
+   "x": 1108,
+   "z": 283,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry, just off a double. Twelve hours. Kings Cross, hi, what's wrong?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Kings Cross like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Emergency. Everything comes through the door at Kellett Street: footballers, grandmothers, a man with a fork. Never a dull shift.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the wayside chapel complaint.",
+     "choices": [
+      {
+       "text": "The the Wayside Chapel Complaint",
+       "accept": "qg-l4-kings-cross-067",
+       "denyFlag": "w:qg-l4-kings-cross-067"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Kim counts it out without looking up. -- Don't spend it all at Kellett Street.",
+     "choices": [
+      {
+       "text": "About the the wayside chapel complaint.",
+       "turnin": "qg-l4-kings-cross-067"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good coffee near Kellett Street opens at five. The nurses are there at four fifty-nine.",
+     "improv": {
+      "persona": "Kim, night-shift nurse in Kings Cross, Sydney. Dry, specific, local; never says g'day or crikey; talks about Kellett Street like everyone knows it.",
+      "context": "Someone has asked what Kings Cross is like these days. You are standing near Kellett Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

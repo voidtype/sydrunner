@@ -1,0 +1,517 @@
+{
+ "pack": "area-lakemba-2",
+ "quests": [
+  {
+   "id": "qg-l7-lakemba-052",
+   "act": 3,
+   "title": "The Wangee Road Camera",
+   "blurb": "You are the first person to stop all morning. A new speed camera near Wangee Road has fined half of Lakemba since grand final day. This is the third time I have had this conversation. Photograph it for the appeal, then prove the train to Hurstville is faster anyway. Be polite about it. It costs nothing.",
+   "giver": "qg-lakemba-charbel",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -12251,
+     "z": 5884,
+     "radius": 40,
+     "label": "photograph the camera near Wangee Road"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Lakemba",
+     "to": "Hurstville",
+     "label": "then take the train instead, to Hurstville"
+    }
+   ],
+   "reward": {
+    "cash": 160,
+    "xp": 418,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-lakemba-053",
+   "act": 3,
+   "title": "Left It Near the Ramadan night markets",
+   "blurb": "Do not laugh. I left something on the bench at the Ramadan night markets at ten past ten. It started small, the way these things do. By the time I got back to Lakemba it had walked, so look where I'd have dropped it. I will owe you one, and I pay those.",
+   "giver": "qg-lakemba-cooper",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -12519,
+     "z": 6133,
+     "radius": 30,
+     "label": "check the bench near the Ramadan night markets"
+    },
+    {
+     "kind": "photo",
+     "x": -12267,
+     "z": 5961,
+     "radius": 40,
+     "label": "photograph the bins behind it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-lakemba-cooper",
+     "node": "report-0",
+     "label": "tell me what you found"
+    }
+   ],
+   "reward": {
+    "cash": 150,
+    "xp": 421,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-lakemba-054",
+   "act": 3,
+   "title": "The Parry Park Order",
+   "blurb": "The council knows and the council does not care. The Parry Park order came to seventy more than I'd budgeted and the supplier wants it by bin night. It is not the money. It has stopped being the money. Find seventy in Lakemba and photograph the receipt. Do not make a scene about it.",
+   "giver": "qg-lakemba-michelle",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 120,
+     "label": "square the seventy for the Parry Park order"
+    },
+    {
+     "kind": "photo",
+     "x": -12229,
+     "z": 5805,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 153,
+    "xp": 435,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-lakemba-055",
+   "act": 3,
+   "title": "Rent Money, the Lakemba Mosque",
+   "blurb": "Right. Since you asked. I'm forty-five short on the the Lakemba Mosque rent and the agent doesn't take stories. It is the not knowing that has got me, honestly. Make it somewhere in Lakemba by half seven; I'm not fussy how. I'll put the kettle on for when you're back.",
+   "giver": "qg-lakemba-ahmed",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 77,
+     "label": "earn forty-five somewhere in Lakemba"
+    }
+   ],
+   "reward": {
+    "cash": 145,
+    "xp": 427,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-lakemba-056",
+   "act": 3,
+   "title": "Race Four, the Lakemba Mosque",
+   "blurb": "It is not a police matter and I have checked. There's a horse in race four at ten past ten that a bloke at the Lakemba Mosque swears by. I have got no proof, which is exactly why I am asking. Turn it into fifty-five somewhere in Lakemba and tell me if it came in. There is no rush, but there is a Friday.",
+   "giver": "qg-lakemba-ahmed",
+   "level": 7,
+   "requires": [
+    "qg-l7-lakemba-055"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 95,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-lakemba-ahmed",
+     "node": "report-1",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 200,
+    "xp": 549,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-lakemba-057",
+   "act": 3,
+   "title": "Meat Tray at the Lakemba Hotel",
+   "blurb": "Nobody else has offered, so. The the Lakemba Hotel raffle is thirty-five short of a meat tray and the draw is at closing. It might be nothing. It has not felt like nothing. Find it in Lakemba and put it in the tin. That's the whole job. No catch.",
+   "giver": "qg-lakemba-nadia",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -12527,
+     "z": 5905,
+     "radius": 30,
+     "label": "and drop it at the Lakemba Hotel"
+    }
+   ],
+   "reward": {
+    "cash": 158,
+    "xp": 427,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-lakemba-058",
+   "act": 3,
+   "title": "The Railway Parade Complaint",
+   "blurb": "Two people have already said no. Two women in activewear have photographed my bins outside Railway Parade since Boxing Day. I have got a photo on my phone but it is useless. One has Lakemba council on speed dial; sort it however you sort things. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qg-lakemba-tasnim",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near Railway Parade"
+    }
+   ],
+   "reward": {
+    "cash": 157,
+    "xp": 413,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-lakemba-059",
+   "act": 3,
+   "title": "Cover at Wangee Road",
+   "blurb": "Before you say anything: yes, I know. I've got nobody for the Wangee Road shift at half two and a room full of Lakemba people who've paid. You will see what I mean the second you get there. Fifty of trade and one difficult person at the door. Do not let them talk you into anything.",
+   "giver": "qg-lakemba-dina",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 86,
+     "label": "cover the fifty for the shift"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 1,
+     "label": "and handle whoever's at the door"
+    }
+   ],
+   "reward": {
+    "cash": 150,
+    "xp": 432,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-lakemba-060",
+   "act": 3,
+   "title": "The Wangee Road Tab",
+   "blurb": "This is going to sound small. Two chippies off the Wangee Road job have run a tab in Lakemba since Sunday. I am aware how that sounds. They drove past at the arvo without looking in, so settle it in cash. Ask for me by name at the counter.",
+   "giver": "qg-lakemba-mick",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near Wangee Road"
+    },
+    {
+     "kind": "earn",
+     "dollars": 52,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 143,
+    "xp": 434,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-lakemba-061",
+   "act": 3,
+   "title": "Counting Wangee Road",
+   "blurb": "I would do it myself if I could leave the counter. Council says the Wangee Road car park is never full and I say it's full by half seven. Everyone I have told has looked at me the way you are now. Count both Lakemba car parks, photograph whichever one makes me right. Say nothing to anyone on the way.",
+   "giver": "qg-lakemba-mick",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -12701,
+     "z": 5923,
+     "radius": 30,
+     "label": "count the cars at Wangee Road"
+    },
+    {
+     "kind": "goto",
+     "x": -12529,
+     "z": 5936,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": -12701,
+     "z": 5923,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 158,
+    "xp": 430,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-lakemba-062",
+   "act": 3,
+   "title": "RBT on the knafeh stand",
+   "blurb": "It is the sort of thing you notice or you do not. There's a breath test set up on the knafeh stand since half two. You can tell me I am imagining it. Tell me after. My brother-in-law needs the ute at the far end of Lakemba without a conversation. I'll see you right for it.",
+   "giver": "qg-lakemba-norm",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on the knafeh stand"
+    },
+    {
+     "kind": "goto",
+     "x": -12368,
+     "z": 6244,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 155,
+    "xp": 417,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-lakemba-063",
+   "act": 3,
+   "title": "A Flat White From Haldon Street",
+   "blurb": "You look like you have twenty minutes. I want a flat white from the place near Haldon Street, not the one next to it. My wife says I should let it go. My wife is wrong. Here by half six, while it's still coffee and Lakemba still has some. If anyone asks, you were never here.",
+   "giver": "qg-lakemba-joe",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near Haldon Street"
+    },
+    {
+     "kind": "goto",
+     "x": -12221,
+     "z": 6201,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 158,
+    "xp": 418,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-lakemba-064",
+   "act": 3,
+   "title": "Lads Off Haldon Street",
+   "blurb": "I have been putting it off since Easter. Three of them in TNs on the Haldon Street steps, flogging vapes to schoolkids at the change of shift. This is the third time I have had this conversation. Lakemba used to move them on itself and now it rings me. That's it. That's the whole ask.",
+   "giver": "qg-lakemba-joe",
+   "level": 7,
+   "requires": [
+    "qg-l7-lakemba-063"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Haldon Street"
+    }
+   ],
+   "reward": {
+    "cash": 209,
+    "xp": 529,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-lakemba-065",
+   "act": 3,
+   "title": "Two From Haldon Street",
+   "blurb": "You are the first person to stop all morning. Two of whatever's going near Haldon Street, here, hot, before the footy at half two. The paperwork says one thing and my eyes say another. It's Lakemba; I'm not asking for much. Come and find me after, either way.",
+   "giver": "qg-lakemba-joe",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near Haldon Street"
+    },
+    {
+     "kind": "goto",
+     "x": -12612,
+     "z": 6176,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 399,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-lakemba-066",
+   "act": 3,
+   "title": "Proof of the Ramadan night markets",
+   "blurb": "My knees are gone, so. Nobody in Lakemba believes what the Ramadan night markets looks like at half six. I would have sorted it myself a year ago. Get me a photo close enough that council can't say it's somewhere else. Be polite about it. It costs nothing.",
+   "giver": "qg-lakemba-terry",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -12088,
+     "z": 5533,
+     "radius": 40,
+     "label": "get a picture of the Ramadan night markets before they fix it"
+    }
+   ],
+   "reward": {
+    "cash": 156,
+    "xp": 412,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-lakemba-067",
+   "act": 3,
+   "title": "Tap On at the Ramadan night markets",
+   "blurb": "Honestly, I am past caring how it looks. My Opal says I owe nineteen dollars for a trip from Lakemba I never took on Easter Saturday. I have rung the number on the letter four times. Take the same one to Hurstville and tell me what it charged you. I would rather know than wonder.",
+   "giver": "qg-lakemba-terry",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Lakemba",
+     "to": "Hurstville",
+     "label": "tap on at Lakemba, tap off at Hurstville"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-lakemba-terry",
+     "node": "report-2",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 150,
+    "xp": 437,
+    "unlock": []
+   }
+  }
+ ]
+}

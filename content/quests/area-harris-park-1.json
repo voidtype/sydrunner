@@ -1,0 +1,1449 @@
+{
+ "pack": "area-harris-park-1",
+ "quests": [
+  {
+   "id": "qg-l8-harris-park-001",
+   "act": 3,
+   "title": "Seven a.m. At the Diwali lights",
+   "blurb": "Not being dramatic about this. The site at the Diwali lights starts its jackhammer at dawn on a Wednesday, which is illegal and loud. It is the not knowing that has got me, honestly. Photograph it running and have a word with the Harris Park foreman. Do not make a scene about it.",
+   "giver": "qg-harris-park-charbel",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -18888,
+     "z": -4386,
+     "radius": 40,
+     "label": "photograph the noise from the Diwali lights"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 163,
+    "xp": 448,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-002",
+   "act": 3,
+   "title": "Two From Station Street East",
+   "blurb": "It has been three weeks. Two of whatever's going near Station Street East, here, hot, before the footy at bin night. I am not after trouble. I am after an answer. It's Harris Park; I'm not asking for much. There is no rush, but there is a Friday.",
+   "giver": "qg-harris-park-joon",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near Station Street East"
+    },
+    {
+     "kind": "goto",
+     "x": -18579,
+     "z": -5210,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 168,
+    "xp": 471,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-003",
+   "act": 3,
+   "title": "RBT on Hassall Street",
+   "blurb": "You look like you have twenty minutes. There's a breath test set up on Hassall Street since half seven. It might be nothing. It has not felt like nothing. My brother-in-law needs the ute at the far end of Harris Park without a conversation. Whatever you find, bring it to me first.",
+   "giver": "qg-harris-park-stuart",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on Hassall Street"
+    },
+    {
+     "kind": "goto",
+     "x": -18763,
+     "z": -4425,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 161,
+    "xp": 477,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-004",
+   "act": 3,
+   "title": "The Wigram Street Order",
+   "blurb": "My knees are gone, so. The Wigram Street order came to seventy more than I'd budgeted and the supplier wants it by half two. You will see what I mean the second you get there. Find seventy in Harris Park and photograph the receipt. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qg-harris-park-joyce",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 129,
+     "label": "square the seventy for the Wigram Street order"
+    },
+    {
+     "kind": "photo",
+     "x": -18854,
+     "z": -4675,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 169,
+    "xp": 471,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-005",
+   "act": 3,
+   "title": "Trouble at Little India",
+   "blurb": "Honestly, I am past caring how it looks. Two lads and their mate decided at midnight that Little India is theirs. I would not ask if there was anyone else about. The rest of Harris Park disagrees, so explain the disagreement. You'll know it when you see it.",
+   "giver": "qg-harris-park-val",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Little India"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 162,
+    "xp": 451,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-006",
+   "act": 3,
+   "title": "Rent Money, the Harris Park chaat strip",
+   "blurb": "I'll be straight with you. I'm forty-five short on the the Harris Park chaat strip rent and the agent doesn't take stories. I am aware how that sounds. Make it somewhere in Harris Park by the last train; I'm not fussy how. Do not let them talk you into anything.",
+   "giver": "qg-harris-park-val",
+   "level": 8,
+   "requires": [
+    "qg-l8-harris-park-005"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 83,
+     "label": "earn forty-five somewhere in Harris Park"
+    }
+   ],
+   "reward": {
+    "cash": 209,
+    "xp": 599,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-007",
+   "act": 3,
+   "title": "The Little India Complaint",
+   "blurb": "Do not laugh. Two women in activewear have photographed my bins outside Little India since Monday. Everyone I have told has looked at me the way you are now. One has Harris Park council on speed dial; sort it however you sort things. Do that and we're square.",
+   "giver": "qg-harris-park-val",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near Little India"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 458,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-008",
+   "act": 3,
+   "title": "Something From the Harris Park chaat strip",
+   "blurb": "There is no clever way to say this. The stall at the Harris Park chaat strip has run out and the customers keep coming. There is a version of this where I am the unreasonable one. Find something round Harris Park that'll do before the half six rush. Ask for me by name at the counter.",
+   "giver": "qg-harris-park-sunil",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near the Harris Park chaat strip"
+    },
+    {
+     "kind": "goto",
+     "x": -18811,
+     "z": -4589,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 167,
+    "xp": 453,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-009",
+   "act": 3,
+   "title": "Meat Tray at Marion Street",
+   "blurb": "Someone has to, and it may as well be you. The Marion Street raffle is thirty-five short of a meat tray and the draw is at after the footy. My wife says I should let it go. My wife is wrong. Find it in Harris Park and put it in the tin. Just do not come back empty-handed.",
+   "giver": "qg-harris-park-nadia",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 64,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -18661,
+     "z": -4435,
+     "radius": 30,
+     "label": "and drop it at Marion Street"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 456,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-010",
+   "act": 3,
+   "title": "Before They Touch Marion Street",
+   "blurb": "Right. Since you asked. They start on Marion Street on the last Sunday of the month and the orange fencing goes up. This is the third time I have had this conversation. I want Harris Park on record before it does. I'll see you right for it.",
+   "giver": "qg-harris-park-nadia",
+   "level": 8,
+   "requires": [
+    "qg-l8-harris-park-009"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -18545,
+     "z": -4864,
+     "radius": 40,
+     "label": "photograph the state of Marion Street"
+    },
+    {
+     "kind": "goto",
+     "x": -18701,
+     "z": -5100,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 218,
+    "xp": 611,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-011",
+   "act": 3,
+   "title": "Marion Street Pub Crawl",
+   "blurb": "It is not a police matter and I have checked. A bucks started at Marion Street at noon and it's now three blokes, one pair of pants and a tab. The paperwork says one thing and my eyes say another. Recover the tab by midnight; Harris Park can keep the dignity. If anyone asks, you were never here.",
+   "giver": "qg-harris-park-nadia",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 3,
+     "label": "sort the three from the Marion Street crawl"
+    },
+    {
+     "kind": "earn",
+     "dollars": 37,
+     "label": "and get the twenty they owe"
+    }
+   ],
+   "reward": {
+    "cash": 167,
+    "xp": 444,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-012",
+   "act": 3,
+   "title": "Bin Night, Robin Thomas Reserve",
+   "blurb": "I am told you do odd jobs. Somebody moves the bins on Robin Thomas Reserve in front of my drive every Anzac Day night. I would have sorted it myself a year ago. Photograph the evidence and have a word; Harris Park knows who. That's it. That's the whole ask.",
+   "giver": "qg-harris-park-min-jun",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -18745,
+     "z": -5149,
+     "radius": 40,
+     "label": "photograph the bins at Robin Thomas Reserve"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 156,
+    "xp": 476,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-013",
+   "act": 3,
+   "title": "Probationary at Robin Thomas Reserve",
+   "blurb": "I have written it down twice and lost it twice. A young constable has been doing his first solo patrol round Robin Thomas Reserve since the last Sunday of the month. I have rung the number on the letter four times. He's decided Harris Park is his, so give him a story for the sergeant. Come and find me after, either way.",
+   "giver": "qg-harris-park-min-jun",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "lose the probationary constable near Robin Thomas Reserve"
+    }
+   ],
+   "reward": {
+    "cash": 157,
+    "xp": 466,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-014",
+   "act": 3,
+   "title": "One Stop From Station Street East",
+   "blurb": "You will think I am making this up. I need to know the train from Harris Park stops at Parramatta and doesn't sail through like it did on Tuesday. It started small, the way these things do. Ride it at eleven and photograph the sign. Be polite about it. It costs nothing.",
+   "giver": "qg-harris-park-cooper",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Harris Park",
+     "to": "Parramatta",
+     "label": "take the train to Parramatta"
+    },
+    {
+     "kind": "photo",
+     "x": -18971,
+     "z": -5378,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 166,
+    "xp": 451,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-015",
+   "act": 3,
+   "title": "The the Diwali lights Tab",
+   "blurb": "Two people have already said no. Two chippies off the the Diwali lights job have run a tab in Harris Park since Anzac Day. It is not the money. It has stopped being the money. They drove past at after the footy without looking in, so settle it in cash. Half now if you want it. Most people don't.",
+   "giver": "qg-harris-park-cooper",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Diwali lights"
+    },
+    {
+     "kind": "earn",
+     "dollars": 55,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 156,
+    "xp": 463,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-016",
+   "act": 3,
+   "title": "A Flat White From Station Street East",
+   "blurb": "Keep it between us for now. I want a flat white from the place near Station Street East, not the one next to it. Half the street knows and half the street is pretending not to. Here by first thing, while it's still coffee and Harris Park still has some. There's cash in it. Not a lot.",
+   "giver": "qg-harris-park-rupert",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near Station Street East"
+    },
+    {
+     "kind": "goto",
+     "x": -18628,
+     "z": -4849,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 161,
+    "xp": 481,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-017",
+   "act": 3,
+   "title": "The Hassall Street Camera",
+   "blurb": "Before you say anything: yes, I know. A new speed camera near Hassall Street has fined half of Harris Park since Monday. It is the not knowing that has got me, honestly. Photograph it for the appeal, then prove the train to Parramatta is faster anyway. I will owe you one, and I pay those.",
+   "giver": "qg-harris-park-matilda",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -18624,
+     "z": -4725,
+     "radius": 40,
+     "label": "photograph the camera near Hassall Street"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Harris Park",
+     "to": "Parramatta",
+     "label": "then take the train instead, to Parramatta"
+    }
+   ],
+   "reward": {
+    "cash": 166,
+    "xp": 445,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-018",
+   "act": 3,
+   "title": "Trolley Run, the Harris Park Bowlo",
+   "blurb": "This is going to sound small. A Woolies trolley from the Harris Park Bowlo gets walked to the creek every Sunday. I did try the official route, for what that was worth. Find where it ends up in Harris Park and make the deposit back. Do not make a scene about it.",
+   "giver": "qg-harris-park-daz",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18726,
+     "z": -4671,
+     "radius": 30,
+     "label": "find the trolley near the Harris Park Bowlo"
+    },
+    {
+     "kind": "photo",
+     "x": -18726,
+     "z": -4671,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 46,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 161,
+    "xp": 452,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-019",
+   "act": 3,
+   "title": "The Wigram Street Lift",
+   "blurb": "It is the sort of thing you notice or you do not. The lift at Harris Park station has been out since the Easter Show and I'm told Parramatta is worse. It might be nothing. It has not felt like nothing. Check both Boxing Day and tell me which takes a pram. There is no rush, but there is a Friday.",
+   "giver": "qg-harris-park-anjali",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18715,
+     "z": -4749,
+     "radius": 30,
+     "label": "check the lift at Harris Park station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Harris Park",
+     "to": "Parramatta",
+     "label": "then ride to Parramatta and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-harris-park-anjali",
+     "node": "report-1",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 173,
+    "xp": 444,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-020",
+   "act": 3,
+   "title": "Staffy Near Marion Street",
+   "blurb": "My knees are gone, so. A brindle staffy in a red bandana went over the fence at Marion Street at six in the morning. I would not ask if there was anyone else about. Everyone in Harris Park has definitely seen it and can't say where. That's the whole job. No catch.",
+   "giver": "qg-harris-park-sung",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18446,
+     "z": -4441,
+     "radius": 30,
+     "label": "check the off-leash bit near Marion Street"
+    },
+    {
+     "kind": "photo",
+     "x": -18392,
+     "z": -4724,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-harris-park-sung",
+     "node": "report-1",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 165,
+    "xp": 476,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-021",
+   "act": 3,
+   "title": "Lads Off Marion Street",
+   "blurb": "Honestly, I am past caring how it looks. Three of them in TNs on the Marion Street steps, flogging vapes to schoolkids at lunchtime. I am aware how that sounds. Harris Park used to move them on itself and now it rings me. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qg-harris-park-scott",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Marion Street"
+    }
+   ],
+   "reward": {
+    "cash": 163,
+    "xp": 474,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-022",
+   "act": 3,
+   "title": "Seven a.m. At Robin Thomas Reserve",
+   "blurb": "Do not laugh. The site at Robin Thomas Reserve starts its jackhammer at ten past ten on a Australia Day, which is illegal and loud. There is a version of this where I am the unreasonable one. Photograph it running and have a word with the Harris Park foreman. Do not let them talk you into anything.",
+   "giver": "qg-harris-park-cheryl",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -18924,
+     "z": -4618,
+     "radius": 40,
+     "label": "photograph the noise from Robin Thomas Reserve"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 156,
+    "xp": 447,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-023",
+   "act": 3,
+   "title": "The the Harris Park Bowlo Order",
+   "blurb": "I am told you do odd jobs. The the Harris Park Bowlo order came to seventy more than I'd budgeted and the supplier wants it by six in the morning. I have rung the number on the letter four times. Find seventy in Harris Park and photograph the receipt. If anyone asks, you were never here.",
+   "giver": "qg-harris-park-joe",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 129,
+     "label": "square the seventy for the the Harris Park Bowlo order"
+    },
+    {
+     "kind": "photo",
+     "x": -19046,
+     "z": -4691,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 168,
+    "xp": 447,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-024",
+   "act": 3,
+   "title": "Trouble at Wigram Street",
+   "blurb": "I have written it down twice and lost it twice. Two lads and their mate decided at lunchtime that Wigram Street is theirs. It started small, the way these things do. The rest of Harris Park disagrees, so explain the disagreement. That's it. That's the whole ask.",
+   "giver": "qg-harris-park-yuna",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Wigram Street"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 163,
+    "xp": 450,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-025",
+   "act": 3,
+   "title": "Rent Money, Little India",
+   "blurb": "You will think I am making this up. I'm forty-five short on the Little India rent and the agent doesn't take stories. It has been going on longer than I have admitted to anyone. Make it somewhere in Harris Park by dawn; I'm not fussy how. Come and find me after, either way.",
+   "giver": "qg-harris-park-yuna",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 83,
+     "label": "earn forty-five somewhere in Harris Park"
+    }
+   ],
+   "reward": {
+    "cash": 172,
+    "xp": 471,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-026",
+   "act": 3,
+   "title": "Before They Touch Little India",
+   "blurb": "Keep it between us for now. They start on Little India on the King's Birthday and the orange fencing goes up. It is the not knowing that has got me, honestly. I want Harris Park on record before it does. Half now if you want it. Most people don't.",
+   "giver": "qg-harris-park-bronwyn",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -18659,
+     "z": -4762,
+     "radius": 40,
+     "label": "photograph the state of Little India"
+    },
+    {
+     "kind": "goto",
+     "x": -19014,
+     "z": -4793,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 450,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-027",
+   "act": 3,
+   "title": "Bin Night, the Harris Park chaat strip",
+   "blurb": "Not being dramatic about this. Somebody moves the bins on the Harris Park chaat strip in front of my drive every Thursday night. I did try the official route, for what that was worth. Photograph the evidence and have a word; Harris Park knows who. I will owe you one, and I pay those.",
+   "giver": "qg-harris-park-maddie",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -18833,
+     "z": -4611,
+     "radius": 40,
+     "label": "photograph the bins at the Harris Park chaat strip"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 168,
+    "xp": 471,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-028",
+   "act": 3,
+   "title": "One Stop From Robin Thomas Reserve",
+   "blurb": "I would do it myself if I could leave the counter. I need to know the train from Harris Park stops at Parramatta and doesn't sail through like it did on Anzac Day. There is probably a simple explanation and I would love to hear it. Ride it at knock-off and photograph the sign. Do not make a scene about it.",
+   "giver": "qg-harris-park-riley",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Harris Park",
+     "to": "Parramatta",
+     "label": "take the train to Parramatta"
+    },
+    {
+     "kind": "photo",
+     "x": -18971,
+     "z": -5378,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 157,
+    "xp": 481,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-029",
+   "act": 3,
+   "title": "A Flat White From the Diwali lights",
+   "blurb": "You look like you have twenty minutes. I want a flat white from the place near the Diwali lights, not the one next to it. Nobody else seems to have noticed, which is its own problem. Here by midnight, while it's still coffee and Harris Park still has some. There is no rush, but there is a Friday.",
+   "giver": "qg-harris-park-ravi",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near the Diwali lights"
+    },
+    {
+     "kind": "goto",
+     "x": -18694,
+     "z": -4132,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 163,
+    "xp": 481,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-030",
+   "act": 3,
+   "title": "The the Diwali lights Camera",
+   "blurb": "I have been putting it off since Easter. A new speed camera near the Diwali lights has fined half of Harris Park since Wednesday. You will see what I mean the second you get there. Photograph it for the appeal, then prove the train to Parramatta is faster anyway. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qg-harris-park-ravi",
+   "level": 8,
+   "requires": [
+    "qg-l8-harris-park-029"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -18659,
+     "z": -4462,
+     "radius": 40,
+     "label": "photograph the camera near the Diwali lights"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Harris Park",
+     "to": "Parramatta",
+     "label": "then take the train instead, to Parramatta"
+    }
+   ],
+   "reward": {
+    "cash": 208,
+    "xp": 580,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-031",
+   "act": 3,
+   "title": "Proof of the Diwali lights",
+   "blurb": "You are the first person to stop all morning. Nobody in Harris Park believes what the Diwali lights looks like at knock-off. I would not ask if there was anyone else about. Get me a photo close enough that council can't say it's somewhere else. Whatever you find, bring it to me first.",
+   "giver": "qg-harris-park-ravi",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -18586,
+     "z": -4599,
+     "radius": 40,
+     "label": "get a picture of the Diwali lights before they fix it"
+    }
+   ],
+   "reward": {
+    "cash": 168,
+    "xp": 455,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-032",
+   "act": 3,
+   "title": "Trolley Run, Station Street East",
+   "blurb": "My knees are gone, so. A Woolies trolley from Station Street East gets walked to the creek every Boxing Day. I am aware how that sounds. Find where it ends up in Harris Park and make the deposit back. Take your time. Do not take a week.",
+   "giver": "qg-harris-park-zeina",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18398,
+     "z": -4642,
+     "radius": 30,
+     "label": "find the trolley near Station Street East"
+    },
+    {
+     "kind": "photo",
+     "x": -18398,
+     "z": -4642,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 46,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 173,
+    "xp": 456,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-033",
+   "act": 3,
+   "title": "The Hassall Street Lift",
+   "blurb": "Do not laugh. The lift at Harris Park station has been out since the Easter Show and I'm told Parramatta is worse. You can tell me I am imagining it. Tell me after. Check both Monday and tell me which takes a pram. You'll know it when you see it.",
+   "giver": "qg-harris-park-ji-woo",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18715,
+     "z": -4749,
+     "radius": 30,
+     "label": "check the lift at Harris Park station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Harris Park",
+     "to": "Parramatta",
+     "label": "then ride to Parramatta and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-harris-park-ji-woo",
+     "node": "report-0",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 157,
+    "xp": 477,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-034",
+   "act": 3,
+   "title": "The Hassall Street Course",
+   "blurb": "There is no clever way to say this. A bloke near Hassall Street runs a ninety-minute course he bills at four hundred, and I've paid. My wife says I should let it go. My wife is wrong. Sit it Sunday, then come back to Harris Park and prove it did something. Do not let them talk you into anything.",
+   "giver": "qg-harris-park-ji-woo",
+   "level": 8,
+   "requires": [
+    "qg-l8-harris-park-033"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near Hassall Street"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 224,
+    "xp": 602,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-035",
+   "act": 3,
+   "title": "The the Harris Park Bowlo Fence",
+   "blurb": "Someone has to, and it may as well be you. My neighbour at the Harris Park Bowlo says the tree is on my side and the fence says otherwise. The paperwork says one thing and my eyes say another. Look at it Easter Saturday with Harris Park eyes and tell me the truth. Ask for me by name at the counter.",
+   "giver": "qg-harris-park-fay",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18933,
+     "z": -4727,
+     "radius": 30,
+     "label": "go and look at the fence at the Harris Park Bowlo"
+    },
+    {
+     "kind": "photo",
+     "x": -18933,
+     "z": -4727,
+     "radius": 40,
+     "label": "photograph the tree over it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-harris-park-fay",
+     "node": "report-0",
+     "label": "tell me whose side it's on"
+    }
+   ],
+   "reward": {
+    "cash": 172,
+    "xp": 459,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-036",
+   "act": 3,
+   "title": "Lads Off the Harris Park Bowlo",
+   "blurb": "It is not a police matter and I have checked. Three of them in TNs on the the Harris Park Bowlo steps, flogging vapes to schoolkids at the change of shift. I have rung the number on the letter four times. Harris Park used to move them on itself and now it rings me. Just do not come back empty-handed.",
+   "giver": "qg-harris-park-fay",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from the Harris Park Bowlo"
+    }
+   ],
+   "reward": {
+    "cash": 174,
+    "xp": 460,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-037",
+   "act": 3,
+   "title": "The Wigram Street Float",
+   "blurb": "I am told you do odd jobs. The till at Wigram Street opens Friday with an empty float because somebody took it to the pub. It started small, the way these things do. Sixty before the first Harris Park customer, and I'll never say who. I'll see you right for it.",
+   "giver": "qg-harris-park-colin",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 110,
+     "label": "clear sixty for the Wigram Street float"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-harris-park-colin",
+     "node": "report-0",
+     "label": "hand it over at the counter"
+    }
+   ],
+   "reward": {
+    "cash": 170,
+    "xp": 446,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-038",
+   "act": 3,
+   "title": "Seven a.m. At Wigram Street",
+   "blurb": "I have written it down twice and lost it twice. The site at Wigram Street starts its jackhammer at school pick-up on a Easter Saturday, which is illegal and loud. It has been going on longer than I have admitted to anyone. Photograph it running and have a word with the Harris Park foreman. If anyone asks, you were never here.",
+   "giver": "qg-harris-park-colin",
+   "level": 8,
+   "requires": [
+    "qg-l8-harris-park-037"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -18711,
+     "z": -4623,
+     "radius": 40,
+     "label": "photograph the noise from Wigram Street"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 208,
+    "xp": 606,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-039",
+   "act": 3,
+   "title": "Two From Little India",
+   "blurb": "Two people have already said no. Two of whatever's going near Little India, here, hot, before the footy at three in the morning. It is the not knowing that has got me, honestly. It's Harris Park; I'm not asking for much. Be polite about it. It costs nothing.",
+   "giver": "qg-harris-park-rhonda",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near Little India"
+    },
+    {
+     "kind": "goto",
+     "x": -18783,
+     "z": -4694,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 176,
+    "xp": 459,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-040",
+   "act": 3,
+   "title": "Counting the Harris Park chaat strip",
+   "blurb": "Keep it between us for now. Council says the the Harris Park chaat strip car park is never full and I say it's full by first thing. I have got no proof, which is exactly why I am asking. Count both Harris Park car parks, photograph whichever one makes me right. I would rather know than wonder.",
+   "giver": "qg-harris-park-imogen",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18466,
+     "z": -4728,
+     "radius": 30,
+     "label": "count the cars at the Harris Park chaat strip"
+    },
+    {
+     "kind": "goto",
+     "x": -18402,
+     "z": -4625,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": -18466,
+     "z": -4728,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 164,
+    "xp": 448,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-041",
+   "act": 3,
+   "title": "Cover at Marion Street",
+   "blurb": "Not being dramatic about this. I've got nobody for the Marion Street shift at six in the morning and a room full of Harris Park people who've paid. I am not after trouble. I am after an answer. Fifty of trade and one difficult person at the door. There's cash in it. Not a lot.",
+   "giver": "qg-harris-park-kavya",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 92,
+     "label": "cover the fifty for the shift"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 1,
+     "label": "and handle whoever's at the door"
+    }
+   ],
+   "reward": {
+    "cash": 157,
+    "xp": 445,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-042",
+   "act": 3,
+   "title": "The Marion Street Order",
+   "blurb": "I would do it myself if I could leave the counter. The Marion Street order came to seventy more than I'd budgeted and the supplier wants it by three in the morning. It might be nothing. It has not felt like nothing. Find seventy in Harris Park and photograph the receipt. Come back and tell me straight.",
+   "giver": "qg-harris-park-kavya",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 129,
+     "label": "square the seventy for the Marion Street order"
+    },
+    {
+     "kind": "photo",
+     "x": -18901,
+     "z": -4999,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 169,
+    "xp": 462,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-043",
+   "act": 3,
+   "title": "Trouble at Robin Thomas Reserve",
+   "blurb": "It has been three weeks. Two lads and their mate decided at dawn that Robin Thomas Reserve is theirs. I have got a photo on my phone but it is useless. The rest of Harris Park disagrees, so explain the disagreement. Do not make a scene about it.",
+   "giver": "qg-harris-park-rima",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Robin Thomas Reserve"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 158,
+    "xp": 479,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-harris-park-044",
+   "act": 3,
+   "title": "Rent Money, the Diwali lights",
+   "blurb": "It is the sort of thing you notice or you do not. I'm forty-five short on the the Diwali lights rent and the agent doesn't take stories. Nobody else seems to have noticed, which is its own problem. Make it somewhere in Harris Park by six in the morning; I'm not fussy how. I will know if you skipped a bit.",
+   "giver": "qg-harris-park-rima",
+   "level": 8,
+   "requires": [
+    "qg-l8-harris-park-043"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 83,
+     "label": "earn forty-five somewhere in Harris Park"
+    }
+   ],
+   "reward": {
+    "cash": 220,
+    "xp": 610,
+    "unlock": []
+   }
+  }
+ ]
+}

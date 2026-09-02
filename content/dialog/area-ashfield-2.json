@@ -1,0 +1,1024 @@
+{
+ "pack": "area-ashfield-2",
+ "npcs": [
+  {
+   "id": "qg-ashfield-grace",
+   "name": "Grace, chemist",
+   "x": -8109,
+   "z": 2166,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Script or a chat? Both's fine. Ashfield pharmacy, we do both.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Ashfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Scripts, flu shots, and every man in Ashfield asking quietly about the same thing. Ashfield Park keeps me in Panadol.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's seven a.m. at the ashfield aquatic centre.",
+     "choices": [
+      {
+       "text": "Seven a.m. At the Ashfield Aquatic Centre",
+       "accept": "qg-l6-ashfield-053",
+       "denyFlag": "w:qg-l6-ashfield-053"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Grace counts it out without looking up. -- Don't spend it all at Ashfield Park.",
+     "choices": [
+      {
+       "text": "About seven a.m. at the ashfield aquatic centre.",
+       "turnin": "qg-l6-ashfield-053"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Chemist Warehouse near Ashfield Park sells everything cheaper and nobody there knows your name.",
+     "improv": {
+      "persona": "Grace, chemist in Ashfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Ashfield Park like everyone knows it.",
+      "context": "Someone has asked what Ashfield is like these days. You are standing near Ashfield Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-ashfield-xiu",
+   "name": "Xiu, dumpling house owner",
+   "x": -7357,
+   "z": 2585,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table for one? Sit anywhere. Not that one, that's the boss's. Welcome to Ashfield.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Ashfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Xiao long bao, hand-made, eleven a.m. till the dough runs out. the Ashfield Aquatic Centre queues down the street on Sundays.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Trolley Run, Hercules Street",
+       "accept": "qg-l6-ashfield-054",
+       "denyFlag": "w:qg-l6-ashfield-054"
+      },
+      {
+       "text": "Before They Touch Hercules Street",
+       "accept": "qg-l6-ashfield-055",
+       "denyFlag": "w:qg-l6-ashfield-055",
+       "needFlag": "w:qg-l6-ashfield-054"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Xiu pays up on the spot.",
+     "choices": [
+      {
+       "text": "About trolley run, hercules street.",
+       "turnin": "qg-l6-ashfield-054"
+      },
+      {
+       "text": "About before they touch hercules street.",
+       "turnin": "qg-l6-ashfield-055"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best dumplings in Ashfield are at the place with the worst sign. Everyone knows. Nobody says.",
+     "improv": {
+      "persona": "Xiu, dumpling house owner in Ashfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Ashfield Aquatic Centre like everyone knows it.",
+      "context": "Someone has asked what Ashfield is like these days. You are standing near the Ashfield Aquatic Centre."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-ashfield-renee",
+   "name": "Renee, bowling club greenkeeper",
+   "x": -7992,
+   "z": 2626,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Boots off the green. Boots OFF the green. Sorry. Welcome to Ashfield bowlo.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Ashfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Two greens, one of them dying, and a committee that thinks I'm inventing it. Hercules Street comes for the schnitzel and stays for the raffle.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Race Four, the Ashfield Bowlo",
+       "accept": "qg-l6-ashfield-056",
+       "denyFlag": "w:qg-l6-ashfield-056"
+      },
+      {
+       "text": "Rent Money, the Ashfield Bowlo",
+       "accept": "qg-l6-ashfield-057",
+       "denyFlag": "w:qg-l6-ashfield-057",
+       "needFlag": "w:qg-l6-ashfield-056"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Renee counts it out without looking up. -- Don't spend it all at Hercules Street.",
+     "choices": [
+      {
+       "text": "About race four, the ashfield bowlo.",
+       "turnin": "qg-l6-ashfield-056"
+      },
+      {
+       "text": "About rent money, the ashfield bowlo.",
+       "turnin": "qg-l6-ashfield-057"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Barefoot bowls on a Sunday is what pays for the green you're standing on. I have mixed feelings.",
+     "improv": {
+      "persona": "Renee, bowling club greenkeeper in Ashfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Hercules Street like everyone knows it.",
+      "context": "Someone has asked what Ashfield is like these days. You are standing near Hercules Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Right. And you're sure it was the Ashfield Bowlo? People say the Ashfield Bowlo when they mean the bit next to it. -- Renee writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-ashfield-kai",
+   "name": "Kai, ocean pool regular",
+   "x": -7615,
+   "z": 2403,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Water's fourteen. Fourteen! Ashfield, you'd be mad not to.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Ashfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Every morning, forty laps, rain or hail. Pratten Park has a group of us who've been doing it since Whitlam.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the elizabeth street fence.",
+     "choices": [
+      {
+       "text": "The Elizabeth Street Fence",
+       "accept": "qg-l6-ashfield-058",
+       "denyFlag": "w:qg-l6-ashfield-058"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Kai pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the elizabeth street fence.",
+       "turnin": "qg-l6-ashfield-058"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in lane two at Pratten Park has been swimming the same pace for thirty years. We call him the tide.",
+     "improv": {
+      "persona": "Kai, ocean pool regular in Ashfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Pratten Park like everyone knows it.",
+      "context": "Someone has asked what Ashfield is like these days. You are standing near Pratten Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Kai listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-ashfield-neville",
+   "name": "Neville, strata committee chair",
+   "x": -7539,
+   "z": 2237,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Ashfield strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Ashfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. Elizabeth Street is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Length of Ashfield Mall",
+       "accept": "qg-l6-ashfield-059",
+       "denyFlag": "w:qg-l6-ashfield-059"
+      },
+      {
+       "text": "Trouble at Liverpool Road",
+       "accept": "qg-l6-ashfield-060",
+       "denyFlag": "w:qg-l6-ashfield-060",
+       "needFlag": "w:qg-l6-ashfield-059"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Neville looks it over the way Ashfield looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the length of ashfield mall.",
+       "turnin": "qg-l6-ashfield-059"
+      },
+      {
+       "text": "About trouble at liverpool road.",
+       "turnin": "qg-l6-ashfield-060"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Neville, strata committee chair in Ashfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Elizabeth Street like everyone knows it.",
+      "context": "Someone has asked what Ashfield is like these days. You are standing near Elizabeth Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-ashfield-hao",
+   "name": "Hao, chemist",
+   "x": -7790,
+   "z": 1791,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Script or a chat? Both's fine. Ashfield pharmacy, we do both.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Ashfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Scripts, flu shots, and every man in Ashfield asking quietly about the same thing. Ashfield Mall keeps me in Panadol.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "One Stop From the Shanghai dumpling strip",
+       "accept": "qg-l6-ashfield-061",
+       "denyFlag": "w:qg-l6-ashfield-061"
+      },
+      {
+       "text": "The the Shanghai dumpling strip Camera",
+       "accept": "qg-l6-ashfield-062",
+       "denyFlag": "w:qg-l6-ashfield-062",
+       "needFlag": "w:qg-l6-ashfield-061"
+      },
+      {
+       "text": "Proof of the Shanghai dumpling strip",
+       "accept": "qg-l6-ashfield-063",
+       "denyFlag": "w:qg-l6-ashfield-063"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Hao counts it out without looking up. -- Don't spend it all at Ashfield Mall.",
+     "choices": [
+      {
+       "text": "About one stop from the shanghai dumpling strip.",
+       "turnin": "qg-l6-ashfield-061"
+      },
+      {
+       "text": "About the the shanghai dumpling strip camera.",
+       "turnin": "qg-l6-ashfield-062"
+      },
+      {
+       "text": "About proof of the shanghai dumpling strip.",
+       "turnin": "qg-l6-ashfield-063"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Chemist Warehouse near Ashfield Mall sells everything cheaper and nobody there knows your name.",
+     "improv": {
+      "persona": "Hao, chemist in Ashfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Ashfield Mall like everyone knows it.",
+      "context": "Someone has asked what Ashfield is like these days. You are standing near Ashfield Mall."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-ashfield-kevin",
+   "name": "Kevin, dumpling house owner",
+   "x": -7475,
+   "z": 1938,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table for one? Sit anywhere. Not that one, that's the boss's. Welcome to Ashfield.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Ashfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Xiao long bao, hand-made, eleven a.m. till the dough runs out. the Shanghai dumpling strip queues down the street on Sundays.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's staffy near the ashfield aquatic centre.",
+     "choices": [
+      {
+       "text": "Staffy Near the Ashfield Aquatic Centre",
+       "accept": "qg-l6-ashfield-064",
+       "denyFlag": "w:qg-l6-ashfield-064"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Kevin counts it out without looking up. -- Don't spend it all at the Shanghai dumpling strip.",
+     "choices": [
+      {
+       "text": "About staffy near the ashfield aquatic centre.",
+       "turnin": "qg-l6-ashfield-064"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best dumplings in Ashfield are at the place with the worst sign. Everyone knows. Nobody says.",
+     "improv": {
+      "persona": "Kevin, dumpling house owner in Ashfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Shanghai dumpling strip like everyone knows it.",
+      "context": "Someone has asked what Ashfield is like these days. You are standing near the Shanghai dumpling strip."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Right. And you're sure it was the Ashfield Aquatic Centre? People say the Ashfield Aquatic Centre when they mean the bit next to it. -- Kevin writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-ashfield-bruce",
+   "name": "Bruce, bowling club greenkeeper",
+   "x": -7631,
+   "z": 2020,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Boots off the green. Boots OFF the green. Sorry. Welcome to Ashfield bowlo.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Ashfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Two greens, one of them dying, and a committee that thinks I'm inventing it. Ashfield Park comes for the schnitzel and stays for the raffle.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's something from the ashfield aquatic centre.",
+     "choices": [
+      {
+       "text": "Something From the Ashfield Aquatic Centre",
+       "accept": "qg-l6-ashfield-065",
+       "denyFlag": "w:qg-l6-ashfield-065"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Bruce counts it out without looking up. -- Don't spend it all at Ashfield Park.",
+     "choices": [
+      {
+       "text": "About something from the ashfield aquatic centre.",
+       "turnin": "qg-l6-ashfield-065"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Barefoot bowls on a Sunday is what pays for the green you're standing on. I have mixed feelings.",
+     "improv": {
+      "persona": "Bruce, bowling club greenkeeper in Ashfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Ashfield Park like everyone knows it.",
+      "context": "Someone has asked what Ashfield is like these days. You are standing near Ashfield Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-ashfield-stuart",
+   "name": "Stuart, council ranger",
+   "x": -7602,
+   "z": 2086,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Ashfield is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Ashfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. the Ashfield Aquatic Centre generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the hercules street float.",
+     "choices": [
+      {
+       "text": "The Hercules Street Float",
+       "accept": "qg-l6-ashfield-066",
+       "denyFlag": "w:qg-l6-ashfield-066"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Stuart pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the hercules street float.",
+       "turnin": "qg-l6-ashfield-066"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Stuart, council ranger in Ashfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Ashfield Aquatic Centre like everyone knows it.",
+      "context": "Someone has asked what Ashfield is like these days. You are standing near the Ashfield Aquatic Centre."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Right. And you're sure it was Hercules Street? People say Hercules Street when they mean the bit next to it. -- Stuart writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-ashfield-annabel",
+   "name": "Annabel, ocean pool regular",
+   "x": -7510,
+   "z": 2646,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Water's fourteen. Fourteen! Ashfield, you'd be mad not to.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Ashfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Every morning, forty laps, rain or hail. Hercules Street has a group of us who've been doing it since Whitlam.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the ashfield bowlo order.",
+     "choices": [
+      {
+       "text": "The the Ashfield Bowlo Order",
+       "accept": "qg-l6-ashfield-067",
+       "denyFlag": "w:qg-l6-ashfield-067"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Annabel counts it out without looking up. -- Don't spend it all at Hercules Street.",
+     "choices": [
+      {
+       "text": "About the the ashfield bowlo order.",
+       "turnin": "qg-l6-ashfield-067"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in lane two at Hercules Street has been swimming the same pace for thirty years. We call him the tide.",
+     "improv": {
+      "persona": "Annabel, ocean pool regular in Ashfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Hercules Street like everyone knows it.",
+      "context": "Someone has asked what Ashfield is like these days. You are standing near Hercules Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

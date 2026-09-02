@@ -1,0 +1,509 @@
+{
+ "pack": "area-hurstville-2",
+ "quests": [
+  {
+   "id": "qg-l7-hurstville-054",
+   "act": 3,
+   "title": "Something From the St George Dragons",
+   "blurb": "I have written it down twice and lost it twice. The stall at the St George Dragons has run out and the customers keep coming. The paperwork says one thing and my eyes say another. Find something round Hurstville that'll do before the bin night rush. You'll know it when you see it.",
+   "giver": "qg-hurstville-fergus",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near the St George Dragons"
+    },
+    {
+     "kind": "goto",
+     "x": -9987,
+     "z": 11055,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 148,
+    "xp": 432,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-hurstville-055",
+   "act": 3,
+   "title": "Closing Time at the St George Dragons",
+   "blurb": "You will think I am making this up. Two blokes have slept in my doorway on the St George Dragons since the pub shut. I would have sorted it myself a year ago. The Hurstville delivery's at five, so get them up and show me the step empty. Do not let them talk you into anything.",
+   "giver": "qg-hurstville-fergus",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off the St George Dragons"
+    },
+    {
+     "kind": "photo",
+     "x": -10010,
+     "z": 11202,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 150,
+    "xp": 419,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-hurstville-056",
+   "act": 3,
+   "title": "The Kempt Field Tab",
+   "blurb": "Nobody else has offered, so. Two chippies off the Kempt Field job have run a tab in Hurstville since Tuesday. I have rung the number on the letter four times. They drove past at knock-off without looking in, so settle it in cash. Do that and we're square.",
+   "giver": "qg-hurstville-annabel",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near Kempt Field"
+    },
+    {
+     "kind": "earn",
+     "dollars": 52,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 144,
+    "xp": 436,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-hurstville-057",
+   "act": 3,
+   "title": "Two Signs, Kempt Field",
+   "blurb": "Two people have already said no. Two signs near Kempt Field say opposite things about parking and I've been fined under both. It started small, the way these things do. Get photos of each before the long weekend, when Hurstville council takes one down. Ask for me by name at the counter.",
+   "giver": "qg-hurstville-annabel",
+   "level": 7,
+   "requires": [
+    "qg-l7-hurstville-056"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -9622,
+     "z": 10847,
+     "radius": 40,
+     "label": "photograph the sign at Kempt Field"
+    },
+    {
+     "kind": "photo",
+     "x": -9687,
+     "z": 10581,
+     "radius": 40,
+     "label": "and the one that contradicts it"
+    }
+   ],
+   "reward": {
+    "cash": 198,
+    "xp": 541,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-hurstville-058",
+   "act": 3,
+   "title": "Counting Crofts Avenue",
+   "blurb": "Keep it between us for now. Council says the Crofts Avenue car park is never full and I say it's full by the last train. It has been going on longer than I have admitted to anyone. Count both Hurstville car parks, photograph whichever one makes me right. Say nothing to anyone on the way.",
+   "giver": "qg-hurstville-hugo",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -9535,
+     "z": 11247,
+     "radius": 30,
+     "label": "count the cars at Crofts Avenue"
+    },
+    {
+     "kind": "goto",
+     "x": -9290,
+     "z": 11109,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": -9535,
+     "z": 11247,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 155,
+    "xp": 420,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-hurstville-059",
+   "act": 3,
+   "title": "Ask Around at Parramatta",
+   "blurb": "Before you say anything: yes, I know. There's work going outside Parramatta station and nobody at the Hurstville Bowlo can tell me what. It is not the money. It has stopped being the money. Ride over at knock-off, get the shape of it, come back. Just do not come back empty-handed.",
+   "giver": "qg-hurstville-hugo",
+   "level": 7,
+   "requires": [
+    "qg-l7-hurstville-058"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Hurstville",
+     "to": "Parramatta",
+     "label": "take the train to Parramatta"
+    },
+    {
+     "kind": "goto",
+     "x": -18971,
+     "z": -5378,
+     "radius": 30,
+     "label": "find the people outside Parramatta station"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-hurstville-hugo",
+     "node": "report-1",
+     "label": "then come back and tell me what they said"
+    }
+   ],
+   "reward": {
+    "cash": 208,
+    "xp": 527,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-hurstville-060",
+   "act": 3,
+   "title": "Staffy Near the Hurstville Bowlo",
+   "blurb": "This is going to sound small. A brindle staffy in a red bandana went over the fence at the Hurstville Bowlo at the arvo. It is the not knowing that has got me, honestly. Everyone in Hurstville has definitely seen it and can't say where. If anyone asks, you were never here.",
+   "giver": "qg-hurstville-renee",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10090,
+     "z": 10630,
+     "radius": 30,
+     "label": "check the off-leash bit near the Hurstville Bowlo"
+    },
+    {
+     "kind": "photo",
+     "x": -10099,
+     "z": 10907,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-hurstville-renee",
+     "node": "report-1",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 145,
+    "xp": 411,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-hurstville-061",
+   "act": 3,
+   "title": "Seven a.m. At Forest Road",
+   "blurb": "I would do it myself if I could leave the counter. The site at Forest Road starts its jackhammer at the change of shift on a Easter Saturday, which is illegal and loud. I have got no proof, which is exactly why I am asking. Photograph it running and have a word with the Hurstville foreman. That's it. That's the whole ask.",
+   "giver": "qg-hurstville-craig",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -9761,
+     "z": 11133,
+     "radius": 40,
+     "label": "photograph the noise from Forest Road"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 161,
+    "xp": 405,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-hurstville-062",
+   "act": 3,
+   "title": "RBT on Forest Road",
+   "blurb": "It has been three weeks. There's a breath test set up on Forest Road since half two. I did try the official route, for what that was worth. My brother-in-law needs the ute at the far end of Hurstville without a conversation. Come and find me after, either way.",
+   "giver": "qg-hurstville-craig",
+   "level": 7,
+   "requires": [
+    "qg-l7-hurstville-061"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on Forest Road"
+    },
+    {
+     "kind": "goto",
+     "x": -9934,
+     "z": 11566,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 195,
+    "xp": 530,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-hurstville-063",
+   "act": 3,
+   "title": "Trolley Run, Westfield Hurstville",
+   "blurb": "It is the sort of thing you notice or you do not. A Woolies trolley from Westfield Hurstville gets walked to the creek every Friday. I am not after trouble. I am after an answer. Find where it ends up in Hurstville and make the deposit back. Be polite about it. It costs nothing.",
+   "giver": "qg-hurstville-fiona",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -9873,
+     "z": 10589,
+     "radius": 30,
+     "label": "find the trolley near Westfield Hurstville"
+    },
+    {
+     "kind": "photo",
+     "x": -9873,
+     "z": 10589,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 43,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 158,
+    "xp": 417,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-hurstville-064",
+   "act": 3,
+   "title": "The Length of Hurstville Oval",
+   "blurb": "Honestly, I am past caring how it looks. I haven't walked Hurstville Oval end to end since the light rail came to Hurstville. You will see what I mean the second you get there. Do it Easter Saturday for me and photograph what's at the far end now. Come back and tell me straight.",
+   "giver": "qg-hurstville-tegan",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -9495,
+     "z": 10918,
+     "radius": 30,
+     "label": "walk the length of Hurstville Oval"
+    },
+    {
+     "kind": "goto",
+     "x": -9846,
+     "z": 10929,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -9846,
+     "z": 10929,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 160,
+    "xp": 417,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-hurstville-065",
+   "act": 3,
+   "title": "The Crofts Avenue Lift",
+   "blurb": "I'll be straight with you. The lift at Hurstville station has been out since the Easter Show and I'm told Parramatta is worse. I would not ask if there was anyone else about. Check both the last Sunday of the month and tell me which takes a pram. Do not make a scene about it.",
+   "giver": "qg-hurstville-jarrod",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -9657,
+     "z": 11068,
+     "radius": 30,
+     "label": "check the lift at Hurstville station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Hurstville",
+     "to": "Parramatta",
+     "label": "then ride to Parramatta and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-hurstville-jarrod",
+     "node": "report-0",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 157,
+    "xp": 427,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-hurstville-066",
+   "act": 3,
+   "title": "One Stop From the St George Dragons",
+   "blurb": "There is no clever way to say this. I need to know the train from Hurstville stops at Parramatta and doesn't sail through like it did on Saturday. Everyone I have told has looked at me the way you are now. Ride it at midnight and photograph the sign. I'll put the kettle on for when you're back.",
+   "giver": "qg-hurstville-jarrod",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Hurstville",
+     "to": "Parramatta",
+     "label": "take the train to Parramatta"
+    },
+    {
+     "kind": "photo",
+     "x": -18971,
+     "z": -5378,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 152,
+    "xp": 422,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l7-hurstville-067",
+   "act": 3,
+   "title": "Lads Off Kempt Field",
+   "blurb": "The council knows and the council does not care. Three of them in TNs on the Kempt Field steps, flogging vapes to schoolkids at three in the morning. There is a version of this where I am the unreasonable one. Hurstville used to move them on itself and now it rings me. There is no rush, but there is a Friday.",
+   "giver": "qg-hurstville-cindy",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Kempt Field"
+    }
+   ],
+   "reward": {
+    "cash": 154,
+    "xp": 423,
+    "unlock": []
+   }
+  }
+ ]
+}

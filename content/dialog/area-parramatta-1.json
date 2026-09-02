@@ -1,0 +1,3082 @@
+{
+ "pack": "area-parramatta-1",
+ "npcs": [
+  {
+   "id": "qg-parramatta-hamish",
+   "name": "Hamish, corporate, on a break",
+   "x": -18714,
+   "z": -5492,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I've got eleven minutes. Sorry -- nine. Parramatta, what do you need?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Consulting. I consult. On what, nobody's sure, including me. the Riverside Theatres is where I pretend to have lunch.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Probationary at Old Government House",
+       "accept": "qg-l8-parramatta-001",
+       "denyFlag": "w:qg-l8-parramatta-001"
+      },
+      {
+       "text": "Before They Touch Old Government House",
+       "accept": "qg-l8-parramatta-002",
+       "denyFlag": "w:qg-l8-parramatta-002",
+       "needFlag": "w:qg-l8-parramatta-001"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Hamish counts it out without looking up. -- Don't spend it all at the Riverside Theatres.",
+     "choices": [
+      {
+       "text": "About probationary at old government house.",
+       "turnin": "qg-l8-parramatta-001"
+      },
+      {
+       "text": "About before they touch old government house.",
+       "turnin": "qg-l8-parramatta-002"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The coffee near the Riverside Theatres is eight dollars. I expense it. I'm not proud.",
+     "improv": {
+      "persona": "Hamish, corporate, on a break in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Riverside Theatres like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near the Riverside Theatres."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-angus",
+   "name": "Angus, council ranger",
+   "x": -19078,
+   "z": -4839,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Parramatta is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Old Government House generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the parramatta square camera.",
+     "choices": [
+      {
+       "text": "The Parramatta Square Camera",
+       "accept": "qg-l8-parramatta-003",
+       "denyFlag": "w:qg-l8-parramatta-003"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Angus counts it out without looking up. -- Don't spend it all at Old Government House.",
+     "choices": [
+      {
+       "text": "About the parramatta square camera.",
+       "turnin": "qg-l8-parramatta-003"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Angus, council ranger in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Old Government House like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near Old Government House."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-george",
+   "name": "George, cabbie, twenty years",
+   "x": -18715,
+   "z": -5067,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Where to? Oh, you're not a fare. Fair enough. Parramatta, I know every gutter.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twenty years on the rank. Uber took half of it and the tunnel took the rest. the Parramatta River ferry is still cash, thank god.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's race four, parramatta square.",
+     "choices": [
+      {
+       "text": "Race Four, Parramatta Square",
+       "accept": "qg-l8-parramatta-004",
+       "denyFlag": "w:qg-l8-parramatta-004"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- George counts it out without looking up. -- Don't spend it all at the Parramatta River ferry.",
+     "choices": [
+      {
+       "text": "About race four, parramatta square.",
+       "turnin": "qg-l8-parramatta-004"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never go via the Parramatta River ferry after five. Never. I don't care what the app says.",
+     "improv": {
+      "persona": "George, cabbie, twenty years in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Parramatta River ferry like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near the Parramatta River ferry."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Parramatta would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-wayne",
+   "name": "Wayne, uni student, three jobs",
+   "x": -18786,
+   "z": -5500,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Parramatta rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Parramatta Square is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Centenary Square Tab",
+       "accept": "qg-l8-parramatta-005",
+       "denyFlag": "w:qg-l8-parramatta-005"
+      },
+      {
+       "text": "The Centenary Square Complaint",
+       "accept": "qg-l8-parramatta-006",
+       "denyFlag": "w:qg-l8-parramatta-006",
+       "needFlag": "w:qg-l8-parramatta-005"
+      },
+      {
+       "text": "Something From Centenary Square",
+       "accept": "qg-l8-parramatta-007",
+       "denyFlag": "w:qg-l8-parramatta-007"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Wayne counts it out without looking up. -- Don't spend it all at Parramatta Square.",
+     "choices": [
+      {
+       "text": "About the centenary square tab.",
+       "turnin": "qg-l8-parramatta-005"
+      },
+      {
+       "text": "About the centenary square complaint.",
+       "turnin": "qg-l8-parramatta-006"
+      },
+      {
+       "text": "About something from centenary square.",
+       "turnin": "qg-l8-parramatta-007"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Parramatta Square that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Wayne, uni student, three jobs in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Parramatta Square like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near Parramatta Square."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-tanya",
+   "name": "Tanya, probationary constable",
+   "x": -19464,
+   "z": -5344,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Parramatta LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of Centenary Square. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's meat tray at church street.",
+     "choices": [
+      {
+       "text": "Meat Tray at Church Street",
+       "accept": "qg-l8-parramatta-008",
+       "denyFlag": "w:qg-l8-parramatta-008"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Tanya looks it over the way Parramatta looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About meat tray at church street.",
+       "turnin": "qg-l8-parramatta-008"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about Centenary Square. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Tanya, probationary constable in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Centenary Square like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near Centenary Square."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-ana",
+   "name": "Ana, security guard",
+   "x": -18659,
+   "z": -5491,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bags open, please. Thanks, bro. Welcome to Parramatta.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve-hour shifts standing near Church Street watching people not steal things. Mostly.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rent money, eat street.",
+     "choices": [
+      {
+       "text": "Rent Money, Eat Street",
+       "accept": "qg-l8-parramatta-009",
+       "denyFlag": "w:qg-l8-parramatta-009"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Ana pays up on the spot.",
+     "choices": [
+      {
+       "text": "About rent money, eat street.",
+       "turnin": "qg-l8-parramatta-009"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a bench near Church Street where the whole shift eats lunch. We've named the pigeons.",
+     "improv": {
+      "persona": "Ana, security guard in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Church Street like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near Church Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-karen",
+   "name": "Karen, chippy off a job",
+   "x": -19238,
+   "z": -5229,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Parramatta, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the parramatta park lift.",
+     "choices": [
+      {
+       "text": "The Parramatta Park Lift",
+       "accept": "qg-l8-parramatta-010",
+       "denyFlag": "w:qg-l8-parramatta-010"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Karen pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the parramatta park lift.",
+       "turnin": "qg-l8-parramatta-010"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Parramatta is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Karen, chippy off a job in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Eat Street like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near Eat Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Karen listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-bruce",
+   "name": "Bruce, Eels supporter",
+   "x": -18802,
+   "z": -5535,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Blue and gold, brother. Parra. Parramatta. You bleed it or you don't.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Every home game at CommBank, every away game on the phone at work. Parramatta Park is Eels country and always was.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The the Eels Sparky",
+       "accept": "qg-l8-parramatta-011",
+       "denyFlag": "w:qg-l8-parramatta-011"
+      },
+      {
+       "text": "Lads Off CommBank Stadium",
+       "accept": "qg-l8-parramatta-012",
+       "denyFlag": "w:qg-l8-parramatta-012",
+       "needFlag": "w:qg-l8-parramatta-011"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Bruce pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the eels sparky.",
+       "turnin": "qg-l8-parramatta-011"
+      },
+      {
+       "text": "About lads off commbank stadium.",
+       "turnin": "qg-l8-parramatta-012"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Church Street after a win is the best place in Australia. After a loss, go to Parramatta Park.",
+     "improv": {
+      "persona": "Bruce, Eels supporter in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Parramatta Park like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near Parramatta Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-prue",
+   "name": "Prue, corporate, on a break",
+   "x": -18983,
+   "z": -5392,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I've got eleven minutes. Sorry -- nine. Parramatta, what do you need?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Consulting. I consult. On what, nobody's sure, including me. the Eels is where I pretend to have lunch.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's seven a.m. at commbank stadium.",
+     "choices": [
+      {
+       "text": "Seven a.m. At CommBank Stadium",
+       "accept": "qg-l8-parramatta-013",
+       "denyFlag": "w:qg-l8-parramatta-013"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Prue counts it out without looking up. -- Don't spend it all at the Eels.",
+     "choices": [
+      {
+       "text": "About seven a.m. at commbank stadium.",
+       "turnin": "qg-l8-parramatta-013"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The coffee near the Eels is eight dollars. I expense it. I'm not proud.",
+     "improv": {
+      "persona": "Prue, corporate, on a break in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Eels like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near the Eels."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-norm",
+   "name": "Norm, council ranger",
+   "x": -19003,
+   "z": -5584,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Parramatta is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. CommBank Stadium generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Westfield Parramatta Course",
+       "accept": "qg-l8-parramatta-014",
+       "denyFlag": "w:qg-l8-parramatta-014"
+      },
+      {
+       "text": "Bin Night, Westfield Parramatta",
+       "accept": "qg-l8-parramatta-015",
+       "denyFlag": "w:qg-l8-parramatta-015",
+       "needFlag": "w:qg-l8-parramatta-014"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Norm looks it over the way Parramatta looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the westfield parramatta course.",
+       "turnin": "qg-l8-parramatta-014"
+      },
+      {
+       "text": "About bin night, westfield parramatta.",
+       "turnin": "qg-l8-parramatta-015"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Norm, council ranger in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about CommBank Stadium like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near CommBank Stadium."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-maya",
+   "name": "Maya, cabbie, twenty years",
+   "x": -19261,
+   "z": -5360,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Where to? Oh, you're not a fare. Fair enough. Parramatta, I know every gutter.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twenty years on the rank. Uber took half of it and the tunnel took the rest. Westfield Parramatta is still cash, thank god.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Two Signs, the Riverside Theatres",
+       "accept": "qg-l8-parramatta-016",
+       "denyFlag": "w:qg-l8-parramatta-016"
+      },
+      {
+       "text": "Trolley Run, the Riverside Theatres",
+       "accept": "qg-l8-parramatta-017",
+       "denyFlag": "w:qg-l8-parramatta-017",
+       "needFlag": "w:qg-l8-parramatta-016"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Maya pays up on the spot.",
+     "choices": [
+      {
+       "text": "About two signs, the riverside theatres.",
+       "turnin": "qg-l8-parramatta-016"
+      },
+      {
+       "text": "About trolley run, the riverside theatres.",
+       "turnin": "qg-l8-parramatta-017"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never go via Westfield Parramatta after five. Never. I don't care what the app says.",
+     "improv": {
+      "persona": "Maya, cabbie, twenty years in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Westfield Parramatta like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near Westfield Parramatta."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-hayden",
+   "name": "Hayden, probationary constable",
+   "x": -19214,
+   "z": -5399,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Parramatta LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of Old Government House. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at the parramatta river ferry.",
+     "choices": [
+      {
+       "text": "Trouble at the Parramatta River ferry",
+       "accept": "qg-l8-parramatta-018",
+       "denyFlag": "w:qg-l8-parramatta-018"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Hayden counts it out without looking up. -- Don't spend it all at Old Government House.",
+     "choices": [
+      {
+       "text": "About trouble at the parramatta river ferry.",
+       "turnin": "qg-l8-parramatta-018"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about Old Government House. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Hayden, probationary constable in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Old Government House like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near Old Government House."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-salote",
+   "name": "Salote, security guard",
+   "x": -18751,
+   "z": -5491,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bags open, please. Thanks, bro. Welcome to Parramatta.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve-hour shifts standing near the Parramatta River ferry watching people not steal things. Mostly.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Cover at Parramatta Square",
+       "accept": "qg-l8-parramatta-019",
+       "denyFlag": "w:qg-l8-parramatta-019"
+      },
+      {
+       "text": "The Parramatta Square Fence",
+       "accept": "qg-l8-parramatta-020",
+       "denyFlag": "w:qg-l8-parramatta-020",
+       "needFlag": "w:qg-l8-parramatta-019"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Salote counts it out without looking up. -- Don't spend it all at the Parramatta River ferry.",
+     "choices": [
+      {
+       "text": "About cover at parramatta square.",
+       "turnin": "qg-l8-parramatta-019"
+      },
+      {
+       "text": "About the parramatta square fence.",
+       "turnin": "qg-l8-parramatta-020"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a bench near the Parramatta River ferry where the whole shift eats lunch. We've named the pigeons.",
+     "improv": {
+      "persona": "Salote, security guard in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Parramatta River ferry like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near the Parramatta River ferry."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Right. And you're sure it was Parramatta Square? People say Parramatta Square when they mean the bit next to it. -- Salote writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-neville",
+   "name": "Neville, chippy off a job",
+   "x": -18968,
+   "z": -5709,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Parramatta, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's probationary at centenary square.",
+     "choices": [
+      {
+       "text": "Probationary at Centenary Square",
+       "accept": "qg-l8-parramatta-021",
+       "denyFlag": "w:qg-l8-parramatta-021"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Neville counts it out without looking up. -- Don't spend it all at Parramatta Square.",
+     "choices": [
+      {
+       "text": "About probationary at centenary square.",
+       "turnin": "qg-l8-parramatta-021"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Parramatta is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Neville, chippy off a job in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Parramatta Square like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near Parramatta Square."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-les",
+   "name": "Les, Eels supporter",
+   "x": -19185,
+   "z": -5246,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Blue and gold, brother. Parra. Parramatta. You bleed it or you don't.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Every home game at CommBank, every away game on the phone at work. Centenary Square is Eels country and always was.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "One Stop From Church Street",
+       "accept": "qg-l8-parramatta-022",
+       "denyFlag": "w:qg-l8-parramatta-022"
+      },
+      {
+       "text": "Is Auburn Any Good",
+       "accept": "qg-l8-parramatta-023",
+       "denyFlag": "w:qg-l8-parramatta-023",
+       "needFlag": "w:qg-l8-parramatta-022"
+      },
+      {
+       "text": "Before They Touch Church Street",
+       "accept": "qg-l8-parramatta-024",
+       "denyFlag": "w:qg-l8-parramatta-024"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Les pays up on the spot.",
+     "choices": [
+      {
+       "text": "About one stop from church street.",
+       "turnin": "qg-l8-parramatta-022"
+      },
+      {
+       "text": "About is auburn any good.",
+       "turnin": "qg-l8-parramatta-023"
+      },
+      {
+       "text": "About before they touch church street.",
+       "turnin": "qg-l8-parramatta-024"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Church Street after a win is the best place in Australia. After a loss, go to Centenary Square.",
+     "improv": {
+      "persona": "Les, Eels supporter in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Centenary Square like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near Centenary Square."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Les listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-tegan",
+   "name": "Tegan, corporate, on a break",
+   "x": -19007,
+   "z": -4931,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I've got eleven minutes. Sorry -- nine. Parramatta, what do you need?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Consulting. I consult. On what, nobody's sure, including me. Church Street is where I pretend to have lunch.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Parramatta Park Camera",
+       "accept": "qg-l8-parramatta-025",
+       "denyFlag": "w:qg-l8-parramatta-025"
+      },
+      {
+       "text": "Staffy Near Eat Street",
+       "accept": "qg-l8-parramatta-026",
+       "denyFlag": "w:qg-l8-parramatta-026",
+       "needFlag": "w:qg-l8-parramatta-025"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Tegan pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the parramatta park camera.",
+       "turnin": "qg-l8-parramatta-025"
+      },
+      {
+       "text": "About staffy near eat street.",
+       "turnin": "qg-l8-parramatta-026"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The coffee near Church Street is eight dollars. I expense it. I'm not proud.",
+     "improv": {
+      "persona": "Tegan, corporate, on a break in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Church Street like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near Church Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-2",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Parramatta would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-merv",
+   "name": "Merv, council ranger",
+   "x": -18501,
+   "z": -5403,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Parramatta is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Eat Street generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Race Four, Parramatta Park",
+       "accept": "qg-l8-parramatta-027",
+       "denyFlag": "w:qg-l8-parramatta-027"
+      },
+      {
+       "text": "Proof of Parramatta Park",
+       "accept": "qg-l8-parramatta-028",
+       "denyFlag": "w:qg-l8-parramatta-028",
+       "needFlag": "w:qg-l8-parramatta-027"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Merv pays up on the spot.",
+     "choices": [
+      {
+       "text": "About race four, parramatta park.",
+       "turnin": "qg-l8-parramatta-027"
+      },
+      {
+       "text": "About proof of parramatta park.",
+       "turnin": "qg-l8-parramatta-028"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Merv, council ranger in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Eat Street like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near Eat Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Parramatta would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-hala",
+   "name": "Hala, cabbie, twenty years",
+   "x": -18919,
+   "z": -5426,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Where to? Oh, you're not a fare. Fair enough. Parramatta, I know every gutter.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twenty years on the rank. Uber took half of it and the tunnel took the rest. Parramatta Park is still cash, thank god.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the eels complaint.",
+     "choices": [
+      {
+       "text": "The the Eels Complaint",
+       "accept": "qg-l8-parramatta-029",
+       "denyFlag": "w:qg-l8-parramatta-029"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Hala counts it out without looking up. -- Don't spend it all at Parramatta Park.",
+     "choices": [
+      {
+       "text": "About the the eels complaint.",
+       "turnin": "qg-l8-parramatta-029"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never go via Parramatta Park after five. Never. I don't care what the app says.",
+     "improv": {
+      "persona": "Hala, cabbie, twenty years in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Parramatta Park like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near Parramatta Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-sienna",
+   "name": "Sienna, uni student, three jobs",
+   "x": -19169,
+   "z": -4994,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Parramatta rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the Eels is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the commbank stadium order.",
+     "choices": [
+      {
+       "text": "The CommBank Stadium Order",
+       "accept": "qg-l8-parramatta-030",
+       "denyFlag": "w:qg-l8-parramatta-030"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Sienna looks it over the way Parramatta looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the commbank stadium order.",
+       "turnin": "qg-l8-parramatta-030"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the Eels that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Sienna, uni student, three jobs in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Eels like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near the Eels."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-annabel",
+   "name": "Annabel, probationary constable",
+   "x": -19325,
+   "z": -5156,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Parramatta LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of CommBank Stadium. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Meat Tray at Westfield Parramatta",
+       "accept": "qg-l8-parramatta-031",
+       "denyFlag": "w:qg-l8-parramatta-031"
+      },
+      {
+       "text": "Rent Money, Westfield Parramatta",
+       "accept": "qg-l8-parramatta-032",
+       "denyFlag": "w:qg-l8-parramatta-032",
+       "needFlag": "w:qg-l8-parramatta-031"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Annabel pays up on the spot.",
+     "choices": [
+      {
+       "text": "About meat tray at westfield parramatta.",
+       "turnin": "qg-l8-parramatta-031"
+      },
+      {
+       "text": "About rent money, westfield parramatta.",
+       "turnin": "qg-l8-parramatta-032"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about CommBank Stadium. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Annabel, probationary constable in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about CommBank Stadium like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near CommBank Stadium."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-fetu",
+   "name": "Fetu, security guard",
+   "x": -19127,
+   "z": -5757,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bags open, please. Thanks, bro. Welcome to Parramatta.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve-hour shifts standing near Westfield Parramatta watching people not steal things. Mostly.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Length of the Riverside Theatres",
+       "accept": "qg-l8-parramatta-033",
+       "denyFlag": "w:qg-l8-parramatta-033"
+      },
+      {
+       "text": "The the Riverside Theatres Lift",
+       "accept": "qg-l8-parramatta-034",
+       "denyFlag": "w:qg-l8-parramatta-034",
+       "needFlag": "w:qg-l8-parramatta-033"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Fetu pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the length of the riverside theatres.",
+       "turnin": "qg-l8-parramatta-033"
+      },
+      {
+       "text": "About the the riverside theatres lift.",
+       "turnin": "qg-l8-parramatta-034"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a bench near Westfield Parramatta where the whole shift eats lunch. We've named the pigeons.",
+     "improv": {
+      "persona": "Fetu, security guard in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Westfield Parramatta like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near Westfield Parramatta."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Parramatta would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-hugo",
+   "name": "Hugo, chippy off a job",
+   "x": -19444,
+   "z": -5557,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Parramatta, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Lads Off the Parramatta River ferry",
+       "accept": "qg-l8-parramatta-035",
+       "denyFlag": "w:qg-l8-parramatta-035"
+      },
+      {
+       "text": "Two From Old Government House",
+       "accept": "qg-l8-parramatta-036",
+       "denyFlag": "w:qg-l8-parramatta-036",
+       "needFlag": "w:qg-l8-parramatta-035"
+      },
+      {
+       "text": "Seven a.m. At Old Government House",
+       "accept": "qg-l8-parramatta-037",
+       "denyFlag": "w:qg-l8-parramatta-037"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Hugo counts it out without looking up. -- Don't spend it all at the Riverside Theatres.",
+     "choices": [
+      {
+       "text": "About lads off the parramatta river ferry.",
+       "turnin": "qg-l8-parramatta-035"
+      },
+      {
+       "text": "About two from old government house.",
+       "turnin": "qg-l8-parramatta-036"
+      },
+      {
+       "text": "About seven a.m. at old government house.",
+       "turnin": "qg-l8-parramatta-037"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Parramatta is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Hugo, chippy off a job in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Riverside Theatres like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near the Riverside Theatres."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-kev",
+   "name": "Kev, Eels supporter",
+   "x": -18815,
+   "z": -5447,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Blue and gold, brother. Parra. Parramatta. You bleed it or you don't.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Every home game at CommBank, every away game on the phone at work. Old Government House is Eels country and always was.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Parramatta River ferry Pub Crawl",
+       "accept": "qg-l8-parramatta-038",
+       "denyFlag": "w:qg-l8-parramatta-038"
+      },
+      {
+       "text": "The the Parramatta River ferry Course",
+       "accept": "qg-l8-parramatta-039",
+       "denyFlag": "w:qg-l8-parramatta-039",
+       "needFlag": "w:qg-l8-parramatta-038"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Kev counts it out without looking up. -- Don't spend it all at Old Government House.",
+     "choices": [
+      {
+       "text": "About the parramatta river ferry pub crawl.",
+       "turnin": "qg-l8-parramatta-038"
+      },
+      {
+       "text": "About the the parramatta river ferry course.",
+       "turnin": "qg-l8-parramatta-039"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Church Street after a win is the best place in Australia. After a loss, go to Old Government House.",
+     "improv": {
+      "persona": "Kev, Eels supporter in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Old Government House like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near Old Government House."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-lachlan",
+   "name": "Lachlan, corporate, on a break",
+   "x": -18944,
+   "z": -5547,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I've got eleven minutes. Sorry -- nine. Parramatta, what do you need?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Consulting. I consult. On what, nobody's sure, including me. the Parramatta River ferry is where I pretend to have lunch.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's counting parramatta square.",
+     "choices": [
+      {
+       "text": "Counting Parramatta Square",
+       "accept": "qg-l8-parramatta-040",
+       "denyFlag": "w:qg-l8-parramatta-040"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Lachlan looks it over the way Parramatta looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About counting parramatta square.",
+       "turnin": "qg-l8-parramatta-040"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The coffee near the Parramatta River ferry is eight dollars. I expense it. I'm not proud.",
+     "improv": {
+      "persona": "Lachlan, corporate, on a break in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Parramatta River ferry like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near the Parramatta River ferry."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-rod",
+   "name": "Rod, council ranger",
+   "x": -18915,
+   "z": -5476,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Parramatta is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Parramatta Square generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's bin night, centenary square.",
+     "choices": [
+      {
+       "text": "Bin Night, Centenary Square",
+       "accept": "qg-l8-parramatta-041",
+       "denyFlag": "w:qg-l8-parramatta-041"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Rod pays up on the spot.",
+     "choices": [
+      {
+       "text": "About bin night, centenary square.",
+       "turnin": "qg-l8-parramatta-041"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Rod, council ranger in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Parramatta Square like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near Parramatta Square."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-nour",
+   "name": "Nour, cabbie, twenty years",
+   "x": -19407,
+   "z": -5168,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Where to? Oh, you're not a fare. Fair enough. Parramatta, I know every gutter.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twenty years on the rank. Uber took half of it and the tunnel took the rest. Centenary Square is still cash, thank god.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Parcel for Auburn",
+       "accept": "qg-l8-parramatta-042",
+       "denyFlag": "w:qg-l8-parramatta-042"
+      },
+      {
+       "text": "Trolley Run, Church Street",
+       "accept": "qg-l8-parramatta-043",
+       "denyFlag": "w:qg-l8-parramatta-043",
+       "needFlag": "w:qg-l8-parramatta-042"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Nour pays up on the spot.",
+     "choices": [
+      {
+       "text": "About parcel for auburn.",
+       "turnin": "qg-l8-parramatta-042"
+      },
+      {
+       "text": "About trolley run, church street.",
+       "turnin": "qg-l8-parramatta-043"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never go via Centenary Square after five. Never. I don't care what the app says.",
+     "improv": {
+      "persona": "Nour, cabbie, twenty years in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Centenary Square like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near Centenary Square."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-georgie",
+   "name": "Georgie, uni student, three jobs",
+   "x": -18977,
+   "z": -5287,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Parramatta rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Church Street is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Sightline at Eat Street",
+       "accept": "qg-l8-parramatta-044",
+       "denyFlag": "w:qg-l8-parramatta-044"
+      },
+      {
+       "text": "RBT on Eat Street",
+       "accept": "qg-l8-parramatta-045",
+       "denyFlag": "w:qg-l8-parramatta-045",
+       "needFlag": "w:qg-l8-parramatta-044"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Georgie counts it out without looking up. -- Don't spend it all at Church Street.",
+     "choices": [
+      {
+       "text": "About sightline at eat street.",
+       "turnin": "qg-l8-parramatta-044"
+      },
+      {
+       "text": "About rbt on eat street.",
+       "turnin": "qg-l8-parramatta-045"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Church Street that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Georgie, uni student, three jobs in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Church Street like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near Church Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Parramatta would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-kai",
+   "name": "Kai, probationary constable",
+   "x": -18759,
+   "z": -5602,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Parramatta LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of Eat Street. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at parramatta park.",
+     "choices": [
+      {
+       "text": "Trouble at Parramatta Park",
+       "accept": "qg-l8-parramatta-046",
+       "denyFlag": "w:qg-l8-parramatta-046"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Kai pays up on the spot.",
+     "choices": [
+      {
+       "text": "About trouble at parramatta park.",
+       "turnin": "qg-l8-parramatta-046"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about Eat Street. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Kai, probationary constable in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Eat Street like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near Eat Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-thelma",
+   "name": "Thelma, chippy off a job",
+   "x": -19302,
+   "z": -5232,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Parramatta, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The CommBank Stadium Float",
+       "accept": "qg-l8-parramatta-047",
+       "denyFlag": "w:qg-l8-parramatta-047"
+      },
+      {
+       "text": "Probationary at CommBank Stadium",
+       "accept": "qg-l8-parramatta-048",
+       "denyFlag": "w:qg-l8-parramatta-048",
+       "needFlag": "w:qg-l8-parramatta-047"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Thelma counts it out without looking up. -- Don't spend it all at the Eels.",
+     "choices": [
+      {
+       "text": "About the commbank stadium float.",
+       "turnin": "qg-l8-parramatta-047"
+      },
+      {
+       "text": "About probationary at commbank stadium.",
+       "turnin": "qg-l8-parramatta-048"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Parramatta is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Thelma, chippy off a job in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Eels like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near the Eels."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Right. And you're sure it was CommBank Stadium? People say CommBank Stadium when they mean the bit next to it. -- Thelma writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-parramatta-leanne",
+   "name": "Leanne, Eels supporter",
+   "x": -18725,
+   "z": -5667,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Blue and gold, brother. Parra. Parramatta. You bleed it or you don't.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Parramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Every home game at CommBank, every away game on the phone at work. CommBank Stadium is Eels country and always was.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The the Riverside Theatres Camera",
+       "accept": "qg-l8-parramatta-049",
+       "denyFlag": "w:qg-l8-parramatta-049"
+      },
+      {
+       "text": "Closing Time at the Riverside Theatres",
+       "accept": "qg-l8-parramatta-050",
+       "denyFlag": "w:qg-l8-parramatta-050",
+       "needFlag": "w:qg-l8-parramatta-049"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Leanne looks it over the way Parramatta looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the riverside theatres camera.",
+       "turnin": "qg-l8-parramatta-049"
+      },
+      {
+       "text": "About closing time at the riverside theatres.",
+       "turnin": "qg-l8-parramatta-050"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Church Street after a win is the best place in Australia. After a loss, go to CommBank Stadium.",
+     "improv": {
+      "persona": "Leanne, Eels supporter in Parramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about CommBank Stadium like everyone knows it.",
+      "context": "Someone has asked what Parramatta is like these days. You are standing near CommBank Stadium."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

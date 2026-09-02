@@ -1,0 +1,1725 @@
+{
+ "pack": "area-randwick-1",
+ "quests": [
+  {
+   "id": "qg-l5-randwick-001",
+   "act": 3,
+   "title": "The Royal Randwick Camera",
+   "blurb": "The council knows and the council does not care. A new speed camera near Royal Randwick has fined half of Randwick since Boxing Day. Nobody else seems to have noticed, which is its own problem. Photograph it for the appeal, then prove the train to Milsons Point is faster anyway. Take your time. Do not take a week.",
+   "giver": "qg-randwick-renee",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 2863,
+     "z": 5352,
+     "radius": 40,
+     "label": "photograph the camera near Royal Randwick"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Randwick",
+     "to": "Milsons Point",
+     "label": "then take the train instead, to Milsons Point"
+    }
+   ],
+   "reward": {
+    "cash": 124,
+    "xp": 340,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-002",
+   "act": 3,
+   "title": "Trouble at the Prince of Wales",
+   "blurb": "Right. Since you asked. Two lads and their mate decided at midnight that the Prince of Wales is theirs. I would not ask if there was anyone else about. The rest of Randwick disagrees, so explain the disagreement. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qg-randwick-mai",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near the Prince of Wales"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 120,
+    "xp": 312,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-003",
+   "act": 3,
+   "title": "The the Prince of Wales Fence",
+   "blurb": "It is not a police matter and I have checked. My neighbour at the Prince of Wales says the tree is on my side and the fence says otherwise. I am aware how that sounds. Look at it Saturday with Randwick eyes and tell me the truth. You'll know it when you see it.",
+   "giver": "qg-randwick-mai",
+   "level": 5,
+   "requires": [
+    "qg-l5-randwick-002"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 3028,
+     "z": 5497,
+     "radius": 30,
+     "label": "go and look at the fence at the Prince of Wales"
+    },
+    {
+     "kind": "photo",
+     "x": 3028,
+     "z": 5497,
+     "radius": 40,
+     "label": "photograph the tree over it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-randwick-mai",
+     "node": "report-1",
+     "label": "tell me whose side it's on"
+    }
+   ],
+   "reward": {
+    "cash": 155,
+    "xp": 436,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-004",
+   "act": 3,
+   "title": "Proof of the Ritz cinema",
+   "blurb": "Nobody else has offered, so. Nobody in Randwick believes what the Ritz cinema looks like at half two. My wife says I should let it go. My wife is wrong. Get me a photo close enough that council can't say it's somewhere else. Say nothing to anyone on the way.",
+   "giver": "qg-randwick-hamish",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 2624,
+     "z": 5098,
+     "radius": 40,
+     "label": "get a picture of the Ritz cinema before they fix it"
+    }
+   ],
+   "reward": {
+    "cash": 121,
+    "xp": 338,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-005",
+   "act": 3,
+   "title": "One Stop From Anzac Parade",
+   "blurb": "Two people have already said no. I need to know the train from Randwick stops at Milsons Point and doesn't sail through like it did on the last Sunday of the month. This is the third time I have had this conversation. Ride it at half six and photograph the sign. Just do not come back empty-handed.",
+   "giver": "qg-randwick-dean",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Randwick",
+     "to": "Milsons Point",
+     "label": "take the train to Milsons Point"
+    },
+    {
+     "kind": "photo",
+     "x": 150,
+     "z": -2533,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 122,
+    "xp": 338,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-006",
+   "act": 3,
+   "title": "Before They Touch Anzac Parade",
+   "blurb": "Keep it between us for now. They start on Anzac Parade on Friday and the orange fencing goes up. The paperwork says one thing and my eyes say another. I want Randwick on record before it does. I'll see you right for it.",
+   "giver": "qg-randwick-dean",
+   "level": 5,
+   "requires": [
+    "qg-l5-randwick-005"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 3075,
+     "z": 5301,
+     "radius": 40,
+     "label": "photograph the state of Anzac Parade"
+    },
+    {
+     "kind": "goto",
+     "x": 3187,
+     "z": 5510,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 156,
+    "xp": 455,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-007",
+   "act": 3,
+   "title": "Bin Night, Anzac Parade",
+   "blurb": "Before you say anything: yes, I know. Somebody moves the bins on Anzac Parade in front of my drive every Easter Saturday night. I would have sorted it myself a year ago. Photograph the evidence and have a word; Randwick knows who. If anyone asks, you were never here.",
+   "giver": "qg-randwick-dean",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 2669,
+     "z": 5572,
+     "radius": 40,
+     "label": "photograph the bins at Anzac Parade"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 115,
+    "xp": 310,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-008",
+   "act": 3,
+   "title": "Left It Near UNSW",
+   "blurb": "Not being dramatic about this. I left something on the bench at UNSW at school pick-up. I have rung the number on the letter four times. By the time I got back to Randwick it had walked, so look where I'd have dropped it. That's it. That's the whole ask.",
+   "giver": "qg-randwick-imogen",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 2764,
+     "z": 5619,
+     "radius": 30,
+     "label": "check the bench near UNSW"
+    },
+    {
+     "kind": "photo",
+     "x": 2850,
+     "z": 5519,
+     "radius": 40,
+     "label": "photograph the bins behind it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-randwick-imogen",
+     "node": "report-0",
+     "label": "tell me what you found"
+    }
+   ],
+   "reward": {
+    "cash": 115,
+    "xp": 332,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-009",
+   "act": 3,
+   "title": "The Length of Belmore Road",
+   "blurb": "It is the sort of thing you notice or you do not. I haven't walked Belmore Road end to end since the light rail came to Randwick. Half the street knows and half the street is pretending not to. Do it Wednesday for me and photograph what's at the far end now. Half now if you want it. Most people don't.",
+   "giver": "qg-randwick-bruce",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 2950,
+     "z": 5287,
+     "radius": 30,
+     "label": "walk the length of Belmore Road"
+    },
+    {
+     "kind": "goto",
+     "x": 3276,
+     "z": 5323,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": 3276,
+     "z": 5323,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 131,
+    "xp": 340,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-010",
+   "act": 3,
+   "title": "Cover at Belmore Road",
+   "blurb": "You look like you have twenty minutes. I've got nobody for the Belmore Road shift at half four and a room full of Randwick people who've paid. It is the not knowing that has got me, honestly. Fifty of trade and one difficult person at the door. There's cash in it. Not a lot.",
+   "giver": "qg-randwick-bruce",
+   "level": 5,
+   "requires": [
+    "qg-l5-randwick-009"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 74,
+     "label": "cover the fifty for the shift"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 1,
+     "label": "and handle whoever's at the door"
+    }
+   ],
+   "reward": {
+    "cash": 160,
+    "xp": 425,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-011",
+   "act": 3,
+   "title": "A Flat White From Coogee Bay Road",
+   "blurb": "I have been putting it off since Easter. I want a flat white from the place near Coogee Bay Road, not the one next to it. I have got no proof, which is exactly why I am asking. Here by eleven, while it's still coffee and Randwick still has some. I will owe you one, and I pay those.",
+   "giver": "qg-randwick-minh",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near Coogee Bay Road"
+    },
+    {
+     "kind": "goto",
+     "x": 3023,
+     "z": 5295,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 130,
+    "xp": 330,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-012",
+   "act": 3,
+   "title": "Race Four, Coogee Bay Road",
+   "blurb": "You are the first person to stop all morning. There's a horse in race four at three in the morning that a bloke at Coogee Bay Road swears by. I did try the official route, for what that was worth. Turn it into fifty-five somewhere in Randwick and tell me if it came in. Come back and tell me straight.",
+   "giver": "qg-randwick-minh",
+   "level": 5,
+   "requires": [
+    "qg-l5-randwick-011"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 81,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-randwick-minh",
+     "node": "report-1",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 147,
+    "xp": 454,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-013",
+   "act": 3,
+   "title": "The the Doncaster Lift",
+   "blurb": "My knees are gone, so. The lift at Randwick station has been out since the Easter Show and I'm told Milsons Point is worse. I am not after trouble. I am after an answer. Check both Sunday and tell me which takes a pram. Do not make a scene about it.",
+   "giver": "qg-randwick-lorraine",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 2941,
+     "z": 5319,
+     "radius": 30,
+     "label": "check the lift at Randwick station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Randwick",
+     "to": "Milsons Point",
+     "label": "then ride to Milsons Point and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-randwick-lorraine",
+     "node": "report-0",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 123,
+    "xp": 330,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-014",
+   "act": 3,
+   "title": "The the Doncaster Complaint",
+   "blurb": "Honestly, I am past caring how it looks. Two women in activewear have photographed my bins outside the Doncaster since Melbourne Cup day. There is probably a simple explanation and I would love to hear it. One has Randwick council on speed dial; sort it however you sort things. I will know if you skipped a bit.",
+   "giver": "qg-randwick-lorraine",
+   "level": 5,
+   "requires": [
+    "qg-l5-randwick-013"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near the Doncaster"
+    }
+   ],
+   "reward": {
+    "cash": 170,
+    "xp": 429,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-015",
+   "act": 3,
+   "title": "The Royal Randwick Tab",
+   "blurb": "I'll be straight with you. Two chippies off the Royal Randwick job have run a tab in Randwick since Wednesday. It might be nothing. It has not felt like nothing. They drove past at three in the morning without looking in, so settle it in cash. I'll put the kettle on for when you're back.",
+   "giver": "qg-randwick-lorraine",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near Royal Randwick"
+    },
+    {
+     "kind": "earn",
+     "dollars": 44,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 121,
+    "xp": 325,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-016",
+   "act": 3,
+   "title": "Two From Royal Randwick",
+   "blurb": "Do not laugh. Two of whatever's going near Royal Randwick, here, hot, before the footy at dawn. I have got a photo on my phone but it is useless. It's Randwick; I'm not asking for much. There is no rush, but there is a Friday.",
+   "giver": "qg-randwick-kerry",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near Royal Randwick"
+    },
+    {
+     "kind": "goto",
+     "x": 2989,
+     "z": 5276,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 333,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-017",
+   "act": 3,
+   "title": "Something From the Prince of Wales",
+   "blurb": "There is no clever way to say this. The stall at the Prince of Wales has run out and the customers keep coming. Nobody else seems to have noticed, which is its own problem. Find something round Randwick that'll do before the bin night rush. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qg-randwick-bronwyn",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near the Prince of Wales"
+    },
+    {
+     "kind": "goto",
+     "x": 3202,
+     "z": 5150,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 117,
+    "xp": 316,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-018",
+   "act": 3,
+   "title": "Tap On at the Prince of Wales",
+   "blurb": "The council knows and the council does not care. My Opal says I owe nineteen dollars for a trip from Randwick I never took on Monday. You will see what I mean the second you get there. Take the same one to Milsons Point and tell me what it charged you. Whatever you find, bring it to me first.",
+   "giver": "qg-randwick-bronwyn",
+   "level": 5,
+   "requires": [
+    "qg-l5-randwick-017"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Randwick",
+     "to": "Milsons Point",
+     "label": "tap on at Randwick, tap off at Milsons Point"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-randwick-bronwyn",
+     "node": "report-1",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 168,
+    "xp": 417,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-019",
+   "act": 3,
+   "title": "Rent Money, the Prince of Wales",
+   "blurb": "Someone has to, and it may as well be you. I'm forty-five short on the the Prince of Wales rent and the agent doesn't take stories. I would not ask if there was anyone else about. Make it somewhere in Randwick by first thing; I'm not fussy how. Take your time. Do not take a week.",
+   "giver": "qg-randwick-bronwyn",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 67,
+     "label": "earn forty-five somewhere in Randwick"
+    }
+   ],
+   "reward": {
+    "cash": 122,
+    "xp": 349,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-020",
+   "act": 3,
+   "title": "The the Spot Order",
+   "blurb": "Right. Since you asked. The the Spot order came to seventy more than I'd budgeted and the supplier wants it by closing. I am aware how that sounds. Find seventy in Randwick and photograph the receipt. That's the whole job. No catch.",
+   "giver": "qg-randwick-colin",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 104,
+     "label": "square the seventy for the the Spot order"
+    },
+    {
+     "kind": "photo",
+     "x": 3239,
+     "z": 5457,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 118,
+    "xp": 342,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-021",
+   "act": 3,
+   "title": "Probationary at the Ritz cinema",
+   "blurb": "I am told you do odd jobs. A young constable has been doing his first solo patrol round the Ritz cinema since the last Sunday of the month. There is a version of this where I am the unreasonable one. He's decided Randwick is his, so give him a story for the sergeant. You'll know it when you see it.",
+   "giver": "qg-randwick-nino",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "lose the probationary constable near the Ritz cinema"
+    }
+   ],
+   "reward": {
+    "cash": 115,
+    "xp": 317,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-022",
+   "act": 3,
+   "title": "Sightline at the Ritz cinema",
+   "blurb": "I have written it down twice and lost it twice. Insurance says nobody could have seen the ute hit the fence at the Ritz cinema on Friday. You can tell me I am imagining it. Tell me after. Stand where I stood in Randwick, photograph the view, tell me if I'm lying. Do not let them talk you into anything.",
+   "giver": "qg-randwick-nino",
+   "level": 5,
+   "requires": [
+    "qg-l5-randwick-021"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 2756,
+     "z": 5849,
+     "radius": 30,
+     "label": "stand where it happened at the Ritz cinema"
+    },
+    {
+     "kind": "photo",
+     "x": 2756,
+     "z": 5849,
+     "radius": 40,
+     "label": "photograph the corner"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-randwick-nino",
+     "node": "report-1",
+     "label": "describe the sightline"
+    }
+   ],
+   "reward": {
+    "cash": 161,
+    "xp": 412,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-023",
+   "act": 3,
+   "title": "Lads Off Anzac Parade",
+   "blurb": "Nobody else has offered, so. Three of them in TNs on the Anzac Parade steps, flogging vapes to schoolkids at the arvo. This is the third time I have had this conversation. Randwick used to move them on itself and now it rings me. Ask for me by name at the counter.",
+   "giver": "qg-randwick-graham",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Anzac Parade"
+    }
+   ],
+   "reward": {
+    "cash": 127,
+    "xp": 348,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-024",
+   "act": 3,
+   "title": "Closing Time at Anzac Parade",
+   "blurb": "Two people have already said no. Two blokes have slept in my doorway on Anzac Parade since the pub shut. The paperwork says one thing and my eyes say another. The Randwick delivery's at half seven, so get them up and show me the step empty. Say nothing to anyone on the way.",
+   "giver": "qg-randwick-graham",
+   "level": 5,
+   "requires": [
+    "qg-l5-randwick-023"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off Anzac Parade"
+    },
+    {
+     "kind": "photo",
+     "x": 2874,
+     "z": 5600,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 164,
+    "xp": 421,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-025",
+   "act": 3,
+   "title": "Seven a.m. At Anzac Parade",
+   "blurb": "Keep it between us for now. The site at Anzac Parade starts its jackhammer at ten past ten on a Friday, which is illegal and loud. I would have sorted it myself a year ago. Photograph it running and have a word with the Randwick foreman. Just do not come back empty-handed.",
+   "giver": "qg-randwick-graham",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 2867,
+     "z": 5178,
+     "radius": 40,
+     "label": "photograph the noise from Anzac Parade"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 113,
+    "xp": 348,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-026",
+   "act": 3,
+   "title": "The the Randwick Ritz Float",
+   "blurb": "Before you say anything: yes, I know. The till at the Randwick Ritz opens the long weekend with an empty float because somebody took it to the pub. I have rung the number on the letter four times. Sixty before the first Randwick customer, and I'll never say who. I'll see you right for it.",
+   "giver": "qg-randwick-ngoc",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 89,
+     "label": "clear sixty for the the Randwick Ritz float"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-randwick-ngoc",
+     "node": "report-0",
+     "label": "hand it over at the counter"
+    }
+   ],
+   "reward": {
+    "cash": 123,
+    "xp": 328,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-027",
+   "act": 3,
+   "title": "The UNSW Camera",
+   "blurb": "Not being dramatic about this. A new speed camera near UNSW has fined half of Randwick since grand final day. It started small, the way these things do. Photograph it for the appeal, then prove the train to Milsons Point is faster anyway. If anyone asks, you were never here.",
+   "giver": "qg-randwick-ngoc",
+   "level": 5,
+   "requires": [
+    "qg-l5-randwick-026"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 3100,
+     "z": 5670,
+     "radius": 40,
+     "label": "photograph the camera near UNSW"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Randwick",
+     "to": "Milsons Point",
+     "label": "then take the train instead, to Milsons Point"
+    }
+   ],
+   "reward": {
+    "cash": 155,
+    "xp": 419,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-028",
+   "act": 3,
+   "title": "The the Randwick Ritz Course",
+   "blurb": "This is going to sound small. A bloke near the Randwick Ritz runs a ninety-minute course he bills at four hundred, and I've paid. It has been going on longer than I have admitted to anyone. Sit it Tuesday, then come back to Randwick and prove it did something. That's it. That's the whole ask.",
+   "giver": "qg-randwick-poppy",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near the Randwick Ritz"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 127,
+    "xp": 337,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-029",
+   "act": 3,
+   "title": "Trouble at Belmore Road",
+   "blurb": "I would do it myself if I could leave the counter. Two lads and their mate decided at half six that Belmore Road is theirs. It is not the money. It has stopped being the money. The rest of Randwick disagrees, so explain the disagreement. Come and find me after, either way.",
+   "giver": "qg-randwick-leanne",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Belmore Road"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 130,
+    "xp": 335,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-030",
+   "act": 3,
+   "title": "RBT on Belmore Road",
+   "blurb": "It is the sort of thing you notice or you do not. There's a breath test set up on Belmore Road since the last train. It is the not knowing that has got me, honestly. My brother-in-law needs the ute at the far end of Randwick without a conversation. I would rather know than wonder.",
+   "giver": "qg-randwick-leanne",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on Belmore Road"
+    },
+    {
+     "kind": "goto",
+     "x": 3325,
+     "z": 5269,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 325,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-031",
+   "act": 3,
+   "title": "Counting the Doncaster",
+   "blurb": "I have been putting it off since Easter. Council says the the Doncaster car park is never full and I say it's full by nine sharp. I did try the official route, for what that was worth. Count both Randwick car parks, photograph whichever one makes me right. There's cash in it. Not a lot.",
+   "giver": "qg-randwick-maddie",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 3269,
+     "z": 5040,
+     "radius": 30,
+     "label": "count the cars at the Doncaster"
+    },
+    {
+     "kind": "goto",
+     "x": 3173,
+     "z": 5139,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": 3269,
+     "z": 5040,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 129,
+    "xp": 313,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-032",
+   "act": 3,
+   "title": "Proof of the Doncaster",
+   "blurb": "You are the first person to stop all morning. Nobody in Randwick believes what the Doncaster looks like at school pick-up. I am not after trouble. I am after an answer. Get me a photo close enough that council can't say it's somewhere else. I will owe you one, and I pay those.",
+   "giver": "qg-randwick-les",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 3228,
+     "z": 5732,
+     "radius": 40,
+     "label": "get a picture of the Doncaster before they fix it"
+    }
+   ],
+   "reward": {
+    "cash": 117,
+    "xp": 312,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-033",
+   "act": 3,
+   "title": "One Stop From the Doncaster",
+   "blurb": "My knees are gone, so. I need to know the train from Randwick stops at Milsons Point and doesn't sail through like it did on Boxing Day. There is probably a simple explanation and I would love to hear it. Ride it at after the footy and photograph the sign. Come back and tell me straight.",
+   "giver": "qg-randwick-les",
+   "level": 5,
+   "requires": [
+    "qg-l5-randwick-032"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Randwick",
+     "to": "Milsons Point",
+     "label": "take the train to Milsons Point"
+    },
+    {
+     "kind": "photo",
+     "x": 150,
+     "z": -2533,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 426,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-034",
+   "act": 3,
+   "title": "Before They Touch Royal Randwick",
+   "blurb": "Honestly, I am past caring how it looks. They start on Royal Randwick on the King's Birthday and the orange fencing goes up. It might be nothing. It has not felt like nothing. I want Randwick on record before it does. Do not make a scene about it.",
+   "giver": "qg-randwick-enzo",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 2943,
+     "z": 5341,
+     "radius": 40,
+     "label": "photograph the state of Royal Randwick"
+    },
+    {
+     "kind": "goto",
+     "x": 3090,
+     "z": 5295,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 342,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-035",
+   "act": 3,
+   "title": "Bin Night, Royal Randwick",
+   "blurb": "I'll be straight with you. Somebody moves the bins on Royal Randwick in front of my drive every Sunday night. I have got a photo on my phone but it is useless. Photograph the evidence and have a word; Randwick knows who. I will know if you skipped a bit.",
+   "giver": "qg-randwick-enzo",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 3122,
+     "z": 5371,
+     "radius": 40,
+     "label": "photograph the bins at Royal Randwick"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 130,
+    "xp": 343,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-036",
+   "act": 3,
+   "title": "Meat Tray at the Prince of Wales",
+   "blurb": "There is no clever way to say this. The the Prince of Wales raffle is thirty-five short of a meat tray and the draw is at after the footy. You will see what I mean the second you get there. Find it in Randwick and put it in the tin. There is no rush, but there is a Friday.",
+   "giver": "qg-randwick-scott",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 52,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": 3164,
+     "z": 5168,
+     "radius": 30,
+     "label": "and drop it at the Prince of Wales"
+    }
+   ],
+   "reward": {
+    "cash": 115,
+    "xp": 319,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-037",
+   "act": 3,
+   "title": "The the Spot Sparky",
+   "blurb": "The council knows and the council does not care. The sparky off the the Spot job has owed me since the bathroom and drinks in Randwick from first thing. I would not ask if there was anyone else about. Forty will do and I'll write off the rest. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qg-randwick-thanh",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for the Spot"
+    },
+    {
+     "kind": "earn",
+     "dollars": 59,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 131,
+    "xp": 347,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-038",
+   "act": 3,
+   "title": "A Flat White From the Ritz cinema",
+   "blurb": "I am told you do odd jobs. I want a flat white from the place near the Ritz cinema, not the one next to it. You can tell me I am imagining it. Tell me after. Here by school pick-up, while it's still coffee and Randwick still has some. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qg-randwick-glenn",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near the Ritz cinema"
+    },
+    {
+     "kind": "goto",
+     "x": 3131,
+     "z": 5602,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 124,
+    "xp": 324,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-039",
+   "act": 3,
+   "title": "Race Four, Anzac Parade",
+   "blurb": "I have written it down twice and lost it twice. There's a horse in race four at five that a bloke at Anzac Parade swears by. My wife says I should let it go. My wife is wrong. Turn it into fifty-five somewhere in Randwick and tell me if it came in. You'll know it when you see it.",
+   "giver": "qg-randwick-sienna",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 81,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-randwick-sienna",
+     "node": "report-0",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 113,
+    "xp": 342,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-040",
+   "act": 3,
+   "title": "The Anzac Parade Lift",
+   "blurb": "You will think I am making this up. The lift at Randwick station has been out since the Easter Show and I'm told Milsons Point is worse. This is the third time I have had this conversation. Check both the last Sunday of the month and tell me which takes a pram. Do not let them talk you into anything.",
+   "giver": "qg-randwick-sienna",
+   "level": 5,
+   "requires": [
+    "qg-l5-randwick-039"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 2941,
+     "z": 5319,
+     "radius": 30,
+     "label": "check the lift at Randwick station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Randwick",
+     "to": "Milsons Point",
+     "label": "then ride to Milsons Point and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-randwick-sienna",
+     "node": "report-1",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 168,
+    "xp": 446,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-041",
+   "act": 3,
+   "title": "The Anzac Parade Complaint",
+   "blurb": "Nobody else has offered, so. Two women in activewear have photographed my bins outside Anzac Parade since Friday. The paperwork says one thing and my eyes say another. One has Randwick council on speed dial; sort it however you sort things. Do that and we're square.",
+   "giver": "qg-randwick-sienna",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near Anzac Parade"
+    }
+   ],
+   "reward": {
+    "cash": 125,
+    "xp": 343,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-042",
+   "act": 3,
+   "title": "Two From UNSW",
+   "blurb": "Keep it between us for now. Two of whatever's going near UNSW, here, hot, before the footy at eight at night. I have rung the number on the letter four times. It's Randwick; I'm not asking for much. Say nothing to anyone on the way.",
+   "giver": "qg-randwick-troy",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near UNSW"
+    },
+    {
+     "kind": "goto",
+     "x": 3003,
+     "z": 5390,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 132,
+    "xp": 326,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-043",
+   "act": 3,
+   "title": "Something From the Randwick Ritz",
+   "blurb": "Before you say anything: yes, I know. The stall at the Randwick Ritz has run out and the customers keep coming. It started small, the way these things do. Find something round Randwick that'll do before the ten past ten rush. Just do not come back empty-handed.",
+   "giver": "qg-randwick-beryl",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near the Randwick Ritz"
+    },
+    {
+     "kind": "goto",
+     "x": 2960,
+     "z": 5345,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 314,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-044",
+   "act": 3,
+   "title": "Tap On at the Randwick Ritz",
+   "blurb": "Not being dramatic about this. My Opal says I owe nineteen dollars for a trip from Randwick I never took on Wednesday. It has been going on longer than I have admitted to anyone. Take the same one to Milsons Point and tell me what it charged you. I'll see you right for it.",
+   "giver": "qg-randwick-beryl",
+   "level": 5,
+   "requires": [
+    "qg-l5-randwick-043"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Randwick",
+     "to": "Milsons Point",
+     "label": "tap on at Randwick, tap off at Milsons Point"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-randwick-beryl",
+     "node": "report-1",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 164,
+    "xp": 424,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-045",
+   "act": 3,
+   "title": "Rent Money, Belmore Road",
+   "blurb": "This is going to sound small. I'm forty-five short on the Belmore Road rent and the agent doesn't take stories. It is not the money. It has stopped being the money. Make it somewhere in Randwick by half seven; I'm not fussy how. If anyone asks, you were never here.",
+   "giver": "qg-randwick-pina",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 67,
+     "label": "earn forty-five somewhere in Randwick"
+    }
+   ],
+   "reward": {
+    "cash": 114,
+    "xp": 323,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-046",
+   "act": 3,
+   "title": "The Belmore Road Order",
+   "blurb": "I would do it myself if I could leave the counter. The Belmore Road order came to seventy more than I'd budgeted and the supplier wants it by ten past ten. Half the street knows and half the street is pretending not to. Find seventy in Randwick and photograph the receipt. That's it. That's the whole ask.",
+   "giver": "qg-randwick-pina",
+   "level": 5,
+   "requires": [
+    "qg-l5-randwick-045"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 104,
+     "label": "square the seventy for the Belmore Road order"
+    },
+    {
+     "kind": "photo",
+     "x": 3029,
+     "z": 5496,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 168,
+    "xp": 429,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-047",
+   "act": 3,
+   "title": "Trolley Run, Belmore Road",
+   "blurb": "It has been three weeks. A Woolies trolley from Belmore Road gets walked to the creek every Wednesday. It is the not knowing that has got me, honestly. Find where it ends up in Randwick and make the deposit back. Come and find me after, either way.",
+   "giver": "qg-randwick-pina",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 2719,
+     "z": 5371,
+     "radius": 30,
+     "label": "find the trolley near Belmore Road"
+    },
+    {
+     "kind": "photo",
+     "x": 2719,
+     "z": 5371,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 37,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 118,
+    "xp": 330,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-048",
+   "act": 3,
+   "title": "Probationary at Coogee Bay Road",
+   "blurb": "It is the sort of thing you notice or you do not. A young constable has been doing his first solo patrol round Coogee Bay Road since Sunday. I have got no proof, which is exactly why I am asking. He's decided Randwick is his, so give him a story for the sergeant. Be polite about it. It costs nothing.",
+   "giver": "qg-randwick-lachlan",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "lose the probationary constable near Coogee Bay Road"
+    }
+   ],
+   "reward": {
+    "cash": 116,
+    "xp": 325,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-049",
+   "act": 3,
+   "title": "Two Signs, the Doncaster",
+   "blurb": "I have been putting it off since Easter. Two signs near the Doncaster say opposite things about parking and I've been fined under both. I am not after trouble. I am after an answer. Get photos of each before Boxing Day, when Randwick council takes one down. Half now if you want it. Most people don't.",
+   "giver": "qg-randwick-vinh",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 3244,
+     "z": 5224,
+     "radius": 40,
+     "label": "photograph the sign at the Doncaster"
+    },
+    {
+     "kind": "photo",
+     "x": 2949,
+     "z": 5234,
+     "radius": 40,
+     "label": "and the one that contradicts it"
+    }
+   ],
+   "reward": {
+    "cash": 121,
+    "xp": 346,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-050",
+   "act": 3,
+   "title": "Lads Off Royal Randwick",
+   "blurb": "You are the first person to stop all morning. Three of them in TNs on the Royal Randwick steps, flogging vapes to schoolkids at midnight. There is probably a simple explanation and I would love to hear it. Randwick used to move them on itself and now it rings me. There's cash in it. Not a lot.",
+   "giver": "qg-randwick-prue",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Royal Randwick"
+    }
+   ],
+   "reward": {
+    "cash": 127,
+    "xp": 340,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-051",
+   "act": 3,
+   "title": "Closing Time at Royal Randwick",
+   "blurb": "My knees are gone, so. Two blokes have slept in my doorway on Royal Randwick since the pub shut. It might be nothing. It has not felt like nothing. The Randwick delivery's at the last train, so get them up and show me the step empty. I will owe you one, and I pay those.",
+   "giver": "qg-randwick-prue",
+   "level": 5,
+   "requires": [
+    "qg-l5-randwick-050"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off Royal Randwick"
+    },
+    {
+     "kind": "photo",
+     "x": 2925,
+     "z": 5300,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 165,
+    "xp": 407,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l5-randwick-052",
+   "act": 3,
+   "title": "Seven a.m. At the Prince of Wales",
+   "blurb": "Honestly, I am past caring how it looks. The site at the Prince of Wales starts its jackhammer at nine sharp on a Australia Day, which is illegal and loud. I have got a photo on my phone but it is useless. Photograph it running and have a word with the Randwick foreman. Come back and tell me straight.",
+   "giver": "qg-randwick-marg",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 3238,
+     "z": 5061,
+     "radius": 40,
+     "label": "photograph the noise from the Prince of Wales"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 132,
+    "xp": 326,
+    "unlock": []
+   }
+  }
+ ]
+}

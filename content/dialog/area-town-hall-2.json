@@ -1,0 +1,901 @@
+{
+ "pack": "area-town-hall-2",
+ "npcs": [
+  {
+   "id": "qg-town-hall-nour",
+   "name": "Nour, cabbie, twenty years",
+   "x": -88,
+   "z": 881,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Where to? Oh, you're not a fare. Fair enough. Town Hall, I know every gutter.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Town Hall like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twenty years on the rank. Uber took half of it and the tunnel took the rest. George Street is still cash, thank god.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Length of Pitt Street Mall",
+       "accept": "qg-l4-town-hall-054",
+       "denyFlag": "w:qg-l4-town-hall-054"
+      },
+      {
+       "text": "Meat Tray at Pitt Street Mall",
+       "accept": "qg-l4-town-hall-055",
+       "denyFlag": "w:qg-l4-town-hall-055",
+       "needFlag": "w:qg-l4-town-hall-054"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Nour looks it over the way Town Hall looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the length of pitt street mall.",
+       "turnin": "qg-l4-town-hall-054"
+      },
+      {
+       "text": "About meat tray at pitt street mall.",
+       "turnin": "qg-l4-town-hall-055"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never go via George Street after five. Never. I don't care what the app says.",
+     "improv": {
+      "persona": "Nour, cabbie, twenty years in Town Hall, Sydney. Dry, specific, local; never says g'day or crikey; talks about George Street like everyone knows it.",
+      "context": "Someone has asked what Town Hall is like these days. You are standing near George Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-town-hall-ana",
+   "name": "Ana, security guard",
+   "x": -221,
+   "z": 89,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bags open, please. Thanks, bro. Welcome to Town Hall.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Town Hall like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve-hour shifts standing near Pitt Street Mall watching people not steal things. Mostly.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Hyde Park Pub Crawl",
+       "accept": "qg-l4-town-hall-056",
+       "denyFlag": "w:qg-l4-town-hall-056"
+      },
+      {
+       "text": "Proof of Hyde Park",
+       "accept": "qg-l4-town-hall-057",
+       "denyFlag": "w:qg-l4-town-hall-057",
+       "needFlag": "w:qg-l4-town-hall-056"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Ana counts it out without looking up. -- Don't spend it all at Pitt Street Mall.",
+     "choices": [
+      {
+       "text": "About hyde park pub crawl.",
+       "turnin": "qg-l4-town-hall-056"
+      },
+      {
+       "text": "About proof of hyde park.",
+       "turnin": "qg-l4-town-hall-057"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a bench near Pitt Street Mall where the whole shift eats lunch. We've named the pigeons.",
+     "improv": {
+      "persona": "Ana, security guard in Town Hall, Sydney. Dry, specific, local; never says g'day or crikey; talks about Pitt Street Mall like everyone knows it.",
+      "context": "Someone has asked what Town Hall is like these days. You are standing near Pitt Street Mall."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-town-hall-rosa",
+   "name": "Rosa, barista, own cafe",
+   "x": -204,
+   "z": 217,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flat white? Everyone in Town Hall wants a flat white. Give me a sec, the grinder's sulking.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Town Hall like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I own the place. Own it, run it, sweep it. Hyde Park foot traffic pays the rent and the regulars pay for the machine.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's race four, the archibald fountain.",
+     "choices": [
+      {
+       "text": "Race Four, the Archibald Fountain",
+       "accept": "qg-l4-town-hall-058",
+       "denyFlag": "w:qg-l4-town-hall-058"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Rosa counts it out without looking up. -- Don't spend it all at Hyde Park.",
+     "choices": [
+      {
+       "text": "About race four, the archibald fountain.",
+       "turnin": "qg-l4-town-hall-058"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There are eleven cafes on this strip and we all buy beans off the same bloke in Hyde Park. Don't tell anyone.",
+     "improv": {
+      "persona": "Rosa, barista, own cafe in Town Hall, Sydney. Dry, specific, local; never says g'day or crikey; talks about Hyde Park like everyone knows it.",
+      "context": "Someone has asked what Town Hall is like these days. You are standing near Hyde Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Rosa listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-town-hall-fergus-b",
+   "name": "Fergus B., bike courier",
+   "x": 7,
+   "z": 788,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Can't stop -- actually can, the app's crashed. Town Hall, what's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Town Hall like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Deliveries across the city on a bike with one brake. the Archibald Fountain is a fifteen-minute pickup that takes forty.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rbt on martin place.",
+     "choices": [
+      {
+       "text": "RBT on Martin Place",
+       "accept": "qg-l4-town-hall-059",
+       "denyFlag": "w:qg-l4-town-hall-059"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Fergus B. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About rbt on martin place.",
+       "turnin": "qg-l4-town-hall-059"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The lift at the Archibald Fountain takes longer than the ride from Central. I've timed it.",
+     "improv": {
+      "persona": "Fergus B., bike courier in Town Hall, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Archibald Fountain like everyone knows it.",
+      "context": "Someone has asked what Town Hall is like these days. You are standing near the Archibald Fountain."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-town-hall-annabel-b",
+   "name": "Annabel B., corporate, on a break",
+   "x": -275,
+   "z": 535,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I've got eleven minutes. Sorry -- nine. Town Hall, what do you need?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Town Hall like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Consulting. I consult. On what, nobody's sure, including me. Martin Place is where I pretend to have lunch.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Parcel for Circular Quay",
+       "accept": "qg-l4-town-hall-060",
+       "denyFlag": "w:qg-l4-town-hall-060"
+      },
+      {
+       "text": "The the Strand Arcade Tab",
+       "accept": "qg-l4-town-hall-061",
+       "denyFlag": "w:qg-l4-town-hall-061",
+       "needFlag": "w:qg-l4-town-hall-060"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Annabel B. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About parcel for circular quay.",
+       "turnin": "qg-l4-town-hall-060"
+      },
+      {
+       "text": "About the the strand arcade tab.",
+       "turnin": "qg-l4-town-hall-061"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The coffee near Martin Place is eight dollars. I expense it. I'm not proud.",
+     "improv": {
+      "persona": "Annabel B., corporate, on a break in Town Hall, Sydney. Dry, specific, local; never says g'day or crikey; talks about Martin Place like everyone knows it.",
+      "context": "Someone has asked what Town Hall is like these days. You are standing near Martin Place."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-town-hall-cooper",
+   "name": "Cooper, probationary constable",
+   "x": -349,
+   "z": 170,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Town Hall LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Town Hall like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of the Strand Arcade. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rent money, angel place.",
+     "choices": [
+      {
+       "text": "Rent Money, Angel Place",
+       "accept": "qg-l4-town-hall-062",
+       "denyFlag": "w:qg-l4-town-hall-062"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Cooper pays up on the spot.",
+     "choices": [
+      {
+       "text": "About rent money, angel place.",
+       "turnin": "qg-l4-town-hall-062"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about the Strand Arcade. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Cooper, probationary constable in Town Hall, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Strand Arcade like everyone knows it.",
+      "context": "Someone has asked what Town Hall is like these days. You are standing near the Strand Arcade."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-town-hall-shirl-c",
+   "name": "Shirl C., busker, one amp",
+   "x": -254,
+   "z": 332,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hold that thought, the council's coming past. Right. Town Hall, what a crowd.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Town Hall like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I play the same six songs at Angel Place and nobody has ever complained. Nobody has ever paid, either.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The World Square Complaint",
+       "accept": "qg-l4-town-hall-063",
+       "denyFlag": "w:qg-l4-town-hall-063"
+      },
+      {
+       "text": "Cover at World Square",
+       "accept": "qg-l4-town-hall-064",
+       "denyFlag": "w:qg-l4-town-hall-064",
+       "needFlag": "w:qg-l4-town-hall-063"
+      },
+      {
+       "text": "The World Square Camera",
+       "accept": "qg-l4-town-hall-065",
+       "denyFlag": "w:qg-l4-town-hall-065"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Shirl C. looks it over the way Town Hall looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the world square complaint.",
+       "turnin": "qg-l4-town-hall-063"
+      },
+      {
+       "text": "About cover at world square.",
+       "turnin": "qg-l4-town-hall-064"
+      },
+      {
+       "text": "About the world square camera.",
+       "turnin": "qg-l4-town-hall-065"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good pitch is outside Angel Place between four and six. After six it's the bloke with the didgeridoo and a Bluetooth speaker.",
+     "improv": {
+      "persona": "Shirl C., busker, one amp in Town Hall, Sydney. Dry, specific, local; never says g'day or crikey; talks about Angel Place like everyone knows it.",
+      "context": "Someone has asked what Town Hall is like these days. You are standing near Angel Place."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-town-hall-sam",
+   "name": "Sam, cabbie, twenty years",
+   "x": 60,
+   "z": 692,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Where to? Oh, you're not a fare. Fair enough. Town Hall, I know every gutter.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Town Hall like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twenty years on the rank. Uber took half of it and the tunnel took the rest. World Square is still cash, thank god.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's something from the light rail.",
+     "choices": [
+      {
+       "text": "Something From the light rail",
+       "accept": "qg-l4-town-hall-066",
+       "denyFlag": "w:qg-l4-town-hall-066"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Sam looks it over the way Town Hall looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About something from the light rail.",
+       "turnin": "qg-l4-town-hall-066"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never go via World Square after five. Never. I don't care what the app says.",
+     "improv": {
+      "persona": "Sam, cabbie, twenty years in Town Hall, Sydney. Dry, specific, local; never says g'day or crikey; talks about World Square like everyone knows it.",
+      "context": "Someone has asked what Town Hall is like these days. You are standing near World Square."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-town-hall-salote",
+   "name": "Salote, security guard",
+   "x": -586,
+   "z": 880,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bags open, please. Thanks, bro. Welcome to Town Hall.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Town Hall like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve-hour shifts standing near the light rail watching people not steal things. Mostly.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's lads off the qvb.",
+     "choices": [
+      {
+       "text": "Lads Off the QVB",
+       "accept": "qg-l4-town-hall-067",
+       "denyFlag": "w:qg-l4-town-hall-067"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Salote looks it over the way Town Hall looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About lads off the qvb.",
+       "turnin": "qg-l4-town-hall-067"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a bench near the light rail where the whole shift eats lunch. We've named the pigeons.",
+     "improv": {
+      "persona": "Salote, security guard in Town Hall, Sydney. Dry, specific, local; never says g'day or crikey; talks about the light rail like everyone knows it.",
+      "context": "Someone has asked what Town Hall is like these days. You are standing near the light rail."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

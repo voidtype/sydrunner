@@ -1,0 +1,3062 @@
+{
+ "pack": "area-lakemba-1",
+ "npcs": [
+  {
+   "id": "qg-lakemba-mariam",
+   "name": "Mariam, Lebanese bakery owner",
+   "x": -12293,
+   "z": 5976,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Manoush? Zaatar or cheese? Both. Sit. Welcome to Lakemba.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "The oven's been going since 1979 and so has my father. the Lebanese bakeries runs on our bread and doesn't know it.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's tap on at wangee road.",
+     "choices": [
+      {
+       "text": "Tap On at Wangee Road",
+       "accept": "qg-l7-lakemba-001",
+       "denyFlag": "w:qg-l7-lakemba-001"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Mariam counts it out without looking up. -- Don't spend it all at the Lebanese bakeries.",
+     "choices": [
+      {
+       "text": "About tap on at wangee road.",
+       "turnin": "qg-l7-lakemba-001"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Ramadan nights at the Lebanese bakeries you can't move. Come at midnight. Bring cash. Bring an appetite.",
+     "improv": {
+      "persona": "Mariam, Lebanese bakery owner in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Lebanese bakeries like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near the Lebanese bakeries."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Lakemba would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-farhana",
+   "name": "Farhana, grocer",
+   "x": -12348,
+   "z": 6045,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Fresh coriander, best in Lakemba. You didn't come for coriander. Sit.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rice, spices, the fish your mother would know. Wangee Road shops with me on Thursdays, all of it.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The the knafeh stand Sparky",
+       "accept": "qg-l7-lakemba-002",
+       "denyFlag": "w:qg-l7-lakemba-002"
+      },
+      {
+       "text": "Something From the knafeh stand",
+       "accept": "qg-l7-lakemba-003",
+       "denyFlag": "w:qg-l7-lakemba-003",
+       "needFlag": "w:qg-l7-lakemba-002"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Farhana looks it over the way Lakemba looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the knafeh stand sparky.",
+       "turnin": "qg-l7-lakemba-002"
+      },
+      {
+       "text": "About something from the knafeh stand.",
+       "turnin": "qg-l7-lakemba-003"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best biryani in Lakemba is at the place near Wangee Road that doesn't have a sign. Follow the taxis.",
+     "improv": {
+      "persona": "Farhana, grocer in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about Wangee Road like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near Wangee Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-hala",
+   "name": "Hala, baker",
+   "x": -12435,
+   "z": 5621,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flour on everything, sorry. Welcome to Lakemba. Something warm?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Up at three, done by noon, asleep by nine. the knafeh stand eats what I make and I never see them awake.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The the Ramadan night markets Camera",
+       "accept": "qg-l7-lakemba-004",
+       "denyFlag": "w:qg-l7-lakemba-004"
+      },
+      {
+       "text": "Trouble at Haldon Street",
+       "accept": "qg-l7-lakemba-005",
+       "denyFlag": "w:qg-l7-lakemba-005",
+       "needFlag": "w:qg-l7-lakemba-004"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Hala counts it out without looking up. -- Don't spend it all at the knafeh stand.",
+     "choices": [
+      {
+       "text": "About the the ramadan night markets camera.",
+       "turnin": "qg-l7-lakemba-004"
+      },
+      {
+       "text": "About trouble at haldon street.",
+       "turnin": "qg-l7-lakemba-005"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The knafeh at the knafeh stand is my cousin's. Better than mine. Don't tell him.",
+     "improv": {
+      "persona": "Hala, baker in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about the knafeh stand like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near the knafeh stand."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-brett",
+   "name": "Brett, chippy off a job",
+   "x": -12096,
+   "z": 5930,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Lakemba, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Length of the Lakemba Mosque",
+       "accept": "qg-l7-lakemba-006",
+       "denyFlag": "w:qg-l7-lakemba-006"
+      },
+      {
+       "text": "Before They Touch the Ramadan night markets",
+       "accept": "qg-l7-lakemba-007",
+       "denyFlag": "w:qg-l7-lakemba-007",
+       "needFlag": "w:qg-l7-lakemba-006"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Brett counts it out without looking up. -- Don't spend it all at Haldon Street.",
+     "choices": [
+      {
+       "text": "About the length of the lakemba mosque.",
+       "turnin": "qg-l7-lakemba-006"
+      },
+      {
+       "text": "About before they touch the ramadan night markets.",
+       "turnin": "qg-l7-lakemba-007"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Lakemba is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Brett, chippy off a job in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about Haldon Street like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near Haldon Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-georgie",
+   "name": "Georgie, council ranger",
+   "x": -12023,
+   "z": 5622,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Lakemba is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. the Ramadan night markets generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Two Signs, the Lakemba Mosque",
+       "accept": "qg-l7-lakemba-008",
+       "denyFlag": "w:qg-l7-lakemba-008"
+      },
+      {
+       "text": "Closing Time at the Lakemba Mosque",
+       "accept": "qg-l7-lakemba-009",
+       "denyFlag": "w:qg-l7-lakemba-009",
+       "needFlag": "w:qg-l7-lakemba-008"
+      },
+      {
+       "text": "Is Hurstville Any Good",
+       "accept": "qg-l7-lakemba-010",
+       "denyFlag": "w:qg-l7-lakemba-010"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Georgie counts it out without looking up. -- Don't spend it all at the Ramadan night markets.",
+     "choices": [
+      {
+       "text": "About two signs, the lakemba mosque.",
+       "turnin": "qg-l7-lakemba-008"
+      },
+      {
+       "text": "About closing time at the lakemba mosque.",
+       "turnin": "qg-l7-lakemba-009"
+      },
+      {
+       "text": "About is hurstville any good.",
+       "turnin": "qg-l7-lakemba-010"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Georgie, council ranger in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Ramadan night markets like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near the Ramadan night markets."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-2",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Georgie listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-layla",
+   "name": "Layla, mechanic, own shop",
+   "x": -12496,
+   "z": 5489,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "It's the timing belt. I haven't looked. It's always the timing belt. Lakemba, what've you got?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Commodores, Hiluxes, the odd Alfa from a man who should know better. the Lakemba Mosque is where they die.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Left It Near Parry Park",
+       "accept": "qg-l7-lakemba-011",
+       "denyFlag": "w:qg-l7-lakemba-011"
+      },
+      {
+       "text": "Bin Night, Parry Park",
+       "accept": "qg-l7-lakemba-012",
+       "denyFlag": "w:qg-l7-lakemba-012",
+       "needFlag": "w:qg-l7-lakemba-011"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Layla looks it over the way Lakemba looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About left it near parry park.",
+       "turnin": "qg-l7-lakemba-011"
+      },
+      {
+       "text": "About bin night, parry park.",
+       "turnin": "qg-l7-lakemba-012"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never buy a car off the Lakemba Mosque. Never. I've seen where they've been.",
+     "improv": {
+      "persona": "Layla, mechanic, own shop in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Lakemba Mosque like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near the Lakemba Mosque."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Right. And you're sure it was Parry Park? People say Parry Park when they mean the bit next to it. -- Layla writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-tahlia",
+   "name": "Tahlia, uni student, three jobs",
+   "x": -12492,
+   "z": 5996,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Lakemba rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Parry Park is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Probationary at the Lakemba Hotel",
+       "accept": "qg-l7-lakemba-013",
+       "denyFlag": "w:qg-l7-lakemba-013"
+      },
+      {
+       "text": "The the Lakemba Hotel Order",
+       "accept": "qg-l7-lakemba-014",
+       "denyFlag": "w:qg-l7-lakemba-014",
+       "needFlag": "w:qg-l7-lakemba-013"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Tahlia pays up on the spot.",
+     "choices": [
+      {
+       "text": "About probationary at the lakemba hotel.",
+       "turnin": "qg-l7-lakemba-013"
+      },
+      {
+       "text": "About the the lakemba hotel order.",
+       "turnin": "qg-l7-lakemba-014"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Parry Park that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Tahlia, uni student, three jobs in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about Parry Park like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near Parry Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-rima",
+   "name": "Rima, Lebanese bakery owner",
+   "x": -12349,
+   "z": 5502,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Manoush? Zaatar or cheese? Both. Sit. Welcome to Lakemba.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "The oven's been going since 1979 and so has my father. the Lakemba Hotel runs on our bread and doesn't know it.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rent money, railway parade.",
+     "choices": [
+      {
+       "text": "Rent Money, Railway Parade",
+       "accept": "qg-l7-lakemba-015",
+       "denyFlag": "w:qg-l7-lakemba-015"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Rima looks it over the way Lakemba looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About rent money, railway parade.",
+       "turnin": "qg-l7-lakemba-015"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Ramadan nights at the Lakemba Hotel you can't move. Come at midnight. Bring cash. Bring an appetite.",
+     "improv": {
+      "persona": "Rima, Lebanese bakery owner in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Lakemba Hotel like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near the Lakemba Hotel."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-nusrat",
+   "name": "Nusrat, grocer",
+   "x": -11913,
+   "z": 5544,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Fresh coriander, best in Lakemba. You didn't come for coriander. Sit.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rice, spices, the fish your mother would know. Railway Parade shops with me on Thursdays, all of it.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the lebanese bakeries course.",
+     "choices": [
+      {
+       "text": "The the Lebanese bakeries Course",
+       "accept": "qg-l7-lakemba-016",
+       "denyFlag": "w:qg-l7-lakemba-016"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Nusrat pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the lebanese bakeries course.",
+       "turnin": "qg-l7-lakemba-016"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best biryani in Lakemba is at the place near Railway Parade that doesn't have a sign. Follow the taxis.",
+     "improv": {
+      "persona": "Nusrat, grocer in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about Railway Parade like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near Railway Parade."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-zeina",
+   "name": "Zeina, baker",
+   "x": -11846,
+   "z": 5780,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flour on everything, sorry. Welcome to Lakemba. Something warm?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Up at three, done by noon, asleep by nine. the Lebanese bakeries eats what I make and I never see them awake.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's one stop from wangee road.",
+     "choices": [
+      {
+       "text": "One Stop From Wangee Road",
+       "accept": "qg-l7-lakemba-017",
+       "denyFlag": "w:qg-l7-lakemba-017"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Zeina counts it out without looking up. -- Don't spend it all at the Lebanese bakeries.",
+     "choices": [
+      {
+       "text": "About one stop from wangee road.",
+       "turnin": "qg-l7-lakemba-017"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The knafeh at the Lebanese bakeries is my cousin's. Better than mine. Don't tell him.",
+     "improv": {
+      "persona": "Zeina, baker in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Lebanese bakeries like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near the Lebanese bakeries."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-maya",
+   "name": "Maya, mechanic, own shop",
+   "x": -12093,
+   "z": 6147,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "It's the timing belt. I haven't looked. It's always the timing belt. Lakemba, what've you got?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Commodores, Hiluxes, the odd Alfa from a man who should know better. Haldon Street is where they die.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The the Ramadan night markets Tab",
+       "accept": "qg-l7-lakemba-018",
+       "denyFlag": "w:qg-l7-lakemba-018"
+      },
+      {
+       "text": "Counting the Ramadan night markets",
+       "accept": "qg-l7-lakemba-019",
+       "denyFlag": "w:qg-l7-lakemba-019",
+       "needFlag": "w:qg-l7-lakemba-018"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Maya looks it over the way Lakemba looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the ramadan night markets tab.",
+       "turnin": "qg-l7-lakemba-018"
+      },
+      {
+       "text": "About counting the ramadan night markets.",
+       "turnin": "qg-l7-lakemba-019"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never buy a car off Haldon Street. Never. I've seen where they've been.",
+     "improv": {
+      "persona": "Maya, mechanic, own shop in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about Haldon Street like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near Haldon Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-dean",
+   "name": "Dean, uni student, three jobs",
+   "x": -12234,
+   "z": 5670,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Lakemba rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the Ramadan night markets is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "RBT on the Lakemba Mosque",
+       "accept": "qg-l7-lakemba-020",
+       "denyFlag": "w:qg-l7-lakemba-020"
+      },
+      {
+       "text": "A Flat White From the Lakemba Mosque",
+       "accept": "qg-l7-lakemba-021",
+       "denyFlag": "w:qg-l7-lakemba-021",
+       "needFlag": "w:qg-l7-lakemba-020"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Dean pays up on the spot.",
+     "choices": [
+      {
+       "text": "About rbt on the lakemba mosque.",
+       "turnin": "qg-l7-lakemba-020"
+      },
+      {
+       "text": "About a flat white from the lakemba mosque.",
+       "turnin": "qg-l7-lakemba-021"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the Ramadan night markets that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Dean, uni student, three jobs in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Ramadan night markets like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near the Ramadan night markets."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-sam",
+   "name": "Sam, Lebanese bakery owner",
+   "x": -12122,
+   "z": 5805,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Manoush? Zaatar or cheese? Both. Sit. Welcome to Lakemba.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "The oven's been going since 1979 and so has my father. the Lakemba Mosque runs on our bread and doesn't know it.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Lads Off Parry Park",
+       "accept": "qg-l7-lakemba-022",
+       "denyFlag": "w:qg-l7-lakemba-022"
+      },
+      {
+       "text": "Two From Parry Park",
+       "accept": "qg-l7-lakemba-023",
+       "denyFlag": "w:qg-l7-lakemba-023",
+       "needFlag": "w:qg-l7-lakemba-022"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Sam counts it out without looking up. -- Don't spend it all at the Lakemba Mosque.",
+     "choices": [
+      {
+       "text": "About lads off parry park.",
+       "turnin": "qg-l7-lakemba-022"
+      },
+      {
+       "text": "About two from parry park.",
+       "turnin": "qg-l7-lakemba-023"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Ramadan nights at the Lakemba Mosque you can't move. Come at midnight. Bring cash. Bring an appetite.",
+     "improv": {
+      "persona": "Sam, Lebanese bakery owner in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Lakemba Mosque like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near the Lakemba Mosque."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-sajid",
+   "name": "Sajid, grocer",
+   "x": -12024,
+   "z": 5954,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Fresh coriander, best in Lakemba. You didn't come for coriander. Sit.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rice, spices, the fish your mother would know. Parry Park shops with me on Thursdays, all of it.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's proof of the lakemba hotel.",
+     "choices": [
+      {
+       "text": "Proof of the Lakemba Hotel",
+       "accept": "qg-l7-lakemba-024",
+       "denyFlag": "w:qg-l7-lakemba-024"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Sajid looks it over the way Lakemba looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About proof of the lakemba hotel.",
+       "turnin": "qg-l7-lakemba-024"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best biryani in Lakemba is at the place near Parry Park that doesn't have a sign. Follow the taxis.",
+     "improv": {
+      "persona": "Sajid, grocer in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about Parry Park like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near Parry Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-rania",
+   "name": "Rania, baker",
+   "x": -12439,
+   "z": 5976,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flour on everything, sorry. Welcome to Lakemba. Something warm?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Up at three, done by noon, asleep by nine. the Lakemba Hotel eats what I make and I never see them awake.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's seven a.m. at railway parade.",
+     "choices": [
+      {
+       "text": "Seven a.m. At Railway Parade",
+       "accept": "qg-l7-lakemba-025",
+       "denyFlag": "w:qg-l7-lakemba-025"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Rania pays up on the spot.",
+     "choices": [
+      {
+       "text": "About seven a.m. at railway parade.",
+       "turnin": "qg-l7-lakemba-025"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The knafeh at the Lakemba Hotel is my cousin's. Better than mine. Don't tell him.",
+     "improv": {
+      "persona": "Rania, baker in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Lakemba Hotel like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near the Lakemba Hotel."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-toby",
+   "name": "Toby, chippy off a job",
+   "x": -12180,
+   "z": 6237,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Lakemba, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's something from the lebanese bakeries.",
+     "choices": [
+      {
+       "text": "Something From the Lebanese bakeries",
+       "accept": "qg-l7-lakemba-026",
+       "denyFlag": "w:qg-l7-lakemba-026"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Toby pays up on the spot.",
+     "choices": [
+      {
+       "text": "About something from the lebanese bakeries.",
+       "turnin": "qg-l7-lakemba-026"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Lakemba is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Toby, chippy off a job in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about Railway Parade like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near Railway Parade."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-beryl",
+   "name": "Beryl, council ranger",
+   "x": -12299,
+   "z": 6260,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Lakemba is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. the Lebanese bakeries generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The the knafeh stand Camera",
+       "accept": "qg-l7-lakemba-027",
+       "denyFlag": "w:qg-l7-lakemba-027"
+      },
+      {
+       "text": "Trouble at Wangee Road",
+       "accept": "qg-l7-lakemba-028",
+       "denyFlag": "w:qg-l7-lakemba-028",
+       "needFlag": "w:qg-l7-lakemba-027"
+      },
+      {
+       "text": "The Length of the knafeh stand",
+       "accept": "qg-l7-lakemba-029",
+       "denyFlag": "w:qg-l7-lakemba-029"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Beryl counts it out without looking up. -- Don't spend it all at the Lebanese bakeries.",
+     "choices": [
+      {
+       "text": "About the the knafeh stand camera.",
+       "turnin": "qg-l7-lakemba-027"
+      },
+      {
+       "text": "About trouble at wangee road.",
+       "turnin": "qg-l7-lakemba-028"
+      },
+      {
+       "text": "About the length of the knafeh stand.",
+       "turnin": "qg-l7-lakemba-029"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Beryl, council ranger in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Lebanese bakeries like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near the Lebanese bakeries."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-nour",
+   "name": "Nour, mechanic, own shop",
+   "x": -11822,
+   "z": 6226,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "It's the timing belt. I haven't looked. It's always the timing belt. Lakemba, what've you got?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Commodores, Hiluxes, the odd Alfa from a man who should know better. Wangee Road is where they die.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch the knafeh stand.",
+     "choices": [
+      {
+       "text": "Before They Touch the knafeh stand",
+       "accept": "qg-l7-lakemba-030",
+       "denyFlag": "w:qg-l7-lakemba-030"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Nour pays up on the spot.",
+     "choices": [
+      {
+       "text": "About before they touch the knafeh stand.",
+       "turnin": "qg-l7-lakemba-030"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never buy a car off Wangee Road. Never. I've seen where they've been.",
+     "improv": {
+      "persona": "Nour, mechanic, own shop in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about Wangee Road like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near Wangee Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-daz",
+   "name": "Daz, uni student, three jobs",
+   "x": -11827,
+   "z": 5724,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Lakemba rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the knafeh stand is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Closing Time at Haldon Street",
+       "accept": "qg-l7-lakemba-031",
+       "denyFlag": "w:qg-l7-lakemba-031"
+      },
+      {
+       "text": "Left It Near Haldon Street",
+       "accept": "qg-l7-lakemba-032",
+       "denyFlag": "w:qg-l7-lakemba-032",
+       "needFlag": "w:qg-l7-lakemba-031"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Daz looks it over the way Lakemba looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About closing time at haldon street.",
+       "turnin": "qg-l7-lakemba-031"
+      },
+      {
+       "text": "About left it near haldon street.",
+       "turnin": "qg-l7-lakemba-032"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the knafeh stand that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Daz, uni student, three jobs in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about the knafeh stand like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near the knafeh stand."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Daz listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-fadi",
+   "name": "Fadi, Lebanese bakery owner",
+   "x": -12523,
+   "z": 5810,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Manoush? Zaatar or cheese? Both. Sit. Welcome to Lakemba.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "The oven's been going since 1979 and so has my father. Haldon Street runs on our bread and doesn't know it.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's bin night, the ramadan night markets.",
+     "choices": [
+      {
+       "text": "Bin Night, the Ramadan night markets",
+       "accept": "qg-l7-lakemba-033",
+       "denyFlag": "w:qg-l7-lakemba-033"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Fadi counts it out without looking up. -- Don't spend it all at Haldon Street.",
+     "choices": [
+      {
+       "text": "About bin night, the ramadan night markets.",
+       "turnin": "qg-l7-lakemba-033"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Ramadan nights at Haldon Street you can't move. Come at midnight. Bring cash. Bring an appetite.",
+     "improv": {
+      "persona": "Fadi, Lebanese bakery owner in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about Haldon Street like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near Haldon Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-rafi",
+   "name": "Rafi, grocer",
+   "x": -12259,
+   "z": 6025,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Fresh coriander, best in Lakemba. You didn't come for coriander. Sit.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rice, spices, the fish your mother would know. the Ramadan night markets shops with me on Thursdays, all of it.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Probationary at the Lakemba Mosque",
+       "accept": "qg-l7-lakemba-034",
+       "denyFlag": "w:qg-l7-lakemba-034"
+      },
+      {
+       "text": "Parcel for Hurstville",
+       "accept": "qg-l7-lakemba-035",
+       "denyFlag": "w:qg-l7-lakemba-035",
+       "needFlag": "w:qg-l7-lakemba-034"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Rafi looks it over the way Lakemba looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About probationary at the lakemba mosque.",
+       "turnin": "qg-l7-lakemba-034"
+      },
+      {
+       "text": "About parcel for hurstville.",
+       "turnin": "qg-l7-lakemba-035"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best biryani in Lakemba is at the place near the Ramadan night markets that doesn't have a sign. Follow the taxis.",
+     "improv": {
+      "persona": "Rafi, grocer in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Ramadan night markets like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near the Ramadan night markets."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-barry",
+   "name": "Barry, chippy off a job",
+   "x": -12398,
+   "z": 5886,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Lakemba, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The the Lakemba Hotel Lift",
+       "accept": "qg-l7-lakemba-036",
+       "denyFlag": "w:qg-l7-lakemba-036"
+      },
+      {
+       "text": "Rent Money, the Lakemba Hotel",
+       "accept": "qg-l7-lakemba-037",
+       "denyFlag": "w:qg-l7-lakemba-037",
+       "needFlag": "w:qg-l7-lakemba-036"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Barry pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the lakemba hotel lift.",
+       "turnin": "qg-l7-lakemba-036"
+      },
+      {
+       "text": "About rent money, the lakemba hotel.",
+       "turnin": "qg-l7-lakemba-037"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Lakemba is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Barry, chippy off a job in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about Parry Park like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near Parry Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Lakemba would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-karen",
+   "name": "Karen, council ranger",
+   "x": -12178,
+   "z": 5846,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Lakemba is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. the Lakemba Hotel generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Race Four, Railway Parade",
+       "accept": "qg-l7-lakemba-038",
+       "denyFlag": "w:qg-l7-lakemba-038"
+      },
+      {
+       "text": "The Railway Parade Course",
+       "accept": "qg-l7-lakemba-039",
+       "denyFlag": "w:qg-l7-lakemba-039",
+       "needFlag": "w:qg-l7-lakemba-038"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Karen pays up on the spot.",
+     "choices": [
+      {
+       "text": "About race four, railway parade.",
+       "turnin": "qg-l7-lakemba-038"
+      },
+      {
+       "text": "About the railway parade course.",
+       "turnin": "qg-l7-lakemba-039"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Karen, council ranger in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Lakemba Hotel like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near the Lakemba Hotel."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Lakemba would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-tony",
+   "name": "Tony, mechanic, own shop",
+   "x": -12599,
+   "z": 5784,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "It's the timing belt. I haven't looked. It's always the timing belt. Lakemba, what've you got?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Commodores, Hiluxes, the odd Alfa from a man who should know better. Railway Parade is where they die.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trolley run, the lebanese bakeries.",
+     "choices": [
+      {
+       "text": "Trolley Run, the Lebanese bakeries",
+       "accept": "qg-l7-lakemba-040",
+       "denyFlag": "w:qg-l7-lakemba-040"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Tony counts it out without looking up. -- Don't spend it all at Railway Parade.",
+     "choices": [
+      {
+       "text": "About trolley run, the lebanese bakeries.",
+       "turnin": "qg-l7-lakemba-040"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never buy a car off Railway Parade. Never. I've seen where they've been.",
+     "improv": {
+      "persona": "Tony, mechanic, own shop in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about Railway Parade like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near Railway Parade."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-eddie",
+   "name": "Eddie, uni student, three jobs",
+   "x": -11923,
+   "z": 5805,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Lakemba rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the Lebanese bakeries is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Meat Tray at the knafeh stand",
+       "accept": "qg-l7-lakemba-041",
+       "denyFlag": "w:qg-l7-lakemba-041"
+      },
+      {
+       "text": "The Wangee Road Complaint",
+       "accept": "qg-l7-lakemba-042",
+       "denyFlag": "w:qg-l7-lakemba-042",
+       "needFlag": "w:qg-l7-lakemba-041"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Eddie looks it over the way Lakemba looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About meat tray at the knafeh stand.",
+       "turnin": "qg-l7-lakemba-041"
+      },
+      {
+       "text": "About the wangee road complaint.",
+       "turnin": "qg-l7-lakemba-042"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the Lebanese bakeries that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Eddie, uni student, three jobs in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Lebanese bakeries like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near the Lebanese bakeries."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-bassam",
+   "name": "Bassam, Lebanese bakery owner",
+   "x": -12477,
+   "z": 6336,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Manoush? Zaatar or cheese? Both. Sit. Welcome to Lakemba.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "The oven's been going since 1979 and so has my father. Wangee Road runs on our bread and doesn't know it.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Cover at Haldon Street",
+       "accept": "qg-l7-lakemba-043",
+       "denyFlag": "w:qg-l7-lakemba-043"
+      },
+      {
+       "text": "The knafeh stand Pub Crawl",
+       "accept": "qg-l7-lakemba-044",
+       "denyFlag": "w:qg-l7-lakemba-044",
+       "needFlag": "w:qg-l7-lakemba-043"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Bassam pays up on the spot.",
+     "choices": [
+      {
+       "text": "About cover at haldon street.",
+       "turnin": "qg-l7-lakemba-043"
+      },
+      {
+       "text": "About the knafeh stand pub crawl.",
+       "turnin": "qg-l7-lakemba-044"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Ramadan nights at Wangee Road you can't move. Come at midnight. Bring cash. Bring an appetite.",
+     "improv": {
+      "persona": "Bassam, Lebanese bakery owner in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about Wangee Road like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near Wangee Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-imran",
+   "name": "Imran, grocer",
+   "x": -12250,
+   "z": 5834,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Fresh coriander, best in Lakemba. You didn't come for coriander. Sit.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rice, spices, the fish your mother would know. the knafeh stand shops with me on Thursdays, all of it.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Haldon Street Tab",
+       "accept": "qg-l7-lakemba-045",
+       "denyFlag": "w:qg-l7-lakemba-045"
+      },
+      {
+       "text": "Counting Haldon Street",
+       "accept": "qg-l7-lakemba-046",
+       "denyFlag": "w:qg-l7-lakemba-046",
+       "needFlag": "w:qg-l7-lakemba-045"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Imran counts it out without looking up. -- Don't spend it all at the knafeh stand.",
+     "choices": [
+      {
+       "text": "About the haldon street tab.",
+       "turnin": "qg-l7-lakemba-045"
+      },
+      {
+       "text": "About counting haldon street.",
+       "turnin": "qg-l7-lakemba-046"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best biryani in Lakemba is at the place near the knafeh stand that doesn't have a sign. Follow the taxis.",
+     "improv": {
+      "persona": "Imran, grocer in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about the knafeh stand like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near the knafeh stand."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-sienna",
+   "name": "Sienna, chippy off a job",
+   "x": -12638,
+   "z": 6122,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Lakemba, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "A Flat White From Parry Park",
+       "accept": "qg-l7-lakemba-047",
+       "denyFlag": "w:qg-l7-lakemba-047"
+      },
+      {
+       "text": "Lads Off the Lakemba Mosque",
+       "accept": "qg-l7-lakemba-048",
+       "denyFlag": "w:qg-l7-lakemba-048",
+       "needFlag": "w:qg-l7-lakemba-047"
+      },
+      {
+       "text": "Two From the Lakemba Mosque",
+       "accept": "qg-l7-lakemba-049",
+       "denyFlag": "w:qg-l7-lakemba-049"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Sienna looks it over the way Lakemba looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About a flat white from parry park.",
+       "turnin": "qg-l7-lakemba-047"
+      },
+      {
+       "text": "About lads off the lakemba mosque.",
+       "turnin": "qg-l7-lakemba-048"
+      },
+      {
+       "text": "About two from the lakemba mosque.",
+       "turnin": "qg-l7-lakemba-049"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Lakemba is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Sienna, chippy off a job in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Ramadan night markets like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near the Ramadan night markets."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-george",
+   "name": "George, mechanic, own shop",
+   "x": -12210,
+   "z": 5972,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "It's the timing belt. I haven't looked. It's always the timing belt. Lakemba, what've you got?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Commodores, Hiluxes, the odd Alfa from a man who should know better. Parry Park is where they die.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's seven a.m. at the lakemba hotel.",
+     "choices": [
+      {
+       "text": "Seven a.m. At the Lakemba Hotel",
+       "accept": "qg-l7-lakemba-050",
+       "denyFlag": "w:qg-l7-lakemba-050"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- George counts it out without looking up. -- Don't spend it all at Parry Park.",
+     "choices": [
+      {
+       "text": "About seven a.m. at the lakemba hotel.",
+       "turnin": "qg-l7-lakemba-050"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never buy a car off Parry Park. Never. I've seen where they've been.",
+     "improv": {
+      "persona": "George, mechanic, own shop in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about Parry Park like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near Parry Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-lakemba-sharon",
+   "name": "Sharon, uni student, three jobs",
+   "x": -12469,
+   "z": 5611,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Lakemba rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Lakemba like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the Lakemba Hotel is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's something from railway parade.",
+     "choices": [
+      {
+       "text": "Something From Railway Parade",
+       "accept": "qg-l7-lakemba-051",
+       "denyFlag": "w:qg-l7-lakemba-051"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Sharon looks it over the way Lakemba looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About something from railway parade.",
+       "turnin": "qg-l7-lakemba-051"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the Lakemba Hotel that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Sharon, uni student, three jobs in Lakemba, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Lakemba Hotel like everyone knows it.",
+      "context": "Someone has asked what Lakemba is like these days. You are standing near the Lakemba Hotel."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,1314 @@
+{
+ "pack": "area-bankstown-2",
+ "npcs": [
+  {
+   "id": "qg-bankstown-sam",
+   "name": "Sam, mechanic, own shop",
+   "x": -16403,
+   "z": 6047,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "It's the timing belt. I haven't looked. It's always the timing belt. Bankstown, what've you got?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bankstown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Commodores, Hiluxes, the odd Alfa from a man who should know better. the Bankstown Bulldogs is where they die.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's sightline at the bankstown pho strip.",
+     "choices": [
+      {
+       "text": "Sightline at the Bankstown pho strip",
+       "accept": "qg-l7-bankstown-050",
+       "denyFlag": "w:qg-l7-bankstown-050"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Sam pays up on the spot.",
+     "choices": [
+      {
+       "text": "About sightline at the bankstown pho strip.",
+       "turnin": "qg-l7-bankstown-050"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never buy a car off the Bankstown Bulldogs. Never. I've seen where they've been.",
+     "improv": {
+      "persona": "Sam, mechanic, own shop in Bankstown, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Bankstown Bulldogs like everyone knows it.",
+      "context": "Someone has asked what Bankstown is like these days. You are standing near the Bankstown Bulldogs."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Sam listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-bankstown-kim",
+   "name": "Kim, pho shop owner",
+   "x": -15841,
+   "z": 5402,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sit, sit. Small or large? It's the same price for you, you look hungry. Welcome to Bankstown.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bankstown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "My mother's recipe, my landlord's rent. the Bankstown pho strip is a hundred metres of pho and every bowl is a family argument.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Meat Tray at Restwell Street",
+       "accept": "qg-l7-bankstown-051",
+       "denyFlag": "w:qg-l7-bankstown-051"
+      },
+      {
+       "text": "The Restwell Street Float",
+       "accept": "qg-l7-bankstown-052",
+       "denyFlag": "w:qg-l7-bankstown-052",
+       "needFlag": "w:qg-l7-bankstown-051"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Kim counts it out without looking up. -- Don't spend it all at the Bankstown pho strip.",
+     "choices": [
+      {
+       "text": "About meat tray at restwell street.",
+       "turnin": "qg-l7-bankstown-051"
+      },
+      {
+       "text": "About the restwell street float.",
+       "turnin": "qg-l7-bankstown-052"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Eat at the place with the queue of nurses. Nurses know. the Bankstown pho strip, past the pharmacy.",
+     "improv": {
+      "persona": "Kim, pho shop owner in Bankstown, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Bankstown pho strip like everyone knows it.",
+      "context": "Someone has asked what Bankstown is like these days. You are standing near the Bankstown pho strip."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Kim listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-bankstown-rania",
+   "name": "Rania, Lebanese bakery owner",
+   "x": -16046,
+   "z": 6244,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Manoush? Zaatar or cheese? Both. Sit. Welcome to Bankstown.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bankstown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "The oven's been going since 1979 and so has my father. Restwell Street runs on our bread and doesn't know it.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Cover at Jacobs Street",
+       "accept": "qg-l7-bankstown-053",
+       "denyFlag": "w:qg-l7-bankstown-053"
+      },
+      {
+       "text": "Counting Jacobs Street",
+       "accept": "qg-l7-bankstown-054",
+       "denyFlag": "w:qg-l7-bankstown-054",
+       "needFlag": "w:qg-l7-bankstown-053"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Rania looks it over the way Bankstown looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About cover at jacobs street.",
+       "turnin": "qg-l7-bankstown-053"
+      },
+      {
+       "text": "About counting jacobs street.",
+       "turnin": "qg-l7-bankstown-054"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Ramadan nights at Restwell Street you can't move. Come at midnight. Bring cash. Bring an appetite.",
+     "improv": {
+      "persona": "Rania, Lebanese bakery owner in Bankstown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Restwell Street like everyone knows it.",
+      "context": "Someone has asked what Bankstown is like these days. You are standing near Restwell Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-bankstown-nour",
+   "name": "Nour, Bulldogs supporter",
+   "x": -15686,
+   "z": 5849,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Blue and white, habibi. Blue and white. Bankstown, you here for the game?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bankstown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Every home game since I was six. My dad, my uncles, the whole family in the Belmore stand at Jacobs Street.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the bankstown arts centre lift.",
+     "choices": [
+      {
+       "text": "The the Bankstown Arts Centre Lift",
+       "accept": "qg-l7-bankstown-055",
+       "denyFlag": "w:qg-l7-bankstown-055"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Nour pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the bankstown arts centre lift.",
+       "turnin": "qg-l7-bankstown-055"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best kebab in Bankstown is next to the worst car park in Sydney. Jacobs Street. Both are famous.",
+     "improv": {
+      "persona": "Nour, Bulldogs supporter in Bankstown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Jacobs Street like everyone knows it.",
+      "context": "Someone has asked what Bankstown is like these days. You are standing near Jacobs Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Right. And you're sure it was the Bankstown Arts Centre? People say the Bankstown Arts Centre when they mean the bit next to it. -- Nour writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-bankstown-angus",
+   "name": "Angus, chippy off a job",
+   "x": -15899,
+   "z": 5555,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Bankstown, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bankstown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's something from bankstown central.",
+     "choices": [
+      {
+       "text": "Something From Bankstown Central",
+       "accept": "qg-l7-bankstown-056",
+       "denyFlag": "w:qg-l7-bankstown-056"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Angus counts it out without looking up. -- Don't spend it all at the Bankstown Arts Centre.",
+     "choices": [
+      {
+       "text": "About something from bankstown central.",
+       "turnin": "qg-l7-bankstown-056"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Bankstown is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Angus, chippy off a job in Bankstown, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Bankstown Arts Centre like everyone knows it.",
+      "context": "Someone has asked what Bankstown is like these days. You are standing near the Bankstown Arts Centre."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-bankstown-barry",
+   "name": "Barry, RSL sub-branch secretary",
+   "x": -16041,
+   "z": 6055,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sign in, love. Everyone signs in. Bankstown RSL, you're very welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bankstown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Raffles, Anzac Day, the bistro's schnitzel and a room full of pokies I have opinions about. Bankstown Central sends us its regulars.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's lads off the bankstown sports club.",
+     "choices": [
+      {
+       "text": "Lads Off the Bankstown Sports Club",
+       "accept": "qg-l7-bankstown-057",
+       "denyFlag": "w:qg-l7-bankstown-057"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Barry looks it over the way Bankstown looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About lads off the bankstown sports club.",
+       "turnin": "qg-l7-bankstown-057"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The cheapest schooner in Bankstown is at the sub-branch, six o'clock, before the Ode. Stand up for the Ode.",
+     "improv": {
+      "persona": "Barry, RSL sub-branch secretary in Bankstown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Bankstown Central like everyone knows it.",
+      "context": "Someone has asked what Bankstown is like these days. You are standing near Bankstown Central."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-bankstown-neville",
+   "name": "Neville, council ranger",
+   "x": -16487,
+   "z": 5767,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Bankstown is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bankstown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. the Bankstown Sports Club generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the paul keating park sparky.",
+     "choices": [
+      {
+       "text": "The Paul Keating Park Sparky",
+       "accept": "qg-l7-bankstown-058",
+       "denyFlag": "w:qg-l7-bankstown-058"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Neville counts it out without looking up. -- Don't spend it all at the Bankstown Sports Club.",
+     "choices": [
+      {
+       "text": "About the paul keating park sparky.",
+       "turnin": "qg-l7-bankstown-058"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Neville, council ranger in Bankstown, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Bankstown Sports Club like everyone knows it.",
+      "context": "Someone has asked what Bankstown is like these days. You are standing near the Bankstown Sports Club."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-bankstown-layla",
+   "name": "Layla, mechanic, own shop",
+   "x": -16229,
+   "z": 6055,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "It's the timing belt. I haven't looked. It's always the timing belt. Bankstown, what've you got?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bankstown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Commodores, Hiluxes, the odd Alfa from a man who should know better. Paul Keating Park is where they die.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rbt on chapel road.",
+     "choices": [
+      {
+       "text": "RBT on Chapel Road",
+       "accept": "qg-l7-bankstown-059",
+       "denyFlag": "w:qg-l7-bankstown-059"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Layla counts it out without looking up. -- Don't spend it all at Paul Keating Park.",
+     "choices": [
+      {
+       "text": "About rbt on chapel road.",
+       "turnin": "qg-l7-bankstown-059"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never buy a car off Paul Keating Park. Never. I've seen where they've been.",
+     "improv": {
+      "persona": "Layla, mechanic, own shop in Bankstown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Paul Keating Park like everyone knows it.",
+      "context": "Someone has asked what Bankstown is like these days. You are standing near Paul Keating Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-bankstown-linh",
+   "name": "Linh, pho shop owner",
+   "x": -16066,
+   "z": 5579,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sit, sit. Small or large? It's the same price for you, you look hungry. Welcome to Bankstown.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bankstown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "My mother's recipe, my landlord's rent. Chapel Road is a hundred metres of pho and every bowl is a family argument.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Parcel for Lakemba",
+       "accept": "qg-l7-bankstown-060",
+       "denyFlag": "w:qg-l7-bankstown-060"
+      },
+      {
+       "text": "Race Four, Old Town Plaza",
+       "accept": "qg-l7-bankstown-061",
+       "denyFlag": "w:qg-l7-bankstown-061",
+       "needFlag": "w:qg-l7-bankstown-060"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Linh pays up on the spot.",
+     "choices": [
+      {
+       "text": "About parcel for lakemba.",
+       "turnin": "qg-l7-bankstown-060"
+      },
+      {
+       "text": "About race four, old town plaza.",
+       "turnin": "qg-l7-bankstown-061"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Eat at the place with the queue of nurses. Nurses know. Chapel Road, past the pharmacy.",
+     "improv": {
+      "persona": "Linh, pho shop owner in Bankstown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Chapel Road like everyone knows it.",
+      "context": "Someone has asked what Bankstown is like these days. You are standing near Chapel Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Bankstown would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-bankstown-zeina",
+   "name": "Zeina, Lebanese bakery owner",
+   "x": -15666,
+   "z": 5946,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Manoush? Zaatar or cheese? Both. Sit. Welcome to Bankstown.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bankstown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "The oven's been going since 1979 and so has my father. Old Town Plaza runs on our bread and doesn't know it.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Closing Time at the Bankstown Bulldogs",
+       "accept": "qg-l7-bankstown-062",
+       "denyFlag": "w:qg-l7-bankstown-062"
+      },
+      {
+       "text": "One Stop From the Bankstown Bulldogs",
+       "accept": "qg-l7-bankstown-063",
+       "denyFlag": "w:qg-l7-bankstown-063",
+       "needFlag": "w:qg-l7-bankstown-062"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Zeina pays up on the spot.",
+     "choices": [
+      {
+       "text": "About closing time at the bankstown bulldogs.",
+       "turnin": "qg-l7-bankstown-062"
+      },
+      {
+       "text": "About one stop from the bankstown bulldogs.",
+       "turnin": "qg-l7-bankstown-063"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Ramadan nights at Old Town Plaza you can't move. Come at midnight. Bring cash. Bring an appetite.",
+     "improv": {
+      "persona": "Zeina, Lebanese bakery owner in Bankstown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Old Town Plaza like everyone knows it.",
+      "context": "Someone has asked what Bankstown is like these days. You are standing near Old Town Plaza."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-bankstown-dina",
+   "name": "Dina, Bulldogs supporter",
+   "x": -16488,
+   "z": 5651,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Blue and white, habibi. Blue and white. Bankstown, you here for the game?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bankstown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Every home game since I was six. My dad, my uncles, the whole family in the Belmore stand at the Bankstown Bulldogs.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the bankstown pho strip fence.",
+     "choices": [
+      {
+       "text": "The the Bankstown pho strip Fence",
+       "accept": "qg-l7-bankstown-064",
+       "denyFlag": "w:qg-l7-bankstown-064"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Dina looks it over the way Bankstown looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the bankstown pho strip fence.",
+       "turnin": "qg-l7-bankstown-064"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best kebab in Bankstown is next to the worst car park in Sydney. the Bankstown Bulldogs. Both are famous.",
+     "improv": {
+      "persona": "Dina, Bulldogs supporter in Bankstown, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Bankstown Bulldogs like everyone knows it.",
+      "context": "Someone has asked what Bankstown is like these days. You are standing near the Bankstown Bulldogs."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Bankstown would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-bankstown-mitch",
+   "name": "Mitch, chippy off a job",
+   "x": -15829,
+   "z": 5902,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Bankstown, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bankstown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the length of restwell street.",
+     "choices": [
+      {
+       "text": "The Length of Restwell Street",
+       "accept": "qg-l7-bankstown-065",
+       "denyFlag": "w:qg-l7-bankstown-065"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Mitch looks it over the way Bankstown looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the length of restwell street.",
+       "turnin": "qg-l7-bankstown-065"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Bankstown is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Mitch, chippy off a job in Bankstown, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Bankstown pho strip like everyone knows it.",
+      "context": "Someone has asked what Bankstown is like these days. You are standing near the Bankstown pho strip."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-bankstown-colin",
+   "name": "Colin, council ranger",
+   "x": -15756,
+   "z": 5800,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Bankstown is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bankstown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Jacobs Street generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Rent Money, Bankstown Central",
+       "accept": "qg-l7-bankstown-066",
+       "denyFlag": "w:qg-l7-bankstown-066"
+      },
+      {
+       "text": "Two From the Bankstown Arts Centre",
+       "accept": "qg-l7-bankstown-067",
+       "denyFlag": "w:qg-l7-bankstown-067",
+       "needFlag": "w:qg-l7-bankstown-066"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Colin pays up on the spot.",
+     "choices": [
+      {
+       "text": "About rent money, bankstown central.",
+       "turnin": "qg-l7-bankstown-066"
+      },
+      {
+       "text": "About two from the bankstown arts centre.",
+       "turnin": "qg-l7-bankstown-067"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Colin, council ranger in Bankstown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Jacobs Street like everyone knows it.",
+      "context": "Someone has asked what Bankstown is like these days. You are standing near Jacobs Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

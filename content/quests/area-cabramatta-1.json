@@ -1,0 +1,1508 @@
+{
+ "pack": "area-cabramatta-1",
+ "quests": [
+  {
+   "id": "qg-l9-cabramatta-001",
+   "act": 3,
+   "title": "Tap On at John Street",
+   "blurb": "Not being dramatic about this. My Opal says I owe nineteen dollars for a trip from Cabramatta I never took on Thursday. Nobody else seems to have noticed, which is its own problem. Take the same one to Liverpool and tell me what it charged you. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qg-cabramatta-linh",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Cabramatta",
+     "to": "Liverpool",
+     "label": "tap on at Cabramatta, tap off at Liverpool"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-cabramatta-linh",
+     "node": "report-1",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 173,
+    "xp": 514,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-002",
+   "act": 3,
+   "title": "The the Freedom Gate Lift",
+   "blurb": "This is going to sound small. The lift at Cabramatta station has been out since the Easter Show and I'm told Liverpool is worse. You will see what I mean the second you get there. Check both the long weekend and tell me which takes a pram. Whatever you find, bring it to me first.",
+   "giver": "qg-cabramatta-vanna",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -25004,
+     "z": 3393,
+     "radius": 30,
+     "label": "check the lift at Cabramatta station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Cabramatta",
+     "to": "Liverpool",
+     "label": "then ride to Liverpool and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-cabramatta-vanna",
+     "node": "report-0",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 173,
+    "xp": 495,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-003",
+   "act": 3,
+   "title": "Staffy Near the Freedom Gate",
+   "blurb": "I would do it myself if I could leave the counter. A brindle staffy in a red bandana went over the fence at the Freedom Gate at nine sharp. I would not ask if there was anyone else about. Everyone in Cabramatta has definitely seen it and can't say where. Take your time. Do not take a week.",
+   "giver": "qg-cabramatta-vanna",
+   "level": 9,
+   "requires": [
+    "qg-l9-cabramatta-002"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -24995,
+     "z": 3369,
+     "radius": 30,
+     "label": "check the off-leash bit near the Freedom Gate"
+    },
+    {
+     "kind": "photo",
+     "x": -24817,
+     "z": 3281,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-cabramatta-vanna",
+     "node": "report-1",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 242,
+    "xp": 636,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-004",
+   "act": 3,
+   "title": "Is Liverpool Any Good",
+   "blurb": "It has been three weeks. The agent says I should move to Liverpool and I haven't been since the nineties. I am aware how that sounds. Ride over Thursday, photograph the station front, tell me honestly. That's the whole job. No catch.",
+   "giver": "qg-cabramatta-vanna",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Cabramatta",
+     "to": "Liverpool",
+     "label": "take the train to Liverpool"
+    },
+    {
+     "kind": "photo",
+     "x": -25924,
+     "z": 6714,
+     "radius": 40,
+     "label": "photograph the station front"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-cabramatta-vanna",
+     "node": "report-2",
+     "label": "tell me if it's worth the move"
+    }
+   ],
+   "reward": {
+    "cash": 179,
+    "xp": 525,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-005",
+   "act": 3,
+   "title": "Before They Touch the pho strip",
+   "blurb": "You look like you have twenty minutes. They start on the pho strip on Sunday and the orange fencing goes up. There is a version of this where I am the unreasonable one. I want Cabramatta on record before it does. You'll know it when you see it.",
+   "giver": "qg-cabramatta-tony",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -24892,
+     "z": 3774,
+     "radius": 40,
+     "label": "photograph the state of the pho strip"
+    },
+    {
+     "kind": "goto",
+     "x": -25262,
+     "z": 3855,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 178,
+    "xp": 509,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-006",
+   "act": 3,
+   "title": "Bin Night, Cabra-Vale Diggers",
+   "blurb": "I have been putting it off since Easter. Somebody moves the bins on Cabra-Vale Diggers in front of my drive every Melbourne Cup day night. You can tell me I am imagining it. Tell me after. Photograph the evidence and have a word; Cabramatta knows who. Do not let them talk you into anything.",
+   "giver": "qg-cabramatta-leanne",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -24875,
+     "z": 3677,
+     "radius": 40,
+     "label": "photograph the bins at Cabra-Vale Diggers"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 177,
+    "xp": 516,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-007",
+   "act": 3,
+   "title": "Left It Near Hughes Street",
+   "blurb": "Honestly, I am past caring how it looks. I left something on the bench at Hughes Street at half six. The paperwork says one thing and my eyes say another. By the time I got back to Cabramatta it had walked, so look where I'd have dropped it. Say nothing to anyone on the way.",
+   "giver": "qg-cabramatta-matilda",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -24944,
+     "z": 3563,
+     "radius": 30,
+     "label": "check the bench near Hughes Street"
+    },
+    {
+     "kind": "photo",
+     "x": -24760,
+     "z": 3636,
+     "radius": 40,
+     "label": "photograph the bins behind it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-cabramatta-matilda",
+     "node": "report-2",
+     "label": "tell me what you found"
+    }
+   ],
+   "reward": {
+    "cash": 186,
+    "xp": 523,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-008",
+   "act": 3,
+   "title": "The the Moon Festival Camera",
+   "blurb": "I'll be straight with you. A new speed camera near the Moon Festival has fined half of Cabramatta since Saturday. I would have sorted it myself a year ago. Photograph it for the appeal, then prove the train to Liverpool is faster anyway. Just do not come back empty-handed.",
+   "giver": "qg-cabramatta-fadi",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -25046,
+     "z": 3487,
+     "radius": 40,
+     "label": "photograph the camera near the Moon Festival"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Cabramatta",
+     "to": "Liverpool",
+     "label": "then take the train instead, to Liverpool"
+    }
+   ],
+   "reward": {
+    "cash": 173,
+    "xp": 519,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-009",
+   "act": 3,
+   "title": "Trolley Run, the Moon Festival",
+   "blurb": "Do not laugh. A Woolies trolley from the Moon Festival gets walked to the creek every Boxing Day. I have rung the number on the letter four times. Find where it ends up in Cabramatta and make the deposit back. I'll see you right for it.",
+   "giver": "qg-cabramatta-fadi",
+   "level": 9,
+   "requires": [
+    "qg-l9-cabramatta-008"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -24941,
+     "z": 3395,
+     "radius": 30,
+     "label": "find the trolley near the Moon Festival"
+    },
+    {
+     "kind": "photo",
+     "x": -24941,
+     "z": 3395,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 49,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 230,
+    "xp": 676,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-010",
+   "act": 3,
+   "title": "The the Cabramatta Bowlo Complaint",
+   "blurb": "Someone has to, and it may as well be you. Two women in activewear have photographed my bins outside the Cabramatta Bowlo since the King's Birthday. It is not the money. It has stopped being the money. One has Cabramatta council on speed dial; sort it however you sort things. Come and find me after, either way.",
+   "giver": "qg-cabramatta-sokha",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near the Cabramatta Bowlo"
+    }
+   ],
+   "reward": {
+    "cash": 175,
+    "xp": 504,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-011",
+   "act": 3,
+   "title": "Parcel for Liverpool",
+   "blurb": "I am told you do odd jobs. A parcel from Cabramatta Plaza has to be at Liverpool by eight at night and Australia Post quoted me Saturday. I have got no proof, which is exactly why I am asking. Take the train and hand it to the people outside the station. Half now if you want it. Most people don't.",
+   "giver": "qg-cabramatta-elie",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Cabramatta",
+     "to": "Liverpool",
+     "label": "carry it on the train to Liverpool"
+    },
+    {
+     "kind": "goto",
+     "x": -25924,
+     "z": 6714,
+     "radius": 30,
+     "label": "hand it over outside the station, where the crowd is"
+    }
+   ],
+   "reward": {
+    "cash": 188,
+    "xp": 498,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-012",
+   "act": 3,
+   "title": "The Cabramatta Plaza Sparky",
+   "blurb": "I have written it down twice and lost it twice. The sparky off the Cabramatta Plaza job has owed me since the bathroom and drinks in Cabramatta from first thing. I did try the official route, for what that was worth. Forty will do and I'll write off the rest. There's cash in it. Not a lot.",
+   "giver": "qg-cabramatta-chantelle",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for Cabramatta Plaza"
+    },
+    {
+     "kind": "earn",
+     "dollars": 78,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 171,
+    "xp": 500,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-013",
+   "act": 3,
+   "title": "Meat Tray at the pho strip",
+   "blurb": "You will think I am making this up. The the pho strip raffle is thirty-five short of a meat tray and the draw is at bin night. I am not after trouble. I am after an answer. Find it in Cabramatta and put it in the tin. I will owe you one, and I pay those.",
+   "giver": "qg-cabramatta-neville",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 69,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -25066,
+     "z": 3611,
+     "radius": 30,
+     "label": "and drop it at the pho strip"
+    }
+   ],
+   "reward": {
+    "cash": 174,
+    "xp": 496,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-014",
+   "act": 3,
+   "title": "Counting Cabra-Vale Diggers",
+   "blurb": "Keep it between us for now. Council says the Cabra-Vale Diggers car park is never full and I say it's full by lunchtime. I have got a photo on my phone but it is useless. Count both Cabramatta car parks, photograph whichever one makes me right. I will know if you skipped a bit.",
+   "giver": "qg-cabramatta-hala",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -25117,
+     "z": 3446,
+     "radius": 30,
+     "label": "count the cars at Cabra-Vale Diggers"
+    },
+    {
+     "kind": "goto",
+     "x": -25028,
+     "z": 3115,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": -25117,
+     "z": 3446,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 173,
+    "xp": 522,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-015",
+   "act": 3,
+   "title": "RBT on Cabra-Vale Diggers",
+   "blurb": "Before you say anything: yes, I know. There's a breath test set up on Cabra-Vale Diggers since dawn. Nobody else seems to have noticed, which is its own problem. My brother-in-law needs the ute at the far end of Cabramatta without a conversation. I'll put the kettle on for when you're back.",
+   "giver": "qg-cabramatta-hala",
+   "level": 9,
+   "requires": [
+    "qg-l9-cabramatta-014"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on Cabra-Vale Diggers"
+    },
+    {
+     "kind": "goto",
+     "x": -25015,
+     "z": 3415,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 230,
+    "xp": 642,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-016",
+   "act": 3,
+   "title": "The Length of Hughes Street",
+   "blurb": "This is going to sound small. I haven't walked Hughes Street end to end since the light rail came to Cabramatta. I would not ask if there was anyone else about. Do it the last Sunday of the month for me and photograph what's at the far end now. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qg-cabramatta-hoa",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -25321,
+     "z": 3042,
+     "radius": 30,
+     "label": "walk the length of Hughes Street"
+    },
+    {
+     "kind": "goto",
+     "x": -24953,
+     "z": 2993,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -24953,
+     "z": 2993,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 188,
+    "xp": 492,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-017",
+   "act": 3,
+   "title": "Two From the Moon Festival",
+   "blurb": "It has been three weeks. Two of whatever's going near the Moon Festival, here, hot, before the footy at half seven. Everyone I have told has looked at me the way you are now. It's Cabramatta; I'm not asking for much. Take your time. Do not take a week.",
+   "giver": "qg-cabramatta-chantha",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near the Moon Festival"
+    },
+    {
+     "kind": "goto",
+     "x": -25473,
+     "z": 3433,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 183,
+    "xp": 515,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-018",
+   "act": 3,
+   "title": "Lads Off the Moon Festival",
+   "blurb": "It is the sort of thing you notice or you do not. Three of them in TNs on the the Moon Festival steps, flogging vapes to schoolkids at ten past ten. There is a version of this where I am the unreasonable one. Cabramatta used to move them on itself and now it rings me. That's the whole job. No catch.",
+   "giver": "qg-cabramatta-chantha",
+   "level": 9,
+   "requires": [
+    "qg-l9-cabramatta-017"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from the Moon Festival"
+    }
+   ],
+   "reward": {
+    "cash": 241,
+    "xp": 633,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-019",
+   "act": 3,
+   "title": "The Dutton Lane Order",
+   "blurb": "You look like you have twenty minutes. The Dutton Lane order came to seventy more than I'd budgeted and the supplier wants it by the arvo. You can tell me I am imagining it. Tell me after. Find seventy in Cabramatta and photograph the receipt. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qg-cabramatta-wayne",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 137,
+     "label": "square the seventy for the Dutton Lane order"
+    },
+    {
+     "kind": "photo",
+     "x": -24822,
+     "z": 3683,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 174,
+    "xp": 521,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-020",
+   "act": 3,
+   "title": "Closing Time at Dutton Lane",
+   "blurb": "I have been putting it off since Easter. Two blokes have slept in my doorway on Dutton Lane since the pub shut. My wife says I should let it go. My wife is wrong. The Cabramatta delivery's at half seven, so get them up and show me the step empty. You'll know it when you see it.",
+   "giver": "qg-cabramatta-wayne",
+   "level": 9,
+   "requires": [
+    "qg-l9-cabramatta-019"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off Dutton Lane"
+    },
+    {
+     "kind": "photo",
+     "x": -24678,
+     "z": 3769,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 230,
+    "xp": 658,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-021",
+   "act": 3,
+   "title": "The the Cabramatta Bowlo Tab",
+   "blurb": "You are the first person to stop all morning. Two chippies off the the Cabramatta Bowlo job have run a tab in Cabramatta since Sunday. This is the third time I have had this conversation. They drove past at half two without looking in, so settle it in cash. Do not let them talk you into anything.",
+   "giver": "qg-cabramatta-nadia",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Cabramatta Bowlo"
+    },
+    {
+     "kind": "earn",
+     "dollars": 59,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 173,
+    "xp": 510,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-022",
+   "act": 3,
+   "title": "A Flat White From John Street",
+   "blurb": "My knees are gone, so. I want a flat white from the place near John Street, not the one next to it. The paperwork says one thing and my eyes say another. Here by the arvo, while it's still coffee and Cabramatta still has some. Do that and we're square.",
+   "giver": "qg-cabramatta-nadia",
+   "level": 9,
+   "requires": [
+    "qg-l9-cabramatta-021"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near John Street"
+    },
+    {
+     "kind": "goto",
+     "x": -25046,
+     "z": 3508,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 239,
+    "xp": 636,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-023",
+   "act": 3,
+   "title": "The the Freedom Gate Course",
+   "blurb": "Honestly, I am past caring how it looks. A bloke near the Freedom Gate runs a ninety-minute course he bills at four hundred, and I've paid. I would have sorted it myself a year ago. Sit it Monday, then come back to Cabramatta and prove it did something. Ask for me by name at the counter.",
+   "giver": "qg-cabramatta-phil",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near the Freedom Gate"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 173,
+    "xp": 507,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-024",
+   "act": 3,
+   "title": "Trouble at John Street",
+   "blurb": "I'll be straight with you. Two lads and their mate decided at half two that John Street is theirs. I have rung the number on the letter four times. The rest of Cabramatta disagrees, so explain the disagreement. Say nothing to anyone on the way.",
+   "giver": "qg-cabramatta-phil",
+   "level": 9,
+   "requires": [
+    "qg-l9-cabramatta-023"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near John Street"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 235,
+    "xp": 651,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-025",
+   "act": 3,
+   "title": "Proof of Cabramatta Plaza",
+   "blurb": "Someone has to, and it may as well be you. Nobody in Cabramatta believes what Cabramatta Plaza looks like at half six. Half the street knows and half the street is pretending not to. Get me a photo close enough that council can't say it's somewhere else. That's it. That's the whole ask.",
+   "giver": "qg-cabramatta-sam",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -24859,
+     "z": 3317,
+     "radius": 40,
+     "label": "get a picture of Cabramatta Plaza before they fix it"
+    }
+   ],
+   "reward": {
+    "cash": 186,
+    "xp": 495,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-026",
+   "act": 3,
+   "title": "Before They Touch Cabramatta Plaza",
+   "blurb": "Right. Since you asked. They start on Cabramatta Plaza on Monday and the orange fencing goes up. It is the not knowing that has got me, honestly. I want Cabramatta on record before it does. Come and find me after, either way.",
+   "giver": "qg-cabramatta-sam",
+   "level": 9,
+   "requires": [
+    "qg-l9-cabramatta-025"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -24923,
+     "z": 2987,
+     "radius": 40,
+     "label": "photograph the state of Cabramatta Plaza"
+    },
+    {
+     "kind": "goto",
+     "x": -25089,
+     "z": 3174,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 238,
+    "xp": 667,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-027",
+   "act": 3,
+   "title": "Bin Night, the pho strip",
+   "blurb": "It is not a police matter and I have checked. Somebody moves the bins on the pho strip in front of my drive every Saturday night. I have got no proof, which is exactly why I am asking. Photograph the evidence and have a word; Cabramatta knows who. Be polite about it. It costs nothing.",
+   "giver": "qg-cabramatta-mai",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -25046,
+     "z": 2987,
+     "radius": 40,
+     "label": "photograph the bins at the pho strip"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 186,
+    "xp": 489,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-028",
+   "act": 3,
+   "title": "Something From Cabra-Vale Diggers",
+   "blurb": "I have written it down twice and lost it twice. The stall at Cabra-Vale Diggers has run out and the customers keep coming. I am not after trouble. I am after an answer. Find something round Cabramatta that'll do before the half six rush. Half now if you want it. Most people don't.",
+   "giver": "qg-cabramatta-bopha",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near Cabra-Vale Diggers"
+    },
+    {
+     "kind": "goto",
+     "x": -25062,
+     "z": 3340,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 184,
+    "xp": 493,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-029",
+   "act": 3,
+   "title": "Trolley Run, Hughes Street",
+   "blurb": "Two people have already said no. A Woolies trolley from Hughes Street gets walked to the creek every Monday. I have got a photo on my phone but it is useless. Find where it ends up in Cabramatta and make the deposit back. Come back and tell me straight.",
+   "giver": "qg-cabramatta-denise",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -24641,
+     "z": 3440,
+     "radius": 30,
+     "label": "find the trolley near Hughes Street"
+    },
+    {
+     "kind": "photo",
+     "x": -24641,
+     "z": 3440,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 49,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 177,
+    "xp": 487,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-030",
+   "act": 3,
+   "title": "The Dutton Lane Complaint",
+   "blurb": "Not being dramatic about this. Two women in activewear have photographed my bins outside Dutton Lane since Saturday. I would not ask if there was anyone else about. One has Cabramatta council on speed dial; sort it however you sort things. I'll put the kettle on for when you're back.",
+   "giver": "qg-cabramatta-fergus",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near Dutton Lane"
+    }
+   ],
+   "reward": {
+    "cash": 172,
+    "xp": 513,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-031",
+   "act": 3,
+   "title": "Seven a.m. At the Cabramatta Bowlo",
+   "blurb": "I would do it myself if I could leave the counter. The site at the Cabramatta Bowlo starts its jackhammer at school pick-up on a Australia Day, which is illegal and loud. Everyone I have told has looked at me the way you are now. Photograph it running and have a word with the Cabramatta foreman. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qg-cabramatta-tanya",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -24813,
+     "z": 3455,
+     "radius": 40,
+     "label": "photograph the noise from the Cabramatta Bowlo"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 174,
+    "xp": 486,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-032",
+   "act": 3,
+   "title": "Meat Tray at John Street",
+   "blurb": "It is the sort of thing you notice or you do not. The John Street raffle is thirty-five short of a meat tray and the draw is at three in the morning. You can tell me I am imagining it. Tell me after. Find it in Cabramatta and put it in the tin. Take your time. Do not take a week.",
+   "giver": "qg-cabramatta-bassam",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 69,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -24853,
+     "z": 3627,
+     "radius": 30,
+     "label": "and drop it at John Street"
+    }
+   ],
+   "reward": {
+    "cash": 188,
+    "xp": 498,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-033",
+   "act": 3,
+   "title": "Counting the Freedom Gate",
+   "blurb": "You are the first person to stop all morning. Council says the the Freedom Gate car park is never full and I say it's full by peak hour. The paperwork says one thing and my eyes say another. Count both Cabramatta car parks, photograph whichever one makes me right. You'll know it when you see it.",
+   "giver": "qg-cabramatta-tuan",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -24750,
+     "z": 3203,
+     "radius": 30,
+     "label": "count the cars at the Freedom Gate"
+    },
+    {
+     "kind": "goto",
+     "x": -24789,
+     "z": 3479,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": -24750,
+     "z": 3203,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 176,
+    "xp": 490,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-034",
+   "act": 3,
+   "title": "Ask Around at Liverpool",
+   "blurb": "My knees are gone, so. There's work going outside Liverpool station and nobody at the pho strip can tell me what. I would have sorted it myself a year ago. Ride over at school pick-up, get the shape of it, come back. Do not let them talk you into anything.",
+   "giver": "qg-cabramatta-tuan",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Cabramatta",
+     "to": "Liverpool",
+     "label": "take the train to Liverpool"
+    },
+    {
+     "kind": "goto",
+     "x": -25924,
+     "z": 6714,
+     "radius": 30,
+     "label": "find the people outside Liverpool station"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-cabramatta-tuan",
+     "node": "report-2",
+     "label": "then come back and tell me what they said"
+    }
+   ],
+   "reward": {
+    "cash": 188,
+    "xp": 525,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-035",
+   "act": 3,
+   "title": "RBT on Cabramatta Plaza",
+   "blurb": "Honestly, I am past caring how it looks. There's a breath test set up on Cabramatta Plaza since five. I have rung the number on the letter four times. My brother-in-law needs the ute at the far end of Cabramatta without a conversation. Do that and we're square.",
+   "giver": "qg-cabramatta-sopheap",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on Cabramatta Plaza"
+    },
+    {
+     "kind": "goto",
+     "x": -24828,
+     "z": 3252,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 173,
+    "xp": 495,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-036",
+   "act": 3,
+   "title": "Two From Cabra-Vale Diggers",
+   "blurb": "There is no clever way to say this. Two of whatever's going near Cabra-Vale Diggers, here, hot, before the footy at first thing. It is not the money. It has stopped being the money. It's Cabramatta; I'm not asking for much. Just do not come back empty-handed.",
+   "giver": "qg-cabramatta-joe",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near Cabra-Vale Diggers"
+    },
+    {
+     "kind": "goto",
+     "x": -25022,
+     "z": 3498,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 190,
+    "xp": 500,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-037",
+   "act": 3,
+   "title": "Lads Off Hughes Street",
+   "blurb": "The council knows and the council does not care. Three of them in TNs on the Hughes Street steps, flogging vapes to schoolkids at bin night. Half the street knows and half the street is pretending not to. Cabramatta used to move them on itself and now it rings me. I'll see you right for it.",
+   "giver": "qg-cabramatta-bruce",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Hughes Street"
+    }
+   ],
+   "reward": {
+    "cash": 177,
+    "xp": 512,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-038",
+   "act": 3,
+   "title": "The Hughes Street Order",
+   "blurb": "Someone has to, and it may as well be you. The Hughes Street order came to seventy more than I'd budgeted and the supplier wants it by five. It is the not knowing that has got me, honestly. Find seventy in Cabramatta and photograph the receipt. If anyone asks, you were never here.",
+   "giver": "qg-cabramatta-bruce",
+   "level": 9,
+   "requires": [
+    "qg-l9-cabramatta-037"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 137,
+     "label": "square the seventy for the Hughes Street order"
+    },
+    {
+     "kind": "photo",
+     "x": -25320,
+     "z": 3501,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 243,
+    "xp": 680,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-039",
+   "act": 3,
+   "title": "The the Moon Festival Tab",
+   "blurb": "It is not a police matter and I have checked. Two chippies off the the Moon Festival job have run a tab in Cabramatta since Monday. I did try the official route, for what that was worth. They drove past at ten past ten without looking in, so settle it in cash. Come and find me after, either way.",
+   "giver": "qg-cabramatta-reg",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Moon Festival"
+    },
+    {
+     "kind": "earn",
+     "dollars": 59,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 175,
+    "xp": 504,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-040",
+   "act": 3,
+   "title": "A Flat White From Dutton Lane",
+   "blurb": "I am told you do odd jobs. I want a flat white from the place near Dutton Lane, not the one next to it. I am not after trouble. I am after an answer. Here by bin night, while it's still coffee and Cabramatta still has some. Be polite about it. It costs nothing.",
+   "giver": "qg-cabramatta-reg",
+   "level": 9,
+   "requires": [
+    "qg-l9-cabramatta-039"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near Dutton Lane"
+    },
+    {
+     "kind": "goto",
+     "x": -25073,
+     "z": 3436,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 234,
+    "xp": 658,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-041",
+   "act": 3,
+   "title": "The Dutton Lane Course",
+   "blurb": "I have written it down twice and lost it twice. A bloke near Dutton Lane runs a ninety-minute course he bills at four hundred, and I've paid. There is probably a simple explanation and I would love to hear it. Sit it Melbourne Cup day, then come back to Cabramatta and prove it did something. I would rather know than wonder.",
+   "giver": "qg-cabramatta-reg",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near Dutton Lane"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 182,
+    "xp": 488,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-042",
+   "act": 3,
+   "title": "Trouble at Dutton Lane",
+   "blurb": "You will think I am making this up. Two lads and their mate decided at ten past ten that Dutton Lane is theirs. It might be nothing. It has not felt like nothing. The rest of Cabramatta disagrees, so explain the disagreement. Half now if you want it. Most people don't.",
+   "giver": "qg-cabramatta-dina",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Dutton Lane"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 172,
+    "xp": 490,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-043",
+   "act": 3,
+   "title": "Before They Touch the Freedom Gate",
+   "blurb": "This is going to sound small. They start on the Freedom Gate on Friday and the orange fencing goes up. Everyone I have told has looked at me the way you are now. I want Cabramatta on record before it does. I'll put the kettle on for when you're back.",
+   "giver": "qg-cabramatta-bazza",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -25347,
+     "z": 3146,
+     "radius": 40,
+     "label": "photograph the state of the Freedom Gate"
+    },
+    {
+     "kind": "goto",
+     "x": -25361,
+     "z": 3484,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 181,
+    "xp": 501,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cabramatta-044",
+   "act": 3,
+   "title": "One Stop From the Freedom Gate",
+   "blurb": "I would do it myself if I could leave the counter. I need to know the train from Cabramatta stops at Liverpool and doesn't sail through like it did on Easter Saturday. There is a version of this where I am the unreasonable one. Ride it at half seven and photograph the sign. There is no rush, but there is a Friday.",
+   "giver": "qg-cabramatta-bazza",
+   "level": 9,
+   "requires": [
+    "qg-l9-cabramatta-043"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Cabramatta",
+     "to": "Liverpool",
+     "label": "take the train to Liverpool"
+    },
+    {
+     "kind": "photo",
+     "x": -25924,
+     "z": 6714,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 230,
+    "xp": 670,
+    "unlock": []
+   }
+  }
+ ]
+}

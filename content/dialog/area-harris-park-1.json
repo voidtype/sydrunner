@@ -1,0 +1,2982 @@
+{
+ "pack": "area-harris-park-1",
+ "npcs": [
+  {
+   "id": "qg-harris-park-charbel",
+   "name": "Charbel, baker",
+   "x": -18800,
+   "z": -4608,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flour on everything, sorry. Welcome to Harris Park. Something warm?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Up at three, done by noon, asleep by nine. Robin Thomas Reserve eats what I make and I never see them awake.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's seven a.m. at the diwali lights.",
+     "choices": [
+      {
+       "text": "Seven a.m. At the Diwali lights",
+       "accept": "qg-l8-harris-park-001",
+       "denyFlag": "w:qg-l8-harris-park-001"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Charbel looks it over the way Harris Park looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About seven a.m. at the diwali lights.",
+       "turnin": "qg-l8-harris-park-001"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The knafeh at Robin Thomas Reserve is my cousin's. Better than mine. Don't tell him.",
+     "improv": {
+      "persona": "Charbel, baker in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about Robin Thomas Reserve like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near Robin Thomas Reserve."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-joon",
+   "name": "Joon, HSC tutor",
+   "x": -18616,
+   "z": -4925,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Band six or nothing. Sorry, that's the brochure talking. Harris Park, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Maths extension two, Saturdays, forty kids and their mothers in the corridor. the Diwali lights has three of us on one block.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two from station street east.",
+     "choices": [
+      {
+       "text": "Two From Station Street East",
+       "accept": "qg-l8-harris-park-002",
+       "denyFlag": "w:qg-l8-harris-park-002"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Joon looks it over the way Harris Park looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About two from station street east.",
+       "turnin": "qg-l8-harris-park-002"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every second shopfront near the Diwali lights is a tutoring college. The first one is a bubble tea.",
+     "improv": {
+      "persona": "Joon, HSC tutor in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Diwali lights like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near the Diwali lights."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-stuart",
+   "name": "Stuart, real estate agent",
+   "x": -18416,
+   "z": -4518,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Harris Park is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. Station Street East is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rbt on hassall street.",
+     "choices": [
+      {
+       "text": "RBT on Hassall Street",
+       "accept": "qg-l8-harris-park-003",
+       "denyFlag": "w:qg-l8-harris-park-003"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Stuart looks it over the way Harris Park looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About rbt on hassall street.",
+       "turnin": "qg-l8-harris-park-003"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. Station Street East means cosy.",
+     "improv": {
+      "persona": "Stuart, real estate agent in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about Station Street East like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near Station Street East."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-joyce",
+   "name": "Joyce, council ranger",
+   "x": -18617,
+   "z": -4984,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Harris Park is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. the Harris Park Bowlo generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the wigram street order.",
+     "choices": [
+      {
+       "text": "The Wigram Street Order",
+       "accept": "qg-l8-harris-park-004",
+       "denyFlag": "w:qg-l8-harris-park-004"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Joyce pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the wigram street order.",
+       "turnin": "qg-l8-harris-park-004"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Joyce, council ranger in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Harris Park Bowlo like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near the Harris Park Bowlo."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-val",
+   "name": "Val, uni student, three jobs",
+   "x": -18648,
+   "z": -4738,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Harris Park rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Wigram Street is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Trouble at Little India",
+       "accept": "qg-l8-harris-park-005",
+       "denyFlag": "w:qg-l8-harris-park-005"
+      },
+      {
+       "text": "Rent Money, the Harris Park chaat strip",
+       "accept": "qg-l8-harris-park-006",
+       "denyFlag": "w:qg-l8-harris-park-006",
+       "needFlag": "w:qg-l8-harris-park-005"
+      },
+      {
+       "text": "The Little India Complaint",
+       "accept": "qg-l8-harris-park-007",
+       "denyFlag": "w:qg-l8-harris-park-007"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Val looks it over the way Harris Park looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About trouble at little india.",
+       "turnin": "qg-l8-harris-park-005"
+      },
+      {
+       "text": "About rent money, the harris park chaat strip.",
+       "turnin": "qg-l8-harris-park-006"
+      },
+      {
+       "text": "About the little india complaint.",
+       "turnin": "qg-l8-harris-park-007"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Wigram Street that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Val, uni student, three jobs in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about Wigram Street like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near Wigram Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-sunil",
+   "name": "Sunil, chaat shop owner",
+   "x": -18466,
+   "z": -4408,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Pani puri? Six for you, six for me. Welcome to Harris Park, uncle's shop.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Chaat, dosa, the best chai on Wigram Street. Little India on Diwali is a hundred thousand people and one register.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's something from the harris park chaat strip.",
+     "choices": [
+      {
+       "text": "Something From the Harris Park chaat strip",
+       "accept": "qg-l8-harris-park-008",
+       "denyFlag": "w:qg-l8-harris-park-008"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Sunil counts it out without looking up. -- Don't spend it all at Little India.",
+     "choices": [
+      {
+       "text": "About something from the harris park chaat strip.",
+       "turnin": "qg-l8-harris-park-008"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good sweets at Little India are in the second cabinet. The first cabinet is for tourists.",
+     "improv": {
+      "persona": "Sunil, chaat shop owner in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about Little India like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near Little India."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-nadia",
+   "name": "Nadia, baker",
+   "x": -18853,
+   "z": -4703,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flour on everything, sorry. Welcome to Harris Park. Something warm?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Up at three, done by noon, asleep by nine. the Harris Park chaat strip eats what I make and I never see them awake.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Meat Tray at Marion Street",
+       "accept": "qg-l8-harris-park-009",
+       "denyFlag": "w:qg-l8-harris-park-009"
+      },
+      {
+       "text": "Before They Touch Marion Street",
+       "accept": "qg-l8-harris-park-010",
+       "denyFlag": "w:qg-l8-harris-park-010",
+       "needFlag": "w:qg-l8-harris-park-009"
+      },
+      {
+       "text": "Marion Street Pub Crawl",
+       "accept": "qg-l8-harris-park-011",
+       "denyFlag": "w:qg-l8-harris-park-011"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Nadia counts it out without looking up. -- Don't spend it all at the Harris Park chaat strip.",
+     "choices": [
+      {
+       "text": "About meat tray at marion street.",
+       "turnin": "qg-l8-harris-park-009"
+      },
+      {
+       "text": "About before they touch marion street.",
+       "turnin": "qg-l8-harris-park-010"
+      },
+      {
+       "text": "About marion street pub crawl.",
+       "turnin": "qg-l8-harris-park-011"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The knafeh at the Harris Park chaat strip is my cousin's. Better than mine. Don't tell him.",
+     "improv": {
+      "persona": "Nadia, baker in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Harris Park chaat strip like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near the Harris Park chaat strip."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-min-jun",
+   "name": "Min-jun, HSC tutor",
+   "x": -18495,
+   "z": -4983,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Band six or nothing. Sorry, that's the brochure talking. Harris Park, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Maths extension two, Saturdays, forty kids and their mothers in the corridor. Marion Street has three of us on one block.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Bin Night, Robin Thomas Reserve",
+       "accept": "qg-l8-harris-park-012",
+       "denyFlag": "w:qg-l8-harris-park-012"
+      },
+      {
+       "text": "Probationary at Robin Thomas Reserve",
+       "accept": "qg-l8-harris-park-013",
+       "denyFlag": "w:qg-l8-harris-park-013",
+       "needFlag": "w:qg-l8-harris-park-012"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Min-jun looks it over the way Harris Park looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About bin night, robin thomas reserve.",
+       "turnin": "qg-l8-harris-park-012"
+      },
+      {
+       "text": "About probationary at robin thomas reserve.",
+       "turnin": "qg-l8-harris-park-013"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every second shopfront near Marion Street is a tutoring college. The first one is a bubble tea.",
+     "improv": {
+      "persona": "Min-jun, HSC tutor in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about Marion Street like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near Marion Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-cooper",
+   "name": "Cooper, real estate agent",
+   "x": -18320,
+   "z": -4849,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Harris Park is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. Robin Thomas Reserve is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "One Stop From Station Street East",
+       "accept": "qg-l8-harris-park-014",
+       "denyFlag": "w:qg-l8-harris-park-014"
+      },
+      {
+       "text": "The the Diwali lights Tab",
+       "accept": "qg-l8-harris-park-015",
+       "denyFlag": "w:qg-l8-harris-park-015",
+       "needFlag": "w:qg-l8-harris-park-014"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Cooper looks it over the way Harris Park looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About one stop from station street east.",
+       "turnin": "qg-l8-harris-park-014"
+      },
+      {
+       "text": "About the the diwali lights tab.",
+       "turnin": "qg-l8-harris-park-015"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. Robin Thomas Reserve means cosy.",
+     "improv": {
+      "persona": "Cooper, real estate agent in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about Robin Thomas Reserve like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near Robin Thomas Reserve."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-rupert",
+   "name": "Rupert, chippy off a job",
+   "x": -18520,
+   "z": -5161,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Harris Park, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's a flat white from station street east.",
+     "choices": [
+      {
+       "text": "A Flat White From Station Street East",
+       "accept": "qg-l8-harris-park-016",
+       "denyFlag": "w:qg-l8-harris-park-016"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Rupert pays up on the spot.",
+     "choices": [
+      {
+       "text": "About a flat white from station street east.",
+       "turnin": "qg-l8-harris-park-016"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Harris Park is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Rupert, chippy off a job in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Diwali lights like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near the Diwali lights."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-matilda",
+   "name": "Matilda, council ranger",
+   "x": -18475,
+   "z": -4536,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Harris Park is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Station Street East generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the hassall street camera.",
+     "choices": [
+      {
+       "text": "The Hassall Street Camera",
+       "accept": "qg-l8-harris-park-017",
+       "denyFlag": "w:qg-l8-harris-park-017"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Matilda counts it out without looking up. -- Don't spend it all at Station Street East.",
+     "choices": [
+      {
+       "text": "About the hassall street camera.",
+       "turnin": "qg-l8-harris-park-017"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Matilda, council ranger in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about Station Street East like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near Station Street East."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-daz",
+   "name": "Daz, uni student, three jobs",
+   "x": -18864,
+   "z": -4353,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Harris Park rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Hassall Street is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trolley run, the harris park bowlo.",
+     "choices": [
+      {
+       "text": "Trolley Run, the Harris Park Bowlo",
+       "accept": "qg-l8-harris-park-018",
+       "denyFlag": "w:qg-l8-harris-park-018"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Daz counts it out without looking up. -- Don't spend it all at Hassall Street.",
+     "choices": [
+      {
+       "text": "About trolley run, the harris park bowlo.",
+       "turnin": "qg-l8-harris-park-018"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Hassall Street that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Daz, uni student, three jobs in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about Hassall Street like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near Hassall Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-anjali",
+   "name": "Anjali, chaat shop owner",
+   "x": -19016,
+   "z": -4694,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Pani puri? Six for you, six for me. Welcome to Harris Park, uncle's shop.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Chaat, dosa, the best chai on Wigram Street. the Harris Park Bowlo on Diwali is a hundred thousand people and one register.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the wigram street lift.",
+     "choices": [
+      {
+       "text": "The Wigram Street Lift",
+       "accept": "qg-l8-harris-park-019",
+       "denyFlag": "w:qg-l8-harris-park-019"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Anjali looks it over the way Harris Park looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the wigram street lift.",
+       "turnin": "qg-l8-harris-park-019"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good sweets at the Harris Park Bowlo are in the second cabinet. The first cabinet is for tourists.",
+     "improv": {
+      "persona": "Anjali, chaat shop owner in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Harris Park Bowlo like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near the Harris Park Bowlo."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Harris Park would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-sung",
+   "name": "Sung, HSC tutor",
+   "x": -18661,
+   "z": -4601,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Band six or nothing. Sorry, that's the brochure talking. Harris Park, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Maths extension two, Saturdays, forty kids and their mothers in the corridor. Little India has three of us on one block.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's staffy near marion street.",
+     "choices": [
+      {
+       "text": "Staffy Near Marion Street",
+       "accept": "qg-l8-harris-park-020",
+       "denyFlag": "w:qg-l8-harris-park-020"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Sung looks it over the way Harris Park looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About staffy near marion street.",
+       "turnin": "qg-l8-harris-park-020"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every second shopfront near Little India is a tutoring college. The first one is a bubble tea.",
+     "improv": {
+      "persona": "Sung, HSC tutor in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about Little India like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near Little India."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Right. And you're sure it was Marion Street? People say Marion Street when they mean the bit next to it. -- Sung writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-scott",
+   "name": "Scott, real estate agent",
+   "x": -18850,
+   "z": -4563,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Harris Park is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. the Harris Park chaat strip is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's lads off marion street.",
+     "choices": [
+      {
+       "text": "Lads Off Marion Street",
+       "accept": "qg-l8-harris-park-021",
+       "denyFlag": "w:qg-l8-harris-park-021"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Scott pays up on the spot.",
+     "choices": [
+      {
+       "text": "About lads off marion street.",
+       "turnin": "qg-l8-harris-park-021"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. the Harris Park chaat strip means cosy.",
+     "improv": {
+      "persona": "Scott, real estate agent in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Harris Park chaat strip like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near the Harris Park chaat strip."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-cheryl",
+   "name": "Cheryl, chippy off a job",
+   "x": -18744,
+   "z": -4382,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Harris Park, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's seven a.m. at robin thomas reserve.",
+     "choices": [
+      {
+       "text": "Seven a.m. At Robin Thomas Reserve",
+       "accept": "qg-l8-harris-park-022",
+       "denyFlag": "w:qg-l8-harris-park-022"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Cheryl counts it out without looking up. -- Don't spend it all at Marion Street.",
+     "choices": [
+      {
+       "text": "About seven a.m. at robin thomas reserve.",
+       "turnin": "qg-l8-harris-park-022"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Harris Park is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Cheryl, chippy off a job in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about Marion Street like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near Marion Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-joe",
+   "name": "Joe, baker",
+   "x": -19184,
+   "z": -4458,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flour on everything, sorry. Welcome to Harris Park. Something warm?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Up at three, done by noon, asleep by nine. Hassall Street eats what I make and I never see them awake.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the harris park bowlo order.",
+     "choices": [
+      {
+       "text": "The the Harris Park Bowlo Order",
+       "accept": "qg-l8-harris-park-023",
+       "denyFlag": "w:qg-l8-harris-park-023"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Joe looks it over the way Harris Park looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the harris park bowlo order.",
+       "turnin": "qg-l8-harris-park-023"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The knafeh at Hassall Street is my cousin's. Better than mine. Don't tell him.",
+     "improv": {
+      "persona": "Joe, baker in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about Hassall Street like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near Hassall Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-yuna",
+   "name": "Yuna, HSC tutor",
+   "x": -18688,
+   "z": -4884,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Band six or nothing. Sorry, that's the brochure talking. Harris Park, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Maths extension two, Saturdays, forty kids and their mothers in the corridor. the Harris Park Bowlo has three of us on one block.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Trouble at Wigram Street",
+       "accept": "qg-l8-harris-park-024",
+       "denyFlag": "w:qg-l8-harris-park-024"
+      },
+      {
+       "text": "Rent Money, Little India",
+       "accept": "qg-l8-harris-park-025",
+       "denyFlag": "w:qg-l8-harris-park-025",
+       "needFlag": "w:qg-l8-harris-park-024"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Yuna pays up on the spot.",
+     "choices": [
+      {
+       "text": "About trouble at wigram street.",
+       "turnin": "qg-l8-harris-park-024"
+      },
+      {
+       "text": "About rent money, little india.",
+       "turnin": "qg-l8-harris-park-025"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every second shopfront near the Harris Park Bowlo is a tutoring college. The first one is a bubble tea.",
+     "improv": {
+      "persona": "Yuna, HSC tutor in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Harris Park Bowlo like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near the Harris Park Bowlo."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-bronwyn",
+   "name": "Bronwyn, real estate agent",
+   "x": -18726,
+   "z": -4622,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Harris Park is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. Wigram Street is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch little india.",
+     "choices": [
+      {
+       "text": "Before They Touch Little India",
+       "accept": "qg-l8-harris-park-026",
+       "denyFlag": "w:qg-l8-harris-park-026"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Bronwyn pays up on the spot.",
+     "choices": [
+      {
+       "text": "About before they touch little india.",
+       "turnin": "qg-l8-harris-park-026"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. Wigram Street means cosy.",
+     "improv": {
+      "persona": "Bronwyn, real estate agent in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about Wigram Street like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near Wigram Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-maddie",
+   "name": "Maddie, chippy off a job",
+   "x": -18661,
+   "z": -4285,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Harris Park, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's bin night, the harris park chaat strip.",
+     "choices": [
+      {
+       "text": "Bin Night, the Harris Park chaat strip",
+       "accept": "qg-l8-harris-park-027",
+       "denyFlag": "w:qg-l8-harris-park-027"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Maddie counts it out without looking up. -- Don't spend it all at Little India.",
+     "choices": [
+      {
+       "text": "About bin night, the harris park chaat strip.",
+       "turnin": "qg-l8-harris-park-027"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Harris Park is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Maddie, chippy off a job in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about Little India like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near Little India."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-riley",
+   "name": "Riley, council ranger",
+   "x": -18674,
+   "z": -4547,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Harris Park is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. the Harris Park chaat strip generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's one stop from robin thomas reserve.",
+     "choices": [
+      {
+       "text": "One Stop From Robin Thomas Reserve",
+       "accept": "qg-l8-harris-park-028",
+       "denyFlag": "w:qg-l8-harris-park-028"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Riley pays up on the spot.",
+     "choices": [
+      {
+       "text": "About one stop from robin thomas reserve.",
+       "turnin": "qg-l8-harris-park-028"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Riley, council ranger in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Harris Park chaat strip like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near the Harris Park chaat strip."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-ravi",
+   "name": "Ravi, chaat shop owner",
+   "x": -18366,
+   "z": -4359,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Pani puri? Six for you, six for me. Welcome to Harris Park, uncle's shop.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Chaat, dosa, the best chai on Wigram Street. Robin Thomas Reserve on Diwali is a hundred thousand people and one register.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "A Flat White From the Diwali lights",
+       "accept": "qg-l8-harris-park-029",
+       "denyFlag": "w:qg-l8-harris-park-029"
+      },
+      {
+       "text": "The the Diwali lights Camera",
+       "accept": "qg-l8-harris-park-030",
+       "denyFlag": "w:qg-l8-harris-park-030",
+       "needFlag": "w:qg-l8-harris-park-029"
+      },
+      {
+       "text": "Proof of the Diwali lights",
+       "accept": "qg-l8-harris-park-031",
+       "denyFlag": "w:qg-l8-harris-park-031"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Ravi counts it out without looking up. -- Don't spend it all at Robin Thomas Reserve.",
+     "choices": [
+      {
+       "text": "About a flat white from the diwali lights.",
+       "turnin": "qg-l8-harris-park-029"
+      },
+      {
+       "text": "About the the diwali lights camera.",
+       "turnin": "qg-l8-harris-park-030"
+      },
+      {
+       "text": "About proof of the diwali lights.",
+       "turnin": "qg-l8-harris-park-031"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good sweets at Robin Thomas Reserve are in the second cabinet. The first cabinet is for tourists.",
+     "improv": {
+      "persona": "Ravi, chaat shop owner in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about Robin Thomas Reserve like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near Robin Thomas Reserve."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-zeina",
+   "name": "Zeina, baker",
+   "x": -18677,
+   "z": -4808,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flour on everything, sorry. Welcome to Harris Park. Something warm?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Up at three, done by noon, asleep by nine. the Diwali lights eats what I make and I never see them awake.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trolley run, station street east.",
+     "choices": [
+      {
+       "text": "Trolley Run, Station Street East",
+       "accept": "qg-l8-harris-park-032",
+       "denyFlag": "w:qg-l8-harris-park-032"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Zeina looks it over the way Harris Park looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About trolley run, station street east.",
+       "turnin": "qg-l8-harris-park-032"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The knafeh at the Diwali lights is my cousin's. Better than mine. Don't tell him.",
+     "improv": {
+      "persona": "Zeina, baker in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Diwali lights like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near the Diwali lights."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-ji-woo",
+   "name": "Ji-woo, HSC tutor",
+   "x": -18608,
+   "z": -4695,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Band six or nothing. Sorry, that's the brochure talking. Harris Park, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Maths extension two, Saturdays, forty kids and their mothers in the corridor. Station Street East has three of us on one block.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Hassall Street Lift",
+       "accept": "qg-l8-harris-park-033",
+       "denyFlag": "w:qg-l8-harris-park-033"
+      },
+      {
+       "text": "The Hassall Street Course",
+       "accept": "qg-l8-harris-park-034",
+       "denyFlag": "w:qg-l8-harris-park-034",
+       "needFlag": "w:qg-l8-harris-park-033"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Ji-woo pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the hassall street lift.",
+       "turnin": "qg-l8-harris-park-033"
+      },
+      {
+       "text": "About the hassall street course.",
+       "turnin": "qg-l8-harris-park-034"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every second shopfront near Station Street East is a tutoring college. The first one is a bubble tea.",
+     "improv": {
+      "persona": "Ji-woo, HSC tutor in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about Station Street East like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near Station Street East."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Harris Park would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-fay",
+   "name": "Fay, real estate agent",
+   "x": -19214,
+   "z": -4876,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Harris Park is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. Hassall Street is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The the Harris Park Bowlo Fence",
+       "accept": "qg-l8-harris-park-035",
+       "denyFlag": "w:qg-l8-harris-park-035"
+      },
+      {
+       "text": "Lads Off the Harris Park Bowlo",
+       "accept": "qg-l8-harris-park-036",
+       "denyFlag": "w:qg-l8-harris-park-036",
+       "needFlag": "w:qg-l8-harris-park-035"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Fay looks it over the way Harris Park looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the harris park bowlo fence.",
+       "turnin": "qg-l8-harris-park-035"
+      },
+      {
+       "text": "About lads off the harris park bowlo.",
+       "turnin": "qg-l8-harris-park-036"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. Hassall Street means cosy.",
+     "improv": {
+      "persona": "Fay, real estate agent in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about Hassall Street like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near Hassall Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Harris Park would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-colin",
+   "name": "Colin, chippy off a job",
+   "x": -18867,
+   "z": -4303,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Harris Park, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Wigram Street Float",
+       "accept": "qg-l8-harris-park-037",
+       "denyFlag": "w:qg-l8-harris-park-037"
+      },
+      {
+       "text": "Seven a.m. At Wigram Street",
+       "accept": "qg-l8-harris-park-038",
+       "denyFlag": "w:qg-l8-harris-park-038",
+       "needFlag": "w:qg-l8-harris-park-037"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Colin looks it over the way Harris Park looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the wigram street float.",
+       "turnin": "qg-l8-harris-park-037"
+      },
+      {
+       "text": "About seven a.m. at wigram street.",
+       "turnin": "qg-l8-harris-park-038"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Harris Park is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Colin, chippy off a job in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Harris Park Bowlo like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near the Harris Park Bowlo."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Right. And you're sure it was Wigram Street? People say Wigram Street when they mean the bit next to it. -- Colin writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-rhonda",
+   "name": "Rhonda, council ranger",
+   "x": -18450,
+   "z": -4874,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Harris Park is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Wigram Street generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two from little india.",
+     "choices": [
+      {
+       "text": "Two From Little India",
+       "accept": "qg-l8-harris-park-039",
+       "denyFlag": "w:qg-l8-harris-park-039"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Rhonda pays up on the spot.",
+     "choices": [
+      {
+       "text": "About two from little india.",
+       "turnin": "qg-l8-harris-park-039"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Rhonda, council ranger in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about Wigram Street like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near Wigram Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-imogen",
+   "name": "Imogen, uni student, three jobs",
+   "x": -18531,
+   "z": -5041,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Harris Park rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Little India is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's counting the harris park chaat strip.",
+     "choices": [
+      {
+       "text": "Counting the Harris Park chaat strip",
+       "accept": "qg-l8-harris-park-040",
+       "denyFlag": "w:qg-l8-harris-park-040"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Imogen pays up on the spot.",
+     "choices": [
+      {
+       "text": "About counting the harris park chaat strip.",
+       "turnin": "qg-l8-harris-park-040"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Little India that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Imogen, uni student, three jobs in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about Little India like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near Little India."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-kavya",
+   "name": "Kavya, chaat shop owner",
+   "x": -19237,
+   "z": -4846,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Pani puri? Six for you, six for me. Welcome to Harris Park, uncle's shop.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Chaat, dosa, the best chai on Wigram Street. the Harris Park chaat strip on Diwali is a hundred thousand people and one register.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Cover at Marion Street",
+       "accept": "qg-l8-harris-park-041",
+       "denyFlag": "w:qg-l8-harris-park-041"
+      },
+      {
+       "text": "The Marion Street Order",
+       "accept": "qg-l8-harris-park-042",
+       "denyFlag": "w:qg-l8-harris-park-042",
+       "needFlag": "w:qg-l8-harris-park-041"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Kavya counts it out without looking up. -- Don't spend it all at the Harris Park chaat strip.",
+     "choices": [
+      {
+       "text": "About cover at marion street.",
+       "turnin": "qg-l8-harris-park-041"
+      },
+      {
+       "text": "About the marion street order.",
+       "turnin": "qg-l8-harris-park-042"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good sweets at the Harris Park chaat strip are in the second cabinet. The first cabinet is for tourists.",
+     "improv": {
+      "persona": "Kavya, chaat shop owner in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Harris Park chaat strip like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near the Harris Park chaat strip."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-harris-park-rima",
+   "name": "Rima, baker",
+   "x": -19124,
+   "z": -4557,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flour on everything, sorry. Welcome to Harris Park. Something warm?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Harris Park like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Up at three, done by noon, asleep by nine. Marion Street eats what I make and I never see them awake.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Trouble at Robin Thomas Reserve",
+       "accept": "qg-l8-harris-park-043",
+       "denyFlag": "w:qg-l8-harris-park-043"
+      },
+      {
+       "text": "Rent Money, the Diwali lights",
+       "accept": "qg-l8-harris-park-044",
+       "denyFlag": "w:qg-l8-harris-park-044",
+       "needFlag": "w:qg-l8-harris-park-043"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Rima pays up on the spot.",
+     "choices": [
+      {
+       "text": "About trouble at robin thomas reserve.",
+       "turnin": "qg-l8-harris-park-043"
+      },
+      {
+       "text": "About rent money, the diwali lights.",
+       "turnin": "qg-l8-harris-park-044"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The knafeh at Marion Street is my cousin's. Better than mine. Don't tell him.",
+     "improv": {
+      "persona": "Rima, baker in Harris Park, Sydney. Dry, specific, local; never says g'day or crikey; talks about Marion Street like everyone knows it.",
+      "context": "Someone has asked what Harris Park is like these days. You are standing near Marion Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

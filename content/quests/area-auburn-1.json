@@ -1,0 +1,1447 @@
+{
+ "pack": "area-auburn-1",
+ "quests": [
+  {
+   "id": "qg-l8-auburn-001",
+   "act": 3,
+   "title": "Counting Auburn Road",
+   "blurb": "You look like you have twenty minutes. Council says the Auburn Road car park is never full and I say it's full by knock-off. It started small, the way these things do. Count both Auburn car parks, photograph whichever one makes me right. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qg-auburn-hakan",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -16556,
+     "z": -2158,
+     "radius": 30,
+     "label": "count the cars at Auburn Road"
+    },
+    {
+     "kind": "goto",
+     "x": -16324,
+     "z": -1957,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": -16556,
+     "z": -2158,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 164,
+    "xp": 449,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-002",
+   "act": 3,
+   "title": "The Auburn Road Complaint",
+   "blurb": "You are the first person to stop all morning. Two women in activewear have photographed my bins outside Auburn Road since the long weekend. It is not the money. It has stopped being the money. One has Auburn council on speed dial; sort it however you sort things. Do not let them talk you into anything.",
+   "giver": "qg-auburn-hakan",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near Auburn Road"
+    }
+   ],
+   "reward": {
+    "cash": 175,
+    "xp": 479,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-003",
+   "act": 3,
+   "title": "Lads Off the Auburn Botanic Gardens",
+   "blurb": "I'll be straight with you. Three of them in TNs on the the Auburn Botanic Gardens steps, flogging vapes to schoolkids at the last train. I have got no proof, which is exactly why I am asking. Auburn used to move them on itself and now it rings me. Say nothing to anyone on the way.",
+   "giver": "qg-auburn-tony",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from the Auburn Botanic Gardens"
+    }
+   ],
+   "reward": {
+    "cash": 166,
+    "xp": 453,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-004",
+   "act": 3,
+   "title": "Before They Touch the Auburn Botanic Gardens",
+   "blurb": "Do not laugh. They start on the Auburn Botanic Gardens on Monday and the orange fencing goes up. I did try the official route, for what that was worth. I want Auburn on record before it does. Just do not come back empty-handed.",
+   "giver": "qg-auburn-tony",
+   "level": 8,
+   "requires": [
+    "qg-l8-auburn-003"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -16160,
+     "z": -2251,
+     "radius": 40,
+     "label": "photograph the state of the Auburn Botanic Gardens"
+    },
+    {
+     "kind": "goto",
+     "x": -16217,
+     "z": -1881,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 203,
+    "xp": 602,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-005",
+   "act": 3,
+   "title": "Two From the Turkish pide strip",
+   "blurb": "I have written it down twice and lost it twice. Two of whatever's going near the Turkish pide strip, here, hot, before the footy at midnight. I would not ask if there was anyone else about. It's Auburn; I'm not asking for much. Half now if you want it. Most people don't.",
+   "giver": "qg-auburn-sienna",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near the Turkish pide strip"
+    },
+    {
+     "kind": "goto",
+     "x": -16718,
+     "z": -2147,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 160,
+    "xp": 457,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-006",
+   "act": 3,
+   "title": "The the Turkish pide strip Tab",
+   "blurb": "You will think I am making this up. Two chippies off the the Turkish pide strip job have run a tab in Auburn since Easter Saturday. I am aware how that sounds. They drove past at the last train without looking in, so settle it in cash. There's cash in it. Not a lot.",
+   "giver": "qg-auburn-sienna",
+   "level": 8,
+   "requires": [
+    "qg-l8-auburn-005"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Turkish pide strip"
+    },
+    {
+     "kind": "earn",
+     "dollars": 55,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 222,
+    "xp": 590,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-007",
+   "act": 3,
+   "title": "Tap On at Auburn Central",
+   "blurb": "Nobody else has offered, so. My Opal says I owe nineteen dollars for a trip from Auburn I never took on the last Sunday of the month. Everyone I have told has looked at me the way you are now. Take the same one to Cabramatta and tell me what it charged you. I will owe you one, and I pay those.",
+   "giver": "qg-auburn-jarrod",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Auburn",
+     "to": "Cabramatta",
+     "label": "tap on at Auburn, tap off at Cabramatta"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-auburn-jarrod",
+     "node": "report-0",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 167,
+    "xp": 450,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-008",
+   "act": 3,
+   "title": "A Flat White From the Auburn Lidcombe Bowlo",
+   "blurb": "Not being dramatic about this. I want a flat white from the place near the Auburn Lidcombe Bowlo, not the one next to it. This is the third time I have had this conversation. Here by midnight, while it's still coffee and Auburn still has some. I'll put the kettle on for when you're back.",
+   "giver": "qg-auburn-mustafa",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near the Auburn Lidcombe Bowlo"
+    },
+    {
+     "kind": "goto",
+     "x": -16216,
+     "z": -2420,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 164,
+    "xp": 469,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-009",
+   "act": 3,
+   "title": "Left It Near the Auburn Lidcombe Bowlo",
+   "blurb": "I would do it myself if I could leave the counter. I left something on the bench at the Auburn Lidcombe Bowlo at after the footy. I would have sorted it myself a year ago. By the time I got back to Auburn it had walked, so look where I'd have dropped it. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qg-auburn-fatima",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -16260,
+     "z": -1549,
+     "radius": 30,
+     "label": "check the bench near the Auburn Lidcombe Bowlo"
+    },
+    {
+     "kind": "photo",
+     "x": -16214,
+     "z": -1857,
+     "radius": 40,
+     "label": "photograph the bins behind it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-auburn-fatima",
+     "node": "report-0",
+     "label": "tell me what you found"
+    }
+   ],
+   "reward": {
+    "cash": 174,
+    "xp": 457,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-010",
+   "act": 3,
+   "title": "One Stop From Auburn Road",
+   "blurb": "It has been three weeks. I need to know the train from Auburn stops at Cabramatta and doesn't sail through like it did on the last Sunday of the month. I have rung the number on the letter four times. Ride it at nine sharp and photograph the sign. Whatever you find, bring it to me first.",
+   "giver": "qg-auburn-fatima",
+   "level": 8,
+   "requires": [
+    "qg-l8-auburn-009"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Auburn",
+     "to": "Cabramatta",
+     "label": "take the train to Cabramatta"
+    },
+    {
+     "kind": "photo",
+     "x": -25004,
+     "z": 3393,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 225,
+    "xp": 582,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-011",
+   "act": 3,
+   "title": "Is Cabramatta Any Good",
+   "blurb": "My knees are gone, so. The agent says I should move to Cabramatta and I haven't been since the nineties. It is the not knowing that has got me, honestly. Ride over Thursday, photograph the station front, tell me honestly. Do not let them talk you into anything.",
+   "giver": "qg-auburn-layla",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Auburn",
+     "to": "Cabramatta",
+     "label": "take the train to Cabramatta"
+    },
+    {
+     "kind": "photo",
+     "x": -25004,
+     "z": 3393,
+     "radius": 40,
+     "label": "photograph the station front"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-auburn-layla",
+     "node": "report-1",
+     "label": "tell me if it's worth the move"
+    }
+   ],
+   "reward": {
+    "cash": 167,
+    "xp": 448,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-012",
+   "act": 3,
+   "title": "Staffy Near Rawson Street",
+   "blurb": "Someone has to, and it may as well be you. A brindle staffy in a red bandana went over the fence at Rawson Street at after the footy. I have got a photo on my phone but it is useless. Everyone in Auburn has definitely seen it and can't say where. If anyone asks, you were never here.",
+   "giver": "qg-auburn-kerry",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -16118,
+     "z": -2323,
+     "radius": 30,
+     "label": "check the off-leash bit near Rawson Street"
+    },
+    {
+     "kind": "photo",
+     "x": -16251,
+     "z": -2069,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-auburn-kerry",
+     "node": "report-1",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 158,
+    "xp": 478,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-013",
+   "act": 3,
+   "title": "Closing Time at the Turkish pide strip",
+   "blurb": "Right. Since you asked. Two blokes have slept in my doorway on the Turkish pide strip since the pub shut. Nobody else seems to have noticed, which is its own problem. The Auburn delivery's at peak hour, so get them up and show me the step empty. That's it. That's the whole ask.",
+   "giver": "qg-auburn-zeynep",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off the Turkish pide strip"
+    },
+    {
+     "kind": "photo",
+     "x": -16338,
+     "z": -1964,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 166,
+    "xp": 469,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-014",
+   "act": 3,
+   "title": "Meat Tray at Auburn Central",
+   "blurb": "I am told you do odd jobs. The Auburn Central raffle is thirty-five short of a meat tray and the draw is at eleven. I would not ask if there was anyone else about. Find it in Auburn and put it in the tin. Be polite about it. It costs nothing.",
+   "giver": "qg-auburn-farida",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 64,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -16608,
+     "z": -2047,
+     "radius": 30,
+     "label": "and drop it at Auburn Central"
+    }
+   ],
+   "reward": {
+    "cash": 171,
+    "xp": 465,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-015",
+   "act": 3,
+   "title": "Counting Wyatt Park",
+   "blurb": "Nobody else has offered, so. Council says the Wyatt Park car park is never full and I say it's full by eight at night. There is a version of this where I am the unreasonable one. Count both Auburn car parks, photograph whichever one makes me right. There's cash in it. Not a lot.",
+   "giver": "qg-auburn-george",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -16653,
+     "z": -2014,
+     "radius": 30,
+     "label": "count the cars at Wyatt Park"
+    },
+    {
+     "kind": "goto",
+     "x": -16802,
+     "z": -1781,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": -16653,
+     "z": -2014,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 168,
+    "xp": 443,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-016",
+   "act": 3,
+   "title": "Trouble at Wyatt Park",
+   "blurb": "Two people have already said no. Two lads and their mate decided at peak hour that Wyatt Park is theirs. You can tell me I am imagining it. Tell me after. The rest of Auburn disagrees, so explain the disagreement. I will owe you one, and I pay those.",
+   "giver": "qg-auburn-george",
+   "level": 8,
+   "requires": [
+    "qg-l8-auburn-015"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Wyatt Park"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 216,
+    "xp": 593,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-017",
+   "act": 3,
+   "title": "The Wyatt Park Complaint",
+   "blurb": "Keep it between us for now. Two women in activewear have photographed my bins outside Wyatt Park since Wednesday. My wife says I should let it go. My wife is wrong. One has Auburn council on speed dial; sort it however you sort things. Come back and tell me straight.",
+   "giver": "qg-auburn-george",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near Wyatt Park"
+    }
+   ],
+   "reward": {
+    "cash": 165,
+    "xp": 459,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-018",
+   "act": 3,
+   "title": "RBT on the Auburn Lidcombe Bowlo",
+   "blurb": "Not being dramatic about this. There's a breath test set up on the Auburn Lidcombe Bowlo since three in the morning. The paperwork says one thing and my eyes say another. My brother-in-law needs the ute at the far end of Auburn without a conversation. I will know if you skipped a bit.",
+   "giver": "qg-auburn-sam",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on the Auburn Lidcombe Bowlo"
+    },
+    {
+     "kind": "goto",
+     "x": -16875,
+     "z": -2141,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 161,
+    "xp": 449,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-019",
+   "act": 3,
+   "title": "Before They Touch Auburn Road",
+   "blurb": "I would do it myself if I could leave the counter. They start on Auburn Road on Boxing Day and the orange fencing goes up. I have rung the number on the letter four times. I want Auburn on record before it does. There is no rush, but there is a Friday.",
+   "giver": "qg-auburn-troy",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -16442,
+     "z": -1990,
+     "radius": 40,
+     "label": "photograph the state of Auburn Road"
+    },
+    {
+     "kind": "goto",
+     "x": -16516,
+     "z": -1863,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 165,
+    "xp": 457,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-020",
+   "act": 3,
+   "title": "Sightline at the Auburn Gallipoli Mosque",
+   "blurb": "It has been three weeks. Insurance says nobody could have seen the ute hit the fence at the Auburn Gallipoli Mosque on the King's Birthday. It started small, the way these things do. Stand where I stood in Auburn, photograph the view, tell me if I'm lying. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qg-auburn-imogen",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -16343,
+     "z": -1792,
+     "radius": 30,
+     "label": "stand where it happened at the Auburn Gallipoli Mosque"
+    },
+    {
+     "kind": "photo",
+     "x": -16343,
+     "z": -1792,
+     "radius": 40,
+     "label": "photograph the corner"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-auburn-imogen",
+     "node": "report-0",
+     "label": "describe the sightline"
+    }
+   ],
+   "reward": {
+    "cash": 172,
+    "xp": 462,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-021",
+   "act": 3,
+   "title": "Race Four, the Auburn Gallipoli Mosque",
+   "blurb": "You look like you have twenty minutes. There's a horse in race four at eight at night that a bloke at the Auburn Gallipoli Mosque swears by. It is not the money. It has stopped being the money. Turn it into fifty-five somewhere in Auburn and tell me if it came in. Take your time. Do not take a week.",
+   "giver": "qg-auburn-imogen",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 101,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-auburn-imogen",
+     "node": "report-2",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 158,
+    "xp": 457,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-022",
+   "act": 3,
+   "title": "Something From the Auburn Botanic Gardens",
+   "blurb": "I have been putting it off since Easter. The stall at the Auburn Botanic Gardens has run out and the customers keep coming. Half the street knows and half the street is pretending not to. Find something round Auburn that'll do before the ten past ten rush. That's the whole job. No catch.",
+   "giver": "qg-auburn-leanne",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near the Auburn Botanic Gardens"
+    },
+    {
+     "kind": "goto",
+     "x": -16612,
+     "z": -1778,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 165,
+    "xp": 463,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-023",
+   "act": 3,
+   "title": "Two From the Auburn Botanic Gardens",
+   "blurb": "You are the first person to stop all morning. Two of whatever's going near the Auburn Botanic Gardens, here, hot, before the footy at six in the morning. It is the not knowing that has got me, honestly. It's Auburn; I'm not asking for much. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qg-auburn-leanne",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near the Auburn Botanic Gardens"
+    },
+    {
+     "kind": "goto",
+     "x": -16861,
+     "z": -2115,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 173,
+    "xp": 477,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-024",
+   "act": 3,
+   "title": "Tap On at Rawson Street",
+   "blurb": "Honestly, I am past caring how it looks. My Opal says I owe nineteen dollars for a trip from Auburn I never took on Friday. I did try the official route, for what that was worth. Take the same one to Cabramatta and tell me what it charged you. Do not let them talk you into anything.",
+   "giver": "qg-auburn-yusuf",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Auburn",
+     "to": "Cabramatta",
+     "label": "tap on at Auburn, tap off at Cabramatta"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-auburn-yusuf",
+     "node": "report-1",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 175,
+    "xp": 479,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-025",
+   "act": 3,
+   "title": "Trolley Run, the Turkish pide strip",
+   "blurb": "There is no clever way to say this. A Woolies trolley from the Turkish pide strip gets walked to the creek every Easter Saturday. It might be nothing. It has not felt like nothing. Find where it ends up in Auburn and make the deposit back. Say nothing to anyone on the way.",
+   "giver": "qg-auburn-nour",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -16793,
+     "z": -1593,
+     "radius": 30,
+     "label": "find the trolley near the Turkish pide strip"
+    },
+    {
+     "kind": "photo",
+     "x": -16793,
+     "z": -1593,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 46,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 161,
+    "xp": 443,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-026",
+   "act": 3,
+   "title": "A Flat White From Wyatt Park",
+   "blurb": "The council knows and the council does not care. I want a flat white from the place near Wyatt Park, not the one next to it. I have got a photo on my phone but it is useless. Here by the arvo, while it's still coffee and Auburn still has some. Just do not come back empty-handed.",
+   "giver": "qg-auburn-mariam",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near Wyatt Park"
+    },
+    {
+     "kind": "goto",
+     "x": -16136,
+     "z": -1770,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 168,
+    "xp": 461,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-027",
+   "act": 3,
+   "title": "Rent Money, Auburn Central",
+   "blurb": "Someone has to, and it may as well be you. I'm forty-five short on the Auburn Central rent and the agent doesn't take stories. Nobody else seems to have noticed, which is its own problem. Make it somewhere in Auburn by half seven; I'm not fussy how. I'll see you right for it.",
+   "giver": "qg-auburn-mariam",
+   "level": 8,
+   "requires": [
+    "qg-l8-auburn-026"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 83,
+     "label": "earn forty-five somewhere in Auburn"
+    }
+   ],
+   "reward": {
+    "cash": 228,
+    "xp": 614,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-028",
+   "act": 3,
+   "title": "One Stop From the Auburn Lidcombe Bowlo",
+   "blurb": "It is not a police matter and I have checked. I need to know the train from Auburn stops at Cabramatta and doesn't sail through like it did on Anzac Day. I would not ask if there was anyone else about. Ride it at knock-off and photograph the sign. That's it. That's the whole ask.",
+   "giver": "qg-auburn-gail",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Auburn",
+     "to": "Cabramatta",
+     "label": "take the train to Cabramatta"
+    },
+    {
+     "kind": "photo",
+     "x": -25004,
+     "z": 3393,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 173,
+    "xp": 457,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-029",
+   "act": 3,
+   "title": "The the Auburn Lidcombe Bowlo Camera",
+   "blurb": "I have written it down twice and lost it twice. A new speed camera near the Auburn Lidcombe Bowlo has fined half of Auburn since the last Sunday of the month. Everyone I have told has looked at me the way you are now. Photograph it for the appeal, then prove the train to Cabramatta is faster anyway. Be polite about it. It costs nothing.",
+   "giver": "qg-auburn-scott",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -15916,
+     "z": -1925,
+     "radius": 40,
+     "label": "photograph the camera near the Auburn Lidcombe Bowlo"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Auburn",
+     "to": "Cabramatta",
+     "label": "then take the train instead, to Cabramatta"
+    }
+   ],
+   "reward": {
+    "cash": 163,
+    "xp": 470,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-030",
+   "act": 3,
+   "title": "The Length of Auburn Road",
+   "blurb": "You will think I am making this up. I haven't walked Auburn Road end to end since the light rail came to Auburn. There is a version of this where I am the unreasonable one. Do it Wednesday for me and photograph what's at the far end now. I would rather know than wonder.",
+   "giver": "qg-auburn-brett",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -16896,
+     "z": -2044,
+     "radius": 30,
+     "label": "walk the length of Auburn Road"
+    },
+    {
+     "kind": "goto",
+     "x": -16767,
+     "z": -1902,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -16767,
+     "z": -1902,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 170,
+    "xp": 469,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-031",
+   "act": 3,
+   "title": "The the Auburn Gallipoli Mosque Fence",
+   "blurb": "Two people have already said no. My neighbour at the Auburn Gallipoli Mosque says the tree is on my side and the fence says otherwise. My wife says I should let it go. My wife is wrong. Look at it the long weekend with Auburn eyes and tell me the truth. There's cash in it. Not a lot.",
+   "giver": "qg-auburn-emre",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -16551,
+     "z": -1802,
+     "radius": 30,
+     "label": "go and look at the fence at the Auburn Gallipoli Mosque"
+    },
+    {
+     "kind": "photo",
+     "x": -16551,
+     "z": -1802,
+     "radius": 40,
+     "label": "photograph the tree over it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-auburn-emre",
+     "node": "report-1",
+     "label": "tell me whose side it's on"
+    }
+   ],
+   "reward": {
+    "cash": 160,
+    "xp": 455,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-032",
+   "act": 3,
+   "title": "Staffy Near the Auburn Botanic Gardens",
+   "blurb": "This is going to sound small. A brindle staffy in a red bandana went over the fence at the Auburn Botanic Gardens at the arvo. I have rung the number on the letter four times. Everyone in Auburn has definitely seen it and can't say where. I will know if you skipped a bit.",
+   "giver": "qg-auburn-nasir",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -16784,
+     "z": -1846,
+     "radius": 30,
+     "label": "check the off-leash bit near the Auburn Botanic Gardens"
+    },
+    {
+     "kind": "photo",
+     "x": -16596,
+     "z": -1703,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-auburn-nasir",
+     "node": "report-2",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 165,
+    "xp": 467,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-033",
+   "act": 3,
+   "title": "Closing Time at the cherry blossoms",
+   "blurb": "I would do it myself if I could leave the counter. Two blokes have slept in my doorway on the cherry blossoms since the pub shut. It started small, the way these things do. The Auburn delivery's at after the footy, so get them up and show me the step empty. I'll put the kettle on for when you're back.",
+   "giver": "qg-auburn-bassam",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off the cherry blossoms"
+    },
+    {
+     "kind": "photo",
+     "x": -16504,
+     "z": -2220,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 470,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-034",
+   "act": 3,
+   "title": "Seven a.m. At the cherry blossoms",
+   "blurb": "It has been three weeks. The site at the cherry blossoms starts its jackhammer at nine sharp on a Sunday, which is illegal and loud. It has been going on longer than I have admitted to anyone. Photograph it running and have a word with the Auburn foreman. There is no rush, but there is a Friday.",
+   "giver": "qg-auburn-bassam",
+   "level": 8,
+   "requires": [
+    "qg-l8-auburn-033"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -16335,
+     "z": -1884,
+     "radius": 40,
+     "label": "photograph the noise from the cherry blossoms"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 207,
+    "xp": 598,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-035",
+   "act": 3,
+   "title": "Meat Tray at the cherry blossoms",
+   "blurb": "It is the sort of thing you notice or you do not. The the cherry blossoms raffle is thirty-five short of a meat tray and the draw is at midnight. It is not the money. It has stopped being the money. Find it in Auburn and put it in the tin. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qg-auburn-bassam",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 64,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -16368,
+     "z": -2046,
+     "radius": 30,
+     "label": "and drop it at the cherry blossoms"
+    }
+   ],
+   "reward": {
+    "cash": 170,
+    "xp": 463,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-036",
+   "act": 3,
+   "title": "The Rawson Street Sparky",
+   "blurb": "You look like you have twenty minutes. The sparky off the Rawson Street job has owed me since the bathroom and drinks in Auburn from after the footy. Half the street knows and half the street is pretending not to. Forty will do and I'll write off the rest. Whatever you find, bring it to me first.",
+   "giver": "qg-auburn-omar",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for Rawson Street"
+    },
+    {
+     "kind": "earn",
+     "dollars": 74,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 160,
+    "xp": 453,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-037",
+   "act": 3,
+   "title": "Trouble at the Turkish pide strip",
+   "blurb": "My knees are gone, so. Two lads and their mate decided at half four that the Turkish pide strip is theirs. I did try the official route, for what that was worth. The rest of Auburn disagrees, so explain the disagreement. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qg-auburn-kev",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near the Turkish pide strip"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 170,
+    "xp": 470,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-038",
+   "act": 3,
+   "title": "Something From Auburn Road",
+   "blurb": "I am told you do odd jobs. The stall at Auburn Road has run out and the customers keep coming. Everyone I have told has looked at me the way you are now. Find something round Auburn that'll do before the eleven rush. That's it. That's the whole ask.",
+   "giver": "qg-auburn-laila",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near Auburn Road"
+    },
+    {
+     "kind": "goto",
+     "x": -16645,
+     "z": -1947,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 175,
+    "xp": 475,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-039",
+   "act": 3,
+   "title": "Two From Auburn Road",
+   "blurb": "I have written it down twice and lost it twice. Two of whatever's going near Auburn Road, here, hot, before the footy at three in the morning. There is a version of this where I am the unreasonable one. It's Auburn; I'm not asking for much. Come and find me after, either way.",
+   "giver": "qg-auburn-laila",
+   "level": 8,
+   "requires": [
+    "qg-l8-auburn-038"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near Auburn Road"
+    },
+    {
+     "kind": "goto",
+     "x": -16415,
+     "z": -1863,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 221,
+    "xp": 607,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-040",
+   "act": 3,
+   "title": "The the Auburn Gallipoli Mosque Tab",
+   "blurb": "You will think I am making this up. Two chippies off the the Auburn Gallipoli Mosque job have run a tab in Auburn since Thursday. You can tell me I am imagining it. Tell me after. They drove past at first thing without looking in, so settle it in cash. Be polite about it. It costs nothing.",
+   "giver": "qg-auburn-hala",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Auburn Gallipoli Mosque"
+    },
+    {
+     "kind": "earn",
+     "dollars": 55,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 170,
+    "xp": 482,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-041",
+   "act": 3,
+   "title": "Tap On at the Auburn Botanic Gardens",
+   "blurb": "Two people have already said no. My Opal says I owe nineteen dollars for a trip from Auburn I never took on Anzac Day. This is the third time I have had this conversation. Take the same one to Cabramatta and tell me what it charged you. Half now if you want it. Most people don't.",
+   "giver": "qg-auburn-ahmed",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Auburn",
+     "to": "Cabramatta",
+     "label": "tap on at Auburn, tap off at Cabramatta"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-auburn-ahmed",
+     "node": "report-0",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 161,
+    "xp": 468,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l8-auburn-042",
+   "act": 3,
+   "title": "Trolley Run, the cherry blossoms",
+   "blurb": "Not being dramatic about this. A Woolies trolley from the cherry blossoms gets walked to the creek every the last Sunday of the month. I have rung the number on the letter four times. Find where it ends up in Auburn and make the deposit back. Come back and tell me straight.",
+   "giver": "qg-auburn-daz",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -16815,
+     "z": -2063,
+     "radius": 30,
+     "label": "find the trolley near the cherry blossoms"
+    },
+    {
+     "kind": "photo",
+     "x": -16815,
+     "z": -2063,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 46,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 157,
+    "xp": 463,
+    "unlock": []
+   }
+  }
+ ]
+}

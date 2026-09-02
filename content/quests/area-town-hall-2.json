@@ -1,0 +1,446 @@
+{
+ "pack": "area-town-hall-2",
+ "quests": [
+  {
+   "id": "qg-l4-town-hall-054",
+   "act": 3,
+   "title": "The Length of Pitt Street Mall",
+   "blurb": "It is not a police matter and I have checked. I haven't walked Pitt Street Mall end to end since the light rail came to Town Hall. Nobody else seems to have noticed, which is its own problem. Do it Wednesday for me and photograph what's at the far end now. I'll see you right for it.",
+   "giver": "qg-town-hall-nour",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -92,
+     "z": 520,
+     "radius": 30,
+     "label": "walk the length of Pitt Street Mall"
+    },
+    {
+     "kind": "goto",
+     "x": -273,
+     "z": 536,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -273,
+     "z": 536,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 112,
+    "xp": 294,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l4-town-hall-055",
+   "act": 3,
+   "title": "Meat Tray at Pitt Street Mall",
+   "blurb": "I am told you do odd jobs. The Pitt Street Mall raffle is thirty-five short of a meat tray and the draw is at lunchtime. You will see what I mean the second you get there. Find it in Town Hall and put it in the tin. If anyone asks, you were never here.",
+   "giver": "qg-town-hall-nour",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 48,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -341,
+     "z": 743,
+     "radius": 30,
+     "label": "and drop it at Pitt Street Mall"
+    }
+   ],
+   "reward": {
+    "cash": 110,
+    "xp": 298,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l4-town-hall-056",
+   "act": 3,
+   "title": "Hyde Park Pub Crawl",
+   "blurb": "I have written it down twice and lost it twice. A bucks started at Hyde Park at noon and it's now three blokes, one pair of pants and a tab. I would not ask if there was anyone else about. Recover the tab by half two; Town Hall can keep the dignity. That's it. That's the whole ask.",
+   "giver": "qg-town-hall-ana",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 3,
+     "label": "sort the three from the Hyde Park crawl"
+    },
+    {
+     "kind": "earn",
+     "dollars": 27,
+     "label": "and get the twenty they owe"
+    }
+   ],
+   "reward": {
+    "cash": 109,
+    "xp": 291,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l4-town-hall-057",
+   "act": 3,
+   "title": "Proof of Hyde Park",
+   "blurb": "You will think I am making this up. Nobody in Town Hall believes what Hyde Park looks like at the arvo. I am aware how that sounds. Get me a photo close enough that council can't say it's somewhere else. Come and find me after, either way.",
+   "giver": "qg-town-hall-ana",
+   "level": 4,
+   "requires": [
+    "qg-l4-town-hall-056"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -382,
+     "z": 466,
+     "radius": 40,
+     "label": "get a picture of Hyde Park before they fix it"
+    }
+   ],
+   "reward": {
+    "cash": 146,
+    "xp": 394,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l4-town-hall-058",
+   "act": 3,
+   "title": "Race Four, the Archibald Fountain",
+   "blurb": "Nobody else has offered, so. There's a horse in race four at the change of shift that a bloke at the Archibald Fountain swears by. Everyone I have told has looked at me the way you are now. Turn it into fifty-five somewhere in Town Hall and tell me if it came in. Be polite about it. It costs nothing.",
+   "giver": "qg-town-hall-rosa",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 75,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-town-hall-rosa",
+     "node": "report-0",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 113,
+    "xp": 295,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l4-town-hall-059",
+   "act": 3,
+   "title": "RBT on Martin Place",
+   "blurb": "Keep it between us for now. There's a breath test set up on Martin Place since knock-off. You can tell me I am imagining it. Tell me after. My brother-in-law needs the ute at the far end of Town Hall without a conversation. Half now if you want it. Most people don't.",
+   "giver": "qg-town-hall-fergus-b",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on Martin Place"
+    },
+    {
+     "kind": "goto",
+     "x": -257,
+     "z": 634,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 297,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l4-town-hall-060",
+   "act": 3,
+   "title": "Parcel for Circular Quay",
+   "blurb": "Before you say anything: yes, I know. A parcel from Angel Place has to be at Circular Quay by half six and Australia Post quoted me the King's Birthday. My wife says I should let it go. My wife is wrong. Take the train and hand it to the people outside the station. There's cash in it. Not a lot.",
+   "giver": "qg-town-hall-annabel-b",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Town Hall",
+     "to": "Circular Quay",
+     "label": "carry it on the train to Circular Quay"
+    },
+    {
+     "kind": "goto",
+     "x": 123,
+     "z": -877,
+     "radius": 30,
+     "label": "hand it over outside the station, where the crowd is"
+    }
+   ],
+   "reward": {
+    "cash": 108,
+    "xp": 293,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l4-town-hall-061",
+   "act": 3,
+   "title": "The the Strand Arcade Tab",
+   "blurb": "Not being dramatic about this. Two chippies off the the Strand Arcade job have run a tab in Town Hall since Saturday. This is the third time I have had this conversation. They drove past at the change of shift without looking in, so settle it in cash. I will owe you one, and I pay those.",
+   "giver": "qg-town-hall-annabel-b",
+   "level": 4,
+   "requires": [
+    "qg-l4-town-hall-060"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Strand Arcade"
+    },
+    {
+     "kind": "earn",
+     "dollars": 41,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 152,
+    "xp": 351,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l4-town-hall-062",
+   "act": 3,
+   "title": "Rent Money, Angel Place",
+   "blurb": "This is going to sound small. I'm forty-five short on the Angel Place rent and the agent doesn't take stories. The paperwork says one thing and my eyes say another. Make it somewhere in Town Hall by half four; I'm not fussy how. Come back and tell me straight.",
+   "giver": "qg-town-hall-cooper",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 61,
+     "label": "earn forty-five somewhere in Town Hall"
+    }
+   ],
+   "reward": {
+    "cash": 110,
+    "xp": 287,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l4-town-hall-063",
+   "act": 3,
+   "title": "The World Square Complaint",
+   "blurb": "It is the sort of thing you notice or you do not. Two women in activewear have photographed my bins outside World Square since the last Sunday of the month. It started small, the way these things do. One has Town Hall council on speed dial; sort it however you sort things. I'll put the kettle on for when you're back.",
+   "giver": "qg-town-hall-shirl-c",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near World Square"
+    }
+   ],
+   "reward": {
+    "cash": 111,
+    "xp": 295,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l4-town-hall-064",
+   "act": 3,
+   "title": "Cover at World Square",
+   "blurb": "You look like you have twenty minutes. I've got nobody for the World Square shift at after the footy and a room full of Town Hall people who've paid. It has been going on longer than I have admitted to anyone. Fifty of trade and one difficult person at the door. There is no rush, but there is a Friday.",
+   "giver": "qg-town-hall-shirl-c",
+   "level": 4,
+   "requires": [
+    "qg-l4-town-hall-063"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 68,
+     "label": "cover the fifty for the shift"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 1,
+     "label": "and handle whoever's at the door"
+    }
+   ],
+   "reward": {
+    "cash": 150,
+    "xp": 348,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l4-town-hall-065",
+   "act": 3,
+   "title": "The World Square Camera",
+   "blurb": "I have been putting it off since Easter. A new speed camera near World Square has fined half of Town Hall since Easter Saturday. It is not the money. It has stopped being the money. Photograph it for the appeal, then prove the train to Circular Quay is faster anyway. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qg-town-hall-shirl-c",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -428,
+     "z": 62,
+     "radius": 40,
+     "label": "photograph the camera near World Square"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Town Hall",
+     "to": "Circular Quay",
+     "label": "then take the train instead, to Circular Quay"
+    }
+   ],
+   "reward": {
+    "cash": 111,
+    "xp": 295,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l4-town-hall-066",
+   "act": 3,
+   "title": "Something From the light rail",
+   "blurb": "You are the first person to stop all morning. The stall at the light rail has run out and the customers keep coming. Half the street knows and half the street is pretending not to. Find something round Town Hall that'll do before the school pick-up rush. Whatever you find, bring it to me first.",
+   "giver": "qg-town-hall-sam",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near the light rail"
+    },
+    {
+     "kind": "goto",
+     "x": 285,
+     "z": 845,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 107,
+    "xp": 298,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l4-town-hall-067",
+   "act": 3,
+   "title": "Lads Off the QVB",
+   "blurb": "My knees are gone, so. Three of them in TNs on the the QVB steps, flogging vapes to schoolkids at eight at night. It is the not knowing that has got me, honestly. Town Hall used to move them on itself and now it rings me. Take your time. Do not take a week.",
+   "giver": "qg-town-hall-salote",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from the QVB"
+    }
+   ],
+   "reward": {
+    "cash": 114,
+    "xp": 302,
+    "unlock": []
+   }
+  }
+ ]
+}

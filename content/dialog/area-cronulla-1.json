@@ -1,0 +1,2964 @@
+{
+ "pack": "area-cronulla-1",
+ "npcs": [
+  {
+   "id": "qg-cronulla-kylie",
+   "name": "Kylie, surfer, dawn patrol",
+   "x": -4737,
+   "z": 20981,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Onshore. Absolutely cooked. Cronulla is flat as a tack, mate.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Check the cam, drive down, paddle out, get skunked. Kingsway on a good day is why people move here.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the cronulla surf club complaint.",
+     "choices": [
+      {
+       "text": "The the Cronulla surf club Complaint",
+       "accept": "qg-l9-cronulla-001",
+       "denyFlag": "w:qg-l9-cronulla-001"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Kylie pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the cronulla surf club complaint.",
+       "turnin": "qg-l9-cronulla-001"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The car park at Kingsway has a bloke who's been there since 1994. He's fine. Don't move his cone.",
+     "improv": {
+      "persona": "Kylie, surfer, dawn patrol in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about Kingsway like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near Kingsway."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-terry",
+   "name": "Terry, nippers parent, on the sand",
+   "x": -4650,
+   "z": 20781,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sunscreen! Sorry, not you. Six-year-olds. Cronulla, what's happening?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Every Sunday at seven, forty kids in pink caps and their parents in the surf club. the Northies is where I lost my voice.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Lads Off the Cronulla surf club",
+       "accept": "qg-l9-cronulla-002",
+       "denyFlag": "w:qg-l9-cronulla-002"
+      },
+      {
+       "text": "The the Cronulla surf club Camera",
+       "accept": "qg-l9-cronulla-003",
+       "denyFlag": "w:qg-l9-cronulla-003",
+       "needFlag": "w:qg-l9-cronulla-002"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Terry pays up on the spot.",
+     "choices": [
+      {
+       "text": "About lads off the cronulla surf club.",
+       "turnin": "qg-l9-cronulla-002"
+      },
+      {
+       "text": "About the the cronulla surf club camera.",
+       "turnin": "qg-l9-cronulla-003"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bacon and egg roll at the Northies's surf club is the best in the Shire. Fight me.",
+     "improv": {
+      "persona": "Terry, nippers parent, on the sand in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Northies like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near the Northies."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-wayne",
+   "name": "Wayne, Sharks supporter",
+   "x": -4900.3,
+   "z": 20523.2,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Up, up Cronulla. 2016, mate. Never forget. Cronulla, what's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Shark Park, every home game, since the seats were bleachers. the Cronulla surf club is where we drank after the grand final.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's meat tray at cronulla mall.",
+     "choices": [
+      {
+       "text": "Meat Tray at Cronulla Mall",
+       "accept": "qg-l9-cronulla-004",
+       "denyFlag": "w:qg-l9-cronulla-004"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Wayne looks it over the way Cronulla looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About meat tray at cronulla mall.",
+       "turnin": "qg-l9-cronulla-004"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best thing about the Shire is you never have to leave. The worst thing is the Cronulla surf club on a long weekend.",
+     "improv": {
+      "persona": "Wayne, Sharks supporter in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Cronulla surf club like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near the Cronulla surf club."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-beryl",
+   "name": "Beryl, RSL sub-branch secretary",
+   "x": -4657,
+   "z": 20432,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sign in, love. Everyone signs in. Cronulla RSL, you're very welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Raffles, Anzac Day, the bistro's schnitzel and a room full of pokies I have opinions about. Cronulla Mall sends us its regulars.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "A Flat White From North Cronulla",
+       "accept": "qg-l9-cronulla-005",
+       "denyFlag": "w:qg-l9-cronulla-005"
+      },
+      {
+       "text": "Proof of North Cronulla",
+       "accept": "qg-l9-cronulla-006",
+       "denyFlag": "w:qg-l9-cronulla-006",
+       "needFlag": "w:qg-l9-cronulla-005"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Beryl looks it over the way Cronulla looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About a flat white from north cronulla.",
+       "turnin": "qg-l9-cronulla-005"
+      },
+      {
+       "text": "About proof of north cronulla.",
+       "turnin": "qg-l9-cronulla-006"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The cheapest schooner in Cronulla is at the sub-branch, six o'clock, before the Ode. Stand up for the Ode.",
+     "improv": {
+      "persona": "Beryl, RSL sub-branch secretary in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about Cronulla Mall like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near Cronulla Mall."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-val",
+   "name": "Val, chippy off a job",
+   "x": -5135,
+   "z": 21094,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Cronulla, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the length of the alley.",
+     "choices": [
+      {
+       "text": "The Length of the Alley",
+       "accept": "qg-l9-cronulla-007",
+       "denyFlag": "w:qg-l9-cronulla-007"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Val pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the length of the alley.",
+       "turnin": "qg-l9-cronulla-007"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Cronulla is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Val, chippy off a job in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about North Cronulla like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near North Cronulla."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-fiona",
+   "name": "Fiona, real estate agent",
+   "x": -4552,
+   "z": 20940,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Cronulla is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. the Alley is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's bin night, wanda.",
+     "choices": [
+      {
+       "text": "Bin Night, Wanda",
+       "accept": "qg-l9-cronulla-008",
+       "denyFlag": "w:qg-l9-cronulla-008"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Fiona counts it out without looking up. -- Don't spend it all at the Alley.",
+     "choices": [
+      {
+       "text": "About bin night, wanda.",
+       "turnin": "qg-l9-cronulla-008"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. the Alley means cosy.",
+     "improv": {
+      "persona": "Fiona, real estate agent in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Alley like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near the Alley."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-sharon",
+   "name": "Sharon, Shire local, never left",
+   "x": -5018,
+   "z": 21315,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from here. It's fine. Cronulla. Everyone's welcome, sort of.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Born at Sutherland, school at Cronulla, married at the RSL. Wanda is my whole world and I'm happy with it.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the cronulla rsl fence.",
+     "choices": [
+      {
+       "text": "The the Cronulla RSL Fence",
+       "accept": "qg-l9-cronulla-009",
+       "denyFlag": "w:qg-l9-cronulla-009"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Sharon counts it out without looking up. -- Don't spend it all at Wanda.",
+     "choices": [
+      {
+       "text": "About the the cronulla rsl fence.",
+       "turnin": "qg-l9-cronulla-009"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a bloke at Wanda who's been surfing the same break since the Whitlam dismissal. He's fine.",
+     "improv": {
+      "persona": "Sharon, Shire local, never left in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about Wanda like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near Wanda."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Sharon listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-harriet",
+   "name": "Harriet, surfer, dawn patrol",
+   "x": -5094,
+   "z": 20990,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Onshore. Absolutely cooked. Cronulla is flat as a tack, mate.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Check the cam, drive down, paddle out, get skunked. the Cronulla RSL on a good day is why people move here.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch the cronulla sharks.",
+     "choices": [
+      {
+       "text": "Before They Touch the Cronulla Sharks",
+       "accept": "qg-l9-cronulla-010",
+       "denyFlag": "w:qg-l9-cronulla-010"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Harriet counts it out without looking up. -- Don't spend it all at the Cronulla RSL.",
+     "choices": [
+      {
+       "text": "About before they touch the cronulla sharks.",
+       "turnin": "qg-l9-cronulla-010"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The car park at the Cronulla RSL has a bloke who's been there since 1994. He's fine. Don't move his cone.",
+     "improv": {
+      "persona": "Harriet, surfer, dawn patrol in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Cronulla RSL like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near the Cronulla RSL."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-thelma",
+   "name": "Thelma, nippers parent, on the sand",
+   "x": -5430,
+   "z": 20830,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sunscreen! Sorry, not you. Six-year-olds. Cronulla, what's happening?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Every Sunday at seven, forty kids in pink caps and their parents in the surf club. the Cronulla Sharks is where I lost my voice.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's seven a.m. at gunnamatta bay.",
+     "choices": [
+      {
+       "text": "Seven a.m. At Gunnamatta Bay",
+       "accept": "qg-l9-cronulla-011",
+       "denyFlag": "w:qg-l9-cronulla-011"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Thelma pays up on the spot.",
+     "choices": [
+      {
+       "text": "About seven a.m. at gunnamatta bay.",
+       "turnin": "qg-l9-cronulla-011"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bacon and egg roll at the Cronulla Sharks's surf club is the best in the Shire. Fight me.",
+     "improv": {
+      "persona": "Thelma, nippers parent, on the sand in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Cronulla Sharks like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near the Cronulla Sharks."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-jason",
+   "name": "Jason, Sharks supporter",
+   "x": -5118,
+   "z": 20535,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Up, up Cronulla. 2016, mate. Never forget. Cronulla, what's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Shark Park, every home game, since the seats were bleachers. Gunnamatta Bay is where we drank after the grand final.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Is Penrith Any Good",
+       "accept": "qg-l9-cronulla-012",
+       "denyFlag": "w:qg-l9-cronulla-012"
+      },
+      {
+       "text": "The the Bundeena ferry Tab",
+       "accept": "qg-l9-cronulla-013",
+       "denyFlag": "w:qg-l9-cronulla-013",
+       "needFlag": "w:qg-l9-cronulla-012"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Jason pays up on the spot.",
+     "choices": [
+      {
+       "text": "About is penrith any good.",
+       "turnin": "qg-l9-cronulla-012"
+      },
+      {
+       "text": "About the the bundeena ferry tab.",
+       "turnin": "qg-l9-cronulla-013"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best thing about the Shire is you never have to leave. The worst thing is Gunnamatta Bay on a long weekend.",
+     "improv": {
+      "persona": "Jason, Sharks supporter in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about Gunnamatta Bay like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near Gunnamatta Bay."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Jason listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-nathan",
+   "name": "Nathan, RSL sub-branch secretary",
+   "x": -4831,
+   "z": 20725,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sign in, love. Everyone signs in. Cronulla RSL, you're very welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Raffles, Anzac Day, the bistro's schnitzel and a room full of pokies I have opinions about. the Bundeena ferry sends us its regulars.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the kingsway order.",
+     "choices": [
+      {
+       "text": "The Kingsway Order",
+       "accept": "qg-l9-cronulla-014",
+       "denyFlag": "w:qg-l9-cronulla-014"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Nathan counts it out without looking up. -- Don't spend it all at the Bundeena ferry.",
+     "choices": [
+      {
+       "text": "About the kingsway order.",
+       "turnin": "qg-l9-cronulla-014"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The cheapest schooner in Cronulla is at the sub-branch, six o'clock, before the Ode. Stand up for the Ode.",
+     "improv": {
+      "persona": "Nathan, RSL sub-branch secretary in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Bundeena ferry like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near the Bundeena ferry."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-trish",
+   "name": "Trish, chippy off a job",
+   "x": -4788,
+   "z": 20576,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Cronulla, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's something from the cronulla surf club.",
+     "choices": [
+      {
+       "text": "Something From the Cronulla surf club",
+       "accept": "qg-l9-cronulla-015",
+       "denyFlag": "w:qg-l9-cronulla-015"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Trish looks it over the way Cronulla looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About something from the cronulla surf club.",
+       "turnin": "qg-l9-cronulla-015"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Cronulla is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Trish, chippy off a job in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about Kingsway like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near Kingsway."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-jacinta",
+   "name": "Jacinta, real estate agent",
+   "x": -4701,
+   "z": 20547,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Cronulla is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. the Northies is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at the cronulla surf club.",
+     "choices": [
+      {
+       "text": "Trouble at the Cronulla surf club",
+       "accept": "qg-l9-cronulla-016",
+       "denyFlag": "w:qg-l9-cronulla-016"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Jacinta counts it out without looking up. -- Don't spend it all at the Northies.",
+     "choices": [
+      {
+       "text": "About trouble at the cronulla surf club.",
+       "turnin": "qg-l9-cronulla-016"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. the Northies means cosy.",
+     "improv": {
+      "persona": "Jacinta, real estate agent in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Northies like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near the Northies."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-clementine",
+   "name": "Clementine, Shire local, never left",
+   "x": -5057,
+   "z": 20871,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from here. It's fine. Cronulla. Everyone's welcome, sort of.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Born at Sutherland, school at Cronulla, married at the RSL. the Cronulla surf club is my whole world and I'm happy with it.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two from cronulla mall.",
+     "choices": [
+      {
+       "text": "Two From Cronulla Mall",
+       "accept": "qg-l9-cronulla-017",
+       "denyFlag": "w:qg-l9-cronulla-017"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Clementine counts it out without looking up. -- Don't spend it all at the Cronulla surf club.",
+     "choices": [
+      {
+       "text": "About two from cronulla mall.",
+       "turnin": "qg-l9-cronulla-017"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a bloke at the Cronulla surf club who's been surfing the same break since the Whitlam dismissal. He's fine.",
+     "improv": {
+      "persona": "Clementine, Shire local, never left in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Cronulla surf club like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near the Cronulla surf club."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-georgie",
+   "name": "Georgie, RSL sub-branch secretary",
+   "x": -5368,
+   "z": 20725,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sign in, love. Everyone signs in. Cronulla RSL, you're very welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Raffles, Anzac Day, the bistro's schnitzel and a room full of pokies I have opinions about. Wanda sends us its regulars.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rbt on the cronulla rsl.",
+     "choices": [
+      {
+       "text": "RBT on the Cronulla RSL",
+       "accept": "qg-l9-cronulla-018",
+       "denyFlag": "w:qg-l9-cronulla-018"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Georgie counts it out without looking up. -- Don't spend it all at Wanda.",
+     "choices": [
+      {
+       "text": "About rbt on the cronulla rsl.",
+       "turnin": "qg-l9-cronulla-018"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The cheapest schooner in Cronulla is at the sub-branch, six o'clock, before the Ode. Stand up for the Ode.",
+     "improv": {
+      "persona": "Georgie, RSL sub-branch secretary in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about Wanda like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near Wanda."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-elaine",
+   "name": "Elaine, chippy off a job",
+   "x": -4595,
+   "z": 20885,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Cronulla, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Closing Time at the Cronulla Sharks",
+       "accept": "qg-l9-cronulla-019",
+       "denyFlag": "w:qg-l9-cronulla-019"
+      },
+      {
+       "text": "Lads Off the Cronulla Sharks",
+       "accept": "qg-l9-cronulla-020",
+       "denyFlag": "w:qg-l9-cronulla-020",
+       "needFlag": "w:qg-l9-cronulla-019"
+      },
+      {
+       "text": "The the Cronulla Sharks Camera",
+       "accept": "qg-l9-cronulla-021",
+       "denyFlag": "w:qg-l9-cronulla-021"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Elaine counts it out without looking up. -- Don't spend it all at the Cronulla RSL.",
+     "choices": [
+      {
+       "text": "About closing time at the cronulla sharks.",
+       "turnin": "qg-l9-cronulla-019"
+      },
+      {
+       "text": "About lads off the cronulla sharks.",
+       "turnin": "qg-l9-cronulla-020"
+      },
+      {
+       "text": "About the the cronulla sharks camera.",
+       "turnin": "qg-l9-cronulla-021"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Cronulla is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Elaine, chippy off a job in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Cronulla RSL like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near the Cronulla RSL."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-jarrod",
+   "name": "Jarrod, real estate agent",
+   "x": -4950,
+   "z": 20903,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Cronulla is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. the Cronulla Sharks is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's meat tray at gunnamatta bay.",
+     "choices": [
+      {
+       "text": "Meat Tray at Gunnamatta Bay",
+       "accept": "qg-l9-cronulla-022",
+       "denyFlag": "w:qg-l9-cronulla-022"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Jarrod counts it out without looking up. -- Don't spend it all at the Cronulla Sharks.",
+     "choices": [
+      {
+       "text": "About meat tray at gunnamatta bay.",
+       "turnin": "qg-l9-cronulla-022"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. the Cronulla Sharks means cosy.",
+     "improv": {
+      "persona": "Jarrod, real estate agent in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Cronulla Sharks like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near the Cronulla Sharks."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-karen",
+   "name": "Karen, Shire local, never left",
+   "x": -5237,
+   "z": 21170,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from here. It's fine. Cronulla. Everyone's welcome, sort of.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Born at Sutherland, school at Cronulla, married at the RSL. Gunnamatta Bay is my whole world and I'm happy with it.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Parcel for Penrith",
+       "accept": "qg-l9-cronulla-023",
+       "denyFlag": "w:qg-l9-cronulla-023"
+      },
+      {
+       "text": "Proof of the Bundeena ferry",
+       "accept": "qg-l9-cronulla-024",
+       "denyFlag": "w:qg-l9-cronulla-024",
+       "needFlag": "w:qg-l9-cronulla-023"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Karen counts it out without looking up. -- Don't spend it all at Gunnamatta Bay.",
+     "choices": [
+      {
+       "text": "About parcel for penrith.",
+       "turnin": "qg-l9-cronulla-023"
+      },
+      {
+       "text": "About proof of the bundeena ferry.",
+       "turnin": "qg-l9-cronulla-024"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a bloke at Gunnamatta Bay who's been surfing the same break since the Whitlam dismissal. He's fine.",
+     "improv": {
+      "persona": "Karen, Shire local, never left in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about Gunnamatta Bay like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near Gunnamatta Bay."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-maureen",
+   "name": "Maureen, nippers parent, on the sand",
+   "x": -5227,
+   "z": 20639,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sunscreen! Sorry, not you. Six-year-olds. Cronulla, what's happening?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Every Sunday at seven, forty kids in pink caps and their parents in the surf club. Kingsway is where I lost my voice.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's counting the northies.",
+     "choices": [
+      {
+       "text": "Counting the Northies",
+       "accept": "qg-l9-cronulla-025",
+       "denyFlag": "w:qg-l9-cronulla-025"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Maureen pays up on the spot.",
+     "choices": [
+      {
+       "text": "About counting the northies.",
+       "turnin": "qg-l9-cronulla-025"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bacon and egg roll at Kingsway's surf club is the best in the Shire. Fight me.",
+     "improv": {
+      "persona": "Maureen, nippers parent, on the sand in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about Kingsway like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near Kingsway."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-daz",
+   "name": "Daz, Sharks supporter",
+   "x": -4794,
+   "z": 20477,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Up, up Cronulla. 2016, mate. Never forget. Cronulla, what's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Shark Park, every home game, since the seats were bleachers. the Northies is where we drank after the grand final.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's bin night, the cronulla surf club.",
+     "choices": [
+      {
+       "text": "Bin Night, the Cronulla surf club",
+       "accept": "qg-l9-cronulla-026",
+       "denyFlag": "w:qg-l9-cronulla-026"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Daz pays up on the spot.",
+     "choices": [
+      {
+       "text": "About bin night, the cronulla surf club.",
+       "turnin": "qg-l9-cronulla-026"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best thing about the Shire is you never have to leave. The worst thing is the Northies on a long weekend.",
+     "improv": {
+      "persona": "Daz, Sharks supporter in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Northies like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near the Northies."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-rod",
+   "name": "Rod, RSL sub-branch secretary",
+   "x": -4598,
+   "z": 20627,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sign in, love. Everyone signs in. Cronulla RSL, you're very welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Raffles, Anzac Day, the bistro's schnitzel and a room full of pokies I have opinions about. the Cronulla surf club sends us its regulars.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch cronulla mall.",
+     "choices": [
+      {
+       "text": "Before They Touch Cronulla Mall",
+       "accept": "qg-l9-cronulla-027",
+       "denyFlag": "w:qg-l9-cronulla-027"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Rod pays up on the spot.",
+     "choices": [
+      {
+       "text": "About before they touch cronulla mall.",
+       "turnin": "qg-l9-cronulla-027"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The cheapest schooner in Cronulla is at the sub-branch, six o'clock, before the Ode. Stand up for the Ode.",
+     "improv": {
+      "persona": "Rod, RSL sub-branch secretary in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Cronulla surf club like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near the Cronulla surf club."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-matilda",
+   "name": "Matilda, chippy off a job",
+   "x": -4965,
+   "z": 20635,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Cronulla, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Seven a.m. At North Cronulla",
+       "accept": "qg-l9-cronulla-028",
+       "denyFlag": "w:qg-l9-cronulla-028"
+      },
+      {
+       "text": "Tap On at North Cronulla",
+       "accept": "qg-l9-cronulla-029",
+       "denyFlag": "w:qg-l9-cronulla-029",
+       "needFlag": "w:qg-l9-cronulla-028"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Matilda looks it over the way Cronulla looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About seven a.m. at north cronulla.",
+       "turnin": "qg-l9-cronulla-028"
+      },
+      {
+       "text": "About tap on at north cronulla.",
+       "turnin": "qg-l9-cronulla-029"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Cronulla is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Matilda, chippy off a job in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about Cronulla Mall like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near Cronulla Mall."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-2",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Cronulla would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-gav",
+   "name": "Gav, real estate agent",
+   "x": -4847,
+   "z": 21280,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Cronulla is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. North Cronulla is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's sightline at the alley.",
+     "choices": [
+      {
+       "text": "Sightline at the Alley",
+       "accept": "qg-l9-cronulla-030",
+       "denyFlag": "w:qg-l9-cronulla-030"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Gav looks it over the way Cronulla looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About sightline at the alley.",
+       "turnin": "qg-l9-cronulla-030"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. North Cronulla means cosy.",
+     "improv": {
+      "persona": "Gav, real estate agent in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about North Cronulla like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near North Cronulla."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-2",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Gav listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-tegan",
+   "name": "Tegan, surfer, dawn patrol",
+   "x": -4841.1,
+   "z": 20515,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Onshore. Absolutely cooked. Cronulla is flat as a tack, mate.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Check the cam, drive down, paddle out, get skunked. Wanda on a good day is why people move here.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's something from the cronulla sharks.",
+     "choices": [
+      {
+       "text": "Something From the Cronulla Sharks",
+       "accept": "qg-l9-cronulla-031",
+       "denyFlag": "w:qg-l9-cronulla-031"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Tegan pays up on the spot.",
+     "choices": [
+      {
+       "text": "About something from the cronulla sharks.",
+       "turnin": "qg-l9-cronulla-031"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The car park at Wanda has a bloke who's been there since 1994. He's fine. Don't move his cone.",
+     "improv": {
+      "persona": "Tegan, surfer, dawn patrol in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about Wanda like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near Wanda."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-riley",
+   "name": "Riley, nippers parent, on the sand",
+   "x": -5044,
+   "z": 20725,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sunscreen! Sorry, not you. Six-year-olds. Cronulla, what's happening?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Every Sunday at seven, forty kids in pink caps and their parents in the surf club. the Cronulla RSL is where I lost my voice.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Two From the Cronulla Sharks",
+       "accept": "qg-l9-cronulla-032",
+       "denyFlag": "w:qg-l9-cronulla-032"
+      },
+      {
+       "text": "Trolley Run, the Cronulla Sharks",
+       "accept": "qg-l9-cronulla-033",
+       "denyFlag": "w:qg-l9-cronulla-033",
+       "needFlag": "w:qg-l9-cronulla-032"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Riley looks it over the way Cronulla looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About two from the cronulla sharks.",
+       "turnin": "qg-l9-cronulla-032"
+      },
+      {
+       "text": "About trolley run, the cronulla sharks.",
+       "turnin": "qg-l9-cronulla-033"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bacon and egg roll at the Cronulla RSL's surf club is the best in the Shire. Fight me.",
+     "improv": {
+      "persona": "Riley, nippers parent, on the sand in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Cronulla RSL like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near the Cronulla RSL."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-stuart",
+   "name": "Stuart, RSL sub-branch secretary",
+   "x": -4957,
+   "z": 20869,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sign in, love. Everyone signs in. Cronulla RSL, you're very welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Raffles, Anzac Day, the bistro's schnitzel and a room full of pokies I have opinions about. Gunnamatta Bay sends us its regulars.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Race Four, the Bundeena ferry",
+       "accept": "qg-l9-cronulla-034",
+       "denyFlag": "w:qg-l9-cronulla-034"
+      },
+      {
+       "text": "Ask Around at Penrith",
+       "accept": "qg-l9-cronulla-035",
+       "denyFlag": "w:qg-l9-cronulla-035",
+       "needFlag": "w:qg-l9-cronulla-034"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Stuart pays up on the spot.",
+     "choices": [
+      {
+       "text": "About race four, the bundeena ferry.",
+       "turnin": "qg-l9-cronulla-034"
+      },
+      {
+       "text": "About ask around at penrith.",
+       "turnin": "qg-l9-cronulla-035"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The cheapest schooner in Cronulla is at the sub-branch, six o'clock, before the Ode. Stand up for the Ode.",
+     "improv": {
+      "persona": "Stuart, RSL sub-branch secretary in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about Gunnamatta Bay like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near Gunnamatta Bay."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Right. And you're sure it was the Bundeena ferry? People say the Bundeena ferry when they mean the bit next to it. -- Stuart writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Cronulla would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-rhonda",
+   "name": "Rhonda, Shire local, never left",
+   "x": -5033,
+   "z": 20782,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from here. It's fine. Cronulla. Everyone's welcome, sort of.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Born at Sutherland, school at Cronulla, married at the RSL. the Northies is my whole world and I'm happy with it.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Cronulla Mall Complaint",
+       "accept": "qg-l9-cronulla-036",
+       "denyFlag": "w:qg-l9-cronulla-036"
+      },
+      {
+       "text": "Closing Time at the Cronulla surf club",
+       "accept": "qg-l9-cronulla-037",
+       "denyFlag": "w:qg-l9-cronulla-037",
+       "needFlag": "w:qg-l9-cronulla-036"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Rhonda looks it over the way Cronulla looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the cronulla mall complaint.",
+       "turnin": "qg-l9-cronulla-036"
+      },
+      {
+       "text": "About closing time at the cronulla surf club.",
+       "turnin": "qg-l9-cronulla-037"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a bloke at the Northies who's been surfing the same break since the Whitlam dismissal. He's fine.",
+     "improv": {
+      "persona": "Rhonda, Shire local, never left in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Northies like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near the Northies."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-hamish",
+   "name": "Hamish, surfer, dawn patrol",
+   "x": -5070,
+   "z": 20830,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Onshore. Absolutely cooked. Cronulla is flat as a tack, mate.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Check the cam, drive down, paddle out, get skunked. the Cronulla surf club on a good day is why people move here.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Lads Off Cronulla Mall",
+       "accept": "qg-l9-cronulla-038",
+       "denyFlag": "w:qg-l9-cronulla-038"
+      },
+      {
+       "text": "The Cronulla Mall Camera",
+       "accept": "qg-l9-cronulla-039",
+       "denyFlag": "w:qg-l9-cronulla-039",
+       "needFlag": "w:qg-l9-cronulla-038"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Hamish looks it over the way Cronulla looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About lads off cronulla mall.",
+       "turnin": "qg-l9-cronulla-038"
+      },
+      {
+       "text": "About the cronulla mall camera.",
+       "turnin": "qg-l9-cronulla-039"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The car park at the Cronulla surf club has a bloke who's been there since 1994. He's fine. Don't move his cone.",
+     "improv": {
+      "persona": "Hamish, surfer, dawn patrol in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Cronulla surf club like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near the Cronulla surf club."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-shirl",
+   "name": "Shirl, RSL sub-branch secretary",
+   "x": -4929,
+   "z": 20820,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sign in, love. Everyone signs in. Cronulla RSL, you're very welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Raffles, Anzac Day, the bistro's schnitzel and a room full of pokies I have opinions about. the Alley sends us its regulars.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's counting wanda.",
+     "choices": [
+      {
+       "text": "Counting Wanda",
+       "accept": "qg-l9-cronulla-040",
+       "denyFlag": "w:qg-l9-cronulla-040"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Shirl looks it over the way Cronulla looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About counting wanda.",
+       "turnin": "qg-l9-cronulla-040"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The cheapest schooner in Cronulla is at the sub-branch, six o'clock, before the Ode. Stand up for the Ode.",
+     "improv": {
+      "persona": "Shirl, RSL sub-branch secretary in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Alley like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near the Alley."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cronulla-shaz",
+   "name": "Shaz, chippy off a job",
+   "x": -4819,
+   "z": 21010,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Cronulla, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cronulla like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's bin night, the cronulla rsl.",
+     "choices": [
+      {
+       "text": "Bin Night, the Cronulla RSL",
+       "accept": "qg-l9-cronulla-041",
+       "denyFlag": "w:qg-l9-cronulla-041"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Shaz counts it out without looking up. -- Don't spend it all at Wanda.",
+     "choices": [
+      {
+       "text": "About bin night, the cronulla rsl.",
+       "turnin": "qg-l9-cronulla-041"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Cronulla is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Shaz, chippy off a job in Cronulla, Sydney. Dry, specific, local; never says g'day or crikey; talks about Wanda like everyone knows it.",
+      "context": "Someone has asked what Cronulla is like these days. You are standing near Wanda."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,1812 @@
+{
+ "pack": "area-penrith-2",
+ "npcs": [
+  {
+   "id": "qg-penrith-chantelle",
+   "name": "Chantelle, council ranger",
+   "x": -47440,
+   "z": -12295,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Penrith is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Penrith like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. the Panthers generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's seven a.m. at penrith plaza.",
+     "choices": [
+      {
+       "text": "Seven a.m. At Penrith Plaza",
+       "accept": "qg-l10-penrith-047",
+       "denyFlag": "w:qg-l10-penrith-047"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Chantelle counts it out without looking up. -- Don't spend it all at the Panthers.",
+     "choices": [
+      {
+       "text": "About seven a.m. at penrith plaza.",
+       "turnin": "qg-l10-penrith-047"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Chantelle, council ranger in Penrith, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Panthers like everyone knows it.",
+      "context": "Someone has asked what Penrith is like these days. You are standing near the Panthers."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-penrith-omar",
+   "name": "Omar, mechanic, own shop",
+   "x": -47978,
+   "z": -11819,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "It's the timing belt. I haven't looked. It's always the timing belt. Penrith, what've you got?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Penrith like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Commodores, Hiluxes, the odd Alfa from a man who should know better. the Nepean River is where they die.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's counting tench reserve.",
+     "choices": [
+      {
+       "text": "Counting Tench Reserve",
+       "accept": "qg-l10-penrith-048",
+       "denyFlag": "w:qg-l10-penrith-048"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Omar looks it over the way Penrith looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About counting tench reserve.",
+       "turnin": "qg-l10-penrith-048"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never buy a car off the Nepean River. Never. I've seen where they've been.",
+     "improv": {
+      "persona": "Omar, mechanic, own shop in Penrith, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Nepean River like everyone knows it.",
+      "context": "Someone has asked what Penrith is like these days. You are standing near the Nepean River."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-penrith-riley",
+   "name": "Riley, proud westie",
+   "x": -48079,
+   "z": -11867,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Westie and proud, mate. Say it. Penrith. Yeah.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Penrith like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Born at Nepean, work at Penrith, drive a ute with a P plate I should've taken off ten years ago. Tench Reserve is home.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch high street.",
+     "choices": [
+      {
+       "text": "Before They Touch High Street",
+       "accept": "qg-l10-penrith-049",
+       "denyFlag": "w:qg-l10-penrith-049"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Riley looks it over the way Penrith looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About before they touch high street.",
+       "turnin": "qg-l10-penrith-049"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The M4 at five is a car park. The M4 at six is a slower car park. Tench Reserve's the shortcut. Don't tell anyone.",
+     "improv": {
+      "persona": "Riley, proud westie in Penrith, Sydney. Dry, specific, local; never says g'day or crikey; talks about Tench Reserve like everyone knows it.",
+      "context": "Someone has asked what Penrith is like these days. You are standing near Tench Reserve."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-penrith-merv",
+   "name": "Merv, Panthers supporter",
+   "x": -48144,
+   "z": -12595,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Four in a row. FOUR. Penrith, you here for the game?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Penrith like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Panthers member since the Leagues Club was a shed. High Street is where the whole of the west turns up on a Friday.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Rent Money, the Penrith Whitewater stadium",
+       "accept": "qg-l10-penrith-050",
+       "denyFlag": "w:qg-l10-penrith-050"
+      },
+      {
+       "text": "Trouble at Mulgoa Road",
+       "accept": "qg-l10-penrith-051",
+       "denyFlag": "w:qg-l10-penrith-051",
+       "needFlag": "w:qg-l10-penrith-050"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Merv pays up on the spot.",
+     "choices": [
+      {
+       "text": "About rent money, the penrith whitewater stadium.",
+       "turnin": "qg-l10-penrith-050"
+      },
+      {
+       "text": "About trouble at mulgoa road.",
+       "turnin": "qg-l10-penrith-051"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Log Cabin at High Street has seen every grand final and most of the divorces.",
+     "improv": {
+      "persona": "Merv, Panthers supporter in Penrith, Sydney. Dry, specific, local; never says g'day or crikey; talks about High Street like everyone knows it.",
+      "context": "Someone has asked what Penrith is like these days. You are standing near High Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-penrith-stuart",
+   "name": "Stuart, chippy off a job",
+   "x": -47879,
+   "z": -11789,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Penrith, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Penrith like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's probationary at mulgoa road.",
+     "choices": [
+      {
+       "text": "Probationary at Mulgoa Road",
+       "accept": "qg-l10-penrith-052",
+       "denyFlag": "w:qg-l10-penrith-052"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Stuart looks it over the way Penrith looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About probationary at mulgoa road.",
+       "turnin": "qg-l10-penrith-052"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Penrith is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Stuart, chippy off a job in Penrith, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Penrith Whitewater stadium like everyone knows it.",
+      "context": "Someone has asked what Penrith is like these days. You are standing near the Penrith Whitewater stadium."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-penrith-joyce",
+   "name": "Joyce, RSL sub-branch secretary",
+   "x": -47461,
+   "z": -11943,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sign in, love. Everyone signs in. Penrith RSL, you're very welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Penrith like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Raffles, Anzac Day, the bistro's schnitzel and a room full of pokies I have opinions about. Mulgoa Road sends us its regulars.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the log cabin course.",
+     "choices": [
+      {
+       "text": "The the Log Cabin Course",
+       "accept": "qg-l10-penrith-053",
+       "denyFlag": "w:qg-l10-penrith-053"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Joyce looks it over the way Penrith looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the log cabin course.",
+       "turnin": "qg-l10-penrith-053"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The cheapest schooner in Penrith is at the sub-branch, six o'clock, before the Ode. Stand up for the Ode.",
+     "improv": {
+      "persona": "Joyce, RSL sub-branch secretary in Penrith, Sydney. Dry, specific, local; never says g'day or crikey; talks about Mulgoa Road like everyone knows it.",
+      "context": "Someone has asked what Penrith is like these days. You are standing near Mulgoa Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-penrith-gav",
+   "name": "Gav, council ranger",
+   "x": -47610,
+   "z": -12536,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Penrith is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Penrith like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. the Log Cabin generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's one stop from penrith paceway.",
+     "choices": [
+      {
+       "text": "One Stop From Penrith Paceway",
+       "accept": "qg-l10-penrith-054",
+       "denyFlag": "w:qg-l10-penrith-054"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Gav pays up on the spot.",
+     "choices": [
+      {
+       "text": "About one stop from penrith paceway.",
+       "turnin": "qg-l10-penrith-054"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Gav, council ranger in Penrith, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Log Cabin like everyone knows it.",
+      "context": "Someone has asked what Penrith is like these days. You are standing near the Log Cabin."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-penrith-barry",
+   "name": "Barry, probationary constable",
+   "x": -47783,
+   "z": -12173,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Penrith LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Penrith like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of Penrith Paceway. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's cover at the great western highway.",
+     "choices": [
+      {
+       "text": "Cover at the Great Western Highway",
+       "accept": "qg-l10-penrith-055",
+       "denyFlag": "w:qg-l10-penrith-055"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Barry pays up on the spot.",
+     "choices": [
+      {
+       "text": "About cover at the great western highway.",
+       "turnin": "qg-l10-penrith-055"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about Penrith Paceway. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Barry, probationary constable in Penrith, Sydney. Dry, specific, local; never says g'day or crikey; talks about Penrith Paceway like everyone knows it.",
+      "context": "Someone has asked what Penrith is like these days. You are standing near Penrith Paceway."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-penrith-kai",
+   "name": "Kai, proud westie",
+   "x": -47741,
+   "z": -12545,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Westie and proud, mate. Say it. Penrith. Yeah.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Penrith like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Born at Nepean, work at Penrith, drive a ute with a P plate I should've taken off ten years ago. the Panthers is home.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's staffy near the nepean river.",
+     "choices": [
+      {
+       "text": "Staffy Near the Nepean River",
+       "accept": "qg-l10-penrith-056",
+       "denyFlag": "w:qg-l10-penrith-056"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Kai counts it out without looking up. -- Don't spend it all at the Panthers.",
+     "choices": [
+      {
+       "text": "About staffy near the nepean river.",
+       "turnin": "qg-l10-penrith-056"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The M4 at five is a car park. The M4 at six is a slower car park. the Panthers's the shortcut. Don't tell anyone.",
+     "improv": {
+      "persona": "Kai, proud westie in Penrith, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Panthers like everyone knows it.",
+      "context": "Someone has asked what Penrith is like these days. You are standing near the Panthers."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-2",
+     "line": "Right. And you're sure it was the Nepean River? People say the Nepean River when they mean the bit next to it. -- Kai writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-penrith-norm",
+   "name": "Norm, Panthers supporter",
+   "x": -48251,
+   "z": -12032,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Four in a row. FOUR. Penrith, you here for the game?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Penrith like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Panthers member since the Leagues Club was a shed. Penrith Plaza is where the whole of the west turns up on a Friday.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's closing time at the nepean river.",
+     "choices": [
+      {
+       "text": "Closing Time at the Nepean River",
+       "accept": "qg-l10-penrith-057",
+       "denyFlag": "w:qg-l10-penrith-057"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Norm counts it out without looking up. -- Don't spend it all at Penrith Plaza.",
+     "choices": [
+      {
+       "text": "About closing time at the nepean river.",
+       "turnin": "qg-l10-penrith-057"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Log Cabin at Penrith Plaza has seen every grand final and most of the divorces.",
+     "improv": {
+      "persona": "Norm, Panthers supporter in Penrith, Sydney. Dry, specific, local; never says g'day or crikey; talks about Penrith Plaza like everyone knows it.",
+      "context": "Someone has asked what Penrith is like these days. You are standing near Penrith Plaza."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-penrith-bronwyn",
+   "name": "Bronwyn, chippy off a job",
+   "x": -48206,
+   "z": -12426,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Penrith, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Penrith like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's something from high street.",
+     "choices": [
+      {
+       "text": "Something From High Street",
+       "accept": "qg-l10-penrith-058",
+       "denyFlag": "w:qg-l10-penrith-058"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Bronwyn pays up on the spot.",
+     "choices": [
+      {
+       "text": "About something from high street.",
+       "turnin": "qg-l10-penrith-058"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Penrith is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Bronwyn, chippy off a job in Penrith, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Nepean River like everyone knows it.",
+      "context": "Someone has asked what Penrith is like these days. You are standing near the Nepean River."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-penrith-bazza",
+   "name": "Bazza, RSL sub-branch secretary",
+   "x": -48141,
+   "z": -12326,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sign in, love. Everyone signs in. Penrith RSL, you're very welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Penrith like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Raffles, Anzac Day, the bistro's schnitzel and a room full of pokies I have opinions about. Tench Reserve sends us its regulars.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's ask around at blacktown.",
+     "choices": [
+      {
+       "text": "Ask Around at Blacktown",
+       "accept": "qg-l10-penrith-059",
+       "denyFlag": "w:qg-l10-penrith-059"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Bazza looks it over the way Penrith looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About ask around at blacktown.",
+       "turnin": "qg-l10-penrith-059"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The cheapest schooner in Penrith is at the sub-branch, six o'clock, before the Ode. Stand up for the Ode.",
+     "improv": {
+      "persona": "Bazza, RSL sub-branch secretary in Penrith, Sydney. Dry, specific, local; never says g'day or crikey; talks about Tench Reserve like everyone knows it.",
+      "context": "Someone has asked what Penrith is like these days. You are standing near Tench Reserve."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Right. And you're sure it was Mulgoa Road? People say Mulgoa Road when they mean the bit next to it. -- Bazza writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-penrith-pam",
+   "name": "Pam, council ranger",
+   "x": -48056,
+   "z": -12309,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Penrith is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Penrith like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. High Street generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the log cabin camera.",
+     "choices": [
+      {
+       "text": "The the Log Cabin Camera",
+       "accept": "qg-l10-penrith-060",
+       "denyFlag": "w:qg-l10-penrith-060"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Pam counts it out without looking up. -- Don't spend it all at High Street.",
+     "choices": [
+      {
+       "text": "About the the log cabin camera.",
+       "turnin": "qg-l10-penrith-060"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Pam, council ranger in Penrith, Sydney. Dry, specific, local; never says g'day or crikey; talks about High Street like everyone knows it.",
+      "context": "Someone has asked what Penrith is like these days. You are standing near High Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-penrith-denise",
+   "name": "Denise, probationary constable",
+   "x": -47720,
+   "z": -12266,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Penrith LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Penrith like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of the Penrith Whitewater stadium. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "A Flat White From Penrith Paceway",
+       "accept": "qg-l10-penrith-061",
+       "denyFlag": "w:qg-l10-penrith-061"
+      },
+      {
+       "text": "The Mulgoa Road Complaint",
+       "accept": "qg-l10-penrith-062",
+       "denyFlag": "w:qg-l10-penrith-062",
+       "needFlag": "w:qg-l10-penrith-061"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Denise pays up on the spot.",
+     "choices": [
+      {
+       "text": "About a flat white from penrith paceway.",
+       "turnin": "qg-l10-penrith-061"
+      },
+      {
+       "text": "About the mulgoa road complaint.",
+       "turnin": "qg-l10-penrith-062"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about the Penrith Whitewater stadium. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Denise, probationary constable in Penrith, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Penrith Whitewater stadium like everyone knows it.",
+      "context": "Someone has asked what Penrith is like these days. You are standing near the Penrith Whitewater stadium."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-penrith-zeina",
+   "name": "Zeina, mechanic, own shop",
+   "x": -47758,
+   "z": -11960,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "It's the timing belt. I haven't looked. It's always the timing belt. Penrith, what've you got?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Penrith like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Commodores, Hiluxes, the odd Alfa from a man who should know better. Mulgoa Road is where they die.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's seven a.m. at the log cabin.",
+     "choices": [
+      {
+       "text": "Seven a.m. At the Log Cabin",
+       "accept": "qg-l10-penrith-063",
+       "denyFlag": "w:qg-l10-penrith-063"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Zeina looks it over the way Penrith looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About seven a.m. at the log cabin.",
+       "turnin": "qg-l10-penrith-063"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never buy a car off Mulgoa Road. Never. I've seen where they've been.",
+     "improv": {
+      "persona": "Zeina, mechanic, own shop in Penrith, Sydney. Dry, specific, local; never says g'day or crikey; talks about Mulgoa Road like everyone knows it.",
+      "context": "Someone has asked what Penrith is like these days. You are standing near Mulgoa Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-penrith-phil",
+   "name": "Phil, Panthers supporter",
+   "x": -48079,
+   "z": -12465,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Four in a row. FOUR. Penrith, you here for the game?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Penrith like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Panthers member since the Leagues Club was a shed. Penrith Paceway is where the whole of the west turns up on a Friday.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's proof of the great western highway.",
+     "choices": [
+      {
+       "text": "Proof of the Great Western Highway",
+       "accept": "qg-l10-penrith-064",
+       "denyFlag": "w:qg-l10-penrith-064"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Phil counts it out without looking up. -- Don't spend it all at Penrith Paceway.",
+     "choices": [
+      {
+       "text": "About proof of the great western highway.",
+       "turnin": "qg-l10-penrith-064"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Log Cabin at Penrith Paceway has seen every grand final and most of the divorces.",
+     "improv": {
+      "persona": "Phil, Panthers supporter in Penrith, Sydney. Dry, specific, local; never says g'day or crikey; talks about Penrith Paceway like everyone knows it.",
+      "context": "Someone has asked what Penrith is like these days. You are standing near Penrith Paceway."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-penrith-dot",
+   "name": "Dot, chippy off a job",
+   "x": -47621,
+   "z": -12118,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Penrith, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Penrith like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch the panthers.",
+     "choices": [
+      {
+       "text": "Before They Touch the Panthers",
+       "accept": "qg-l10-penrith-065",
+       "denyFlag": "w:qg-l10-penrith-065"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Dot looks it over the way Penrith looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About before they touch the panthers.",
+       "turnin": "qg-l10-penrith-065"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Penrith is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Dot, chippy off a job in Penrith, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Great Western Highway like everyone knows it.",
+      "context": "Someone has asked what Penrith is like these days. You are standing near the Great Western Highway."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-penrith-rod",
+   "name": "Rod, RSL sub-branch secretary",
+   "x": -47887,
+   "z": -12224,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sign in, love. Everyone signs in. Penrith RSL, you're very welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Penrith like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Raffles, Anzac Day, the bistro's schnitzel and a room full of pokies I have opinions about. the Panthers sends us its regulars.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at the nepean river.",
+     "choices": [
+      {
+       "text": "Trouble at the Nepean River",
+       "accept": "qg-l10-penrith-066",
+       "denyFlag": "w:qg-l10-penrith-066"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Rod counts it out without looking up. -- Don't spend it all at the Panthers.",
+     "choices": [
+      {
+       "text": "About trouble at the nepean river.",
+       "turnin": "qg-l10-penrith-066"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The cheapest schooner in Penrith is at the sub-branch, six o'clock, before the Ode. Stand up for the Ode.",
+     "improv": {
+      "persona": "Rod, RSL sub-branch secretary in Penrith, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Panthers like everyone knows it.",
+      "context": "Someone has asked what Penrith is like these days. You are standing near the Panthers."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-penrith-shaz",
+   "name": "Shaz, council ranger",
+   "x": -47402,
+   "z": -12408,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Penrith is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Penrith like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Penrith Plaza generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's probationary at the nepean river.",
+     "choices": [
+      {
+       "text": "Probationary at the Nepean River",
+       "accept": "qg-l10-penrith-067",
+       "denyFlag": "w:qg-l10-penrith-067"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Shaz counts it out without looking up. -- Don't spend it all at Penrith Plaza.",
+     "choices": [
+      {
+       "text": "About probationary at the nepean river.",
+       "turnin": "qg-l10-penrith-067"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Shaz, council ranger in Penrith, Sydney. Dry, specific, local; never says g'day or crikey; talks about Penrith Plaza like everyone knows it.",
+      "context": "Someone has asked what Penrith is like these days. You are standing near Penrith Plaza."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

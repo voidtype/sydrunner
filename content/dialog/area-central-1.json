@@ -1,0 +1,3131 @@
+{
+ "pack": "area-central-1",
+ "npcs": [
+  {
+   "id": "qg-central-kevin",
+   "name": "Kevin, dumpling house owner",
+   "x": 41,
+   "z": 2078,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table for one? Sit anywhere. Not that one, that's the boss's. Welcome to Central.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Xiao long bao, hand-made, eleven a.m. till the dough runs out. the Grand Concourse queues down the street on Sundays.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Sightline at Thomas Street",
+       "accept": "qg-l3-central-001",
+       "denyFlag": "w:qg-l3-central-001"
+      },
+      {
+       "text": "Left It Near Thomas Street",
+       "accept": "qg-l3-central-002",
+       "denyFlag": "w:qg-l3-central-002",
+       "needFlag": "w:qg-l3-central-001"
+      },
+      {
+       "text": "The Length of Thomas Street",
+       "accept": "qg-l3-central-003",
+       "denyFlag": "w:qg-l3-central-003"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Kevin looks it over the way Central looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About sightline at thomas street.",
+       "turnin": "qg-l3-central-001"
+      },
+      {
+       "text": "About left it near thomas street.",
+       "turnin": "qg-l3-central-002"
+      },
+      {
+       "text": "About the length of thomas street.",
+       "turnin": "qg-l3-central-003"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best dumplings in Central are at the place with the worst sign. Everyone knows. Nobody says.",
+     "improv": {
+      "persona": "Kevin, dumpling house owner in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Grand Concourse like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near the Grand Concourse."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Right. And you're sure it was Thomas Street? People say Thomas Street when they mean the bit next to it. -- Kevin writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Right. And you're sure it was Thomas Street? People say Thomas Street when they mean the bit next to it. -- Kevin writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-terry",
+   "name": "Terry, backpacker on a working visa",
+   "x": -404,
+   "z": 1425,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Alright? Sorry, you're not the hostel guy. Central's wild, man.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Eighty-eight days of farm work done, now I'm pouring beers near Thomas Street and sleeping eight to a room.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Central's clock tower Camera",
+       "accept": "qg-l3-central-004",
+       "denyFlag": "w:qg-l3-central-004"
+      },
+      {
+       "text": "The the Haymarket paifang Course",
+       "accept": "qg-l3-central-005",
+       "denyFlag": "w:qg-l3-central-005",
+       "needFlag": "w:qg-l3-central-004"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Terry looks it over the way Central looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the central's clock tower camera.",
+       "turnin": "qg-l3-central-004"
+      },
+      {
+       "text": "About the the haymarket paifang course.",
+       "turnin": "qg-l3-central-005"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a goon bag somewhere near Thomas Street that has my name on it, literally, I wrote it.",
+     "improv": {
+      "persona": "Terry, backpacker on a working visa in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about Thomas Street like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near Thomas Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-digby",
+   "name": "Digby, busker, one amp",
+   "x": -450,
+   "z": 1697,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hold that thought, the council's coming past. Right. Central, what a crowd.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I play the same six songs at the Haymarket paifang and nobody has ever complained. Nobody has ever paid, either.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Is Town Hall Any Good",
+       "accept": "qg-l3-central-006",
+       "denyFlag": "w:qg-l3-central-006"
+      },
+      {
+       "text": "Meat Tray at Central's clock tower",
+       "accept": "qg-l3-central-007",
+       "denyFlag": "w:qg-l3-central-007",
+       "needFlag": "w:qg-l3-central-006"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Digby counts it out without looking up. -- Don't spend it all at the Haymarket paifang.",
+     "choices": [
+      {
+       "text": "About is town hall any good.",
+       "turnin": "qg-l3-central-006"
+      },
+      {
+       "text": "About meat tray at central's clock tower.",
+       "turnin": "qg-l3-central-007"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good pitch is outside the Haymarket paifang between four and six. After six it's the bloke with the didgeridoo and a Bluetooth speaker.",
+     "improv": {
+      "persona": "Digby, busker, one amp in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Haymarket paifang like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near the Haymarket paifang."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Central would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-joe",
+   "name": "Joe, cabbie, twenty years",
+   "x": -467,
+   "z": 2142,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Where to? Oh, you're not a fare. Fair enough. Central, I know every gutter.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twenty years on the rank. Uber took half of it and the tunnel took the rest. Central's clock tower is still cash, thank god.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Something From the Devonshire Street tunnel",
+       "accept": "qg-l3-central-008",
+       "denyFlag": "w:qg-l3-central-008"
+      },
+      {
+       "text": "Seven a.m. At the Devonshire Street tunnel",
+       "accept": "qg-l3-central-009",
+       "denyFlag": "w:qg-l3-central-009",
+       "needFlag": "w:qg-l3-central-008"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Joe counts it out without looking up. -- Don't spend it all at Central's clock tower.",
+     "choices": [
+      {
+       "text": "About something from the devonshire street tunnel.",
+       "turnin": "qg-l3-central-008"
+      },
+      {
+       "text": "About seven a.m. at the devonshire street tunnel.",
+       "turnin": "qg-l3-central-009"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never go via Central's clock tower after five. Never. I don't care what the app says.",
+     "improv": {
+      "persona": "Joe, cabbie, twenty years in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about Central's clock tower like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near Central's clock tower."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-toby",
+   "name": "Toby, probationary constable",
+   "x": -430,
+   "z": 1836,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Central LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of the Devonshire Street tunnel. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's staffy near chinatown.",
+     "choices": [
+      {
+       "text": "Staffy Near Chinatown",
+       "accept": "qg-l3-central-010",
+       "denyFlag": "w:qg-l3-central-010"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Toby pays up on the spot.",
+     "choices": [
+      {
+       "text": "About staffy near chinatown.",
+       "turnin": "qg-l3-central-010"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about the Devonshire Street tunnel. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Toby, probationary constable in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Devonshire Street tunnel like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near the Devonshire Street tunnel."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Central would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-annabel",
+   "name": "Annabel, uni student, three jobs",
+   "x": -13,
+   "z": 1813,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Central rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Chinatown is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Paddy's Markets Order",
+       "accept": "qg-l3-central-011",
+       "denyFlag": "w:qg-l3-central-011"
+      },
+      {
+       "text": "Trolley Run, Paddy's Markets",
+       "accept": "qg-l3-central-012",
+       "denyFlag": "w:qg-l3-central-012",
+       "needFlag": "w:qg-l3-central-011"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Annabel counts it out without looking up. -- Don't spend it all at Chinatown.",
+     "choices": [
+      {
+       "text": "About the paddy's markets order.",
+       "turnin": "qg-l3-central-011"
+      },
+      {
+       "text": "About trolley run, paddy's markets.",
+       "turnin": "qg-l3-central-012"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Chinatown that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Annabel, uni student, three jobs in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about Chinatown like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near Chinatown."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-chantelle",
+   "name": "Chantelle, lost property clerk",
+   "x": -282,
+   "z": 1635,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Describe it. No, before you tell me where you lost it, describe it. Central lost property.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Umbrellas, phones, one prosthetic leg. Paddy's Markets produces more forgotten laptops than anywhere in the network.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Cover at Dixon Street",
+       "accept": "qg-l3-central-013",
+       "denyFlag": "w:qg-l3-central-013"
+      },
+      {
+       "text": "Probationary at Dixon Street",
+       "accept": "qg-l3-central-014",
+       "denyFlag": "w:qg-l3-central-014",
+       "needFlag": "w:qg-l3-central-013"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Chantelle counts it out without looking up. -- Don't spend it all at Paddy's Markets.",
+     "choices": [
+      {
+       "text": "About cover at dixon street.",
+       "turnin": "qg-l3-central-013"
+      },
+      {
+       "text": "About probationary at dixon street.",
+       "turnin": "qg-l3-central-014"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Nobody comes back for the umbrellas. Six hundred umbrellas. I've started a collection.",
+     "improv": {
+      "persona": "Chantelle, lost property clerk in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about Paddy's Markets like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near Paddy's Markets."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-ling",
+   "name": "Ling, dumpling house owner",
+   "x": -377,
+   "z": 1542,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table for one? Sit anywhere. Not that one, that's the boss's. Welcome to Central.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Xiao long bao, hand-made, eleven a.m. till the dough runs out. Dixon Street queues down the street on Sundays.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Race Four, the Capitol Theatre",
+       "accept": "qg-l3-central-015",
+       "denyFlag": "w:qg-l3-central-015"
+      },
+      {
+       "text": "One Stop From the Capitol Theatre",
+       "accept": "qg-l3-central-016",
+       "denyFlag": "w:qg-l3-central-016",
+       "needFlag": "w:qg-l3-central-015"
+      },
+      {
+       "text": "Rent Money, the Capitol Theatre",
+       "accept": "qg-l3-central-017",
+       "denyFlag": "w:qg-l3-central-017"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Ling pays up on the spot.",
+     "choices": [
+      {
+       "text": "About race four, the capitol theatre.",
+       "turnin": "qg-l3-central-015"
+      },
+      {
+       "text": "About one stop from the capitol theatre.",
+       "turnin": "qg-l3-central-016"
+      },
+      {
+       "text": "About rent money, the capitol theatre.",
+       "turnin": "qg-l3-central-017"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best dumplings in Central are at the place with the worst sign. Everyone knows. Nobody says.",
+     "improv": {
+      "persona": "Ling, dumpling house owner in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about Dixon Street like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near Dixon Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Right. And you're sure it was the Capitol Theatre? People say the Capitol Theatre when they mean the bit next to it. -- Ling writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-fay",
+   "name": "Fay, backpacker on a working visa",
+   "x": -241,
+   "z": 2139,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Alright? Sorry, you're not the hostel guy. Central's wild, man.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Eighty-eight days of farm work done, now I'm pouring beers near the Capitol Theatre and sleeping eight to a room.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch belmore park.",
+     "choices": [
+      {
+       "text": "Before They Touch Belmore Park",
+       "accept": "qg-l3-central-018",
+       "denyFlag": "w:qg-l3-central-018"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Fay pays up on the spot.",
+     "choices": [
+      {
+       "text": "About before they touch belmore park.",
+       "turnin": "qg-l3-central-018"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a goon bag somewhere near the Capitol Theatre that has my name on it, literally, I wrote it.",
+     "improv": {
+      "persona": "Fay, backpacker on a working visa in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Capitol Theatre like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near the Capitol Theatre."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-kerry",
+   "name": "Kerry, busker, one amp",
+   "x": -273,
+   "z": 1371,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hold that thought, the council's coming past. Right. Central, what a crowd.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I play the same six songs at Belmore Park and nobody has ever complained. Nobody has ever paid, either.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Two From Eddy Avenue",
+       "accept": "qg-l3-central-019",
+       "denyFlag": "w:qg-l3-central-019"
+      },
+      {
+       "text": "Tap On at Eddy Avenue",
+       "accept": "qg-l3-central-020",
+       "denyFlag": "w:qg-l3-central-020",
+       "needFlag": "w:qg-l3-central-019"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Kerry pays up on the spot.",
+     "choices": [
+      {
+       "text": "About two from eddy avenue.",
+       "turnin": "qg-l3-central-019"
+      },
+      {
+       "text": "About tap on at eddy avenue.",
+       "turnin": "qg-l3-central-020"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good pitch is outside Belmore Park between four and six. After six it's the bloke with the didgeridoo and a Bluetooth speaker.",
+     "improv": {
+      "persona": "Kerry, busker, one amp in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about Belmore Park like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near Belmore Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Central would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-ahmed",
+   "name": "Ahmed, cabbie, twenty years",
+   "x": -531,
+   "z": 1313,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Where to? Oh, you're not a fare. Fair enough. Central, I know every gutter.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twenty years on the rank. Uber took half of it and the tunnel took the rest. Eddy Avenue is still cash, thank god.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the thomas street complaint.",
+     "choices": [
+      {
+       "text": "The Thomas Street Complaint",
+       "accept": "qg-l3-central-021",
+       "denyFlag": "w:qg-l3-central-021"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Ahmed pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the thomas street complaint.",
+       "turnin": "qg-l3-central-021"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never go via Eddy Avenue after five. Never. I don't care what the app says.",
+     "improv": {
+      "persona": "Ahmed, cabbie, twenty years in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about Eddy Avenue like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near Eddy Avenue."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-riley",
+   "name": "Riley, probationary constable",
+   "x": -247,
+   "z": 1635,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Central LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of the Grand Concourse. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Thomas Street Fence",
+       "accept": "qg-l3-central-022",
+       "denyFlag": "w:qg-l3-central-022"
+      },
+      {
+       "text": "Proof of Thomas Street",
+       "accept": "qg-l3-central-023",
+       "denyFlag": "w:qg-l3-central-023",
+       "needFlag": "w:qg-l3-central-022"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Riley looks it over the way Central looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the thomas street fence.",
+       "turnin": "qg-l3-central-022"
+      },
+      {
+       "text": "About proof of thomas street.",
+       "turnin": "qg-l3-central-023"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about the Grand Concourse. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Riley, probationary constable in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Grand Concourse like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near the Grand Concourse."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Central would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-bluey",
+   "name": "Bluey, uni student, three jobs",
+   "x": -289,
+   "z": 2117,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Central rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Thomas Street is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the haymarket paifang lift.",
+     "choices": [
+      {
+       "text": "The the Haymarket paifang Lift",
+       "accept": "qg-l3-central-024",
+       "denyFlag": "w:qg-l3-central-024"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Bluey counts it out without looking up. -- Don't spend it all at Thomas Street.",
+     "choices": [
+      {
+       "text": "About the the haymarket paifang lift.",
+       "turnin": "qg-l3-central-024"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Thomas Street that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Bluey, uni student, three jobs in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about Thomas Street like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near Thomas Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Central would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-fiona",
+   "name": "Fiona, lost property clerk",
+   "x": -717,
+   "z": 1962,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Describe it. No, before you tell me where you lost it, describe it. Central lost property.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Umbrellas, phones, one prosthetic leg. the Haymarket paifang produces more forgotten laptops than anywhere in the network.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Central's clock tower Pub Crawl",
+       "accept": "qg-l3-central-025",
+       "denyFlag": "w:qg-l3-central-025"
+      },
+      {
+       "text": "Counting Central's clock tower",
+       "accept": "qg-l3-central-026",
+       "denyFlag": "w:qg-l3-central-026",
+       "needFlag": "w:qg-l3-central-025"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Fiona counts it out without looking up. -- Don't spend it all at the Haymarket paifang.",
+     "choices": [
+      {
+       "text": "About central's clock tower pub crawl.",
+       "turnin": "qg-l3-central-025"
+      },
+      {
+       "text": "About counting central's clock tower.",
+       "turnin": "qg-l3-central-026"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Nobody comes back for the umbrellas. Six hundred umbrellas. I've started a collection.",
+     "improv": {
+      "persona": "Fiona, lost property clerk in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Haymarket paifang like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near the Haymarket paifang."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-wei",
+   "name": "Wei, dumpling house owner",
+   "x": -499,
+   "z": 1288,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table for one? Sit anywhere. Not that one, that's the boss's. Welcome to Central.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Xiao long bao, hand-made, eleven a.m. till the dough runs out. Central's clock tower queues down the street on Sundays.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's lads off the devonshire street tunnel.",
+     "choices": [
+      {
+       "text": "Lads Off the Devonshire Street tunnel",
+       "accept": "qg-l3-central-027",
+       "denyFlag": "w:qg-l3-central-027"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Wei counts it out without looking up. -- Don't spend it all at Central's clock tower.",
+     "choices": [
+      {
+       "text": "About lads off the devonshire street tunnel.",
+       "turnin": "qg-l3-central-027"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best dumplings in Central are at the place with the worst sign. Everyone knows. Nobody says.",
+     "improv": {
+      "persona": "Wei, dumpling house owner in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about Central's clock tower like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near Central's clock tower."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-rhonda",
+   "name": "Rhonda, backpacker on a working visa",
+   "x": -359,
+   "z": 1491,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Alright? Sorry, you're not the hostel guy. Central's wild, man.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Eighty-eight days of farm work done, now I'm pouring beers near the Devonshire Street tunnel and sleeping eight to a room.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's a flat white from paddy's markets.",
+     "choices": [
+      {
+       "text": "A Flat White From Paddy's Markets",
+       "accept": "qg-l3-central-028",
+       "denyFlag": "w:qg-l3-central-028"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Rhonda looks it over the way Central looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About a flat white from paddy's markets.",
+       "turnin": "qg-l3-central-028"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a goon bag somewhere near the Devonshire Street tunnel that has my name on it, literally, I wrote it.",
+     "improv": {
+      "persona": "Rhonda, backpacker on a working visa in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Devonshire Street tunnel like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near the Devonshire Street tunnel."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-neville",
+   "name": "Neville, busker, one amp",
+   "x": -374,
+   "z": 1409,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hold that thought, the council's coming past. Right. Central, what a crowd.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I play the same six songs at Chinatown and nobody has ever complained. Nobody has ever paid, either.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Paddy's Markets Sparky",
+       "accept": "qg-l3-central-029",
+       "denyFlag": "w:qg-l3-central-029"
+      },
+      {
+       "text": "Bin Night, Paddy's Markets",
+       "accept": "qg-l3-central-030",
+       "denyFlag": "w:qg-l3-central-030",
+       "needFlag": "w:qg-l3-central-029"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Neville counts it out without looking up. -- Don't spend it all at Chinatown.",
+     "choices": [
+      {
+       "text": "About the paddy's markets sparky.",
+       "turnin": "qg-l3-central-029"
+      },
+      {
+       "text": "About bin night, paddy's markets.",
+       "turnin": "qg-l3-central-030"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good pitch is outside Chinatown between four and six. After six it's the bloke with the didgeridoo and a Bluetooth speaker.",
+     "improv": {
+      "persona": "Neville, busker, one amp in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about Chinatown like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near Chinatown."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-charbel",
+   "name": "Charbel, cabbie, twenty years",
+   "x": -528,
+   "z": 1752,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Where to? Oh, you're not a fare. Fair enough. Central, I know every gutter.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twenty years on the rank. Uber took half of it and the tunnel took the rest. Paddy's Markets is still cash, thank god.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the dixon street tab.",
+     "choices": [
+      {
+       "text": "The Dixon Street Tab",
+       "accept": "qg-l3-central-031",
+       "denyFlag": "w:qg-l3-central-031"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Charbel looks it over the way Central looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the dixon street tab.",
+       "turnin": "qg-l3-central-031"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never go via Paddy's Markets after five. Never. I don't care what the app says.",
+     "improv": {
+      "persona": "Charbel, cabbie, twenty years in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about Paddy's Markets like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near Paddy's Markets."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-brett",
+   "name": "Brett, probationary constable",
+   "x": -685,
+   "z": 1727,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Central LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of Dixon Street. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Length of the Capitol Theatre",
+       "accept": "qg-l3-central-032",
+       "denyFlag": "w:qg-l3-central-032"
+      },
+      {
+       "text": "The Belmore Park Camera",
+       "accept": "qg-l3-central-033",
+       "denyFlag": "w:qg-l3-central-033",
+       "needFlag": "w:qg-l3-central-032"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Brett looks it over the way Central looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the length of the capitol theatre.",
+       "turnin": "qg-l3-central-032"
+      },
+      {
+       "text": "About the belmore park camera.",
+       "turnin": "qg-l3-central-033"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about Dixon Street. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Brett, probationary constable in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about Dixon Street like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near Dixon Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-sienna",
+   "name": "Sienna, uni student, three jobs",
+   "x": -761,
+   "z": 1714,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Central rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the Capitol Theatre is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the belmore park course.",
+     "choices": [
+      {
+       "text": "The Belmore Park Course",
+       "accept": "qg-l3-central-034",
+       "denyFlag": "w:qg-l3-central-034"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Sienna counts it out without looking up. -- Don't spend it all at the Capitol Theatre.",
+     "choices": [
+      {
+       "text": "About the belmore park course.",
+       "turnin": "qg-l3-central-034"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the Capitol Theatre that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Sienna, uni student, three jobs in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Capitol Theatre like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near the Capitol Theatre."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-dean",
+   "name": "Dean, lost property clerk",
+   "x": -631,
+   "z": 2079,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Describe it. No, before you tell me where you lost it, describe it. Central lost property.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Umbrellas, phones, one prosthetic leg. Belmore Park produces more forgotten laptops than anywhere in the network.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Meat Tray at Eddy Avenue",
+       "accept": "qg-l3-central-035",
+       "denyFlag": "w:qg-l3-central-035"
+      },
+      {
+       "text": "Something From Eddy Avenue",
+       "accept": "qg-l3-central-036",
+       "denyFlag": "w:qg-l3-central-036",
+       "needFlag": "w:qg-l3-central-035"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Dean counts it out without looking up. -- Don't spend it all at Belmore Park.",
+     "choices": [
+      {
+       "text": "About meat tray at eddy avenue.",
+       "turnin": "qg-l3-central-035"
+      },
+      {
+       "text": "About something from eddy avenue.",
+       "turnin": "qg-l3-central-036"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Nobody comes back for the umbrellas. Six hundred umbrellas. I've started a collection.",
+     "improv": {
+      "persona": "Dean, lost property clerk in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about Belmore Park like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near Belmore Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-jason",
+   "name": "Jason, dumpling house owner",
+   "x": -331,
+   "z": 1721,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table for one? Sit anywhere. Not that one, that's the boss's. Welcome to Central.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Xiao long bao, hand-made, eleven a.m. till the dough runs out. Eddy Avenue queues down the street on Sundays.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Seven a.m. At the Grand Concourse",
+       "accept": "qg-l3-central-037",
+       "denyFlag": "w:qg-l3-central-037"
+      },
+      {
+       "text": "Staffy Near the Grand Concourse",
+       "accept": "qg-l3-central-038",
+       "denyFlag": "w:qg-l3-central-038",
+       "needFlag": "w:qg-l3-central-037"
+      },
+      {
+       "text": "The the Grand Concourse Order",
+       "accept": "qg-l3-central-039",
+       "denyFlag": "w:qg-l3-central-039"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Jason looks it over the way Central looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About seven a.m. at the grand concourse.",
+       "turnin": "qg-l3-central-037"
+      },
+      {
+       "text": "About staffy near the grand concourse.",
+       "turnin": "qg-l3-central-038"
+      },
+      {
+       "text": "About the the grand concourse order.",
+       "turnin": "qg-l3-central-039"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best dumplings in Central are at the place with the worst sign. Everyone knows. Nobody says.",
+     "improv": {
+      "persona": "Jason, dumpling house owner in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about Eddy Avenue like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near Eddy Avenue."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Jason listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-shaz",
+   "name": "Shaz, backpacker on a working visa",
+   "x": -439,
+   "z": 1634,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Alright? Sorry, you're not the hostel guy. Central's wild, man.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Eighty-eight days of farm work done, now I'm pouring beers near the Grand Concourse and sleeping eight to a room.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Trolley Run, Thomas Street",
+       "accept": "qg-l3-central-040",
+       "denyFlag": "w:qg-l3-central-040"
+      },
+      {
+       "text": "RBT on Thomas Street",
+       "accept": "qg-l3-central-041",
+       "denyFlag": "w:qg-l3-central-041",
+       "needFlag": "w:qg-l3-central-040"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Shaz looks it over the way Central looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About trolley run, thomas street.",
+       "turnin": "qg-l3-central-040"
+      },
+      {
+       "text": "About rbt on thomas street.",
+       "turnin": "qg-l3-central-041"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a goon bag somewhere near the Grand Concourse that has my name on it, literally, I wrote it.",
+     "improv": {
+      "persona": "Shaz, backpacker on a working visa in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Grand Concourse like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near the Grand Concourse."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-lorraine",
+   "name": "Lorraine, busker, one amp",
+   "x": -144,
+   "z": 1905,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hold that thought, the council's coming past. Right. Central, what a crowd.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I play the same six songs at Thomas Street and nobody has ever complained. Nobody has ever paid, either.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's cover at the haymarket paifang.",
+     "choices": [
+      {
+       "text": "Cover at the Haymarket paifang",
+       "accept": "qg-l3-central-042",
+       "denyFlag": "w:qg-l3-central-042"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Lorraine looks it over the way Central looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About cover at the haymarket paifang.",
+       "turnin": "qg-l3-central-042"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good pitch is outside Thomas Street between four and six. After six it's the bloke with the didgeridoo and a Bluetooth speaker.",
+     "improv": {
+      "persona": "Lorraine, busker, one amp in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about Thomas Street like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near Thomas Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-omar",
+   "name": "Omar, cabbie, twenty years",
+   "x": -308,
+   "z": 2204,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Where to? Oh, you're not a fare. Fair enough. Central, I know every gutter.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twenty years on the rank. Uber took half of it and the tunnel took the rest. the Haymarket paifang is still cash, thank god.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Probationary at Central's clock tower",
+       "accept": "qg-l3-central-043",
+       "denyFlag": "w:qg-l3-central-043"
+      },
+      {
+       "text": "Race Four, Central's clock tower",
+       "accept": "qg-l3-central-044",
+       "denyFlag": "w:qg-l3-central-044",
+       "needFlag": "w:qg-l3-central-043"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Omar counts it out without looking up. -- Don't spend it all at the Haymarket paifang.",
+     "choices": [
+      {
+       "text": "About probationary at central's clock tower.",
+       "turnin": "qg-l3-central-043"
+      },
+      {
+       "text": "About race four, central's clock tower.",
+       "turnin": "qg-l3-central-044"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never go via the Haymarket paifang after five. Never. I don't care what the app says.",
+     "improv": {
+      "persona": "Omar, cabbie, twenty years in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Haymarket paifang like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near the Haymarket paifang."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Omar listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-beryl",
+   "name": "Beryl, probationary constable",
+   "x": -265,
+   "z": 1660,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Central LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of Central's clock tower. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "One Stop From the Devonshire Street tunnel",
+       "accept": "qg-l3-central-045",
+       "denyFlag": "w:qg-l3-central-045"
+      },
+      {
+       "text": "Rent Money, the Devonshire Street tunnel",
+       "accept": "qg-l3-central-046",
+       "denyFlag": "w:qg-l3-central-046",
+       "needFlag": "w:qg-l3-central-045"
+      },
+      {
+       "text": "Before They Touch the Devonshire Street tunnel",
+       "accept": "qg-l3-central-047",
+       "denyFlag": "w:qg-l3-central-047"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Beryl pays up on the spot.",
+     "choices": [
+      {
+       "text": "About one stop from the devonshire street tunnel.",
+       "turnin": "qg-l3-central-045"
+      },
+      {
+       "text": "About rent money, the devonshire street tunnel.",
+       "turnin": "qg-l3-central-046"
+      },
+      {
+       "text": "About before they touch the devonshire street tunnel.",
+       "turnin": "qg-l3-central-047"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about Central's clock tower. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Beryl, probationary constable in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about Central's clock tower like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near Central's clock tower."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-debbie",
+   "name": "Debbie, uni student, three jobs",
+   "x": -479,
+   "z": 1322,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Central rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the Devonshire Street tunnel is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two from chinatown.",
+     "choices": [
+      {
+       "text": "Two From Chinatown",
+       "accept": "qg-l3-central-048",
+       "denyFlag": "w:qg-l3-central-048"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Debbie looks it over the way Central looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About two from chinatown.",
+       "turnin": "qg-l3-central-048"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the Devonshire Street tunnel that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Debbie, uni student, three jobs in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Devonshire Street tunnel like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near the Devonshire Street tunnel."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-graham",
+   "name": "Graham, lost property clerk",
+   "x": -523,
+   "z": 2123,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Describe it. No, before you tell me where you lost it, describe it. Central lost property.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Umbrellas, phones, one prosthetic leg. Chinatown produces more forgotten laptops than anywhere in the network.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Dixon Street Complaint",
+       "accept": "qg-l3-central-049",
+       "denyFlag": "w:qg-l3-central-049"
+      },
+      {
+       "text": "Two Signs, Paddy's Markets",
+       "accept": "qg-l3-central-050",
+       "denyFlag": "w:qg-l3-central-050",
+       "needFlag": "w:qg-l3-central-049"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Graham pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the dixon street complaint.",
+       "turnin": "qg-l3-central-049"
+      },
+      {
+       "text": "About two signs, paddy's markets.",
+       "turnin": "qg-l3-central-050"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Nobody comes back for the umbrellas. Six hundred umbrellas. I've started a collection.",
+     "improv": {
+      "persona": "Graham, lost property clerk in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about Chinatown like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near Chinatown."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-cindy",
+   "name": "Cindy, dumpling house owner",
+   "x": -546,
+   "z": 1922,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table for one? Sit anywhere. Not that one, that's the boss's. Welcome to Central.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Xiao long bao, hand-made, eleven a.m. till the dough runs out. Paddy's Markets queues down the street on Sundays.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the dixon street fence.",
+     "choices": [
+      {
+       "text": "The Dixon Street Fence",
+       "accept": "qg-l3-central-051",
+       "denyFlag": "w:qg-l3-central-051"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Cindy counts it out without looking up. -- Don't spend it all at Paddy's Markets.",
+     "choices": [
+      {
+       "text": "About the dixon street fence.",
+       "turnin": "qg-l3-central-051"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best dumplings in Central are at the place with the worst sign. Everyone knows. Nobody says.",
+     "improv": {
+      "persona": "Cindy, dumpling house owner in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about Paddy's Markets like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near Paddy's Markets."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Central would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-central-prue",
+   "name": "Prue, backpacker on a working visa",
+   "x": -47,
+   "z": 1689,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Alright? Sorry, you're not the hostel guy. Central's wild, man.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Central like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Eighty-eight days of farm work done, now I'm pouring beers near Dixon Street and sleeping eight to a room.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the capitol theatre lift.",
+     "choices": [
+      {
+       "text": "The the Capitol Theatre Lift",
+       "accept": "qg-l3-central-052",
+       "denyFlag": "w:qg-l3-central-052"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Prue counts it out without looking up. -- Don't spend it all at Dixon Street.",
+     "choices": [
+      {
+       "text": "About the the capitol theatre lift.",
+       "turnin": "qg-l3-central-052"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a goon bag somewhere near Dixon Street that has my name on it, literally, I wrote it.",
+     "improv": {
+      "persona": "Prue, backpacker on a working visa in Central, Sydney. Dry, specific, local; never says g'day or crikey; talks about Dixon Street like everyone knows it.",
+      "context": "Someone has asked what Central is like these days. You are standing near Dixon Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Central would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

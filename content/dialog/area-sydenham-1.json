@@ -1,0 +1,3141 @@
+{
+ "pack": "area-sydenham-1",
+ "npcs": [
+  {
+   "id": "qg-sydenham-norm",
+   "name": "Norm, chippy off a job",
+   "x": -4294,
+   "z": 5228,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Sydenham, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Left It Near Sydenham Road",
+       "accept": "qg-l2-sydenham-001",
+       "denyFlag": "w:qg-l2-sydenham-001"
+      },
+      {
+       "text": "Something From Sydenham Road",
+       "accept": "qg-l2-sydenham-002",
+       "denyFlag": "w:qg-l2-sydenham-002",
+       "needFlag": "w:qg-l2-sydenham-001"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Norm pays up on the spot.",
+     "choices": [
+      {
+       "text": "About left it near sydenham road.",
+       "turnin": "qg-l2-sydenham-001"
+      },
+      {
+       "text": "About something from sydenham road.",
+       "turnin": "qg-l2-sydenham-002"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Sydenham is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Norm, chippy off a job in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Princes Highway like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near the Princes Highway."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Right. And you're sure it was Sydenham Road? People say Sydenham Road when they mean the bit next to it. -- Norm writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-annabel",
+   "name": "Annabel, cycleway campaigner",
+   "x": -4098,
+   "z": 5564,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You didn't drive here, did you? Sorry. Reflex. Sydenham is nearly bike-friendly.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve years lobbying council for a painted line along Sydenham Road. We got the paint. It's a sharrow.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Cooks River cycleway Pub Crawl",
+       "accept": "qg-l2-sydenham-003",
+       "denyFlag": "w:qg-l2-sydenham-003"
+      },
+      {
+       "text": "The the Cooks River cycleway Course",
+       "accept": "qg-l2-sydenham-004",
+       "denyFlag": "w:qg-l2-sydenham-004",
+       "needFlag": "w:qg-l2-sydenham-003"
+      },
+      {
+       "text": "Two Signs, the Cooks River cycleway",
+       "accept": "qg-l2-sydenham-005",
+       "denyFlag": "w:qg-l2-sydenham-005"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Annabel pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the cooks river cycleway pub crawl.",
+       "turnin": "qg-l2-sydenham-003"
+      },
+      {
+       "text": "About the the cooks river cycleway course.",
+       "turnin": "qg-l2-sydenham-004"
+      },
+      {
+       "text": "About two signs, the cooks river cycleway.",
+       "turnin": "qg-l2-sydenham-005"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Cooks River path is beautiful until it isn't. Watch for the bit near Sydenham Road where the path just ends.",
+     "improv": {
+      "persona": "Annabel, cycleway campaigner in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about Sydenham Road like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near Sydenham Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-amit",
+   "name": "Amit, servo night shift",
+   "x": -3904,
+   "z": 4665,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Pump four's off. Pump four's been off since May. Welcome to Sydenham.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Ten hours, one register, and the pie warmer. You learn who Sydenham is at three in the morning.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two from the ikea at tempe.",
+     "choices": [
+      {
+       "text": "Two From the IKEA at Tempe",
+       "accept": "qg-l2-sydenham-006",
+       "denyFlag": "w:qg-l2-sydenham-006"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Amit looks it over the way Sydenham looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About two from the ikea at tempe.",
+       "turnin": "qg-l2-sydenham-006"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good pie is the one at the back of the Cooks River cycleway's warmer. The front ones have been there since the shift before me.",
+     "improv": {
+      "persona": "Amit, servo night shift in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Cooks River cycleway like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near the Cooks River cycleway."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-hayden",
+   "name": "Hayden, dog walker, four leads",
+   "x": -3630,
+   "z": 5204,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hang on, hang on -- sit. Not you. Sorry, Sydenham at this hour is chaos. What's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six dogs, three suburbs, one car park at the IKEA at Tempe. Two of them aren't mine and one of them isn't a dog, legally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch unwins bridge road.",
+     "choices": [
+      {
+       "text": "Before They Touch Unwins Bridge Road",
+       "accept": "qg-l2-sydenham-007",
+       "denyFlag": "w:qg-l2-sydenham-007"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Hayden counts it out without looking up. -- Don't spend it all at the IKEA at Tempe.",
+     "choices": [
+      {
+       "text": "About before they touch unwins bridge road.",
+       "turnin": "qg-l2-sydenham-007"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The off-leash bit at the IKEA at Tempe is fine until the magpies come back. Then nothing is fine.",
+     "improv": {
+      "persona": "Hayden, dog walker, four leads in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about the IKEA at Tempe like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near the IKEA at Tempe."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-angus",
+   "name": "Angus, council ranger",
+   "x": -3902,
+   "z": 4923,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Sydenham is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Unwins Bridge Road generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Counting the Sydenham Green",
+       "accept": "qg-l2-sydenham-008",
+       "denyFlag": "w:qg-l2-sydenham-008"
+      },
+      {
+       "text": "The Length of the Sydenham Green",
+       "accept": "qg-l2-sydenham-009",
+       "denyFlag": "w:qg-l2-sydenham-009",
+       "needFlag": "w:qg-l2-sydenham-008"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Angus pays up on the spot.",
+     "choices": [
+      {
+       "text": "About counting the sydenham green.",
+       "turnin": "qg-l2-sydenham-008"
+      },
+      {
+       "text": "About the length of the sydenham green.",
+       "turnin": "qg-l2-sydenham-009"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Angus, council ranger in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about Unwins Bridge Road like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near Unwins Bridge Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-clive",
+   "name": "Clive, IKEA flatpack assembler",
+   "x": -3571,
+   "z": 5401,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Allen key. Never leave home without it. Sydenham, nice to meet you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "People buy the wardrobe, get it home, and ring me. Every second house in Sydenham has a KALLAX I built.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at tempe tip.",
+     "choices": [
+      {
+       "text": "Trouble at Tempe Tip",
+       "accept": "qg-l2-sydenham-010",
+       "denyFlag": "w:qg-l2-sydenham-010"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Clive counts it out without looking up. -- Don't spend it all at the Sydenham Green.",
+     "choices": [
+      {
+       "text": "About trouble at tempe tip.",
+       "turnin": "qg-l2-sydenham-010"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "the Sydenham Green's car park at four on a Sunday is a war. Bring water.",
+     "improv": {
+      "persona": "Clive, IKEA flatpack assembler in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Sydenham Green like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near the Sydenham Green."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-joyce",
+   "name": "Joyce, chippy off a job",
+   "x": -4382,
+   "z": 4960,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Sydenham, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Probationary at Tempe Tip",
+       "accept": "qg-l2-sydenham-011",
+       "denyFlag": "w:qg-l2-sydenham-011"
+      },
+      {
+       "text": "Bin Night, Tempe Tip",
+       "accept": "qg-l2-sydenham-012",
+       "denyFlag": "w:qg-l2-sydenham-012",
+       "needFlag": "w:qg-l2-sydenham-011"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Joyce counts it out without looking up. -- Don't spend it all at the Sydenham flight path.",
+     "choices": [
+      {
+       "text": "About probationary at tempe tip.",
+       "turnin": "qg-l2-sydenham-011"
+      },
+      {
+       "text": "About bin night, tempe tip.",
+       "turnin": "qg-l2-sydenham-012"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Sydenham is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Joyce, chippy off a job in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Sydenham flight path like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near the Sydenham flight path."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-mitch",
+   "name": "Mitch, cycleway campaigner",
+   "x": -4351,
+   "z": 5102,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You didn't drive here, did you? Sorry. Reflex. Sydenham is nearly bike-friendly.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve years lobbying council for a painted line along Tempe Tip. We got the paint. It's a sharrow.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Cover at Tempe Reserve",
+       "accept": "qg-l2-sydenham-013",
+       "denyFlag": "w:qg-l2-sydenham-013"
+      },
+      {
+       "text": "Trolley Run, Tempe Reserve",
+       "accept": "qg-l2-sydenham-014",
+       "denyFlag": "w:qg-l2-sydenham-014",
+       "needFlag": "w:qg-l2-sydenham-013"
+      },
+      {
+       "text": "The Tempe Reserve Tab",
+       "accept": "qg-l2-sydenham-015",
+       "denyFlag": "w:qg-l2-sydenham-015"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Mitch pays up on the spot.",
+     "choices": [
+      {
+       "text": "About cover at tempe reserve.",
+       "turnin": "qg-l2-sydenham-013"
+      },
+      {
+       "text": "About trolley run, tempe reserve.",
+       "turnin": "qg-l2-sydenham-014"
+      },
+      {
+       "text": "About the tempe reserve tab.",
+       "turnin": "qg-l2-sydenham-015"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Cooks River path is beautiful until it isn't. Watch for the bit near Tempe Tip where the path just ends.",
+     "improv": {
+      "persona": "Mitch, cycleway campaigner in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about Tempe Tip like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near Tempe Tip."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-harpreet",
+   "name": "Harpreet, servo night shift",
+   "x": -3570,
+   "z": 5433,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Pump four's off. Pump four's been off since May. Welcome to Sydenham.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Ten hours, one register, and the pie warmer. You learn who Sydenham is at three in the morning.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's meat tray at the princes highway.",
+     "choices": [
+      {
+       "text": "Meat Tray at the Princes Highway",
+       "accept": "qg-l2-sydenham-016",
+       "denyFlag": "w:qg-l2-sydenham-016"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Harpreet looks it over the way Sydenham looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About meat tray at the princes highway.",
+       "turnin": "qg-l2-sydenham-016"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good pie is the one at the back of Tempe Reserve's warmer. The front ones have been there since the shift before me.",
+     "improv": {
+      "persona": "Harpreet, servo night shift in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about Tempe Reserve like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near Tempe Reserve."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-cooper",
+   "name": "Cooper, dog walker, four leads",
+   "x": -3830,
+   "z": 5201,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hang on, hang on -- sit. Not you. Sorry, Sydenham at this hour is chaos. What's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six dogs, three suburbs, one car park at the Princes Highway. Two of them aren't mine and one of them isn't a dog, legally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's closing time at sydenham road.",
+     "choices": [
+      {
+       "text": "Closing Time at Sydenham Road",
+       "accept": "qg-l2-sydenham-017",
+       "denyFlag": "w:qg-l2-sydenham-017"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Cooper looks it over the way Sydenham looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About closing time at sydenham road.",
+       "turnin": "qg-l2-sydenham-017"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The off-leash bit at the Princes Highway is fine until the magpies come back. Then nothing is fine.",
+     "improv": {
+      "persona": "Cooper, dog walker, four leads in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Princes Highway like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near the Princes Highway."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-luke",
+   "name": "Luke, council ranger",
+   "x": -3929,
+   "z": 5116,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Sydenham is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Sydenham Road generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Rent Money, the IKEA at Tempe",
+       "accept": "qg-l2-sydenham-018",
+       "denyFlag": "w:qg-l2-sydenham-018"
+      },
+      {
+       "text": "The the Cooks River cycleway Sparky",
+       "accept": "qg-l2-sydenham-019",
+       "denyFlag": "w:qg-l2-sydenham-019",
+       "needFlag": "w:qg-l2-sydenham-018"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Luke looks it over the way Sydenham looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About rent money, the ikea at tempe.",
+       "turnin": "qg-l2-sydenham-018"
+      },
+      {
+       "text": "About the the cooks river cycleway sparky.",
+       "turnin": "qg-l2-sydenham-019"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Luke, council ranger in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about Sydenham Road like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near Sydenham Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-harriet",
+   "name": "Harriet, IKEA flatpack assembler",
+   "x": -3762,
+   "z": 5196,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Allen key. Never leave home without it. Sydenham, nice to meet you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "People buy the wardrobe, get it home, and ring me. Every second house in Sydenham has a KALLAX I built.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the ikea at tempe complaint.",
+     "choices": [
+      {
+       "text": "The the IKEA at Tempe Complaint",
+       "accept": "qg-l2-sydenham-020",
+       "denyFlag": "w:qg-l2-sydenham-020"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Harriet pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the ikea at tempe complaint.",
+       "turnin": "qg-l2-sydenham-020"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "the Cooks River cycleway's car park at four on a Sunday is a war. Bring water.",
+     "improv": {
+      "persona": "Harriet, IKEA flatpack assembler in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Cooks River cycleway like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near the Cooks River cycleway."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-jarrod-a",
+   "name": "Jarrod A., chippy off a job",
+   "x": -4053,
+   "z": 4991,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Sydenham, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Unwins Bridge Road Camera",
+       "accept": "qg-l2-sydenham-021",
+       "denyFlag": "w:qg-l2-sydenham-021"
+      },
+      {
+       "text": "Proof of Unwins Bridge Road",
+       "accept": "qg-l2-sydenham-022",
+       "denyFlag": "w:qg-l2-sydenham-022",
+       "needFlag": "w:qg-l2-sydenham-021"
+      },
+      {
+       "text": "Lads Off Unwins Bridge Road",
+       "accept": "qg-l2-sydenham-023",
+       "denyFlag": "w:qg-l2-sydenham-023"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Jarrod A. counts it out without looking up. -- Don't spend it all at the IKEA at Tempe.",
+     "choices": [
+      {
+       "text": "About the unwins bridge road camera.",
+       "turnin": "qg-l2-sydenham-021"
+      },
+      {
+       "text": "About proof of unwins bridge road.",
+       "turnin": "qg-l2-sydenham-022"
+      },
+      {
+       "text": "About lads off unwins bridge road.",
+       "turnin": "qg-l2-sydenham-023"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Sydenham is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Jarrod A., chippy off a job in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about the IKEA at Tempe like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near the IKEA at Tempe."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-tahlia-a",
+   "name": "Tahlia A., cycleway campaigner",
+   "x": -3706,
+   "z": 4800,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You didn't drive here, did you? Sorry. Reflex. Sydenham is nearly bike-friendly.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve years lobbying council for a painted line along Unwins Bridge Road. We got the paint. It's a sharrow.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "One Stop From the Sydenham Green",
+       "accept": "qg-l2-sydenham-024",
+       "denyFlag": "w:qg-l2-sydenham-024"
+      },
+      {
+       "text": "Seven a.m. At the Sydenham Green",
+       "accept": "qg-l2-sydenham-025",
+       "denyFlag": "w:qg-l2-sydenham-025",
+       "needFlag": "w:qg-l2-sydenham-024"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Tahlia A. looks it over the way Sydenham looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About one stop from the sydenham green.",
+       "turnin": "qg-l2-sydenham-024"
+      },
+      {
+       "text": "About seven a.m. at the sydenham green.",
+       "turnin": "qg-l2-sydenham-025"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Cooks River path is beautiful until it isn't. Watch for the bit near Unwins Bridge Road where the path just ends.",
+     "improv": {
+      "persona": "Tahlia A., cycleway campaigner in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about Unwins Bridge Road like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near Unwins Bridge Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-kavya",
+   "name": "Kavya, servo night shift",
+   "x": -4048,
+   "z": 5119,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Pump four's off. Pump four's been off since May. Welcome to Sydenham.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Ten hours, one register, and the pie warmer. You learn who Sydenham is at three in the morning.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The the Sydenham flight path Lift",
+       "accept": "qg-l2-sydenham-026",
+       "denyFlag": "w:qg-l2-sydenham-026"
+      },
+      {
+       "text": "Sightline at the Sydenham flight path",
+       "accept": "qg-l2-sydenham-027",
+       "denyFlag": "w:qg-l2-sydenham-027",
+       "needFlag": "w:qg-l2-sydenham-026"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Kavya looks it over the way Sydenham looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the sydenham flight path lift.",
+       "turnin": "qg-l2-sydenham-026"
+      },
+      {
+       "text": "About sightline at the sydenham flight path.",
+       "turnin": "qg-l2-sydenham-027"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good pie is the one at the back of the Sydenham Green's warmer. The front ones have been there since the shift before me.",
+     "improv": {
+      "persona": "Kavya, servo night shift in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Sydenham Green like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near the Sydenham Green."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Sydenham would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Sydenham would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-matilda-a",
+   "name": "Matilda A., dog walker, four leads",
+   "x": -3760,
+   "z": 4868,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hang on, hang on -- sit. Not you. Sorry, Sydenham at this hour is chaos. What's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six dogs, three suburbs, one car park at the Sydenham flight path. Two of them aren't mine and one of them isn't a dog, legally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Tap On at Tempe Tip",
+       "accept": "qg-l2-sydenham-028",
+       "denyFlag": "w:qg-l2-sydenham-028"
+      },
+      {
+       "text": "Race Four, Tempe Tip",
+       "accept": "qg-l2-sydenham-029",
+       "denyFlag": "w:qg-l2-sydenham-029",
+       "needFlag": "w:qg-l2-sydenham-028"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Matilda A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About tap on at tempe tip.",
+       "turnin": "qg-l2-sydenham-028"
+      },
+      {
+       "text": "About race four, tempe tip.",
+       "turnin": "qg-l2-sydenham-029"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The off-leash bit at the Sydenham flight path is fine until the magpies come back. Then nothing is fine.",
+     "improv": {
+      "persona": "Matilda A., dog walker, four leads in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Sydenham flight path like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near the Sydenham flight path."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Matilda A. listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-2",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Sydenham would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-kylie",
+   "name": "Kylie, IKEA flatpack assembler",
+   "x": -3981,
+   "z": 5178,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Allen key. Never leave home without it. Sydenham, nice to meet you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "People buy the wardrobe, get it home, and ring me. Every second house in Sydenham has a KALLAX I built.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's a flat white from the princes highway.",
+     "choices": [
+      {
+       "text": "A Flat White From the Princes Highway",
+       "accept": "qg-l2-sydenham-030",
+       "denyFlag": "w:qg-l2-sydenham-030"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Kylie counts it out without looking up. -- Don't spend it all at Tempe Reserve.",
+     "choices": [
+      {
+       "text": "About a flat white from the princes highway.",
+       "turnin": "qg-l2-sydenham-030"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Tempe Reserve's car park at four on a Sunday is a war. Bring water.",
+     "improv": {
+      "persona": "Kylie, IKEA flatpack assembler in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about Tempe Reserve like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near Tempe Reserve."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-poppy",
+   "name": "Poppy, chippy off a job",
+   "x": -4034,
+   "z": 5213,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Sydenham, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The the IKEA at Tempe Course",
+       "accept": "qg-l2-sydenham-031",
+       "denyFlag": "w:qg-l2-sydenham-031"
+      },
+      {
+       "text": "The the Cooks River cycleway Order",
+       "accept": "qg-l2-sydenham-032",
+       "denyFlag": "w:qg-l2-sydenham-032",
+       "needFlag": "w:qg-l2-sydenham-031"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Poppy pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the ikea at tempe course.",
+       "turnin": "qg-l2-sydenham-031"
+      },
+      {
+       "text": "About the the cooks river cycleway order.",
+       "turnin": "qg-l2-sydenham-032"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Sydenham is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Poppy, chippy off a job in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Princes Highway like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near the Princes Highway."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-thelma-a",
+   "name": "Thelma A., cycleway campaigner",
+   "x": -3756,
+   "z": 5261,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You didn't drive here, did you? Sorry. Reflex. Sydenham is nearly bike-friendly.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve years lobbying council for a painted line along Sydenham Road. We got the paint. It's a sharrow.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Two From the Cooks River cycleway",
+       "accept": "qg-l2-sydenham-033",
+       "denyFlag": "w:qg-l2-sydenham-033"
+      },
+      {
+       "text": "The the Cooks River cycleway Fence",
+       "accept": "qg-l2-sydenham-034",
+       "denyFlag": "w:qg-l2-sydenham-034",
+       "needFlag": "w:qg-l2-sydenham-033"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Thelma A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About two from the cooks river cycleway.",
+       "turnin": "qg-l2-sydenham-033"
+      },
+      {
+       "text": "About the the cooks river cycleway fence.",
+       "turnin": "qg-l2-sydenham-034"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Cooks River path is beautiful until it isn't. Watch for the bit near Sydenham Road where the path just ends.",
+     "improv": {
+      "persona": "Thelma A., cycleway campaigner in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about Sydenham Road like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near Sydenham Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Thelma A. listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-pooja",
+   "name": "Pooja, servo night shift",
+   "x": -3721,
+   "z": 4955,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Pump four's off. Pump four's been off since May. Welcome to Sydenham.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Ten hours, one register, and the pie warmer. You learn who Sydenham is at three in the morning.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Before They Touch the IKEA at Tempe",
+       "accept": "qg-l2-sydenham-035",
+       "denyFlag": "w:qg-l2-sydenham-035"
+      },
+      {
+       "text": "Counting the IKEA at Tempe",
+       "accept": "qg-l2-sydenham-036",
+       "denyFlag": "w:qg-l2-sydenham-036",
+       "needFlag": "w:qg-l2-sydenham-035"
+      },
+      {
+       "text": "The Length of the IKEA at Tempe",
+       "accept": "qg-l2-sydenham-037",
+       "denyFlag": "w:qg-l2-sydenham-037"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Pooja counts it out without looking up. -- Don't spend it all at the Cooks River cycleway.",
+     "choices": [
+      {
+       "text": "About before they touch the ikea at tempe.",
+       "turnin": "qg-l2-sydenham-035"
+      },
+      {
+       "text": "About counting the ikea at tempe.",
+       "turnin": "qg-l2-sydenham-036"
+      },
+      {
+       "text": "About the length of the ikea at tempe.",
+       "turnin": "qg-l2-sydenham-037"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good pie is the one at the back of the Cooks River cycleway's warmer. The front ones have been there since the shift before me.",
+     "improv": {
+      "persona": "Pooja, servo night shift in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Cooks River cycleway like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near the Cooks River cycleway."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-leanne-a",
+   "name": "Leanne A., dog walker, four leads",
+   "x": -4092,
+   "z": 4729,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hang on, hang on -- sit. Not you. Sorry, Sydenham at this hour is chaos. What's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six dogs, three suburbs, one car park at the IKEA at Tempe. Two of them aren't mine and one of them isn't a dog, legally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Trouble at the Sydenham Green",
+       "accept": "qg-l2-sydenham-038",
+       "denyFlag": "w:qg-l2-sydenham-038"
+      },
+      {
+       "text": "Probationary at Unwins Bridge Road",
+       "accept": "qg-l2-sydenham-039",
+       "denyFlag": "w:qg-l2-sydenham-039",
+       "needFlag": "w:qg-l2-sydenham-038"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Leanne A. looks it over the way Sydenham looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About trouble at the sydenham green.",
+       "turnin": "qg-l2-sydenham-038"
+      },
+      {
+       "text": "About probationary at unwins bridge road.",
+       "turnin": "qg-l2-sydenham-039"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The off-leash bit at the IKEA at Tempe is fine until the magpies come back. Then nothing is fine.",
+     "improv": {
+      "persona": "Leanne A., dog walker, four leads in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about the IKEA at Tempe like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near the IKEA at Tempe."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-dean-a",
+   "name": "Dean A., council ranger",
+   "x": -4236,
+   "z": 4878,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Sydenham is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Unwins Bridge Road generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Bin Night, the Sydenham Green",
+       "accept": "qg-l2-sydenham-040",
+       "denyFlag": "w:qg-l2-sydenham-040"
+      },
+      {
+       "text": "Cover at the Sydenham Green",
+       "accept": "qg-l2-sydenham-041",
+       "denyFlag": "w:qg-l2-sydenham-041",
+       "needFlag": "w:qg-l2-sydenham-040"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Dean A. counts it out without looking up. -- Don't spend it all at Unwins Bridge Road.",
+     "choices": [
+      {
+       "text": "About bin night, the sydenham green.",
+       "turnin": "qg-l2-sydenham-040"
+      },
+      {
+       "text": "About cover at the sydenham green.",
+       "turnin": "qg-l2-sydenham-041"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Dean A., council ranger in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about Unwins Bridge Road like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near Unwins Bridge Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-renee-a",
+   "name": "Renee A., IKEA flatpack assembler",
+   "x": -3571,
+   "z": 5082,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Allen key. Never leave home without it. Sydenham, nice to meet you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "People buy the wardrobe, get it home, and ring me. Every second house in Sydenham has a KALLAX I built.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Trolley Run, the Sydenham flight path",
+       "accept": "qg-l2-sydenham-042",
+       "denyFlag": "w:qg-l2-sydenham-042"
+      },
+      {
+       "text": "The the Sydenham flight path Tab",
+       "accept": "qg-l2-sydenham-043",
+       "denyFlag": "w:qg-l2-sydenham-043",
+       "needFlag": "w:qg-l2-sydenham-042"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Renee A. looks it over the way Sydenham looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About trolley run, the sydenham flight path.",
+       "turnin": "qg-l2-sydenham-042"
+      },
+      {
+       "text": "About the the sydenham flight path tab.",
+       "turnin": "qg-l2-sydenham-043"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "the Sydenham Green's car park at four on a Sunday is a war. Bring water.",
+     "improv": {
+      "persona": "Renee A., IKEA flatpack assembler in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Sydenham Green like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near the Sydenham Green."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-jason-a",
+   "name": "Jason A., chippy off a job",
+   "x": -4121,
+   "z": 4766,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Sydenham, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Meat Tray at Tempe Tip",
+       "accept": "qg-l2-sydenham-044",
+       "denyFlag": "w:qg-l2-sydenham-044"
+      },
+      {
+       "text": "The Tempe Tip Float",
+       "accept": "qg-l2-sydenham-045",
+       "denyFlag": "w:qg-l2-sydenham-045",
+       "needFlag": "w:qg-l2-sydenham-044"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Jason A. looks it over the way Sydenham looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About meat tray at tempe tip.",
+       "turnin": "qg-l2-sydenham-044"
+      },
+      {
+       "text": "About the tempe tip float.",
+       "turnin": "qg-l2-sydenham-045"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Sydenham is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Jason A., chippy off a job in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Sydenham flight path like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near the Sydenham flight path."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Right. And you're sure it was Tempe Tip? People say Tempe Tip when they mean the bit next to it. -- Jason A. writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-lachlan",
+   "name": "Lachlan, cycleway campaigner",
+   "x": -3753,
+   "z": 5421,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You didn't drive here, did you? Sorry. Reflex. Sydenham is nearly bike-friendly.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve years lobbying council for a painted line along Tempe Tip. We got the paint. It's a sharrow.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Closing Time at Tempe Reserve",
+       "accept": "qg-l2-sydenham-046",
+       "denyFlag": "w:qg-l2-sydenham-046"
+      },
+      {
+       "text": "Rent Money, the Princes Highway",
+       "accept": "qg-l2-sydenham-047",
+       "denyFlag": "w:qg-l2-sydenham-047",
+       "needFlag": "w:qg-l2-sydenham-046"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Lachlan pays up on the spot.",
+     "choices": [
+      {
+       "text": "About closing time at tempe reserve.",
+       "turnin": "qg-l2-sydenham-046"
+      },
+      {
+       "text": "About rent money, the princes highway.",
+       "turnin": "qg-l2-sydenham-047"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Cooks River path is beautiful until it isn't. Watch for the bit near Tempe Tip where the path just ends.",
+     "improv": {
+      "persona": "Lachlan, cycleway campaigner in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about Tempe Tip like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near Tempe Tip."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-val",
+   "name": "Val, dog walker, four leads",
+   "x": -3607,
+   "z": 5581,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hang on, hang on -- sit. Not you. Sorry, Sydenham at this hour is chaos. What's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six dogs, three suburbs, one car park at the Princes Highway. Two of them aren't mine and one of them isn't a dog, legally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "RBT on Sydenham Road",
+       "accept": "qg-l2-sydenham-048",
+       "denyFlag": "w:qg-l2-sydenham-048"
+      },
+      {
+       "text": "The Sydenham Road Complaint",
+       "accept": "qg-l2-sydenham-049",
+       "denyFlag": "w:qg-l2-sydenham-049",
+       "needFlag": "w:qg-l2-sydenham-048"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Val pays up on the spot.",
+     "choices": [
+      {
+       "text": "About rbt on sydenham road.",
+       "turnin": "qg-l2-sydenham-048"
+      },
+      {
+       "text": "About the sydenham road complaint.",
+       "turnin": "qg-l2-sydenham-049"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The off-leash bit at the Princes Highway is fine until the magpies come back. Then nothing is fine.",
+     "improv": {
+      "persona": "Val, dog walker, four leads in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Princes Highway like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near the Princes Highway."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-phil",
+   "name": "Phil, council ranger",
+   "x": -4084,
+   "z": 5256,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Sydenham is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Sydenham Road generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The the Cooks River cycleway Camera",
+       "accept": "qg-l2-sydenham-050",
+       "denyFlag": "w:qg-l2-sydenham-050"
+      },
+      {
+       "text": "Proof of the Cooks River cycleway",
+       "accept": "qg-l2-sydenham-051",
+       "denyFlag": "w:qg-l2-sydenham-051",
+       "needFlag": "w:qg-l2-sydenham-050"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Phil counts it out without looking up. -- Don't spend it all at Sydenham Road.",
+     "choices": [
+      {
+       "text": "About the the cooks river cycleway camera.",
+       "turnin": "qg-l2-sydenham-050"
+      },
+      {
+       "text": "About proof of the cooks river cycleway.",
+       "turnin": "qg-l2-sydenham-051"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Phil, council ranger in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about Sydenham Road like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near Sydenham Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-joyce-a",
+   "name": "Joyce A., IKEA flatpack assembler",
+   "x": -3680,
+   "z": 4912,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Allen key. Never leave home without it. Sydenham, nice to meet you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "People buy the wardrobe, get it home, and ring me. Every second house in Sydenham has a KALLAX I built.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Lads Off the IKEA at Tempe",
+       "accept": "qg-l2-sydenham-052",
+       "denyFlag": "w:qg-l2-sydenham-052"
+      },
+      {
+       "text": "One Stop From the IKEA at Tempe",
+       "accept": "qg-l2-sydenham-053",
+       "denyFlag": "w:qg-l2-sydenham-053",
+       "needFlag": "w:qg-l2-sydenham-052"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Joyce A. counts it out without looking up. -- Don't spend it all at the Cooks River cycleway.",
+     "choices": [
+      {
+       "text": "About lads off the ikea at tempe.",
+       "turnin": "qg-l2-sydenham-052"
+      },
+      {
+       "text": "About one stop from the ikea at tempe.",
+       "turnin": "qg-l2-sydenham-053"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "the Cooks River cycleway's car park at four on a Sunday is a war. Bring water.",
+     "improv": {
+      "persona": "Joyce A., IKEA flatpack assembler in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Cooks River cycleway like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near the Cooks River cycleway."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-warwick-a",
+   "name": "Warwick A., chippy off a job",
+   "x": -3914,
+   "z": 5003,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Sydenham, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's seven a.m. at unwins bridge road.",
+     "choices": [
+      {
+       "text": "Seven a.m. At Unwins Bridge Road",
+       "accept": "qg-l2-sydenham-054",
+       "denyFlag": "w:qg-l2-sydenham-054"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Warwick A. counts it out without looking up. -- Don't spend it all at the IKEA at Tempe.",
+     "choices": [
+      {
+       "text": "About seven a.m. at unwins bridge road.",
+       "turnin": "qg-l2-sydenham-054"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Sydenham is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Warwick A., chippy off a job in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about the IKEA at Tempe like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near the IKEA at Tempe."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-sydenham-tegan-a",
+   "name": "Tegan A., cycleway campaigner",
+   "x": -4150,
+   "z": 4871,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You didn't drive here, did you? Sorry. Reflex. Sydenham is nearly bike-friendly.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Sydenham like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve years lobbying council for a painted line along Unwins Bridge Road. We got the paint. It's a sharrow.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The the Sydenham Green Lift",
+       "accept": "qg-l2-sydenham-055",
+       "denyFlag": "w:qg-l2-sydenham-055"
+      },
+      {
+       "text": "Sightline at the Sydenham Green",
+       "accept": "qg-l2-sydenham-056",
+       "denyFlag": "w:qg-l2-sydenham-056",
+       "needFlag": "w:qg-l2-sydenham-055"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Tegan A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the sydenham green lift.",
+       "turnin": "qg-l2-sydenham-055"
+      },
+      {
+       "text": "About sightline at the sydenham green.",
+       "turnin": "qg-l2-sydenham-056"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Cooks River path is beautiful until it isn't. Watch for the bit near Unwins Bridge Road where the path just ends.",
+     "improv": {
+      "persona": "Tegan A., cycleway campaigner in Sydenham, Sydney. Dry, specific, local; never says g'day or crikey; talks about Unwins Bridge Road like everyone knows it.",
+      "context": "Someone has asked what Sydenham is like these days. You are standing near Unwins Bridge Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Sydenham would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Right. And you're sure it was the Sydenham Green? People say the Sydenham Green when they mean the bit next to it. -- Tegan A. writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

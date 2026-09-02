@@ -1,0 +1,316 @@
+{
+ "pack": "area-erskineville-2",
+ "quests": [
+  {
+   "id": "qg-l1-erskineville-059",
+   "act": 3,
+   "title": "The Erskineville Road Tab",
+   "blurb": "My knees are gone, so. Two chippies off the Erskineville Road job have run a tab in Erskineville since Friday. This is the third time I have had this conversation. They drove past at half four without looking in, so settle it in cash. I would rather know than wonder.",
+   "giver": "qg-erskineville-phil",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near Erskineville Road"
+    },
+    {
+     "kind": "earn",
+     "dollars": 30,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 73,
+    "xp": 136,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-erskineville-060",
+   "act": 3,
+   "title": "Counting the Imperial",
+   "blurb": "Honestly, I am past caring how it looks. Council says the the Imperial car park is never full and I say it's full by half six. The paperwork says one thing and my eyes say another. Count both Erskineville car parks, photograph whichever one makes me right. Half now if you want it. Most people don't.",
+   "giver": "qg-erskineville-phil",
+   "level": 1,
+   "requires": [
+    "qg-l1-erskineville-059"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2172,
+     "z": 3566,
+     "radius": 30,
+     "label": "count the cars at the Imperial"
+    },
+    {
+     "kind": "goto",
+     "x": -2488,
+     "z": 3611,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": -2172,
+     "z": 3566,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 224,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-erskineville-061",
+   "act": 3,
+   "title": "Bin Night, the Imperial",
+   "blurb": "I'll be straight with you. Somebody moves the bins on the Imperial in front of my drive every Monday night. I would have sorted it myself a year ago. Photograph the evidence and have a word; Erskineville knows who. There's cash in it. Not a lot.",
+   "giver": "qg-erskineville-phil",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2164,
+     "z": 3567,
+     "radius": 40,
+     "label": "photograph the bins at the Imperial"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 134,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-erskineville-062",
+   "act": 3,
+   "title": "Two From the Imperial",
+   "blurb": "Do not laugh. Two of whatever's going near the Imperial, here, hot, before the footy at peak hour. I have rung the number on the letter four times. It's Erskineville; I'm not asking for much. I will owe you one, and I pay those.",
+   "giver": "qg-erskineville-clive",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near the Imperial"
+    },
+    {
+     "kind": "goto",
+     "x": -2131,
+     "z": 3433,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 168,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-erskineville-063",
+   "act": 3,
+   "title": "The the Imperial Float",
+   "blurb": "There is no clever way to say this. The till at the Imperial opens Australia Day with an empty float because somebody took it to the pub. It started small, the way these things do. Sixty before the first Erskineville customer, and I'll never say who. Come back and tell me straight.",
+   "giver": "qg-erskineville-clive",
+   "level": 1,
+   "requires": [
+    "qg-l1-erskineville-062"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "clear sixty for the the Imperial float"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-erskineville-clive",
+     "node": "report-1",
+     "label": "hand it over at the counter"
+    }
+   ],
+   "reward": {
+    "cash": 87,
+    "xp": 185,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-erskineville-064",
+   "act": 3,
+   "title": "One Stop From Harry Noble Reserve",
+   "blurb": "The council knows and the council does not care. I need to know the train from Erskineville stops at Redfern and doesn't sail through like it did on grand final day. It has been going on longer than I have admitted to anyone. Ride it at eight at night and photograph the sign. Do not make a scene about it.",
+   "giver": "qg-erskineville-pina",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Erskineville",
+     "to": "Redfern",
+     "label": "take the train to Redfern"
+    },
+    {
+     "kind": "photo",
+     "x": -1005,
+     "z": 2584,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 59,
+    "xp": 172,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-erskineville-065",
+   "act": 3,
+   "title": "Trolley Run, Harry Noble Reserve",
+   "blurb": "Someone has to, and it may as well be you. A Woolies trolley from Harry Noble Reserve gets walked to the creek every Friday. It is not the money. It has stopped being the money. Find where it ends up in Erskineville and make the deposit back. I will know if you skipped a bit.",
+   "giver": "qg-erskineville-pina",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2105,
+     "z": 3486,
+     "radius": 30,
+     "label": "find the trolley near Harry Noble Reserve"
+    },
+    {
+     "kind": "photo",
+     "x": -2105,
+     "z": 3486,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 25,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 67,
+    "xp": 144,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-erskineville-066",
+   "act": 3,
+   "title": "The Swanson Street Order",
+   "blurb": "Right. Since you asked. The Swanson Street order came to seventy more than I'd budgeted and the supplier wants it by eleven. Half the street knows and half the street is pretending not to. Find seventy in Erskineville and photograph the receipt. I'll put the kettle on for when you're back.",
+   "giver": "qg-erskineville-les",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 70,
+     "label": "square the seventy for the Swanson Street order"
+    },
+    {
+     "kind": "photo",
+     "x": -2275,
+     "z": 3533,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 59,
+    "xp": 159,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-erskineville-067",
+   "act": 3,
+   "title": "Seven a.m. At the Rose Hotel",
+   "blurb": "It is not a police matter and I have checked. The site at the Rose Hotel starts its jackhammer at five on a Melbourne Cup day, which is illegal and loud. It is the not knowing that has got me, honestly. Photograph it running and have a word with the Erskineville foreman. There is no rush, but there is a Friday.",
+   "giver": "qg-erskineville-karen",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -1915,
+     "z": 3391,
+     "radius": 40,
+     "label": "photograph the noise from the Rose Hotel"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 59,
+    "xp": 160,
+    "unlock": []
+   }
+  }
+ ]
+}

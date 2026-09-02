@@ -1,0 +1,874 @@
+{
+ "pack": "area-cronulla-2",
+ "quests": [
+  {
+   "id": "qg-l9-cronulla-042",
+   "act": 3,
+   "title": "Before They Touch Gunnamatta Bay",
+   "blurb": "Keep it between us for now. They start on Gunnamatta Bay on Monday and the orange fencing goes up. This is the third time I have had this conversation. I want Cronulla on record before it does. There is no rush, but there is a Friday.",
+   "giver": "qg-cronulla-dean",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -4977,
+     "z": 20866,
+     "radius": 40,
+     "label": "photograph the state of Gunnamatta Bay"
+    },
+    {
+     "kind": "goto",
+     "x": -4928,
+     "z": 20633,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 171,
+    "xp": 497,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-043",
+   "act": 3,
+   "title": "Seven a.m. At the Bundeena ferry",
+   "blurb": "Not being dramatic about this. The site at the Bundeena ferry starts its jackhammer at the arvo on a Friday, which is illegal and loud. I would have sorted it myself a year ago. Photograph it running and have a word with the Cronulla foreman. Whatever you find, bring it to me first.",
+   "giver": "qg-cronulla-prue",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -4775,
+     "z": 21053,
+     "radius": 40,
+     "label": "photograph the noise from the Bundeena ferry"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 188,
+    "xp": 498,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-044",
+   "act": 3,
+   "title": "The Kingsway Tab",
+   "blurb": "I would do it myself if I could leave the counter. Two chippies off the Kingsway job have run a tab in Cronulla since Australia Day. It started small, the way these things do. They drove past at the last train without looking in, so settle it in cash. That's the whole job. No catch.",
+   "giver": "qg-cronulla-kylie-anne",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near Kingsway"
+    },
+    {
+     "kind": "earn",
+     "dollars": 59,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 186,
+    "xp": 517,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-045",
+   "act": 3,
+   "title": "Trouble at Cronulla Mall",
+   "blurb": "You are the first person to stop all morning. Two lads and their mate decided at ten past ten that Cronulla Mall is theirs. I have got no proof, which is exactly why I am asking. The rest of Cronulla disagrees, so explain the disagreement. Ask for me by name at the counter.",
+   "giver": "qg-cronulla-glenn",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Cronulla Mall"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 189,
+    "xp": 502,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-046",
+   "act": 3,
+   "title": "Staffy Near North Cronulla",
+   "blurb": "There is no clever way to say this. A brindle staffy in a red bandana went over the fence at North Cronulla at midnight. I have got a photo on my phone but it is useless. Everyone in Cronulla has definitely seen it and can't say where. That's it. That's the whole ask.",
+   "giver": "qg-cronulla-lachlan",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5077,
+     "z": 20965,
+     "radius": 30,
+     "label": "check the off-leash bit near North Cronulla"
+    },
+    {
+     "kind": "photo",
+     "x": -5267,
+     "z": 21285,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-cronulla-lachlan",
+     "node": "report-0",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 186,
+    "xp": 525,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-047",
+   "act": 3,
+   "title": "Race Four, North Cronulla",
+   "blurb": "The council knows and the council does not care. There's a horse in race four at half seven that a bloke at North Cronulla swears by. Nobody else seems to have noticed, which is its own problem. Turn it into fifty-five somewhere in Cronulla and tell me if it came in. Come and find me after, either way.",
+   "giver": "qg-cronulla-lachlan",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 108,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-cronulla-lachlan",
+     "node": "report-2",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 175,
+    "xp": 511,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-048",
+   "act": 3,
+   "title": "Left It Near the Alley",
+   "blurb": "Someone has to, and it may as well be you. I left something on the bench at the Alley at half two. You will see what I mean the second you get there. By the time I got back to Cronulla it had walked, so look where I'd have dropped it. Be polite about it. It costs nothing.",
+   "giver": "qg-cronulla-fergus",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -4849,
+     "z": 20880,
+     "radius": 30,
+     "label": "check the bench near the Alley"
+    },
+    {
+     "kind": "photo",
+     "x": -4480,
+     "z": 20911,
+     "radius": 40,
+     "label": "photograph the bins behind it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-cronulla-fergus",
+     "node": "report-1",
+     "label": "tell me what you found"
+    }
+   ],
+   "reward": {
+    "cash": 174,
+    "xp": 515,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-049",
+   "act": 3,
+   "title": "RBT on Wanda",
+   "blurb": "It is not a police matter and I have checked. There's a breath test set up on Wanda since half six. I am aware how that sounds. My brother-in-law needs the ute at the far end of Cronulla without a conversation. Half now if you want it. Most people don't.",
+   "giver": "qg-cronulla-digby",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on Wanda"
+    },
+    {
+     "kind": "goto",
+     "x": -5048,
+     "z": 20854,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 175,
+    "xp": 524,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-050",
+   "act": 3,
+   "title": "Lads Off the Cronulla RSL",
+   "blurb": "You will think I am making this up. Three of them in TNs on the the Cronulla RSL steps, flogging vapes to schoolkids at after the footy. You can tell me I am imagining it. Tell me after. Cronulla used to move them on itself and now it rings me. Come back and tell me straight.",
+   "giver": "qg-cronulla-phil",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from the Cronulla RSL"
+    }
+   ],
+   "reward": {
+    "cash": 175,
+    "xp": 513,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-051",
+   "act": 3,
+   "title": "The the Cronulla RSL Camera",
+   "blurb": "Nobody else has offered, so. A new speed camera near the Cronulla RSL has fined half of Cronulla since grand final day. My wife says I should let it go. My wife is wrong. Photograph it for the appeal, then prove the train to Penrith is faster anyway. Do not make a scene about it.",
+   "giver": "qg-cronulla-phil",
+   "level": 9,
+   "requires": [
+    "qg-l9-cronulla-050"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -4898,
+     "z": 20563,
+     "radius": 40,
+     "label": "photograph the camera near the Cronulla RSL"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Cronulla",
+     "to": "Penrith",
+     "label": "then take the train instead, to Penrith"
+    }
+   ],
+   "reward": {
+    "cash": 225,
+    "xp": 634,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-052",
+   "act": 3,
+   "title": "Meat Tray at the Cronulla Sharks",
+   "blurb": "Two people have already said no. The the Cronulla Sharks raffle is thirty-five short of a meat tray and the draw is at school pick-up. This is the third time I have had this conversation. Find it in Cronulla and put it in the tin. I will know if you skipped a bit.",
+   "giver": "qg-cronulla-toby",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 69,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -5018,
+     "z": 20810,
+     "radius": 30,
+     "label": "and drop it at the Cronulla Sharks"
+    }
+   ],
+   "reward": {
+    "cash": 184,
+    "xp": 499,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-053",
+   "act": 3,
+   "title": "A Flat White From the Cronulla Sharks",
+   "blurb": "Keep it between us for now. I want a flat white from the place near the Cronulla Sharks, not the one next to it. The paperwork says one thing and my eyes say another. Here by the change of shift, while it's still coffee and Cronulla still has some. I'll put the kettle on for when you're back.",
+   "giver": "qg-cronulla-toby",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near the Cronulla Sharks"
+    },
+    {
+     "kind": "goto",
+     "x": -5066,
+     "z": 20524,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 188,
+    "xp": 489,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-054",
+   "act": 3,
+   "title": "Proof of Gunnamatta Bay",
+   "blurb": "Before you say anything: yes, I know. Nobody in Cronulla believes what Gunnamatta Bay looks like at half four. I would have sorted it myself a year ago. Get me a photo close enough that council can't say it's somewhere else. There is no rush, but there is a Friday.",
+   "giver": "qg-cronulla-troy",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -4935,
+     "z": 20897,
+     "radius": 40,
+     "label": "get a picture of Gunnamatta Bay before they fix it"
+    }
+   ],
+   "reward": {
+    "cash": 189,
+    "xp": 516,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-055",
+   "act": 3,
+   "title": "Two Signs, the Bundeena ferry",
+   "blurb": "Not being dramatic about this. Two signs near the Bundeena ferry say opposite things about parking and I've been fined under both. I have rung the number on the letter four times. Get photos of each before Monday, when Cronulla council takes one down. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qg-cronulla-luke",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -5214,
+     "z": 20753,
+     "radius": 40,
+     "label": "photograph the sign at the Bundeena ferry"
+    },
+    {
+     "kind": "photo",
+     "x": -4939,
+     "z": 20741,
+     "radius": 40,
+     "label": "and the one that contradicts it"
+    }
+   ],
+   "reward": {
+    "cash": 187,
+    "xp": 519,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-056",
+   "act": 3,
+   "title": "The Length of the Bundeena ferry",
+   "blurb": "I would do it myself if I could leave the counter. I haven't walked the Bundeena ferry end to end since the light rail came to Cronulla. It has been going on longer than I have admitted to anyone. Do it the long weekend for me and photograph what's at the far end now. Take your time. Do not take a week.",
+   "giver": "qg-cronulla-luke",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5043,
+     "z": 20822,
+     "radius": 30,
+     "label": "walk the length of the Bundeena ferry"
+    },
+    {
+     "kind": "goto",
+     "x": -5371,
+     "z": 20835,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -5371,
+     "z": 20835,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 189,
+    "xp": 496,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-057",
+   "act": 3,
+   "title": "The Kingsway Course",
+   "blurb": "It is the sort of thing you notice or you do not. A bloke near Kingsway runs a ninety-minute course he bills at four hundred, and I've paid. Half the street knows and half the street is pretending not to. Sit it Boxing Day, then come back to Cronulla and prove it did something. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qg-cronulla-poppy",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near Kingsway"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 186,
+    "xp": 520,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-058",
+   "act": 3,
+   "title": "The Cronulla Mall Sparky",
+   "blurb": "Honestly, I am past caring how it looks. The sparky off the Cronulla Mall job has owed me since the bathroom and drinks in Cronulla from six in the morning. There is probably a simple explanation and I would love to hear it. Forty will do and I'll write off the rest. Say nothing to anyone on the way.",
+   "giver": "qg-cronulla-norm",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for Cronulla Mall"
+    },
+    {
+     "kind": "earn",
+     "dollars": 78,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 183,
+    "xp": 497,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-059",
+   "act": 3,
+   "title": "Tap On at the Alley",
+   "blurb": "I'll be straight with you. My Opal says I owe nineteen dollars for a trip from Cronulla I never took on Friday. It might be nothing. It has not felt like nothing. Take the same one to Penrith and tell me what it charged you. Just do not come back empty-handed.",
+   "giver": "qg-cronulla-pam",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Cronulla",
+     "to": "Penrith",
+     "label": "tap on at Cronulla, tap off at Penrith"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-cronulla-pam",
+     "node": "report-0",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 189,
+    "xp": 520,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-060",
+   "act": 3,
+   "title": "The North Cronulla Tab",
+   "blurb": "Do not laugh. Two chippies off the North Cronulla job have run a tab in Cronulla since Easter Saturday. I have got a photo on my phone but it is useless. They drove past at first thing without looking in, so settle it in cash. I'll see you right for it.",
+   "giver": "qg-cronulla-pam",
+   "level": 9,
+   "requires": [
+    "qg-l9-cronulla-059"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near North Cronulla"
+    },
+    {
+     "kind": "earn",
+     "dollars": 59,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 241,
+    "xp": 641,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-061",
+   "act": 3,
+   "title": "Trouble at Wanda",
+   "blurb": "I am told you do odd jobs. Two lads and their mate decided at six in the morning that Wanda is theirs. There is a version of this where I am the unreasonable one. The rest of Cronulla disagrees, so explain the disagreement. Half now if you want it. Most people don't.",
+   "giver": "qg-cronulla-gail",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Wanda"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 171,
+    "xp": 486,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-062",
+   "act": 3,
+   "title": "Rent Money, Wanda",
+   "blurb": "I have written it down twice and lost it twice. I'm forty-five short on the Wanda rent and the agent doesn't take stories. You can tell me I am imagining it. Tell me after. Make it somewhere in Cronulla by eight at night; I'm not fussy how. There's cash in it. Not a lot.",
+   "giver": "qg-cronulla-gail",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 88,
+     "label": "earn forty-five somewhere in Cronulla"
+    }
+   ],
+   "reward": {
+    "cash": 171,
+    "xp": 523,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-063",
+   "act": 3,
+   "title": "Two From the Cronulla RSL",
+   "blurb": "You will think I am making this up. Two of whatever's going near the Cronulla RSL, here, hot, before the footy at ten past ten. My wife says I should let it go. My wife is wrong. It's Cronulla; I'm not asking for much. I will owe you one, and I pay those.",
+   "giver": "qg-cronulla-barry",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near the Cronulla RSL"
+    },
+    {
+     "kind": "goto",
+     "x": -4878,
+     "z": 20886,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 173,
+    "xp": 519,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-064",
+   "act": 3,
+   "title": "Trolley Run, the Cronulla RSL",
+   "blurb": "Nobody else has offered, so. A Woolies trolley from the Cronulla RSL gets walked to the creek every the last Sunday of the month. This is the third time I have had this conversation. Find where it ends up in Cronulla and make the deposit back. Come back and tell me straight.",
+   "giver": "qg-cronulla-barry",
+   "level": 9,
+   "requires": [
+    "qg-l9-cronulla-063"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -4887,
+     "z": 20869,
+     "radius": 30,
+     "label": "find the trolley near the Cronulla RSL"
+    },
+    {
+     "kind": "photo",
+     "x": -4887,
+     "z": 20869,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 49,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 235,
+    "xp": 640,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-065",
+   "act": 3,
+   "title": "Staffy Near Gunnamatta Bay",
+   "blurb": "Keep it between us for now. A brindle staffy in a red bandana went over the fence at Gunnamatta Bay at half seven. I would have sorted it myself a year ago. Everyone in Cronulla has definitely seen it and can't say where. I will know if you skipped a bit.",
+   "giver": "qg-cronulla-tahlia",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -4653,
+     "z": 20594,
+     "radius": 30,
+     "label": "check the off-leash bit near Gunnamatta Bay"
+    },
+    {
+     "kind": "photo",
+     "x": -4829,
+     "z": 20770,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-cronulla-tahlia",
+     "node": "report-0",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 177,
+    "xp": 491,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-066",
+   "act": 3,
+   "title": "Race Four, Gunnamatta Bay",
+   "blurb": "Before you say anything: yes, I know. There's a horse in race four at ten past ten that a bloke at Gunnamatta Bay swears by. I have rung the number on the letter four times. Turn it into fifty-five somewhere in Cronulla and tell me if it came in. I'll put the kettle on for when you're back.",
+   "giver": "qg-cronulla-tahlia",
+   "level": 9,
+   "requires": [
+    "qg-l9-cronulla-065"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 108,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-cronulla-tahlia",
+     "node": "report-1",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 233,
+    "xp": 664,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-cronulla-067",
+   "act": 3,
+   "title": "RBT on Kingsway",
+   "blurb": "I would do it myself if I could leave the counter. There's a breath test set up on Kingsway since the arvo. It is not the money. It has stopped being the money. My brother-in-law needs the ute at the far end of Cronulla without a conversation. Whatever you find, bring it to me first.",
+   "giver": "qg-cronulla-merv",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on Kingsway"
+    },
+    {
+     "kind": "goto",
+     "x": -5098,
+     "z": 20971,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 179,
+    "xp": 515,
+    "unlock": []
+   }
+  }
+ ]
+}

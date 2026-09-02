@@ -1,0 +1,1809 @@
+{
+ "pack": "area-glebe-1",
+ "quests": [
+  {
+   "id": "qg-l3-glebe-001",
+   "act": 3,
+   "title": "Cover at the Nag's Head",
+   "blurb": "This is going to sound small. I've got nobody for the the Nag's Head shift at school pick-up and a room full of Glebe people who've paid. It is the not knowing that has got me, honestly. Fifty of trade and one difficult person at the door. I will owe you one, and I pay those.",
+   "giver": "qg-glebe-georgie",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 62,
+     "label": "cover the fifty for the shift"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 1,
+     "label": "and handle whoever's at the door"
+    }
+   ],
+   "reward": {
+    "cash": 102,
+    "xp": 258,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-002",
+   "act": 3,
+   "title": "Probationary at Glebe Point Road",
+   "blurb": "I would do it myself if I could leave the counter. A young constable has been doing his first solo patrol round Glebe Point Road since grand final day. I have got no proof, which is exactly why I am asking. He's decided Glebe is his, so give him a story for the sergeant. Come back and tell me straight.",
+   "giver": "qg-glebe-georgie",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "lose the probationary constable near Glebe Point Road"
+    }
+   ],
+   "reward": {
+    "cash": 87,
+    "xp": 236,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-003",
+   "act": 3,
+   "title": "Closing Time at Glebe Point Road",
+   "blurb": "It has been three weeks. Two blokes have slept in my doorway on Glebe Point Road since the pub shut. I did try the official route, for what that was worth. The Glebe delivery's at first thing, so get them up and show me the step empty. Do not make a scene about it.",
+   "giver": "qg-glebe-jarrod",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off Glebe Point Road"
+    },
+    {
+     "kind": "photo",
+     "x": -2106,
+     "z": 1589,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 97,
+    "xp": 230,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-004",
+   "act": 3,
+   "title": "Glebe Point Road Pub Crawl",
+   "blurb": "It is the sort of thing you notice or you do not. A bucks started at Glebe Point Road at noon and it's now three blokes, one pair of pants and a tab. I am not after trouble. I am after an answer. Recover the tab by eleven; Glebe can keep the dignity. I will know if you skipped a bit.",
+   "giver": "qg-glebe-jarrod",
+   "level": 3,
+   "requires": [
+    "qg-l3-glebe-003"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 3,
+     "label": "sort the three from the Glebe Point Road crawl"
+    },
+    {
+     "kind": "earn",
+     "dollars": 25,
+     "label": "and get the twenty they owe"
+    }
+   ],
+   "reward": {
+    "cash": 109,
+    "xp": 296,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-005",
+   "act": 3,
+   "title": "The the Toxteth Order",
+   "blurb": "I have been putting it off since Easter. The the Toxteth order came to seventy more than I'd budgeted and the supplier wants it by five. It might be nothing. It has not felt like nothing. Find seventy in Glebe and photograph the receipt. There is no rush, but there is a Friday.",
+   "giver": "qg-glebe-clementine",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 87,
+     "label": "square the seventy for the the Toxteth order"
+    },
+    {
+     "kind": "photo",
+     "x": -1938,
+     "z": 721,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 94,
+    "xp": 250,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-006",
+   "act": 3,
+   "title": "Something From the Toxteth",
+   "blurb": "You are the first person to stop all morning. The stall at the Toxteth has run out and the customers keep coming. I have got a photo on my phone but it is useless. Find something round Glebe that'll do before the first thing rush. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qg-glebe-clementine",
+   "level": 3,
+   "requires": [
+    "qg-l3-glebe-005"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near the Toxteth"
+    },
+    {
+     "kind": "goto",
+     "x": -2023,
+     "z": 911,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 114,
+    "xp": 332,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-007",
+   "act": 3,
+   "title": "Lads Off Jubilee Park",
+   "blurb": "My knees are gone, so. Three of them in TNs on the Jubilee Park steps, flogging vapes to schoolkids at bin night. Nobody else seems to have noticed, which is its own problem. Glebe used to move them on itself and now it rings me. Whatever you find, bring it to me first.",
+   "giver": "qg-glebe-hugo",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Jubilee Park"
+    }
+   ],
+   "reward": {
+    "cash": 88,
+    "xp": 255,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-008",
+   "act": 3,
+   "title": "A Flat White From the Tramsheds",
+   "blurb": "I'll be straight with you. I want a flat white from the place near the Tramsheds, not the one next to it. I would not ask if there was anyone else about. Here by lunchtime, while it's still coffee and Glebe still has some. That's the whole job. No catch.",
+   "giver": "qg-glebe-michelle",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near the Tramsheds"
+    },
+    {
+     "kind": "goto",
+     "x": -1610,
+     "z": 918,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 94,
+    "xp": 230,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-009",
+   "act": 3,
+   "title": "Sightline at the Tramsheds",
+   "blurb": "Do not laugh. Insurance says nobody could have seen the ute hit the fence at the Tramsheds on the King's Birthday. I am aware how that sounds. Stand where I stood in Glebe, photograph the view, tell me if I'm lying. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qg-glebe-michelle",
+   "level": 3,
+   "requires": [
+    "qg-l3-glebe-008"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2002,
+     "z": 1372,
+     "radius": 30,
+     "label": "stand where it happened at the Tramsheds"
+    },
+    {
+     "kind": "photo",
+     "x": -2002,
+     "z": 1372,
+     "radius": 40,
+     "label": "photograph the corner"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-glebe-michelle",
+     "node": "report-1",
+     "label": "describe the sightline"
+    }
+   ],
+   "reward": {
+    "cash": 116,
+    "xp": 299,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-010",
+   "act": 3,
+   "title": "Bin Night, Glebe Markets",
+   "blurb": "The council knows and the council does not care. Somebody moves the bins on Glebe Markets in front of my drive every Friday night. There is a version of this where I am the unreasonable one. Photograph the evidence and have a word; Glebe knows who. Do not let them talk you into anything.",
+   "giver": "qg-glebe-yiannis",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2031,
+     "z": 1241,
+     "radius": 40,
+     "label": "photograph the bins at Glebe Markets"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 94,
+    "xp": 244,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-011",
+   "act": 3,
+   "title": "The Glebe Markets Complaint",
+   "blurb": "Someone has to, and it may as well be you. Two women in activewear have photographed my bins outside Glebe Markets since Easter Saturday. You can tell me I am imagining it. Tell me after. One has Glebe council on speed dial; sort it however you sort things. Do that and we're square.",
+   "giver": "qg-glebe-yiannis",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near Glebe Markets"
+    }
+   ],
+   "reward": {
+    "cash": 84,
+    "xp": 233,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-012",
+   "act": 3,
+   "title": "The Bicentennial Park Float",
+   "blurb": "Right. Since you asked. The till at Bicentennial Park opens the last Sunday of the month with an empty float because somebody took it to the pub. My wife says I should let it go. My wife is wrong. Sixty before the first Glebe customer, and I'll never say who. Ask for me by name at the counter.",
+   "giver": "qg-glebe-maddie",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 74,
+     "label": "clear sixty for the Bicentennial Park float"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-glebe-maddie",
+     "node": "report-1",
+     "label": "hand it over at the counter"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 249,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-013",
+   "act": 3,
+   "title": "RBT on the Fish Markets",
+   "blurb": "It is not a police matter and I have checked. There's a breath test set up on the Fish Markets since the arvo. This is the third time I have had this conversation. My brother-in-law needs the ute at the far end of Glebe without a conversation. Say nothing to anyone on the way.",
+   "giver": "qg-glebe-kai",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on the Fish Markets"
+    },
+    {
+     "kind": "goto",
+     "x": -1938,
+     "z": 984,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 91,
+    "xp": 249,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-014",
+   "act": 3,
+   "title": "Staffy Near the Fish Markets",
+   "blurb": "I am told you do odd jobs. A brindle staffy in a red bandana went over the fence at the Fish Markets at half seven. The paperwork says one thing and my eyes say another. Everyone in Glebe has definitely seen it and can't say where. Just do not come back empty-handed.",
+   "giver": "qg-glebe-kai",
+   "level": 3,
+   "requires": [
+    "qg-l3-glebe-013"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1756,
+     "z": 975,
+     "radius": 30,
+     "label": "check the off-leash bit near the Fish Markets"
+    },
+    {
+     "kind": "photo",
+     "x": -1965,
+     "z": 935,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-glebe-kai",
+     "node": "report-1",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 120,
+    "xp": 303,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-015",
+   "act": 3,
+   "title": "The Length of the Fish Markets",
+   "blurb": "I have written it down twice and lost it twice. I haven't walked the Fish Markets end to end since the light rail came to Glebe. I would have sorted it myself a year ago. Do it the last Sunday of the month for me and photograph what's at the far end now. I'll see you right for it.",
+   "giver": "qg-glebe-kai",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2239,
+     "z": 887,
+     "radius": 30,
+     "label": "walk the length of the Fish Markets"
+    },
+    {
+     "kind": "goto",
+     "x": -1975,
+     "z": 932,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -1975,
+     "z": 932,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 101,
+    "xp": 252,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-016",
+   "act": 3,
+   "title": "Seven a.m. At Wentworth Park dogs",
+   "blurb": "You will think I am making this up. The site at Wentworth Park dogs starts its jackhammer at midnight on a Tuesday, which is illegal and loud. I have rung the number on the letter four times. Photograph it running and have a word with the Glebe foreman. If anyone asks, you were never here.",
+   "giver": "qg-glebe-shirl",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2086,
+     "z": 898,
+     "radius": 40,
+     "label": "photograph the noise from Wentworth Park dogs"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 88,
+    "xp": 250,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-017",
+   "act": 3,
+   "title": "Counting the Nag's Head",
+   "blurb": "Nobody else has offered, so. Council says the the Nag's Head car park is never full and I say it's full by the change of shift. It started small, the way these things do. Count both Glebe car parks, photograph whichever one makes me right. That's it. That's the whole ask.",
+   "giver": "qg-glebe-eddie",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1822,
+     "z": 1197,
+     "radius": 30,
+     "label": "count the cars at the Nag's Head"
+    },
+    {
+     "kind": "goto",
+     "x": -1593,
+     "z": 1290,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": -1822,
+     "z": 1197,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 102,
+    "xp": 238,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-018",
+   "act": 3,
+   "title": "The the Nag's Head Tab",
+   "blurb": "Keep it between us for now. Two chippies off the the Nag's Head job have run a tab in Glebe since Melbourne Cup day. It is not the money. It has stopped being the money. They drove past at half two without looking in, so settle it in cash. Be polite about it. It costs nothing.",
+   "giver": "qg-glebe-les",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Nag's Head"
+    },
+    {
+     "kind": "earn",
+     "dollars": 37,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 90,
+    "xp": 225,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-019",
+   "act": 3,
+   "title": "The Glebe Point Road Lift",
+   "blurb": "Before you say anything: yes, I know. The lift at Glebe station has been out since the Easter Show and I'm told Central is worse. Half the street knows and half the street is pretending not to. Check both Monday and tell me which takes a pram. I would rather know than wonder.",
+   "giver": "qg-glebe-poppy",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1955,
+     "z": 1001,
+     "radius": 30,
+     "label": "check the lift at Glebe station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Glebe",
+     "to": "Central",
+     "label": "then ride to Central and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-glebe-poppy",
+     "node": "report-0",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 98,
+    "xp": 258,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-020",
+   "act": 3,
+   "title": "Trolley Run, Glebe Point Road",
+   "blurb": "This is going to sound small. A Woolies trolley from Glebe Point Road gets walked to the creek every the long weekend. I have got no proof, which is exactly why I am asking. Find where it ends up in Glebe and make the deposit back. There's cash in it. Not a lot.",
+   "giver": "qg-glebe-poppy",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1952,
+     "z": 850,
+     "radius": 30,
+     "label": "find the trolley near Glebe Point Road"
+    },
+    {
+     "kind": "photo",
+     "x": -1952,
+     "z": 850,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 31,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 88,
+    "xp": 254,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-021",
+   "act": 3,
+   "title": "One Stop From Jubilee Park",
+   "blurb": "You look like you have twenty minutes. I need to know the train from Glebe stops at Central and doesn't sail through like it did on Easter Saturday. It might be nothing. It has not felt like nothing. Ride it at half four and photograph the sign. I will know if you skipped a bit.",
+   "giver": "qg-glebe-tanya",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Glebe",
+     "to": "Central",
+     "label": "take the train to Central"
+    },
+    {
+     "kind": "photo",
+     "x": -306,
+     "z": 1678,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 261,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-022",
+   "act": 3,
+   "title": "Before They Touch the Tramsheds",
+   "blurb": "I have been putting it off since Easter. They start on the Tramsheds on Monday and the orange fencing goes up. I have got a photo on my phone but it is useless. I want Glebe on record before it does. I'll put the kettle on for when you're back.",
+   "giver": "qg-glebe-tanya",
+   "level": 3,
+   "requires": [
+    "qg-l3-glebe-021"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -1986,
+     "z": 891,
+     "radius": 40,
+     "label": "photograph the state of the Tramsheds"
+    },
+    {
+     "kind": "goto",
+     "x": -1887,
+     "z": 754,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 131,
+    "xp": 289,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-023",
+   "act": 3,
+   "title": "Proof of Jubilee Park",
+   "blurb": "You are the first person to stop all morning. Nobody in Glebe believes what Jubilee Park looks like at the change of shift. Nobody else seems to have noticed, which is its own problem. Get me a photo close enough that council can't say it's somewhere else. There is no rush, but there is a Friday.",
+   "giver": "qg-glebe-tanya",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -1989,
+     "z": 1004,
+     "radius": 40,
+     "label": "get a picture of Jubilee Park before they fix it"
+    }
+   ],
+   "reward": {
+    "cash": 98,
+    "xp": 257,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-024",
+   "act": 3,
+   "title": "Race Four, the Tramsheds",
+   "blurb": "My knees are gone, so. There's a horse in race four at half four that a bloke at the Tramsheds swears by. You will see what I mean the second you get there. Turn it into fifty-five somewhere in Glebe and tell me if it came in. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qg-glebe-scott",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 68,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-glebe-scott",
+     "node": "report-1",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 255,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-025",
+   "act": 3,
+   "title": "The the Tramsheds Sparky",
+   "blurb": "Honestly, I am past caring how it looks. The sparky off the the Tramsheds job has owed me since the bathroom and drinks in Glebe from half six. I would not ask if there was anyone else about. Forty will do and I'll write off the rest. Whatever you find, bring it to me first.",
+   "giver": "qg-glebe-scott",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for the Tramsheds"
+    },
+    {
+     "kind": "earn",
+     "dollars": 50,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 237,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-026",
+   "act": 3,
+   "title": "Meat Tray at Glebe Markets",
+   "blurb": "I'll be straight with you. The Glebe Markets raffle is thirty-five short of a meat tray and the draw is at eight at night. I am aware how that sounds. Find it in Glebe and put it in the tin. Take your time. Do not take a week.",
+   "giver": "qg-glebe-warwick",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 43,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -1844,
+     "z": 830,
+     "radius": 30,
+     "label": "and drop it at Glebe Markets"
+    }
+   ],
+   "reward": {
+    "cash": 85,
+    "xp": 240,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-027",
+   "act": 3,
+   "title": "Closing Time at Bicentennial Park",
+   "blurb": "Someone has to, and it may as well be you. Two blokes have slept in my doorway on Bicentennial Park since the pub shut. My wife says I should let it go. My wife is wrong. The Glebe delivery's at peak hour, so get them up and show me the step empty. Do not let them talk you into anything.",
+   "giver": "qg-glebe-hugo-a",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off Bicentennial Park"
+    },
+    {
+     "kind": "photo",
+     "x": -2012,
+     "z": 1011,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 255,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-028",
+   "act": 3,
+   "title": "The Fish Markets Pub Crawl",
+   "blurb": "Right. Since you asked. A bucks started at the Fish Markets at noon and it's now three blokes, one pair of pants and a tab. This is the third time I have had this conversation. Recover the tab by six in the morning; Glebe can keep the dignity. Do that and we're square.",
+   "giver": "qg-glebe-janelle",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 3,
+     "label": "sort the three from the the Fish Markets crawl"
+    },
+    {
+     "kind": "earn",
+     "dollars": 25,
+     "label": "and get the twenty they owe"
+    }
+   ],
+   "reward": {
+    "cash": 84,
+    "xp": 257,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-029",
+   "act": 3,
+   "title": "The Sappho Books Order",
+   "blurb": "I am told you do odd jobs. The Sappho Books order came to seventy more than I'd budgeted and the supplier wants it by five. I would have sorted it myself a year ago. Find seventy in Glebe and photograph the receipt. Say nothing to anyone on the way.",
+   "giver": "qg-glebe-manoli",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 87,
+     "label": "square the seventy for the Sappho Books order"
+    },
+    {
+     "kind": "photo",
+     "x": -2228,
+     "z": 883,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 91,
+    "xp": 225,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-030",
+   "act": 3,
+   "title": "Something From Sappho Books",
+   "blurb": "I have written it down twice and lost it twice. The stall at Sappho Books has run out and the customers keep coming. I have rung the number on the letter four times. Find something round Glebe that'll do before the first thing rush. Just do not come back empty-handed.",
+   "giver": "qg-glebe-manoli",
+   "level": 3,
+   "requires": [
+    "qg-l3-glebe-029"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near Sappho Books"
+    },
+    {
+     "kind": "goto",
+     "x": -1886,
+     "z": 1147,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 124,
+    "xp": 306,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-031",
+   "act": 3,
+   "title": "The the Nag's Head Fence",
+   "blurb": "Nobody else has offered, so. My neighbour at the Nag's Head says the tree is on my side and the fence says otherwise. It has been going on longer than I have admitted to anyone. Look at it Melbourne Cup day with Glebe eyes and tell me the truth. If anyone asks, you were never here.",
+   "giver": "qg-glebe-fergus",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2208,
+     "z": 679,
+     "radius": 30,
+     "label": "go and look at the fence at the Nag's Head"
+    },
+    {
+     "kind": "photo",
+     "x": -2208,
+     "z": 679,
+     "radius": 40,
+     "label": "photograph the tree over it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-glebe-fergus",
+     "node": "report-0",
+     "label": "tell me whose side it's on"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 223,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-032",
+   "act": 3,
+   "title": "Sightline at Glebe Point Road",
+   "blurb": "Keep it between us for now. Insurance says nobody could have seen the ute hit the fence at Glebe Point Road on Tuesday. Half the street knows and half the street is pretending not to. Stand where I stood in Glebe, photograph the view, tell me if I'm lying. Come and find me after, either way.",
+   "giver": "qg-glebe-reg",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1883,
+     "z": 1233,
+     "radius": 30,
+     "label": "stand where it happened at Glebe Point Road"
+    },
+    {
+     "kind": "photo",
+     "x": -1883,
+     "z": 1233,
+     "radius": 40,
+     "label": "photograph the corner"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-glebe-reg",
+     "node": "report-0",
+     "label": "describe the sightline"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 231,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-033",
+   "act": 3,
+   "title": "Rent Money, Glebe Point Road",
+   "blurb": "Before you say anything: yes, I know. I'm forty-five short on the Glebe Point Road rent and the agent doesn't take stories. It is the not knowing that has got me, honestly. Make it somewhere in Glebe by dawn; I'm not fussy how. Be polite about it. It costs nothing.",
+   "giver": "qg-glebe-reg",
+   "level": 3,
+   "requires": [
+    "qg-l3-glebe-032"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 56,
+     "label": "earn forty-five somewhere in Glebe"
+    }
+   ],
+   "reward": {
+    "cash": 113,
+    "xp": 294,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-034",
+   "act": 3,
+   "title": "Bin Night, the Toxteth",
+   "blurb": "Not being dramatic about this. Somebody moves the bins on the Toxteth in front of my drive every Boxing Day night. I have got no proof, which is exactly why I am asking. Photograph the evidence and have a word; Glebe knows who. I would rather know than wonder.",
+   "giver": "qg-glebe-imogen",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -1846,
+     "z": 479,
+     "radius": 40,
+     "label": "photograph the bins at the Toxteth"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 84,
+    "xp": 243,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-035",
+   "act": 3,
+   "title": "The Jubilee Park Complaint",
+   "blurb": "This is going to sound small. Two women in activewear have photographed my bins outside Jubilee Park since Monday. I did try the official route, for what that was worth. One has Glebe council on speed dial; sort it however you sort things. Half now if you want it. Most people don't.",
+   "giver": "qg-glebe-renee-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near Jubilee Park"
+    }
+   ],
+   "reward": {
+    "cash": 91,
+    "xp": 256,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-036",
+   "act": 3,
+   "title": "RBT on Jubilee Park",
+   "blurb": "It has been three weeks. There's a breath test set up on Jubilee Park since dawn. There is probably a simple explanation and I would love to hear it. My brother-in-law needs the ute at the far end of Glebe without a conversation. I will owe you one, and I pay those.",
+   "giver": "qg-glebe-renee-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on Jubilee Park"
+    },
+    {
+     "kind": "goto",
+     "x": -2533,
+     "z": 994,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 87,
+    "xp": 226,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-037",
+   "act": 3,
+   "title": "Staffy Near the Tramsheds",
+   "blurb": "It is the sort of thing you notice or you do not. A brindle staffy in a red bandana went over the fence at the Tramsheds at the arvo. It might be nothing. It has not felt like nothing. Everyone in Glebe has definitely seen it and can't say where. Come back and tell me straight.",
+   "giver": "qg-glebe-jason-a",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2137,
+     "z": 1168,
+     "radius": 30,
+     "label": "check the off-leash bit near the Tramsheds"
+    },
+    {
+     "kind": "photo",
+     "x": -2041,
+     "z": 971,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-glebe-jason-a",
+     "node": "report-0",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 95,
+    "xp": 229,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-038",
+   "act": 3,
+   "title": "The Length of the Tramsheds",
+   "blurb": "You look like you have twenty minutes. I haven't walked the Tramsheds end to end since the light rail came to Glebe. I have got a photo on my phone but it is useless. Do it Monday for me and photograph what's at the far end now. Do not make a scene about it.",
+   "giver": "qg-glebe-jason-a",
+   "level": 3,
+   "requires": [
+    "qg-l3-glebe-037"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1978,
+     "z": 882,
+     "radius": 30,
+     "label": "walk the length of the Tramsheds"
+    },
+    {
+     "kind": "goto",
+     "x": -2340,
+     "z": 958,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -2340,
+     "z": 958,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 134,
+    "xp": 334,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-039",
+   "act": 3,
+   "title": "Seven a.m. At the Tramsheds",
+   "blurb": "I have been putting it off since Easter. The site at the Tramsheds starts its jackhammer at ten past ten on a Sunday, which is illegal and loud. Nobody else seems to have noticed, which is its own problem. Photograph it running and have a word with the Glebe foreman. I will know if you skipped a bit.",
+   "giver": "qg-glebe-jason-a",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2237,
+     "z": 1077,
+     "radius": 40,
+     "label": "photograph the noise from the Tramsheds"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 88,
+    "xp": 240,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-040",
+   "act": 3,
+   "title": "Counting Bicentennial Park",
+   "blurb": "You are the first person to stop all morning. Council says the Bicentennial Park car park is never full and I say it's full by midnight. You will see what I mean the second you get there. Count both Glebe car parks, photograph whichever one makes me right. I'll put the kettle on for when you're back.",
+   "giver": "qg-glebe-pam",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2237,
+     "z": 714,
+     "radius": 30,
+     "label": "count the cars at Bicentennial Park"
+    },
+    {
+     "kind": "goto",
+     "x": -2008,
+     "z": 1015,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": -2237,
+     "z": 714,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 94,
+    "xp": 233,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-041",
+   "act": 3,
+   "title": "Trouble at Bicentennial Park",
+   "blurb": "My knees are gone, so. Two lads and their mate decided at the change of shift that Bicentennial Park is theirs. I would not ask if there was anyone else about. The rest of Glebe disagrees, so explain the disagreement. There is no rush, but there is a Friday.",
+   "giver": "qg-glebe-maria",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Bicentennial Park"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 238,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-042",
+   "act": 3,
+   "title": "The Bicentennial Park Tab",
+   "blurb": "Honestly, I am past caring how it looks. Two chippies off the Bicentennial Park job have run a tab in Glebe since Friday. I am aware how that sounds. They drove past at half two without looking in, so settle it in cash. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qg-glebe-maria",
+   "level": 3,
+   "requires": [
+    "qg-l3-glebe-041"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near Bicentennial Park"
+    },
+    {
+     "kind": "earn",
+     "dollars": 37,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 111,
+    "xp": 313,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-043",
+   "act": 3,
+   "title": "The the Fish Markets Lift",
+   "blurb": "I'll be straight with you. The lift at Glebe station has been out since the Easter Show and I'm told Central is worse. Everyone I have told has looked at me the way you are now. Check both Anzac Day and tell me which takes a pram. Whatever you find, bring it to me first.",
+   "giver": "qg-glebe-beryl-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1955,
+     "z": 1001,
+     "radius": 30,
+     "label": "check the lift at Glebe station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Glebe",
+     "to": "Central",
+     "label": "then ride to Central and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-glebe-beryl-b",
+     "node": "report-0",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 249,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-044",
+   "act": 3,
+   "title": "Trolley Run, the Fish Markets",
+   "blurb": "There is no clever way to say this. A Woolies trolley from the Fish Markets gets walked to the creek every the King's Birthday. You can tell me I am imagining it. Tell me after. Find where it ends up in Glebe and make the deposit back. That's the whole job. No catch.",
+   "giver": "qg-glebe-beryl-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2272,
+     "z": 1103,
+     "radius": 30,
+     "label": "find the trolley near the Fish Markets"
+    },
+    {
+     "kind": "photo",
+     "x": -2272,
+     "z": 1103,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 31,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 228,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-045",
+   "act": 3,
+   "title": "Left It Near Wentworth Park dogs",
+   "blurb": "The council knows and the council does not care. I left something on the bench at Wentworth Park dogs at half four. My wife says I should let it go. My wife is wrong. By the time I got back to Glebe it had walked, so look where I'd have dropped it. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qg-glebe-kev-a",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1775,
+     "z": 757,
+     "radius": 30,
+     "label": "check the bench near Wentworth Park dogs"
+    },
+    {
+     "kind": "photo",
+     "x": -2054,
+     "z": 977,
+     "radius": 40,
+     "label": "photograph the bins behind it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-glebe-kev-a",
+     "node": "report-0",
+     "label": "tell me what you found"
+    }
+   ],
+   "reward": {
+    "cash": 97,
+    "xp": 226,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-046",
+   "act": 3,
+   "title": "The Wentworth Park dogs Course",
+   "blurb": "Someone has to, and it may as well be you. A bloke near Wentworth Park dogs runs a ninety-minute course he bills at four hundred, and I've paid. This is the third time I have had this conversation. Sit it Anzac Day, then come back to Glebe and prove it did something. You'll know it when you see it.",
+   "giver": "qg-glebe-kev-a",
+   "level": 3,
+   "requires": [
+    "qg-l3-glebe-045"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near Wentworth Park dogs"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 109,
+    "xp": 315,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-047",
+   "act": 3,
+   "title": "The Sappho Books Camera",
+   "blurb": "Right. Since you asked. A new speed camera near Sappho Books has fined half of Glebe since Melbourne Cup day. The paperwork says one thing and my eyes say another. Photograph it for the appeal, then prove the train to Central is faster anyway. Do not let them talk you into anything.",
+   "giver": "qg-glebe-joyce-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2033,
+     "z": 1407,
+     "radius": 40,
+     "label": "photograph the camera near Sappho Books"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Glebe",
+     "to": "Central",
+     "label": "then take the train instead, to Central"
+    }
+   ],
+   "reward": {
+    "cash": 95,
+    "xp": 236,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-048",
+   "act": 3,
+   "title": "One Stop From Sappho Books",
+   "blurb": "It is not a police matter and I have checked. I need to know the train from Glebe stops at Central and doesn't sail through like it did on Wednesday. I would have sorted it myself a year ago. Ride it at half four and photograph the sign. Do that and we're square.",
+   "giver": "qg-glebe-joyce-b",
+   "level": 3,
+   "requires": [
+    "qg-l3-glebe-047"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Glebe",
+     "to": "Central",
+     "label": "take the train to Central"
+    },
+    {
+     "kind": "photo",
+     "x": -306,
+     "z": 1678,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 114,
+    "xp": 324,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-049",
+   "act": 3,
+   "title": "Before They Touch the Nag's Head",
+   "blurb": "I am told you do odd jobs. They start on the Nag's Head on Anzac Day and the orange fencing goes up. I have rung the number on the letter four times. I want Glebe on record before it does. Ask for me by name at the counter.",
+   "giver": "qg-glebe-joyce-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2160,
+     "z": 760,
+     "radius": 40,
+     "label": "photograph the state of the Nag's Head"
+    },
+    {
+     "kind": "goto",
+     "x": -2123,
+     "z": 953,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 84,
+    "xp": 232,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-050",
+   "act": 3,
+   "title": "Proof of the Nag's Head",
+   "blurb": "I have written it down twice and lost it twice. Nobody in Glebe believes what the Nag's Head looks like at eight at night. It started small, the way these things do. Get me a photo close enough that council can't say it's somewhere else. Say nothing to anyone on the way.",
+   "giver": "qg-glebe-warwick-a",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2066,
+     "z": 980,
+     "radius": 40,
+     "label": "get a picture of the Nag's Head before they fix it"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 239,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-051",
+   "act": 3,
+   "title": "Race Four, the Nag's Head",
+   "blurb": "You will think I am making this up. There's a horse in race four at peak hour that a bloke at the Nag's Head swears by. It has been going on longer than I have admitted to anyone. Turn it into fifty-five somewhere in Glebe and tell me if it came in. Just do not come back empty-handed.",
+   "giver": "qg-glebe-warwick-a",
+   "level": 3,
+   "requires": [
+    "qg-l3-glebe-050"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 68,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-glebe-warwick-a",
+     "node": "report-1",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 116,
+    "xp": 311,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-052",
+   "act": 3,
+   "title": "The Glebe Point Road Sparky",
+   "blurb": "Nobody else has offered, so. The sparky off the Glebe Point Road job has owed me since the bathroom and drinks in Glebe from six in the morning. It is not the money. It has stopped being the money. Forty will do and I'll write off the rest. I'll see you right for it.",
+   "giver": "qg-glebe-tegan-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for Glebe Point Road"
+    },
+    {
+     "kind": "earn",
+     "dollars": 50,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 88,
+    "xp": 244,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l3-glebe-053",
+   "act": 3,
+   "title": "Meat Tray at Glebe Point Road",
+   "blurb": "Two people have already said no. The Glebe Point Road raffle is thirty-five short of a meat tray and the draw is at three in the morning. Half the street knows and half the street is pretending not to. Find it in Glebe and put it in the tin. If anyone asks, you were never here.",
+   "giver": "qg-glebe-tegan-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 43,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -1705,
+     "z": 1411,
+     "radius": 30,
+     "label": "and drop it at Glebe Point Road"
+    }
+   ],
+   "reward": {
+    "cash": 95,
+    "xp": 227,
+    "unlock": []
+   }
+  }
+ ]
+}

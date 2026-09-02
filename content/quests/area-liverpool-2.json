@@ -1,0 +1,940 @@
+{
+ "pack": "area-liverpool-2",
+ "quests": [
+  {
+   "id": "qg-l9-liverpool-040",
+   "act": 3,
+   "title": "One Stop From Liverpool Hospital",
+   "blurb": "It is the sort of thing you notice or you do not. I need to know the train from Liverpool stops at Cronulla and doesn't sail through like it did on Saturday. I have got a photo on my phone but it is useless. Ride it at closing and photograph the sign. That's the whole job. No catch.",
+   "giver": "qg-liverpool-khoa",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Liverpool",
+     "to": "Cronulla",
+     "label": "take the train to Cronulla"
+    },
+    {
+     "kind": "photo",
+     "x": -5021,
+     "z": 20825,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 184,
+    "xp": 506,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-041",
+   "act": 3,
+   "title": "Tap On at Liverpool Hospital",
+   "blurb": "You look like you have twenty minutes. My Opal says I owe nineteen dollars for a trip from Liverpool I never took on Melbourne Cup day. Nobody else seems to have noticed, which is its own problem. Take the same one to Cronulla and tell me what it charged you. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qg-liverpool-khoa",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Liverpool",
+     "to": "Cronulla",
+     "label": "tap on at Liverpool, tap off at Cronulla"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-liverpool-khoa",
+     "node": "report-2",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 180,
+    "xp": 516,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-042",
+   "act": 3,
+   "title": "RBT on the Liverpool Catholic Club",
+   "blurb": "I have been putting it off since Easter. There's a breath test set up on the Liverpool Catholic Club since ten past ten. You will see what I mean the second you get there. My brother-in-law needs the ute at the far end of Liverpool without a conversation. You'll know it when you see it.",
+   "giver": "qg-liverpool-fergus",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on the Liverpool Catholic Club"
+    },
+    {
+     "kind": "goto",
+     "x": -25823,
+     "z": 6799,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 187,
+    "xp": 521,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-043",
+   "act": 3,
+   "title": "Two From the Liverpool Catholic Club",
+   "blurb": "You are the first person to stop all morning. Two of whatever's going near the Liverpool Catholic Club, here, hot, before the footy at bin night. I would not ask if there was anyone else about. It's Liverpool; I'm not asking for much. Do not let them talk you into anything.",
+   "giver": "qg-liverpool-fergus",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near the Liverpool Catholic Club"
+    },
+    {
+     "kind": "goto",
+     "x": -26004,
+     "z": 6710,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 180,
+    "xp": 498,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-044",
+   "act": 3,
+   "title": "Trouble at Elizabeth Street",
+   "blurb": "My knees are gone, so. Two lads and their mate decided at the last train that Elizabeth Street is theirs. I am aware how that sounds. The rest of Liverpool disagrees, so explain the disagreement. Do that and we're square.",
+   "giver": "qg-liverpool-jarrod",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Elizabeth Street"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 179,
+    "xp": 506,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-045",
+   "act": 3,
+   "title": "Bin Night, Elizabeth Street",
+   "blurb": "Honestly, I am past caring how it looks. Somebody moves the bins on Elizabeth Street in front of my drive every the King's Birthday night. Everyone I have told has looked at me the way you are now. Photograph the evidence and have a word; Liverpool knows who. Ask for me by name at the counter.",
+   "giver": "qg-liverpool-jarrod",
+   "level": 9,
+   "requires": [
+    "qg-l9-liverpool-044"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -25884,
+     "z": 6684,
+     "radius": 40,
+     "label": "photograph the bins at Elizabeth Street"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 242,
+    "xp": 667,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-046",
+   "act": 3,
+   "title": "Proof of Macquarie Street Mall",
+   "blurb": "I have written it down twice and lost it twice. Nobody in Liverpool believes what Macquarie Street Mall looks like at midnight. It has been going on longer than I have admitted to anyone. Get me a photo close enough that council can't say it's somewhere else. Half now if you want it. Most people don't.",
+   "giver": "qg-liverpool-tuan",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -25890,
+     "z": 6663,
+     "radius": 40,
+     "label": "get a picture of Macquarie Street Mall before they fix it"
+    }
+   ],
+   "reward": {
+    "cash": 174,
+    "xp": 525,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-047",
+   "act": 3,
+   "title": "Parcel for Cronulla",
+   "blurb": "Two people have already said no. A parcel from Bigge Park has to be at Cronulla by the last train and Australia Post quoted me Australia Day. It is the not knowing that has got me, honestly. Take the train and hand it to the people outside the station. Come back and tell me straight.",
+   "giver": "qg-liverpool-prue",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Liverpool",
+     "to": "Cronulla",
+     "label": "carry it on the train to Cronulla"
+    },
+    {
+     "kind": "goto",
+     "x": -5021,
+     "z": 20825,
+     "radius": 30,
+     "label": "hand it over outside the station, where the crowd is"
+    }
+   ],
+   "reward": {
+    "cash": 185,
+    "xp": 498,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-048",
+   "act": 3,
+   "title": "Probationary at Bigge Park",
+   "blurb": "Before you say anything: yes, I know. A young constable has been doing his first solo patrol round Bigge Park since the King's Birthday. I did try the official route, for what that was worth. He's decided Liverpool is his, so give him a story for the sergeant. I will know if you skipped a bit.",
+   "giver": "qg-liverpool-phil",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "lose the probationary constable near Bigge Park"
+    }
+   ],
+   "reward": {
+    "cash": 176,
+    "xp": 492,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-049",
+   "act": 3,
+   "title": "Seven a.m. At Liverpool Hospital",
+   "blurb": "Not being dramatic about this. The site at Liverpool Hospital starts its jackhammer at half six on a Wednesday, which is illegal and loud. I am not after trouble. I am after an answer. Photograph it running and have a word with the Liverpool foreman. I'll put the kettle on for when you're back.",
+   "giver": "qg-liverpool-neville",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -25772,
+     "z": 6582,
+     "radius": 40,
+     "label": "photograph the noise from Liverpool Hospital"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 177,
+    "xp": 508,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-050",
+   "act": 3,
+   "title": "The Length of Liverpool Hospital",
+   "blurb": "This is going to sound small. I haven't walked Liverpool Hospital end to end since the light rail came to Liverpool. There is probably a simple explanation and I would love to hear it. Do it Anzac Day for me and photograph what's at the far end now. There is no rush, but there is a Friday.",
+   "giver": "qg-liverpool-neville",
+   "level": 9,
+   "requires": [
+    "qg-l9-liverpool-049"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -25840,
+     "z": 6331,
+     "radius": 30,
+     "label": "walk the length of Liverpool Hospital"
+    },
+    {
+     "kind": "goto",
+     "x": -25771,
+     "z": 6684,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -25771,
+     "z": 6684,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 228,
+    "xp": 675,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-051",
+   "act": 3,
+   "title": "The the Liverpool Catholic Club Complaint",
+   "blurb": "I would do it myself if I could leave the counter. Two women in activewear have photographed my bins outside the Liverpool Catholic Club since Melbourne Cup day. It might be nothing. It has not felt like nothing. One has Liverpool council on speed dial; sort it however you sort things. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qg-liverpool-brooke",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near the Liverpool Catholic Club"
+    }
+   ],
+   "reward": {
+    "cash": 172,
+    "xp": 519,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-052",
+   "act": 3,
+   "title": "The Elizabeth Street Tab",
+   "blurb": "It is the sort of thing you notice or you do not. Two chippies off the Elizabeth Street job have run a tab in Liverpool since Tuesday. Nobody else seems to have noticed, which is its own problem. They drove past at school pick-up without looking in, so settle it in cash. Take your time. Do not take a week.",
+   "giver": "qg-liverpool-fadi",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near Elizabeth Street"
+    },
+    {
+     "kind": "earn",
+     "dollars": 59,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 176,
+    "xp": 512,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-053",
+   "act": 3,
+   "title": "The the Georges River Camera",
+   "blurb": "You look like you have twenty minutes. A new speed camera near the Georges River has fined half of Liverpool since Sunday. You will see what I mean the second you get there. Photograph it for the appeal, then prove the train to Cronulla is faster anyway. That's the whole job. No catch.",
+   "giver": "qg-liverpool-scott",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -25869,
+     "z": 6752,
+     "radius": 40,
+     "label": "photograph the camera near the Georges River"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Liverpool",
+     "to": "Cronulla",
+     "label": "then take the train instead, to Cronulla"
+    }
+   ],
+   "reward": {
+    "cash": 183,
+    "xp": 487,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-054",
+   "act": 3,
+   "title": "Counting the Georges River",
+   "blurb": "I have been putting it off since Easter. Council says the the Georges River car park is never full and I say it's full by half four. I would not ask if there was anyone else about. Count both Liverpool car parks, photograph whichever one makes me right. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qg-liverpool-scott",
+   "level": 9,
+   "requires": [
+    "qg-l9-liverpool-053"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -25757,
+     "z": 6800,
+     "radius": 30,
+     "label": "count the cars at the Georges River"
+    },
+    {
+     "kind": "goto",
+     "x": -25838,
+     "z": 6962,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": -25757,
+     "z": 6800,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 226,
+    "xp": 651,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-055",
+   "act": 3,
+   "title": "Lads Off Woodward Park",
+   "blurb": "You are the first person to stop all morning. Three of them in TNs on the Woodward Park steps, flogging vapes to schoolkids at eleven. I am aware how that sounds. Liverpool used to move them on itself and now it rings me. You'll know it when you see it.",
+   "giver": "qg-liverpool-ngoc",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Woodward Park"
+    }
+   ],
+   "reward": {
+    "cash": 177,
+    "xp": 516,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-056",
+   "act": 3,
+   "title": "Race Four, Collimore Park",
+   "blurb": "I'll be straight with you. There's a horse in race four at three in the morning that a bloke at Collimore Park swears by. You can tell me I am imagining it. Tell me after. Turn it into fifty-five somewhere in Liverpool and tell me if it came in. Ask for me by name at the counter.",
+   "giver": "qg-liverpool-barry",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 108,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-liverpool-barry",
+     "node": "report-1",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 172,
+    "xp": 525,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-057",
+   "act": 3,
+   "title": "The Macquarie Street Mall Fence",
+   "blurb": "There is no clever way to say this. My neighbour at Macquarie Street Mall says the tree is on my side and the fence says otherwise. This is the third time I have had this conversation. Look at it Easter Saturday with Liverpool eyes and tell me the truth. Just do not come back empty-handed.",
+   "giver": "qg-liverpool-tahlia",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -26428,
+     "z": 6517,
+     "radius": 30,
+     "label": "go and look at the fence at Macquarie Street Mall"
+    },
+    {
+     "kind": "photo",
+     "x": -26428,
+     "z": 6517,
+     "radius": 40,
+     "label": "photograph the tree over it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-liverpool-tahlia",
+     "node": "report-0",
+     "label": "tell me whose side it's on"
+    }
+   ],
+   "reward": {
+    "cash": 180,
+    "xp": 512,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-058",
+   "act": 3,
+   "title": "The the Hume Sparky",
+   "blurb": "The council knows and the council does not care. The sparky off the the Hume job has owed me since the bathroom and drinks in Liverpool from eleven. The paperwork says one thing and my eyes say another. Forty will do and I'll write off the rest. I'll see you right for it.",
+   "giver": "qg-liverpool-tahlia",
+   "level": 9,
+   "requires": [
+    "qg-l9-liverpool-057"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for the Hume"
+    },
+    {
+     "kind": "earn",
+     "dollars": 78,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 246,
+    "xp": 640,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-059",
+   "act": 3,
+   "title": "One Stop From Westfield Liverpool",
+   "blurb": "It is not a police matter and I have checked. I need to know the train from Liverpool stops at Cronulla and doesn't sail through like it did on Friday. It started small, the way these things do. Ride it at five and photograph the sign. Come and find me after, either way.",
+   "giver": "qg-liverpool-elaine",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Liverpool",
+     "to": "Cronulla",
+     "label": "take the train to Cronulla"
+    },
+    {
+     "kind": "photo",
+     "x": -5021,
+     "z": 20825,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 180,
+    "xp": 507,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-060",
+   "act": 3,
+   "title": "Tap On at Westfield Liverpool",
+   "blurb": "I am told you do odd jobs. My Opal says I owe nineteen dollars for a trip from Liverpool I never took on Easter Saturday. It has been going on longer than I have admitted to anyone. Take the same one to Cronulla and tell me what it charged you. Be polite about it. It costs nothing.",
+   "giver": "qg-liverpool-elaine",
+   "level": 9,
+   "requires": [
+    "qg-l9-liverpool-059"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Liverpool",
+     "to": "Cronulla",
+     "label": "tap on at Liverpool, tap off at Cronulla"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-liverpool-elaine",
+     "node": "report-1",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 230,
+    "xp": 677,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-061",
+   "act": 3,
+   "title": "RBT on Westfield Liverpool",
+   "blurb": "I have written it down twice and lost it twice. There's a breath test set up on Westfield Liverpool since eleven. It is not the money. It has stopped being the money. My brother-in-law needs the ute at the far end of Liverpool without a conversation. I would rather know than wonder.",
+   "giver": "qg-liverpool-elaine",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on Westfield Liverpool"
+    },
+    {
+     "kind": "goto",
+     "x": -25962,
+     "z": 6562,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 180,
+    "xp": 495,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-062",
+   "act": 3,
+   "title": "Two From Bigge Park",
+   "blurb": "You will think I am making this up. Two of whatever's going near Bigge Park, here, hot, before the footy at lunchtime. Half the street knows and half the street is pretending not to. It's Liverpool; I'm not asking for much. Half now if you want it. Most people don't.",
+   "giver": "qg-liverpool-zeina",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near Bigge Park"
+    },
+    {
+     "kind": "goto",
+     "x": -25882,
+     "z": 6695,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 171,
+    "xp": 522,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-063",
+   "act": 3,
+   "title": "Trouble at Bigge Park",
+   "blurb": "Nobody else has offered, so. Two lads and their mate decided at dawn that Bigge Park is theirs. It is the not knowing that has got me, honestly. The rest of Liverpool disagrees, so explain the disagreement. There's cash in it. Not a lot.",
+   "giver": "qg-liverpool-zeina",
+   "level": 9,
+   "requires": [
+    "qg-l9-liverpool-062"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Bigge Park"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 244,
+    "xp": 649,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-064",
+   "act": 3,
+   "title": "Bin Night, Liverpool Hospital",
+   "blurb": "Two people have already said no. Somebody moves the bins on Liverpool Hospital in front of my drive every grand final day night. I have got no proof, which is exactly why I am asking. Photograph the evidence and have a word; Liverpool knows who. I will owe you one, and I pay those.",
+   "giver": "qg-liverpool-cooper",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -25931,
+     "z": 6248,
+     "radius": 40,
+     "label": "photograph the bins at Liverpool Hospital"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 171,
+    "xp": 525,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-065",
+   "act": 3,
+   "title": "A Flat White From Liverpool Hospital",
+   "blurb": "Keep it between us for now. I want a flat white from the place near Liverpool Hospital, not the one next to it. I did try the official route, for what that was worth. Here by five, while it's still coffee and Liverpool still has some. Come back and tell me straight.",
+   "giver": "qg-liverpool-cooper",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near Liverpool Hospital"
+    },
+    {
+     "kind": "goto",
+     "x": -26106,
+     "z": 6361,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 180,
+    "xp": 501,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-066",
+   "act": 3,
+   "title": "Left It Near Elizabeth Street",
+   "blurb": "Before you say anything: yes, I know. I left something on the bench at Elizabeth Street at ten past ten. I am not after trouble. I am after an answer. By the time I got back to Liverpool it had walked, so look where I'd have dropped it. Do not make a scene about it.",
+   "giver": "qg-liverpool-duc",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -25979,
+     "z": 6552,
+     "radius": 30,
+     "label": "check the bench near Elizabeth Street"
+    },
+    {
+     "kind": "photo",
+     "x": -25969,
+     "z": 6374,
+     "radius": 40,
+     "label": "photograph the bins behind it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-liverpool-duc",
+     "node": "report-1",
+     "label": "tell me what you found"
+    }
+   ],
+   "reward": {
+    "cash": 173,
+    "xp": 524,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l9-liverpool-067",
+   "act": 3,
+   "title": "Something From the Liverpool Catholic Club",
+   "blurb": "Not being dramatic about this. The stall at the Liverpool Catholic Club has run out and the customers keep coming. There is probably a simple explanation and I would love to hear it. Find something round Liverpool that'll do before the bin night rush. I will know if you skipped a bit.",
+   "giver": "qg-liverpool-duc",
+   "level": 9,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near the Liverpool Catholic Club"
+    },
+    {
+     "kind": "goto",
+     "x": -25645,
+     "z": 6598,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 173,
+    "xp": 487,
+    "unlock": []
+   }
+  }
+ ]
+}

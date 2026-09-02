@@ -1,0 +1,446 @@
+{
+ "pack": "area-newtown-2",
+ "npcs": [
+  {
+   "id": "qg-newtown-brooke",
+   "name": "Brooke, uni student, three jobs",
+   "x": -2422,
+   "z": 3075,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Newtown rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Newtown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. King Street is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Enmore Road Tab",
+       "accept": "qg-l1-newtown-059",
+       "denyFlag": "w:qg-l1-newtown-059"
+      },
+      {
+       "text": "Trolley Run, Enmore Road",
+       "accept": "qg-l1-newtown-060",
+       "denyFlag": "w:qg-l1-newtown-060",
+       "needFlag": "w:qg-l1-newtown-059"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Brooke looks it over the way Newtown looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the enmore road tab.",
+       "turnin": "qg-l1-newtown-059"
+      },
+      {
+       "text": "About trolley run, enmore road.",
+       "turnin": "qg-l1-newtown-060"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near King Street that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Brooke, uni student, three jobs in Newtown, Sydney. Dry, specific, local; never says g'day or crikey; talks about King Street like everyone knows it.",
+      "context": "Someone has asked what Newtown is like these days. You are standing near King Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-newtown-tahlia",
+   "name": "Tahlia, busker, one amp",
+   "x": -2420,
+   "z": 3383,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hold that thought, the council's coming past. Right. Newtown, what a crowd.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Newtown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I play the same six songs at Enmore Road and nobody has ever complained. Nobody has ever paid, either.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Something From the Marly",
+       "accept": "qg-l1-newtown-061",
+       "denyFlag": "w:qg-l1-newtown-061"
+      },
+      {
+       "text": "The the Marly Camera",
+       "accept": "qg-l1-newtown-062",
+       "denyFlag": "w:qg-l1-newtown-062",
+       "needFlag": "w:qg-l1-newtown-061"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Tahlia looks it over the way Newtown looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About something from the marly.",
+       "turnin": "qg-l1-newtown-061"
+      },
+      {
+       "text": "About the the marly camera.",
+       "turnin": "qg-l1-newtown-062"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good pitch is outside Enmore Road between four and six. After six it's the bloke with the didgeridoo and a Bluetooth speaker.",
+     "improv": {
+      "persona": "Tahlia, busker, one amp in Newtown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Enmore Road like everyone knows it.",
+      "context": "Someone has asked what Newtown is like these days. You are standing near Enmore Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-newtown-cheryl",
+   "name": "Cheryl, publican",
+   "x": -2649,
+   "z": 3175,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "We're not open. We're never not open. What'll it be, Newtown?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Newtown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I run the pub. Schooners, the meat raffle, the trivia on Wednesdays that started as a joke. the Marly keeps me in business and out of the papers.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Two From the Enmore Theatre",
+       "accept": "qg-l1-newtown-063",
+       "denyFlag": "w:qg-l1-newtown-063"
+      },
+      {
+       "text": "The the Enmore Theatre Course",
+       "accept": "qg-l1-newtown-064",
+       "denyFlag": "w:qg-l1-newtown-064",
+       "needFlag": "w:qg-l1-newtown-063"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Cheryl looks it over the way Newtown looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About two from the enmore theatre.",
+       "turnin": "qg-l1-newtown-063"
+      },
+      {
+       "text": "About the the enmore theatre course.",
+       "turnin": "qg-l1-newtown-064"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Tooheys New, seven dollars, and if you ask for a craft beer I'll point you back toward the Marly.",
+     "improv": {
+      "persona": "Cheryl, publican in Newtown, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Marly like everyone knows it.",
+      "context": "Someone has asked what Newtown is like these days. You are standing near the Marly."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-newtown-annabel",
+   "name": "Annabel, vet nurse",
+   "x": -2630,
+   "z": 2862,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If that's a cat in a bag, bring it round the side. Newtown vet, we're always open in spirit.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Newtown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Cats, greyhounds, the odd cockatoo somebody found. the Enmore Theatre sends us more staffies than the rest of Sydney.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Camperdown Memorial Rest Park Fence",
+       "accept": "qg-l1-newtown-065",
+       "denyFlag": "w:qg-l1-newtown-065"
+      },
+      {
+       "text": "The Length of Camperdown Memorial Rest Park",
+       "accept": "qg-l1-newtown-066",
+       "denyFlag": "w:qg-l1-newtown-066",
+       "needFlag": "w:qg-l1-newtown-065"
+      },
+      {
+       "text": "Staffy Near Camperdown Memorial Rest Park",
+       "accept": "qg-l1-newtown-067",
+       "denyFlag": "w:qg-l1-newtown-067"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Annabel counts it out without looking up. -- Don't spend it all at the Enmore Theatre.",
+     "choices": [
+      {
+       "text": "About the camperdown memorial rest park fence.",
+       "turnin": "qg-l1-newtown-065"
+      },
+      {
+       "text": "About the length of camperdown memorial rest park.",
+       "turnin": "qg-l1-newtown-066"
+      },
+      {
+       "text": "About staffy near camperdown memorial rest park.",
+       "turnin": "qg-l1-newtown-067"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every second dog in Newtown is called Frankie. We've stopped correcting people.",
+     "improv": {
+      "persona": "Annabel, vet nurse in Newtown, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Enmore Theatre like everyone knows it.",
+      "context": "Someone has asked what Newtown is like these days. You are standing near the Enmore Theatre."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Right. And you're sure it was Camperdown Memorial Rest Park? People say Camperdown Memorial Rest Park when they mean the bit next to it. -- Annabel writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-2",
+     "line": "Right. And you're sure it was Camperdown Memorial Rest Park? People say Camperdown Memorial Rest Park when they mean the bit next to it. -- Annabel writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

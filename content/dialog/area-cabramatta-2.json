@@ -1,0 +1,1675 @@
+{
+ "pack": "area-cabramatta-2",
+ "npcs": [
+  {
+   "id": "qg-cabramatta-layla",
+   "name": "Layla, baker",
+   "x": -25135,
+   "z": 3376,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flour on everything, sorry. Welcome to Cabramatta. Something warm?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cabramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Up at three, done by noon, asleep by nine. the Freedom Gate eats what I make and I never see them awake.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Bin Night, Cabramatta Plaza",
+       "accept": "qg-l9-cabramatta-045",
+       "denyFlag": "w:qg-l9-cabramatta-045"
+      },
+      {
+       "text": "The Cabramatta Plaza Fence",
+       "accept": "qg-l9-cabramatta-046",
+       "denyFlag": "w:qg-l9-cabramatta-046",
+       "needFlag": "w:qg-l9-cabramatta-045"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Layla pays up on the spot.",
+     "choices": [
+      {
+       "text": "About bin night, cabramatta plaza.",
+       "turnin": "qg-l9-cabramatta-045"
+      },
+      {
+       "text": "About the cabramatta plaza fence.",
+       "turnin": "qg-l9-cabramatta-046"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The knafeh at the Freedom Gate is my cousin's. Better than mine. Don't tell him.",
+     "improv": {
+      "persona": "Layla, baker in Cabramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Freedom Gate like everyone knows it.",
+      "context": "Someone has asked what Cabramatta is like these days. You are standing near the Freedom Gate."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Layla listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cabramatta-yen",
+   "name": "Yen, pho shop owner",
+   "x": -24555,
+   "z": 3287,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sit, sit. Small or large? It's the same price for you, you look hungry. Welcome to Cabramatta.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cabramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "My mother's recipe, my landlord's rent. Hughes Street is a hundred metres of pho and every bowl is a family argument.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's seven a.m. at the moon festival.",
+     "choices": [
+      {
+       "text": "Seven a.m. At the Moon Festival",
+       "accept": "qg-l9-cabramatta-047",
+       "denyFlag": "w:qg-l9-cabramatta-047"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Yen counts it out without looking up. -- Don't spend it all at Hughes Street.",
+     "choices": [
+      {
+       "text": "About seven a.m. at the moon festival.",
+       "turnin": "qg-l9-cabramatta-047"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Eat at the place with the queue of nurses. Nurses know. Hughes Street, past the pharmacy.",
+     "improv": {
+      "persona": "Yen, pho shop owner in Cabramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Hughes Street like everyone knows it.",
+      "context": "Someone has asked what Cabramatta is like these days. You are standing near Hughes Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cabramatta-dara",
+   "name": "Dara, Cambodian restaurant owner",
+   "x": -25206,
+   "z": 3185,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Amok? You want the amok. Sit down. Welcome to Cabramatta.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cabramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "My parents came in '83 with nothing. the Moon Festival was the nothing. Now it's this.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the dutton lane sparky.",
+     "choices": [
+      {
+       "text": "The Dutton Lane Sparky",
+       "accept": "qg-l9-cabramatta-048",
+       "denyFlag": "w:qg-l9-cabramatta-048"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Dara counts it out without looking up. -- Don't spend it all at the Moon Festival.",
+     "choices": [
+      {
+       "text": "About the dutton lane sparky.",
+       "turnin": "qg-l9-cabramatta-048"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best coffee in Cabramatta is Vietnamese iced and it's at the Moon Festival and it's four dollars.",
+     "improv": {
+      "persona": "Dara, Cambodian restaurant owner in Cabramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Moon Festival like everyone knows it.",
+      "context": "Someone has asked what Cabramatta is like these days. You are standing near the Moon Festival."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cabramatta-hayden",
+   "name": "Hayden, Diggers club duty manager",
+   "x": -24978,
+   "z": 3740,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Members and guests. You're a guest. Sign here. Cabramatta Diggers.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cabramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "The bistro, the bowls, the Anzac service, the raffle that funds the lot. Dutton Lane keeps us honest.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's cover at the cabramatta bowlo.",
+     "choices": [
+      {
+       "text": "Cover at the Cabramatta Bowlo",
+       "accept": "qg-l9-cabramatta-049",
+       "denyFlag": "w:qg-l9-cabramatta-049"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Hayden counts it out without looking up. -- Don't spend it all at Dutton Lane.",
+     "choices": [
+      {
+       "text": "About cover at the cabramatta bowlo.",
+       "turnin": "qg-l9-cabramatta-049"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The $10 steak night at Dutton Lane is the reason half of Cabra has a Tuesday.",
+     "improv": {
+      "persona": "Hayden, Diggers club duty manager in Cabramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Dutton Lane like everyone knows it.",
+      "context": "Someone has asked what Cabramatta is like these days. You are standing near Dutton Lane."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cabramatta-maya",
+   "name": "Maya, baker",
+   "x": -24965,
+   "z": 3260,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flour on everything, sorry. Welcome to Cabramatta. Something warm?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cabramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Up at three, done by noon, asleep by nine. the Cabramatta Bowlo eats what I make and I never see them awake.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's counting john street.",
+     "choices": [
+      {
+       "text": "Counting John Street",
+       "accept": "qg-l9-cabramatta-050",
+       "denyFlag": "w:qg-l9-cabramatta-050"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Maya pays up on the spot.",
+     "choices": [
+      {
+       "text": "About counting john street.",
+       "turnin": "qg-l9-cabramatta-050"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The knafeh at the Cabramatta Bowlo is my cousin's. Better than mine. Don't tell him.",
+     "improv": {
+      "persona": "Maya, baker in Cabramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Cabramatta Bowlo like everyone knows it.",
+      "context": "Someone has asked what Cabramatta is like these days. You are standing near the Cabramatta Bowlo."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cabramatta-clive",
+   "name": "Clive, council ranger",
+   "x": -24659,
+   "z": 3177,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Cabramatta is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cabramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. John Street generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Rent Money, the Freedom Gate",
+       "accept": "qg-l9-cabramatta-051",
+       "denyFlag": "w:qg-l9-cabramatta-051"
+      },
+      {
+       "text": "The Length of the Freedom Gate",
+       "accept": "qg-l9-cabramatta-052",
+       "denyFlag": "w:qg-l9-cabramatta-052",
+       "needFlag": "w:qg-l9-cabramatta-051"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Clive looks it over the way Cabramatta looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About rent money, the freedom gate.",
+       "turnin": "qg-l9-cabramatta-051"
+      },
+      {
+       "text": "About the length of the freedom gate.",
+       "turnin": "qg-l9-cabramatta-052"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Clive, council ranger in Cabramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about John Street like everyone knows it.",
+      "context": "Someone has asked what Cabramatta is like these days. You are standing near John Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cabramatta-colin",
+   "name": "Colin, probationary constable",
+   "x": -24689,
+   "z": 3808,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Cabramatta LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cabramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of the Freedom Gate. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Two From Cabramatta Plaza",
+       "accept": "qg-l9-cabramatta-053",
+       "denyFlag": "w:qg-l9-cabramatta-053"
+      },
+      {
+       "text": "Lads Off Cabramatta Plaza",
+       "accept": "qg-l9-cabramatta-054",
+       "denyFlag": "w:qg-l9-cabramatta-054",
+       "needFlag": "w:qg-l9-cabramatta-053"
+      },
+      {
+       "text": "The Cabramatta Plaza Order",
+       "accept": "qg-l9-cabramatta-055",
+       "denyFlag": "w:qg-l9-cabramatta-055"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Colin pays up on the spot.",
+     "choices": [
+      {
+       "text": "About two from cabramatta plaza.",
+       "turnin": "qg-l9-cabramatta-053"
+      },
+      {
+       "text": "About lads off cabramatta plaza.",
+       "turnin": "qg-l9-cabramatta-054"
+      },
+      {
+       "text": "About the cabramatta plaza order.",
+       "turnin": "qg-l9-cabramatta-055"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about the Freedom Gate. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Colin, probationary constable in Cabramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Freedom Gate like everyone knows it.",
+      "context": "Someone has asked what Cabramatta is like these days. You are standing near the Freedom Gate."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cabramatta-khoa",
+   "name": "Khoa, pho shop owner",
+   "x": -25091,
+   "z": 3685,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sit, sit. Small or large? It's the same price for you, you look hungry. Welcome to Cabramatta.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cabramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "My mother's recipe, my landlord's rent. the pho strip is a hundred metres of pho and every bowl is a family argument.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "A Flat White From Hughes Street",
+       "accept": "qg-l9-cabramatta-056",
+       "denyFlag": "w:qg-l9-cabramatta-056"
+      },
+      {
+       "text": "The Hughes Street Course",
+       "accept": "qg-l9-cabramatta-057",
+       "denyFlag": "w:qg-l9-cabramatta-057",
+       "needFlag": "w:qg-l9-cabramatta-056"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Khoa pays up on the spot.",
+     "choices": [
+      {
+       "text": "About a flat white from hughes street.",
+       "turnin": "qg-l9-cabramatta-056"
+      },
+      {
+       "text": "About the hughes street course.",
+       "turnin": "qg-l9-cabramatta-057"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Eat at the place with the queue of nurses. Nurses know. the pho strip, past the pharmacy.",
+     "improv": {
+      "persona": "Khoa, pho shop owner in Cabramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about the pho strip like everyone knows it.",
+      "context": "Someone has asked what Cabramatta is like these days. You are standing near the pho strip."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cabramatta-dara-a",
+   "name": "Dara A., Cambodian restaurant owner",
+   "x": -24854,
+   "z": 3343,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Amok? You want the amok. Sit down. Welcome to Cabramatta.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cabramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "My parents came in '83 with nothing. Cabra-Vale Diggers was the nothing. Now it's this.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at hughes street.",
+     "choices": [
+      {
+       "text": "Trouble at Hughes Street",
+       "accept": "qg-l9-cabramatta-058",
+       "denyFlag": "w:qg-l9-cabramatta-058"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Dara A. counts it out without looking up. -- Don't spend it all at Cabra-Vale Diggers.",
+     "choices": [
+      {
+       "text": "About trouble at hughes street.",
+       "turnin": "qg-l9-cabramatta-058"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best coffee in Cabramatta is Vietnamese iced and it's at Cabra-Vale Diggers and it's four dollars.",
+     "improv": {
+      "persona": "Dara A., Cambodian restaurant owner in Cabramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Cabra-Vale Diggers like everyone knows it.",
+      "context": "Someone has asked what Cabramatta is like these days. You are standing near Cabra-Vale Diggers."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cabramatta-nola",
+   "name": "Nola, council ranger",
+   "x": -25115,
+   "z": 3657,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Cabramatta is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cabramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Dutton Lane generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the cabramatta bowlo lift.",
+     "choices": [
+      {
+       "text": "The the Cabramatta Bowlo Lift",
+       "accept": "qg-l9-cabramatta-059",
+       "denyFlag": "w:qg-l9-cabramatta-059"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Nola pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the cabramatta bowlo lift.",
+       "turnin": "qg-l9-cabramatta-059"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Nola, council ranger in Cabramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Dutton Lane like everyone knows it.",
+      "context": "Someone has asked what Cabramatta is like these days. You are standing near Dutton Lane."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Right. And you're sure it was the Cabramatta Bowlo? People say the Cabramatta Bowlo when they mean the bit next to it. -- Nola writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cabramatta-kerry",
+   "name": "Kerry, probationary constable",
+   "x": -24789,
+   "z": 3583,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Cabramatta LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cabramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of the Cabramatta Bowlo. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's one stop from john street.",
+     "choices": [
+      {
+       "text": "One Stop From John Street",
+       "accept": "qg-l9-cabramatta-060",
+       "denyFlag": "w:qg-l9-cabramatta-060"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Kerry counts it out without looking up. -- Don't spend it all at the Cabramatta Bowlo.",
+     "choices": [
+      {
+       "text": "About one stop from john street.",
+       "turnin": "qg-l9-cabramatta-060"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about the Cabramatta Bowlo. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Kerry, probationary constable in Cabramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Cabramatta Bowlo like everyone knows it.",
+      "context": "Someone has asked what Cabramatta is like these days. You are standing near the Cabramatta Bowlo."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cabramatta-mariam",
+   "name": "Mariam, mechanic, own shop",
+   "x": -24694,
+   "z": 3666,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "It's the timing belt. I haven't looked. It's always the timing belt. Cabramatta, what've you got?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cabramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Commodores, Hiluxes, the odd Alfa from a man who should know better. John Street is where they die.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's bin night, the freedom gate.",
+     "choices": [
+      {
+       "text": "Bin Night, the Freedom Gate",
+       "accept": "qg-l9-cabramatta-061",
+       "denyFlag": "w:qg-l9-cabramatta-061"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Mariam pays up on the spot.",
+     "choices": [
+      {
+       "text": "About bin night, the freedom gate.",
+       "turnin": "qg-l9-cabramatta-061"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never buy a car off John Street. Never. I've seen where they've been.",
+     "improv": {
+      "persona": "Mariam, mechanic, own shop in Cabramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about John Street like everyone knows it.",
+      "context": "Someone has asked what Cabramatta is like these days. You are standing near John Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cabramatta-thu",
+   "name": "Thu, pho shop owner",
+   "x": -25035,
+   "z": 3704,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sit, sit. Small or large? It's the same price for you, you look hungry. Welcome to Cabramatta.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cabramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "My mother's recipe, my landlord's rent. the Freedom Gate is a hundred metres of pho and every bowl is a family argument.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the cabramatta plaza camera.",
+     "choices": [
+      {
+       "text": "The Cabramatta Plaza Camera",
+       "accept": "qg-l9-cabramatta-062",
+       "denyFlag": "w:qg-l9-cabramatta-062"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Thu looks it over the way Cabramatta looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the cabramatta plaza camera.",
+       "turnin": "qg-l9-cabramatta-062"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Eat at the place with the queue of nurses. Nurses know. the Freedom Gate, past the pharmacy.",
+     "improv": {
+      "persona": "Thu, pho shop owner in Cabramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Freedom Gate like everyone knows it.",
+      "context": "Someone has asked what Cabramatta is like these days. You are standing near the Freedom Gate."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cabramatta-riley",
+   "name": "Riley, Diggers club duty manager",
+   "x": -25052,
+   "z": 3276,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Members and guests. You're a guest. Sign here. Cabramatta Diggers.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cabramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "The bistro, the bowls, the Anzac service, the raffle that funds the lot. the pho strip keeps us honest.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Race Four, Cabra-Vale Diggers",
+       "accept": "qg-l9-cabramatta-063",
+       "denyFlag": "w:qg-l9-cabramatta-063"
+      },
+      {
+       "text": "Seven a.m. At Cabra-Vale Diggers",
+       "accept": "qg-l9-cabramatta-064",
+       "denyFlag": "w:qg-l9-cabramatta-064",
+       "needFlag": "w:qg-l9-cabramatta-063"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Riley counts it out without looking up. -- Don't spend it all at the pho strip.",
+     "choices": [
+      {
+       "text": "About race four, cabra-vale diggers.",
+       "turnin": "qg-l9-cabramatta-063"
+      },
+      {
+       "text": "About seven a.m. at cabra-vale diggers.",
+       "turnin": "qg-l9-cabramatta-064"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The $10 steak night at the pho strip is the reason half of Cabra has a Tuesday.",
+     "improv": {
+      "persona": "Riley, Diggers club duty manager in Cabramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about the pho strip like everyone knows it.",
+      "context": "Someone has asked what Cabramatta is like these days. You are standing near the pho strip."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Cabramatta would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cabramatta-nathan",
+   "name": "Nathan, council ranger",
+   "x": -24936,
+   "z": 3125,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Cabramatta is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cabramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Hughes Street generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's cover at the moon festival.",
+     "choices": [
+      {
+       "text": "Cover at the Moon Festival",
+       "accept": "qg-l9-cabramatta-065",
+       "denyFlag": "w:qg-l9-cabramatta-065"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Nathan looks it over the way Cabramatta looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About cover at the moon festival.",
+       "turnin": "qg-l9-cabramatta-065"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Nathan, council ranger in Cabramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Hughes Street like everyone knows it.",
+      "context": "Someone has asked what Cabramatta is like these days. You are standing near Hughes Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cabramatta-nour",
+   "name": "Nour, mechanic, own shop",
+   "x": -25063,
+   "z": 3305,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "It's the timing belt. I haven't looked. It's always the timing belt. Cabramatta, what've you got?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cabramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Commodores, Hiluxes, the odd Alfa from a man who should know better. Dutton Lane is where they die.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the length of the cabramatta bowlo.",
+     "choices": [
+      {
+       "text": "The Length of the Cabramatta Bowlo",
+       "accept": "qg-l9-cabramatta-066",
+       "denyFlag": "w:qg-l9-cabramatta-066"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Nour counts it out without looking up. -- Don't spend it all at Dutton Lane.",
+     "choices": [
+      {
+       "text": "About the length of the cabramatta bowlo.",
+       "turnin": "qg-l9-cabramatta-066"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never buy a car off Dutton Lane. Never. I've seen where they've been.",
+     "improv": {
+      "persona": "Nour, mechanic, own shop in Cabramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about Dutton Lane like everyone knows it.",
+      "context": "Someone has asked what Cabramatta is like these days. You are standing near Dutton Lane."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-cabramatta-bopha-a",
+   "name": "Bopha A., Cambodian restaurant owner",
+   "x": -25165,
+   "z": 3120,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Amok? You want the amok. Sit down. Welcome to Cabramatta.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Cabramatta like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "My parents came in '83 with nothing. John Street was the nothing. Now it's this.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two from the freedom gate.",
+     "choices": [
+      {
+       "text": "Two From the Freedom Gate",
+       "accept": "qg-l9-cabramatta-067",
+       "denyFlag": "w:qg-l9-cabramatta-067"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Bopha A. looks it over the way Cabramatta looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About two from the freedom gate.",
+       "turnin": "qg-l9-cabramatta-067"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best coffee in Cabramatta is Vietnamese iced and it's at John Street and it's four dollars.",
+     "improv": {
+      "persona": "Bopha A., Cambodian restaurant owner in Cabramatta, Sydney. Dry, specific, local; never says g'day or crikey; talks about John Street like everyone knows it.",
+      "context": "Someone has asked what Cabramatta is like these days. You are standing near John Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

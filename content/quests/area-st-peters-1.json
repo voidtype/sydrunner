@@ -1,0 +1,2042 @@
+{
+ "pack": "area-st-peters-1",
+ "quests": [
+  {
+   "id": "qg-l1-st-peters-001",
+   "act": 3,
+   "title": "Lads Off the Camdenville oval",
+   "blurb": "Before you say anything: yes, I know. Three of them in TNs on the the Camdenville oval steps, flogging vapes to schoolkids at half seven. This is the third time I have had this conversation. St Peters used to move them on itself and now it rings me. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qg-st-peters-glenn",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from the Camdenville oval"
+    }
+   ],
+   "reward": {
+    "cash": 55,
+    "xp": 147,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-002",
+   "act": 3,
+   "title": "Sightline at the Camdenville oval",
+   "blurb": "Not being dramatic about this. Insurance says nobody could have seen the ute hit the fence at the Camdenville oval on Anzac Day. The paperwork says one thing and my eyes say another. Stand where I stood in St Peters, photograph the view, tell me if I'm lying. You'll know it when you see it.",
+   "giver": "qg-st-peters-glenn",
+   "level": 1,
+   "requires": [
+    "qg-l1-st-peters-001"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2888,
+     "z": 4773,
+     "radius": 30,
+     "label": "stand where it happened at the Camdenville oval"
+    },
+    {
+     "kind": "photo",
+     "x": -2888,
+     "z": 4773,
+     "radius": 40,
+     "label": "photograph the corner"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-st-peters-glenn",
+     "node": "report-1",
+     "label": "describe the sightline"
+    }
+   ],
+   "reward": {
+    "cash": 77,
+    "xp": 182,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-003",
+   "act": 3,
+   "title": "The the Camdenville oval Tab",
+   "blurb": "This is going to sound small. Two chippies off the the Camdenville oval job have run a tab in St Peters since the last Sunday of the month. I would have sorted it myself a year ago. They drove past at bin night without looking in, so settle it in cash. Do not let them talk you into anything.",
+   "giver": "qg-st-peters-glenn",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Camdenville oval"
+    },
+    {
+     "kind": "earn",
+     "dollars": 30,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 60,
+    "xp": 160,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-004",
+   "act": 3,
+   "title": "Closing Time at the WestConnex vent stack",
+   "blurb": "I would do it myself if I could leave the counter. Two blokes have slept in my doorway on the WestConnex vent stack since the pub shut. I have rung the number on the letter four times. The St Peters delivery's at the last train, so get them up and show me the step empty. Do that and we're square.",
+   "giver": "qg-st-peters-georgie",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off the WestConnex vent stack"
+    },
+    {
+     "kind": "photo",
+     "x": -2568,
+     "z": 4450,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 71,
+    "xp": 142,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-005",
+   "act": 3,
+   "title": "Is Marrickville Any Good",
+   "blurb": "It has been three weeks. The agent says I should move to Marrickville and I haven't been since the nineties. It started small, the way these things do. Ride over the long weekend, photograph the station front, tell me honestly. Ask for me by name at the counter.",
+   "giver": "qg-st-peters-georgie",
+   "level": 1,
+   "requires": [
+    "qg-l1-st-peters-004"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "St Peters",
+     "to": "Marrickville",
+     "label": "take the train to Marrickville"
+    },
+    {
+     "kind": "photo",
+     "x": -5051,
+     "z": 5130,
+     "radius": 40,
+     "label": "photograph the station front"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-st-peters-georgie",
+     "node": "report-1",
+     "label": "tell me if it's worth the move"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 198,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-006",
+   "act": 3,
+   "title": "Rent Money, the WestConnex vent stack",
+   "blurb": "It is the sort of thing you notice or you do not. I'm forty-five short on the the WestConnex vent stack rent and the agent doesn't take stories. It has been going on longer than I have admitted to anyone. Make it somewhere in St Peters by closing; I'm not fussy how. Say nothing to anyone on the way.",
+   "giver": "qg-st-peters-georgie",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 45,
+     "label": "earn forty-five somewhere in St Peters"
+    }
+   ],
+   "reward": {
+    "cash": 58,
+    "xp": 157,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-007",
+   "act": 3,
+   "title": "Two Signs, May Street",
+   "blurb": "You look like you have twenty minutes. Two signs near May Street say opposite things about parking and I've been fined under both. It is not the money. It has stopped being the money. Get photos of each before Monday, when St Peters council takes one down. Just do not come back empty-handed.",
+   "giver": "qg-st-peters-dot",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2480,
+     "z": 4320,
+     "radius": 40,
+     "label": "photograph the sign at May Street"
+    },
+    {
+     "kind": "photo",
+     "x": -2342,
+     "z": 4035,
+     "radius": 40,
+     "label": "and the one that contradicts it"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 151,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-008",
+   "act": 3,
+   "title": "The Length of May Street",
+   "blurb": "I have been putting it off since Easter. I haven't walked May Street end to end since the light rail came to St Peters. Half the street knows and half the street is pretending not to. Do it Sunday for me and photograph what's at the far end now. I'll see you right for it.",
+   "giver": "qg-st-peters-dot",
+   "level": 1,
+   "requires": [
+    "qg-l1-st-peters-007"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2417,
+     "z": 4835,
+     "radius": 30,
+     "label": "walk the length of May Street"
+    },
+    {
+     "kind": "goto",
+     "x": -2342,
+     "z": 4564,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -2342,
+     "z": 4564,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 75,
+    "xp": 196,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-009",
+   "act": 3,
+   "title": "RBT on the St Peters interchange",
+   "blurb": "You are the first person to stop all morning. There's a breath test set up on the St Peters interchange since the arvo. It is the not knowing that has got me, honestly. My brother-in-law needs the ute at the far end of St Peters without a conversation. If anyone asks, you were never here.",
+   "giver": "qg-st-peters-dot",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on the St Peters interchange"
+    },
+    {
+     "kind": "goto",
+     "x": -2126,
+     "z": 4241,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 72,
+    "xp": 139,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-010",
+   "act": 3,
+   "title": "Counting the brick kilns",
+   "blurb": "My knees are gone, so. Council says the the brick kilns car park is never full and I say it's full by after the footy. I have got no proof, which is exactly why I am asking. Count both St Peters car parks, photograph whichever one makes me right. That's it. That's the whole ask.",
+   "giver": "qg-st-peters-michelle",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2745,
+     "z": 4362,
+     "radius": 30,
+     "label": "count the cars at the brick kilns"
+    },
+    {
+     "kind": "goto",
+     "x": -2609,
+     "z": 4517,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": -2745,
+     "z": 4362,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 64,
+    "xp": 158,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-011",
+   "act": 3,
+   "title": "A Flat White From Sydney Park",
+   "blurb": "Honestly, I am past caring how it looks. I want a flat white from the place near Sydney Park, not the one next to it. I did try the official route, for what that was worth. Here by half four, while it's still coffee and St Peters still has some. Come and find me after, either way.",
+   "giver": "qg-st-peters-simran",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near Sydney Park"
+    },
+    {
+     "kind": "goto",
+     "x": -2596,
+     "z": 4047,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 59,
+    "xp": 162,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-012",
+   "act": 3,
+   "title": "The Sydney Park Float",
+   "blurb": "I'll be straight with you. The till at Sydney Park opens Easter Saturday with an empty float because somebody took it to the pub. I am not after trouble. I am after an answer. Sixty before the first St Peters customer, and I'll never say who. Be polite about it. It costs nothing.",
+   "giver": "qg-st-peters-simran",
+   "level": 1,
+   "requires": [
+    "qg-l1-st-peters-011"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "clear sixty for the Sydney Park float"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-st-peters-simran",
+     "node": "report-1",
+     "label": "hand it over at the counter"
+    }
+   ],
+   "reward": {
+    "cash": 74,
+    "xp": 185,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-013",
+   "act": 3,
+   "title": "Left It Near the brick kilns",
+   "blurb": "Do not laugh. I left something on the bench at the brick kilns at three in the morning. There is probably a simple explanation and I would love to hear it. By the time I got back to St Peters it had walked, so look where I'd have dropped it. I would rather know than wonder.",
+   "giver": "qg-st-peters-chantelle",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1998,
+     "z": 4463,
+     "radius": 30,
+     "label": "check the bench near the brick kilns"
+    },
+    {
+     "kind": "photo",
+     "x": -2093,
+     "z": 4547,
+     "radius": 40,
+     "label": "photograph the bins behind it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-st-peters-chantelle",
+     "node": "report-0",
+     "label": "tell me what you found"
+    }
+   ],
+   "reward": {
+    "cash": 73,
+    "xp": 149,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-014",
+   "act": 3,
+   "title": "Probationary at the brick kilns",
+   "blurb": "There is no clever way to say this. A young constable has been doing his first solo patrol round the brick kilns since Friday. It might be nothing. It has not felt like nothing. He's decided St Peters is his, so give him a story for the sergeant. Half now if you want it. Most people don't.",
+   "giver": "qg-st-peters-chantelle",
+   "level": 1,
+   "requires": [
+    "qg-l1-st-peters-013"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "lose the probationary constable near the brick kilns"
+    }
+   ],
+   "reward": {
+    "cash": 90,
+    "xp": 196,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-015",
+   "act": 3,
+   "title": "Two From the brick kilns",
+   "blurb": "The council knows and the council does not care. Two of whatever's going near the brick kilns, here, hot, before the footy at half six. I have got a photo on my phone but it is useless. It's St Peters; I'm not asking for much. There's cash in it. Not a lot.",
+   "giver": "qg-st-peters-chantelle",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near the brick kilns"
+    },
+    {
+     "kind": "goto",
+     "x": -2534,
+     "z": 4332,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 55,
+    "xp": 141,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-016",
+   "act": 3,
+   "title": "Before They Touch the Princes Highway",
+   "blurb": "Someone has to, and it may as well be you. They start on the Princes Highway on grand final day and the orange fencing goes up. Nobody else seems to have noticed, which is its own problem. I want St Peters on record before it does. I will owe you one, and I pay those.",
+   "giver": "qg-st-peters-shirl",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2207,
+     "z": 4579,
+     "radius": 40,
+     "label": "photograph the state of the Princes Highway"
+    },
+    {
+     "kind": "goto",
+     "x": -2419,
+     "z": 4797,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 62,
+    "xp": 149,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-017",
+   "act": 3,
+   "title": "The King Street south end Fence",
+   "blurb": "Right. Since you asked. My neighbour at King Street south end says the tree is on my side and the fence says otherwise. You will see what I mean the second you get there. Look at it Wednesday with St Peters eyes and tell me the truth. Come back and tell me straight.",
+   "giver": "qg-st-peters-sienna",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2332,
+     "z": 4610,
+     "radius": 30,
+     "label": "go and look at the fence at King Street south end"
+    },
+    {
+     "kind": "photo",
+     "x": -2332,
+     "z": 4610,
+     "radius": 40,
+     "label": "photograph the tree over it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-st-peters-sienna",
+     "node": "report-0",
+     "label": "tell me whose side it's on"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 146,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-018",
+   "act": 3,
+   "title": "The King Street south end Camera",
+   "blurb": "It is not a police matter and I have checked. A new speed camera near King Street south end has fined half of St Peters since Anzac Day. I would not ask if there was anyone else about. Photograph it for the appeal, then prove the train to Marrickville is faster anyway. Do not make a scene about it.",
+   "giver": "qg-st-peters-sienna",
+   "level": 1,
+   "requires": [
+    "qg-l1-st-peters-017"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2152,
+     "z": 4698,
+     "radius": 40,
+     "label": "photograph the camera near King Street south end"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "St Peters",
+     "to": "Marrickville",
+     "label": "then take the train instead, to Marrickville"
+    }
+   ],
+   "reward": {
+    "cash": 72,
+    "xp": 208,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-019",
+   "act": 3,
+   "title": "Meat Tray at King Street south end",
+   "blurb": "I am told you do odd jobs. The King Street south end raffle is thirty-five short of a meat tray and the draw is at three in the morning. I am aware how that sounds. Find it in St Peters and put it in the tin. I will know if you skipped a bit.",
+   "giver": "qg-st-peters-sienna",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 35,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -2477,
+     "z": 4501,
+     "radius": 30,
+     "label": "and drop it at King Street south end"
+    }
+   ],
+   "reward": {
+    "cash": 58,
+    "xp": 164,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-020",
+   "act": 3,
+   "title": "Trouble at the Camdenville oval",
+   "blurb": "I have written it down twice and lost it twice. Two lads and their mate decided at dawn that the Camdenville oval is theirs. Everyone I have told has looked at me the way you are now. The rest of St Peters disagrees, so explain the disagreement. I'll put the kettle on for when you're back.",
+   "giver": "qg-st-peters-bruce",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near the Camdenville oval"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 73,
+    "xp": 171,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-021",
+   "act": 3,
+   "title": "The the Camdenville oval Course",
+   "blurb": "You will think I am making this up. A bloke near the Camdenville oval runs a ninety-minute course he bills at four hundred, and I've paid. There is a version of this where I am the unreasonable one. Sit it the long weekend, then come back to St Peters and prove it did something. There is no rush, but there is a Friday.",
+   "giver": "qg-st-peters-bruce",
+   "level": 1,
+   "requires": [
+    "qg-l1-st-peters-020"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near the Camdenville oval"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 79,
+    "xp": 208,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-022",
+   "act": 3,
+   "title": "Something From the WestConnex vent stack",
+   "blurb": "Nobody else has offered, so. The stall at the WestConnex vent stack has run out and the customers keep coming. You can tell me I am imagining it. Tell me after. Find something round St Peters that'll do before the lunchtime rush. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qg-st-peters-toby",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near the WestConnex vent stack"
+    },
+    {
+     "kind": "goto",
+     "x": -2707,
+     "z": 4050,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 166,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-023",
+   "act": 3,
+   "title": "Parcel for Marrickville",
+   "blurb": "Two people have already said no. A parcel from May Street has to be at Marrickville by dawn and Australia Post quoted me Tuesday. My wife says I should let it go. My wife is wrong. Take the train and hand it to the people outside the station. Whatever you find, bring it to me first.",
+   "giver": "qg-st-peters-toby",
+   "level": 1,
+   "requires": [
+    "qg-l1-st-peters-022"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "St Peters",
+     "to": "Marrickville",
+     "label": "carry it on the train to Marrickville"
+    },
+    {
+     "kind": "goto",
+     "x": -5051,
+     "z": 5130,
+     "radius": 30,
+     "label": "hand it over outside the station, where the crowd is"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 216,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-024",
+   "act": 3,
+   "title": "Proof of May Street",
+   "blurb": "Keep it between us for now. Nobody in St Peters believes what May Street looks like at bin night. This is the third time I have had this conversation. Get me a photo close enough that council can't say it's somewhere else. Take your time. Do not take a week.",
+   "giver": "qg-st-peters-deepa",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2360,
+     "z": 3843,
+     "radius": 40,
+     "label": "get a picture of May Street before they fix it"
+    }
+   ],
+   "reward": {
+    "cash": 61,
+    "xp": 160,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-025",
+   "act": 3,
+   "title": "Bin Night, the St Peters interchange",
+   "blurb": "Before you say anything: yes, I know. Somebody moves the bins on the St Peters interchange in front of my drive every Easter Saturday night. The paperwork says one thing and my eyes say another. Photograph the evidence and have a word; St Peters knows who. That's the whole job. No catch.",
+   "giver": "qg-st-peters-nola",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2571,
+     "z": 4213,
+     "radius": 40,
+     "label": "photograph the bins at the St Peters interchange"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 69,
+    "xp": 162,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-026",
+   "act": 3,
+   "title": "Staffy Near the St Peters interchange",
+   "blurb": "Not being dramatic about this. A brindle staffy in a red bandana went over the fence at the St Peters interchange at ten past ten. I would have sorted it myself a year ago. Everyone in St Peters has definitely seen it and can't say where. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qg-st-peters-nola",
+   "level": 1,
+   "requires": [
+    "qg-l1-st-peters-025"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2480,
+     "z": 4617,
+     "radius": 30,
+     "label": "check the off-leash bit near the St Peters interchange"
+    },
+    {
+     "kind": "photo",
+     "x": -2502,
+     "z": 4419,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-st-peters-nola",
+     "node": "report-1",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 183,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-027",
+   "act": 3,
+   "title": "Tap On at the St Peters interchange",
+   "blurb": "This is going to sound small. My Opal says I owe nineteen dollars for a trip from St Peters I never took on Sunday. I have rung the number on the letter four times. Take the same one to Marrickville and tell me what it charged you. You'll know it when you see it.",
+   "giver": "qg-st-peters-nola",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "St Peters",
+     "to": "Marrickville",
+     "label": "tap on at St Peters, tap off at Marrickville"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-st-peters-nola",
+     "node": "report-2",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 73,
+    "xp": 152,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-028",
+   "act": 3,
+   "title": "One Stop From Sydney Park",
+   "blurb": "I would do it myself if I could leave the counter. I need to know the train from St Peters stops at Marrickville and doesn't sail through like it did on Australia Day. It started small, the way these things do. Ride it at the last train and photograph the sign. Do not let them talk you into anything.",
+   "giver": "qg-st-peters-trish",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "St Peters",
+     "to": "Marrickville",
+     "label": "take the train to Marrickville"
+    },
+    {
+     "kind": "photo",
+     "x": -5051,
+     "z": 5130,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 74,
+    "xp": 164,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-029",
+   "act": 3,
+   "title": "The the brick kilns Sparky",
+   "blurb": "It has been three weeks. The sparky off the the brick kilns job has owed me since the bathroom and drinks in St Peters from half two. It has been going on longer than I have admitted to anyone. Forty will do and I'll write off the rest. Do that and we're square.",
+   "giver": "qg-st-peters-dean",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for the brick kilns"
+    },
+    {
+     "kind": "earn",
+     "dollars": 40,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 73,
+    "xp": 134,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-030",
+   "act": 3,
+   "title": "The the brick kilns Lift",
+   "blurb": "It is the sort of thing you notice or you do not. The lift at St Peters station has been out since the Easter Show and I'm told Marrickville is worse. It is not the money. It has stopped being the money. Check both Friday and tell me which takes a pram. Ask for me by name at the counter.",
+   "giver": "qg-st-peters-dean",
+   "level": 1,
+   "requires": [
+    "qg-l1-st-peters-029"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2560,
+     "z": 4272,
+     "radius": 30,
+     "label": "check the lift at St Peters station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "St Peters",
+     "to": "Marrickville",
+     "label": "then ride to Marrickville and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-st-peters-dean",
+     "node": "report-1",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 74,
+    "xp": 192,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-031",
+   "act": 3,
+   "title": "Trolley Run, the brick kilns",
+   "blurb": "You look like you have twenty minutes. A Woolies trolley from the brick kilns gets walked to the creek every Easter Saturday. Half the street knows and half the street is pretending not to. Find where it ends up in St Peters and make the deposit back. Say nothing to anyone on the way.",
+   "giver": "qg-st-peters-dean",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2710,
+     "z": 4170,
+     "radius": 30,
+     "label": "find the trolley near the brick kilns"
+    },
+    {
+     "kind": "photo",
+     "x": -2710,
+     "z": 4170,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 25,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 62,
+    "xp": 170,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-032",
+   "act": 3,
+   "title": "Race Four, the Princes Highway",
+   "blurb": "I have been putting it off since Easter. There's a horse in race four at nine sharp that a bloke at the Princes Highway swears by. It is the not knowing that has got me, honestly. Turn it into fifty-five somewhere in St Peters and tell me if it came in. Just do not come back empty-handed.",
+   "giver": "qg-st-peters-leanne",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 55,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-st-peters-leanne",
+     "node": "report-0",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 152,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-033",
+   "act": 3,
+   "title": "Seven a.m. At the Princes Highway",
+   "blurb": "You are the first person to stop all morning. The site at the Princes Highway starts its jackhammer at midnight on a Thursday, which is illegal and loud. I have got no proof, which is exactly why I am asking. Photograph it running and have a word with the St Peters foreman. I'll see you right for it.",
+   "giver": "qg-st-peters-leanne",
+   "level": 1,
+   "requires": [
+    "qg-l1-st-peters-032"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -3144,
+     "z": 4306,
+     "radius": 40,
+     "label": "photograph the noise from the Princes Highway"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 79,
+    "xp": 200,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-034",
+   "act": 3,
+   "title": "The King Street south end Order",
+   "blurb": "My knees are gone, so. The King Street south end order came to seventy more than I'd budgeted and the supplier wants it by after the footy. I did try the official route, for what that was worth. Find seventy in St Peters and photograph the receipt. If anyone asks, you were never here.",
+   "giver": "qg-st-peters-kerry",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 70,
+     "label": "square the seventy for the King Street south end order"
+    },
+    {
+     "kind": "photo",
+     "x": -2146,
+     "z": 4565,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 154,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-035",
+   "act": 3,
+   "title": "The King Street south end Complaint",
+   "blurb": "Honestly, I am past caring how it looks. Two women in activewear have photographed my bins outside King Street south end since the last Sunday of the month. I am not after trouble. I am after an answer. One has St Peters council on speed dial; sort it however you sort things. That's it. That's the whole ask.",
+   "giver": "qg-st-peters-kerry",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near King Street south end"
+    }
+   ],
+   "reward": {
+    "cash": 74,
+    "xp": 150,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-036",
+   "act": 3,
+   "title": "Cover at the Camdenville oval",
+   "blurb": "I'll be straight with you. I've got nobody for the the Camdenville oval shift at half six and a room full of St Peters people who've paid. There is probably a simple explanation and I would love to hear it. Fifty of trade and one difficult person at the door. Come and find me after, either way.",
+   "giver": "qg-st-peters-gurpreet",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 50,
+     "label": "cover the fifty for the shift"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 1,
+     "label": "and handle whoever's at the door"
+    }
+   ],
+   "reward": {
+    "cash": 58,
+    "xp": 164,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-037",
+   "act": 3,
+   "title": "The Camdenville oval Pub Crawl",
+   "blurb": "Do not laugh. A bucks started at the Camdenville oval at noon and it's now three blokes, one pair of pants and a tab. It might be nothing. It has not felt like nothing. Recover the tab by the change of shift; St Peters can keep the dignity. Be polite about it. It costs nothing.",
+   "giver": "qg-st-peters-gurpreet",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 3,
+     "label": "sort the three from the the Camdenville oval crawl"
+    },
+    {
+     "kind": "earn",
+     "dollars": 20,
+     "label": "and get the twenty they owe"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 145,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-038",
+   "act": 3,
+   "title": "Lads Off the WestConnex vent stack",
+   "blurb": "There is no clever way to say this. Three of them in TNs on the the WestConnex vent stack steps, flogging vapes to schoolkids at peak hour. I have got a photo on my phone but it is useless. St Peters used to move them on itself and now it rings me. I would rather know than wonder.",
+   "giver": "qg-st-peters-kylie-anne",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from the WestConnex vent stack"
+    }
+   ],
+   "reward": {
+    "cash": 57,
+    "xp": 144,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-039",
+   "act": 3,
+   "title": "Sightline at the WestConnex vent stack",
+   "blurb": "The council knows and the council does not care. Insurance says nobody could have seen the ute hit the fence at the WestConnex vent stack on Tuesday. Nobody else seems to have noticed, which is its own problem. Stand where I stood in St Peters, photograph the view, tell me if I'm lying. Half now if you want it. Most people don't.",
+   "giver": "qg-st-peters-kylie-anne",
+   "level": 1,
+   "requires": [
+    "qg-l1-st-peters-038"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2206,
+     "z": 4355,
+     "radius": 30,
+     "label": "stand where it happened at the WestConnex vent stack"
+    },
+    {
+     "kind": "photo",
+     "x": -2206,
+     "z": 4355,
+     "radius": 40,
+     "label": "photograph the corner"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-st-peters-kylie-anne",
+     "node": "report-1",
+     "label": "describe the sightline"
+    }
+   ],
+   "reward": {
+    "cash": 88,
+    "xp": 182,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-040",
+   "act": 3,
+   "title": "The May Street Tab",
+   "blurb": "Someone has to, and it may as well be you. Two chippies off the May Street job have run a tab in St Peters since Saturday. You will see what I mean the second you get there. They drove past at eight at night without looking in, so settle it in cash. There's cash in it. Not a lot.",
+   "giver": "qg-st-peters-graham",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near May Street"
+    },
+    {
+     "kind": "earn",
+     "dollars": 30,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 165,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-041",
+   "act": 3,
+   "title": "Closing Time at May Street",
+   "blurb": "Right. Since you asked. Two blokes have slept in my doorway on May Street since the pub shut. I would not ask if there was anyone else about. The St Peters delivery's at half four, so get them up and show me the step empty. I will owe you one, and I pay those.",
+   "giver": "qg-st-peters-graham",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off May Street"
+    },
+    {
+     "kind": "photo",
+     "x": -2674,
+     "z": 4424,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 57,
+    "xp": 154,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-042",
+   "act": 3,
+   "title": "Rent Money, the St Peters interchange",
+   "blurb": "It is not a police matter and I have checked. I'm forty-five short on the the St Peters interchange rent and the agent doesn't take stories. I am aware how that sounds. Make it somewhere in St Peters by eleven; I'm not fussy how. Come back and tell me straight.",
+   "giver": "qg-st-peters-kai",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 45,
+     "label": "earn forty-five somewhere in St Peters"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 140,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-043",
+   "act": 3,
+   "title": "Two Signs, the St Peters interchange",
+   "blurb": "I am told you do odd jobs. Two signs near the St Peters interchange say opposite things about parking and I've been fined under both. Everyone I have told has looked at me the way you are now. Get photos of each before Sunday, when St Peters council takes one down. Do not make a scene about it.",
+   "giver": "qg-st-peters-kai",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2716,
+     "z": 4402,
+     "radius": 40,
+     "label": "photograph the sign at the St Peters interchange"
+    },
+    {
+     "kind": "photo",
+     "x": -2510,
+     "z": 4356,
+     "radius": 40,
+     "label": "and the one that contradicts it"
+    }
+   ],
+   "reward": {
+    "cash": 62,
+    "xp": 138,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-044",
+   "act": 3,
+   "title": "The Length of Sydney Park",
+   "blurb": "I have written it down twice and lost it twice. I haven't walked Sydney Park end to end since the light rail came to St Peters. There is a version of this where I am the unreasonable one. Do it Australia Day for me and photograph what's at the far end now. I will know if you skipped a bit.",
+   "giver": "qg-st-peters-fay",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2895,
+     "z": 4642,
+     "radius": 30,
+     "label": "walk the length of Sydney Park"
+    },
+    {
+     "kind": "goto",
+     "x": -2916,
+     "z": 4520,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -2916,
+     "z": 4520,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 71,
+    "xp": 143,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-045",
+   "act": 3,
+   "title": "RBT on the brick kilns",
+   "blurb": "You will think I am making this up. There's a breath test set up on the brick kilns since six in the morning. You can tell me I am imagining it. Tell me after. My brother-in-law needs the ute at the far end of St Peters without a conversation. I'll put the kettle on for when you're back.",
+   "giver": "qg-st-peters-fay",
+   "level": 1,
+   "requires": [
+    "qg-l1-st-peters-044"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on the brick kilns"
+    },
+    {
+     "kind": "goto",
+     "x": -2461,
+     "z": 4383,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 77,
+    "xp": 185,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-046",
+   "act": 3,
+   "title": "Counting King Street south end",
+   "blurb": "Nobody else has offered, so. Council says the King Street south end car park is never full and I say it's full by lunchtime. My wife says I should let it go. My wife is wrong. Count both St Peters car parks, photograph whichever one makes me right. There is no rush, but there is a Friday.",
+   "giver": "qg-st-peters-fiona",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2491,
+     "z": 4399,
+     "radius": 30,
+     "label": "count the cars at King Street south end"
+    },
+    {
+     "kind": "goto",
+     "x": -2701,
+     "z": 4172,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": -2491,
+     "z": 4399,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 57,
+    "xp": 166,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-047",
+   "act": 3,
+   "title": "A Flat White From the brick kilns",
+   "blurb": "Two people have already said no. I want a flat white from the place near the brick kilns, not the one next to it. This is the third time I have had this conversation. Here by first thing, while it's still coffee and St Peters still has some. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qg-st-peters-fiona",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near the brick kilns"
+    },
+    {
+     "kind": "goto",
+     "x": -2799,
+     "z": 4161,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 62,
+    "xp": 163,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-048",
+   "act": 3,
+   "title": "The the Princes Highway Float",
+   "blurb": "Keep it between us for now. The till at the Princes Highway opens the last Sunday of the month with an empty float because somebody took it to the pub. The paperwork says one thing and my eyes say another. Sixty before the first St Peters customer, and I'll never say who. Whatever you find, bring it to me first.",
+   "giver": "qg-st-peters-anjali",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "clear sixty for the the Princes Highway float"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-st-peters-anjali",
+     "node": "report-1",
+     "label": "hand it over at the counter"
+    }
+   ],
+   "reward": {
+    "cash": 56,
+    "xp": 140,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-049",
+   "act": 3,
+   "title": "Left It Near King Street south end",
+   "blurb": "Before you say anything: yes, I know. I left something on the bench at King Street south end at half seven. I would have sorted it myself a year ago. By the time I got back to St Peters it had walked, so look where I'd have dropped it. Take your time. Do not take a week.",
+   "giver": "qg-st-peters-hugo",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2361,
+     "z": 4340,
+     "radius": 30,
+     "label": "check the bench near King Street south end"
+    },
+    {
+     "kind": "photo",
+     "x": -2278,
+     "z": 4122,
+     "radius": 40,
+     "label": "photograph the bins behind it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-st-peters-hugo",
+     "node": "report-0",
+     "label": "tell me what you found"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 168,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-050",
+   "act": 3,
+   "title": "Probationary at King Street south end",
+   "blurb": "Not being dramatic about this. A young constable has been doing his first solo patrol round King Street south end since Anzac Day. I have rung the number on the letter four times. He's decided St Peters is his, so give him a story for the sergeant. That's the whole job. No catch.",
+   "giver": "qg-st-peters-hugo",
+   "level": 1,
+   "requires": [
+    "qg-l1-st-peters-049"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "lose the probationary constable near King Street south end"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 213,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-051",
+   "act": 3,
+   "title": "Two From the Camdenville oval",
+   "blurb": "This is going to sound small. Two of whatever's going near the Camdenville oval, here, hot, before the footy at the arvo. It started small, the way these things do. It's St Peters; I'm not asking for much. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qg-st-peters-shaz",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near the Camdenville oval"
+    },
+    {
+     "kind": "goto",
+     "x": -2362,
+     "z": 4792,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 73,
+    "xp": 160,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-052",
+   "act": 3,
+   "title": "Before They Touch the Camdenville oval",
+   "blurb": "I would do it myself if I could leave the counter. They start on the Camdenville oval on Wednesday and the orange fencing goes up. It has been going on longer than I have admitted to anyone. I want St Peters on record before it does. You'll know it when you see it.",
+   "giver": "qg-st-peters-shaz",
+   "level": 1,
+   "requires": [
+    "qg-l1-st-peters-051"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2275,
+     "z": 4247,
+     "radius": 40,
+     "label": "photograph the state of the Camdenville oval"
+    },
+    {
+     "kind": "goto",
+     "x": -2396,
+     "z": 4340,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 81,
+    "xp": 185,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-053",
+   "act": 3,
+   "title": "The the WestConnex vent stack Fence",
+   "blurb": "It has been three weeks. My neighbour at the WestConnex vent stack says the tree is on my side and the fence says otherwise. It is not the money. It has stopped being the money. Look at it Sunday with St Peters eyes and tell me the truth. Do not let them talk you into anything.",
+   "giver": "qg-st-peters-mick",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2394,
+     "z": 4480,
+     "radius": 30,
+     "label": "go and look at the fence at the WestConnex vent stack"
+    },
+    {
+     "kind": "photo",
+     "x": -2394,
+     "z": 4480,
+     "radius": 40,
+     "label": "photograph the tree over it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qg-st-peters-mick",
+     "node": "report-0",
+     "label": "tell me whose side it's on"
+    }
+   ],
+   "reward": {
+    "cash": 74,
+    "xp": 167,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-054",
+   "act": 3,
+   "title": "The the WestConnex vent stack Camera",
+   "blurb": "It is the sort of thing you notice or you do not. A new speed camera near the WestConnex vent stack has fined half of St Peters since Melbourne Cup day. Half the street knows and half the street is pretending not to. Photograph it for the appeal, then prove the train to Marrickville is faster anyway. Do that and we're square.",
+   "giver": "qg-st-peters-mick",
+   "level": 1,
+   "requires": [
+    "qg-l1-st-peters-053"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2514,
+     "z": 4389,
+     "radius": 40,
+     "label": "photograph the camera near the WestConnex vent stack"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "St Peters",
+     "to": "Marrickville",
+     "label": "then take the train instead, to Marrickville"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 213,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-055",
+   "act": 3,
+   "title": "Meat Tray at the WestConnex vent stack",
+   "blurb": "You look like you have twenty minutes. The the WestConnex vent stack raffle is thirty-five short of a meat tray and the draw is at half seven. It is the not knowing that has got me, honestly. Find it in St Peters and put it in the tin. Ask for me by name at the counter.",
+   "giver": "qg-st-peters-mick",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 35,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -2830,
+     "z": 4141,
+     "radius": 30,
+     "label": "and drop it at the WestConnex vent stack"
+    }
+   ],
+   "reward": {
+    "cash": 63,
+    "xp": 169,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-056",
+   "act": 3,
+   "title": "Trouble at May Street",
+   "blurb": "I have been putting it off since Easter. Two lads and their mate decided at nine sharp that May Street is theirs. I have got no proof, which is exactly why I am asking. The rest of St Peters disagrees, so explain the disagreement. Say nothing to anyone on the way.",
+   "giver": "qg-st-peters-ray",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near May Street"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 61,
+    "xp": 161,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-057",
+   "act": 3,
+   "title": "The May Street Course",
+   "blurb": "You are the first person to stop all morning. A bloke near May Street runs a ninety-minute course he bills at four hundred, and I've paid. I did try the official route, for what that was worth. Sit it Boxing Day, then come back to St Peters and prove it did something. Just do not come back empty-handed.",
+   "giver": "qg-st-peters-ray",
+   "level": 1,
+   "requires": [
+    "qg-l1-st-peters-056"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near May Street"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 77,
+    "xp": 194,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-058",
+   "act": 3,
+   "title": "Something From the St Peters interchange",
+   "blurb": "My knees are gone, so. The stall at the St Peters interchange has run out and the customers keep coming. I am not after trouble. I am after an answer. Find something round St Peters that'll do before the after the footy rush. I'll see you right for it.",
+   "giver": "qg-st-peters-jason",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near the St Peters interchange"
+    },
+    {
+     "kind": "goto",
+     "x": -2364,
+     "z": 4148,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 67,
+    "xp": 172,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-059",
+   "act": 3,
+   "title": "Proof of the St Peters interchange",
+   "blurb": "Honestly, I am past caring how it looks. Nobody in St Peters believes what the St Peters interchange looks like at half two. There is probably a simple explanation and I would love to hear it. Get me a photo close enough that council can't say it's somewhere else. If anyone asks, you were never here.",
+   "giver": "qg-st-peters-jason",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2652,
+     "z": 4148,
+     "radius": 40,
+     "label": "get a picture of the St Peters interchange before they fix it"
+    }
+   ],
+   "reward": {
+    "cash": 64,
+    "xp": 153,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qg-l1-st-peters-060",
+   "act": 3,
+   "title": "Bin Night, Sydney Park",
+   "blurb": "I'll be straight with you. Somebody moves the bins on Sydney Park in front of my drive every Easter Saturday night. It might be nothing. It has not felt like nothing. Photograph the evidence and have a word; St Peters knows who. That's it. That's the whole ask.",
+   "giver": "qg-st-peters-priya",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -3011,
+     "z": 4687,
+     "radius": 40,
+     "label": "photograph the bins at Sydney Park"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 65,
+    "xp": 166,
+    "unlock": []
+   }
+  }
+ ]
+}

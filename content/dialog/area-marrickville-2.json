@@ -1,0 +1,603 @@
+{
+ "pack": "area-marrickville-2",
+ "npcs": [
+  {
+   "id": "qg-marrickville-stuart",
+   "name": "Stuart, bowling club greenkeeper",
+   "x": -4776,
+   "z": 5533,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Boots off the green. Boots OFF the green. Sorry. Welcome to Marrickville bowlo.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Marrickville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Two greens, one of them dying, and a committee that thinks I'm inventing it. Illawarra Road comes for the schnitzel and stays for the raffle.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch the marrickville metro.",
+     "choices": [
+      {
+       "text": "Before They Touch the Marrickville Metro",
+       "accept": "qg-l2-marrickville-059",
+       "denyFlag": "w:qg-l2-marrickville-059"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Stuart pays up on the spot.",
+     "choices": [
+      {
+       "text": "About before they touch the marrickville metro.",
+       "turnin": "qg-l2-marrickville-059"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Barefoot bowls on a Sunday is what pays for the green you're standing on. I have mixed feelings.",
+     "improv": {
+      "persona": "Stuart, bowling club greenkeeper in Marrickville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Illawarra Road like everyone knows it.",
+      "context": "Someone has asked what Marrickville is like these days. You are standing near Illawarra Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-marrickville-tahlia",
+   "name": "Tahlia, chippy off a job",
+   "x": -4931,
+   "z": 4865,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Marrickville, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Marrickville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Two From Hellenic Bakery",
+       "accept": "qg-l2-marrickville-060",
+       "denyFlag": "w:qg-l2-marrickville-060"
+      },
+      {
+       "text": "Trolley Run, Hellenic Bakery",
+       "accept": "qg-l2-marrickville-061",
+       "denyFlag": "w:qg-l2-marrickville-061",
+       "needFlag": "w:qg-l2-marrickville-060"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Tahlia looks it over the way Marrickville looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About two from hellenic bakery.",
+       "turnin": "qg-l2-marrickville-060"
+      },
+      {
+       "text": "About trolley run, hellenic bakery.",
+       "turnin": "qg-l2-marrickville-061"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Marrickville is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Tahlia, chippy off a job in Marrickville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Marrickville Metro like everyone knows it.",
+      "context": "Someone has asked what Marrickville is like these days. You are standing near the Marrickville Metro."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-marrickville-kerry",
+   "name": "Kerry, council ranger",
+   "x": -5040,
+   "z": 5339,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Marrickville is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Marrickville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Hellenic Bakery generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Seven a.m. At the Henson",
+       "accept": "qg-l2-marrickville-062",
+       "denyFlag": "w:qg-l2-marrickville-062"
+      },
+      {
+       "text": "Something From the Henson",
+       "accept": "qg-l2-marrickville-063",
+       "denyFlag": "w:qg-l2-marrickville-063",
+       "needFlag": "w:qg-l2-marrickville-062"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Kerry pays up on the spot.",
+     "choices": [
+      {
+       "text": "About seven a.m. at the henson.",
+       "turnin": "qg-l2-marrickville-062"
+      },
+      {
+       "text": "About something from the henson.",
+       "turnin": "qg-l2-marrickville-063"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Kerry, council ranger in Marrickville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Hellenic Bakery like everyone knows it.",
+      "context": "Someone has asked what Marrickville is like these days. You are standing near Hellenic Bakery."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-marrickville-renee",
+   "name": "Renee, cycleway campaigner",
+   "x": -5292,
+   "z": 4858,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You didn't drive here, did you? Sorry. Reflex. Marrickville is nearly bike-friendly.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Marrickville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve years lobbying council for a painted line along the Henson. We got the paint. It's a sharrow.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the cooks river order.",
+     "choices": [
+      {
+       "text": "The the Cooks River Order",
+       "accept": "qg-l2-marrickville-064",
+       "denyFlag": "w:qg-l2-marrickville-064"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Renee looks it over the way Marrickville looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the cooks river order.",
+       "turnin": "qg-l2-marrickville-064"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Cooks River path is beautiful until it isn't. Watch for the bit near the Henson where the path just ends.",
+     "improv": {
+      "persona": "Renee, cycleway campaigner in Marrickville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Henson like everyone knows it.",
+      "context": "Someone has asked what Marrickville is like these days. You are standing near the Henson."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-marrickville-yen",
+   "name": "Yen, pho shop owner",
+   "x": -4893,
+   "z": 4825,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sit, sit. Small or large? It's the same price for you, you look hungry. Welcome to Marrickville.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Marrickville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "My mother's recipe, my landlord's rent. Addison Road markets is a hundred metres of pho and every bowl is a family argument.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Proof of the Cooks River",
+       "accept": "qg-l2-marrickville-065",
+       "denyFlag": "w:qg-l2-marrickville-065"
+      },
+      {
+       "text": "Left It Near the Cooks River",
+       "accept": "qg-l2-marrickville-066",
+       "denyFlag": "w:qg-l2-marrickville-066",
+       "needFlag": "w:qg-l2-marrickville-065"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Yen counts it out without looking up. -- Don't spend it all at Addison Road markets.",
+     "choices": [
+      {
+       "text": "About proof of the cooks river.",
+       "turnin": "qg-l2-marrickville-065"
+      },
+      {
+       "text": "About left it near the cooks river.",
+       "turnin": "qg-l2-marrickville-066"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Eat at the place with the queue of nurses. Nurses know. Addison Road markets, past the pharmacy.",
+     "improv": {
+      "persona": "Yen, pho shop owner in Marrickville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Addison Road markets like everyone knows it.",
+      "context": "Someone has asked what Marrickville is like these days. You are standing near Addison Road markets."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Yen listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qg-marrickville-manoli",
+   "name": "Manoli, bakery owner",
+   "x": -5421,
+   "z": 5159,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Take a number. There's no numbers, I just like saying it. Marrickville, how are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Marrickville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Spanakopita at six, custard by nine, sold out by two. the Cooks River has bought its lunch here since 1974.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's lads off marrickville bowlo.",
+     "choices": [
+      {
+       "text": "Lads Off Marrickville Bowlo",
+       "accept": "qg-l2-marrickville-067",
+       "denyFlag": "w:qg-l2-marrickville-067"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Manoli looks it over the way Marrickville looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About lads off marrickville bowlo.",
+       "turnin": "qg-l2-marrickville-067"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "My father built the Cooks River's counter with his own hands. Then the council made him move it eleven centimetres.",
+     "improv": {
+      "persona": "Manoli, bakery owner in Marrickville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Cooks River like everyone knows it.",
+      "context": "Someone has asked what Marrickville is like these days. You are standing near the Cooks River."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
