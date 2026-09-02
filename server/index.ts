@@ -181,6 +181,7 @@ import { verifyPlaceables } from '../client/src/world/placeables.ts';
 import { InteriorStore, defaultInteriorPath, verifyInteriorStore } from './interiors.ts';
 import { verifyDoorway } from '../client/src/world/doorway.ts';
 import { verifyAreaLine } from '../client/src/game/arealine.ts';
+import { verifyBoats } from '../client/src/game/boats.ts';
 import { verifyInterior } from '../client/src/world/interior.ts';
 import { verifySpaces } from '../client/src/net/spaces.ts';
 import { verifyDeviceLost } from '../client/src/devicelost.ts';
@@ -489,6 +490,7 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // see is a check that goes green on a broken build.
     ['verifyDoorway', verifyDoorway()],
     ['verifyAreaLine', verifyAreaLine()],
+    ['verifyBoats', verifyBoats()],
     ['verifyInterior', verifyInterior()],
     // And what people put in the rooms. `verifyInteriorStore` is server-only of
     // the two, because it is the only end with a disk.

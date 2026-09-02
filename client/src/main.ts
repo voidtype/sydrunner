@@ -64,7 +64,7 @@ import { BODY_COUNT, CAR_PAINT_COUNT, TrafficMovers, carBodySizes } from './worl
 // --- Workstream Q: nothing appears or disappears while you are looking at it.
 import { ViewLatch, verifyViewLatch } from './game/viewlatch.ts';
 import { SWEEP_HZ, loadCarModels } from './world/carlod.ts';
-import {
+import { trafficSeconds,
   CAR_BODY_SIZE,
   CAR_STAGE_PARKED_IN,
   CAR_STAGE_PARKED_OUT,
@@ -549,6 +549,8 @@ import {
 } from './game/camera.ts';
 import { FOV_BASE, Feedback } from './game/feedback.ts';
 import { Locator, verifyLocator } from './game/locator.ts';
+import { verifyBoats } from './game/boats.ts';
+import { BoatFleet } from './world/boats.ts';
 import { AreaLine, verifyAreaLine } from './game/arealine.ts';
 import { AreaLineView } from './arealine.ts';
 // The drive, narrated sparingly, through the notice channel that already
@@ -1051,6 +1053,9 @@ async function main(): Promise<void> {
   // And the hero line's clock: the dwell, the encore rule and the fade's
   // shape, none of which a screenshot could tell from a broken one.
   const areaLineFailures = timed('area line', verifyAreaLine);
+  // The ferries: every route is water and every boat is somewhere on it at
+  // every second, or the timetable is wrong in a way only a player would see.
+  const boatFailures = timed('boats', verifyBoats);
   // WORKSTREAM N (carry): the restore sentence, on the same criterion. A
   // dangling em dash in a pill and a suburb poll that never gives up are both
   // invisible to anything that only asks whether the player ended up in the
@@ -1578,6 +1583,7 @@ async function main(): Promise<void> {
     nameFailures.length ||
     locatorFailures.length ||
     areaLineFailures.length ||
+    boatFailures.length ||
     carryFailures.length ||
     trafficFailures.length ||
     viewLatchFailures.length ||
@@ -1667,6 +1673,7 @@ async function main(): Promise<void> {
           ...nameFailures,
           ...locatorFailures,
           ...areaLineFailures,
+          ...boatFailures,
           ...carryFailures,
           ...trafficFailures,
           ...viewLatchFailures,
@@ -3867,6 +3874,9 @@ async function main(): Promise<void> {
   const staticCars = new StaticCarField();
   streamer.setStaticCarSink(staticCars);
   const trafficMovers = new TrafficMovers(streamer.cars);
+  // The harbour's ferries and the bays' tinnies. See `game/boats.ts`.
+  const boats = new BoatFleet();
+  scene.add(boats);
   for (const mesh of trafficMovers.meshes) scene.add(mesh);
   // --- Workstream Q: the (dis)appearance latch, and the obstacle roster.
   //
@@ -12854,6 +12864,13 @@ async function main(): Promise<void> {
 
     }
     // Indoors: the crowd, the rigs and the raves. See `indoors`.
+    frameProfile.at(FSEC.boats);
+    // Gated indoors with the rest of the ambient city: a pure function of the
+    // second, so skipping frames is exact and the ferry is where it would
+    // have been when you come back out.
+    if (!indoors) {
+      boats.update(trafficSeconds(trafficTick(Date.now())), camera.position.x, camera.position.z, streamer.terrain.sea_level_y);
+    }
     frameProfile.at(FSEC.crowd);
     if (!indoors) {
       // And the crowd, on exactly the same terms and immediately after, because

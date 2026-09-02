@@ -84,11 +84,14 @@ The board's record so far is four shipped out of six filed — the sun (#5), the
 crazy taxi (#4), the trains (#3), the bat swat (#1) — which is a hit rate worth
 respecting. The two open:
 
-- **#2 Boats — ferries, jetskis.** Adopt-later as **timetabled ferries** on the
-  railway's own philosophy: deterministic timetable, boardable at wharves, the
-  Manly run as the harbour's Hornsby→Penrith. A dormant `vessels` flag already
-  sits in the code waiting for exactly this. Jetskis after there is water
-  physics worth the name.
+- **#2 Boats — ferries, jetskis.** **Shipped** as timetabled ferries on the
+  railway's own philosophy (`game/boats.ts`): nine of Sydney Ferries' routes
+  as water-only paths over the bake's own terrain, a deterministic timetable
+  with a boat each way on every route, four Freshwaters on the Manly run,
+  RiverCats up the Parramatta River, the Emerald shape on the inner harbour,
+  and tinnies tied up at the bay wharves. NPC vehicles for now: not boardable,
+  zero wire (rule 5). Boarding at wharves is the next step, on `riding.ts`'s
+  carriage model. Jetskis after there is water physics worth the name.
 - **#6 Creeks.** A pipeline item — real creek lines carved at the next retile,
   paired with the water system that ferries will need anyway.
 

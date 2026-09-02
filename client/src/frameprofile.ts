@@ -156,32 +156,34 @@ export const FSEC = {
   lights: 7,
   /** The car LOD sweep, the driven fleet (and its smoke), the box fleet. */
   traffic: 8,
+  /** The ferries and the tinnies: a pose per boat, and the distance cull. */
+  boats: 9,
   /** `PedestrianCrowd.update` and the raves that share its rig pool. */
-  crowd: 9,
+  crowd: 10,
   /** The squad, the street factions, the flock, the five characters, the ambient events. */
-  police: 10,
+  police: 11,
   /** The five rising-edge scans over every actor, the tracers, the barks. */
-  npcvoice: 11,
+  npcvoice: 12,
   /** The investigation banner, the star row, the patrol fleet, Polair, the mixes. */
-  heat: 12,
+  heat: 13,
   /** Every rig posed on the frame delta: the fighters, the three viewmodels, the remotes. */
-  actors: 13,
+  actors: 14,
   /** The parked and ridden bikes, their headlights, and every football in the air. */
-  bikes: 14,
+  bikes: 15,
   /** `nameplates`, and the forced world-matrix recompose per plate that it needs. */
-  plates: 15,
+  plates: 16,
   /** `updateTeamLook`: the tinted bodies, the horns, the ground rings and the tents. */
-  teams: 16,
+  teams: 17,
   /** `renderer.render`. Everything above this line is what the CPU did to prepare it. */
-  render: 17,
+  render: 18,
   /** The bug box's grab, the frame ring, and the 2.5 Hz debug overlay. */
-  present: 18,
+  present: 19,
 } as const;
 
 /** Parallel to `FSEC`; index by the constant to get the label. */
 export const FRAME_SECTION_NAMES: readonly string[] = [
   'input', 'sim', 'camera', 'hud', 'sky', 'stream', 'rail', 'lights',
-  'traffic', 'crowd', 'police', 'npcvoice', 'heat', 'actors', 'bikes',
+  'traffic', 'boats', 'crowd', 'police', 'npcvoice', 'heat', 'actors', 'bikes',
   'plates', 'teams', 'render', 'present',
 ];
 
