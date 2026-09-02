@@ -1,0 +1,1425 @@
+{
+ "pack": "areab-ashfield-1",
+ "quests": [
+  {
+   "id": "qgb-l6-ashfield-001",
+   "act": 3,
+   "title": "Race Four, Hercules Street",
+   "blurb": "Do not laugh. There's a horse in race four at school pick-up that a bloke at Hercules Street swears by. I would not ask if there was anyone else about. Turn it into fifty-five somewhere in Ashfield and tell me if it came in. Do that and we're square.",
+   "giver": "qgb-ashfield-li",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 88,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-ashfield-li",
+     "node": "report-0",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 142,
+    "xp": 388,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-002",
+   "act": 3,
+   "title": "Proof of Hercules Street",
+   "blurb": "There is no clever way to say this. Nobody in Ashfield believes what Hercules Street looks like at after the footy. I am aware how that sounds. Get me a photo close enough that council can't say it's somewhere else. Ask for me by name at the counter.",
+   "giver": "qgb-ashfield-li",
+   "level": 6,
+   "requires": [
+    "qgb-l6-ashfield-001"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -7631,
+     "z": 2337,
+     "radius": 40,
+     "label": "get a picture of Hercules Street before they fix it"
+    }
+   ],
+   "reward": {
+    "cash": 169,
+    "xp": 495,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-003",
+   "act": 3,
+   "title": "The Hercules Street Sparky",
+   "blurb": "The council knows and the council does not care. The sparky off the Hercules Street job has owed me since the bathroom and drinks in Ashfield from nine sharp. Everyone I have told has looked at me the way you are now. Forty will do and I'll write off the rest. Say nothing to anyone on the way.",
+   "giver": "qgb-ashfield-li",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for Hercules Street"
+    },
+    {
+     "kind": "earn",
+     "dollars": 64,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 131,
+    "xp": 356,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-004",
+   "act": 3,
+   "title": "Bin Night, Pratten Park",
+   "blurb": "Someone has to, and it may as well be you. Somebody moves the bins on Pratten Park in front of my drive every Boxing Day night. There is a version of this where I am the unreasonable one. Photograph the evidence and have a word; Ashfield knows who. Just do not come back empty-handed.",
+   "giver": "qgb-ashfield-prue",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -7627,
+     "z": 2317,
+     "radius": 40,
+     "label": "photograph the bins at Pratten Park"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 132,
+    "xp": 378,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-005",
+   "act": 3,
+   "title": "One Stop From Elizabeth Street",
+   "blurb": "I am told you do odd jobs. I need to know the train from Ashfield stops at Burwood and doesn't sail through like it did on Monday. This is the third time I have had this conversation. Ride it at eight at night and photograph the sign. That's it. That's the whole ask.",
+   "giver": "qgb-ashfield-kerry",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Ashfield",
+     "to": "Burwood",
+     "label": "take the train to Burwood"
+    },
+    {
+     "kind": "photo",
+     "x": -9747,
+     "z": 1157,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 144,
+    "xp": 364,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-006",
+   "act": 3,
+   "title": "The Elizabeth Street Float",
+   "blurb": "You will think I am making this up. The till at Elizabeth Street opens the long weekend with an empty float because somebody took it to the pub. I would have sorted it myself a year ago. Sixty before the first Ashfield customer, and I'll never say who. Be polite about it. It costs nothing.",
+   "giver": "qgb-ashfield-kerry",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 96,
+     "label": "clear sixty for the Elizabeth Street float"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-ashfield-kerry",
+     "node": "report-2",
+     "label": "hand it over at the counter"
+    }
+   ],
+   "reward": {
+    "cash": 131,
+    "xp": 384,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-007",
+   "act": 3,
+   "title": "Before They Touch Ashfield Mall",
+   "blurb": "Two people have already said no. They start on Ashfield Mall on Boxing Day and the orange fencing goes up. It started small, the way these things do. I want Ashfield on record before it does. Half now if you want it. Most people don't.",
+   "giver": "qgb-ashfield-beryl",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -7401,
+     "z": 2400,
+     "radius": 40,
+     "label": "photograph the state of Ashfield Mall"
+    },
+    {
+     "kind": "goto",
+     "x": -7716,
+     "z": 2247,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 143,
+    "xp": 369,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-008",
+   "act": 3,
+   "title": "The Ashfield Mall Camera",
+   "blurb": "Before you say anything: yes, I know. A new speed camera near Ashfield Mall has fined half of Ashfield since the King's Birthday. It is not the money. It has stopped being the money. Photograph it for the appeal, then prove the train to Burwood is faster anyway. I will owe you one, and I pay those.",
+   "giver": "qgb-ashfield-brett",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -7486,
+     "z": 2340,
+     "radius": 40,
+     "label": "photograph the camera near Ashfield Mall"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Ashfield",
+     "to": "Burwood",
+     "label": "then take the train instead, to Burwood"
+    }
+   ],
+   "reward": {
+    "cash": 146,
+    "xp": 386,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-009",
+   "act": 3,
+   "title": "Left It Near the Shanghai dumpling strip",
+   "blurb": "It has been three weeks. I left something on the bench at the Shanghai dumpling strip at peak hour. I did try the official route, for what that was worth. By the time I got back to Ashfield it had walked, so look where I'd have dropped it. I'll put the kettle on for when you're back.",
+   "giver": "qgb-ashfield-jason-a",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7791,
+     "z": 2144,
+     "radius": 30,
+     "label": "check the bench near the Shanghai dumpling strip"
+    },
+    {
+     "kind": "photo",
+     "x": -8030,
+     "z": 2177,
+     "radius": 40,
+     "label": "photograph the bins behind it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-ashfield-jason-a",
+     "node": "report-2",
+     "label": "tell me what you found"
+    }
+   ],
+   "reward": {
+    "cash": 136,
+    "xp": 373,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-010",
+   "act": 3,
+   "title": "Counting Ashfield Park",
+   "blurb": "It is the sort of thing you notice or you do not. Council says the Ashfield Park car park is never full and I say it's full by bin night. I am not after trouble. I am after an answer. Count both Ashfield car parks, photograph whichever one makes me right. There is no rush, but there is a Friday.",
+   "giver": "qgb-ashfield-mei",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7643,
+     "z": 2336,
+     "radius": 30,
+     "label": "count the cars at Ashfield Park"
+    },
+    {
+     "kind": "goto",
+     "x": -7842,
+     "z": 2253,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": -7643,
+     "z": 2336,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 136,
+    "xp": 375,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-011",
+   "act": 3,
+   "title": "Lads Off Hercules Street",
+   "blurb": "I have been putting it off since Easter. Three of them in TNs on the Hercules Street steps, flogging vapes to schoolkids at lunchtime. It might be nothing. It has not felt like nothing. Ashfield used to move them on itself and now it rings me. Whatever you find, bring it to me first.",
+   "giver": "qgb-ashfield-troy",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Hercules Street"
+    }
+   ],
+   "reward": {
+    "cash": 132,
+    "xp": 389,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-012",
+   "act": 3,
+   "title": "Sightline at the Ashfield Bowlo",
+   "blurb": "You are the first person to stop all morning. Insurance says nobody could have seen the ute hit the fence at the Ashfield Bowlo on Friday. I have got a photo on my phone but it is useless. Stand where I stood in Ashfield, photograph the view, tell me if I'm lying. Take your time. Do not take a week.",
+   "giver": "qgb-ashfield-troy",
+   "level": 6,
+   "requires": [
+    "qgb-l6-ashfield-011"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7450,
+     "z": 2426,
+     "radius": 30,
+     "label": "stand where it happened at the Ashfield Bowlo"
+    },
+    {
+     "kind": "photo",
+     "x": -7450,
+     "z": 2426,
+     "radius": 40,
+     "label": "photograph the corner"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-ashfield-troy",
+     "node": "report-1",
+     "label": "describe the sightline"
+    }
+   ],
+   "reward": {
+    "cash": 179,
+    "xp": 511,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-013",
+   "act": 3,
+   "title": "Seven a.m. At the Ashfield Bowlo",
+   "blurb": "Honestly, I am past caring how it looks. The site at the Ashfield Bowlo starts its jackhammer at closing on a Anzac Day, which is illegal and loud. You will see what I mean the second you get there. Photograph it running and have a word with the Ashfield foreman. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qgb-ashfield-nathan",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -7733,
+     "z": 2547,
+     "radius": 40,
+     "label": "photograph the noise from the Ashfield Bowlo"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 145,
+    "xp": 386,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-014",
+   "act": 3,
+   "title": "The the Ashfield Bowlo Fence",
+   "blurb": "I'll be straight with you. My neighbour at the Ashfield Bowlo says the tree is on my side and the fence says otherwise. I would not ask if there was anyone else about. Look at it the last Sunday of the month with Ashfield eyes and tell me the truth. You'll know it when you see it.",
+   "giver": "qgb-ashfield-nathan",
+   "level": 6,
+   "requires": [
+    "qgb-l6-ashfield-013"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -8071,
+     "z": 2291,
+     "radius": 30,
+     "label": "go and look at the fence at the Ashfield Bowlo"
+    },
+    {
+     "kind": "photo",
+     "x": -8071,
+     "z": 2291,
+     "radius": 40,
+     "label": "photograph the tree over it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-ashfield-nathan",
+     "node": "report-1",
+     "label": "tell me whose side it's on"
+    }
+   ],
+   "reward": {
+    "cash": 189,
+    "xp": 508,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-015",
+   "act": 3,
+   "title": "Trolley Run, Pratten Park",
+   "blurb": "Do not laugh. A Woolies trolley from Pratten Park gets walked to the creek every Wednesday. I am aware how that sounds. Find where it ends up in Ashfield and make the deposit back. Do not let them talk you into anything.",
+   "giver": "qgb-ashfield-terry",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7952,
+     "z": 2076,
+     "radius": 30,
+     "label": "find the trolley near Pratten Park"
+    },
+    {
+     "kind": "photo",
+     "x": -7952,
+     "z": 2076,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 40,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 369,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-016",
+   "act": 3,
+   "title": "A Flat White From Elizabeth Street",
+   "blurb": "Someone has to, and it may as well be you. I want a flat white from the place near Elizabeth Street, not the one next to it. You can tell me I am imagining it. Tell me after. Here by closing, while it's still coffee and Ashfield still has some. Say nothing to anyone on the way.",
+   "giver": "qgb-ashfield-eddie",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near Elizabeth Street"
+    },
+    {
+     "kind": "goto",
+     "x": -7354,
+     "z": 2410,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 138,
+    "xp": 382,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-017",
+   "act": 3,
+   "title": "The Liverpool Road Tab",
+   "blurb": "It is not a police matter and I have checked. Two chippies off the Liverpool Road job have run a tab in Ashfield since the last Sunday of the month. This is the third time I have had this conversation. They drove past at lunchtime without looking in, so settle it in cash. I'll see you right for it.",
+   "giver": "qgb-ashfield-jenny",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near Liverpool Road"
+    },
+    {
+     "kind": "earn",
+     "dollars": 48,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 136,
+    "xp": 368,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-018",
+   "act": 3,
+   "title": "Before They Touch the Ashfield Bowlo",
+   "blurb": "Before you say anything: yes, I know. They start on the Ashfield Bowlo on Wednesday and the orange fencing goes up. Half the street knows and half the street is pretending not to. I want Ashfield on record before it does. There's cash in it. Not a lot.",
+   "giver": "qgb-ashfield-debbie",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -7710,
+     "z": 2115,
+     "radius": 40,
+     "label": "photograph the state of the Ashfield Bowlo"
+    },
+    {
+     "kind": "goto",
+     "x": -7441,
+     "z": 2167,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 137,
+    "xp": 375,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-019",
+   "act": 3,
+   "title": "Left It Near Pratten Park",
+   "blurb": "You look like you have twenty minutes. I left something on the bench at Pratten Park at closing. It might be nothing. It has not felt like nothing. By the time I got back to Ashfield it had walked, so look where I'd have dropped it. There is no rush, but there is a Friday.",
+   "giver": "qgb-ashfield-wei-a",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7655,
+     "z": 2173,
+     "radius": 30,
+     "label": "check the bench near Pratten Park"
+    },
+    {
+     "kind": "photo",
+     "x": -7812,
+     "z": 2053,
+     "radius": 40,
+     "label": "photograph the bins behind it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-ashfield-wei-a",
+     "node": "report-2",
+     "label": "tell me what you found"
+    }
+   ],
+   "reward": {
+    "cash": 138,
+    "xp": 376,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-020",
+   "act": 3,
+   "title": "Counting Elizabeth Street",
+   "blurb": "I have been putting it off since Easter. Council says the Elizabeth Street car park is never full and I say it's full by the change of shift. I have got a photo on my phone but it is useless. Count both Ashfield car parks, photograph whichever one makes me right. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-ashfield-xiu-a",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7459,
+     "z": 2435,
+     "radius": 30,
+     "label": "count the cars at Elizabeth Street"
+    },
+    {
+     "kind": "goto",
+     "x": -7588,
+     "z": 2608,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": -7459,
+     "z": 2435,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 130,
+    "xp": 360,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-021",
+   "act": 3,
+   "title": "The Elizabeth Street Complaint",
+   "blurb": "You are the first person to stop all morning. Two women in activewear have photographed my bins outside Elizabeth Street since Tuesday. Nobody else seems to have noticed, which is its own problem. One has Ashfield council on speed dial; sort it however you sort things. Whatever you find, bring it to me first.",
+   "giver": "qgb-ashfield-xiu-a",
+   "level": 6,
+   "requires": [
+    "qgb-l6-ashfield-020"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near Elizabeth Street"
+    }
+   ],
+   "reward": {
+    "cash": 165,
+    "xp": 473,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-022",
+   "act": 3,
+   "title": "The Length of the Shanghai dumpling strip",
+   "blurb": "There is no clever way to say this. I haven't walked the Shanghai dumpling strip end to end since the light rail came to Ashfield. There is a version of this where I am the unreasonable one. Do it Saturday for me and photograph what's at the far end now. Do not let them talk you into anything.",
+   "giver": "qgb-ashfield-mitch",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7299,
+     "z": 2668,
+     "radius": 30,
+     "label": "walk the length of the Shanghai dumpling strip"
+    },
+    {
+     "kind": "goto",
+     "x": -7654,
+     "z": 2636,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -7654,
+     "z": 2636,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 135,
+    "xp": 362,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-023",
+   "act": 3,
+   "title": "Trolley Run, the Ashfield Aquatic Centre",
+   "blurb": "It is not a police matter and I have checked. A Woolies trolley from the Ashfield Aquatic Centre gets walked to the creek every Easter Saturday. The paperwork says one thing and my eyes say another. Find where it ends up in Ashfield and make the deposit back. Just do not come back empty-handed.",
+   "giver": "qgb-ashfield-sharon",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7626,
+     "z": 2038,
+     "radius": 30,
+     "label": "find the trolley near the Ashfield Aquatic Centre"
+    },
+    {
+     "kind": "photo",
+     "x": -7626,
+     "z": 2038,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 40,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 136,
+    "xp": 364,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-024",
+   "act": 3,
+   "title": "Staffy Near Hercules Street",
+   "blurb": "I have written it down twice and lost it twice. A brindle staffy in a red bandana went over the fence at Hercules Street at nine sharp. I have rung the number on the letter four times. Everyone in Ashfield has definitely seen it and can't say where. If anyone asks, you were never here.",
+   "giver": "qgb-ashfield-eric",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7211,
+     "z": 2322,
+     "radius": 30,
+     "label": "check the off-leash bit near Hercules Street"
+    },
+    {
+     "kind": "photo",
+     "x": -7300,
+     "z": 2548,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-ashfield-eric",
+     "node": "report-1",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 136,
+    "xp": 377,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-025",
+   "act": 3,
+   "title": "A Flat White From Hercules Street",
+   "blurb": "You will think I am making this up. I want a flat white from the place near Hercules Street, not the one next to it. It started small, the way these things do. Here by midnight, while it's still coffee and Ashfield still has some. That's it. That's the whole ask.",
+   "giver": "qgb-ashfield-eric",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near Hercules Street"
+    },
+    {
+     "kind": "goto",
+     "x": -7409,
+     "z": 2494,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 143,
+    "xp": 358,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-026",
+   "act": 3,
+   "title": "Race Four, Pratten Park",
+   "blurb": "Before you say anything: yes, I know. There's a horse in race four at after the footy that a bloke at Pratten Park swears by. It is the not knowing that has got me, honestly. Turn it into fifty-five somewhere in Ashfield and tell me if it came in. Half now if you want it. Most people don't.",
+   "giver": "qgb-ashfield-kev",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 88,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-ashfield-kev",
+     "node": "report-1",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 141,
+    "xp": 359,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-027",
+   "act": 3,
+   "title": "The Elizabeth Street Sparky",
+   "blurb": "This is going to sound small. The sparky off the Elizabeth Street job has owed me since the bathroom and drinks in Ashfield from half four. I did try the official route, for what that was worth. Forty will do and I'll write off the rest. I will owe you one, and I pay those.",
+   "giver": "qgb-ashfield-dot",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for Elizabeth Street"
+    },
+    {
+     "kind": "earn",
+     "dollars": 64,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 133,
+    "xp": 386,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-028",
+   "act": 3,
+   "title": "Rent Money, Liverpool Road",
+   "blurb": "I would do it myself if I could leave the counter. I'm forty-five short on the Liverpool Road rent and the agent doesn't take stories. I am not after trouble. I am after an answer. Make it somewhere in Ashfield by eleven; I'm not fussy how. Come back and tell me straight.",
+   "giver": "qgb-ashfield-trent",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 72,
+     "label": "earn forty-five somewhere in Ashfield"
+    }
+   ],
+   "reward": {
+    "cash": 130,
+    "xp": 393,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-029",
+   "act": 3,
+   "title": "The Ashfield Mall Order",
+   "blurb": "It is the sort of thing you notice or you do not. The Ashfield Mall order came to seventy more than I'd budgeted and the supplier wants it by eight at night. It might be nothing. It has not felt like nothing. Find seventy in Ashfield and photograph the receipt. I will know if you skipped a bit.",
+   "giver": "qgb-ashfield-riley",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 112,
+     "label": "square the seventy for the Ashfield Mall order"
+    },
+    {
+     "kind": "photo",
+     "x": -7368,
+     "z": 2238,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 138,
+    "xp": 358,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-030",
+   "act": 3,
+   "title": "Two From Pratten Park",
+   "blurb": "The council knows and the council does not care. Two of whatever's going near Pratten Park, here, hot, before the footy at half four. My wife says I should let it go. My wife is wrong. It's Ashfield; I'm not asking for much. Do not let them talk you into anything.",
+   "giver": "qgb-ashfield-jarrod",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near Pratten Park"
+    },
+    {
+     "kind": "goto",
+     "x": -7736,
+     "z": 2373,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 136,
+    "xp": 369,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-031",
+   "act": 3,
+   "title": "The Length of Liverpool Road",
+   "blurb": "Right. Since you asked. I haven't walked Liverpool Road end to end since the light rail came to Ashfield. The paperwork says one thing and my eyes say another. Do it Wednesday for me and photograph what's at the far end now. Ask for me by name at the counter.",
+   "giver": "qgb-ashfield-jason",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7226,
+     "z": 2335,
+     "radius": 30,
+     "label": "walk the length of Liverpool Road"
+    },
+    {
+     "kind": "goto",
+     "x": -7554,
+     "z": 2491,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -7554,
+     "z": 2491,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 131,
+    "xp": 361,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-032",
+   "act": 3,
+   "title": "Closing Time at Elizabeth Street",
+   "blurb": "It is not a police matter and I have checked. Two blokes have slept in my doorway on Elizabeth Street since the pub shut. I would have sorted it myself a year ago. The Ashfield delivery's at eight at night, so get them up and show me the step empty. Say nothing to anyone on the way.",
+   "giver": "qgb-ashfield-jason",
+   "level": 6,
+   "requires": [
+    "qgb-l6-ashfield-031"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off Elizabeth Street"
+    },
+    {
+     "kind": "photo",
+     "x": -7462,
+     "z": 1919,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 166,
+    "xp": 512,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-033",
+   "act": 3,
+   "title": "The Liverpool Road Fence",
+   "blurb": "I am told you do odd jobs. My neighbour at Liverpool Road says the tree is on my side and the fence says otherwise. I have rung the number on the letter four times. Look at it the last Sunday of the month with Ashfield eyes and tell me the truth. Just do not come back empty-handed.",
+   "giver": "qgb-ashfield-jason",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7680,
+     "z": 2301,
+     "radius": 30,
+     "label": "go and look at the fence at Liverpool Road"
+    },
+    {
+     "kind": "photo",
+     "x": -7680,
+     "z": 2301,
+     "radius": 40,
+     "label": "photograph the tree over it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-ashfield-jason",
+     "node": "report-2",
+     "label": "tell me whose side it's on"
+    }
+   ],
+   "reward": {
+    "cash": 146,
+    "xp": 355,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-034",
+   "act": 3,
+   "title": "The Ashfield Mall Lift",
+   "blurb": "I have written it down twice and lost it twice. The lift at Ashfield station has been out since the Easter Show and I'm told Burwood is worse. It started small, the way these things do. Check both Tuesday and tell me which takes a pram. I'll see you right for it.",
+   "giver": "qgb-ashfield-michelle",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -7627,
+     "z": 2205,
+     "radius": 30,
+     "label": "check the lift at Ashfield station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Ashfield",
+     "to": "Burwood",
+     "label": "then ride to Burwood and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-ashfield-michelle",
+     "node": "report-0",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 134,
+    "xp": 375,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-035",
+   "act": 3,
+   "title": "The the Shanghai dumpling strip Course",
+   "blurb": "Nobody else has offered, so. A bloke near the Shanghai dumpling strip runs a ninety-minute course he bills at four hundred, and I've paid. It is not the money. It has stopped being the money. Sit it Sunday, then come back to Ashfield and prove it did something. That's it. That's the whole ask.",
+   "giver": "qgb-ashfield-jason-b",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near the Shanghai dumpling strip"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 140,
+    "xp": 374,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-036",
+   "act": 3,
+   "title": "The the Shanghai dumpling strip Tab",
+   "blurb": "Two people have already said no. Two chippies off the the Shanghai dumpling strip job have run a tab in Ashfield since Melbourne Cup day. Half the street knows and half the street is pretending not to. They drove past at dawn without looking in, so settle it in cash. Come and find me after, either way.",
+   "giver": "qgb-ashfield-jason-b",
+   "level": 6,
+   "requires": [
+    "qgb-l6-ashfield-035"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Shanghai dumpling strip"
+    },
+    {
+     "kind": "earn",
+     "dollars": 48,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 186,
+    "xp": 472,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-037",
+   "act": 3,
+   "title": "Bin Night, Hercules Street",
+   "blurb": "It has been three weeks. Somebody moves the bins on Hercules Street in front of my drive every Monday night. It might be nothing. It has not felt like nothing. Photograph the evidence and have a word; Ashfield knows who. Come back and tell me straight.",
+   "giver": "qgb-ashfield-poppy",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -7806,
+     "z": 1734,
+     "radius": 40,
+     "label": "photograph the bins at Hercules Street"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 374,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-038",
+   "act": 3,
+   "title": "Two Signs, Ashfield Mall",
+   "blurb": "You are the first person to stop all morning. Two signs near Ashfield Mall say opposite things about parking and I've been fined under both. I would not ask if there was anyone else about. Get photos of each before Saturday, when Ashfield council takes one down. There is no rush, but there is a Friday.",
+   "giver": "qgb-ashfield-dean",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -7720,
+     "z": 2484,
+     "radius": 40,
+     "label": "photograph the sign at Ashfield Mall"
+    },
+    {
+     "kind": "photo",
+     "x": -7583,
+     "z": 2204,
+     "radius": 40,
+     "label": "and the one that contradicts it"
+    }
+   ],
+   "reward": {
+    "cash": 136,
+    "xp": 364,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-039",
+   "act": 3,
+   "title": "Meat Tray at Elizabeth Street",
+   "blurb": "Honestly, I am past caring how it looks. The Elizabeth Street raffle is thirty-five short of a meat tray and the draw is at knock-off. Everyone I have told has looked at me the way you are now. Find it in Ashfield and put it in the tin. Whatever you find, bring it to me first.",
+   "giver": "qgb-ashfield-wei-b",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 56,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -7715,
+     "z": 2349,
+     "radius": 30,
+     "label": "and drop it at Elizabeth Street"
+    }
+   ],
+   "reward": {
+    "cash": 137,
+    "xp": 382,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-040",
+   "act": 3,
+   "title": "The Elizabeth Street Camera",
+   "blurb": "I'll be straight with you. A new speed camera near Elizabeth Street has fined half of Ashfield since Monday. There is a version of this where I am the unreasonable one. Photograph it for the appeal, then prove the train to Burwood is faster anyway. Take your time. Do not take a week.",
+   "giver": "qgb-ashfield-wei-b",
+   "level": 6,
+   "requires": [
+    "qgb-l6-ashfield-039"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -7895,
+     "z": 2571,
+     "radius": 40,
+     "label": "photograph the camera near Elizabeth Street"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Ashfield",
+     "to": "Burwood",
+     "label": "then take the train instead, to Burwood"
+    }
+   ],
+   "reward": {
+    "cash": 183,
+    "xp": 468,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-ashfield-041",
+   "act": 3,
+   "title": "Trouble at the Ashfield Aquatic Centre",
+   "blurb": "It is not a police matter and I have checked. Two lads and their mate decided at the last train that the Ashfield Aquatic Centre is theirs. I have rung the number on the letter four times. The rest of Ashfield disagrees, so explain the disagreement. Ask for me by name at the counter.",
+   "giver": "qgb-ashfield-graham",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near the Ashfield Aquatic Centre"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 140,
+    "xp": 359,
+    "unlock": []
+   }
+  }
+ ]
+}

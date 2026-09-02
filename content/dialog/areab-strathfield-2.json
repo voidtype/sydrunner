@@ -1,0 +1,2791 @@
+{
+ "pack": "areab-strathfield-2",
+ "npcs": [
+  {
+   "id": "qgb-strathfield-hana-d",
+   "name": "Hana D., HSC tutor",
+   "x": -10365,
+   "z": 542,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Band six or nothing. Sorry, that's the brochure talking. Strathfield, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Maths extension two, Saturdays, forty kids and their mothers in the corridor. The Boulevarde has three of us on one block.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the strathfield park fence.",
+     "choices": [
+      {
+       "text": "The Strathfield Park Fence",
+       "accept": "qgb-l6-strathfield-035",
+       "denyFlag": "w:qgb-l6-strathfield-035"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Hana D. looks it over the way Strathfield looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the strathfield park fence.",
+       "turnin": "qgb-l6-strathfield-035"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every second shopfront near The Boulevarde is a tutoring college. The first one is a bubble tea.",
+     "improv": {
+      "persona": "Hana D., HSC tutor in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about The Boulevarde like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near The Boulevarde."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-2",
+     "line": "Right. And you're sure it was Strathfield Park? People say Strathfield Park when they mean the bit next to it. -- Hana D. writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-fergus",
+   "name": "Fergus, commuter of long standing",
+   "x": -10845,
+   "z": 244,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "The 7:42's late. It's always late. Strathfield, welcome to my life.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Forty years on the Western line. Strathfield Park platform 3 has a seat with my name on it, figuratively, and one day literally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the strathfield plaza camera.",
+     "choices": [
+      {
+       "text": "The Strathfield Plaza Camera",
+       "accept": "qgb-l6-strathfield-036",
+       "denyFlag": "w:qgb-l6-strathfield-036"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Fergus counts it out without looking up. -- Don't spend it all at Strathfield Park.",
+     "choices": [
+      {
+       "text": "About the strathfield plaza camera.",
+       "turnin": "qgb-l6-strathfield-036"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The quiet carriage at Strathfield Park is a myth. It's a suggestion. It's a war.",
+     "improv": {
+      "persona": "Fergus, commuter of long standing in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Strathfield Park like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near Strathfield Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-beryl",
+   "name": "Beryl, real estate agent",
+   "x": -10580,
+   "z": 80,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Strathfield is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. Albert Road is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Trouble at the Strathfield interchange",
+       "accept": "qgb-l6-strathfield-037",
+       "denyFlag": "w:qgb-l6-strathfield-037"
+      },
+      {
+       "text": "The the Strathfield interchange Tab",
+       "accept": "qgb-l6-strathfield-038",
+       "denyFlag": "w:qgb-l6-strathfield-038",
+       "needFlag": "w:qgb-l6-strathfield-037"
+      },
+      {
+       "text": "Two Signs, the Strathfield interchange",
+       "accept": "qgb-l6-strathfield-039",
+       "denyFlag": "w:qgb-l6-strathfield-039"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Beryl pays up on the spot.",
+     "choices": [
+      {
+       "text": "About trouble at the strathfield interchange.",
+       "turnin": "qgb-l6-strathfield-037"
+      },
+      {
+       "text": "About the the strathfield interchange tab.",
+       "turnin": "qgb-l6-strathfield-038"
+      },
+      {
+       "text": "About two signs, the strathfield interchange.",
+       "turnin": "qgb-l6-strathfield-039"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. Albert Road means cosy.",
+     "improv": {
+      "persona": "Beryl, real estate agent in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Albert Road like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near Albert Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-ji-woo-b",
+   "name": "Ji-woo B., Korean BBQ owner",
+   "x": -10209,
+   "z": 251,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table? Grill's hot. Mind the smoke. Welcome to Strathfield.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Pork belly, kimchi, soju until the last train. Cooper Street is Strathfield's real main street.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trolley run, strathfield square.",
+     "choices": [
+      {
+       "text": "Trolley Run, Strathfield Square",
+       "accept": "qgb-l6-strathfield-040",
+       "denyFlag": "w:qgb-l6-strathfield-040"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Ji-woo B. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About trolley run, strathfield square.",
+       "turnin": "qgb-l6-strathfield-040"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The karaoke room behind Cooper Street has a Bon Jovi problem. It's not the customers. It's my father.",
+     "improv": {
+      "persona": "Ji-woo B., Korean BBQ owner in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Cooper Street like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near Cooper Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-joon-e",
+   "name": "Joon E., HSC tutor",
+   "x": -10625,
+   "z": 1026,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Band six or nothing. Sorry, that's the brochure talking. Strathfield, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Maths extension two, Saturdays, forty kids and their mothers in the corridor. Strathfield Square has three of us on one block.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's cover at the korean strip.",
+     "choices": [
+      {
+       "text": "Cover at the Korean strip",
+       "accept": "qgb-l6-strathfield-041",
+       "denyFlag": "w:qgb-l6-strathfield-041"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Joon E. looks it over the way Strathfield looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About cover at the korean strip.",
+       "turnin": "qgb-l6-strathfield-041"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every second shopfront near Strathfield Square is a tutoring college. The first one is a bubble tea.",
+     "improv": {
+      "persona": "Joon E., HSC tutor in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Strathfield Square like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near Strathfield Square."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-lachlan",
+   "name": "Lachlan, real estate agent",
+   "x": -10653,
+   "z": 560,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Strathfield is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. The Boulevarde is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's a flat white from strathfield park.",
+     "choices": [
+      {
+       "text": "A Flat White From Strathfield Park",
+       "accept": "qgb-l6-strathfield-042",
+       "denyFlag": "w:qgb-l6-strathfield-042"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Lachlan pays up on the spot.",
+     "choices": [
+      {
+       "text": "About a flat white from strathfield park.",
+       "turnin": "qgb-l6-strathfield-042"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. The Boulevarde means cosy.",
+     "improv": {
+      "persona": "Lachlan, real estate agent in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about The Boulevarde like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near The Boulevarde."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-min-jun-e",
+   "name": "Min-jun E., Korean BBQ owner",
+   "x": -10569,
+   "z": 652,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table? Grill's hot. Mind the smoke. Welcome to Strathfield.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Pork belly, kimchi, soju until the last train. Churchill Avenue is Strathfield's real main street.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's seven a.m. at strathfield plaza.",
+     "choices": [
+      {
+       "text": "Seven a.m. At Strathfield Plaza",
+       "accept": "qgb-l6-strathfield-043",
+       "denyFlag": "w:qgb-l6-strathfield-043"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Min-jun E. looks it over the way Strathfield looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About seven a.m. at strathfield plaza.",
+       "turnin": "qgb-l6-strathfield-043"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The karaoke room behind Churchill Avenue has a Bon Jovi problem. It's not the customers. It's my father.",
+     "improv": {
+      "persona": "Min-jun E., Korean BBQ owner in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Churchill Avenue like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near Churchill Avenue."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-luke",
+   "name": "Luke, probationary constable",
+   "x": -10404,
+   "z": 419,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Strathfield LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of The Boulevarde. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's one stop from the strathfield interchange.",
+     "choices": [
+      {
+       "text": "One Stop From the Strathfield interchange",
+       "accept": "qgb-l6-strathfield-044",
+       "denyFlag": "w:qgb-l6-strathfield-044"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Luke pays up on the spot.",
+     "choices": [
+      {
+       "text": "About one stop from the strathfield interchange.",
+       "turnin": "qgb-l6-strathfield-044"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about The Boulevarde. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Luke, probationary constable in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about The Boulevarde like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near The Boulevarde."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-yuna-c",
+   "name": "Yuna C., Korean BBQ owner",
+   "x": -10566,
+   "z": 704,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table? Grill's hot. Mind the smoke. Welcome to Strathfield.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Pork belly, kimchi, soju until the last train. Albert Road is Strathfield's real main street.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the strathfield interchange fence.",
+     "choices": [
+      {
+       "text": "The the Strathfield interchange Fence",
+       "accept": "qgb-l6-strathfield-045",
+       "denyFlag": "w:qgb-l6-strathfield-045"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Yuna C. looks it over the way Strathfield looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the strathfield interchange fence.",
+       "turnin": "qgb-l6-strathfield-045"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The karaoke room behind Albert Road has a Bon Jovi problem. It's not the customers. It's my father.",
+     "improv": {
+      "persona": "Yuna C., Korean BBQ owner in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Albert Road like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near Albert Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Yuna C. listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-phil",
+   "name": "Phil, commuter of long standing",
+   "x": -10698,
+   "z": 396,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "The 7:42's late. It's always late. Strathfield, welcome to my life.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Forty years on the Western line. Churchill Avenue platform 3 has a seat with my name on it, figuratively, and one day literally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at cooper street.",
+     "choices": [
+      {
+       "text": "Trouble at Cooper Street",
+       "accept": "qgb-l6-strathfield-046",
+       "denyFlag": "w:qgb-l6-strathfield-046"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Phil pays up on the spot.",
+     "choices": [
+      {
+       "text": "About trouble at cooper street.",
+       "turnin": "qgb-l6-strathfield-046"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The quiet carriage at Churchill Avenue is a myth. It's a suggestion. It's a war.",
+     "improv": {
+      "persona": "Phil, commuter of long standing in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Churchill Avenue like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near Churchill Avenue."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-graham",
+   "name": "Graham, strata committee chair",
+   "x": -10767,
+   "z": 82,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Strathfield strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. Cooper Street is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the strathfield square sparky.",
+     "choices": [
+      {
+       "text": "The Strathfield Square Sparky",
+       "accept": "qgb-l6-strathfield-047",
+       "denyFlag": "w:qgb-l6-strathfield-047"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Graham pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the strathfield square sparky.",
+       "turnin": "qgb-l6-strathfield-047"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Graham, strata committee chair in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Cooper Street like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near Cooper Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-denise",
+   "name": "Denise, probationary constable",
+   "x": -10762,
+   "z": 868,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Strathfield LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of Strathfield Square. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rent money, the boulevarde.",
+     "choices": [
+      {
+       "text": "Rent Money, The Boulevarde",
+       "accept": "qgb-l6-strathfield-048",
+       "denyFlag": "w:qgb-l6-strathfield-048"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Denise counts it out without looking up. -- Don't spend it all at Strathfield Square.",
+     "choices": [
+      {
+       "text": "About rent money, the boulevarde.",
+       "turnin": "qgb-l6-strathfield-048"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about Strathfield Square. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Denise, probationary constable in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Strathfield Square like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near Strathfield Square."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-jae-c",
+   "name": "Jae C., Korean BBQ owner",
+   "x": -10142,
+   "z": 491,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table? Grill's hot. Mind the smoke. Welcome to Strathfield.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Pork belly, kimchi, soju until the last train. The Boulevarde is Strathfield's real main street.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the albert road lift.",
+     "choices": [
+      {
+       "text": "The Albert Road Lift",
+       "accept": "qgb-l6-strathfield-049",
+       "denyFlag": "w:qgb-l6-strathfield-049"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Jae C. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the albert road lift.",
+       "turnin": "qgb-l6-strathfield-049"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The karaoke room behind The Boulevarde has a Bon Jovi problem. It's not the customers. It's my father.",
+     "improv": {
+      "persona": "Jae C., Korean BBQ owner in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about The Boulevarde like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near The Boulevarde."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Right. And you're sure it was Albert Road? People say Albert Road when they mean the bit next to it. -- Jae C. writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-hyun-e",
+   "name": "Hyun E., HSC tutor",
+   "x": -10820,
+   "z": 680,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Band six or nothing. Sorry, that's the brochure talking. Strathfield, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Maths extension two, Saturdays, forty kids and their mothers in the corridor. Strathfield Park has three of us on one block.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's meat tray at the strathfield interchange.",
+     "choices": [
+      {
+       "text": "Meat Tray at the Strathfield interchange",
+       "accept": "qgb-l6-strathfield-050",
+       "denyFlag": "w:qgb-l6-strathfield-050"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Hyun E. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About meat tray at the strathfield interchange.",
+       "turnin": "qgb-l6-strathfield-050"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every second shopfront near Strathfield Park is a tutoring college. The first one is a bubble tea.",
+     "improv": {
+      "persona": "Hyun E., HSC tutor in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Strathfield Park like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near Strathfield Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-dot",
+   "name": "Dot, strata committee chair",
+   "x": -10763,
+   "z": 752,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Strathfield strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. Churchill Avenue is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the strathfield square tab.",
+     "choices": [
+      {
+       "text": "The Strathfield Square Tab",
+       "accept": "qgb-l6-strathfield-051",
+       "denyFlag": "w:qgb-l6-strathfield-051"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Dot counts it out without looking up. -- Don't spend it all at Churchill Avenue.",
+     "choices": [
+      {
+       "text": "About the strathfield square tab.",
+       "turnin": "qgb-l6-strathfield-051"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Dot, strata committee chair in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Churchill Avenue like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near Churchill Avenue."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-kylie-anne",
+   "name": "Kylie-Anne, probationary constable",
+   "x": -10807,
+   "z": 769,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Strathfield LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of Strathfield Plaza. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's seven a.m. at cooper street.",
+     "choices": [
+      {
+       "text": "Seven a.m. At Cooper Street",
+       "accept": "qgb-l6-strathfield-052",
+       "denyFlag": "w:qgb-l6-strathfield-052"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Kylie-Anne looks it over the way Strathfield looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About seven a.m. at cooper street.",
+       "turnin": "qgb-l6-strathfield-052"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about Strathfield Plaza. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Kylie-Anne, probationary constable in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Strathfield Plaza like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near Strathfield Plaza."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-mitch",
+   "name": "Mitch, uni student, three jobs",
+   "x": -10740,
+   "z": 319,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Strathfield rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Cooper Street is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rbt on strathfield square.",
+     "choices": [
+      {
+       "text": "RBT on Strathfield Square",
+       "accept": "qgb-l6-strathfield-053",
+       "denyFlag": "w:qgb-l6-strathfield-053"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Mitch looks it over the way Strathfield looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About rbt on strathfield square.",
+       "turnin": "qgb-l6-strathfield-053"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Cooper Street that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Mitch, uni student, three jobs in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Cooper Street like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near Cooper Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-georgie",
+   "name": "Georgie, commuter of long standing",
+   "x": -10326,
+   "z": 728,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "The 7:42's late. It's always late. Strathfield, welcome to my life.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Forty years on the Western line. The Boulevarde platform 3 has a seat with my name on it, figuratively, and one day literally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Tap On at Albert Road",
+       "accept": "qgb-l6-strathfield-054",
+       "denyFlag": "w:qgb-l6-strathfield-054"
+      },
+      {
+       "text": "Proof of Albert Road",
+       "accept": "qgb-l6-strathfield-055",
+       "denyFlag": "w:qgb-l6-strathfield-055",
+       "needFlag": "w:qgb-l6-strathfield-054"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Georgie counts it out without looking up. -- Don't spend it all at The Boulevarde.",
+     "choices": [
+      {
+       "text": "About tap on at albert road.",
+       "turnin": "qgb-l6-strathfield-054"
+      },
+      {
+       "text": "About proof of albert road.",
+       "turnin": "qgb-l6-strathfield-055"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The quiet carriage at The Boulevarde is a myth. It's a suggestion. It's a war.",
+     "improv": {
+      "persona": "Georgie, commuter of long standing in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about The Boulevarde like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near The Boulevarde."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Right. And you're sure it was Albert Road? People say Albert Road when they mean the bit next to it. -- Georgie writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-sienna",
+   "name": "Sienna, strata committee chair",
+   "x": -10437,
+   "z": 737,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Strathfield strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. Albert Road is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's closing time at churchill avenue.",
+     "choices": [
+      {
+       "text": "Closing Time at Churchill Avenue",
+       "accept": "qgb-l6-strathfield-056",
+       "denyFlag": "w:qgb-l6-strathfield-056"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Sienna counts it out without looking up. -- Don't spend it all at Albert Road.",
+     "choices": [
+      {
+       "text": "About closing time at churchill avenue.",
+       "turnin": "qgb-l6-strathfield-056"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Sienna, strata committee chair in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Albert Road like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near Albert Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-val",
+   "name": "Val, probationary constable",
+   "x": -10881,
+   "z": 552,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Strathfield LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of the Strathfield interchange. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the churchill avenue camera.",
+     "choices": [
+      {
+       "text": "The Churchill Avenue Camera",
+       "accept": "qgb-l6-strathfield-057",
+       "denyFlag": "w:qgb-l6-strathfield-057"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Val counts it out without looking up. -- Don't spend it all at the Strathfield interchange.",
+     "choices": [
+      {
+       "text": "About the churchill avenue camera.",
+       "turnin": "qgb-l6-strathfield-057"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about the Strathfield interchange. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Val, probationary constable in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Strathfield interchange like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near the Strathfield interchange."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-ji-woo-c",
+   "name": "Ji-woo C., HSC tutor",
+   "x": -10560,
+   "z": 623,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Band six or nothing. Sorry, that's the brochure talking. Strathfield, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Maths extension two, Saturdays, forty kids and their mothers in the corridor. Cooper Street has three of us on one block.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's bin night, strathfield square.",
+     "choices": [
+      {
+       "text": "Bin Night, Strathfield Square",
+       "accept": "qgb-l6-strathfield-058",
+       "denyFlag": "w:qgb-l6-strathfield-058"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Ji-woo C. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About bin night, strathfield square.",
+       "turnin": "qgb-l6-strathfield-058"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every second shopfront near Cooper Street is a tutoring college. The first one is a bubble tea.",
+     "improv": {
+      "persona": "Ji-woo C., HSC tutor in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Cooper Street like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near Cooper Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-brett",
+   "name": "Brett, commuter of long standing",
+   "x": -10516,
+   "z": 340,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "The 7:42's late. It's always late. Strathfield, welcome to my life.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Forty years on the Western line. Strathfield Square platform 3 has a seat with my name on it, figuratively, and one day literally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the boulevarde complaint.",
+     "choices": [
+      {
+       "text": "The The Boulevarde Complaint",
+       "accept": "qgb-l6-strathfield-059",
+       "denyFlag": "w:qgb-l6-strathfield-059"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Brett looks it over the way Strathfield looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the boulevarde complaint.",
+       "turnin": "qgb-l6-strathfield-059"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The quiet carriage at Strathfield Square is a myth. It's a suggestion. It's a war.",
+     "improv": {
+      "persona": "Brett, commuter of long standing in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Strathfield Square like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near Strathfield Square."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-clementine",
+   "name": "Clementine, strata committee chair",
+   "x": -10668,
+   "z": 808,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Strathfield strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. The Boulevarde is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's one stop from strathfield park.",
+     "choices": [
+      {
+       "text": "One Stop From Strathfield Park",
+       "accept": "qgb-l6-strathfield-060",
+       "denyFlag": "w:qgb-l6-strathfield-060"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Clementine pays up on the spot.",
+     "choices": [
+      {
+       "text": "About one stop from strathfield park.",
+       "turnin": "qgb-l6-strathfield-060"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Clementine, strata committee chair in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about The Boulevarde like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near The Boulevarde."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-neville",
+   "name": "Neville, uni student, three jobs",
+   "x": -10592,
+   "z": 756,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Strathfield rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Albert Road is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's race four, churchill avenue.",
+     "choices": [
+      {
+       "text": "Race Four, Churchill Avenue",
+       "accept": "qgb-l6-strathfield-061",
+       "denyFlag": "w:qgb-l6-strathfield-061"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Neville counts it out without looking up. -- Don't spend it all at Albert Road.",
+     "choices": [
+      {
+       "text": "About race four, churchill avenue.",
+       "turnin": "qgb-l6-strathfield-061"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Albert Road that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Neville, uni student, three jobs in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Albert Road like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near Albert Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Strathfield would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-hana-e",
+   "name": "Hana E., Korean BBQ owner",
+   "x": -10814,
+   "z": 459,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table? Grill's hot. Mind the smoke. Welcome to Strathfield.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Pork belly, kimchi, soju until the last train. the Strathfield interchange is Strathfield's real main street.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the strathfield plaza sparky.",
+     "choices": [
+      {
+       "text": "The Strathfield Plaza Sparky",
+       "accept": "qgb-l6-strathfield-062",
+       "denyFlag": "w:qgb-l6-strathfield-062"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Hana E. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the strathfield plaza sparky.",
+       "turnin": "qgb-l6-strathfield-062"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The karaoke room behind the Strathfield interchange has a Bon Jovi problem. It's not the customers. It's my father.",
+     "improv": {
+      "persona": "Hana E., Korean BBQ owner in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Strathfield interchange like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near the Strathfield interchange."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-min-jun-f",
+   "name": "Min-jun F., HSC tutor",
+   "x": -10538,
+   "z": 906,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Band six or nothing. Sorry, that's the brochure talking. Strathfield, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Maths extension two, Saturdays, forty kids and their mothers in the corridor. Churchill Avenue has three of us on one block.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Strathfield Plaza Course",
+       "accept": "qgb-l6-strathfield-063",
+       "denyFlag": "w:qgb-l6-strathfield-063"
+      },
+      {
+       "text": "RBT on Strathfield Plaza",
+       "accept": "qgb-l6-strathfield-064",
+       "denyFlag": "w:qgb-l6-strathfield-064",
+       "needFlag": "w:qgb-l6-strathfield-063"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Min-jun F. looks it over the way Strathfield looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the strathfield plaza course.",
+       "turnin": "qgb-l6-strathfield-063"
+      },
+      {
+       "text": "About rbt on strathfield plaza.",
+       "turnin": "qgb-l6-strathfield-064"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every second shopfront near Churchill Avenue is a tutoring college. The first one is a bubble tea.",
+     "improv": {
+      "persona": "Min-jun F., HSC tutor in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Churchill Avenue like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near Churchill Avenue."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-scott",
+   "name": "Scott, commuter of long standing",
+   "x": -10819,
+   "z": 111,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "The 7:42's late. It's always late. Strathfield, welcome to my life.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Forty years on the Western line. Strathfield Plaza platform 3 has a seat with my name on it, figuratively, and one day literally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's bin night, cooper street.",
+     "choices": [
+      {
+       "text": "Bin Night, Cooper Street",
+       "accept": "qgb-l6-strathfield-065",
+       "denyFlag": "w:qgb-l6-strathfield-065"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Scott looks it over the way Strathfield looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About bin night, cooper street.",
+       "turnin": "qgb-l6-strathfield-065"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The quiet carriage at Strathfield Plaza is a myth. It's a suggestion. It's a war.",
+     "improv": {
+      "persona": "Scott, commuter of long standing in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Strathfield Plaza like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near Strathfield Plaza."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-beryl-a",
+   "name": "Beryl A., strata committee chair",
+   "x": -10202,
+   "z": 499,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Strathfield strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. Strathfield Square is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's something from the korean strip.",
+     "choices": [
+      {
+       "text": "Something From the Korean strip",
+       "accept": "qgb-l6-strathfield-066",
+       "denyFlag": "w:qgb-l6-strathfield-066"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Beryl A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About something from the korean strip.",
+       "turnin": "qgb-l6-strathfield-066"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Beryl A., strata committee chair in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about Strathfield Square like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near Strathfield Square."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-strathfield-kev-a",
+   "name": "Kev A., probationary constable",
+   "x": -10408,
+   "z": 532,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Strathfield LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Strathfield like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of the Korean strip. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch the boulevarde.",
+     "choices": [
+      {
+       "text": "Before They Touch The Boulevarde",
+       "accept": "qgb-l6-strathfield-067",
+       "denyFlag": "w:qgb-l6-strathfield-067"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Kev A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About before they touch the boulevarde.",
+       "turnin": "qgb-l6-strathfield-067"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about the Korean strip. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Kev A., probationary constable in Strathfield, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Korean strip like everyone knows it.",
+      "context": "Someone has asked what Strathfield is like these days. You are standing near the Korean strip."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,816 @@
+{
+ "pack": "areab-erskineville-2",
+ "quests": [
+  {
+   "id": "qgb-l1-erskineville-044",
+   "act": 3,
+   "title": "Race Four, Erskineville Road",
+   "blurb": "Nobody else has offered, so. There's a horse in race four at dawn that a bloke at Erskineville Road swears by. It started small, the way these things do. Turn it into fifty-five somewhere in Erskineville and tell me if it came in. Do that and we're square.",
+   "giver": "qgb-erskineville-elaine-b",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 55,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-erskineville-elaine-b",
+     "node": "report-0",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 146,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-erskineville-045",
+   "act": 3,
+   "title": "Probationary at Harry Noble Reserve",
+   "blurb": "Before you say anything: yes, I know. A young constable has been doing his first solo patrol round Harry Noble Reserve since the last Sunday of the month. Half the street knows and half the street is pretending not to. He's decided Erskineville is his, so give him a story for the sergeant. Just do not come back empty-handed.",
+   "giver": "qgb-erskineville-enzo-e",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "lose the probationary constable near Harry Noble Reserve"
+    }
+   ],
+   "reward": {
+    "cash": 72,
+    "xp": 170,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-erskineville-046",
+   "act": 3,
+   "title": "Lads Off Harry Noble Reserve",
+   "blurb": "This is going to sound small. Three of them in TNs on the Harry Noble Reserve steps, flogging vapes to schoolkids at lunchtime. I have got no proof, which is exactly why I am asking. Erskineville used to move them on itself and now it rings me. If anyone asks, you were never here.",
+   "giver": "qgb-erskineville-val-b",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Harry Noble Reserve"
+    }
+   ],
+   "reward": {
+    "cash": 58,
+    "xp": 159,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-erskineville-047",
+   "act": 3,
+   "title": "Swanson Street Pub Crawl",
+   "blurb": "I would do it myself if I could leave the counter. A bucks started at Swanson Street at noon and it's now three blokes, one pair of pants and a tab. I did try the official route, for what that was worth. Recover the tab by first thing; Erskineville can keep the dignity. That's it. That's the whole ask.",
+   "giver": "qgb-erskineville-val-b",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 3,
+     "label": "sort the three from the Swanson Street crawl"
+    },
+    {
+     "kind": "earn",
+     "dollars": 20,
+     "label": "and get the twenty they owe"
+    }
+   ],
+   "reward": {
+    "cash": 67,
+    "xp": 139,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-erskineville-048",
+   "act": 3,
+   "title": "Two Signs, the Rose Hotel",
+   "blurb": "It has been three weeks. Two signs near the Rose Hotel say opposite things about parking and I've been fined under both. I am not after trouble. I am after an answer. Get photos of each before the last Sunday of the month, when Erskineville council takes one down. Come and find me after, either way.",
+   "giver": "qgb-erskineville-barry-a",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2129,
+     "z": 3579,
+     "radius": 40,
+     "label": "photograph the sign at the Rose Hotel"
+    },
+    {
+     "kind": "photo",
+     "x": -2173,
+     "z": 3821,
+     "radius": 40,
+     "label": "and the one that contradicts it"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 146,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-erskineville-049",
+   "act": 3,
+   "title": "Trolley Run, the Erskineville village shops",
+   "blurb": "You look like you have twenty minutes. A Woolies trolley from the Erskineville village shops gets walked to the creek every Thursday. It might be nothing. It has not felt like nothing. Find where it ends up in Erskineville and make the deposit back. I would rather know than wonder.",
+   "giver": "qgb-erskineville-janelle-b",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2044,
+     "z": 3556,
+     "radius": 30,
+     "label": "find the trolley near the Erskineville village shops"
+    },
+    {
+     "kind": "photo",
+     "x": -2044,
+     "z": 3556,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 25,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 69,
+    "xp": 159,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-erskineville-050",
+   "act": 3,
+   "title": "Rent Money, the Imperial",
+   "blurb": "I have been putting it off since Easter. I'm forty-five short on the the Imperial rent and the agent doesn't take stories. I have got a photo on my phone but it is useless. Make it somewhere in Erskineville by dawn; I'm not fussy how. Half now if you want it. Most people don't.",
+   "giver": "qgb-erskineville-janelle-b",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 45,
+     "label": "earn forty-five somewhere in Erskineville"
+    }
+   ],
+   "reward": {
+    "cash": 57,
+    "xp": 168,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-erskineville-051",
+   "act": 3,
+   "title": "Before They Touch the Erskineville village shops",
+   "blurb": "You are the first person to stop all morning. They start on the Erskineville village shops on Melbourne Cup day and the orange fencing goes up. Nobody else seems to have noticed, which is its own problem. I want Erskineville on record before it does. There's cash in it. Not a lot.",
+   "giver": "qgb-erskineville-hayden-a",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2029,
+     "z": 3725,
+     "radius": 40,
+     "label": "photograph the state of the Erskineville village shops"
+    },
+    {
+     "kind": "goto",
+     "x": -2045,
+     "z": 3601,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 155,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-erskineville-052",
+   "act": 3,
+   "title": "RBT on Erskineville Road",
+   "blurb": "My knees are gone, so. There's a breath test set up on Erskineville Road since half seven. You will see what I mean the second you get there. My brother-in-law needs the ute at the far end of Erskineville without a conversation. I will owe you one, and I pay those.",
+   "giver": "qgb-erskineville-hayden-a",
+   "level": 1,
+   "requires": [
+    "qgb-l1-erskineville-051"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on Erskineville Road"
+    },
+    {
+     "kind": "goto",
+     "x": -2006,
+     "z": 3770,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 79,
+    "xp": 202,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-erskineville-053",
+   "act": 3,
+   "title": "A Flat White From the Imperial",
+   "blurb": "Honestly, I am past caring how it looks. I want a flat white from the place near the Imperial, not the one next to it. I would not ask if there was anyone else about. Here by half two, while it's still coffee and Erskineville still has some. Come back and tell me straight.",
+   "giver": "qgb-erskineville-sienna-b",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near the Imperial"
+    },
+    {
+     "kind": "goto",
+     "x": -2084,
+     "z": 3664,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 69,
+    "xp": 151,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-erskineville-054",
+   "act": 3,
+   "title": "Tap On at the Erskineville village shops",
+   "blurb": "Right. Since you asked. My Opal says I owe nineteen dollars for a trip from Erskineville I never took on Melbourne Cup day. This is the third time I have had this conversation. Take the same one to Redfern and tell me what it charged you. Whatever you find, bring it to me first.",
+   "giver": "qgb-erskineville-rupert-b",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Erskineville",
+     "to": "Redfern",
+     "label": "tap on at Erskineville, tap off at Redfern"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-erskineville-rupert-b",
+     "node": "report-1",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 63,
+    "xp": 167,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-erskineville-055",
+   "act": 3,
+   "title": "One Stop From Swanson Street",
+   "blurb": "I am told you do odd jobs. I need to know the train from Erskineville stops at Redfern and doesn't sail through like it did on Tuesday. I would have sorted it myself a year ago. Ride it at the last train and photograph the sign. That's the whole job. No catch.",
+   "giver": "qgb-erskineville-harriet-b",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Erskineville",
+     "to": "Redfern",
+     "label": "take the train to Redfern"
+    },
+    {
+     "kind": "photo",
+     "x": -972,
+     "z": 2673,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 74,
+    "xp": 149,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-erskineville-056",
+   "act": 3,
+   "title": "Trolley Run, the Erko",
+   "blurb": "You will think I am making this up. A Woolies trolley from the Erko gets walked to the creek every Saturday. It started small, the way these things do. Find where it ends up in Erskineville and make the deposit back. You'll know it when you see it.",
+   "giver": "qgb-erskineville-norm-a",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2134,
+     "z": 3309,
+     "radius": 30,
+     "label": "find the trolley near the Erko"
+    },
+    {
+     "kind": "photo",
+     "x": -2134,
+     "z": 3309,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 25,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 63,
+    "xp": 152,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-erskineville-057",
+   "act": 3,
+   "title": "Before They Touch the Macdonaldtown footbridge",
+   "blurb": "Two people have already said no. They start on the Macdonaldtown footbridge on Easter Saturday and the orange fencing goes up. It is not the money. It has stopped being the money. I want Erskineville on record before it does. Do that and we're square.",
+   "giver": "qgb-erskineville-fay-a",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2512,
+     "z": 3455,
+     "radius": 40,
+     "label": "photograph the state of the Macdonaldtown footbridge"
+    },
+    {
+     "kind": "goto",
+     "x": -2396,
+     "z": 3292,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 59,
+    "xp": 144,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-erskineville-058",
+   "act": 3,
+   "title": "Something From Harry Noble Reserve",
+   "blurb": "This is going to sound small. The stall at Harry Noble Reserve has run out and the customers keep coming. I did try the official route, for what that was worth. Find something round Erskineville that'll do before the after the footy rush. I'll see you right for it.",
+   "giver": "qgb-erskineville-jacinta-b",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near Harry Noble Reserve"
+    },
+    {
+     "kind": "goto",
+     "x": -2149,
+     "z": 3465,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 61,
+    "xp": 141,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-erskineville-059",
+   "act": 3,
+   "title": "Bin Night, Erskineville Road",
+   "blurb": "I would do it myself if I could leave the counter. Somebody moves the bins on Erskineville Road in front of my drive every Friday night. I am not after trouble. I am after an answer. Photograph the evidence and have a word; Erskineville knows who. If anyone asks, you were never here.",
+   "giver": "qgb-erskineville-glenn-b",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -1832,
+     "z": 3810,
+     "radius": 40,
+     "label": "photograph the bins at Erskineville Road"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 62,
+    "xp": 168,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-erskineville-060",
+   "act": 3,
+   "title": "Sightline at the Imperial",
+   "blurb": "It is the sort of thing you notice or you do not. Insurance says nobody could have seen the ute hit the fence at the Imperial on Easter Saturday. It might be nothing. It has not felt like nothing. Stand where I stood in Erskineville, photograph the view, tell me if I'm lying. Come and find me after, either way.",
+   "giver": "qgb-erskineville-kerry-b",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2047,
+     "z": 3533,
+     "radius": 30,
+     "label": "stand where it happened at the Imperial"
+    },
+    {
+     "kind": "photo",
+     "x": -2047,
+     "z": 3533,
+     "radius": 40,
+     "label": "photograph the corner"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-erskineville-kerry-b",
+     "node": "report-1",
+     "label": "describe the sightline"
+    }
+   ],
+   "reward": {
+    "cash": 55,
+    "xp": 138,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-erskineville-061",
+   "act": 3,
+   "title": "The Erskineville Road Fence",
+   "blurb": "You look like you have twenty minutes. My neighbour at Erskineville Road says the tree is on my side and the fence says otherwise. I have got a photo on my phone but it is useless. Look at it Monday with Erskineville eyes and tell me the truth. Be polite about it. It costs nothing.",
+   "giver": "qgb-erskineville-kerry-b",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2200,
+     "z": 3149,
+     "radius": 30,
+     "label": "go and look at the fence at Erskineville Road"
+    },
+    {
+     "kind": "photo",
+     "x": -2200,
+     "z": 3149,
+     "radius": 40,
+     "label": "photograph the tree over it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-erskineville-kerry-b",
+     "node": "report-2",
+     "label": "tell me whose side it's on"
+    }
+   ],
+   "reward": {
+    "cash": 56,
+    "xp": 149,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-erskineville-062",
+   "act": 3,
+   "title": "The Length of Swanson Street",
+   "blurb": "You are the first person to stop all morning. I haven't walked Swanson Street end to end since the light rail came to Erskineville. You will see what I mean the second you get there. Do it Friday for me and photograph what's at the far end now. Half now if you want it. Most people don't.",
+   "giver": "qgb-erskineville-scott-b",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2176,
+     "z": 3466,
+     "radius": 30,
+     "label": "walk the length of Swanson Street"
+    },
+    {
+     "kind": "goto",
+     "x": -2048,
+     "z": 3536,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -2048,
+     "z": 3536,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 68,
+    "xp": 156,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-erskineville-063",
+   "act": 3,
+   "title": "The Rose Hotel Pub Crawl",
+   "blurb": "Honestly, I am past caring how it looks. A bucks started at the Rose Hotel at noon and it's now three blokes, one pair of pants and a tab. I am aware how that sounds. Recover the tab by school pick-up; Erskineville can keep the dignity. I will owe you one, and I pay those.",
+   "giver": "qgb-erskineville-fiona-b",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 3,
+     "label": "sort the three from the the Rose Hotel crawl"
+    },
+    {
+     "kind": "earn",
+     "dollars": 20,
+     "label": "and get the twenty they owe"
+    }
+   ],
+   "reward": {
+    "cash": 61,
+    "xp": 146,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-erskineville-064",
+   "act": 3,
+   "title": "Cover at the Rose Hotel",
+   "blurb": "The council knows and the council does not care. I've got nobody for the the Rose Hotel shift at three in the morning and a room full of Erskineville people who've paid. My wife says I should let it go. My wife is wrong. Fifty of trade and one difficult person at the door. I'll put the kettle on for when you're back.",
+   "giver": "qgb-erskineville-lorraine-a",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 50,
+     "label": "cover the fifty for the shift"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 1,
+     "label": "and handle whoever's at the door"
+    }
+   ],
+   "reward": {
+    "cash": 57,
+    "xp": 143,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-erskineville-065",
+   "act": 3,
+   "title": "RBT on the Erskineville village shops",
+   "blurb": "Someone has to, and it may as well be you. There's a breath test set up on the Erskineville village shops since first thing. This is the third time I have had this conversation. My brother-in-law needs the ute at the far end of Erskineville without a conversation. There is no rush, but there is a Friday.",
+   "giver": "qgb-erskineville-bruce-b",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on the Erskineville village shops"
+    },
+    {
+     "kind": "goto",
+     "x": -2240,
+     "z": 3705,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 144,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-erskineville-066",
+   "act": 3,
+   "title": "Seven a.m. At the Macdonaldtown footbridge",
+   "blurb": "Right. Since you asked. The site at the Macdonaldtown footbridge starts its jackhammer at eleven on a Anzac Day, which is illegal and loud. The paperwork says one thing and my eyes say another. Photograph it running and have a word with the Erskineville foreman. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-erskineville-bruce-b",
+   "level": 1,
+   "requires": [
+    "qgb-l1-erskineville-065"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2222,
+     "z": 3627,
+     "radius": 40,
+     "label": "photograph the noise from the Macdonaldtown footbridge"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 72,
+    "xp": 187,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-erskineville-067",
+   "act": 3,
+   "title": "Left It Near the Imperial",
+   "blurb": "You will think I am making this up. I left something on the bench at the Imperial at five. It has been going on longer than I have admitted to anyone. By the time I got back to Erskineville it had walked, so look where I'd have dropped it. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qgb-erskineville-enzo-f",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1715,
+     "z": 3273,
+     "radius": 30,
+     "label": "check the bench near the Imperial"
+    },
+    {
+     "kind": "photo",
+     "x": -1919,
+     "z": 3568,
+     "radius": 40,
+     "label": "photograph the bins behind it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-erskineville-enzo-f",
+     "node": "report-0",
+     "label": "tell me what you found"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 164,
+    "unlock": []
+   }
+  }
+ ]
+}

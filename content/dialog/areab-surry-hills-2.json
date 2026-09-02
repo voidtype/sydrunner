@@ -1,0 +1,2336 @@
+{
+ "pack": "areab-surry-hills-2",
+ "npcs": [
+  {
+   "id": "qgb-surry-hills-neville-b",
+   "name": "Neville B., strata committee chair",
+   "x": 317,
+   "z": 2043,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Surry Hills strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Surry Hills like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. Ward Park is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rbt on bourke street bakery.",
+     "choices": [
+      {
+       "text": "RBT on Bourke Street Bakery",
+       "accept": "qgb-l3-surry-hills-040",
+       "denyFlag": "w:qgb-l3-surry-hills-040"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Neville B. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About rbt on bourke street bakery.",
+       "turnin": "qgb-l3-surry-hills-040"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Neville B., strata committee chair in Surry Hills, Sydney. Dry, specific, local; never says g'day or crikey; talks about Ward Park like everyone knows it.",
+      "context": "Someone has asked what Surry Hills is like these days. You are standing near Ward Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-surry-hills-val-b",
+   "name": "Val B., graphic designer, freelance",
+   "x": 322,
+   "z": 2604,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry, one sec, the client wants the logo bigger. Okay. Surry Hills, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Surry Hills like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Logos for cafes that will close in a year. Bourke Street Bakery has had four different fonts on its awning since I moved here.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two signs, riley street.",
+     "choices": [
+      {
+       "text": "Two Signs, Riley Street",
+       "accept": "qgb-l3-surry-hills-041",
+       "denyFlag": "w:qgb-l3-surry-hills-041"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Val B. looks it over the way Surry Hills looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About two signs, riley street.",
+       "turnin": "qgb-l3-surry-hills-041"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The laneway behind Bourke Street Bakery has the good light for shoots. The rats also know.",
+     "improv": {
+      "persona": "Val B., graphic designer, freelance in Surry Hills, Sydney. Dry, specific, local; never says g'day or crikey; talks about Bourke Street Bakery like everyone knows it.",
+      "context": "Someone has asked what Surry Hills is like these days. You are standing near Bourke Street Bakery."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-surry-hills-barry-b",
+   "name": "Barry B., tattooist",
+   "x": -108,
+   "z": 2335,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Walk-ins after two. You're not a walk-in, you've got that look. Surry Hills, yeah?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Surry Hills like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twenty years on the Shakespeare. I've done every Southern Cross in the inner west and then covered half of them up.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the riley street camera.",
+     "choices": [
+      {
+       "text": "The Riley Street Camera",
+       "accept": "qgb-l3-surry-hills-042",
+       "denyFlag": "w:qgb-l3-surry-hills-042"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Barry B. counts it out without looking up. -- Don't spend it all at the Shakespeare.",
+     "choices": [
+      {
+       "text": "About the riley street camera.",
+       "turnin": "qgb-l3-surry-hills-042"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best coffee is next door. The worst decision you ever made is on your calf. Both are fixable.",
+     "improv": {
+      "persona": "Barry B., tattooist in Surry Hills, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Shakespeare like everyone knows it.",
+      "context": "Someone has asked what Surry Hills is like these days. You are standing near the Shakespeare."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-surry-hills-sienna-c",
+   "name": "Sienna C., dog walker, four leads",
+   "x": 278,
+   "z": 2251,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hang on, hang on -- sit. Not you. Sorry, Surry Hills at this hour is chaos. What's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Surry Hills like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six dogs, three suburbs, one car park at Cleveland Street. Two of them aren't mine and one of them isn't a dog, legally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the crown street sparky.",
+     "choices": [
+      {
+       "text": "The Crown Street Sparky",
+       "accept": "qgb-l3-surry-hills-043",
+       "denyFlag": "w:qgb-l3-surry-hills-043"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Sienna C. looks it over the way Surry Hills looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the crown street sparky.",
+       "turnin": "qgb-l3-surry-hills-043"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The off-leash bit at Cleveland Street is fine until the magpies come back. Then nothing is fine.",
+     "improv": {
+      "persona": "Sienna C., dog walker, four leads in Surry Hills, Sydney. Dry, specific, local; never says g'day or crikey; talks about Cleveland Street like everyone knows it.",
+      "context": "Someone has asked what Surry Hills is like these days. You are standing near Cleveland Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-surry-hills-poppy-a",
+   "name": "Poppy A., strata committee chair",
+   "x": 458,
+   "z": 2576,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Surry Hills strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Surry Hills like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. Bourke Street is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the clock hotel lift.",
+     "choices": [
+      {
+       "text": "The the Clock Hotel Lift",
+       "accept": "qgb-l3-surry-hills-044",
+       "denyFlag": "w:qgb-l3-surry-hills-044"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Poppy A. counts it out without looking up. -- Don't spend it all at Bourke Street.",
+     "choices": [
+      {
+       "text": "About the the clock hotel lift.",
+       "turnin": "qgb-l3-surry-hills-044"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Poppy A., strata committee chair in Surry Hills, Sydney. Dry, specific, local; never says g'day or crikey; talks about Bourke Street like everyone knows it.",
+      "context": "Someone has asked what Surry Hills is like these days. You are standing near Bourke Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Surry Hills would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-surry-hills-rupert-b",
+   "name": "Rupert B., graphic designer, freelance",
+   "x": 694,
+   "z": 2049,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry, one sec, the client wants the logo bigger. Okay. Surry Hills, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Surry Hills like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Logos for cafes that will close in a year. the Clock Hotel has had four different fonts on its awning since I moved here.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trolley run, shannon reserve.",
+     "choices": [
+      {
+       "text": "Trolley Run, Shannon Reserve",
+       "accept": "qgb-l3-surry-hills-045",
+       "denyFlag": "w:qgb-l3-surry-hills-045"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Rupert B. counts it out without looking up. -- Don't spend it all at the Clock Hotel.",
+     "choices": [
+      {
+       "text": "About trolley run, shannon reserve.",
+       "turnin": "qgb-l3-surry-hills-045"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The laneway behind the Clock Hotel has the good light for shoots. The rats also know.",
+     "improv": {
+      "persona": "Rupert B., graphic designer, freelance in Surry Hills, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Clock Hotel like everyone knows it.",
+      "context": "Someone has asked what Surry Hills is like these days. You are standing near the Clock Hotel."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-surry-hills-harriet-a",
+   "name": "Harriet A., tattooist",
+   "x": 454,
+   "z": 1932,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Walk-ins after two. You're not a walk-in, you've got that look. Surry Hills, yeah?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Surry Hills like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twenty years on Shannon Reserve. I've done every Southern Cross in the inner west and then covered half of them up.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's a flat white from riley street.",
+     "choices": [
+      {
+       "text": "A Flat White From Riley Street",
+       "accept": "qgb-l3-surry-hills-046",
+       "denyFlag": "w:qgb-l3-surry-hills-046"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Harriet A. counts it out without looking up. -- Don't spend it all at Shannon Reserve.",
+     "choices": [
+      {
+       "text": "About a flat white from riley street.",
+       "turnin": "qgb-l3-surry-hills-046"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best coffee is next door. The worst decision you ever made is on your calf. Both are fixable.",
+     "improv": {
+      "persona": "Harriet A., tattooist in Surry Hills, Sydney. Dry, specific, local; never says g'day or crikey; talks about Shannon Reserve like everyone knows it.",
+      "context": "Someone has asked what Surry Hills is like these days. You are standing near Shannon Reserve."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-surry-hills-fay-a",
+   "name": "Fay A., real estate agent",
+   "x": 113,
+   "z": 2394,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Surry Hills is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Surry Hills like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. Bourke Street Bakery is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's left it near riley street.",
+     "choices": [
+      {
+       "text": "Left It Near Riley Street",
+       "accept": "qgb-l3-surry-hills-047",
+       "denyFlag": "w:qgb-l3-surry-hills-047"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Fay A. looks it over the way Surry Hills looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About left it near riley street.",
+       "turnin": "qgb-l3-surry-hills-047"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. Bourke Street Bakery means cosy.",
+     "improv": {
+      "persona": "Fay A., real estate agent in Surry Hills, Sydney. Dry, specific, local; never says g'day or crikey; talks about Bourke Street Bakery like everyone knows it.",
+      "context": "Someone has asked what Surry Hills is like these days. You are standing near Bourke Street Bakery."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Fay A. listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-surry-hills-daz-b",
+   "name": "Daz B., dog walker, four leads",
+   "x": 226,
+   "z": 2063,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hang on, hang on -- sit. Not you. Sorry, Surry Hills at this hour is chaos. What's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Surry Hills like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six dogs, three suburbs, one car park at the Shakespeare. Two of them aren't mine and one of them isn't a dog, legally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's seven a.m. at riley street.",
+     "choices": [
+      {
+       "text": "Seven a.m. At Riley Street",
+       "accept": "qgb-l3-surry-hills-048",
+       "denyFlag": "w:qgb-l3-surry-hills-048"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Daz B. counts it out without looking up. -- Don't spend it all at the Shakespeare.",
+     "choices": [
+      {
+       "text": "About seven a.m. at riley street.",
+       "turnin": "qgb-l3-surry-hills-048"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The off-leash bit at the Shakespeare is fine until the magpies come back. Then nothing is fine.",
+     "improv": {
+      "persona": "Daz B., dog walker, four leads in Surry Hills, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Shakespeare like everyone knows it.",
+      "context": "Someone has asked what Surry Hills is like these days. You are standing near the Shakespeare."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-surry-hills-jacinta-a",
+   "name": "Jacinta A., publican",
+   "x": 299,
+   "z": 2175,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "We're not open. We're never not open. What'll it be, Surry Hills?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Surry Hills like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I run the pub. Schooners, the meat raffle, the trivia on Wednesdays that started as a joke. Riley Street keeps me in business and out of the papers.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rbt on the surry hills library.",
+     "choices": [
+      {
+       "text": "RBT on the Surry Hills Library",
+       "accept": "qgb-l3-surry-hills-049",
+       "denyFlag": "w:qgb-l3-surry-hills-049"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Jacinta A. counts it out without looking up. -- Don't spend it all at Riley Street.",
+     "choices": [
+      {
+       "text": "About rbt on the surry hills library.",
+       "turnin": "qgb-l3-surry-hills-049"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Tooheys New, seven dollars, and if you ask for a craft beer I'll point you back toward Riley Street.",
+     "improv": {
+      "persona": "Jacinta A., publican in Surry Hills, Sydney. Dry, specific, local; never says g'day or crikey; talks about Riley Street like everyone knows it.",
+      "context": "Someone has asked what Surry Hills is like these days. You are standing near Riley Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-surry-hills-kerry-d",
+   "name": "Kerry D., graphic designer, freelance",
+   "x": 121,
+   "z": 1917,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry, one sec, the client wants the logo bigger. Okay. Surry Hills, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Surry Hills like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Logos for cafes that will close in a year. Cleveland Street has had four different fonts on its awning since I moved here.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the crown street order.",
+     "choices": [
+      {
+       "text": "The Crown Street Order",
+       "accept": "qgb-l3-surry-hills-050",
+       "denyFlag": "w:qgb-l3-surry-hills-050"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Kerry D. counts it out without looking up. -- Don't spend it all at Cleveland Street.",
+     "choices": [
+      {
+       "text": "About the crown street order.",
+       "turnin": "qgb-l3-surry-hills-050"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The laneway behind Cleveland Street has the good light for shoots. The rats also know.",
+     "improv": {
+      "persona": "Kerry D., graphic designer, freelance in Surry Hills, Sydney. Dry, specific, local; never says g'day or crikey; talks about Cleveland Street like everyone knows it.",
+      "context": "Someone has asked what Surry Hills is like these days. You are standing near Cleveland Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-surry-hills-scott-a",
+   "name": "Scott A., tattooist",
+   "x": 582,
+   "z": 2240,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Walk-ins after two. You're not a walk-in, you've got that look. Surry Hills, yeah?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Surry Hills like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twenty years on Crown Street. I've done every Southern Cross in the inner west and then covered half of them up.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the bourke street fence.",
+     "choices": [
+      {
+       "text": "The Bourke Street Fence",
+       "accept": "qgb-l3-surry-hills-051",
+       "denyFlag": "w:qgb-l3-surry-hills-051"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Scott A. looks it over the way Surry Hills looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the bourke street fence.",
+       "turnin": "qgb-l3-surry-hills-051"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best coffee is next door. The worst decision you ever made is on your calf. Both are fixable.",
+     "improv": {
+      "persona": "Scott A., tattooist in Surry Hills, Sydney. Dry, specific, local; never says g'day or crikey; talks about Crown Street like everyone knows it.",
+      "context": "Someone has asked what Surry Hills is like these days. You are standing near Crown Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Scott A. listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-surry-hills-merv-b",
+   "name": "Merv B., real estate agent",
+   "x": 302,
+   "z": 2007,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Surry Hills is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Surry Hills like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. the Clock Hotel is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's lads off shannon reserve.",
+     "choices": [
+      {
+       "text": "Lads Off Shannon Reserve",
+       "accept": "qgb-l3-surry-hills-052",
+       "denyFlag": "w:qgb-l3-surry-hills-052"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Merv B. counts it out without looking up. -- Don't spend it all at the Clock Hotel.",
+     "choices": [
+      {
+       "text": "About lads off shannon reserve.",
+       "turnin": "qgb-l3-surry-hills-052"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. the Clock Hotel means cosy.",
+     "improv": {
+      "persona": "Merv B., real estate agent in Surry Hills, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Clock Hotel like everyone knows it.",
+      "context": "Someone has asked what Surry Hills is like these days. You are standing near the Clock Hotel."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-surry-hills-cheryl-a",
+   "name": "Cheryl A., strata committee chair",
+   "x": 754,
+   "z": 1989,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Surry Hills strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Surry Hills like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. Bourke Street Bakery is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Sightline at Riley Street",
+       "accept": "qgb-l3-surry-hills-053",
+       "denyFlag": "w:qgb-l3-surry-hills-053"
+      },
+      {
+       "text": "Race Four, the Shakespeare",
+       "accept": "qgb-l3-surry-hills-054",
+       "denyFlag": "w:qgb-l3-surry-hills-054",
+       "needFlag": "w:qgb-l3-surry-hills-053"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Cheryl A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About sightline at riley street.",
+       "turnin": "qgb-l3-surry-hills-053"
+      },
+      {
+       "text": "About race four, the shakespeare.",
+       "turnin": "qgb-l3-surry-hills-054"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Cheryl A., strata committee chair in Surry Hills, Sydney. Dry, specific, local; never says g'day or crikey; talks about Bourke Street Bakery like everyone knows it.",
+      "context": "Someone has asked what Surry Hills is like these days. You are standing near Bourke Street Bakery."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Right. And you're sure it was Riley Street? People say Riley Street when they mean the bit next to it. -- Cheryl A. writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Cheryl A. listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-surry-hills-phil-b",
+   "name": "Phil B., graphic designer, freelance",
+   "x": 221,
+   "z": 2299,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry, one sec, the client wants the logo bigger. Okay. Surry Hills, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Surry Hills like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Logos for cafes that will close in a year. the Shakespeare has had four different fonts on its awning since I moved here.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Riley Street Tab",
+       "accept": "qgb-l3-surry-hills-055",
+       "denyFlag": "w:qgb-l3-surry-hills-055"
+      },
+      {
+       "text": "Something From Cleveland Street",
+       "accept": "qgb-l3-surry-hills-056",
+       "denyFlag": "w:qgb-l3-surry-hills-056",
+       "needFlag": "w:qgb-l3-surry-hills-055"
+      },
+      {
+       "text": "Counting Riley Street",
+       "accept": "qgb-l3-surry-hills-057",
+       "denyFlag": "w:qgb-l3-surry-hills-057"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Phil B. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the riley street tab.",
+       "turnin": "qgb-l3-surry-hills-055"
+      },
+      {
+       "text": "About something from cleveland street.",
+       "turnin": "qgb-l3-surry-hills-056"
+      },
+      {
+       "text": "About counting riley street.",
+       "turnin": "qgb-l3-surry-hills-057"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The laneway behind the Shakespeare has the good light for shoots. The rats also know.",
+     "improv": {
+      "persona": "Phil B., graphic designer, freelance in Surry Hills, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Shakespeare like everyone knows it.",
+      "context": "Someone has asked what Surry Hills is like these days. You are standing near the Shakespeare."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-surry-hills-enzo-c",
+   "name": "Enzo C., barista, own cafe",
+   "x": 279,
+   "z": 2385,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flat white? Everyone in Surry Hills wants a flat white. Give me a sec, the grinder's sulking.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Surry Hills like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I own the place. Own it, run it, sweep it. the Surry Hills Library foot traffic pays the rent and the regulars pay for the machine.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two from crown street.",
+     "choices": [
+      {
+       "text": "Two From Crown Street",
+       "accept": "qgb-l3-surry-hills-058",
+       "denyFlag": "w:qgb-l3-surry-hills-058"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Enzo C. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About two from crown street.",
+       "turnin": "qgb-l3-surry-hills-058"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There are eleven cafes on this strip and we all buy beans off the same bloke in the Surry Hills Library. Don't tell anyone.",
+     "improv": {
+      "persona": "Enzo C., barista, own cafe in Surry Hills, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Surry Hills Library like everyone knows it.",
+      "context": "Someone has asked what Surry Hills is like these days. You are standing near the Surry Hills Library."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-surry-hills-hamish-a",
+   "name": "Hamish A., dog walker, four leads",
+   "x": -74,
+   "z": 2105,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hang on, hang on -- sit. Not you. Sorry, Surry Hills at this hour is chaos. What's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Surry Hills like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six dogs, three suburbs, one car park at Crown Street. Two of them aren't mine and one of them isn't a dog, legally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Seven a.m. At Bourke Street",
+       "accept": "qgb-l3-surry-hills-059",
+       "denyFlag": "w:qgb-l3-surry-hills-059"
+      },
+      {
+       "text": "One Stop From Bourke Street",
+       "accept": "qgb-l3-surry-hills-060",
+       "denyFlag": "w:qgb-l3-surry-hills-060",
+       "needFlag": "w:qgb-l3-surry-hills-059"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Hamish A. counts it out without looking up. -- Don't spend it all at Crown Street.",
+     "choices": [
+      {
+       "text": "About seven a.m. at bourke street.",
+       "turnin": "qgb-l3-surry-hills-059"
+      },
+      {
+       "text": "About one stop from bourke street.",
+       "turnin": "qgb-l3-surry-hills-060"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The off-leash bit at Crown Street is fine until the magpies come back. Then nothing is fine.",
+     "improv": {
+      "persona": "Hamish A., dog walker, four leads in Surry Hills, Sydney. Dry, specific, local; never says g'day or crikey; talks about Crown Street like everyone knows it.",
+      "context": "Someone has asked what Surry Hills is like these days. You are standing near Crown Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-surry-hills-hugo",
+   "name": "Hugo, strata committee chair",
+   "x": 631,
+   "z": 2510,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Surry Hills strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Surry Hills like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. the Clock Hotel is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the shannon reserve camera.",
+     "choices": [
+      {
+       "text": "The Shannon Reserve Camera",
+       "accept": "qgb-l3-surry-hills-061",
+       "denyFlag": "w:qgb-l3-surry-hills-061"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Hugo looks it over the way Surry Hills looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the shannon reserve camera.",
+       "turnin": "qgb-l3-surry-hills-061"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Hugo, strata committee chair in Surry Hills, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Clock Hotel like everyone knows it.",
+      "context": "Someone has asked what Surry Hills is like these days. You are standing near the Clock Hotel."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-surry-hills-dot-a",
+   "name": "Dot A., graphic designer, freelance",
+   "x": 670,
+   "z": 2083,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry, one sec, the client wants the logo bigger. Okay. Surry Hills, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Surry Hills like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Logos for cafes that will close in a year. Shannon Reserve has had four different fonts on its awning since I moved here.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's closing time at ward park.",
+     "choices": [
+      {
+       "text": "Closing Time at Ward Park",
+       "accept": "qgb-l3-surry-hills-062",
+       "denyFlag": "w:qgb-l3-surry-hills-062"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Dot A. counts it out without looking up. -- Don't spend it all at Shannon Reserve.",
+     "choices": [
+      {
+       "text": "About closing time at ward park.",
+       "turnin": "qgb-l3-surry-hills-062"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The laneway behind Shannon Reserve has the good light for shoots. The rats also know.",
+     "improv": {
+      "persona": "Dot A., graphic designer, freelance in Surry Hills, Sydney. Dry, specific, local; never says g'day or crikey; talks about Shannon Reserve like everyone knows it.",
+      "context": "Someone has asked what Surry Hills is like these days. You are standing near Shannon Reserve."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-surry-hills-rosa-a",
+   "name": "Rosa A., barista, own cafe",
+   "x": 567,
+   "z": 2303,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flat white? Everyone in Surry Hills wants a flat white. Give me a sec, the grinder's sulking.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Surry Hills like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I own the place. Own it, run it, sweep it. Bourke Street Bakery foot traffic pays the rent and the regulars pay for the machine.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's probationary at the shakespeare.",
+     "choices": [
+      {
+       "text": "Probationary at the Shakespeare",
+       "accept": "qgb-l3-surry-hills-063",
+       "denyFlag": "w:qgb-l3-surry-hills-063"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Rosa A. counts it out without looking up. -- Don't spend it all at Bourke Street Bakery.",
+     "choices": [
+      {
+       "text": "About probationary at the shakespeare.",
+       "turnin": "qgb-l3-surry-hills-063"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There are eleven cafes on this strip and we all buy beans off the same bloke in Bourke Street Bakery. Don't tell anyone.",
+     "improv": {
+      "persona": "Rosa A., barista, own cafe in Surry Hills, Sydney. Dry, specific, local; never says g'day or crikey; talks about Bourke Street Bakery like everyone knows it.",
+      "context": "Someone has asked what Surry Hills is like these days. You are standing near Bourke Street Bakery."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-surry-hills-wayne-b",
+   "name": "Wayne B., real estate agent",
+   "x": 320,
+   "z": 2241,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Surry Hills is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Surry Hills like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. the Shakespeare is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the cleveland street lift.",
+     "choices": [
+      {
+       "text": "The Cleveland Street Lift",
+       "accept": "qgb-l3-surry-hills-064",
+       "denyFlag": "w:qgb-l3-surry-hills-064"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Wayne B. counts it out without looking up. -- Don't spend it all at the Shakespeare.",
+     "choices": [
+      {
+       "text": "About the cleveland street lift.",
+       "turnin": "qgb-l3-surry-hills-064"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. the Shakespeare means cosy.",
+     "improv": {
+      "persona": "Wayne B., real estate agent in Surry Hills, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Shakespeare like everyone knows it.",
+      "context": "Someone has asked what Surry Hills is like these days. You are standing near the Shakespeare."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Wayne B. listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-surry-hills-debbie-a",
+   "name": "Debbie A., strata committee chair",
+   "x": -168,
+   "z": 2206,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Surry Hills strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Surry Hills like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. Cleveland Street is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's a flat white from bourke street bakery.",
+     "choices": [
+      {
+       "text": "A Flat White From Bourke Street Bakery",
+       "accept": "qgb-l3-surry-hills-065",
+       "denyFlag": "w:qgb-l3-surry-hills-065"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Debbie A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About a flat white from bourke street bakery.",
+       "turnin": "qgb-l3-surry-hills-065"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Debbie A., strata committee chair in Surry Hills, Sydney. Dry, specific, local; never says g'day or crikey; talks about Cleveland Street like everyone knows it.",
+      "context": "Someone has asked what Surry Hills is like these days. You are standing near Cleveland Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-surry-hills-colin-a",
+   "name": "Colin A., tattooist",
+   "x": 429,
+   "z": 2374,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Walk-ins after two. You're not a walk-in, you've got that look. Surry Hills, yeah?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Surry Hills like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twenty years on Bourke Street. I've done every Southern Cross in the inner west and then covered half of them up.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's one stop from cleveland street.",
+     "choices": [
+      {
+       "text": "One Stop From Cleveland Street",
+       "accept": "qgb-l3-surry-hills-066",
+       "denyFlag": "w:qgb-l3-surry-hills-066"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Colin A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About one stop from cleveland street.",
+       "turnin": "qgb-l3-surry-hills-066"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best coffee is next door. The worst decision you ever made is on your calf. Both are fixable.",
+     "improv": {
+      "persona": "Colin A., tattooist in Surry Hills, Sydney. Dry, specific, local; never says g'day or crikey; talks about Bourke Street like everyone knows it.",
+      "context": "Someone has asked what Surry Hills is like these days. You are standing near Bourke Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-surry-hills-sal-a",
+   "name": "Sal A., barista, own cafe",
+   "x": 345,
+   "z": 1914,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flat white? Everyone in Surry Hills wants a flat white. Give me a sec, the grinder's sulking.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Surry Hills like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I own the place. Own it, run it, sweep it. the Clock Hotel foot traffic pays the rent and the regulars pay for the machine.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two signs, shannon reserve.",
+     "choices": [
+      {
+       "text": "Two Signs, Shannon Reserve",
+       "accept": "qgb-l3-surry-hills-067",
+       "denyFlag": "w:qgb-l3-surry-hills-067"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Sal A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About two signs, shannon reserve.",
+       "turnin": "qgb-l3-surry-hills-067"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There are eleven cafes on this strip and we all buy beans off the same bloke in the Clock Hotel. Don't tell anyone.",
+     "improv": {
+      "persona": "Sal A., barista, own cafe in Surry Hills, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Clock Hotel like everyone knows it.",
+      "context": "Someone has asked what Surry Hills is like these days. You are standing near the Clock Hotel."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

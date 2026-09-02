@@ -1,0 +1,1347 @@
+{
+ "pack": "areab-surry-hills-1",
+ "quests": [
+  {
+   "id": "qgb-l3-surry-hills-001",
+   "act": 3,
+   "title": "Lads Off Cleveland Street",
+   "blurb": "I would do it myself if I could leave the counter. Three of them in TNs on the Cleveland Street steps, flogging vapes to schoolkids at eleven. I am not after trouble. I am after an answer. Surry Hills used to move them on itself and now it rings me. I will know if you skipped a bit.",
+   "giver": "qgb-surry-hills-sal",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Cleveland Street"
+    }
+   ],
+   "reward": {
+    "cash": 91,
+    "xp": 224,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-002",
+   "act": 3,
+   "title": "The Length of Bourke Street",
+   "blurb": "It is the sort of thing you notice or you do not. I haven't walked Bourke Street end to end since the light rail came to Surry Hills. It might be nothing. It has not felt like nothing. Do it Boxing Day for me and photograph what's at the far end now. There is no rush, but there is a Friday.",
+   "giver": "qgb-surry-hills-narelle-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 679,
+     "z": 1787,
+     "radius": 30,
+     "label": "walk the length of Bourke Street"
+    },
+    {
+     "kind": "goto",
+     "x": 870,
+     "z": 2096,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": 870,
+     "z": 2096,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 87,
+    "xp": 259,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-003",
+   "act": 3,
+   "title": "Trolley Run, Bourke Street",
+   "blurb": "I have been putting it off since Easter. A Woolies trolley from Bourke Street gets walked to the creek every Monday. Nobody else seems to have noticed, which is its own problem. Find where it ends up in Surry Hills and make the deposit back. Whatever you find, bring it to me first.",
+   "giver": "qgb-surry-hills-brett-a",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 341,
+     "z": 2148,
+     "radius": 30,
+     "label": "find the trolley near Bourke Street"
+    },
+    {
+     "kind": "photo",
+     "x": 341,
+     "z": 2148,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 31,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 91,
+    "xp": 239,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-004",
+   "act": 3,
+   "title": "Before They Touch Bourke Street",
+   "blurb": "You are the first person to stop all morning. They start on Bourke Street on Sunday and the orange fencing goes up. You will see what I mean the second you get there. I want Surry Hills on record before it does. Take your time. Do not take a week.",
+   "giver": "qgb-surry-hills-brett-a",
+   "level": 3,
+   "requires": [
+    "qgb-l3-surry-hills-003"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 640,
+     "z": 1835,
+     "radius": 40,
+     "label": "photograph the state of Bourke Street"
+    },
+    {
+     "kind": "goto",
+     "x": 840,
+     "z": 2042,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 127,
+    "xp": 307,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-005",
+   "act": 3,
+   "title": "Tap On at Bourke Street Bakery",
+   "blurb": "I'll be straight with you. My Opal says I owe nineteen dollars for a trip from Surry Hills I never took on Easter Saturday. Everyone I have told has looked at me the way you are now. Take the same one to Kings Cross and tell me what it charged you. You'll know it when you see it.",
+   "giver": "qgb-surry-hills-reg",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Surry Hills",
+     "to": "Kings Cross",
+     "label": "tap on at Surry Hills, tap off at Kings Cross"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-surry-hills-reg",
+     "node": "report-0",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 225,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-006",
+   "act": 3,
+   "title": "Counting Shannon Reserve",
+   "blurb": "There is no clever way to say this. Council says the Shannon Reserve car park is never full and I say it's full by peak hour. You can tell me I am imagining it. Tell me after. Count both Surry Hills car parks, photograph whichever one makes me right. Do that and we're square.",
+   "giver": "qgb-surry-hills-reg",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 272,
+     "z": 1966,
+     "radius": 30,
+     "label": "count the cars at Shannon Reserve"
+    },
+    {
+     "kind": "goto",
+     "x": 422,
+     "z": 2180,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": 272,
+     "z": 1966,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 92,
+    "xp": 227,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-007",
+   "act": 3,
+   "title": "RBT on the Shakespeare",
+   "blurb": "I have written it down twice and lost it twice. There's a breath test set up on the Shakespeare since bin night. It started small, the way these things do. My brother-in-law needs the ute at the far end of Surry Hills without a conversation. That's it. That's the whole ask.",
+   "giver": "qgb-surry-hills-grazia-a",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on the Shakespeare"
+    },
+    {
+     "kind": "goto",
+     "x": 352,
+     "z": 2184,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 90,
+    "xp": 246,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-008",
+   "act": 3,
+   "title": "One Stop From the Shakespeare",
+   "blurb": "You will think I am making this up. I need to know the train from Surry Hills stops at Kings Cross and doesn't sail through like it did on Easter Saturday. It has been going on longer than I have admitted to anyone. Ride it at five and photograph the sign. Come and find me after, either way.",
+   "giver": "qgb-surry-hills-grazia-a",
+   "level": 3,
+   "requires": [
+    "qgb-l3-surry-hills-007"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Surry Hills",
+     "to": "Kings Cross",
+     "label": "take the train to Kings Cross"
+    },
+    {
+     "kind": "photo",
+     "x": 1157,
+     "z": 645,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 127,
+    "xp": 335,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-009",
+   "act": 3,
+   "title": "Meat Tray at Crown Street",
+   "blurb": "This is going to sound small. The Crown Street raffle is thirty-five short of a meat tray and the draw is at ten past ten. I am not after trouble. I am after an answer. Find it in Surry Hills and put it in the tin. Come back and tell me straight.",
+   "giver": "qgb-surry-hills-stuart-a",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 43,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": 454,
+     "z": 2101,
+     "radius": 30,
+     "label": "and drop it at Crown Street"
+    }
+   ],
+   "reward": {
+    "cash": 100,
+    "xp": 223,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-010",
+   "act": 3,
+   "title": "Proof of the Clock Hotel",
+   "blurb": "My knees are gone, so. Nobody in Surry Hills believes what the Clock Hotel looks like at bin night. I am aware how that sounds. Get me a photo close enough that council can't say it's somewhere else. Take your time. Do not take a week.",
+   "giver": "qgb-surry-hills-tahlia-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -200,
+     "z": 1931,
+     "radius": 40,
+     "label": "get a picture of the Clock Hotel before they fix it"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 244,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-011",
+   "act": 3,
+   "title": "Trolley Run, Ward Park",
+   "blurb": "Honestly, I am past caring how it looks. A Woolies trolley from Ward Park gets walked to the creek every Easter Saturday. Everyone I have told has looked at me the way you are now. Find where it ends up in Surry Hills and make the deposit back. That's the whole job. No catch.",
+   "giver": "qgb-surry-hills-tahlia-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 145,
+     "z": 1910,
+     "radius": 30,
+     "label": "find the trolley near Ward Park"
+    },
+    {
+     "kind": "photo",
+     "x": 145,
+     "z": 1910,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 31,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 245,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-012",
+   "act": 3,
+   "title": "Sightline at Ward Park",
+   "blurb": "Do not laugh. Insurance says nobody could have seen the ute hit the fence at Ward Park on the last Sunday of the month. You can tell me I am imagining it. Tell me after. Stand where I stood in Surry Hills, photograph the view, tell me if I'm lying. You'll know it when you see it.",
+   "giver": "qgb-surry-hills-matilda-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -81,
+     "z": 2153,
+     "radius": 30,
+     "label": "stand where it happened at Ward Park"
+    },
+    {
+     "kind": "photo",
+     "x": -81,
+     "z": 2153,
+     "radius": 40,
+     "label": "photograph the corner"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-surry-hills-matilda-b",
+     "node": "report-1",
+     "label": "describe the sightline"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 253,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-013",
+   "act": 3,
+   "title": "Something From the Shakespeare",
+   "blurb": "The council knows and the council does not care. The stall at the Shakespeare has run out and the customers keep coming. This is the third time I have had this conversation. Find something round Surry Hills that'll do before the closing rush. Do that and we're square.",
+   "giver": "qgb-surry-hills-hugo-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near the Shakespeare"
+    },
+    {
+     "kind": "goto",
+     "x": 250,
+     "z": 2640,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 101,
+    "xp": 256,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-014",
+   "act": 3,
+   "title": "Counting the Shakespeare",
+   "blurb": "Someone has to, and it may as well be you. Council says the the Shakespeare car park is never full and I say it's full by the last train. The paperwork says one thing and my eyes say another. Count both Surry Hills car parks, photograph whichever one makes me right. Ask for me by name at the counter.",
+   "giver": "qgb-surry-hills-marg-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 599,
+     "z": 2369,
+     "radius": 30,
+     "label": "count the cars at the Shakespeare"
+    },
+    {
+     "kind": "goto",
+     "x": 307,
+     "z": 2170,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": 599,
+     "z": 2369,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 88,
+    "xp": 226,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-015",
+   "act": 3,
+   "title": "Trouble at the Shakespeare",
+   "blurb": "Right. Since you asked. Two lads and their mate decided at knock-off that the Shakespeare is theirs. I would have sorted it myself a year ago. The rest of Surry Hills disagrees, so explain the disagreement. Say nothing to anyone on the way.",
+   "giver": "qgb-surry-hills-marg-b",
+   "level": 3,
+   "requires": [
+    "qgb-l3-surry-hills-014"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near the Shakespeare"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 134,
+    "xp": 303,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-016",
+   "act": 3,
+   "title": "Riley Street Pub Crawl",
+   "blurb": "I am told you do odd jobs. A bucks started at Riley Street at noon and it's now three blokes, one pair of pants and a tab. It started small, the way these things do. Recover the tab by the arvo; Surry Hills can keep the dignity. I'll see you right for it.",
+   "giver": "qgb-surry-hills-bluey-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 3,
+     "label": "sort the three from the Riley Street crawl"
+    },
+    {
+     "kind": "earn",
+     "dollars": 25,
+     "label": "and get the twenty they owe"
+    }
+   ],
+   "reward": {
+    "cash": 88,
+    "xp": 252,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-017",
+   "act": 3,
+   "title": "Two From Riley Street",
+   "blurb": "I have written it down twice and lost it twice. Two of whatever's going near Riley Street, here, hot, before the footy at half seven. It has been going on longer than I have admitted to anyone. It's Surry Hills; I'm not asking for much. If anyone asks, you were never here.",
+   "giver": "qgb-surry-hills-bluey-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near Riley Street"
+    },
+    {
+     "kind": "goto",
+     "x": 332,
+     "z": 2119,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 93,
+    "xp": 235,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-018",
+   "act": 3,
+   "title": "The the Surry Hills Library Complaint",
+   "blurb": "You will think I am making this up. Two women in activewear have photographed my bins outside the Surry Hills Library since Melbourne Cup day. It is not the money. It has stopped being the money. One has Surry Hills council on speed dial; sort it however you sort things. That's it. That's the whole ask.",
+   "giver": "qgb-surry-hills-pam",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near the Surry Hills Library"
+    }
+   ],
+   "reward": {
+    "cash": 102,
+    "xp": 257,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-019",
+   "act": 3,
+   "title": "Staffy Near Crown Street",
+   "blurb": "Nobody else has offered, so. A brindle staffy in a red bandana went over the fence at Crown Street at half six. Half the street knows and half the street is pretending not to. Everyone in Surry Hills has definitely seen it and can't say where. Come and find me after, either way.",
+   "giver": "qgb-surry-hills-trent-c",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 315,
+     "z": 2011,
+     "radius": 30,
+     "label": "check the off-leash bit near Crown Street"
+    },
+    {
+     "kind": "photo",
+     "x": 213,
+     "z": 2187,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-surry-hills-trent-c",
+     "node": "report-0",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 91,
+    "xp": 229,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-020",
+   "act": 3,
+   "title": "Cover at Cleveland Street",
+   "blurb": "Two people have already said no. I've got nobody for the Cleveland Street shift at the change of shift and a room full of Surry Hills people who've paid. It is the not knowing that has got me, honestly. Fifty of trade and one difficult person at the door. Be polite about it. It costs nothing.",
+   "giver": "qgb-surry-hills-trent-c",
+   "level": 3,
+   "requires": [
+    "qgb-l3-surry-hills-019"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 62,
+     "label": "cover the fifty for the shift"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 1,
+     "label": "and handle whoever's at the door"
+    }
+   ],
+   "reward": {
+    "cash": 129,
+    "xp": 329,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-021",
+   "act": 3,
+   "title": "Closing Time at Bourke Street",
+   "blurb": "I would do it myself if I could leave the counter. Two blokes have slept in my doorway on Bourke Street since the pub shut. It might be nothing. It has not felt like nothing. The Surry Hills delivery's at half two, so get them up and show me the step empty. Come back and tell me straight.",
+   "giver": "qgb-surry-hills-dean-c",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off Bourke Street"
+    },
+    {
+     "kind": "photo",
+     "x": 555,
+     "z": 2413,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 95,
+    "xp": 252,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-022",
+   "act": 3,
+   "title": "Probationary at Shannon Reserve",
+   "blurb": "I have been putting it off since Easter. A young constable has been doing his first solo patrol round Shannon Reserve since Monday. I would not ask if there was anyone else about. He's decided Surry Hills is his, so give him a story for the sergeant. There is no rush, but there is a Friday.",
+   "giver": "qgb-surry-hills-jason-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "lose the probationary constable near Shannon Reserve"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 225,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-023",
+   "act": 3,
+   "title": "Parcel for Kings Cross",
+   "blurb": "I'll be straight with you. A parcel from the Shakespeare has to be at Kings Cross by after the footy and Australia Post quoted me Saturday. You can tell me I am imagining it. Tell me after. Take the train and hand it to the people outside the station. That's the whole job. No catch.",
+   "giver": "qgb-surry-hills-graham-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Surry Hills",
+     "to": "Kings Cross",
+     "label": "carry it on the train to Kings Cross"
+    },
+    {
+     "kind": "goto",
+     "x": 1157,
+     "z": 645,
+     "radius": 30,
+     "label": "hand it over outside the station, where the crowd is"
+    }
+   ],
+   "reward": {
+    "cash": 98,
+    "xp": 228,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-024",
+   "act": 3,
+   "title": "The the Surry Hills Library Float",
+   "blurb": "Someone has to, and it may as well be you. The till at the Surry Hills Library opens Easter Saturday with an empty float because somebody took it to the pub. I would have sorted it myself a year ago. Sixty before the first Surry Hills customer, and I'll never say who. Do that and we're square.",
+   "giver": "qgb-surry-hills-joyce-f",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 74,
+     "label": "clear sixty for the the Surry Hills Library float"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-surry-hills-joyce-f",
+     "node": "report-1",
+     "label": "hand it over at the counter"
+    }
+   ],
+   "reward": {
+    "cash": 103,
+    "xp": 222,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-025",
+   "act": 3,
+   "title": "The the Clock Hotel Tab",
+   "blurb": "It is not a police matter and I have checked. Two chippies off the the Clock Hotel job have run a tab in Surry Hills since the King's Birthday. It started small, the way these things do. They drove past at school pick-up without looking in, so settle it in cash. Say nothing to anyone on the way.",
+   "giver": "qgb-surry-hills-warwick-c",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Clock Hotel"
+    },
+    {
+     "kind": "earn",
+     "dollars": 37,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 92,
+    "xp": 253,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-026",
+   "act": 3,
+   "title": "Tap On at Crown Street",
+   "blurb": "I have written it down twice and lost it twice. My Opal says I owe nineteen dollars for a trip from Surry Hills I never took on Friday. It is not the money. It has stopped being the money. Take the same one to Kings Cross and tell me what it charged you. I'll see you right for it.",
+   "giver": "qgb-surry-hills-tegan-c",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Surry Hills",
+     "to": "Kings Cross",
+     "label": "tap on at Surry Hills, tap off at Kings Cross"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-surry-hills-tegan-c",
+     "node": "report-1",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 240,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-027",
+   "act": 3,
+   "title": "Seven a.m. At the Clock Hotel",
+   "blurb": "Not being dramatic about this. The site at the Clock Hotel starts its jackhammer at half four on a Easter Saturday, which is illegal and loud. There is probably a simple explanation and I would love to hear it. Photograph it running and have a word with the Surry Hills foreman. Half now if you want it. Most people don't.",
+   "giver": "qgb-surry-hills-imogen-d",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 253,
+     "z": 2108,
+     "radius": 40,
+     "label": "photograph the noise from the Clock Hotel"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 102,
+    "xp": 253,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-028",
+   "act": 3,
+   "title": "One Stop From Shannon Reserve",
+   "blurb": "I would do it myself if I could leave the counter. I need to know the train from Surry Hills stops at Kings Cross and doesn't sail through like it did on the last Sunday of the month. I have got a photo on my phone but it is useless. Ride it at eleven and photograph the sign. I will owe you one, and I pay those.",
+   "giver": "qgb-surry-hills-fergus-d",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Surry Hills",
+     "to": "Kings Cross",
+     "label": "take the train to Kings Cross"
+    },
+    {
+     "kind": "photo",
+     "x": 1157,
+     "z": 645,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 98,
+    "xp": 262,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-029",
+   "act": 3,
+   "title": "The the Shakespeare Course",
+   "blurb": "You look like you have twenty minutes. A bloke near the Shakespeare runs a ninety-minute course he bills at four hundred, and I've paid. I would not ask if there was anyone else about. Sit it Friday, then come back to Surry Hills and prove it did something. I will know if you skipped a bit.",
+   "giver": "qgb-surry-hills-angela-a",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near the Shakespeare"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 94,
+    "xp": 223,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-030",
+   "act": 3,
+   "title": "Ask Around at Kings Cross",
+   "blurb": "I have been putting it off since Easter. There's work going outside Kings Cross station and nobody at Riley Street can tell me what. I am aware how that sounds. Ride over at dawn, get the shape of it, come back. I'll put the kettle on for when you're back.",
+   "giver": "qgb-surry-hills-eddie-c",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Surry Hills",
+     "to": "Kings Cross",
+     "label": "take the train to Kings Cross"
+    },
+    {
+     "kind": "goto",
+     "x": 1157,
+     "z": 645,
+     "radius": 30,
+     "label": "find the people outside Kings Cross station"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-surry-hills-eddie-c",
+     "node": "report-0",
+     "label": "then come back and tell me what they said"
+    }
+   ],
+   "reward": {
+    "cash": 85,
+    "xp": 259,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-031",
+   "act": 3,
+   "title": "The Riley Street Fence",
+   "blurb": "Honestly, I am past caring how it looks. My neighbour at Riley Street says the tree is on my side and the fence says otherwise. You can tell me I am imagining it. Tell me after. Look at it grand final day with Surry Hills eyes and tell me the truth. Whatever you find, bring it to me first.",
+   "giver": "qgb-surry-hills-shirl-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 666,
+     "z": 2339,
+     "radius": 30,
+     "label": "go and look at the fence at Riley Street"
+    },
+    {
+     "kind": "photo",
+     "x": 666,
+     "z": 2339,
+     "radius": 40,
+     "label": "photograph the tree over it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-surry-hills-shirl-b",
+     "node": "report-1",
+     "label": "tell me whose side it's on"
+    }
+   ],
+   "reward": {
+    "cash": 97,
+    "xp": 252,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-032",
+   "act": 3,
+   "title": "Bin Night, Riley Street",
+   "blurb": "There is no clever way to say this. Somebody moves the bins on Riley Street in front of my drive every Wednesday night. The paperwork says one thing and my eyes say another. Photograph the evidence and have a word; Surry Hills knows who. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qgb-surry-hills-reg-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 230,
+     "z": 2148,
+     "radius": 40,
+     "label": "photograph the bins at Riley Street"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 91,
+    "xp": 223,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-033",
+   "act": 3,
+   "title": "Lads Off the Surry Hills Library",
+   "blurb": "The council knows and the council does not care. Three of them in TNs on the the Surry Hills Library steps, flogging vapes to schoolkids at ten past ten. I would have sorted it myself a year ago. Surry Hills used to move them on itself and now it rings me. You'll know it when you see it.",
+   "giver": "qgb-surry-hills-kylie-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from the Surry Hills Library"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 247,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-034",
+   "act": 3,
+   "title": "The the Surry Hills Library Lift",
+   "blurb": "Someone has to, and it may as well be you. The lift at Surry Hills station has been out since the Easter Show and I'm told Kings Cross is worse. I have rung the number on the letter four times. Check both Melbourne Cup day and tell me which takes a pram. Do not let them talk you into anything.",
+   "giver": "qgb-surry-hills-kylie-b",
+   "level": 3,
+   "requires": [
+    "qgb-l3-surry-hills-033"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 256,
+     "z": 2168,
+     "radius": 30,
+     "label": "check the lift at Surry Hills station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Surry Hills",
+     "to": "Kings Cross",
+     "label": "then ride to Kings Cross and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-surry-hills-kylie-b",
+     "node": "report-1",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 130,
+    "xp": 304,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-035",
+   "act": 3,
+   "title": "The Ward Park Tab",
+   "blurb": "I am told you do odd jobs. Two chippies off the Ward Park job have run a tab in Surry Hills since Monday. It is not the money. It has stopped being the money. They drove past at half seven without looking in, so settle it in cash. Say nothing to anyone on the way.",
+   "giver": "qgb-surry-hills-sharon-a",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near Ward Park"
+    },
+    {
+     "kind": "earn",
+     "dollars": 37,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 93,
+    "xp": 223,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-036",
+   "act": 3,
+   "title": "Something From Bourke Street",
+   "blurb": "Nobody else has offered, so. The stall at Bourke Street has run out and the customers keep coming. I have got no proof, which is exactly why I am asking. Find something round Surry Hills that'll do before the dawn rush. If anyone asks, you were never here.",
+   "giver": "qgb-surry-hills-tony-c",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near Bourke Street"
+    },
+    {
+     "kind": "goto",
+     "x": 305,
+     "z": 2174,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 258,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-037",
+   "act": 3,
+   "title": "Counting the Clock Hotel",
+   "blurb": "Two people have already said no. Council says the the Clock Hotel car park is never full and I say it's full by the arvo. I did try the official route, for what that was worth. Count both Surry Hills car parks, photograph whichever one makes me right. That's it. That's the whole ask.",
+   "giver": "qgb-surry-hills-bronwyn-a",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 22,
+     "z": 2155,
+     "radius": 30,
+     "label": "count the cars at the Clock Hotel"
+    },
+    {
+     "kind": "goto",
+     "x": 359,
+     "z": 2092,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": 22,
+     "z": 2155,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 95,
+    "xp": 229,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-038",
+   "act": 3,
+   "title": "Two From Shannon Reserve",
+   "blurb": "Not being dramatic about this. Two of whatever's going near Shannon Reserve, here, hot, before the footy at the last train. It might be nothing. It has not felt like nothing. It's Surry Hills; I'm not asking for much. I would rather know than wonder.",
+   "giver": "qgb-surry-hills-luke-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near Shannon Reserve"
+    },
+    {
+     "kind": "goto",
+     "x": 367,
+     "z": 2142,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 229,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-surry-hills-039",
+   "act": 3,
+   "title": "Staffy Near Bourke Street Bakery",
+   "blurb": "This is going to sound small. A brindle staffy in a red bandana went over the fence at Bourke Street Bakery at knock-off. I have got a photo on my phone but it is useless. Everyone in Surry Hills has definitely seen it and can't say where. Half now if you want it. Most people don't.",
+   "giver": "qgb-surry-hills-luke-b",
+   "level": 3,
+   "requires": [
+    "qgb-l3-surry-hills-038"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 452,
+     "z": 2574,
+     "radius": 30,
+     "label": "check the off-leash bit near Bourke Street Bakery"
+    },
+    {
+     "kind": "photo",
+     "x": 607,
+     "z": 2599,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-surry-hills-luke-b",
+     "node": "report-1",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 118,
+    "xp": 309,
+    "unlock": []
+   }
+  }
+ ]
+}

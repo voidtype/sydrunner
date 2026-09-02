@@ -1,0 +1,1446 @@
+{
+ "pack": "areab-marrickville-1",
+ "quests": [
+  {
+   "id": "qgb-l2-marrickville-001",
+   "act": 3,
+   "title": "Rent Money, Hellenic Bakery",
+   "blurb": "The council knows and the council does not care. I'm forty-five short on the Hellenic Bakery rent and the agent doesn't take stories. The paperwork says one thing and my eyes say another. Make it somewhere in Marrickville by nine sharp; I'm not fussy how. Do that and we're square.",
+   "giver": "qgb-marrickville-thanh",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 50,
+     "label": "earn forty-five somewhere in Marrickville"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 202,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-002",
+   "act": 3,
+   "title": "The the Marrickville Metro Camera",
+   "blurb": "Someone has to, and it may as well be you. A new speed camera near the Marrickville Metro has fined half of Marrickville since Easter Saturday. I would have sorted it myself a year ago. Photograph it for the appeal, then prove the train to Surry Hills is faster anyway. Ask for me by name at the counter.",
+   "giver": "qgb-marrickville-thanh",
+   "level": 2,
+   "requires": [
+    "qgb-l2-marrickville-001"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -4901,
+     "z": 4944,
+     "radius": 40,
+     "label": "photograph the camera near the Marrickville Metro"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Marrickville",
+     "to": "Surry Hills",
+     "label": "then take the train instead, to Surry Hills"
+    }
+   ],
+   "reward": {
+    "cash": 105,
+    "xp": 265,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-003",
+   "act": 3,
+   "title": "Race Four, the Henson",
+   "blurb": "It is not a police matter and I have checked. There's a horse in race four at the change of shift that a bloke at the Henson swears by. It started small, the way these things do. Turn it into fifty-five somewhere in Marrickville and tell me if it came in. Just do not come back empty-handed.",
+   "giver": "qgb-marrickville-nick",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 62,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-marrickville-nick",
+     "node": "report-1",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 71,
+    "xp": 186,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-004",
+   "act": 3,
+   "title": "Closing Time at the Henson",
+   "blurb": "I am told you do odd jobs. Two blokes have slept in my doorway on the Henson since the pub shut. It has been going on longer than I have admitted to anyone. The Marrickville delivery's at half four, so get them up and show me the step empty. I'll see you right for it.",
+   "giver": "qgb-marrickville-debbie",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off the Henson"
+    },
+    {
+     "kind": "photo",
+     "x": -5302,
+     "z": 5052,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 72,
+    "xp": 209,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-005",
+   "act": 3,
+   "title": "Lads Off Addison Road markets",
+   "blurb": "Nobody else has offered, so. Three of them in TNs on the Addison Road markets steps, flogging vapes to schoolkids at midnight. It is the not knowing that has got me, honestly. Marrickville used to move them on itself and now it rings me. Come and find me after, either way.",
+   "giver": "qgb-marrickville-gail",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Addison Road markets"
+    }
+   ],
+   "reward": {
+    "cash": 80,
+    "xp": 202,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-006",
+   "act": 3,
+   "title": "Trolley Run, the Cooks River",
+   "blurb": "Keep it between us for now. A Woolies trolley from the Cooks River gets walked to the creek every the King's Birthday. I did try the official route, for what that was worth. Find where it ends up in Marrickville and make the deposit back. I would rather know than wonder.",
+   "giver": "qgb-marrickville-sienna",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -4839,
+     "z": 5203,
+     "radius": 30,
+     "label": "find the trolley near the Cooks River"
+    },
+    {
+     "kind": "photo",
+     "x": -4839,
+     "z": 5203,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 28,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 77,
+    "xp": 196,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-007",
+   "act": 3,
+   "title": "The Batch Brewing Sparky",
+   "blurb": "It is the sort of thing you notice or you do not. The sparky off the Batch Brewing job has owed me since the bathroom and drinks in Marrickville from peak hour. You will see what I mean the second you get there. Forty will do and I'll write off the rest. I will know if you skipped a bit.",
+   "giver": "qgb-marrickville-phuc",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for Batch Brewing"
+    },
+    {
+     "kind": "earn",
+     "dollars": 45,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 188,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-008",
+   "act": 3,
+   "title": "The pho strip Pub Crawl",
+   "blurb": "I have been putting it off since Easter. A bucks started at the pho strip at noon and it's now three blokes, one pair of pants and a tab. I am aware how that sounds. Recover the tab by half six; Marrickville can keep the dignity. There is no rush, but there is a Friday.",
+   "giver": "qgb-marrickville-phuc",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 3,
+     "label": "sort the three from the the pho strip crawl"
+    },
+    {
+     "kind": "earn",
+     "dollars": 22,
+     "label": "and get the twenty they owe"
+    }
+   ],
+   "reward": {
+    "cash": 73,
+    "xp": 188,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-009",
+   "act": 3,
+   "title": "Tap On at Marrickville Road",
+   "blurb": "You are the first person to stop all morning. My Opal says I owe nineteen dollars for a trip from Marrickville I never took on Melbourne Cup day. Everyone I have told has looked at me the way you are now. Take the same one to Surry Hills and tell me what it charged you. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-marrickville-andreas",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Marrickville",
+     "to": "Surry Hills",
+     "label": "tap on at Marrickville, tap off at Surry Hills"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-marrickville-andreas",
+     "node": "report-0",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 183,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-010",
+   "act": 3,
+   "title": "Something From Illawarra Road",
+   "blurb": "I'll be straight with you. The stall at Illawarra Road has run out and the customers keep coming. My wife says I should let it go. My wife is wrong. Find something round Marrickville that'll do before the first thing rush. That's the whole job. No catch.",
+   "giver": "qgb-marrickville-troy",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near Illawarra Road"
+    },
+    {
+     "kind": "goto",
+     "x": -4956,
+     "z": 5456,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 87,
+    "xp": 217,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-011",
+   "act": 3,
+   "title": "Meat Tray at the Marrickville Metro",
+   "blurb": "Do not laugh. The the Marrickville Metro raffle is thirty-five short of a meat tray and the draw is at six in the morning. This is the third time I have had this conversation. Find it in Marrickville and put it in the tin. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qgb-marrickville-fiona",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 39,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -4950,
+     "z": 5357,
+     "radius": 30,
+     "label": "and drop it at the Marrickville Metro"
+    }
+   ],
+   "reward": {
+    "cash": 75,
+    "xp": 196,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-012",
+   "act": 3,
+   "title": "One Stop From Hellenic Bakery",
+   "blurb": "There is no clever way to say this. I need to know the train from Marrickville stops at Surry Hills and doesn't sail through like it did on Melbourne Cup day. The paperwork says one thing and my eyes say another. Ride it at eight at night and photograph the sign. You'll know it when you see it.",
+   "giver": "qgb-marrickville-fiona",
+   "level": 2,
+   "requires": [
+    "qgb-l2-marrickville-011"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Marrickville",
+     "to": "Surry Hills",
+     "label": "take the train to Surry Hills"
+    },
+    {
+     "kind": "photo",
+     "x": 256,
+     "z": 2168,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 238,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-013",
+   "act": 3,
+   "title": "Rent Money, Addison Road markets",
+   "blurb": "Right. Since you asked. I'm forty-five short on the Addison Road markets rent and the agent doesn't take stories. It started small, the way these things do. Make it somewhere in Marrickville by dawn; I'm not fussy how. Ask for me by name at the counter.",
+   "giver": "qgb-marrickville-trent",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 50,
+     "label": "earn forty-five somewhere in Marrickville"
+    }
+   ],
+   "reward": {
+    "cash": 73,
+    "xp": 193,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-014",
+   "act": 3,
+   "title": "The the Henson Camera",
+   "blurb": "It is not a police matter and I have checked. A new speed camera near the Henson has fined half of Marrickville since Sunday. It has been going on longer than I have admitted to anyone. Photograph it for the appeal, then prove the train to Surry Hills is faster anyway. Say nothing to anyone on the way.",
+   "giver": "qgb-marrickville-trent",
+   "level": 2,
+   "requires": [
+    "qgb-l2-marrickville-013"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -5073,
+     "z": 4957,
+     "radius": 40,
+     "label": "photograph the camera near the Henson"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Marrickville",
+     "to": "Surry Hills",
+     "label": "then take the train instead, to Surry Hills"
+    }
+   ],
+   "reward": {
+    "cash": 108,
+    "xp": 265,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-015",
+   "act": 3,
+   "title": "A Flat White From Addison Road markets",
+   "blurb": "I am told you do odd jobs. I want a flat white from the place near Addison Road markets, not the one next to it. It is not the money. It has stopped being the money. Here by eight at night, while it's still coffee and Marrickville still has some. Just do not come back empty-handed.",
+   "giver": "qgb-marrickville-trent",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near Addison Road markets"
+    },
+    {
+     "kind": "goto",
+     "x": -5379,
+     "z": 4819,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 77,
+    "xp": 216,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-016",
+   "act": 3,
+   "title": "Counting Addison Road markets",
+   "blurb": "You will think I am making this up. Council says the Addison Road markets car park is never full and I say it's full by dawn. It is the not knowing that has got me, honestly. Count both Marrickville car parks, photograph whichever one makes me right. If anyone asks, you were never here.",
+   "giver": "qgb-marrickville-vinh",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5041,
+     "z": 5073,
+     "radius": 30,
+     "label": "count the cars at Addison Road markets"
+    },
+    {
+     "kind": "goto",
+     "x": -4966,
+     "z": 4891,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": -5041,
+     "z": 5073,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 80,
+    "xp": 186,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-017",
+   "act": 3,
+   "title": "Before They Touch Enmore Park",
+   "blurb": "Not being dramatic about this. They start on Enmore Park on Sunday and the orange fencing goes up. It might be nothing. It has not felt like nothing. I want Marrickville on record before it does. Half now if you want it. Most people don't.",
+   "giver": "qgb-marrickville-eddie",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -5015,
+     "z": 5302,
+     "radius": 40,
+     "label": "photograph the state of Enmore Park"
+    },
+    {
+     "kind": "goto",
+     "x": -5087,
+     "z": 5194,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 77,
+    "xp": 192,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-018",
+   "act": 3,
+   "title": "Lads Off Batch Brewing",
+   "blurb": "This is going to sound small. Three of them in TNs on the Batch Brewing steps, flogging vapes to schoolkids at lunchtime. I have got a photo on my phone but it is useless. Marrickville used to move them on itself and now it rings me. There's cash in it. Not a lot.",
+   "giver": "qgb-marrickville-hamish",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Batch Brewing"
+    }
+   ],
+   "reward": {
+    "cash": 80,
+    "xp": 190,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-019",
+   "act": 3,
+   "title": "RBT on Marrickville Road",
+   "blurb": "I would do it myself if I could leave the counter. There's a breath test set up on Marrickville Road since knock-off. Nobody else seems to have noticed, which is its own problem. My brother-in-law needs the ute at the far end of Marrickville without a conversation. I will owe you one, and I pay those.",
+   "giver": "qgb-marrickville-maddie",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on Marrickville Road"
+    },
+    {
+     "kind": "goto",
+     "x": -4838,
+     "z": 5292,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 81,
+    "xp": 199,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-020",
+   "act": 3,
+   "title": "Two From Illawarra Road",
+   "blurb": "You look like you have twenty minutes. Two of whatever's going near Illawarra Road, here, hot, before the footy at closing. I am aware how that sounds. It's Marrickville; I'm not asking for much. I will know if you skipped a bit.",
+   "giver": "qgb-marrickville-bruce",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near Illawarra Road"
+    },
+    {
+     "kind": "goto",
+     "x": -5474,
+     "z": 5366,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 73,
+    "xp": 213,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-021",
+   "act": 3,
+   "title": "The the Marrickville Metro Tab",
+   "blurb": "Do not laugh. Two chippies off the the Marrickville Metro job have run a tab in Marrickville since Australia Day. The paperwork says one thing and my eyes say another. They drove past at half seven without looking in, so settle it in cash. That's the whole job. No catch.",
+   "giver": "qgb-marrickville-despina",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Marrickville Metro"
+    },
+    {
+     "kind": "earn",
+     "dollars": 34,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 75,
+    "xp": 200,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-022",
+   "act": 3,
+   "title": "Bin Night, the Henson",
+   "blurb": "Someone has to, and it may as well be you. Somebody moves the bins on the Henson in front of my drive every grand final day night. It started small, the way these things do. Photograph the evidence and have a word; Marrickville knows who. Do not let them talk you into anything.",
+   "giver": "qgb-marrickville-shirl",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -4898,
+     "z": 5239,
+     "radius": 40,
+     "label": "photograph the bins at the Henson"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 76,
+    "xp": 201,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-023",
+   "act": 3,
+   "title": "Trouble at the Cooks River",
+   "blurb": "It is not a police matter and I have checked. Two lads and their mate decided at midnight that the Cooks River is theirs. It is not the money. It has stopped being the money. The rest of Marrickville disagrees, so explain the disagreement. Ask for me by name at the counter.",
+   "giver": "qgb-marrickville-riley",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near the Cooks River"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 73,
+    "xp": 188,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-024",
+   "act": 3,
+   "title": "Staffy Near Marrickville Bowlo",
+   "blurb": "I am told you do odd jobs. A brindle staffy in a red bandana went over the fence at Marrickville Bowlo at the last train. Half the street knows and half the street is pretending not to. Everyone in Marrickville has definitely seen it and can't say where. Say nothing to anyone on the way.",
+   "giver": "qgb-marrickville-riley",
+   "level": 2,
+   "requires": [
+    "qgb-l2-marrickville-023"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5144,
+     "z": 5510,
+     "radius": 30,
+     "label": "check the off-leash bit near Marrickville Bowlo"
+    },
+    {
+     "kind": "photo",
+     "x": -4944,
+     "z": 5446,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-marrickville-riley",
+     "node": "report-1",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 92,
+    "xp": 242,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-025",
+   "act": 3,
+   "title": "Something From Marrickville Bowlo",
+   "blurb": "I have written it down twice and lost it twice. The stall at Marrickville Bowlo has run out and the customers keep coming. It is the not knowing that has got me, honestly. Find something round Marrickville that'll do before the nine sharp rush. Just do not come back empty-handed.",
+   "giver": "qgb-marrickville-brett",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near Marrickville Bowlo"
+    },
+    {
+     "kind": "goto",
+     "x": -5356,
+     "z": 4733,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 75,
+    "xp": 180,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-026",
+   "act": 3,
+   "title": "The Length of Enmore Park",
+   "blurb": "Nobody else has offered, so. I haven't walked Enmore Park end to end since the light rail came to Marrickville. I did try the official route, for what that was worth. Do it Tuesday for me and photograph what's at the far end now. If anyone asks, you were never here.",
+   "giver": "qgb-marrickville-tuan",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5014,
+     "z": 4603,
+     "radius": 30,
+     "label": "walk the length of Enmore Park"
+    },
+    {
+     "kind": "goto",
+     "x": -4750,
+     "z": 4783,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -4750,
+     "z": 4783,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 216,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-027",
+   "act": 3,
+   "title": "One Stop From Enmore Park",
+   "blurb": "Two people have already said no. I need to know the train from Marrickville stops at Surry Hills and doesn't sail through like it did on the long weekend. I am not after trouble. I am after an answer. Ride it at the change of shift and photograph the sign. That's it. That's the whole ask.",
+   "giver": "qgb-marrickville-tuan",
+   "level": 2,
+   "requires": [
+    "qgb-l2-marrickville-026"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Marrickville",
+     "to": "Surry Hills",
+     "label": "take the train to Surry Hills"
+    },
+    {
+     "kind": "photo",
+     "x": 256,
+     "z": 2168,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 113,
+    "xp": 234,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-028",
+   "act": 3,
+   "title": "Parcel for Surry Hills",
+   "blurb": "Keep it between us for now. A parcel from Batch Brewing has to be at Surry Hills by half two and Australia Post quoted me grand final day. There is probably a simple explanation and I would love to hear it. Take the train and hand it to the people outside the station. Come and find me after, either way.",
+   "giver": "qgb-marrickville-tuan",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Marrickville",
+     "to": "Surry Hills",
+     "label": "carry it on the train to Surry Hills"
+    },
+    {
+     "kind": "goto",
+     "x": 256,
+     "z": 2168,
+     "radius": 30,
+     "label": "hand it over outside the station, where the crowd is"
+    }
+   ],
+   "reward": {
+    "cash": 79,
+    "xp": 211,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-029",
+   "act": 3,
+   "title": "Seven a.m. At the pho strip",
+   "blurb": "Not being dramatic about this. The site at the pho strip starts its jackhammer at school pick-up on a Monday, which is illegal and loud. I have got a photo on my phone but it is useless. Photograph it running and have a word with the Marrickville foreman. I would rather know than wonder.",
+   "giver": "qgb-marrickville-janelle",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -5193,
+     "z": 4835,
+     "radius": 40,
+     "label": "photograph the noise from the pho strip"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 88,
+    "xp": 200,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-030",
+   "act": 3,
+   "title": "A Flat White From Illawarra Road",
+   "blurb": "It has been three weeks. I want a flat white from the place near Illawarra Road, not the one next to it. I would not ask if there was anyone else about. Here by the change of shift, while it's still coffee and Marrickville still has some. I will owe you one, and I pay those.",
+   "giver": "qgb-marrickville-sharon",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near Illawarra Road"
+    },
+    {
+     "kind": "goto",
+     "x": -5132,
+     "z": 5109,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 77,
+    "xp": 201,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-031",
+   "act": 3,
+   "title": "Race Four, the Marrickville Metro",
+   "blurb": "I have been putting it off since Easter. There's a horse in race four at peak hour that a bloke at the Marrickville Metro swears by. There is a version of this where I am the unreasonable one. Turn it into fifty-five somewhere in Marrickville and tell me if it came in. I will know if you skipped a bit.",
+   "giver": "qgb-marrickville-rod",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 62,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-marrickville-rod",
+     "node": "report-0",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 69,
+    "xp": 196,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-032",
+   "act": 3,
+   "title": "Closing Time at the Marrickville Metro",
+   "blurb": "You are the first person to stop all morning. Two blokes have slept in my doorway on the Marrickville Metro since the pub shut. You can tell me I am imagining it. Tell me after. The Marrickville delivery's at school pick-up, so get them up and show me the step empty. I'll put the kettle on for when you're back.",
+   "giver": "qgb-marrickville-rod",
+   "level": 2,
+   "requires": [
+    "qgb-l2-marrickville-031"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off the Marrickville Metro"
+    },
+    {
+     "kind": "photo",
+     "x": -4966,
+     "z": 4562,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 103,
+    "xp": 283,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-033",
+   "act": 3,
+   "title": "Before They Touch Hellenic Bakery",
+   "blurb": "Honestly, I am past caring how it looks. They start on Hellenic Bakery on Friday and the orange fencing goes up. This is the third time I have had this conversation. I want Marrickville on record before it does. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-marrickville-reg",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -5054,
+     "z": 4542,
+     "radius": 40,
+     "label": "photograph the state of Hellenic Bakery"
+    },
+    {
+     "kind": "goto",
+     "x": -4964,
+     "z": 4814,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 201,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-034",
+   "act": 3,
+   "title": "Lads Off Hellenic Bakery",
+   "blurb": "I'll be straight with you. Three of them in TNs on the Hellenic Bakery steps, flogging vapes to schoolkids at peak hour. The paperwork says one thing and my eyes say another. Marrickville used to move them on itself and now it rings me. Whatever you find, bring it to me first.",
+   "giver": "qgb-marrickville-reg",
+   "level": 2,
+   "requires": [
+    "qgb-l2-marrickville-033"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Hellenic Bakery"
+    }
+   ],
+   "reward": {
+    "cash": 112,
+    "xp": 239,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-035",
+   "act": 3,
+   "title": "The Hellenic Bakery Lift",
+   "blurb": "Do not laugh. The lift at Marrickville station has been out since the Easter Show and I'm told Surry Hills is worse. I would have sorted it myself a year ago. Check both Monday and tell me which takes a pram. Take your time. Do not take a week.",
+   "giver": "qgb-marrickville-reg",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5056,
+     "z": 5069,
+     "radius": 30,
+     "label": "check the lift at Marrickville station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Marrickville",
+     "to": "Surry Hills",
+     "label": "then ride to Surry Hills and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-marrickville-reg",
+     "node": "report-2",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 77,
+    "xp": 195,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-036",
+   "act": 3,
+   "title": "Two Signs, Marrickville Bowlo",
+   "blurb": "The council knows and the council does not care. Two signs near Marrickville Bowlo say opposite things about parking and I've been fined under both. It started small, the way these things do. Get photos of each before Friday, when Marrickville council takes one down. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qgb-marrickville-kosta",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -5055,
+     "z": 4985,
+     "radius": 40,
+     "label": "photograph the sign at Marrickville Bowlo"
+    },
+    {
+     "kind": "photo",
+     "x": -5010,
+     "z": 5142,
+     "radius": 40,
+     "label": "and the one that contradicts it"
+    }
+   ],
+   "reward": {
+    "cash": 81,
+    "xp": 213,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-037",
+   "act": 3,
+   "title": "Left It Near Marrickville Bowlo",
+   "blurb": "It is not a police matter and I have checked. I left something on the bench at Marrickville Bowlo at first thing. Half the street knows and half the street is pretending not to. By the time I got back to Marrickville it had walked, so look where I'd have dropped it. Do that and we're square.",
+   "giver": "qgb-marrickville-rhonda",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -5367,
+     "z": 4831,
+     "radius": 30,
+     "label": "check the bench near Marrickville Bowlo"
+    },
+    {
+     "kind": "photo",
+     "x": -5063,
+     "z": 4843,
+     "radius": 40,
+     "label": "photograph the bins behind it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-marrickville-rhonda",
+     "node": "report-1",
+     "label": "tell me what you found"
+    }
+   ],
+   "reward": {
+    "cash": 78,
+    "xp": 203,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-038",
+   "act": 3,
+   "title": "The Enmore Park Course",
+   "blurb": "I am told you do odd jobs. A bloke near Enmore Park runs a ninety-minute course he bills at four hundred, and I've paid. It is the not knowing that has got me, honestly. Sit it grand final day, then come back to Marrickville and prove it did something. Ask for me by name at the counter.",
+   "giver": "qgb-marrickville-jason",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near Enmore Park"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 188,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-039",
+   "act": 3,
+   "title": "The Marrickville Bowlo Tab",
+   "blurb": "I have written it down twice and lost it twice. Two chippies off the Marrickville Bowlo job have run a tab in Marrickville since Thursday. I have got no proof, which is exactly why I am asking. They drove past at five without looking in, so settle it in cash. Say nothing to anyone on the way.",
+   "giver": "qgb-marrickville-jason",
+   "level": 2,
+   "requires": [
+    "qgb-l2-marrickville-038"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near Marrickville Bowlo"
+    },
+    {
+     "kind": "earn",
+     "dollars": 34,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 112,
+    "xp": 261,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-040",
+   "act": 3,
+   "title": "Ask Around at Surry Hills",
+   "blurb": "Two people have already said no. There's work going outside Surry Hills station and nobody at the pho strip can tell me what. There is probably a simple explanation and I would love to hear it. Ride over at first thing, get the shape of it, come back. If anyone asks, you were never here.",
+   "giver": "qgb-marrickville-cheryl",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Marrickville",
+     "to": "Surry Hills",
+     "label": "take the train to Surry Hills"
+    },
+    {
+     "kind": "goto",
+     "x": 256,
+     "z": 2168,
+     "radius": 30,
+     "label": "find the people outside Surry Hills station"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-marrickville-cheryl",
+     "node": "report-2",
+     "label": "then come back and tell me what they said"
+    }
+   ],
+   "reward": {
+    "cash": 75,
+    "xp": 180,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-041",
+   "act": 3,
+   "title": "Trouble at the pho strip",
+   "blurb": "Not being dramatic about this. Two lads and their mate decided at closing that the pho strip is theirs. Nobody else seems to have noticed, which is its own problem. The rest of Marrickville disagrees, so explain the disagreement. Be polite about it. It costs nothing.",
+   "giver": "qgb-marrickville-prue",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near the pho strip"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 195,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-042",
+   "act": 3,
+   "title": "The the pho strip Order",
+   "blurb": "This is going to sound small. The the pho strip order came to seventy more than I'd budgeted and the supplier wants it by lunchtime. You will see what I mean the second you get there. Find seventy in Marrickville and photograph the receipt. I would rather know than wonder.",
+   "giver": "qgb-marrickville-prue",
+   "level": 2,
+   "requires": [
+    "qgb-l2-marrickville-041"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 78,
+     "label": "square the seventy for the the pho strip order"
+    },
+    {
+     "kind": "photo",
+     "x": -4705,
+     "z": 5163,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 257,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-marrickville-043",
+   "act": 3,
+   "title": "Something From Marrickville Road",
+   "blurb": "It has been three weeks. The stall at Marrickville Road has run out and the customers keep coming. I am aware how that sounds. Find something round Marrickville that'll do before the ten past ten rush. There's cash in it. Not a lot.",
+   "giver": "qgb-marrickville-thu",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near Marrickville Road"
+    },
+    {
+     "kind": "goto",
+     "x": -5111,
+     "z": 5190,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 188,
+    "unlock": []
+   }
+  }
+ ]
+}

@@ -1,0 +1,2925 @@
+{
+ "pack": "areab-liverpool-1",
+ "npcs": [
+  {
+   "id": "qgb-liverpool-nathan",
+   "name": "Nathan, chippy off a job",
+   "x": -26014,
+   "z": 6503,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Liverpool, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Probationary at Macquarie Street Mall",
+       "accept": "qgb-l9-liverpool-001",
+       "denyFlag": "w:qgb-l9-liverpool-001"
+      },
+      {
+       "text": "A Flat White From Westfield Liverpool",
+       "accept": "qgb-l9-liverpool-002",
+       "denyFlag": "w:qgb-l9-liverpool-002",
+       "needFlag": "w:qgb-l9-liverpool-001"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Nathan pays up on the spot.",
+     "choices": [
+      {
+       "text": "About probationary at macquarie street mall.",
+       "turnin": "qgb-l9-liverpool-001"
+      },
+      {
+       "text": "About a flat white from westfield liverpool.",
+       "turnin": "qgb-l9-liverpool-002"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Liverpool is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Nathan, chippy off a job in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hume like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near the Hume."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-pam",
+   "name": "Pam, RSL sub-branch secretary",
+   "x": -26045,
+   "z": 7096,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sign in, love. Everyone signs in. Liverpool RSL, you're very welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Raffles, Anzac Day, the bistro's schnitzel and a room full of pokies I have opinions about. Macquarie Street Mall sends us its regulars.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Meat Tray at Westfield Liverpool",
+       "accept": "qgb-l9-liverpool-003",
+       "denyFlag": "w:qgb-l9-liverpool-003"
+      },
+      {
+       "text": "Ask Around at Cronulla",
+       "accept": "qgb-l9-liverpool-004",
+       "denyFlag": "w:qgb-l9-liverpool-004",
+       "needFlag": "w:qgb-l9-liverpool-003"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Pam looks it over the way Liverpool looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About meat tray at westfield liverpool.",
+       "turnin": "qgb-l9-liverpool-003"
+      },
+      {
+       "text": "About ask around at cronulla.",
+       "turnin": "qgb-l9-liverpool-004"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The cheapest schooner in Liverpool is at the sub-branch, six o'clock, before the Ode. Stand up for the Ode.",
+     "improv": {
+      "persona": "Pam, RSL sub-branch secretary in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about Macquarie Street Mall like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near Macquarie Street Mall."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-2",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Pam listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-clementine",
+   "name": "Clementine, chippy off a job",
+   "x": -26268,
+   "z": 7006,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Liverpool, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's proof of collimore park.",
+     "choices": [
+      {
+       "text": "Proof of Collimore Park",
+       "accept": "qgb-l9-liverpool-005",
+       "denyFlag": "w:qgb-l9-liverpool-005"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Clementine looks it over the way Liverpool looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About proof of collimore park.",
+       "turnin": "qgb-l9-liverpool-005"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Liverpool is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Clementine, chippy off a job in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Georges River like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near the Georges River."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-luke",
+   "name": "Luke, council ranger",
+   "x": -25913,
+   "z": 7073,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Liverpool is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Collimore Park generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two signs, the hume.",
+     "choices": [
+      {
+       "text": "Two Signs, the Hume",
+       "accept": "qgb-l9-liverpool-006",
+       "denyFlag": "w:qgb-l9-liverpool-006"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Luke looks it over the way Liverpool looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About two signs, the hume.",
+       "turnin": "qgb-l9-liverpool-006"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Luke, council ranger in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about Collimore Park like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near Collimore Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-jason",
+   "name": "Jason, probationary constable",
+   "x": -26365,
+   "z": 6516,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Liverpool LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of the Hume. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's one stop from macquarie street mall.",
+     "choices": [
+      {
+       "text": "One Stop From Macquarie Street Mall",
+       "accept": "qgb-l9-liverpool-007",
+       "denyFlag": "w:qgb-l9-liverpool-007"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Jason pays up on the spot.",
+     "choices": [
+      {
+       "text": "About one stop from macquarie street mall.",
+       "turnin": "qgb-l9-liverpool-007"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about the Hume. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Jason, probationary constable in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hume like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near the Hume."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-brett",
+   "name": "Brett, chippy off a job",
+   "x": -26052,
+   "z": 6739,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Liverpool, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's a flat white from the liverpool catholic club.",
+     "choices": [
+      {
+       "text": "A Flat White From the Liverpool Catholic Club",
+       "accept": "qgb-l9-liverpool-008",
+       "denyFlag": "w:qgb-l9-liverpool-008"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Brett counts it out without looking up. -- Don't spend it all at Liverpool Hospital.",
+     "choices": [
+      {
+       "text": "About a flat white from the liverpool catholic club.",
+       "turnin": "qgb-l9-liverpool-008"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Liverpool is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Brett, chippy off a job in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about Liverpool Hospital like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near Liverpool Hospital."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-les",
+   "name": "Les, RSL sub-branch secretary",
+   "x": -25763,
+   "z": 6536,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sign in, love. Everyone signs in. Liverpool RSL, you're very welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Raffles, Anzac Day, the bistro's schnitzel and a room full of pokies I have opinions about. the Liverpool Catholic Club sends us its regulars.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's something from elizabeth street.",
+     "choices": [
+      {
+       "text": "Something From Elizabeth Street",
+       "accept": "qgb-l9-liverpool-009",
+       "denyFlag": "w:qgb-l9-liverpool-009"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Les pays up on the spot.",
+     "choices": [
+      {
+       "text": "About something from elizabeth street.",
+       "turnin": "qgb-l9-liverpool-009"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The cheapest schooner in Liverpool is at the sub-branch, six o'clock, before the Ode. Stand up for the Ode.",
+     "improv": {
+      "persona": "Les, RSL sub-branch secretary in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Liverpool Catholic Club like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near the Liverpool Catholic Club."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-dean",
+   "name": "Dean, council ranger",
+   "x": -26098,
+   "z": 6498,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Liverpool is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Elizabeth Street generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's closing time at the georges river.",
+     "choices": [
+      {
+       "text": "Closing Time at the Georges River",
+       "accept": "qgb-l9-liverpool-010",
+       "denyFlag": "w:qgb-l9-liverpool-010"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Dean pays up on the spot.",
+     "choices": [
+      {
+       "text": "About closing time at the georges river.",
+       "turnin": "qgb-l9-liverpool-010"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Dean, council ranger in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about Elizabeth Street like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near Elizabeth Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-bruce",
+   "name": "Bruce, probationary constable",
+   "x": -25835,
+   "z": 6778,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Liverpool LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of the Georges River. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Two From Collimore Park",
+       "accept": "qgb-l9-liverpool-011",
+       "denyFlag": "w:qgb-l9-liverpool-011"
+      },
+      {
+       "text": "Cover at Woodward Park",
+       "accept": "qgb-l9-liverpool-012",
+       "denyFlag": "w:qgb-l9-liverpool-012",
+       "needFlag": "w:qgb-l9-liverpool-011"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Bruce counts it out without looking up. -- Don't spend it all at the Georges River.",
+     "choices": [
+      {
+       "text": "About two from collimore park.",
+       "turnin": "qgb-l9-liverpool-011"
+      },
+      {
+       "text": "About cover at woodward park.",
+       "turnin": "qgb-l9-liverpool-012"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about the Georges River. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Bruce, probationary constable in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Georges River like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near the Georges River."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-ahmed",
+   "name": "Ahmed, mechanic, own shop",
+   "x": -25574,
+   "z": 6593,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "It's the timing belt. I haven't looked. It's always the timing belt. Liverpool, what've you got?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Commodores, Hiluxes, the odd Alfa from a man who should know better. Woodward Park is where they die.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch collimore park.",
+     "choices": [
+      {
+       "text": "Before They Touch Collimore Park",
+       "accept": "qgb-l9-liverpool-013",
+       "denyFlag": "w:qgb-l9-liverpool-013"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Ahmed pays up on the spot.",
+     "choices": [
+      {
+       "text": "About before they touch collimore park.",
+       "turnin": "qgb-l9-liverpool-013"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never buy a car off Woodward Park. Never. I've seen where they've been.",
+     "improv": {
+      "persona": "Ahmed, mechanic, own shop in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about Woodward Park like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near Woodward Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-wayne",
+   "name": "Wayne, chippy off a job",
+   "x": -25781,
+   "z": 6260,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Liverpool, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Westfield Liverpool Camera",
+       "accept": "qgb-l9-liverpool-014",
+       "denyFlag": "w:qgb-l9-liverpool-014"
+      },
+      {
+       "text": "Trolley Run, Westfield Liverpool",
+       "accept": "qgb-l9-liverpool-015",
+       "denyFlag": "w:qgb-l9-liverpool-015",
+       "needFlag": "w:qgb-l9-liverpool-014"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Wayne looks it over the way Liverpool looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the westfield liverpool camera.",
+       "turnin": "qgb-l9-liverpool-014"
+      },
+      {
+       "text": "About trolley run, westfield liverpool.",
+       "turnin": "qgb-l9-liverpool-015"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Liverpool is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Wayne, chippy off a job in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about Macquarie Street Mall like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near Macquarie Street Mall."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-fay",
+   "name": "Fay, RSL sub-branch secretary",
+   "x": -25911,
+   "z": 7001,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sign in, love. Everyone signs in. Liverpool RSL, you're very welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Raffles, Anzac Day, the bistro's schnitzel and a room full of pokies I have opinions about. Westfield Liverpool sends us its regulars.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two signs, bigge park.",
+     "choices": [
+      {
+       "text": "Two Signs, Bigge Park",
+       "accept": "qgb-l9-liverpool-016",
+       "denyFlag": "w:qgb-l9-liverpool-016"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Fay pays up on the spot.",
+     "choices": [
+      {
+       "text": "About two signs, bigge park.",
+       "turnin": "qgb-l9-liverpool-016"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The cheapest schooner in Liverpool is at the sub-branch, six o'clock, before the Ode. Stand up for the Ode.",
+     "improv": {
+      "persona": "Fay, RSL sub-branch secretary in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about Westfield Liverpool like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near Westfield Liverpool."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-beryl",
+   "name": "Beryl, council ranger",
+   "x": -25885,
+   "z": 6824,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Liverpool is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Bigge Park generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rent money, liverpool hospital.",
+     "choices": [
+      {
+       "text": "Rent Money, Liverpool Hospital",
+       "accept": "qgb-l9-liverpool-017",
+       "denyFlag": "w:qgb-l9-liverpool-017"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Beryl pays up on the spot.",
+     "choices": [
+      {
+       "text": "About rent money, liverpool hospital.",
+       "turnin": "qgb-l9-liverpool-017"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Beryl, council ranger in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about Bigge Park like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near Bigge Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-gav",
+   "name": "Gav, uni student, three jobs",
+   "x": -25968,
+   "z": 6329,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Liverpool rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Elizabeth Street is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's bin night, the georges river.",
+     "choices": [
+      {
+       "text": "Bin Night, the Georges River",
+       "accept": "qgb-l9-liverpool-018",
+       "denyFlag": "w:qgb-l9-liverpool-018"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Gav pays up on the spot.",
+     "choices": [
+      {
+       "text": "About bin night, the georges river.",
+       "turnin": "qgb-l9-liverpool-018"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Elizabeth Street that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Gav, uni student, three jobs in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about Elizabeth Street like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near Elizabeth Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-yen",
+   "name": "Yen, night-shift nurse",
+   "x": -25947,
+   "z": 7124,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry, just off a double. Twelve hours. Liverpool, hi, what's wrong?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Emergency. Everything comes through the door at the Georges River: footballers, grandmothers, a man with a fork. Never a dull shift.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Seven a.m. At Woodward Park",
+       "accept": "qgb-l9-liverpool-019",
+       "denyFlag": "w:qgb-l9-liverpool-019"
+      },
+      {
+       "text": "The Woodward Park Sparky",
+       "accept": "qgb-l9-liverpool-020",
+       "denyFlag": "w:qgb-l9-liverpool-020",
+       "needFlag": "w:qgb-l9-liverpool-019"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Yen looks it over the way Liverpool looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About seven a.m. at woodward park.",
+       "turnin": "qgb-l9-liverpool-019"
+      },
+      {
+       "text": "About the woodward park sparky.",
+       "turnin": "qgb-l9-liverpool-020"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good coffee near the Georges River opens at five. The nurses are there at four fifty-nine.",
+     "improv": {
+      "persona": "Yen, night-shift nurse in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Georges River like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near the Georges River."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-karen",
+   "name": "Karen, chippy off a job",
+   "x": -25876,
+   "z": 7114,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Liverpool, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's lads off collimore park.",
+     "choices": [
+      {
+       "text": "Lads Off Collimore Park",
+       "accept": "qgb-l9-liverpool-021",
+       "denyFlag": "w:qgb-l9-liverpool-021"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Karen counts it out without looking up. -- Don't spend it all at Woodward Park.",
+     "choices": [
+      {
+       "text": "About lads off collimore park.",
+       "turnin": "qgb-l9-liverpool-021"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Liverpool is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Karen, chippy off a job in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about Woodward Park like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near Woodward Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-kai",
+   "name": "Kai, RSL sub-branch secretary",
+   "x": -26162,
+   "z": 6255,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sign in, love. Everyone signs in. Liverpool RSL, you're very welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Raffles, Anzac Day, the bistro's schnitzel and a room full of pokies I have opinions about. Collimore Park sends us its regulars.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's sightline at the liverpool catholic club.",
+     "choices": [
+      {
+       "text": "Sightline at the Liverpool Catholic Club",
+       "accept": "qgb-l9-liverpool-022",
+       "denyFlag": "w:qgb-l9-liverpool-022"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Kai pays up on the spot.",
+     "choices": [
+      {
+       "text": "About sightline at the liverpool catholic club.",
+       "turnin": "qgb-l9-liverpool-022"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The cheapest schooner in Liverpool is at the sub-branch, six o'clock, before the Ode. Stand up for the Ode.",
+     "improv": {
+      "persona": "Kai, RSL sub-branch secretary in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about Collimore Park like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near Collimore Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Kai listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-kerry",
+   "name": "Kerry, council ranger",
+   "x": -25801,
+   "z": 6731,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Liverpool is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. the Hume generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's counting macquarie street mall.",
+     "choices": [
+      {
+       "text": "Counting Macquarie Street Mall",
+       "accept": "qgb-l9-liverpool-023",
+       "denyFlag": "w:qgb-l9-liverpool-023"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Kerry looks it over the way Liverpool looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About counting macquarie street mall.",
+       "turnin": "qgb-l9-liverpool-023"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Kerry, council ranger in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hume like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near the Hume."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-minh",
+   "name": "Minh, night-shift nurse",
+   "x": -25843,
+   "z": 6607,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry, just off a double. Twelve hours. Liverpool, hi, what's wrong?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Emergency. Everything comes through the door at Liverpool Hospital: footballers, grandmothers, a man with a fork. Never a dull shift.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the length of the liverpool catholic club.",
+     "choices": [
+      {
+       "text": "The Length of the Liverpool Catholic Club",
+       "accept": "qgb-l9-liverpool-024",
+       "denyFlag": "w:qgb-l9-liverpool-024"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Minh pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the length of the liverpool catholic club.",
+       "turnin": "qgb-l9-liverpool-024"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good coffee near Liverpool Hospital opens at five. The nurses are there at four fifty-nine.",
+     "improv": {
+      "persona": "Minh, night-shift nurse in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about Liverpool Hospital like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near Liverpool Hospital."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-warwick",
+   "name": "Warwick, council ranger",
+   "x": -26093,
+   "z": 6231,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Liverpool is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. the Georges River generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the woodward park lift.",
+     "choices": [
+      {
+       "text": "The Woodward Park Lift",
+       "accept": "qgb-l9-liverpool-025",
+       "denyFlag": "w:qgb-l9-liverpool-025"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Warwick pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the woodward park lift.",
+       "turnin": "qgb-l9-liverpool-025"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Warwick, council ranger in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Georges River like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near the Georges River."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-2",
+     "line": "Right. And you're sure it was Woodward Park? People say Woodward Park when they mean the bit next to it. -- Warwick writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-georgie",
+   "name": "Georgie, probationary constable",
+   "x": -25953,
+   "z": 7055,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Liverpool LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of Woodward Park. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's one stop from collimore park.",
+     "choices": [
+      {
+       "text": "One Stop From Collimore Park",
+       "accept": "qgb-l9-liverpool-026",
+       "denyFlag": "w:qgb-l9-liverpool-026"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Georgie pays up on the spot.",
+     "choices": [
+      {
+       "text": "About one stop from collimore park.",
+       "turnin": "qgb-l9-liverpool-026"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about Woodward Park. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Georgie, probationary constable in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about Woodward Park like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near Woodward Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-charbel",
+   "name": "Charbel, mechanic, own shop",
+   "x": -26156,
+   "z": 6634,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "It's the timing belt. I haven't looked. It's always the timing belt. Liverpool, what've you got?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Commodores, Hiluxes, the odd Alfa from a man who should know better. Collimore Park is where they die.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's bin night, the hume.",
+     "choices": [
+      {
+       "text": "Bin Night, the Hume",
+       "accept": "qgb-l9-liverpool-027",
+       "denyFlag": "w:qgb-l9-liverpool-027"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Charbel pays up on the spot.",
+     "choices": [
+      {
+       "text": "About bin night, the hume.",
+       "turnin": "qgb-l9-liverpool-027"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never buy a car off Collimore Park. Never. I've seen where they've been.",
+     "improv": {
+      "persona": "Charbel, mechanic, own shop in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about Collimore Park like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near Collimore Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-matilda",
+   "name": "Matilda, uni student, three jobs",
+   "x": -26322,
+   "z": 6550,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Liverpool rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the Hume is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Seven a.m. At Macquarie Street Mall",
+       "accept": "qgb-l9-liverpool-028",
+       "denyFlag": "w:qgb-l9-liverpool-028"
+      },
+      {
+       "text": "The Macquarie Street Mall Sparky",
+       "accept": "qgb-l9-liverpool-029",
+       "denyFlag": "w:qgb-l9-liverpool-029",
+       "needFlag": "w:qgb-l9-liverpool-028"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Matilda looks it over the way Liverpool looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About seven a.m. at macquarie street mall.",
+       "turnin": "qgb-l9-liverpool-028"
+      },
+      {
+       "text": "About the macquarie street mall sparky.",
+       "turnin": "qgb-l9-liverpool-029"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the Hume that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Matilda, uni student, three jobs in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hume like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near the Hume."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-glenn",
+   "name": "Glenn, uni student, three jobs",
+   "x": -25734,
+   "z": 7008,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Liverpool rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the Georges River is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's cover at the hume.",
+     "choices": [
+      {
+       "text": "Cover at the Hume",
+       "accept": "qgb-l9-liverpool-030",
+       "denyFlag": "w:qgb-l9-liverpool-030"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Glenn counts it out without looking up. -- Don't spend it all at the Georges River.",
+     "choices": [
+      {
+       "text": "About cover at the hume.",
+       "turnin": "qgb-l9-liverpool-030"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the Georges River that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Glenn, uni student, three jobs in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Georges River like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near the Georges River."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-maureen",
+   "name": "Maureen, chippy off a job",
+   "x": -25736,
+   "z": 6277,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Liverpool, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Macquarie Street Mall Float",
+       "accept": "qgb-l9-liverpool-031",
+       "denyFlag": "w:qgb-l9-liverpool-031"
+      },
+      {
+       "text": "Trolley Run, Liverpool Hospital",
+       "accept": "qgb-l9-liverpool-032",
+       "denyFlag": "w:qgb-l9-liverpool-032",
+       "needFlag": "w:qgb-l9-liverpool-031"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Maureen looks it over the way Liverpool looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the macquarie street mall float.",
+       "turnin": "qgb-l9-liverpool-031"
+      },
+      {
+       "text": "About trolley run, liverpool hospital.",
+       "turnin": "qgb-l9-liverpool-032"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Liverpool is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Maureen, chippy off a job in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about Collimore Park like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near Collimore Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Liverpool would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-michelle",
+   "name": "Michelle, RSL sub-branch secretary",
+   "x": -26244,
+   "z": 6825,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sign in, love. Everyone signs in. Liverpool RSL, you're very welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Raffles, Anzac Day, the bistro's schnitzel and a room full of pokies I have opinions about. the Hume sends us its regulars.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the macquarie street mall lift.",
+     "choices": [
+      {
+       "text": "The Macquarie Street Mall Lift",
+       "accept": "qgb-l9-liverpool-033",
+       "denyFlag": "w:qgb-l9-liverpool-033"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Michelle pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the macquarie street mall lift.",
+       "turnin": "qgb-l9-liverpool-033"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The cheapest schooner in Liverpool is at the sub-branch, six o'clock, before the Ode. Stand up for the Ode.",
+     "improv": {
+      "persona": "Michelle, RSL sub-branch secretary in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hume like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near the Hume."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-2",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Michelle listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-shaz",
+   "name": "Shaz, uni student, three jobs",
+   "x": -25992,
+   "z": 6454,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Liverpool rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Liverpool Hospital is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's probationary at the liverpool catholic club.",
+     "choices": [
+      {
+       "text": "Probationary at the Liverpool Catholic Club",
+       "accept": "qgb-l9-liverpool-034",
+       "denyFlag": "w:qgb-l9-liverpool-034"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Shaz pays up on the spot.",
+     "choices": [
+      {
+       "text": "About probationary at the liverpool catholic club.",
+       "turnin": "qgb-l9-liverpool-034"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Liverpool Hospital that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Shaz, uni student, three jobs in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about Liverpool Hospital like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near Liverpool Hospital."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-harriet",
+   "name": "Harriet, uni student, three jobs",
+   "x": -25727,
+   "z": 6491,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Liverpool rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Macquarie Street Mall is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch bigge park.",
+     "choices": [
+      {
+       "text": "Before They Touch Bigge Park",
+       "accept": "qgb-l9-liverpool-035",
+       "denyFlag": "w:qgb-l9-liverpool-035"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Harriet looks it over the way Liverpool looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About before they touch bigge park.",
+       "turnin": "qgb-l9-liverpool-035"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Macquarie Street Mall that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Harriet, uni student, three jobs in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about Macquarie Street Mall like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near Macquarie Street Mall."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-digby",
+   "name": "Digby, chippy off a job",
+   "x": -25784,
+   "z": 6793,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Liverpool, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at liverpool hospital.",
+     "choices": [
+      {
+       "text": "Trouble at Liverpool Hospital",
+       "accept": "qgb-l9-liverpool-036",
+       "denyFlag": "w:qgb-l9-liverpool-036"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Digby counts it out without looking up. -- Don't spend it all at Bigge Park.",
+     "choices": [
+      {
+       "text": "About trouble at liverpool hospital.",
+       "turnin": "qgb-l9-liverpool-036"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Liverpool is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Digby, chippy off a job in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about Bigge Park like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near Bigge Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-liverpool-hayden",
+   "name": "Hayden, uni student, three jobs",
+   "x": -26070,
+   "z": 6603,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Liverpool rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Liverpool like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Woodward Park is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's staffy near collimore park.",
+     "choices": [
+      {
+       "text": "Staffy Near Collimore Park",
+       "accept": "qgb-l9-liverpool-037",
+       "denyFlag": "w:qgb-l9-liverpool-037"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Hayden counts it out without looking up. -- Don't spend it all at Woodward Park.",
+     "choices": [
+      {
+       "text": "About staffy near collimore park.",
+       "turnin": "qgb-l9-liverpool-037"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Woodward Park that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Hayden, uni student, three jobs in Liverpool, Sydney. Dry, specific, local; never says g'day or crikey; talks about Woodward Park like everyone knows it.",
+      "context": "Someone has asked what Liverpool is like these days. You are standing near Woodward Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Hayden listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

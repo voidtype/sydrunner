@@ -1,0 +1,929 @@
+{
+ "pack": "areab-bankstown-2",
+ "quests": [
+  {
+   "id": "qgb-l7-bankstown-041",
+   "act": 3,
+   "title": "Cover at Old Town Plaza",
+   "blurb": "Keep it between us for now. I've got nobody for the Old Town Plaza shift at half four and a room full of Bankstown people who've paid. I am aware how that sounds. Fifty of trade and one difficult person at the door. Just do not come back empty-handed.",
+   "giver": "qgb-bankstown-digby",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 86,
+     "label": "cover the fifty for the shift"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 1,
+     "label": "and handle whoever's at the door"
+    }
+   ],
+   "reward": {
+    "cash": 154,
+    "xp": 438,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-042",
+   "act": 3,
+   "title": "Race Four, the Bankstown pho strip",
+   "blurb": "Before you say anything: yes, I know. There's a horse in race four at half six that a bloke at the Bankstown pho strip swears by. Everyone I have told has looked at me the way you are now. Turn it into fifty-five somewhere in Bankstown and tell me if it came in. I'll see you right for it.",
+   "giver": "qgb-bankstown-digby",
+   "level": 7,
+   "requires": [
+    "qgb-l7-bankstown-041"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 95,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-bankstown-digby",
+     "node": "report-1",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 185,
+    "xp": 534,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-043",
+   "act": 3,
+   "title": "Tap On at Restwell Street",
+   "blurb": "It has been three weeks. My Opal says I owe nineteen dollars for a trip from Bankstown I never took on Tuesday. This is the third time I have had this conversation. Take the same one to Lakemba and tell me what it charged you. Be polite about it. It costs nothing.",
+   "giver": "qgb-bankstown-duc",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Bankstown",
+     "to": "Lakemba",
+     "label": "tap on at Bankstown, tap off at Lakemba"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-bankstown-duc",
+     "node": "report-1",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 154,
+    "xp": 427,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-044",
+   "act": 3,
+   "title": "The Length of Jacobs Street",
+   "blurb": "My knees are gone, so. I haven't walked Jacobs Street end to end since the light rail came to Bankstown. It has been going on longer than I have admitted to anyone. Do it Saturday for me and photograph what's at the far end now. Come back and tell me straight.",
+   "giver": "qgb-bankstown-layla-e",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -16044,
+     "z": 5705,
+     "radius": 30,
+     "label": "walk the length of Jacobs Street"
+    },
+    {
+     "kind": "goto",
+     "x": -15811,
+     "z": 5991,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -15811,
+     "z": 5991,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 146,
+    "xp": 417,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-045",
+   "act": 3,
+   "title": "Trolley Run, Jacobs Street",
+   "blurb": "Honestly, I am past caring how it looks. A Woolies trolley from Jacobs Street gets walked to the creek every Boxing Day. It is not the money. It has stopped being the money. Find where it ends up in Bankstown and make the deposit back. Do not make a scene about it.",
+   "giver": "qgb-bankstown-layla-e",
+   "level": 7,
+   "requires": [
+    "qgb-l7-bankstown-044"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -15950,
+     "z": 5812,
+     "radius": 30,
+     "label": "find the trolley near Jacobs Street"
+    },
+    {
+     "kind": "photo",
+     "x": -15950,
+     "z": 5812,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 43,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 189,
+    "xp": 530,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-046",
+   "act": 3,
+   "title": "The the Bankstown Sports Club Lift",
+   "blurb": "Someone has to, and it may as well be you. The lift at Bankstown station has been out since the Easter Show and I'm told Lakemba is worse. I am not after trouble. I am after an answer. Check both the King's Birthday and tell me which takes a pram. Whatever you find, bring it to me first.",
+   "giver": "qgb-bankstown-trish",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -16073,
+     "z": 5694,
+     "radius": 30,
+     "label": "check the lift at Bankstown station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Bankstown",
+     "to": "Lakemba",
+     "label": "then ride to Lakemba and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-bankstown-trish",
+     "node": "report-0",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 148,
+    "xp": 415,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-047",
+   "act": 3,
+   "title": "The Length of Bankstown Central",
+   "blurb": "I would do it myself if I could leave the counter. I haven't walked Bankstown Central end to end since the light rail came to Bankstown. This is the third time I have had this conversation. Do it Friday for me and photograph what's at the far end now. That's it. That's the whole ask.",
+   "giver": "qgb-bankstown-tony-b",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -16234,
+     "z": 5484,
+     "radius": 30,
+     "label": "walk the length of Bankstown Central"
+    },
+    {
+     "kind": "goto",
+     "x": -16010,
+     "z": 5478,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -16010,
+     "z": 5478,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 152,
+    "xp": 408,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-048",
+   "act": 3,
+   "title": "Meat Tray at the Bankstown Arts Centre",
+   "blurb": "It is the sort of thing you notice or you do not. The the Bankstown Arts Centre raffle is thirty-five short of a meat tray and the draw is at school pick-up. I would have sorted it myself a year ago. Find it in Bankstown and put it in the tin. Be polite about it. It costs nothing.",
+   "giver": "qgb-bankstown-tony-b",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -15991,
+     "z": 5686,
+     "radius": 30,
+     "label": "and drop it at the Bankstown Arts Centre"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 428,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-049",
+   "act": 3,
+   "title": "Seven a.m. At the Bankstown Sports Club",
+   "blurb": "My knees are gone, so. The site at the Bankstown Sports Club starts its jackhammer at eight at night on a the King's Birthday, which is illegal and loud. It is not the money. It has stopped being the money. Photograph it running and have a word with the Bankstown foreman. I will owe you one, and I pay those.",
+   "giver": "qgb-bankstown-elie-b",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -16292,
+     "z": 5215,
+     "radius": 40,
+     "label": "photograph the noise from the Bankstown Sports Club"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 143,
+    "xp": 429,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-050",
+   "act": 3,
+   "title": "The the Bankstown Bulldogs Course",
+   "blurb": "I'll be straight with you. A bloke near the Bankstown Bulldogs runs a ninety-minute course he bills at four hundred, and I've paid. It is the not knowing that has got me, honestly. Sit it Friday, then come back to Bankstown and prove it did something. Do not make a scene about it.",
+   "giver": "qgb-bankstown-nour-f",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near the Bankstown Bulldogs"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 147,
+    "xp": 405,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-051",
+   "act": 3,
+   "title": "Staffy Near Chapel Road",
+   "blurb": "There is no clever way to say this. A brindle staffy in a red bandana went over the fence at Chapel Road at bin night. I did try the official route, for what that was worth. Everyone in Bankstown has definitely seen it and can't say where. I'll put the kettle on for when you're back.",
+   "giver": "qgb-bankstown-rhonda",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -16024,
+     "z": 5135,
+     "radius": 30,
+     "label": "check the off-leash bit near Chapel Road"
+    },
+    {
+     "kind": "photo",
+     "x": -15897,
+     "z": 5311,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-bankstown-rhonda",
+     "node": "report-0",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 142,
+    "xp": 434,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-052",
+   "act": 3,
+   "title": "Closing Time at Chapel Road",
+   "blurb": "The council knows and the council does not care. Two blokes have slept in my doorway on Chapel Road since the pub shut. I am not after trouble. I am after an answer. The Bankstown delivery's at five, so get them up and show me the step empty. There is no rush, but there is a Friday.",
+   "giver": "qgb-bankstown-rhonda",
+   "level": 7,
+   "requires": [
+    "qgb-l7-bankstown-051"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off Chapel Road"
+    },
+    {
+     "kind": "photo",
+     "x": -16037,
+     "z": 5896,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 202,
+    "xp": 541,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-053",
+   "act": 3,
+   "title": "The Old Town Plaza Sparky",
+   "blurb": "Right. Since you asked. The sparky off the Old Town Plaza job has owed me since the bathroom and drinks in Bankstown from ten past ten. It might be nothing. It has not felt like nothing. Forty will do and I'll write off the rest. Whatever you find, bring it to me first.",
+   "giver": "qgb-bankstown-kylie-anne",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for Old Town Plaza"
+    },
+    {
+     "kind": "earn",
+     "dollars": 69,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 161,
+    "xp": 412,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-054",
+   "act": 3,
+   "title": "The the Bankstown Arts Centre Tab",
+   "blurb": "Keep it between us for now. Two chippies off the the Bankstown Arts Centre job have run a tab in Bankstown since Australia Day. There is a version of this where I am the unreasonable one. They drove past at six in the morning without looking in, so settle it in cash. Ask for me by name at the counter.",
+   "giver": "qgb-bankstown-phuc",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Bankstown Arts Centre"
+    },
+    {
+     "kind": "earn",
+     "dollars": 52,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 410,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-055",
+   "act": 3,
+   "title": "Something From the Bankstown Arts Centre",
+   "blurb": "Before you say anything: yes, I know. The stall at the Bankstown Arts Centre has run out and the customers keep coming. You can tell me I am imagining it. Tell me after. Find something round Bankstown that'll do before the half seven rush. Say nothing to anyone on the way.",
+   "giver": "qgb-bankstown-layla-f",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near the Bankstown Arts Centre"
+    },
+    {
+     "kind": "goto",
+     "x": -15971,
+     "z": 5885,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 147,
+    "xp": 420,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-056",
+   "act": 3,
+   "title": "The Bankstown Central Fence",
+   "blurb": "It is the sort of thing you notice or you do not. My neighbour at Bankstown Central says the tree is on my side and the fence says otherwise. I have rung the number on the letter four times. Look at it Thursday with Bankstown eyes and tell me the truth. Come and find me after, either way.",
+   "giver": "qgb-bankstown-elie-c",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -15963,
+     "z": 5528,
+     "radius": 30,
+     "label": "go and look at the fence at Bankstown Central"
+    },
+    {
+     "kind": "photo",
+     "x": -15963,
+     "z": 5528,
+     "radius": 40,
+     "label": "photograph the tree over it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-bankstown-elie-c",
+     "node": "report-2",
+     "label": "tell me whose side it's on"
+    }
+   ],
+   "reward": {
+    "cash": 148,
+    "xp": 403,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-057",
+   "act": 3,
+   "title": "The Bankstown Central Lift",
+   "blurb": "You look like you have twenty minutes. The lift at Bankstown station has been out since the Easter Show and I'm told Lakemba is worse. It started small, the way these things do. Check both Sunday and tell me which takes a pram. Be polite about it. It costs nothing.",
+   "giver": "qgb-bankstown-imogen",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -16073,
+     "z": 5694,
+     "radius": 30,
+     "label": "check the lift at Bankstown station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Bankstown",
+     "to": "Lakemba",
+     "label": "then ride to Lakemba and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-bankstown-imogen",
+     "node": "report-0",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 150,
+    "xp": 402,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-058",
+   "act": 3,
+   "title": "Proof of the Bankstown pho strip",
+   "blurb": "The council knows and the council does not care. Nobody in Bankstown believes what the Bankstown pho strip looks like at the last train. There is probably a simple explanation and I would love to hear it. Get me a photo close enough that council can't say it's somewhere else. I'll put the kettle on for when you're back.",
+   "giver": "qgb-bankstown-ngoc",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -15971,
+     "z": 5672,
+     "radius": 40,
+     "label": "get a picture of the Bankstown pho strip before they fix it"
+    }
+   ],
+   "reward": {
+    "cash": 154,
+    "xp": 420,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-059",
+   "act": 3,
+   "title": "Two Signs, Restwell Street",
+   "blurb": "Someone has to, and it may as well be you. Two signs near Restwell Street say opposite things about parking and I've been fined under both. It might be nothing. It has not felt like nothing. Get photos of each before Wednesday, when Bankstown council takes one down. There is no rush, but there is a Friday.",
+   "giver": "qgb-bankstown-ngoc",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -16108,
+     "z": 5455,
+     "radius": 40,
+     "label": "photograph the sign at Restwell Street"
+    },
+    {
+     "kind": "photo",
+     "x": -16153,
+     "z": 5727,
+     "radius": 40,
+     "label": "and the one that contradicts it"
+    }
+   ],
+   "reward": {
+    "cash": 155,
+    "xp": 399,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-060",
+   "act": 3,
+   "title": "Tap On at the Bankstown pho strip",
+   "blurb": "Right. Since you asked. My Opal says I owe nineteen dollars for a trip from Bankstown I never took on Sunday. I have got a photo on my phone but it is useless. Take the same one to Lakemba and tell me what it charged you. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-bankstown-tony-c",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Bankstown",
+     "to": "Lakemba",
+     "label": "tap on at Bankstown, tap off at Lakemba"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-bankstown-tony-c",
+     "node": "report-1",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 158,
+    "xp": 409,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-061",
+   "act": 3,
+   "title": "RBT on the Bankstown Bulldogs",
+   "blurb": "It is not a police matter and I have checked. There's a breath test set up on the Bankstown Bulldogs since half seven. Nobody else seems to have noticed, which is its own problem. My brother-in-law needs the ute at the far end of Bankstown without a conversation. Whatever you find, bring it to me first.",
+   "giver": "qgb-bankstown-tony-c",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on the Bankstown Bulldogs"
+    },
+    {
+     "kind": "goto",
+     "x": -15973,
+     "z": 5642,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 143,
+    "xp": 405,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-062",
+   "act": 3,
+   "title": "Something From the Bankstown Sports Club",
+   "blurb": "You will think I am making this up. The stall at the Bankstown Sports Club has run out and the customers keep coming. I am aware how that sounds. Find something round Bankstown that'll do before the nine sharp rush. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qgb-bankstown-leanne",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near the Bankstown Sports Club"
+    },
+    {
+     "kind": "goto",
+     "x": -16186,
+     "z": 5620,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 160,
+    "xp": 398,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-063",
+   "act": 3,
+   "title": "Proof of Old Town Plaza",
+   "blurb": "I'll be straight with you. Nobody in Bankstown believes what Old Town Plaza looks like at the arvo. I did try the official route, for what that was worth. Get me a photo close enough that council can't say it's somewhere else. I will owe you one, and I pay those.",
+   "giver": "qgb-bankstown-nour-g",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -15846,
+     "z": 5697,
+     "radius": 40,
+     "label": "get a picture of Old Town Plaza before they fix it"
+    }
+   ],
+   "reward": {
+    "cash": 146,
+    "xp": 434,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-064",
+   "act": 3,
+   "title": "Trouble at the Bankstown Sports Club",
+   "blurb": "It has been three weeks. Two lads and their mate decided at after the footy that the Bankstown Sports Club is theirs. It started small, the way these things do. The rest of Bankstown disagrees, so explain the disagreement. I'll see you right for it.",
+   "giver": "qgb-bankstown-tanya",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near the Bankstown Sports Club"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 143,
+    "xp": 406,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-065",
+   "act": 3,
+   "title": "The the Bankstown Bulldogs Sparky",
+   "blurb": "You look like you have twenty minutes. The sparky off the the Bankstown Bulldogs job has owed me since the bathroom and drinks in Bankstown from half four. It is not the money. It has stopped being the money. Forty will do and I'll write off the rest. That's it. That's the whole ask.",
+   "giver": "qgb-bankstown-dean",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for the Bankstown Bulldogs"
+    },
+    {
+     "kind": "earn",
+     "dollars": 69,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 148,
+    "xp": 413,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-066",
+   "act": 3,
+   "title": "The Chapel Road Order",
+   "blurb": "I have been putting it off since Easter. The Chapel Road order came to seventy more than I'd budgeted and the supplier wants it by half six. Half the street knows and half the street is pretending not to. Find seventy in Bankstown and photograph the receipt. Come and find me after, either way.",
+   "giver": "qgb-bankstown-dean",
+   "level": 7,
+   "requires": [
+    "qgb-l7-bankstown-065"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 120,
+     "label": "square the seventy for the Chapel Road order"
+    },
+    {
+     "kind": "photo",
+     "x": -16116,
+     "z": 5762,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 194,
+    "xp": 555,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-bankstown-067",
+   "act": 3,
+   "title": "Bin Night, Old Town Plaza",
+   "blurb": "You are the first person to stop all morning. Somebody moves the bins on Old Town Plaza in front of my drive every Easter Saturday night. It is the not knowing that has got me, honestly. Photograph the evidence and have a word; Bankstown knows who. Be polite about it. It costs nothing.",
+   "giver": "qgb-bankstown-dean",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -16089,
+     "z": 5655,
+     "radius": 40,
+     "label": "photograph the bins at Old Town Plaza"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 161,
+    "xp": 429,
+    "unlock": []
+   }
+  }
+ ]
+}

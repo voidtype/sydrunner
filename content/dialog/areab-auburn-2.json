@@ -1,0 +1,2699 @@
+{
+ "pack": "areab-auburn-2",
+ "npcs": [
+  {
+   "id": "qgb-auburn-tony-b",
+   "name": "Tony B., mechanic, own shop",
+   "x": -16479,
+   "z": -2167,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "It's the timing belt. I haven't looked. It's always the timing belt. Auburn, what've you got?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Commodores, Hiluxes, the odd Alfa from a man who should know better. the Auburn Lidcombe Bowlo is where they die.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the auburn road course.",
+     "choices": [
+      {
+       "text": "The Auburn Road Course",
+       "accept": "qgb-l8-auburn-037",
+       "denyFlag": "w:qgb-l8-auburn-037"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Tony B. counts it out without looking up. -- Don't spend it all at the Auburn Lidcombe Bowlo.",
+     "choices": [
+      {
+       "text": "About the auburn road course.",
+       "turnin": "qgb-l8-auburn-037"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never buy a car off the Auburn Lidcombe Bowlo. Never. I've seen where they've been.",
+     "improv": {
+      "persona": "Tony B., mechanic, own shop in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Auburn Lidcombe Bowlo like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near the Auburn Lidcombe Bowlo."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-kylie-anne",
+   "name": "Kylie-Anne, council ranger",
+   "x": -16134,
+   "z": -2285,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Auburn is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Auburn Road generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's a flat white from the auburn gallipoli mosque.",
+     "choices": [
+      {
+       "text": "A Flat White From the Auburn Gallipoli Mosque",
+       "accept": "qgb-l8-auburn-038",
+       "denyFlag": "w:qgb-l8-auburn-038"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Kylie-Anne pays up on the spot.",
+     "choices": [
+      {
+       "text": "About a flat white from the auburn gallipoli mosque.",
+       "turnin": "qgb-l8-auburn-038"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Kylie-Anne, council ranger in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about Auburn Road like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near Auburn Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-yusuf-a",
+   "name": "Yusuf A., carpet shop owner",
+   "x": -16012,
+   "z": -2221,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Come in, look, no buying. Tea? Tea. Auburn, you're welcome here.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rugs from home, twenty years in Auburn. Rawson Street customers come for the tea and leave with a rug.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's counting the turkish pide strip.",
+     "choices": [
+      {
+       "text": "Counting the Turkish pide strip",
+       "accept": "qgb-l8-auburn-039",
+       "denyFlag": "w:qgb-l8-auburn-039"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Yusuf A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About counting the turkish pide strip.",
+       "turnin": "qgb-l8-auburn-039"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The kabuli near Rawson Street is the closest thing to my mother's cooking in this hemisphere.",
+     "improv": {
+      "persona": "Yusuf A., carpet shop owner in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about Rawson Street like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near Rawson Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-elie-a",
+   "name": "Elie A., baker",
+   "x": -15956,
+   "z": -1615,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flour on everything, sorry. Welcome to Auburn. Something warm?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Up at three, done by noon, asleep by nine. the Turkish pide strip eats what I make and I never see them awake.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two from auburn central.",
+     "choices": [
+      {
+       "text": "Two From Auburn Central",
+       "accept": "qgb-l8-auburn-040",
+       "denyFlag": "w:qgb-l8-auburn-040"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Elie A. counts it out without looking up. -- Don't spend it all at the Turkish pide strip.",
+     "choices": [
+      {
+       "text": "About two from auburn central.",
+       "turnin": "qgb-l8-auburn-040"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The knafeh at the Turkish pide strip is my cousin's. Better than mine. Don't tell him.",
+     "improv": {
+      "persona": "Elie A., baker in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Turkish pide strip like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near the Turkish pide strip."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-nour-a",
+   "name": "Nour A., mechanic, own shop",
+   "x": -16664,
+   "z": -1510,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "It's the timing belt. I haven't looked. It's always the timing belt. Auburn, what've you got?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Commodores, Hiluxes, the odd Alfa from a man who should know better. Auburn Central is where they die.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the auburn lidcombe bowlo fence.",
+     "choices": [
+      {
+       "text": "The the Auburn Lidcombe Bowlo Fence",
+       "accept": "qgb-l8-auburn-041",
+       "denyFlag": "w:qgb-l8-auburn-041"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Nour A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the auburn lidcombe bowlo fence.",
+       "turnin": "qgb-l8-auburn-041"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never buy a car off Auburn Central. Never. I've seen where they've been.",
+     "improv": {
+      "persona": "Nour A., mechanic, own shop in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about Auburn Central like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near Auburn Central."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Right. And you're sure it was the Auburn Lidcombe Bowlo? People say the Auburn Lidcombe Bowlo when they mean the bit next to it. -- Nour A. writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-val",
+   "name": "Val, council ranger",
+   "x": -16817,
+   "z": -1629,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Auburn is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Wyatt Park generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's bin night, auburn road.",
+     "choices": [
+      {
+       "text": "Bin Night, Auburn Road",
+       "accept": "qgb-l8-auburn-042",
+       "denyFlag": "w:qgb-l8-auburn-042"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Val counts it out without looking up. -- Don't spend it all at Wyatt Park.",
+     "choices": [
+      {
+       "text": "About bin night, auburn road.",
+       "turnin": "qgb-l8-auburn-042"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Val, council ranger in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about Wyatt Park like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near Wyatt Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-narelle",
+   "name": "Narelle, chippy off a job",
+   "x": -16645,
+   "z": -1436,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Auburn, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the auburn botanic gardens lift.",
+     "choices": [
+      {
+       "text": "The the Auburn Botanic Gardens Lift",
+       "accept": "qgb-l8-auburn-043",
+       "denyFlag": "w:qgb-l8-auburn-043"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Narelle looks it over the way Auburn looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the auburn botanic gardens lift.",
+       "turnin": "qgb-l8-auburn-043"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Auburn is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Narelle, chippy off a job in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Auburn Lidcombe Bowlo like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near the Auburn Lidcombe Bowlo."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Auburn would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-elie-b",
+   "name": "Elie B., mechanic, own shop",
+   "x": -16036,
+   "z": -1692,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "It's the timing belt. I haven't looked. It's always the timing belt. Auburn, what've you got?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Commodores, Hiluxes, the odd Alfa from a man who should know better. Rawson Street is where they die.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's seven a.m. at the turkish pide strip.",
+     "choices": [
+      {
+       "text": "Seven a.m. At the Turkish pide strip",
+       "accept": "qgb-l8-auburn-044",
+       "denyFlag": "w:qgb-l8-auburn-044"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Elie B. looks it over the way Auburn looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About seven a.m. at the turkish pide strip.",
+       "turnin": "qgb-l8-auburn-044"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never buy a car off Rawson Street. Never. I've seen where they've been.",
+     "improv": {
+      "persona": "Elie B., mechanic, own shop in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about Rawson Street like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near Rawson Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-trent",
+   "name": "Trent, council ranger",
+   "x": -16583,
+   "z": -2188,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Auburn is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. the Turkish pide strip generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Race Four, Auburn Central",
+       "accept": "qgb-l8-auburn-045",
+       "denyFlag": "w:qgb-l8-auburn-045"
+      },
+      {
+       "text": "The Auburn Central Float",
+       "accept": "qgb-l8-auburn-046",
+       "denyFlag": "w:qgb-l8-auburn-046",
+       "needFlag": "w:qgb-l8-auburn-045"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Trent looks it over the way Auburn looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About race four, auburn central.",
+       "turnin": "qgb-l8-auburn-045"
+      },
+      {
+       "text": "About the auburn central float.",
+       "turnin": "qgb-l8-auburn-046"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Trent, council ranger in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Turkish pide strip like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near the Turkish pide strip."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Trent listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Right. And you're sure it was Auburn Central? People say Auburn Central when they mean the bit next to it. -- Trent writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-luke",
+   "name": "Luke, botanic gardens groundskeeper",
+   "x": -16297,
+   "z": -1952,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Off the grass. That grass. This grass is fine. Auburn gardens, welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Cherry trees, koi, and every wedding photographer in western Sydney. Wyatt Park in August is my Christmas.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Trolley Run, the Auburn Lidcombe Bowlo",
+       "accept": "qgb-l8-auburn-047",
+       "denyFlag": "w:qgb-l8-auburn-047"
+      },
+      {
+       "text": "Two From the Auburn Lidcombe Bowlo",
+       "accept": "qgb-l8-auburn-048",
+       "denyFlag": "w:qgb-l8-auburn-048",
+       "needFlag": "w:qgb-l8-auburn-047"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Luke counts it out without looking up. -- Don't spend it all at Wyatt Park.",
+     "choices": [
+      {
+       "text": "About trolley run, the auburn lidcombe bowlo.",
+       "turnin": "qgb-l8-auburn-047"
+      },
+      {
+       "text": "About two from the auburn lidcombe bowlo.",
+       "turnin": "qgb-l8-auburn-048"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The ibis at Wyatt Park have worked out the bins. They're smarter than the council.",
+     "improv": {
+      "persona": "Luke, botanic gardens groundskeeper in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about Wyatt Park like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near Wyatt Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-mehmet-c",
+   "name": "Mehmet C., pide shop owner",
+   "x": -16537,
+   "z": -2021,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Pide's out of the oven in two minutes. Sit. Auburn, welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Pide, kebab, baklava my wife won't let me sell. the Auburn Lidcombe Bowlo eats here after Friday prayers.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Meat Tray at Rawson Street",
+       "accept": "qgb-l8-auburn-049",
+       "denyFlag": "w:qgb-l8-auburn-049"
+      },
+      {
+       "text": "Bin Night, the Auburn Gallipoli Mosque",
+       "accept": "qgb-l8-auburn-050",
+       "denyFlag": "w:qgb-l8-auburn-050",
+       "needFlag": "w:qgb-l8-auburn-049"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Mehmet C. looks it over the way Auburn looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About meat tray at rawson street.",
+       "turnin": "qgb-l8-auburn-049"
+      },
+      {
+       "text": "About bin night, the auburn gallipoli mosque.",
+       "turnin": "qgb-l8-auburn-050"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The gardens at the Auburn Lidcombe Bowlo in August are the cherry blossoms. Everyone comes. Nobody buys pide.",
+     "improv": {
+      "persona": "Mehmet C., pide shop owner in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Auburn Lidcombe Bowlo like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near the Auburn Lidcombe Bowlo."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-nasir-a",
+   "name": "Nasir A., carpet shop owner",
+   "x": -16666,
+   "z": -2042,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Come in, look, no buying. Tea? Tea. Auburn, you're welcome here.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rugs from home, twenty years in Auburn. Auburn Road customers come for the tea and leave with a rug.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the rawson street camera.",
+     "choices": [
+      {
+       "text": "The Rawson Street Camera",
+       "accept": "qgb-l8-auburn-051",
+       "denyFlag": "w:qgb-l8-auburn-051"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Nasir A. counts it out without looking up. -- Don't spend it all at Auburn Road.",
+     "choices": [
+      {
+       "text": "About the rawson street camera.",
+       "turnin": "qgb-l8-auburn-051"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The kabuli near Auburn Road is the closest thing to my mother's cooking in this hemisphere.",
+     "improv": {
+      "persona": "Nasir A., carpet shop owner in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about Auburn Road like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near Auburn Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-hamish",
+   "name": "Hamish, chippy off a job",
+   "x": -16394,
+   "z": -1779,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Auburn, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's left it near the turkish pide strip.",
+     "choices": [
+      {
+       "text": "Left It Near the Turkish pide strip",
+       "accept": "qgb-l8-auburn-052",
+       "denyFlag": "w:qgb-l8-auburn-052"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Hamish pays up on the spot.",
+     "choices": [
+      {
+       "text": "About left it near the turkish pide strip.",
+       "turnin": "qgb-l8-auburn-052"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Auburn is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Hamish, chippy off a job in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about Rawson Street like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near Rawson Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Right. And you're sure it was the Turkish pide strip? People say the Turkish pide strip when they mean the bit next to it. -- Hamish writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-angus",
+   "name": "Angus, botanic gardens groundskeeper",
+   "x": -16848,
+   "z": -2023,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Off the grass. That grass. This grass is fine. Auburn gardens, welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Cherry trees, koi, and every wedding photographer in western Sydney. the Turkish pide strip in August is my Christmas.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the length of wyatt park.",
+     "choices": [
+      {
+       "text": "The Length of Wyatt Park",
+       "accept": "qgb-l8-auburn-053",
+       "denyFlag": "w:qgb-l8-auburn-053"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Angus counts it out without looking up. -- Don't spend it all at the Turkish pide strip.",
+     "choices": [
+      {
+       "text": "About the length of wyatt park.",
+       "turnin": "qgb-l8-auburn-053"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The ibis at the Turkish pide strip have worked out the bins. They're smarter than the council.",
+     "improv": {
+      "persona": "Angus, botanic gardens groundskeeper in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Turkish pide strip like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near the Turkish pide strip."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-shirl",
+   "name": "Shirl, council ranger",
+   "x": -16577,
+   "z": -1786,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Auburn is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. the Auburn Gallipoli Mosque generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the cherry blossoms complaint.",
+     "choices": [
+      {
+       "text": "The the cherry blossoms Complaint",
+       "accept": "qgb-l8-auburn-054",
+       "denyFlag": "w:qgb-l8-auburn-054"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Shirl pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the cherry blossoms complaint.",
+       "turnin": "qgb-l8-auburn-054"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Shirl, council ranger in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Auburn Gallipoli Mosque like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near the Auburn Gallipoli Mosque."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-elie-c",
+   "name": "Elie C., baker",
+   "x": -15927,
+   "z": -2113,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flour on everything, sorry. Welcome to Auburn. Something warm?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Up at three, done by noon, asleep by nine. Auburn Central eats what I make and I never see them awake.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's something from the auburn lidcombe bowlo.",
+     "choices": [
+      {
+       "text": "Something From the Auburn Lidcombe Bowlo",
+       "accept": "qgb-l8-auburn-055",
+       "denyFlag": "w:qgb-l8-auburn-055"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Elie C. counts it out without looking up. -- Don't spend it all at Auburn Central.",
+     "choices": [
+      {
+       "text": "About something from the auburn lidcombe bowlo.",
+       "turnin": "qgb-l8-auburn-055"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The knafeh at Auburn Central is my cousin's. Better than mine. Don't tell him.",
+     "improv": {
+      "persona": "Elie C., baker in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about Auburn Central like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near Auburn Central."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-denise",
+   "name": "Denise, council ranger",
+   "x": -15978,
+   "z": -2158,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Auburn is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. the Auburn Lidcombe Bowlo generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's counting the auburn botanic gardens.",
+     "choices": [
+      {
+       "text": "Counting the Auburn Botanic Gardens",
+       "accept": "qgb-l8-auburn-056",
+       "denyFlag": "w:qgb-l8-auburn-056"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Denise pays up on the spot.",
+     "choices": [
+      {
+       "text": "About counting the auburn botanic gardens.",
+       "turnin": "qgb-l8-auburn-056"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Denise, council ranger in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Auburn Lidcombe Bowlo like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near the Auburn Lidcombe Bowlo."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-craig",
+   "name": "Craig, chippy off a job",
+   "x": -16160,
+   "z": -1956,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Auburn, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's lads off the auburn gallipoli mosque.",
+     "choices": [
+      {
+       "text": "Lads Off the Auburn Gallipoli Mosque",
+       "accept": "qgb-l8-auburn-057",
+       "denyFlag": "w:qgb-l8-auburn-057"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Craig pays up on the spot.",
+     "choices": [
+      {
+       "text": "About lads off the auburn gallipoli mosque.",
+       "turnin": "qgb-l8-auburn-057"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Auburn is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Craig, chippy off a job in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about Auburn Road like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near Auburn Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-elie-d",
+   "name": "Elie D., mechanic, own shop",
+   "x": -16170,
+   "z": -1427,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "It's the timing belt. I haven't looked. It's always the timing belt. Auburn, what've you got?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Commodores, Hiluxes, the odd Alfa from a man who should know better. the Turkish pide strip is where they die.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at auburn central.",
+     "choices": [
+      {
+       "text": "Trouble at Auburn Central",
+       "accept": "qgb-l8-auburn-058",
+       "denyFlag": "w:qgb-l8-auburn-058"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Elie D. looks it over the way Auburn looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About trouble at auburn central.",
+       "turnin": "qgb-l8-auburn-058"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never buy a car off the Turkish pide strip. Never. I've seen where they've been.",
+     "improv": {
+      "persona": "Elie D., mechanic, own shop in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Turkish pide strip like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near the Turkish pide strip."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-mehmet-d",
+   "name": "Mehmet D., pide shop owner",
+   "x": -15853,
+   "z": -1861,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Pide's out of the oven in two minutes. Sit. Auburn, welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Pide, kebab, baklava my wife won't let me sell. Auburn Road eats here after Friday prayers.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's staffy near the turkish pide strip.",
+     "choices": [
+      {
+       "text": "Staffy Near the Turkish pide strip",
+       "accept": "qgb-l8-auburn-059",
+       "denyFlag": "w:qgb-l8-auburn-059"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Mehmet D. counts it out without looking up. -- Don't spend it all at Auburn Road.",
+     "choices": [
+      {
+       "text": "About staffy near the turkish pide strip.",
+       "turnin": "qgb-l8-auburn-059"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The gardens at Auburn Road in August are the cherry blossoms. Everyone comes. Nobody buys pide.",
+     "improv": {
+      "persona": "Mehmet D., pide shop owner in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about Auburn Road like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near Auburn Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Right. And you're sure it was the Turkish pide strip? People say the Turkish pide strip when they mean the bit next to it. -- Mehmet D. writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-karim-a",
+   "name": "Karim A., carpet shop owner",
+   "x": -16575,
+   "z": -2053,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Come in, look, no buying. Tea? Tea. Auburn, you're welcome here.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rugs from home, twenty years in Auburn. the Auburn Gallipoli Mosque customers come for the tea and leave with a rug.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rbt on the auburn botanic gardens.",
+     "choices": [
+      {
+       "text": "RBT on the Auburn Botanic Gardens",
+       "accept": "qgb-l8-auburn-060",
+       "denyFlag": "w:qgb-l8-auburn-060"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Karim A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About rbt on the auburn botanic gardens.",
+       "turnin": "qgb-l8-auburn-060"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The kabuli near the Auburn Gallipoli Mosque is the closest thing to my mother's cooking in this hemisphere.",
+     "improv": {
+      "persona": "Karim A., carpet shop owner in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Auburn Gallipoli Mosque like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near the Auburn Gallipoli Mosque."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-maureen",
+   "name": "Maureen, botanic gardens groundskeeper",
+   "x": -16209,
+   "z": -1853,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Off the grass. That grass. This grass is fine. Auburn gardens, welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Cherry trees, koi, and every wedding photographer in western Sydney. Auburn Central in August is my Christmas.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trolley run, wyatt park.",
+     "choices": [
+      {
+       "text": "Trolley Run, Wyatt Park",
+       "accept": "qgb-l8-auburn-061",
+       "denyFlag": "w:qgb-l8-auburn-061"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Maureen counts it out without looking up. -- Don't spend it all at Auburn Central.",
+     "choices": [
+      {
+       "text": "About trolley run, wyatt park.",
+       "turnin": "qgb-l8-auburn-061"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The ibis at Auburn Central have worked out the bins. They're smarter than the council.",
+     "improv": {
+      "persona": "Maureen, botanic gardens groundskeeper in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about Auburn Central like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near Auburn Central."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-elif-d",
+   "name": "Elif D., pide shop owner",
+   "x": -16634,
+   "z": -1835,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Pide's out of the oven in two minutes. Sit. Auburn, welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Pide, kebab, baklava my wife won't let me sell. Wyatt Park eats here after Friday prayers.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's cover at the cherry blossoms.",
+     "choices": [
+      {
+       "text": "Cover at the cherry blossoms",
+       "accept": "qgb-l8-auburn-062",
+       "denyFlag": "w:qgb-l8-auburn-062"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Elif D. counts it out without looking up. -- Don't spend it all at Wyatt Park.",
+     "choices": [
+      {
+       "text": "About cover at the cherry blossoms.",
+       "turnin": "qgb-l8-auburn-062"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The gardens at Wyatt Park in August are the cherry blossoms. Everyone comes. Nobody buys pide.",
+     "improv": {
+      "persona": "Elif D., pide shop owner in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about Wyatt Park like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near Wyatt Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-zahra-a",
+   "name": "Zahra A., carpet shop owner",
+   "x": -16412,
+   "z": -2222,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Come in, look, no buying. Tea? Tea. Auburn, you're welcome here.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rugs from home, twenty years in Auburn. the Auburn Lidcombe Bowlo customers come for the tea and leave with a rug.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the auburn road order.",
+     "choices": [
+      {
+       "text": "The Auburn Road Order",
+       "accept": "qgb-l8-auburn-063",
+       "denyFlag": "w:qgb-l8-auburn-063"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Zahra A. looks it over the way Auburn looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the auburn road order.",
+       "turnin": "qgb-l8-auburn-063"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The kabuli near the Auburn Lidcombe Bowlo is the closest thing to my mother's cooking in this hemisphere.",
+     "improv": {
+      "persona": "Zahra A., carpet shop owner in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Auburn Lidcombe Bowlo like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near the Auburn Lidcombe Bowlo."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-nour-b",
+   "name": "Nour B., baker",
+   "x": -16732,
+   "z": -1996,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flour on everything, sorry. Welcome to Auburn. Something warm?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Up at three, done by noon, asleep by nine. Auburn Road eats what I make and I never see them awake.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's meat tray at the auburn gallipoli mosque.",
+     "choices": [
+      {
+       "text": "Meat Tray at the Auburn Gallipoli Mosque",
+       "accept": "qgb-l8-auburn-064",
+       "denyFlag": "w:qgb-l8-auburn-064"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Nour B. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About meat tray at the auburn gallipoli mosque.",
+       "turnin": "qgb-l8-auburn-064"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The knafeh at Auburn Road is my cousin's. Better than mine. Don't tell him.",
+     "improv": {
+      "persona": "Nour B., baker in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about Auburn Road like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near Auburn Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-tony-c",
+   "name": "Tony C., mechanic, own shop",
+   "x": -16290,
+   "z": -1674,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "It's the timing belt. I haven't looked. It's always the timing belt. Auburn, what've you got?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Commodores, Hiluxes, the odd Alfa from a man who should know better. the Auburn Gallipoli Mosque is where they die.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's bin night, the cherry blossoms.",
+     "choices": [
+      {
+       "text": "Bin Night, the cherry blossoms",
+       "accept": "qgb-l8-auburn-065",
+       "denyFlag": "w:qgb-l8-auburn-065"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Tony C. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About bin night, the cherry blossoms.",
+       "turnin": "qgb-l8-auburn-065"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never buy a car off the Auburn Gallipoli Mosque. Never. I've seen where they've been.",
+     "improv": {
+      "persona": "Tony C., mechanic, own shop in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Auburn Gallipoli Mosque like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near the Auburn Gallipoli Mosque."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-nola",
+   "name": "Nola, council ranger",
+   "x": -16308,
+   "z": -1877,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Auburn is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. the Auburn Botanic Gardens generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the cherry blossoms camera.",
+     "choices": [
+      {
+       "text": "The the cherry blossoms Camera",
+       "accept": "qgb-l8-auburn-066",
+       "denyFlag": "w:qgb-l8-auburn-066"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Nola looks it over the way Auburn looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the cherry blossoms camera.",
+       "turnin": "qgb-l8-auburn-066"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Nola, council ranger in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Auburn Botanic Gardens like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near the Auburn Botanic Gardens."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-auburn-ray",
+   "name": "Ray, chippy off a job",
+   "x": -16414,
+   "z": -2190,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Auburn, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Auburn like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's probationary at the auburn gallipoli mosque.",
+     "choices": [
+      {
+       "text": "Probationary at the Auburn Gallipoli Mosque",
+       "accept": "qgb-l8-auburn-067",
+       "denyFlag": "w:qgb-l8-auburn-067"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Ray pays up on the spot.",
+     "choices": [
+      {
+       "text": "About probationary at the auburn gallipoli mosque.",
+       "turnin": "qgb-l8-auburn-067"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Auburn is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Ray, chippy off a job in Auburn, Sydney. Dry, specific, local; never says g'day or crikey; talks about the cherry blossoms like everyone knows it.",
+      "context": "Someone has asked what Auburn is like these days. You are standing near the cherry blossoms."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

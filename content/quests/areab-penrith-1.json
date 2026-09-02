@@ -1,0 +1,1185 @@
+{
+ "pack": "areab-penrith-1",
+ "quests": [
+  {
+   "id": "qgb-l10-penrith-001",
+   "act": 3,
+   "title": "The the Panthers Tab",
+   "blurb": "Someone has to, and it may as well be you. Two chippies off the the Panthers job have run a tab in Penrith since Friday. Everyone I have told has looked at me the way you are now. They drove past at eight at night without looking in, so settle it in cash. Just do not come back empty-handed.",
+   "giver": "qgb-penrith-warwick",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Panthers"
+    },
+    {
+     "kind": "earn",
+     "dollars": 62,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 204,
+    "xp": 563,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-002",
+   "act": 3,
+   "title": "The the Panthers Fence",
+   "blurb": "I have written it down twice and lost it twice. My neighbour at the Panthers says the tree is on my side and the fence says otherwise. This is the third time I have had this conversation. Look at it Boxing Day with Penrith eyes and tell me the truth. Come and find me after, either way.",
+   "giver": "qgb-penrith-karen",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -47716,
+     "z": -12273,
+     "radius": 30,
+     "label": "go and look at the fence at the Panthers"
+    },
+    {
+     "kind": "photo",
+     "x": -47716,
+     "z": -12273,
+     "radius": 40,
+     "label": "photograph the tree over it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-penrith-karen",
+     "node": "report-2",
+     "label": "tell me whose side it's on"
+    }
+   ],
+   "reward": {
+    "cash": 204,
+    "xp": 547,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-003",
+   "act": 3,
+   "title": "Lads Off the Panthers",
+   "blurb": "My knees are gone, so. Three of them in TNs on the the Panthers steps, flogging vapes to schoolkids at eleven. I have got a photo on my phone but it is useless. Penrith used to move them on itself and now it rings me. That's the whole job. No catch.",
+   "giver": "qgb-penrith-rhonda",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from the Panthers"
+    }
+   ],
+   "reward": {
+    "cash": 186,
+    "xp": 562,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-004",
+   "act": 3,
+   "title": "Proof of the Log Cabin",
+   "blurb": "I'll be straight with you. Nobody in Penrith believes what the Log Cabin looks like at eight at night. You will see what I mean the second you get there. Get me a photo close enough that council can't say it's somewhere else. You'll know it when you see it.",
+   "giver": "qgb-penrith-gail",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -47987,
+     "z": -12401,
+     "radius": 40,
+     "label": "get a picture of the Log Cabin before they fix it"
+    }
+   ],
+   "reward": {
+    "cash": 204,
+    "xp": 554,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-005",
+   "act": 3,
+   "title": "Before They Touch Penrith Paceway",
+   "blurb": "Do not laugh. They start on Penrith Paceway on Easter Saturday and the orange fencing goes up. I would not ask if there was anyone else about. I want Penrith on record before it does. Do not let them talk you into anything.",
+   "giver": "qgb-penrith-gail",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -47973,
+     "z": -12441,
+     "radius": 40,
+     "label": "photograph the state of Penrith Paceway"
+    },
+    {
+     "kind": "goto",
+     "x": -47772,
+     "z": -12319,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 194,
+    "xp": 556,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-006",
+   "act": 3,
+   "title": "The Mulgoa Road Course",
+   "blurb": "I am told you do odd jobs. A bloke near Mulgoa Road runs a ninety-minute course he bills at four hundred, and I've paid. The paperwork says one thing and my eyes say another. Sit it the King's Birthday, then come back to Penrith and prove it did something. I'll see you right for it.",
+   "giver": "qgb-penrith-cooper",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near Mulgoa Road"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 188,
+    "xp": 532,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-007",
+   "act": 3,
+   "title": "Trouble at the Log Cabin",
+   "blurb": "You will think I am making this up. Two lads and their mate decided at five that the Log Cabin is theirs. I have rung the number on the letter four times. The rest of Penrith disagrees, so explain the disagreement. That's it. That's the whole ask.",
+   "giver": "qgb-penrith-digby",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near the Log Cabin"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 203,
+    "xp": 551,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-008",
+   "act": 3,
+   "title": "RBT on High Street",
+   "blurb": "Not being dramatic about this. There's a breath test set up on High Street since ten past ten. It is the not knowing that has got me, honestly. My brother-in-law needs the ute at the far end of Penrith without a conversation. There's cash in it. Not a lot.",
+   "giver": "qgb-penrith-brett",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on High Street"
+    },
+    {
+     "kind": "goto",
+     "x": -47888,
+     "z": -12602,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 204,
+    "xp": 565,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-009",
+   "act": 3,
+   "title": "Two From Penrith Plaza",
+   "blurb": "I would do it myself if I could leave the counter. Two of whatever's going near Penrith Plaza, here, hot, before the footy at closing. I did try the official route, for what that was worth. It's Penrith; I'm not asking for much. Come back and tell me straight.",
+   "giver": "qgb-penrith-kylie-anne",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near Penrith Plaza"
+    },
+    {
+     "kind": "goto",
+     "x": -47660,
+     "z": -11758,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 204,
+    "xp": 559,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-010",
+   "act": 3,
+   "title": "Something From Penrith Plaza",
+   "blurb": "You look like you have twenty minutes. The stall at Penrith Plaza has run out and the customers keep coming. It might be nothing. It has not felt like nothing. Find something round Penrith that'll do before the lunchtime rush. I'll put the kettle on for when you're back.",
+   "giver": "qgb-penrith-tahlia",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near Penrith Plaza"
+    },
+    {
+     "kind": "goto",
+     "x": -47610,
+     "z": -12268,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 202,
+    "xp": 565,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-011",
+   "act": 3,
+   "title": "Counting Penrith Paceway",
+   "blurb": "There is no clever way to say this. Council says the Penrith Paceway car park is never full and I say it's full by knock-off. There is a version of this where I am the unreasonable one. Count both Penrith car parks, photograph whichever one makes me right. You'll know it when you see it.",
+   "giver": "qgb-penrith-sharon",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -47681,
+     "z": -12042,
+     "radius": 30,
+     "label": "count the cars at Penrith Paceway"
+    },
+    {
+     "kind": "goto",
+     "x": -47973,
+     "z": -11829,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": -47681,
+     "z": -12042,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 205,
+    "xp": 560,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-012",
+   "act": 3,
+   "title": "Race Four, Mulgoa Road",
+   "blurb": "Someone has to, and it may as well be you. There's a horse in race four at bin night that a bloke at Mulgoa Road swears by. My wife says I should let it go. My wife is wrong. Turn it into fifty-five somewhere in Penrith and tell me if it came in. Do that and we're square.",
+   "giver": "qgb-penrith-sharon",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 114,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-penrith-sharon",
+     "node": "report-2",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 190,
+    "xp": 554,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-013",
+   "act": 3,
+   "title": "Rent Money, the Log Cabin",
+   "blurb": "Right. Since you asked. I'm forty-five short on the the Log Cabin rent and the agent doesn't take stories. This is the third time I have had this conversation. Make it somewhere in Penrith by the last train; I'm not fussy how. Ask for me by name at the counter.",
+   "giver": "qgb-penrith-graham",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 94,
+     "label": "earn forty-five somewhere in Penrith"
+    }
+   ],
+   "reward": {
+    "cash": 190,
+    "xp": 552,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-014",
+   "act": 3,
+   "title": "The Penrith Paceway Tab",
+   "blurb": "You will think I am making this up. Two chippies off the Penrith Paceway job have run a tab in Penrith since Sunday. It started small, the way these things do. They drove past at knock-off without looking in, so settle it in cash. If anyone asks, you were never here.",
+   "giver": "qgb-penrith-fiona",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near Penrith Paceway"
+    },
+    {
+     "kind": "earn",
+     "dollars": 62,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 198,
+    "xp": 569,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-015",
+   "act": 3,
+   "title": "The Penrith Plaza Complaint",
+   "blurb": "Not being dramatic about this. Two women in activewear have photographed my bins outside Penrith Plaza since Easter Saturday. I have got no proof, which is exactly why I am asking. One has Penrith council on speed dial; sort it however you sort things. Half now if you want it. Most people don't.",
+   "giver": "qgb-penrith-tegan",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near Penrith Plaza"
+    }
+   ],
+   "reward": {
+    "cash": 189,
+    "xp": 562,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-016",
+   "act": 3,
+   "title": "The the Panthers Order",
+   "blurb": "This is going to sound small. The the Panthers order came to seventy more than I'd budgeted and the supplier wants it by the last train. I did try the official route, for what that was worth. Find seventy in Penrith and photograph the receipt. There's cash in it. Not a lot.",
+   "giver": "qgb-penrith-tegan",
+   "level": 10,
+   "requires": [
+    "qgb-l10-penrith-015"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 146,
+     "label": "square the seventy for the the Panthers order"
+    },
+    {
+     "kind": "photo",
+     "x": -47576,
+     "z": -11820,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 261,
+    "xp": 696,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-017",
+   "act": 3,
+   "title": "Two From the Nepean River",
+   "blurb": "I would do it myself if I could leave the counter. Two of whatever's going near the Nepean River, here, hot, before the footy at nine sharp. I am not after trouble. I am after an answer. It's Penrith; I'm not asking for much. I will owe you one, and I pay those.",
+   "giver": "qgb-penrith-kylie",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near the Nepean River"
+    },
+    {
+     "kind": "goto",
+     "x": -48245,
+     "z": -12597,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 187,
+    "xp": 532,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-018",
+   "act": 3,
+   "title": "Trolley Run, the Penrith Whitewater stadium",
+   "blurb": "My knees are gone, so. A Woolies trolley from the Penrith Whitewater stadium gets walked to the creek every Easter Saturday. I would not ask if there was anyone else about. Find where it ends up in Penrith and make the deposit back. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-penrith-bluey",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -48198,
+     "z": -11929,
+     "radius": 30,
+     "label": "find the trolley near the Penrith Whitewater stadium"
+    },
+    {
+     "kind": "photo",
+     "x": -48198,
+     "z": -11929,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 52,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 191,
+    "xp": 538,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-019",
+   "act": 3,
+   "title": "Tap On at the Great Western Highway",
+   "blurb": "There is no clever way to say this. My Opal says I owe nineteen dollars for a trip from Penrith I never took on the King's Birthday. You can tell me I am imagining it. Tell me after. Take the same one to Blacktown and tell me what it charged you. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qgb-penrith-annabel",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Penrith",
+     "to": "Blacktown",
+     "label": "tap on at Penrith, tap off at Blacktown"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-penrith-annabel",
+     "node": "report-1",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 188,
+    "xp": 541,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-020",
+   "act": 3,
+   "title": "The Length of the Panthers",
+   "blurb": "You will think I am making this up. I haven't walked the Panthers end to end since the light rail came to Penrith. It has been going on longer than I have admitted to anyone. Do it Friday for me and photograph what's at the far end now. I'll see you right for it.",
+   "giver": "qgb-penrith-lorraine",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -47773,
+     "z": -12528,
+     "radius": 30,
+     "label": "walk the length of the Panthers"
+    },
+    {
+     "kind": "goto",
+     "x": -47758,
+     "z": -12169,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -47758,
+     "z": -12169,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 195,
+    "xp": 553,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-021",
+   "act": 3,
+   "title": "One Stop From the Nepean River",
+   "blurb": "Keep it between us for now. I need to know the train from Penrith stops at Blacktown and doesn't sail through like it did on Anzac Day. It is the not knowing that has got me, honestly. Ride it at school pick-up and photograph the sign. Come and find me after, either way.",
+   "giver": "qgb-penrith-colin",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Penrith",
+     "to": "Blacktown",
+     "label": "take the train to Blacktown"
+    },
+    {
+     "kind": "photo",
+     "x": -28190,
+     "z": -10660,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 204,
+    "xp": 540,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-022",
+   "act": 3,
+   "title": "Seven a.m. At the Penrith Whitewater stadium",
+   "blurb": "Not being dramatic about this. The site at the Penrith Whitewater stadium starts its jackhammer at three in the morning on a grand final day, which is illegal and loud. I did try the official route, for what that was worth. Photograph it running and have a word with the Penrith foreman. I would rather know than wonder.",
+   "giver": "qgb-penrith-rania",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -47873,
+     "z": -12535,
+     "radius": 40,
+     "label": "photograph the noise from the Penrith Whitewater stadium"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 198,
+    "xp": 551,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-023",
+   "act": 3,
+   "title": "The the Penrith Whitewater stadium Fence",
+   "blurb": "It has been three weeks. My neighbour at the Penrith Whitewater stadium says the tree is on my side and the fence says otherwise. It might be nothing. It has not felt like nothing. Look at it Friday with Penrith eyes and tell me the truth. I will owe you one, and I pay those.",
+   "giver": "qgb-penrith-leanne",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -48042,
+     "z": -11871,
+     "radius": 30,
+     "label": "go and look at the fence at the Penrith Whitewater stadium"
+    },
+    {
+     "kind": "photo",
+     "x": -48042,
+     "z": -11871,
+     "radius": 40,
+     "label": "photograph the tree over it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-penrith-leanne",
+     "node": "report-2",
+     "label": "tell me whose side it's on"
+    }
+   ],
+   "reward": {
+    "cash": 197,
+    "xp": 531,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-024",
+   "act": 3,
+   "title": "Two From Penrith Paceway",
+   "blurb": "You look like you have twenty minutes. Two of whatever's going near Penrith Paceway, here, hot, before the footy at school pick-up. Nobody else seems to have noticed, which is its own problem. It's Penrith; I'm not asking for much. Do not make a scene about it.",
+   "giver": "qgb-penrith-eddie",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near Penrith Paceway"
+    },
+    {
+     "kind": "goto",
+     "x": -47499,
+     "z": -11937,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 198,
+    "xp": 541,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-025",
+   "act": 3,
+   "title": "Cover at the Log Cabin",
+   "blurb": "I have been putting it off since Easter. I've got nobody for the the Log Cabin shift at eight at night and a room full of Penrith people who've paid. You will see what I mean the second you get there. Fifty of trade and one difficult person at the door. I will know if you skipped a bit.",
+   "giver": "qgb-penrith-maureen",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 104,
+     "label": "cover the fifty for the shift"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 1,
+     "label": "and handle whoever's at the door"
+    }
+   ],
+   "reward": {
+    "cash": 198,
+    "xp": 553,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-026",
+   "act": 3,
+   "title": "Something From Penrith Paceway",
+   "blurb": "Honestly, I am past caring how it looks. The stall at Penrith Paceway has run out and the customers keep coming. Everyone I have told has looked at me the way you are now. Find something round Penrith that'll do before the peak hour rush. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-penrith-kerry",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near Penrith Paceway"
+    },
+    {
+     "kind": "goto",
+     "x": -48265,
+     "z": -12414,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 185,
+    "xp": 557,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-027",
+   "act": 3,
+   "title": "Trolley Run, the Panthers",
+   "blurb": "There is no clever way to say this. A Woolies trolley from the Panthers gets walked to the creek every Sunday. My wife says I should let it go. My wife is wrong. Find where it ends up in Penrith and make the deposit back. That's the whole job. No catch.",
+   "giver": "qgb-penrith-tony",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -48054,
+     "z": -12764,
+     "radius": 30,
+     "label": "find the trolley near the Panthers"
+    },
+    {
+     "kind": "photo",
+     "x": -48054,
+     "z": -12764,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 52,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 193,
+    "xp": 546,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-028",
+   "act": 3,
+   "title": "The the Panthers Lift",
+   "blurb": "The council knows and the council does not care. The lift at Penrith station has been out since the Easter Show and I'm told Blacktown is worse. This is the third time I have had this conversation. Check both Melbourne Cup day and tell me which takes a pram. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qgb-penrith-tony",
+   "level": 10,
+   "requires": [
+    "qgb-l10-penrith-027"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -47745,
+     "z": -12188,
+     "radius": 30,
+     "label": "check the lift at Penrith station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Penrith",
+     "to": "Blacktown",
+     "label": "then ride to Blacktown and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-penrith-tony",
+     "node": "report-1",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 250,
+    "xp": 728,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-029",
+   "act": 3,
+   "title": "Meat Tray at Penrith Plaza",
+   "blurb": "Right. Since you asked. The Penrith Plaza raffle is thirty-five short of a meat tray and the draw is at peak hour. I would have sorted it myself a year ago. Find it in Penrith and put it in the tin. Do not let them talk you into anything.",
+   "giver": "qgb-penrith-rupert",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 73,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -47812,
+     "z": -12100,
+     "radius": 30,
+     "label": "and drop it at Penrith Plaza"
+    }
+   ],
+   "reward": {
+    "cash": 194,
+    "xp": 531,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-030",
+   "act": 3,
+   "title": "A Flat White From Tench Reserve",
+   "blurb": "I am told you do odd jobs. I want a flat white from the place near Tench Reserve, not the one next to it. It started small, the way these things do. Here by eleven, while it's still coffee and Penrith still has some. Ask for me by name at the counter.",
+   "giver": "qgb-penrith-nola",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near Tench Reserve"
+    },
+    {
+     "kind": "goto",
+     "x": -47741,
+     "z": -12254,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 187,
+    "xp": 546,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-031",
+   "act": 3,
+   "title": "The High Street Course",
+   "blurb": "Keep it between us for now. A bloke near High Street runs a ninety-minute course he bills at four hundred, and I've paid. I have got no proof, which is exactly why I am asking. Sit it Melbourne Cup day, then come back to Penrith and prove it did something. That's it. That's the whole ask.",
+   "giver": "qgb-penrith-glenn",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near High Street"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 192,
+    "xp": 539,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-032",
+   "act": 3,
+   "title": "Before They Touch the Penrith Whitewater stadium",
+   "blurb": "Before you say anything: yes, I know. They start on the Penrith Whitewater stadium on the King's Birthday and the orange fencing goes up. I did try the official route, for what that was worth. I want Penrith on record before it does. Come and find me after, either way.",
+   "giver": "qgb-penrith-michelle",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -47781,
+     "z": -11658,
+     "radius": 40,
+     "label": "photograph the state of the Penrith Whitewater stadium"
+    },
+    {
+     "kind": "goto",
+     "x": -47874,
+     "z": -11862,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 190,
+    "xp": 536,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-033",
+   "act": 3,
+   "title": "One Stop From the Log Cabin",
+   "blurb": "It is the sort of thing you notice or you do not. I need to know the train from Penrith stops at Blacktown and doesn't sail through like it did on Friday. Nobody else seems to have noticed, which is its own problem. Ride it at closing and photograph the sign. I will owe you one, and I pay those.",
+   "giver": "qgb-penrith-nour",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Penrith",
+     "to": "Blacktown",
+     "label": "take the train to Blacktown"
+    },
+    {
+     "kind": "photo",
+     "x": -28190,
+     "z": -10660,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 198,
+    "xp": 560,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-034",
+   "act": 3,
+   "title": "Bin Night, the Log Cabin",
+   "blurb": "You look like you have twenty minutes. Somebody moves the bins on the Log Cabin in front of my drive every Easter Saturday night. You will see what I mean the second you get there. Photograph the evidence and have a word; Penrith knows who. Come back and tell me straight.",
+   "giver": "qgb-penrith-nour",
+   "level": 10,
+   "requires": [
+    "qgb-l10-penrith-033"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -47465,
+     "z": -12336,
+     "radius": 40,
+     "label": "photograph the bins at the Log Cabin"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 243,
+    "xp": 719,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-penrith-035",
+   "act": 3,
+   "title": "Staffy Near the Panthers",
+   "blurb": "Honestly, I am past caring how it looks. A brindle staffy in a red bandana went over the fence at the Panthers at knock-off. There is a version of this where I am the unreasonable one. Everyone in Penrith has definitely seen it and can't say where. There is no rush, but there is a Friday.",
+   "giver": "qgb-penrith-narelle",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -47761,
+     "z": -12423,
+     "radius": 30,
+     "label": "check the off-leash bit near the Panthers"
+    },
+    {
+     "kind": "photo",
+     "x": -47544,
+     "z": -12410,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-penrith-narelle",
+     "node": "report-0",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 194,
+    "xp": 551,
+    "unlock": []
+   }
+  }
+ ]
+}

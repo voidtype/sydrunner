@@ -1,0 +1,920 @@
+{
+ "pack": "areab-milsons-point-2",
+ "quests": [
+  {
+   "id": "qgb-l5-milsons-point-041",
+   "act": 3,
+   "title": "Meat Tray at Bradfield Park",
+   "blurb": "Before you say anything: yes, I know. The Bradfield Park raffle is thirty-five short of a meat tray and the draw is at bin night. Nobody else seems to have noticed, which is its own problem. Find it in Milsons Point and put it in the tin. I would rather know than wonder.",
+   "giver": "qgb-milsons-point-luke-a",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 52,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": 234,
+     "z": -2585,
+     "radius": 30,
+     "label": "and drop it at Bradfield Park"
+    }
+   ],
+   "reward": {
+    "cash": 126,
+    "xp": 314,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-042",
+   "act": 3,
+   "title": "One Stop From the North Sydney Olympic Pool",
+   "blurb": "It is the sort of thing you notice or you do not. I need to know the train from Milsons Point stops at Ashfield and doesn't sail through like it did on Anzac Day. There is a version of this where I am the unreasonable one. Ride it at five and photograph the sign. Do not make a scene about it.",
+   "giver": "qgb-milsons-point-barry-a",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Milsons Point",
+     "to": "Ashfield",
+     "label": "take the train to Ashfield"
+    },
+    {
+     "kind": "photo",
+     "x": -7627,
+     "z": 2205,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 117,
+    "xp": 347,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-043",
+   "act": 3,
+   "title": "The Lavender Bay Tab",
+   "blurb": "I have written it down twice and lost it twice. Two chippies off the Lavender Bay job have run a tab in Milsons Point since Melbourne Cup day. I am not after trouble. I am after an answer. They drove past at ten past ten without looking in, so settle it in cash. Just do not come back empty-handed.",
+   "giver": "qgb-milsons-point-poppy-b",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near Lavender Bay"
+    },
+    {
+     "kind": "earn",
+     "dollars": 44,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 123,
+    "xp": 340,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-044",
+   "act": 3,
+   "title": "Tap On at Bradfield Park",
+   "blurb": "Nobody else has offered, so. My Opal says I owe nineteen dollars for a trip from Milsons Point I never took on Tuesday. It might be nothing. It has not felt like nothing. Take the same one to Ashfield and tell me what it charged you. If anyone asks, you were never here.",
+   "giver": "qgb-milsons-point-rupert-a",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Milsons Point",
+     "to": "Ashfield",
+     "label": "tap on at Milsons Point, tap off at Ashfield"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-milsons-point-rupert-a",
+     "node": "report-0",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 119,
+    "xp": 327,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-045",
+   "act": 3,
+   "title": "Before They Touch Blues Point",
+   "blurb": "Before you say anything: yes, I know. They start on Blues Point on the long weekend and the orange fencing goes up. You will see what I mean the second you get there. I want Milsons Point on record before it does. Be polite about it. It costs nothing.",
+   "giver": "qgb-milsons-point-harriet-a",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 320,
+     "z": -2737,
+     "radius": 40,
+     "label": "photograph the state of Blues Point"
+    },
+    {
+     "kind": "goto",
+     "x": 524,
+     "z": -2552,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 122,
+    "xp": 317,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-046",
+   "act": 3,
+   "title": "Rent Money, Lavender Bay",
+   "blurb": "The council knows and the council does not care. I'm forty-five short on the Lavender Bay rent and the agent doesn't take stories. Half the street knows and half the street is pretending not to. Make it somewhere in Milsons Point by ten past ten; I'm not fussy how. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qgb-milsons-point-scott-b",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 67,
+     "label": "earn forty-five somewhere in Milsons Point"
+    }
+   ],
+   "reward": {
+    "cash": 120,
+    "xp": 321,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-047",
+   "act": 3,
+   "title": "The Lavender Bay Lift",
+   "blurb": "Someone has to, and it may as well be you. The lift at Milsons Point station has been out since the Easter Show and I'm told Ashfield is worse. It is the not knowing that has got me, honestly. Check both Monday and tell me which takes a pram. You'll know it when you see it.",
+   "giver": "qgb-milsons-point-fiona-a",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 145,
+     "z": -2496,
+     "radius": 30,
+     "label": "check the lift at Milsons Point station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Milsons Point",
+     "to": "Ashfield",
+     "label": "then ride to Ashfield and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-milsons-point-fiona-a",
+     "node": "report-0",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 315,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-048",
+   "act": 3,
+   "title": "Closing Time at Lavender Bay",
+   "blurb": "Right. Since you asked. Two blokes have slept in my doorway on Lavender Bay since the pub shut. I have got no proof, which is exactly why I am asking. The Milsons Point delivery's at half seven, so get them up and show me the step empty. Do not let them talk you into anything.",
+   "giver": "qgb-milsons-point-fiona-a",
+   "level": 5,
+   "requires": [
+    "qgb-l5-milsons-point-047"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off Lavender Bay"
+    },
+    {
+     "kind": "photo",
+     "x": -25,
+     "z": -2331,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 172,
+    "xp": 406,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-049",
+   "act": 3,
+   "title": "The the Kirribilli markets Complaint",
+   "blurb": "You will think I am making this up. Two women in activewear have photographed my bins outside the Kirribilli markets since Easter Saturday. It might be nothing. It has not felt like nothing. One has Milsons Point council on speed dial; sort it however you sort things. Just do not come back empty-handed.",
+   "giver": "qgb-milsons-point-lorraine-a",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near the Kirribilli markets"
+    }
+   ],
+   "reward": {
+    "cash": 115,
+    "xp": 329,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-050",
+   "act": 3,
+   "title": "Meat Tray at the Kirribilli markets",
+   "blurb": "Keep it between us for now. The the Kirribilli markets raffle is thirty-five short of a meat tray and the draw is at midnight. You will see what I mean the second you get there. Find it in Milsons Point and put it in the tin. That's it. That's the whole ask.",
+   "giver": "qgb-milsons-point-fetu",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 52,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -81,
+     "z": -2582,
+     "radius": 30,
+     "label": "and drop it at the Kirribilli markets"
+    }
+   ],
+   "reward": {
+    "cash": 132,
+    "xp": 343,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-051",
+   "act": 3,
+   "title": "A Flat White From the Kirribilli markets",
+   "blurb": "Not being dramatic about this. I want a flat white from the place near the Kirribilli markets, not the one next to it. I am aware how that sounds. Here by half seven, while it's still coffee and Milsons Point still has some. Be polite about it. It costs nothing.",
+   "giver": "qgb-milsons-point-fetu",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near the Kirribilli markets"
+    },
+    {
+     "kind": "goto",
+     "x": -163,
+     "z": -2706,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 119,
+    "xp": 320,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-052",
+   "act": 3,
+   "title": "Cover at the North Sydney Olympic Pool",
+   "blurb": "My knees are gone, so. I've got nobody for the the North Sydney Olympic Pool shift at half two and a room full of Milsons Point people who've paid. I have rung the number on the letter four times. Fifty of trade and one difficult person at the door. I'll put the kettle on for when you're back.",
+   "giver": "qgb-milsons-point-mitch-a",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 74,
+     "label": "cover the fifty for the shift"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 1,
+     "label": "and handle whoever's at the door"
+    }
+   ],
+   "reward": {
+    "cash": 113,
+    "xp": 324,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-053",
+   "act": 3,
+   "title": "Left It Near Kirribilli",
+   "blurb": "I'll be straight with you. I left something on the bench at Kirribilli at half six. It has been going on longer than I have admitted to anyone. By the time I got back to Milsons Point it had walked, so look where I'd have dropped it. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-milsons-point-maddie-a",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 273,
+     "z": -2670,
+     "radius": 30,
+     "label": "check the bench near Kirribilli"
+    },
+    {
+     "kind": "photo",
+     "x": -96,
+     "z": -2734,
+     "radius": 40,
+     "label": "photograph the bins behind it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-milsons-point-maddie-a",
+     "node": "report-0",
+     "label": "tell me what you found"
+    }
+   ],
+   "reward": {
+    "cash": 118,
+    "xp": 332,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-054",
+   "act": 3,
+   "title": "Something From the Greenwood",
+   "blurb": "It is not a police matter and I have checked. The stall at the Greenwood has run out and the customers keep coming. I am not after trouble. I am after an answer. Find something round Milsons Point that'll do before the the change of shift rush. Do not let them talk you into anything.",
+   "giver": "qgb-milsons-point-toby-a",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near the Greenwood"
+    },
+    {
+     "kind": "goto",
+     "x": 191,
+     "z": -2613,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 124,
+    "xp": 340,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-055",
+   "act": 3,
+   "title": "The Blues Point Fence",
+   "blurb": "I have written it down twice and lost it twice. My neighbour at Blues Point says the tree is on my side and the fence says otherwise. It might be nothing. It has not felt like nothing. Look at it Australia Day with Milsons Point eyes and tell me the truth. Ask for me by name at the counter.",
+   "giver": "qgb-milsons-point-dot-b",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 521,
+     "z": -2836,
+     "radius": 30,
+     "label": "go and look at the fence at Blues Point"
+    },
+    {
+     "kind": "photo",
+     "x": 521,
+     "z": -2836,
+     "radius": 40,
+     "label": "photograph the tree over it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-milsons-point-dot-b",
+     "node": "report-1",
+     "label": "tell me whose side it's on"
+    }
+   ],
+   "reward": {
+    "cash": 126,
+    "xp": 317,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-056",
+   "act": 3,
+   "title": "Trolley Run, Luna Park",
+   "blurb": "Nobody else has offered, so. A Woolies trolley from Luna Park gets walked to the creek every grand final day. Nobody else seems to have noticed, which is its own problem. Find where it ends up in Milsons Point and make the deposit back. Just do not come back empty-handed.",
+   "giver": "qgb-milsons-point-clive-b",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -55,
+     "z": -2220,
+     "radius": 30,
+     "label": "find the trolley near Luna Park"
+    },
+    {
+     "kind": "photo",
+     "x": -55,
+     "z": -2220,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 37,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 115,
+    "xp": 334,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-057",
+   "act": 3,
+   "title": "The Miller Street Camera",
+   "blurb": "Two people have already said no. A new speed camera near Miller Street has fined half of Milsons Point since Thursday. You will see what I mean the second you get there. Photograph it for the appeal, then prove the train to Ashfield is faster anyway. I'll see you right for it.",
+   "giver": "qgb-milsons-point-clive-b",
+   "level": 5,
+   "requires": [
+    "qgb-l5-milsons-point-056"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 192,
+     "z": -2310,
+     "radius": 40,
+     "label": "photograph the camera near Miller Street"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Milsons Point",
+     "to": "Ashfield",
+     "label": "then take the train instead, to Ashfield"
+    }
+   ],
+   "reward": {
+    "cash": 147,
+    "xp": 411,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-058",
+   "act": 3,
+   "title": "Sightline at the Bridge's northern pylon",
+   "blurb": "I have been putting it off since Easter. Insurance says nobody could have seen the ute hit the fence at the Bridge's northern pylon on the long weekend. I would have sorted it myself a year ago. Stand where I stood in Milsons Point, photograph the view, tell me if I'm lying. Come back and tell me straight.",
+   "giver": "qgb-milsons-point-debbie-b",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 129,
+     "z": -2614,
+     "radius": 30,
+     "label": "stand where it happened at the Bridge's northern pylon"
+    },
+    {
+     "kind": "photo",
+     "x": 129,
+     "z": -2614,
+     "radius": 40,
+     "label": "photograph the corner"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-milsons-point-debbie-b",
+     "node": "report-0",
+     "label": "describe the sightline"
+    }
+   ],
+   "reward": {
+    "cash": 126,
+    "xp": 310,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-059",
+   "act": 3,
+   "title": "Trouble at the Bridge's northern pylon",
+   "blurb": "My knees are gone, so. Two lads and their mate decided at eleven that the Bridge's northern pylon is theirs. It started small, the way these things do. The rest of Milsons Point disagrees, so explain the disagreement. I will know if you skipped a bit.",
+   "giver": "qgb-milsons-point-nathan-a",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near the Bridge's northern pylon"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 312,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-060",
+   "act": 3,
+   "title": "Race Four, Blues Point",
+   "blurb": "The council knows and the council does not care. There's a horse in race four at three in the morning that a bloke at Blues Point swears by. I have got no proof, which is exactly why I am asking. Turn it into fifty-five somewhere in Milsons Point and tell me if it came in. Take your time. Do not take a week.",
+   "giver": "qgb-milsons-point-denise-a",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 81,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-milsons-point-denise-a",
+     "node": "report-1",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 127,
+    "xp": 320,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-061",
+   "act": 3,
+   "title": "One Stop From the Kirribilli markets",
+   "blurb": "It is not a police matter and I have checked. I need to know the train from Milsons Point stops at Ashfield and doesn't sail through like it did on the long weekend. There is probably a simple explanation and I would love to hear it. Ride it at peak hour and photograph the sign. You'll know it when you see it.",
+   "giver": "qgb-milsons-point-rod-a",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Milsons Point",
+     "to": "Ashfield",
+     "label": "take the train to Ashfield"
+    },
+    {
+     "kind": "photo",
+     "x": -7627,
+     "z": 2205,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 120,
+    "xp": 325,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-062",
+   "act": 3,
+   "title": "Two From the Greenwood",
+   "blurb": "I have written it down twice and lost it twice. Two of whatever's going near the Greenwood, here, hot, before the footy at eleven. I have got a photo on my phone but it is useless. It's Milsons Point; I'm not asking for much. Do that and we're square.",
+   "giver": "qgb-milsons-point-ana-b",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near the Greenwood"
+    },
+    {
+     "kind": "goto",
+     "x": -317,
+     "z": -2439,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 132,
+    "xp": 324,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-063",
+   "act": 3,
+   "title": "Bin Night, the Greenwood",
+   "blurb": "Nobody else has offered, so. Somebody moves the bins on the Greenwood in front of my drive every Tuesday night. You will see what I mean the second you get there. Photograph the evidence and have a word; Milsons Point knows who. Say nothing to anyone on the way.",
+   "giver": "qgb-milsons-point-lachlan-a",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -160,
+     "z": -2604,
+     "radius": 40,
+     "label": "photograph the bins at the Greenwood"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 118,
+    "xp": 320,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-064",
+   "act": 3,
+   "title": "Staffy Near Luna Park",
+   "blurb": "Two people have already said no. A brindle staffy in a red bandana went over the fence at Luna Park at dawn. I would not ask if there was anyone else about. Everyone in Milsons Point has definitely seen it and can't say where. Just do not come back empty-handed.",
+   "giver": "qgb-milsons-point-chantelle-b",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 266,
+     "z": -2565,
+     "radius": 30,
+     "label": "check the off-leash bit near Luna Park"
+    },
+    {
+     "kind": "photo",
+     "x": -109,
+     "z": -2543,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-milsons-point-chantelle-b",
+     "node": "report-0",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 117,
+    "xp": 317,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-065",
+   "act": 3,
+   "title": "The Length of the North Sydney Olympic Pool",
+   "blurb": "Keep it between us for now. I haven't walked the North Sydney Olympic Pool end to end since the light rail came to Milsons Point. I am aware how that sounds. Do it Easter Saturday for me and photograph what's at the far end now. I'll see you right for it.",
+   "giver": "qgb-milsons-point-riley-a",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 223,
+     "z": -2527,
+     "radius": 30,
+     "label": "walk the length of the North Sydney Olympic Pool"
+    },
+    {
+     "kind": "goto",
+     "x": 293,
+     "z": -2717,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": 293,
+     "z": -2717,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 117,
+    "xp": 321,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-066",
+   "act": 3,
+   "title": "Rent Money, Bradfield Park",
+   "blurb": "It is the sort of thing you notice or you do not. I'm forty-five short on the Bradfield Park rent and the agent doesn't take stories. The paperwork says one thing and my eyes say another. Make it somewhere in Milsons Point by eight at night; I'm not fussy how. Half now if you want it. Most people don't.",
+   "giver": "qgb-milsons-point-clementine-b",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 67,
+     "label": "earn forty-five somewhere in Milsons Point"
+    }
+   ],
+   "reward": {
+    "cash": 118,
+    "xp": 332,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-milsons-point-067",
+   "act": 3,
+   "title": "Trouble at the Kirribilli markets",
+   "blurb": "You are the first person to stop all morning. Two lads and their mate decided at ten past ten that the Kirribilli markets is theirs. It started small, the way these things do. The rest of Milsons Point disagrees, so explain the disagreement. Come back and tell me straight.",
+   "giver": "qgb-milsons-point-bazza-b",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near the Kirribilli markets"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 131,
+    "xp": 340,
+    "unlock": []
+   }
+  }
+ ]
+}

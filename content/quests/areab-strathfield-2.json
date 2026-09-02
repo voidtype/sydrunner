@@ -1,0 +1,1094 @@
+{
+ "pack": "areab-strathfield-2",
+ "quests": [
+  {
+   "id": "qgb-l6-strathfield-035",
+   "act": 3,
+   "title": "The Strathfield Park Fence",
+   "blurb": "The council knows and the council does not care. My neighbour at Strathfield Park says the tree is on my side and the fence says otherwise. It might be nothing. It has not felt like nothing. Look at it Anzac Day with Strathfield eyes and tell me the truth. That's the whole job. No catch.",
+   "giver": "qgb-strathfield-hana-d",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10660,
+     "z": 385,
+     "radius": 30,
+     "label": "go and look at the fence at Strathfield Park"
+    },
+    {
+     "kind": "photo",
+     "x": -10660,
+     "z": 385,
+     "radius": 40,
+     "label": "photograph the tree over it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-strathfield-hana-d",
+     "node": "report-2",
+     "label": "tell me whose side it's on"
+    }
+   ],
+   "reward": {
+    "cash": 146,
+    "xp": 381,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-036",
+   "act": 3,
+   "title": "The Strathfield Plaza Camera",
+   "blurb": "Right. Since you asked. A new speed camera near Strathfield Plaza has fined half of Strathfield since grand final day. Nobody else seems to have noticed, which is its own problem. Photograph it for the appeal, then prove the train to Bankstown is faster anyway. You'll know it when you see it.",
+   "giver": "qgb-strathfield-fergus",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -10671,
+     "z": 560,
+     "radius": 40,
+     "label": "photograph the camera near Strathfield Plaza"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Strathfield",
+     "to": "Bankstown",
+     "label": "then take the train instead, to Bankstown"
+    }
+   ],
+   "reward": {
+    "cash": 146,
+    "xp": 392,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-037",
+   "act": 3,
+   "title": "Trouble at the Strathfield interchange",
+   "blurb": "It is not a police matter and I have checked. Two lads and their mate decided at closing that the Strathfield interchange is theirs. You will see what I mean the second you get there. The rest of Strathfield disagrees, so explain the disagreement. Do not let them talk you into anything.",
+   "giver": "qgb-strathfield-beryl",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near the Strathfield interchange"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 145,
+    "xp": 392,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-038",
+   "act": 3,
+   "title": "The the Strathfield interchange Tab",
+   "blurb": "I am told you do odd jobs. Two chippies off the the Strathfield interchange job have run a tab in Strathfield since Sunday. I would not ask if there was anyone else about. They drove past at lunchtime without looking in, so settle it in cash. Do that and we're square.",
+   "giver": "qgb-strathfield-beryl",
+   "level": 6,
+   "requires": [
+    "qgb-l6-strathfield-037"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Strathfield interchange"
+    },
+    {
+     "kind": "earn",
+     "dollars": 48,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 189,
+    "xp": 478,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-039",
+   "act": 3,
+   "title": "Two Signs, the Strathfield interchange",
+   "blurb": "I have written it down twice and lost it twice. Two signs near the Strathfield interchange say opposite things about parking and I've been fined under both. I am aware how that sounds. Get photos of each before Melbourne Cup day, when Strathfield council takes one down. Ask for me by name at the counter.",
+   "giver": "qgb-strathfield-beryl",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -10392,
+     "z": 254,
+     "radius": 40,
+     "label": "photograph the sign at the Strathfield interchange"
+    },
+    {
+     "kind": "photo",
+     "x": -10295,
+     "z": 456,
+     "radius": 40,
+     "label": "and the one that contradicts it"
+    }
+   ],
+   "reward": {
+    "cash": 144,
+    "xp": 383,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-040",
+   "act": 3,
+   "title": "Trolley Run, Strathfield Square",
+   "blurb": "This is going to sound small. A Woolies trolley from Strathfield Square gets walked to the creek every the King's Birthday. I would have sorted it myself a year ago. Find where it ends up in Strathfield and make the deposit back. Be polite about it. It costs nothing.",
+   "giver": "qgb-strathfield-ji-woo-b",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10022,
+     "z": 520,
+     "radius": 30,
+     "label": "find the trolley near Strathfield Square"
+    },
+    {
+     "kind": "photo",
+     "x": -10022,
+     "z": 520,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 40,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 136,
+    "xp": 357,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-041",
+   "act": 3,
+   "title": "Cover at the Korean strip",
+   "blurb": "It is the sort of thing you notice or you do not. I've got nobody for the the Korean strip shift at lunchtime and a room full of Strathfield people who've paid. It has been going on longer than I have admitted to anyone. Fifty of trade and one difficult person at the door. There's cash in it. Not a lot.",
+   "giver": "qgb-strathfield-joon-e",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 80,
+     "label": "cover the fifty for the shift"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 1,
+     "label": "and handle whoever's at the door"
+    }
+   ],
+   "reward": {
+    "cash": 140,
+    "xp": 364,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-042",
+   "act": 3,
+   "title": "A Flat White From Strathfield Park",
+   "blurb": "My knees are gone, so. I want a flat white from the place near Strathfield Park, not the one next to it. I have got no proof, which is exactly why I am asking. Here by ten past ten, while it's still coffee and Strathfield still has some. I will know if you skipped a bit.",
+   "giver": "qgb-strathfield-lachlan",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near Strathfield Park"
+    },
+    {
+     "kind": "goto",
+     "x": -10624,
+     "z": 966,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 131,
+    "xp": 356,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-043",
+   "act": 3,
+   "title": "Seven a.m. At Strathfield Plaza",
+   "blurb": "You will think I am making this up. The site at Strathfield Plaza starts its jackhammer at closing on a Monday, which is illegal and loud. There is a version of this where I am the unreasonable one. Photograph it running and have a word with the Strathfield foreman. Ask for me by name at the counter.",
+   "giver": "qgb-strathfield-min-jun-e",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -10468,
+     "z": 797,
+     "radius": 40,
+     "label": "photograph the noise from Strathfield Plaza"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 140,
+    "xp": 362,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-044",
+   "act": 3,
+   "title": "One Stop From the Strathfield interchange",
+   "blurb": "It is the sort of thing you notice or you do not. I need to know the train from Strathfield stops at Bankstown and doesn't sail through like it did on Thursday. It is not the money. It has stopped being the money. Ride it at the change of shift and photograph the sign. Half now if you want it. Most people don't.",
+   "giver": "qgb-strathfield-luke",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Strathfield",
+     "to": "Bankstown",
+     "label": "take the train to Bankstown"
+    },
+    {
+     "kind": "photo",
+     "x": -16073,
+     "z": 5694,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 368,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-045",
+   "act": 3,
+   "title": "The the Strathfield interchange Fence",
+   "blurb": "Honestly, I am past caring how it looks. My neighbour at the Strathfield interchange says the tree is on my side and the fence says otherwise. I am not after trouble. I am after an answer. Look at it Australia Day with Strathfield eyes and tell me the truth. I will know if you skipped a bit.",
+   "giver": "qgb-strathfield-yuna-c",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10761,
+     "z": 455,
+     "radius": 30,
+     "label": "go and look at the fence at the Strathfield interchange"
+    },
+    {
+     "kind": "photo",
+     "x": -10761,
+     "z": 455,
+     "radius": 40,
+     "label": "photograph the tree over it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-strathfield-yuna-c",
+     "node": "report-1",
+     "label": "tell me whose side it's on"
+    }
+   ],
+   "reward": {
+    "cash": 143,
+    "xp": 359,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-046",
+   "act": 3,
+   "title": "Trouble at Cooper Street",
+   "blurb": "There is no clever way to say this. Two lads and their mate decided at half six that Cooper Street is theirs. I have got a photo on my phone but it is useless. The rest of Strathfield disagrees, so explain the disagreement. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-strathfield-phil",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Cooper Street"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 140,
+    "xp": 365,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-047",
+   "act": 3,
+   "title": "The Strathfield Square Sparky",
+   "blurb": "Right. Since you asked. The sparky off the Strathfield Square job has owed me since the bathroom and drinks in Strathfield from after the footy. I would not ask if there was anyone else about. Forty will do and I'll write off the rest. That's the whole job. No catch.",
+   "giver": "qgb-strathfield-graham",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for Strathfield Square"
+    },
+    {
+     "kind": "earn",
+     "dollars": 64,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 135,
+    "xp": 389,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-048",
+   "act": 3,
+   "title": "Rent Money, The Boulevarde",
+   "blurb": "I have written it down twice and lost it twice. I'm forty-five short on the The Boulevarde rent and the agent doesn't take stories. There is a version of this where I am the unreasonable one. Make it somewhere in Strathfield by nine sharp; I'm not fussy how. Do not let them talk you into anything.",
+   "giver": "qgb-strathfield-denise",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 72,
+     "label": "earn forty-five somewhere in Strathfield"
+    }
+   ],
+   "reward": {
+    "cash": 129,
+    "xp": 388,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-049",
+   "act": 3,
+   "title": "The Albert Road Lift",
+   "blurb": "Before you say anything: yes, I know. The lift at Strathfield station has been out since the Easter Show and I'm told Bankstown is worse. I would have sorted it myself a year ago. Check both grand final day and tell me which takes a pram. I'll see you right for it.",
+   "giver": "qgb-strathfield-jae-c",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10664,
+     "z": 567,
+     "radius": 30,
+     "label": "check the lift at Strathfield station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Strathfield",
+     "to": "Bankstown",
+     "label": "then ride to Bankstown and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-strathfield-jae-c",
+     "node": "report-1",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 138,
+    "xp": 387,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-050",
+   "act": 3,
+   "title": "Meat Tray at the Strathfield interchange",
+   "blurb": "I would do it myself if I could leave the counter. The the Strathfield interchange raffle is thirty-five short of a meat tray and the draw is at after the footy. It has been going on longer than I have admitted to anyone. Find it in Strathfield and put it in the tin. Come and find me after, either way.",
+   "giver": "qgb-strathfield-hyun-e",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 56,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -10704,
+     "z": 932,
+     "radius": 30,
+     "label": "and drop it at the Strathfield interchange"
+    }
+   ],
+   "reward": {
+    "cash": 129,
+    "xp": 389,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-051",
+   "act": 3,
+   "title": "The Strathfield Square Tab",
+   "blurb": "My knees are gone, so. Two chippies off the Strathfield Square job have run a tab in Strathfield since Sunday. I am not after trouble. I am after an answer. They drove past at peak hour without looking in, so settle it in cash. Come back and tell me straight.",
+   "giver": "qgb-strathfield-dot",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near Strathfield Square"
+    },
+    {
+     "kind": "earn",
+     "dollars": 48,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 133,
+    "xp": 369,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-052",
+   "act": 3,
+   "title": "Seven a.m. At Cooper Street",
+   "blurb": "I'll be straight with you. The site at Cooper Street starts its jackhammer at eleven on a Boxing Day, which is illegal and loud. It might be nothing. It has not felt like nothing. Photograph it running and have a word with the Strathfield foreman. I will know if you skipped a bit.",
+   "giver": "qgb-strathfield-kylie-anne",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -11026,
+     "z": 581,
+     "radius": 40,
+     "label": "photograph the noise from Cooper Street"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 131,
+    "xp": 359,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-053",
+   "act": 3,
+   "title": "RBT on Strathfield Square",
+   "blurb": "The council knows and the council does not care. There's a breath test set up on Strathfield Square since after the footy. You will see what I mean the second you get there. My brother-in-law needs the ute at the far end of Strathfield without a conversation. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-strathfield-mitch",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on Strathfield Square"
+    },
+    {
+     "kind": "goto",
+     "x": -11003,
+     "z": 438,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 143,
+    "xp": 359,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-054",
+   "act": 3,
+   "title": "Tap On at Albert Road",
+   "blurb": "I am told you do odd jobs. My Opal says I owe nineteen dollars for a trip from Strathfield I never took on Sunday. There is a version of this where I am the unreasonable one. Take the same one to Bankstown and tell me what it charged you. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qgb-strathfield-georgie",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Strathfield",
+     "to": "Bankstown",
+     "label": "tap on at Strathfield, tap off at Bankstown"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-strathfield-georgie",
+     "node": "report-1",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 132,
+    "xp": 375,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-055",
+   "act": 3,
+   "title": "Proof of Albert Road",
+   "blurb": "I have written it down twice and lost it twice. Nobody in Strathfield believes what Albert Road looks like at school pick-up. You can tell me I am imagining it. Tell me after. Get me a photo close enough that council can't say it's somewhere else. You'll know it when you see it.",
+   "giver": "qgb-strathfield-georgie",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -10342,
+     "z": 837,
+     "radius": 40,
+     "label": "get a picture of Albert Road before they fix it"
+    }
+   ],
+   "reward": {
+    "cash": 141,
+    "xp": 388,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-056",
+   "act": 3,
+   "title": "Closing Time at Churchill Avenue",
+   "blurb": "Before you say anything: yes, I know. Two blokes have slept in my doorway on Churchill Avenue since the pub shut. I have rung the number on the letter four times. The Strathfield delivery's at eight at night, so get them up and show me the step empty. Just do not come back empty-handed.",
+   "giver": "qgb-strathfield-sienna",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off Churchill Avenue"
+    },
+    {
+     "kind": "photo",
+     "x": -10747,
+     "z": 602,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 134,
+    "xp": 391,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-057",
+   "act": 3,
+   "title": "The Churchill Avenue Camera",
+   "blurb": "This is going to sound small. A new speed camera near Churchill Avenue has fined half of Strathfield since Saturday. It has been going on longer than I have admitted to anyone. Photograph it for the appeal, then prove the train to Bankstown is faster anyway. If anyone asks, you were never here.",
+   "giver": "qgb-strathfield-val",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -10678,
+     "z": 882,
+     "radius": 40,
+     "label": "photograph the camera near Churchill Avenue"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Strathfield",
+     "to": "Bankstown",
+     "label": "then take the train instead, to Bankstown"
+    }
+   ],
+   "reward": {
+    "cash": 130,
+    "xp": 357,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-058",
+   "act": 3,
+   "title": "Bin Night, Strathfield Square",
+   "blurb": "You are the first person to stop all morning. Somebody moves the bins on Strathfield Square in front of my drive every Easter Saturday night. I am not after trouble. I am after an answer. Photograph the evidence and have a word; Strathfield knows who. There's cash in it. Not a lot.",
+   "giver": "qgb-strathfield-ji-woo-c",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -10639,
+     "z": 317,
+     "radius": 40,
+     "label": "photograph the bins at Strathfield Square"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 130,
+    "xp": 356,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-059",
+   "act": 3,
+   "title": "The The Boulevarde Complaint",
+   "blurb": "Honestly, I am past caring how it looks. Two women in activewear have photographed my bins outside The Boulevarde since Monday. It might be nothing. It has not felt like nothing. One has Strathfield council on speed dial; sort it however you sort things. Come back and tell me straight.",
+   "giver": "qgb-strathfield-brett",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near The Boulevarde"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 360,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-060",
+   "act": 3,
+   "title": "One Stop From Strathfield Park",
+   "blurb": "The council knows and the council does not care. I need to know the train from Strathfield stops at Bankstown and doesn't sail through like it did on Saturday. I would not ask if there was anyone else about. Ride it at first thing and photograph the sign. There is no rush, but there is a Friday.",
+   "giver": "qgb-strathfield-clementine",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Strathfield",
+     "to": "Bankstown",
+     "label": "take the train to Bankstown"
+    },
+    {
+     "kind": "photo",
+     "x": -16073,
+     "z": 5694,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 139,
+    "xp": 362,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-061",
+   "act": 3,
+   "title": "Race Four, Churchill Avenue",
+   "blurb": "It is not a police matter and I have checked. There's a horse in race four at closing that a bloke at Churchill Avenue swears by. There is a version of this where I am the unreasonable one. Turn it into fifty-five somewhere in Strathfield and tell me if it came in. Take your time. Do not take a week.",
+   "giver": "qgb-strathfield-neville",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 88,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-strathfield-neville",
+     "node": "report-0",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 134,
+    "xp": 355,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-062",
+   "act": 3,
+   "title": "The Strathfield Plaza Sparky",
+   "blurb": "You will think I am making this up. The sparky off the Strathfield Plaza job has owed me since the bathroom and drinks in Strathfield from half seven. This is the third time I have had this conversation. Forty will do and I'll write off the rest. You'll know it when you see it.",
+   "giver": "qgb-strathfield-hana-e",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for Strathfield Plaza"
+    },
+    {
+     "kind": "earn",
+     "dollars": 64,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 130,
+    "xp": 393,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-063",
+   "act": 3,
+   "title": "The Strathfield Plaza Course",
+   "blurb": "Keep it between us for now. A bloke near Strathfield Plaza runs a ninety-minute course he bills at four hundred, and I've paid. I have rung the number on the letter four times. Sit it Wednesday, then come back to Strathfield and prove it did something. Ask for me by name at the counter.",
+   "giver": "qgb-strathfield-min-jun-f",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near Strathfield Plaza"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 146,
+    "xp": 374,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-064",
+   "act": 3,
+   "title": "RBT on Strathfield Plaza",
+   "blurb": "Before you say anything: yes, I know. There's a breath test set up on Strathfield Plaza since closing. It started small, the way these things do. My brother-in-law needs the ute at the far end of Strathfield without a conversation. Say nothing to anyone on the way.",
+   "giver": "qgb-strathfield-min-jun-f",
+   "level": 6,
+   "requires": [
+    "qgb-l6-strathfield-063"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on Strathfield Plaza"
+    },
+    {
+     "kind": "goto",
+     "x": -10640,
+     "z": 1073,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 169,
+    "xp": 468,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-065",
+   "act": 3,
+   "title": "Bin Night, Cooper Street",
+   "blurb": "This is going to sound small. Somebody moves the bins on Cooper Street in front of my drive every Melbourne Cup day night. It is not the money. It has stopped being the money. Photograph the evidence and have a word; Strathfield knows who. I'll see you right for it.",
+   "giver": "qgb-strathfield-scott",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -11155,
+     "z": 220,
+     "radius": 40,
+     "label": "photograph the bins at Cooper Street"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 145,
+    "xp": 361,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-066",
+   "act": 3,
+   "title": "Something From the Korean strip",
+   "blurb": "You look like you have twenty minutes. The stall at the Korean strip has run out and the customers keep coming. I did try the official route, for what that was worth. Find something round Strathfield that'll do before the knock-off rush. Be polite about it. It costs nothing.",
+   "giver": "qgb-strathfield-beryl-a",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near the Korean strip"
+    },
+    {
+     "kind": "goto",
+     "x": -10434,
+     "z": 626,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 132,
+    "xp": 362,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-strathfield-067",
+   "act": 3,
+   "title": "Before They Touch The Boulevarde",
+   "blurb": "You are the first person to stop all morning. They start on The Boulevarde on Sunday and the orange fencing goes up. There is probably a simple explanation and I would love to hear it. I want Strathfield on record before it does. Half now if you want it. Most people don't.",
+   "giver": "qgb-strathfield-kev-a",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -10649,
+     "z": 581,
+     "radius": 40,
+     "label": "photograph the state of The Boulevarde"
+    },
+    {
+     "kind": "goto",
+     "x": -10911,
+     "z": 566,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 144,
+    "xp": 374,
+    "unlock": []
+   }
+  }
+ ]
+}

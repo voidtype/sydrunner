@@ -1,0 +1,2194 @@
+{
+ "pack": "areab-redfern-2",
+ "npcs": [
+  {
+   "id": "qgb-redfern-janelle-c",
+   "name": "Janelle C., Rabbitohs tragic",
+   "x": -1225,
+   "z": 2516,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Red and green, mate. Red and green. Redfern bleeds it. You're not a Roosters man, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Redfern like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Fifty years a member. I've seen premierships and I've seen 2006. Redfern Street is holy ground.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's lads off the block.",
+     "choices": [
+      {
+       "text": "Lads Off the Block",
+       "accept": "qgb-l2-redfern-042",
+       "denyFlag": "w:qgb-l2-redfern-042"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Janelle C. counts it out without looking up. -- Don't spend it all at Redfern Street.",
+     "choices": [
+      {
+       "text": "About lads off the block.",
+       "turnin": "qgb-l2-redfern-042"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Redfern Oval clubhouse does a schnitty that'll set you up for a fortnight.",
+     "improv": {
+      "persona": "Janelle C., Rabbitohs tragic in Redfern, Sydney. Dry, specific, local; never says g'day or crikey; talks about Redfern Street like everyone knows it.",
+      "context": "Someone has asked what Redfern is like these days. You are standing near Redfern Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-redfern-hayden-b",
+   "name": "Hayden B., council ranger",
+   "x": -1153,
+   "z": 2627,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Redfern is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Redfern like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. the Block generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the redfern oval sparky.",
+     "choices": [
+      {
+       "text": "The Redfern Oval Sparky",
+       "accept": "qgb-l2-redfern-043",
+       "denyFlag": "w:qgb-l2-redfern-043"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Hayden B. counts it out without looking up. -- Don't spend it all at the Block.",
+     "choices": [
+      {
+       "text": "About the redfern oval sparky.",
+       "turnin": "qgb-l2-redfern-043"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Hayden B., council ranger in Redfern, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Block like everyone knows it.",
+      "context": "Someone has asked what Redfern is like these days. You are standing near the Block."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-redfern-rocco-h",
+   "name": "Rocco H., barista, own cafe",
+   "x": -1118,
+   "z": 2650,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flat white? Everyone in Redfern wants a flat white. Give me a sec, the grinder's sulking.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Redfern like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I own the place. Own it, run it, sweep it. the Rabbitohs foot traffic pays the rent and the regulars pay for the machine.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's bin night, carriageworks.",
+     "choices": [
+      {
+       "text": "Bin Night, Carriageworks",
+       "accept": "qgb-l2-redfern-044",
+       "denyFlag": "w:qgb-l2-redfern-044"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Rocco H. counts it out without looking up. -- Don't spend it all at the Rabbitohs.",
+     "choices": [
+      {
+       "text": "About bin night, carriageworks.",
+       "turnin": "qgb-l2-redfern-044"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There are eleven cafes on this strip and we all buy beans off the same bloke in the Rabbitohs. Don't tell anyone.",
+     "improv": {
+      "persona": "Rocco H., barista, own cafe in Redfern, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Rabbitohs like everyone knows it.",
+      "context": "Someone has asked what Redfern is like these days. You are standing near the Rabbitohs."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-redfern-harriet-d",
+   "name": "Harriet D., Rabbitohs tragic",
+   "x": -1418,
+   "z": 2444,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Red and green, mate. Red and green. Redfern bleeds it. You're not a Roosters man, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Redfern like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Fifty years a member. I've seen premierships and I've seen 2006. the Redfern Tent Embassy is holy ground.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two from abercrombie street.",
+     "choices": [
+      {
+       "text": "Two From Abercrombie Street",
+       "accept": "qgb-l2-redfern-045",
+       "denyFlag": "w:qgb-l2-redfern-045"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Harriet D. looks it over the way Redfern looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About two from abercrombie street.",
+       "turnin": "qgb-l2-redfern-045"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Redfern Oval clubhouse does a schnitty that'll set you up for a fortnight.",
+     "improv": {
+      "persona": "Harriet D., Rabbitohs tragic in Redfern, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Redfern Tent Embassy like everyone knows it.",
+      "context": "Someone has asked what Redfern is like these days. You are standing near the Redfern Tent Embassy."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-redfern-norm-b",
+   "name": "Norm B., council ranger",
+   "x": -941,
+   "z": 3084,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Redfern is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Redfern like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Abercrombie Street generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at prince alfred park pool.",
+     "choices": [
+      {
+       "text": "Trouble at Prince Alfred Park pool",
+       "accept": "qgb-l2-redfern-046",
+       "denyFlag": "w:qgb-l2-redfern-046"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Norm B. looks it over the way Redfern looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About trouble at prince alfred park pool.",
+       "turnin": "qgb-l2-redfern-046"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Norm B., council ranger in Redfern, Sydney. Dry, specific, local; never says g'day or crikey; talks about Abercrombie Street like everyone knows it.",
+      "context": "Someone has asked what Redfern is like these days. You are standing near Abercrombie Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-redfern-uncle-col-c",
+   "name": "Uncle Col C., community elder",
+   "x": -761,
+   "z": 2635,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're on Gadigal land. Sit down, you're making the place look untidy. Redfern, eh.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Redfern like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I've been on the Block longer than the cafes have. I keep an eye on things. Somebody has to.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's closing time at redfern oval.",
+     "choices": [
+      {
+       "text": "Closing Time at Redfern Oval",
+       "accept": "qgb-l2-redfern-047",
+       "denyFlag": "w:qgb-l2-redfern-047"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Uncle Col C. counts it out without looking up. -- Don't spend it all at the Block.",
+     "choices": [
+      {
+       "text": "About closing time at redfern oval.",
+       "turnin": "qgb-l2-redfern-047"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The mob at the Block do a feed on Fridays. Bring something, don't just turn up.",
+     "improv": {
+      "persona": "Uncle Col C., community elder in Redfern, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Block like everyone knows it.",
+      "context": "Someone has asked what Redfern is like these days. You are standing near the Block."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-redfern-kerry-a",
+   "name": "Kerry A., Rabbitohs tragic",
+   "x": -1028,
+   "z": 2195,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Red and green, mate. Red and green. Redfern bleeds it. You're not a Roosters man, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Redfern like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Fifty years a member. I've seen premierships and I've seen 2006. Redfern Oval is holy ground.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rbt on the rabbitohs.",
+     "choices": [
+      {
+       "text": "RBT on the Rabbitohs",
+       "accept": "qgb-l2-redfern-048",
+       "denyFlag": "w:qgb-l2-redfern-048"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Kerry A. looks it over the way Redfern looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About rbt on the rabbitohs.",
+       "turnin": "qgb-l2-redfern-048"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Redfern Oval clubhouse does a schnitty that'll set you up for a fortnight.",
+     "improv": {
+      "persona": "Kerry A., Rabbitohs tragic in Redfern, Sydney. Dry, specific, local; never says g'day or crikey; talks about Redfern Oval like everyone knows it.",
+      "context": "Someone has asked what Redfern is like these days. You are standing near Redfern Oval."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-redfern-fiona-c",
+   "name": "Fiona C., uni student, three jobs",
+   "x": -1272,
+   "z": 2301,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Redfern rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Redfern like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Eveleigh is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's lads off carriageworks.",
+     "choices": [
+      {
+       "text": "Lads Off Carriageworks",
+       "accept": "qgb-l2-redfern-049",
+       "denyFlag": "w:qgb-l2-redfern-049"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Fiona C. looks it over the way Redfern looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About lads off carriageworks.",
+       "turnin": "qgb-l2-redfern-049"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Eveleigh that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Fiona C., uni student, three jobs in Redfern, Sydney. Dry, specific, local; never says g'day or crikey; talks about Eveleigh like everyone knows it.",
+      "context": "Someone has asked what Redfern is like these days. You are standing near Eveleigh."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-redfern-lorraine-b",
+   "name": "Lorraine B., chippy off a job",
+   "x": -1069,
+   "z": 2611,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Redfern, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Redfern like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Before They Touch Prince Alfred Park pool",
+       "accept": "qgb-l2-redfern-050",
+       "denyFlag": "w:qgb-l2-redfern-050"
+      },
+      {
+       "text": "Proof of Prince Alfred Park pool",
+       "accept": "qgb-l2-redfern-051",
+       "denyFlag": "w:qgb-l2-redfern-051",
+       "needFlag": "w:qgb-l2-redfern-050"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Lorraine B. looks it over the way Redfern looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About before they touch prince alfred park pool.",
+       "turnin": "qgb-l2-redfern-050"
+      },
+      {
+       "text": "About proof of prince alfred park pool.",
+       "turnin": "qgb-l2-redfern-051"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Redfern is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Lorraine B., chippy off a job in Redfern, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Redfern Tent Embassy like everyone knows it.",
+      "context": "Someone has asked what Redfern is like these days. You are standing near the Redfern Tent Embassy."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-redfern-dwayne-c",
+   "name": "Dwayne C., community elder",
+   "x": -1048,
+   "z": 2226,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're on Gadigal land. Sit down, you're making the place look untidy. Redfern, eh.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Redfern like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I've been on Abercrombie Street longer than the cafes have. I keep an eye on things. Somebody has to.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the prince alfred park pool float.",
+     "choices": [
+      {
+       "text": "The Prince Alfred Park pool Float",
+       "accept": "qgb-l2-redfern-052",
+       "denyFlag": "w:qgb-l2-redfern-052"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Dwayne C. looks it over the way Redfern looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the prince alfred park pool float.",
+       "turnin": "qgb-l2-redfern-052"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The mob at Abercrombie Street do a feed on Fridays. Bring something, don't just turn up.",
+     "improv": {
+      "persona": "Dwayne C., community elder in Redfern, Sydney. Dry, specific, local; never says g'day or crikey; talks about Abercrombie Street like everyone knows it.",
+      "context": "Someone has asked what Redfern is like these days. You are standing near Abercrombie Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Right. And you're sure it was Prince Alfred Park pool? People say Prince Alfred Park pool when they mean the bit next to it. -- Dwayne C. writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-redfern-brooke-b",
+   "name": "Brooke B., uni student, three jobs",
+   "x": -1203,
+   "z": 2677,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Redfern rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Redfern like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Redfern Street is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two from the block.",
+     "choices": [
+      {
+       "text": "Two From the Block",
+       "accept": "qgb-l2-redfern-053",
+       "denyFlag": "w:qgb-l2-redfern-053"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Brooke B. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About two from the block.",
+       "turnin": "qgb-l2-redfern-053"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Redfern Street that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Brooke B., uni student, three jobs in Redfern, Sydney. Dry, specific, local; never says g'day or crikey; talks about Redfern Street like everyone knows it.",
+      "context": "Someone has asked what Redfern is like these days. You are standing near Redfern Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-redfern-prue-c",
+   "name": "Prue C., Rabbitohs tragic",
+   "x": -1346,
+   "z": 2689,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Red and green, mate. Red and green. Redfern bleeds it. You're not a Roosters man, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Redfern like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Fifty years a member. I've seen premierships and I've seen 2006. Eveleigh is holy ground.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rent money, the redfern tent embassy.",
+     "choices": [
+      {
+       "text": "Rent Money, the Redfern Tent Embassy",
+       "accept": "qgb-l2-redfern-054",
+       "denyFlag": "w:qgb-l2-redfern-054"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Prue C. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About rent money, the redfern tent embassy.",
+       "turnin": "qgb-l2-redfern-054"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Redfern Oval clubhouse does a schnitty that'll set you up for a fortnight.",
+     "improv": {
+      "persona": "Prue C., Rabbitohs tragic in Redfern, Sydney. Dry, specific, local; never says g'day or crikey; talks about Eveleigh like everyone knows it.",
+      "context": "Someone has asked what Redfern is like these days. You are standing near Eveleigh."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-redfern-toby-c",
+   "name": "Toby C., council ranger",
+   "x": -929,
+   "z": 2208,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Redfern is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Redfern like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Carriageworks generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the redfern tent embassy sparky.",
+     "choices": [
+      {
+       "text": "The the Redfern Tent Embassy Sparky",
+       "accept": "qgb-l2-redfern-055",
+       "denyFlag": "w:qgb-l2-redfern-055"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Toby C. counts it out without looking up. -- Don't spend it all at Carriageworks.",
+     "choices": [
+      {
+       "text": "About the the redfern tent embassy sparky.",
+       "turnin": "qgb-l2-redfern-055"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Toby C., council ranger in Redfern, Sydney. Dry, specific, local; never says g'day or crikey; talks about Carriageworks like everyone knows it.",
+      "context": "Someone has asked what Redfern is like these days. You are standing near Carriageworks."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-redfern-dot-b",
+   "name": "Dot B., uni student, three jobs",
+   "x": -609,
+   "z": 2973,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Redfern rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Redfern like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the Redfern Tent Embassy is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's race four, the block.",
+     "choices": [
+      {
+       "text": "Race Four, the Block",
+       "accept": "qgb-l2-redfern-056",
+       "denyFlag": "w:qgb-l2-redfern-056"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Dot B. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About race four, the block.",
+       "turnin": "qgb-l2-redfern-056"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the Redfern Tent Embassy that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Dot B., uni student, three jobs in Redfern, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Redfern Tent Embassy like everyone knows it.",
+      "context": "Someone has asked what Redfern is like these days. You are standing near the Redfern Tent Embassy."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Dot B. listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-redfern-rocco-j",
+   "name": "Rocco J., barista, own cafe",
+   "x": -928,
+   "z": 2283,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flat white? Everyone in Redfern wants a flat white. Give me a sec, the grinder's sulking.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Redfern like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I own the place. Own it, run it, sweep it. Abercrombie Street foot traffic pays the rent and the regulars pay for the machine.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the rabbitohs tab.",
+     "choices": [
+      {
+       "text": "The the Rabbitohs Tab",
+       "accept": "qgb-l2-redfern-057",
+       "denyFlag": "w:qgb-l2-redfern-057"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Rocco J. looks it over the way Redfern looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the rabbitohs tab.",
+       "turnin": "qgb-l2-redfern-057"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There are eleven cafes on this strip and we all buy beans off the same bloke in Abercrombie Street. Don't tell anyone.",
+     "improv": {
+      "persona": "Rocco J., barista, own cafe in Redfern, Sydney. Dry, specific, local; never says g'day or crikey; talks about Abercrombie Street like everyone knows it.",
+      "context": "Someone has asked what Redfern is like these days. You are standing near Abercrombie Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-redfern-enzo-g",
+   "name": "Enzo G., barista, own cafe",
+   "x": -955,
+   "z": 2673,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flat white? Everyone in Redfern wants a flat white. Give me a sec, the grinder's sulking.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Redfern like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I own the place. Own it, run it, sweep it. the Rabbitohs foot traffic pays the rent and the regulars pay for the machine.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rent money, eveleigh.",
+     "choices": [
+      {
+       "text": "Rent Money, Eveleigh",
+       "accept": "qgb-l2-redfern-058",
+       "denyFlag": "w:qgb-l2-redfern-058"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Enzo G. looks it over the way Redfern looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About rent money, eveleigh.",
+       "turnin": "qgb-l2-redfern-058"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There are eleven cafes on this strip and we all buy beans off the same bloke in the Rabbitohs. Don't tell anyone.",
+     "improv": {
+      "persona": "Enzo G., barista, own cafe in Redfern, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Rabbitohs like everyone knows it.",
+      "context": "Someone has asked what Redfern is like these days. You are standing near the Rabbitohs."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-redfern-uncle-col-d",
+   "name": "Uncle Col D., community elder",
+   "x": -1394,
+   "z": 2382,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're on Gadigal land. Sit down, you're making the place look untidy. Redfern, eh.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Redfern like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I've been on Carriageworks longer than the cafes have. I keep an eye on things. Somebody has to.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Lads Off the Redfern Tent Embassy",
+       "accept": "qgb-l2-redfern-059",
+       "denyFlag": "w:qgb-l2-redfern-059"
+      },
+      {
+       "text": "Cover at the Redfern Tent Embassy",
+       "accept": "qgb-l2-redfern-060",
+       "denyFlag": "w:qgb-l2-redfern-060",
+       "needFlag": "w:qgb-l2-redfern-059"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Uncle Col D. looks it over the way Redfern looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About lads off the redfern tent embassy.",
+       "turnin": "qgb-l2-redfern-059"
+      },
+      {
+       "text": "About cover at the redfern tent embassy.",
+       "turnin": "qgb-l2-redfern-060"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The mob at Carriageworks do a feed on Fridays. Bring something, don't just turn up.",
+     "improv": {
+      "persona": "Uncle Col D., community elder in Redfern, Sydney. Dry, specific, local; never says g'day or crikey; talks about Carriageworks like everyone knows it.",
+      "context": "Someone has asked what Redfern is like these days. You are standing near Carriageworks."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-redfern-denise-a",
+   "name": "Denise A., Rabbitohs tragic",
+   "x": -1185,
+   "z": 2939,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Red and green, mate. Red and green. Redfern bleeds it. You're not a Roosters man, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Redfern like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Fifty years a member. I've seen premierships and I've seen 2006. the Redfern Tent Embassy is holy ground.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's counting abercrombie street.",
+     "choices": [
+      {
+       "text": "Counting Abercrombie Street",
+       "accept": "qgb-l2-redfern-061",
+       "denyFlag": "w:qgb-l2-redfern-061"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Denise A. counts it out without looking up. -- Don't spend it all at the Redfern Tent Embassy.",
+     "choices": [
+      {
+       "text": "About counting abercrombie street.",
+       "turnin": "qgb-l2-redfern-061"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Redfern Oval clubhouse does a schnitty that'll set you up for a fortnight.",
+     "improv": {
+      "persona": "Denise A., Rabbitohs tragic in Redfern, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Redfern Tent Embassy like everyone knows it.",
+      "context": "Someone has asked what Redfern is like these days. You are standing near the Redfern Tent Embassy."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-redfern-gail-a",
+   "name": "Gail A., uni student, three jobs",
+   "x": -671,
+   "z": 2825,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Redfern rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Redfern like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Prince Alfred Park pool is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the redfern street tab.",
+     "choices": [
+      {
+       "text": "The Redfern Street Tab",
+       "accept": "qgb-l2-redfern-062",
+       "denyFlag": "w:qgb-l2-redfern-062"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Gail A. looks it over the way Redfern looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the redfern street tab.",
+       "turnin": "qgb-l2-redfern-062"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Prince Alfred Park pool that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Gail A., uni student, three jobs in Redfern, Sydney. Dry, specific, local; never says g'day or crikey; talks about Prince Alfred Park pool like everyone knows it.",
+      "context": "Someone has asked what Redfern is like these days. You are standing near Prince Alfred Park pool."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-redfern-rocco-k",
+   "name": "Rocco K., barista, own cafe",
+   "x": -961,
+   "z": 2824,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flat white? Everyone in Redfern wants a flat white. Give me a sec, the grinder's sulking.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Redfern like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I own the place. Own it, run it, sweep it. the Bearded Tit foot traffic pays the rent and the regulars pay for the machine.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the length of redfern street.",
+     "choices": [
+      {
+       "text": "The Length of Redfern Street",
+       "accept": "qgb-l2-redfern-063",
+       "denyFlag": "w:qgb-l2-redfern-063"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Rocco K. counts it out without looking up. -- Don't spend it all at the Bearded Tit.",
+     "choices": [
+      {
+       "text": "About the length of redfern street.",
+       "turnin": "qgb-l2-redfern-063"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There are eleven cafes on this strip and we all buy beans off the same bloke in the Bearded Tit. Don't tell anyone.",
+     "improv": {
+      "persona": "Rocco K., barista, own cafe in Redfern, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Bearded Tit like everyone knows it.",
+      "context": "Someone has asked what Redfern is like these days. You are standing near the Bearded Tit."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-redfern-chantelle-a",
+   "name": "Chantelle A., chippy off a job",
+   "x": -882,
+   "z": 3120,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Redfern, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Redfern like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at redfern oval.",
+     "choices": [
+      {
+       "text": "Trouble at Redfern Oval",
+       "accept": "qgb-l2-redfern-064",
+       "denyFlag": "w:qgb-l2-redfern-064"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Chantelle A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About trouble at redfern oval.",
+       "turnin": "qgb-l2-redfern-064"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Redfern is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Chantelle A., chippy off a job in Redfern, Sydney. Dry, specific, local; never says g'day or crikey; talks about Redfern Street like everyone knows it.",
+      "context": "Someone has asked what Redfern is like these days. You are standing near Redfern Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-redfern-dwayne-d",
+   "name": "Dwayne D., community elder",
+   "x": -1258,
+   "z": 2520,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're on Gadigal land. Sit down, you're making the place look untidy. Redfern, eh.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Redfern like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I've been on the Block longer than the cafes have. I keep an eye on things. Somebody has to.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Something From the Rabbitohs",
+       "accept": "qgb-l2-redfern-065",
+       "denyFlag": "w:qgb-l2-redfern-065"
+      },
+      {
+       "text": "The the Rabbitohs Complaint",
+       "accept": "qgb-l2-redfern-066",
+       "denyFlag": "w:qgb-l2-redfern-066",
+       "needFlag": "w:qgb-l2-redfern-065"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Dwayne D. counts it out without looking up. -- Don't spend it all at the Block.",
+     "choices": [
+      {
+       "text": "About something from the rabbitohs.",
+       "turnin": "qgb-l2-redfern-065"
+      },
+      {
+       "text": "About the the rabbitohs complaint.",
+       "turnin": "qgb-l2-redfern-066"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The mob at the Block do a feed on Fridays. Bring something, don't just turn up.",
+     "improv": {
+      "persona": "Dwayne D., community elder in Redfern, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Block like everyone knows it.",
+      "context": "Someone has asked what Redfern is like these days. You are standing near the Block."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-redfern-nola-a",
+   "name": "Nola A., chippy off a job",
+   "x": -1049,
+   "z": 2162,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Redfern, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Redfern like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch abercrombie street.",
+     "choices": [
+      {
+       "text": "Before They Touch Abercrombie Street",
+       "accept": "qgb-l2-redfern-067",
+       "denyFlag": "w:qgb-l2-redfern-067"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Nola A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About before they touch abercrombie street.",
+       "turnin": "qgb-l2-redfern-067"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Redfern is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Nola A., chippy off a job in Redfern, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Redfern Tent Embassy like everyone knows it.",
+      "context": "Someone has asked what Redfern is like these days. You are standing near the Redfern Tent Embassy."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

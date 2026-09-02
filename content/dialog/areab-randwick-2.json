@@ -1,0 +1,2762 @@
+{
+ "pack": "areab-randwick-2",
+ "npcs": [
+  {
+   "id": "qgb-randwick-rhonda",
+   "name": "Rhonda, strapper",
+   "x": 2893,
+   "z": 5530,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand behind him. He kicks. Randwick, yeah, what?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I brush, I walk, I hold the head while the vet does the thing. Royal Randwick at dawn is the best job in the world for the money it doesn't pay.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's closing time at the spot.",
+     "choices": [
+      {
+       "text": "Closing Time at the Spot",
+       "accept": "qgb-l5-randwick-038",
+       "denyFlag": "w:qgb-l5-randwick-038"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Rhonda looks it over the way Randwick looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About closing time at the spot.",
+       "turnin": "qgb-l5-randwick-038"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best feed is the trackies' canteen at Royal Randwick, half six, before the owners arrive.",
+     "improv": {
+      "persona": "Rhonda, strapper in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about Royal Randwick like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near Royal Randwick."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-angela",
+   "name": "Angela, barista, own cafe",
+   "x": 2873,
+   "z": 5467,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flat white? Everyone in Randwick wants a flat white. Give me a sec, the grinder's sulking.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I own the place. Own it, run it, sweep it. the Spot foot traffic pays the rent and the regulars pay for the machine.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's one stop from the ritz cinema.",
+     "choices": [
+      {
+       "text": "One Stop From the Ritz cinema",
+       "accept": "qgb-l5-randwick-039",
+       "denyFlag": "w:qgb-l5-randwick-039"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Angela counts it out without looking up. -- Don't spend it all at the Spot.",
+     "choices": [
+      {
+       "text": "About one stop from the ritz cinema.",
+       "turnin": "qgb-l5-randwick-039"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There are eleven cafes on this strip and we all buy beans off the same bloke in the Spot. Don't tell anyone.",
+     "improv": {
+      "persona": "Angela, barista, own cafe in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Spot like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near the Spot."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-linh",
+   "name": "Linh, night-shift nurse",
+   "x": 3258.1,
+   "z": 5294.5,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry, just off a double. Twelve hours. Randwick, hi, what's wrong?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Emergency. Everything comes through the door at Anzac Parade: footballers, grandmothers, a man with a fork. Never a dull shift.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's lads off unsw.",
+     "choices": [
+      {
+       "text": "Lads Off UNSW",
+       "accept": "qgb-l5-randwick-040",
+       "denyFlag": "w:qgb-l5-randwick-040"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Linh counts it out without looking up. -- Don't spend it all at Anzac Parade.",
+     "choices": [
+      {
+       "text": "About lads off unsw.",
+       "turnin": "qgb-l5-randwick-040"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good coffee near Anzac Parade opens at five. The nurses are there at four fifty-nine.",
+     "improv": {
+      "persona": "Linh, night-shift nurse in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about Anzac Parade like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near Anzac Parade."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-barry",
+   "name": "Barry, bowling club greenkeeper",
+   "x": 2601,
+   "z": 5165,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Boots off the green. Boots OFF the green. Sorry. Welcome to Randwick bowlo.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Two greens, one of them dying, and a committee that thinks I'm inventing it. Coogee Bay Road comes for the schnitzel and stays for the raffle.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two from the doncaster.",
+     "choices": [
+      {
+       "text": "Two From the Doncaster",
+       "accept": "qgb-l5-randwick-041",
+       "denyFlag": "w:qgb-l5-randwick-041"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Barry pays up on the spot.",
+     "choices": [
+      {
+       "text": "About two from the doncaster.",
+       "turnin": "qgb-l5-randwick-041"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Barefoot bowls on a Sunday is what pays for the green you're standing on. I have mixed feelings.",
+     "improv": {
+      "persona": "Barry, bowling club greenkeeper in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about Coogee Bay Road like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near Coogee Bay Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-carmela",
+   "name": "Carmela, barista, own cafe",
+   "x": 3003,
+   "z": 5399,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flat white? Everyone in Randwick wants a flat white. Give me a sec, the grinder's sulking.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I own the place. Own it, run it, sweep it. the Doncaster foot traffic pays the rent and the regulars pay for the machine.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's sightline at royal randwick.",
+     "choices": [
+      {
+       "text": "Sightline at Royal Randwick",
+       "accept": "qgb-l5-randwick-042",
+       "denyFlag": "w:qgb-l5-randwick-042"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Carmela pays up on the spot.",
+     "choices": [
+      {
+       "text": "About sightline at royal randwick.",
+       "turnin": "qgb-l5-randwick-042"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There are eleven cafes on this strip and we all buy beans off the same bloke in the Doncaster. Don't tell anyone.",
+     "improv": {
+      "persona": "Carmela, barista, own cafe in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Doncaster like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near the Doncaster."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-2",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Carmela listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-tanya",
+   "name": "Tanya, racegoer, day off",
+   "x": 3266.3,
+   "z": 5011.7,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Fancy anything in the fourth? No? Sensible. Randwick, mate.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Randwick on a Saturday, the TAB on a Tuesday, the fridge in between. Royal Randwick has taken more of my money than my ex.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The the Prince of Wales Camera",
+       "accept": "qgb-l5-randwick-043",
+       "denyFlag": "w:qgb-l5-randwick-043"
+      },
+      {
+       "text": "Counting the Prince of Wales",
+       "accept": "qgb-l5-randwick-044",
+       "denyFlag": "w:qgb-l5-randwick-044",
+       "needFlag": "w:qgb-l5-randwick-043"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Tanya looks it over the way Randwick looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the prince of wales camera.",
+       "turnin": "qgb-l5-randwick-043"
+      },
+      {
+       "text": "About counting the prince of wales.",
+       "turnin": "qgb-l5-randwick-044"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The members' stand at Royal Randwick has better carpet than my house. I've measured.",
+     "improv": {
+      "persona": "Tanya, racegoer, day off in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about Royal Randwick like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near Royal Randwick."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-denise",
+   "name": "Denise, racegoer, day off",
+   "x": 3187,
+   "z": 5337,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Fancy anything in the fourth? No? Sensible. Randwick, mate.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Randwick on a Saturday, the TAB on a Tuesday, the fridge in between. Belmore Road has taken more of my money than my ex.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at coogee bay road.",
+     "choices": [
+      {
+       "text": "Trouble at Coogee Bay Road",
+       "accept": "qgb-l5-randwick-045",
+       "denyFlag": "w:qgb-l5-randwick-045"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Denise pays up on the spot.",
+     "choices": [
+      {
+       "text": "About trouble at coogee bay road.",
+       "turnin": "qgb-l5-randwick-045"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The members' stand at Belmore Road has better carpet than my house. I've measured.",
+     "improv": {
+      "persona": "Denise, racegoer, day off in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about Belmore Road like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near Belmore Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-hoa",
+   "name": "Hoa, night-shift nurse",
+   "x": 2761,
+   "z": 5302,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry, just off a double. Twelve hours. Randwick, hi, what's wrong?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Emergency. Everything comes through the door at Coogee Bay Road: footballers, grandmothers, a man with a fork. Never a dull shift.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's a flat white from the doncaster.",
+     "choices": [
+      {
+       "text": "A Flat White From the Doncaster",
+       "accept": "qgb-l5-randwick-046",
+       "denyFlag": "w:qgb-l5-randwick-046"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Hoa looks it over the way Randwick looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About a flat white from the doncaster.",
+       "turnin": "qgb-l5-randwick-046"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good coffee near Coogee Bay Road opens at five. The nurses are there at four fifty-nine.",
+     "improv": {
+      "persona": "Hoa, night-shift nurse in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about Coogee Bay Road like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near Coogee Bay Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-kylie",
+   "name": "Kylie, racehorse trainer",
+   "x": 3104,
+   "z": 5150,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Four a.m. trackwork, then this. Randwick, you're standing on my lucky patch.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve horses, eleven owners, one that wins. Royal Randwick stables have been here longer than the suburb.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rbt on the spot.",
+     "choices": [
+      {
+       "text": "RBT on the Spot",
+       "accept": "qgb-l5-randwick-047",
+       "denyFlag": "w:qgb-l5-randwick-047"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Kylie looks it over the way Randwick looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About rbt on the spot.",
+       "turnin": "qgb-l5-randwick-047"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "A horse knows if you're nervous. So does the bloke at Royal Randwick who takes the bets.",
+     "improv": {
+      "persona": "Kylie, racehorse trainer in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about Royal Randwick like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near Royal Randwick."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-fay",
+   "name": "Fay, racehorse trainer",
+   "x": 3070.7,
+   "z": 5052,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Four a.m. trackwork, then this. Randwick, you're standing on my lucky patch.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve horses, eleven owners, one that wins. Belmore Road stables have been here longer than the suburb.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trolley run, coogee bay road.",
+     "choices": [
+      {
+       "text": "Trolley Run, Coogee Bay Road",
+       "accept": "qgb-l5-randwick-048",
+       "denyFlag": "w:qgb-l5-randwick-048"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Fay looks it over the way Randwick looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About trolley run, coogee bay road.",
+       "turnin": "qgb-l5-randwick-048"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "A horse knows if you're nervous. So does the bloke at Belmore Road who takes the bets.",
+     "improv": {
+      "persona": "Fay, racehorse trainer in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about Belmore Road like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near Belmore Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-digby",
+   "name": "Digby, strapper",
+   "x": 3135,
+   "z": 5652,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand behind him. He kicks. Randwick, yeah, what?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I brush, I walk, I hold the head while the vet does the thing. Coogee Bay Road at dawn is the best job in the world for the money it doesn't pay.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's something from the spot.",
+     "choices": [
+      {
+       "text": "Something From the Spot",
+       "accept": "qgb-l5-randwick-049",
+       "denyFlag": "w:qgb-l5-randwick-049"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Digby looks it over the way Randwick looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About something from the spot.",
+       "turnin": "qgb-l5-randwick-049"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best feed is the trackies' canteen at Coogee Bay Road, half six, before the owners arrive.",
+     "improv": {
+      "persona": "Digby, strapper in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about Coogee Bay Road like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near Coogee Bay Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-nathan",
+   "name": "Nathan, bowling club greenkeeper",
+   "x": 2898,
+   "z": 5044,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Boots off the green. Boots OFF the green. Sorry. Welcome to Randwick bowlo.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Two greens, one of them dying, and a committee that thinks I'm inventing it. the Doncaster comes for the schnitzel and stays for the raffle.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rent money, royal randwick.",
+     "choices": [
+      {
+       "text": "Rent Money, Royal Randwick",
+       "accept": "qgb-l5-randwick-050",
+       "denyFlag": "w:qgb-l5-randwick-050"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Nathan counts it out without looking up. -- Don't spend it all at the Doncaster.",
+     "choices": [
+      {
+       "text": "About rent money, royal randwick.",
+       "turnin": "qgb-l5-randwick-050"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Barefoot bowls on a Sunday is what pays for the green you're standing on. I have mixed feelings.",
+     "improv": {
+      "persona": "Nathan, bowling club greenkeeper in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Doncaster like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near the Doncaster."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-lucia",
+   "name": "Lucia, barista, own cafe",
+   "x": 3469,
+   "z": 5197,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flat white? Everyone in Randwick wants a flat white. Give me a sec, the grinder's sulking.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I own the place. Own it, run it, sweep it. Royal Randwick foot traffic pays the rent and the regulars pay for the machine.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's one stop from the spot.",
+     "choices": [
+      {
+       "text": "One Stop From the Spot",
+       "accept": "qgb-l5-randwick-051",
+       "denyFlag": "w:qgb-l5-randwick-051"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Lucia pays up on the spot.",
+     "choices": [
+      {
+       "text": "About one stop from the spot.",
+       "turnin": "qgb-l5-randwick-051"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There are eleven cafes on this strip and we all buy beans off the same bloke in Royal Randwick. Don't tell anyone.",
+     "improv": {
+      "persona": "Lucia, barista, own cafe in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about Royal Randwick like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near Royal Randwick."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-tahlia",
+   "name": "Tahlia, racegoer, day off",
+   "x": 3095,
+   "z": 5594,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Fancy anything in the fourth? No? Sensible. Randwick, mate.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Randwick on a Saturday, the TAB on a Tuesday, the fridge in between. the Prince of Wales has taken more of my money than my ex.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at the spot.",
+     "choices": [
+      {
+       "text": "Trouble at the Spot",
+       "accept": "qgb-l5-randwick-052",
+       "denyFlag": "w:qgb-l5-randwick-052"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Tahlia looks it over the way Randwick looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About trouble at the spot.",
+       "turnin": "qgb-l5-randwick-052"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The members' stand at the Prince of Wales has better carpet than my house. I've measured.",
+     "improv": {
+      "persona": "Tahlia, racegoer, day off in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Prince of Wales like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near the Prince of Wales."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-khoa",
+   "name": "Khoa, night-shift nurse",
+   "x": 3025,
+   "z": 5343,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry, just off a double. Twelve hours. Randwick, hi, what's wrong?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Emergency. Everything comes through the door at the Spot: footballers, grandmothers, a man with a fork. Never a dull shift.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch unsw.",
+     "choices": [
+      {
+       "text": "Before They Touch UNSW",
+       "accept": "qgb-l5-randwick-053",
+       "denyFlag": "w:qgb-l5-randwick-053"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Khoa looks it over the way Randwick looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About before they touch unsw.",
+       "turnin": "qgb-l5-randwick-053"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good coffee near the Spot opens at five. The nurses are there at four fifty-nine.",
+     "improv": {
+      "persona": "Khoa, night-shift nurse in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Spot like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near the Spot."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-norm",
+   "name": "Norm, uni student, three jobs",
+   "x": 2796,
+   "z": 5695,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Randwick rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the Ritz cinema is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's bin night, the randwick ritz.",
+     "choices": [
+      {
+       "text": "Bin Night, the Randwick Ritz",
+       "accept": "qgb-l5-randwick-054",
+       "denyFlag": "w:qgb-l5-randwick-054"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Norm counts it out without looking up. -- Don't spend it all at the Ritz cinema.",
+     "choices": [
+      {
+       "text": "About bin night, the randwick ritz.",
+       "turnin": "qgb-l5-randwick-054"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the Ritz cinema that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Norm, uni student, three jobs in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Ritz cinema like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near the Ritz cinema."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-terry",
+   "name": "Terry, strapper",
+   "x": 3169.1,
+   "z": 5201.4,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand behind him. He kicks. Randwick, yeah, what?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I brush, I walk, I hold the head while the vet does the thing. UNSW at dawn is the best job in the world for the money it doesn't pay.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the randwick ritz camera.",
+     "choices": [
+      {
+       "text": "The the Randwick Ritz Camera",
+       "accept": "qgb-l5-randwick-055",
+       "denyFlag": "w:qgb-l5-randwick-055"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Terry pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the randwick ritz camera.",
+       "turnin": "qgb-l5-randwick-055"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best feed is the trackies' canteen at UNSW, half six, before the owners arrive.",
+     "improv": {
+      "persona": "Terry, strapper in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about UNSW like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near UNSW."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-reg",
+   "name": "Reg, strapper",
+   "x": 2780,
+   "z": 5245,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand behind him. He kicks. Randwick, yeah, what?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I brush, I walk, I hold the head while the vet does the thing. the Spot at dawn is the best job in the world for the money it doesn't pay.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's lads off the ritz cinema.",
+     "choices": [
+      {
+       "text": "Lads Off the Ritz cinema",
+       "accept": "qgb-l5-randwick-056",
+       "denyFlag": "w:qgb-l5-randwick-056"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Reg counts it out without looking up. -- Don't spend it all at the Spot.",
+     "choices": [
+      {
+       "text": "About lads off the ritz cinema.",
+       "turnin": "qgb-l5-randwick-056"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best feed is the trackies' canteen at the Spot, half six, before the owners arrive.",
+     "improv": {
+      "persona": "Reg, strapper in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Spot like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near the Spot."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-brooke",
+   "name": "Brooke, bowling club greenkeeper",
+   "x": 2741,
+   "z": 5450,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Boots off the green. Boots OFF the green. Sorry. Welcome to Randwick bowlo.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Two greens, one of them dying, and a committee that thinks I'm inventing it. the Ritz cinema comes for the schnitzel and stays for the raffle.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the anzac parade course.",
+     "choices": [
+      {
+       "text": "The Anzac Parade Course",
+       "accept": "qgb-l5-randwick-057",
+       "denyFlag": "w:qgb-l5-randwick-057"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Brooke pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the anzac parade course.",
+       "turnin": "qgb-l5-randwick-057"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Barefoot bowls on a Sunday is what pays for the green you're standing on. I have mixed feelings.",
+     "improv": {
+      "persona": "Brooke, bowling club greenkeeper in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Ritz cinema like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near the Ritz cinema."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-tony",
+   "name": "Tony, barista, own cafe",
+   "x": 3059.6,
+   "z": 5594.5,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flat white? Everyone in Randwick wants a flat white. Give me a sec, the grinder's sulking.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I own the place. Own it, run it, sweep it. Anzac Parade foot traffic pays the rent and the regulars pay for the machine.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the randwick ritz fence.",
+     "choices": [
+      {
+       "text": "The the Randwick Ritz Fence",
+       "accept": "qgb-l5-randwick-058",
+       "denyFlag": "w:qgb-l5-randwick-058"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Tony looks it over the way Randwick looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the randwick ritz fence.",
+       "turnin": "qgb-l5-randwick-058"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There are eleven cafes on this strip and we all buy beans off the same bloke in Anzac Parade. Don't tell anyone.",
+     "improv": {
+      "persona": "Tony, barista, own cafe in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about Anzac Parade like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near Anzac Parade."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Randwick would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-hung",
+   "name": "Hung, night-shift nurse",
+   "x": 2864,
+   "z": 5728,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry, just off a double. Twelve hours. Randwick, hi, what's wrong?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Emergency. Everything comes through the door at the Randwick Ritz: footballers, grandmothers, a man with a fork. Never a dull shift.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the length of coogee bay road.",
+     "choices": [
+      {
+       "text": "The Length of Coogee Bay Road",
+       "accept": "qgb-l5-randwick-059",
+       "denyFlag": "w:qgb-l5-randwick-059"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Hung looks it over the way Randwick looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the length of coogee bay road.",
+       "turnin": "qgb-l5-randwick-059"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good coffee near the Randwick Ritz opens at five. The nurses are there at four fifty-nine.",
+     "improv": {
+      "persona": "Hung, night-shift nurse in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Randwick Ritz like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near the Randwick Ritz."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-dot",
+   "name": "Dot, uni student, three jobs",
+   "x": 2653,
+   "z": 5353,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Randwick rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Belmore Road is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the coogee bay road tab.",
+     "choices": [
+      {
+       "text": "The Coogee Bay Road Tab",
+       "accept": "qgb-l5-randwick-060",
+       "denyFlag": "w:qgb-l5-randwick-060"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Dot looks it over the way Randwick looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the coogee bay road tab.",
+       "turnin": "qgb-l5-randwick-060"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Belmore Road that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Dot, uni student, three jobs in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about Belmore Road like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near Belmore Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-debbie",
+   "name": "Debbie, racehorse trainer",
+   "x": 3463,
+   "z": 5391,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Four a.m. trackwork, then this. Randwick, you're standing on my lucky patch.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve horses, eleven owners, one that wins. Coogee Bay Road stables have been here longer than the suburb.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rent money, the doncaster.",
+     "choices": [
+      {
+       "text": "Rent Money, the Doncaster",
+       "accept": "qgb-l5-randwick-061",
+       "denyFlag": "w:qgb-l5-randwick-061"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Debbie counts it out without looking up. -- Don't spend it all at Coogee Bay Road.",
+     "choices": [
+      {
+       "text": "About rent money, the doncaster.",
+       "turnin": "qgb-l5-randwick-061"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "A horse knows if you're nervous. So does the bloke at Coogee Bay Road who takes the bets.",
+     "improv": {
+      "persona": "Debbie, racehorse trainer in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about Coogee Bay Road like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near Coogee Bay Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-eddie",
+   "name": "Eddie, strapper",
+   "x": 3297,
+   "z": 5153,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand behind him. He kicks. Randwick, yeah, what?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I brush, I walk, I hold the head while the vet does the thing. the Doncaster at dawn is the best job in the world for the money it doesn't pay.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two signs, the prince of wales.",
+     "choices": [
+      {
+       "text": "Two Signs, the Prince of Wales",
+       "accept": "qgb-l5-randwick-062",
+       "denyFlag": "w:qgb-l5-randwick-062"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Eddie pays up on the spot.",
+     "choices": [
+      {
+       "text": "About two signs, the prince of wales.",
+       "turnin": "qgb-l5-randwick-062"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best feed is the trackies' canteen at the Doncaster, half six, before the owners arrive.",
+     "improv": {
+      "persona": "Eddie, strapper in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Doncaster like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near the Doncaster."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-lucia-a",
+   "name": "Lucia A., barista, own cafe",
+   "x": 2658,
+   "z": 5565,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flat white? Everyone in Randwick wants a flat white. Give me a sec, the grinder's sulking.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I own the place. Own it, run it, sweep it. the Prince of Wales foot traffic pays the rent and the regulars pay for the machine.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's meat tray at the ritz cinema.",
+     "choices": [
+      {
+       "text": "Meat Tray at the Ritz cinema",
+       "accept": "qgb-l5-randwick-063",
+       "denyFlag": "w:qgb-l5-randwick-063"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Lucia A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About meat tray at the ritz cinema.",
+       "turnin": "qgb-l5-randwick-063"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There are eleven cafes on this strip and we all buy beans off the same bloke in the Prince of Wales. Don't tell anyone.",
+     "improv": {
+      "persona": "Lucia A., barista, own cafe in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Prince of Wales like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near the Prince of Wales."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-rocco",
+   "name": "Rocco, barista, own cafe",
+   "x": 2552,
+   "z": 5485,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flat white? Everyone in Randwick wants a flat white. Give me a sec, the grinder's sulking.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I own the place. Own it, run it, sweep it. Coogee Bay Road foot traffic pays the rent and the regulars pay for the machine.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the royal randwick lift.",
+     "choices": [
+      {
+       "text": "The Royal Randwick Lift",
+       "accept": "qgb-l5-randwick-064",
+       "denyFlag": "w:qgb-l5-randwick-064"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Rocco counts it out without looking up. -- Don't spend it all at Coogee Bay Road.",
+     "choices": [
+      {
+       "text": "About the royal randwick lift.",
+       "turnin": "qgb-l5-randwick-064"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There are eleven cafes on this strip and we all buy beans off the same bloke in Coogee Bay Road. Don't tell anyone.",
+     "improv": {
+      "persona": "Rocco, barista, own cafe in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about Coogee Bay Road like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near Coogee Bay Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Rocco listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-kylie-anne",
+   "name": "Kylie-Anne, uni student, three jobs",
+   "x": 3284,
+   "z": 5489,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Randwick rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the Prince of Wales is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's race four, the spot.",
+     "choices": [
+      {
+       "text": "Race Four, the Spot",
+       "accept": "qgb-l5-randwick-065",
+       "denyFlag": "w:qgb-l5-randwick-065"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Kylie-Anne looks it over the way Randwick looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About race four, the spot.",
+       "turnin": "qgb-l5-randwick-065"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the Prince of Wales that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Kylie-Anne, uni student, three jobs in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Prince of Wales like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near the Prince of Wales."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Right. And you're sure it was the Spot? People say the Spot when they mean the bit next to it. -- Kylie-Anne writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-jacinta",
+   "name": "Jacinta, racehorse trainer",
+   "x": 2676,
+   "z": 4940,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Four a.m. trackwork, then this. Randwick, you're standing on my lucky patch.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve horses, eleven owners, one that wins. the Spot stables have been here longer than the suburb.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the ritz cinema camera.",
+     "choices": [
+      {
+       "text": "The the Ritz cinema Camera",
+       "accept": "qgb-l5-randwick-066",
+       "denyFlag": "w:qgb-l5-randwick-066"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Jacinta looks it over the way Randwick looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the ritz cinema camera.",
+       "turnin": "qgb-l5-randwick-066"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "A horse knows if you're nervous. So does the bloke at the Spot who takes the bets.",
+     "improv": {
+      "persona": "Jacinta, racehorse trainer in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Spot like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near the Spot."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-randwick-merv",
+   "name": "Merv, strapper",
+   "x": 2968,
+   "z": 5826,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Don't stand behind him. He kicks. Randwick, yeah, what?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Randwick like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I brush, I walk, I hold the head while the vet does the thing. the Ritz cinema at dawn is the best job in the world for the money it doesn't pay.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the anzac parade fence.",
+     "choices": [
+      {
+       "text": "The Anzac Parade Fence",
+       "accept": "qgb-l5-randwick-067",
+       "denyFlag": "w:qgb-l5-randwick-067"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Merv counts it out without looking up. -- Don't spend it all at the Ritz cinema.",
+     "choices": [
+      {
+       "text": "About the anzac parade fence.",
+       "turnin": "qgb-l5-randwick-067"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best feed is the trackies' canteen at the Ritz cinema, half six, before the owners arrive.",
+     "improv": {
+      "persona": "Merv, strapper in Randwick, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Ritz cinema like everyone knows it.",
+      "context": "Someone has asked what Randwick is like these days. You are standing near the Ritz cinema."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Right. And you're sure it was Anzac Parade? People say Anzac Parade when they mean the bit next to it. -- Merv writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

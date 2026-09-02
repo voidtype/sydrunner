@@ -1,0 +1,1265 @@
+{
+ "pack": "areab-hurstville-1",
+ "quests": [
+  {
+   "id": "qgb-l7-hurstville-001",
+   "act": 3,
+   "title": "The the Hurstville Aquatic Centre Sparky",
+   "blurb": "You look like you have twenty minutes. The sparky off the the Hurstville Aquatic Centre job has owed me since the bathroom and drinks in Hurstville from five. There is probably a simple explanation and I would love to hear it. Forty will do and I'll write off the rest. There's cash in it. Not a lot.",
+   "giver": "qgb-hurstville-chantelle",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for the Hurstville Aquatic Centre"
+    },
+    {
+     "kind": "earn",
+     "dollars": 69,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 160,
+    "xp": 402,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-002",
+   "act": 3,
+   "title": "One Stop From Forest Road",
+   "blurb": "Honestly, I am past caring how it looks. I need to know the train from Hurstville stops at Parramatta and doesn't sail through like it did on Saturday. You will see what I mean the second you get there. Ride it at peak hour and photograph the sign. I will know if you skipped a bit.",
+   "giver": "qgb-hurstville-hayden",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Hurstville",
+     "to": "Parramatta",
+     "label": "take the train to Parramatta"
+    },
+    {
+     "kind": "photo",
+     "x": -18911,
+     "z": -5342,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 153,
+    "xp": 432,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-003",
+   "act": 3,
+   "title": "The Forest Road Course",
+   "blurb": "Do not laugh. A bloke near Forest Road runs a ninety-minute course he bills at four hundred, and I've paid. I am aware how that sounds. Sit it Australia Day, then come back to Hurstville and prove it did something. There is no rush, but there is a Friday.",
+   "giver": "qgb-hurstville-yan",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near Forest Road"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 155,
+    "xp": 402,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-004",
+   "act": 3,
+   "title": "Closing Time at the Hurstville Chinese strip",
+   "blurb": "Someone has to, and it may as well be you. Two blokes have slept in my doorway on the Hurstville Chinese strip since the pub shut. You can tell me I am imagining it. Tell me after. The Hurstville delivery's at lunchtime, so get them up and show me the step empty. Take your time. Do not take a week.",
+   "giver": "qgb-hurstville-michelle",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off the Hurstville Chinese strip"
+    },
+    {
+     "kind": "photo",
+     "x": -9797,
+     "z": 11081,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 158,
+    "xp": 418,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-005",
+   "act": 3,
+   "title": "RBT on the St George Dragons",
+   "blurb": "I am told you do odd jobs. There's a breath test set up on the St George Dragons since ten past ten. The paperwork says one thing and my eyes say another. My brother-in-law needs the ute at the far end of Hurstville without a conversation. You'll know it when you see it.",
+   "giver": "qgb-hurstville-lachlan",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on the St George Dragons"
+    },
+    {
+     "kind": "goto",
+     "x": -10181,
+     "z": 11266,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 149,
+    "xp": 434,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-006",
+   "act": 3,
+   "title": "Meat Tray at Crofts Avenue",
+   "blurb": "Keep it between us for now. The Crofts Avenue raffle is thirty-five short of a meat tray and the draw is at bin night. It is not the money. It has stopped being the money. Find it in Hurstville and put it in the tin. Just do not come back empty-handed.",
+   "giver": "qgb-hurstville-barry",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 60,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -9803,
+     "z": 10949,
+     "radius": 30,
+     "label": "and drop it at Crofts Avenue"
+    }
+   ],
+   "reward": {
+    "cash": 151,
+    "xp": 425,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-007",
+   "act": 3,
+   "title": "The the Hurstville Aquatic Centre Tab",
+   "blurb": "Not being dramatic about this. Two chippies off the the Hurstville Aquatic Centre job have run a tab in Hurstville since grand final day. It is the not knowing that has got me, honestly. They drove past at lunchtime without looking in, so settle it in cash. If anyone asks, you were never here.",
+   "giver": "qgb-hurstville-ken",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Hurstville Aquatic Centre"
+    },
+    {
+     "kind": "earn",
+     "dollars": 52,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 150,
+    "xp": 411,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-008",
+   "act": 3,
+   "title": "Bin Night, the Hurstville Bowlo",
+   "blurb": "This is going to sound small. Somebody moves the bins on the Hurstville Bowlo in front of my drive every Thursday night. I have got no proof, which is exactly why I am asking. Photograph the evidence and have a word; Hurstville knows who. That's it. That's the whole ask.",
+   "giver": "qgb-hurstville-ken",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -9728,
+     "z": 11738,
+     "radius": 40,
+     "label": "photograph the bins at the Hurstville Bowlo"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 152,
+    "xp": 434,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-009",
+   "act": 3,
+   "title": "Trouble at the Hurstville Bowlo",
+   "blurb": "I would do it myself if I could leave the counter. Two lads and their mate decided at the arvo that the Hurstville Bowlo is theirs. I did try the official route, for what that was worth. The rest of Hurstville disagrees, so explain the disagreement. Come and find me after, either way.",
+   "giver": "qgb-hurstville-colin",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near the Hurstville Bowlo"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 147,
+    "xp": 431,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-010",
+   "act": 3,
+   "title": "Before They Touch Forest Road",
+   "blurb": "It is the sort of thing you notice or you do not. They start on Forest Road on Boxing Day and the orange fencing goes up. There is probably a simple explanation and I would love to hear it. I want Hurstville on record before it does. I would rather know than wonder.",
+   "giver": "qgb-hurstville-gail",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -9963,
+     "z": 11549,
+     "radius": 40,
+     "label": "photograph the state of Forest Road"
+    },
+    {
+     "kind": "goto",
+     "x": -9773,
+     "z": 11498,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 157,
+    "xp": 429,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-011",
+   "act": 3,
+   "title": "Two From the Hurstville Chinese strip",
+   "blurb": "You look like you have twenty minutes. Two of whatever's going near the Hurstville Chinese strip, here, hot, before the footy at half two. It might be nothing. It has not felt like nothing. It's Hurstville; I'm not asking for much. Half now if you want it. Most people don't.",
+   "giver": "qgb-hurstville-hao",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near the Hurstville Chinese strip"
+    },
+    {
+     "kind": "goto",
+     "x": -9632,
+     "z": 10872,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 161,
+    "xp": 417,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-012",
+   "act": 3,
+   "title": "Left It Near Westfield Hurstville",
+   "blurb": "I have been putting it off since Easter. I left something on the bench at Westfield Hurstville at the arvo. I have got a photo on my phone but it is useless. By the time I got back to Hurstville it had walked, so look where I'd have dropped it. There's cash in it. Not a lot.",
+   "giver": "qgb-hurstville-hao",
+   "level": 7,
+   "requires": [
+    "qgb-l7-hurstville-011"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -9593,
+     "z": 10847,
+     "radius": 30,
+     "label": "check the bench near Westfield Hurstville"
+    },
+    {
+     "kind": "photo",
+     "x": -9663,
+     "z": 11048,
+     "radius": 40,
+     "label": "photograph the bins behind it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-hurstville-hao",
+     "node": "report-1",
+     "label": "tell me what you found"
+    }
+   ],
+   "reward": {
+    "cash": 208,
+    "xp": 567,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-013",
+   "act": 3,
+   "title": "Lads Off Hurstville Oval",
+   "blurb": "Do not laugh. Three of them in TNs on the Hurstville Oval steps, flogging vapes to schoolkids at the last train. Everyone I have told has looked at me the way you are now. Hurstville used to move them on itself and now it rings me. I'll put the kettle on for when you're back.",
+   "giver": "qgb-hurstville-harriet",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Hurstville Oval"
+    }
+   ],
+   "reward": {
+    "cash": 143,
+    "xp": 408,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-014",
+   "act": 3,
+   "title": "Two Signs, the St George Dragons",
+   "blurb": "There is no clever way to say this. Two signs near the St George Dragons say opposite things about parking and I've been fined under both. There is a version of this where I am the unreasonable one. Get photos of each before the King's Birthday, when Hurstville council takes one down. There is no rush, but there is a Friday.",
+   "giver": "qgb-hurstville-imogen",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -9280,
+     "z": 10854,
+     "radius": 40,
+     "label": "photograph the sign at the St George Dragons"
+    },
+    {
+     "kind": "photo",
+     "x": -9502,
+     "z": 11082,
+     "radius": 40,
+     "label": "and the one that contradicts it"
+    }
+   ],
+   "reward": {
+    "cash": 157,
+    "xp": 402,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-015",
+   "act": 3,
+   "title": "The Kempt Field Complaint",
+   "blurb": "The council knows and the council does not care. Two women in activewear have photographed my bins outside Kempt Field since Saturday. You can tell me I am imagining it. Tell me after. One has Hurstville council on speed dial; sort it however you sort things. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-hurstville-imogen",
+   "level": 7,
+   "requires": [
+    "qgb-l7-hurstville-014"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near Kempt Field"
+    }
+   ],
+   "reward": {
+    "cash": 194,
+    "xp": 529,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-016",
+   "act": 3,
+   "title": "The the Hurstville Bowlo Course",
+   "blurb": "Someone has to, and it may as well be you. A bloke near the Hurstville Bowlo runs a ninety-minute course he bills at four hundred, and I've paid. My wife says I should let it go. My wife is wrong. Sit it Australia Day, then come back to Hurstville and prove it did something. Whatever you find, bring it to me first.",
+   "giver": "qgb-hurstville-li",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near the Hurstville Bowlo"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 149,
+    "xp": 401,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-017",
+   "act": 3,
+   "title": "Closing Time at Crofts Avenue",
+   "blurb": "It is not a police matter and I have checked. Two blokes have slept in my doorway on Crofts Avenue since the pub shut. The paperwork says one thing and my eyes say another. The Hurstville delivery's at half four, so get them up and show me the step empty. That's the whole job. No catch.",
+   "giver": "qgb-hurstville-joyce",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off Crofts Avenue"
+    },
+    {
+     "kind": "photo",
+     "x": -9389,
+     "z": 10691,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 158,
+    "xp": 433,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-018",
+   "act": 3,
+   "title": "Cover at the Hurstville Aquatic Centre",
+   "blurb": "You will think I am making this up. I've got nobody for the the Hurstville Aquatic Centre shift at midnight and a room full of Hurstville people who've paid. It started small, the way these things do. Fifty of trade and one difficult person at the door. Do not let them talk you into anything.",
+   "giver": "qgb-hurstville-bronwyn",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 86,
+     "label": "cover the fifty for the shift"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 1,
+     "label": "and handle whoever's at the door"
+    }
+   ],
+   "reward": {
+    "cash": 143,
+    "xp": 429,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-019",
+   "act": 3,
+   "title": "Tap On at Forest Road",
+   "blurb": "Before you say anything: yes, I know. My Opal says I owe nineteen dollars for a trip from Hurstville I never took on Australia Day. It is the not knowing that has got me, honestly. Take the same one to Parramatta and tell me what it charged you. Just do not come back empty-handed.",
+   "giver": "qgb-hurstville-shirl",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Hurstville",
+     "to": "Parramatta",
+     "label": "tap on at Hurstville, tap off at Parramatta"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-hurstville-shirl",
+     "node": "report-1",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 153,
+    "xp": 437,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-020",
+   "act": 3,
+   "title": "The Forest Road Tab",
+   "blurb": "Not being dramatic about this. Two chippies off the Forest Road job have run a tab in Hurstville since the King's Birthday. I have got no proof, which is exactly why I am asking. They drove past at nine sharp without looking in, so settle it in cash. I'll see you right for it.",
+   "giver": "qgb-hurstville-shirl",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near Forest Road"
+    },
+    {
+     "kind": "earn",
+     "dollars": 52,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 153,
+    "xp": 418,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-021",
+   "act": 3,
+   "title": "Something From the Hurstville Chinese strip",
+   "blurb": "It is the sort of thing you notice or you do not. The stall at the Hurstville Chinese strip has run out and the customers keep coming. It might be nothing. It has not felt like nothing. Find something round Hurstville that'll do before the eleven rush. Be polite about it. It costs nothing.",
+   "giver": "qgb-hurstville-dean",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near the Hurstville Chinese strip"
+    },
+    {
+     "kind": "goto",
+     "x": -10143,
+     "z": 11302,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 143,
+    "xp": 410,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-022",
+   "act": 3,
+   "title": "Race Four, the Hurstville Chinese strip",
+   "blurb": "You look like you have twenty minutes. There's a horse in race four at three in the morning that a bloke at the Hurstville Chinese strip swears by. I have got a photo on my phone but it is useless. Turn it into fifty-five somewhere in Hurstville and tell me if it came in. I would rather know than wonder.",
+   "giver": "qgb-hurstville-dean",
+   "level": 7,
+   "requires": [
+    "qgb-l7-hurstville-021"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 95,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-hurstville-dean",
+     "node": "report-1",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 209,
+    "xp": 558,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-023",
+   "act": 3,
+   "title": "Before They Touch Hurstville Oval",
+   "blurb": "I have been putting it off since Easter. They start on Hurstville Oval on Melbourne Cup day and the orange fencing goes up. Nobody else seems to have noticed, which is its own problem. I want Hurstville on record before it does. Half now if you want it. Most people don't.",
+   "giver": "qgb-hurstville-ling",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -9696,
+     "z": 11194,
+     "radius": 40,
+     "label": "photograph the state of Hurstville Oval"
+    },
+    {
+     "kind": "goto",
+     "x": -9985,
+     "z": 11099,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 151,
+    "xp": 433,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-024",
+   "act": 3,
+   "title": "Trolley Run, Kempt Field",
+   "blurb": "Do not laugh. A Woolies trolley from Kempt Field gets walked to the creek every Wednesday. There is a version of this where I am the unreasonable one. Find where it ends up in Hurstville and make the deposit back. I will know if you skipped a bit.",
+   "giver": "qgb-hurstville-rod",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -9497,
+     "z": 11404,
+     "radius": 30,
+     "label": "find the trolley near Kempt Field"
+    },
+    {
+     "kind": "photo",
+     "x": -9497,
+     "z": 11404,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 43,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 154,
+    "xp": 420,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-025",
+   "act": 3,
+   "title": "Lads Off Crofts Avenue",
+   "blurb": "Someone has to, and it may as well be you. Three of them in TNs on the Crofts Avenue steps, flogging vapes to schoolkids at eight at night. This is the third time I have had this conversation. Hurstville used to move them on itself and now it rings me. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-hurstville-mei",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Crofts Avenue"
+    }
+   ],
+   "reward": {
+    "cash": 161,
+    "xp": 415,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-026",
+   "act": 3,
+   "title": "The Forest Road Lift",
+   "blurb": "You will think I am making this up. The lift at Hurstville station has been out since the Easter Show and I'm told Parramatta is worse. It has been going on longer than I have admitted to anyone. Check both Boxing Day and tell me which takes a pram. You'll know it when you see it.",
+   "giver": "qgb-hurstville-merv",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -9680,
+     "z": 11150,
+     "radius": 30,
+     "label": "check the lift at Hurstville station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Hurstville",
+     "to": "Parramatta",
+     "label": "then ride to Parramatta and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-hurstville-merv",
+     "node": "report-0",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 142,
+    "xp": 437,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-027",
+   "act": 3,
+   "title": "Seven a.m. At the Hurstville Chinese strip",
+   "blurb": "I would do it myself if I could leave the counter. The site at the Hurstville Chinese strip starts its jackhammer at six in the morning on a Tuesday, which is illegal and loud. There is probably a simple explanation and I would love to hear it. Photograph it running and have a word with the Hurstville foreman. If anyone asks, you were never here.",
+   "giver": "qgb-hurstville-sienna",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -9696,
+     "z": 10945,
+     "radius": 40,
+     "label": "photograph the noise from the Hurstville Chinese strip"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 161,
+    "xp": 436,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-028",
+   "act": 3,
+   "title": "Counting the St George Dragons",
+   "blurb": "It has been three weeks. Council says the the St George Dragons car park is never full and I say it's full by lunchtime. It might be nothing. It has not felt like nothing. Count both Hurstville car parks, photograph whichever one makes me right. That's it. That's the whole ask.",
+   "giver": "qgb-hurstville-terry",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -9753,
+     "z": 11322,
+     "radius": 30,
+     "label": "count the cars at the St George Dragons"
+    },
+    {
+     "kind": "goto",
+     "x": -9813,
+     "z": 11641,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": -9753,
+     "z": 11322,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 152,
+    "xp": 430,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-029",
+   "act": 3,
+   "title": "The Crofts Avenue Order",
+   "blurb": "You look like you have twenty minutes. The Crofts Avenue order came to seventy more than I'd budgeted and the supplier wants it by ten past ten. Nobody else seems to have noticed, which is its own problem. Find seventy in Hurstville and photograph the receipt. Be polite about it. It costs nothing.",
+   "giver": "qgb-hurstville-yan-a",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 120,
+     "label": "square the seventy for the Crofts Avenue order"
+    },
+    {
+     "kind": "photo",
+     "x": -10145,
+     "z": 11266,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 146,
+    "xp": 420,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-030",
+   "act": 3,
+   "title": "Race Four, Kempt Field",
+   "blurb": "You are the first person to stop all morning. There's a horse in race four at six in the morning that a bloke at Kempt Field swears by. I would not ask if there was anyone else about. Turn it into fifty-five somewhere in Hurstville and tell me if it came in. Half now if you want it. Most people don't.",
+   "giver": "qgb-hurstville-yan-a",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 95,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-hurstville-yan-a",
+     "node": "report-2",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 148,
+    "xp": 432,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-031",
+   "act": 3,
+   "title": "The the Hurstville Chinese strip Course",
+   "blurb": "I am told you do odd jobs. A bloke near the Hurstville Chinese strip runs a ninety-minute course he bills at four hundred, and I've paid. It started small, the way these things do. Sit it Friday, then come back to Hurstville and prove it did something. Take your time. Do not take a week.",
+   "giver": "qgb-hurstville-yan-b",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near the Hurstville Chinese strip"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 157,
+    "xp": 421,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-032",
+   "act": 3,
+   "title": "Closing Time at Forest Road",
+   "blurb": "Nobody else has offered, so. Two blokes have slept in my doorway on Forest Road since the pub shut. Half the street knows and half the street is pretending not to. The Hurstville delivery's at ten past ten, so get them up and show me the step empty. You'll know it when you see it.",
+   "giver": "qgb-hurstville-glenn",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off Forest Road"
+    },
+    {
+     "kind": "photo",
+     "x": -9636,
+     "z": 11027,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 153,
+    "xp": 399,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-033",
+   "act": 3,
+   "title": "Staffy Near the Hurstville Chinese strip",
+   "blurb": "Not being dramatic about this. A brindle staffy in a red bandana went over the fence at the Hurstville Chinese strip at the arvo. I am not after trouble. I am after an answer. Everyone in Hurstville has definitely seen it and can't say where. Say nothing to anyone on the way.",
+   "giver": "qgb-hurstville-jason-a",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10053,
+     "z": 10727,
+     "radius": 30,
+     "label": "check the off-leash bit near the Hurstville Chinese strip"
+    },
+    {
+     "kind": "photo",
+     "x": -9980,
+     "z": 11089,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-hurstville-jason-a",
+     "node": "report-0",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 156,
+    "xp": 407,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-034",
+   "act": 3,
+   "title": "Tap On at Hurstville Oval",
+   "blurb": "I would do it myself if I could leave the counter. My Opal says I owe nineteen dollars for a trip from Hurstville I never took on Thursday. It might be nothing. It has not felt like nothing. Take the same one to Parramatta and tell me what it charged you. I'll see you right for it.",
+   "giver": "qgb-hurstville-marg",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Hurstville",
+     "to": "Parramatta",
+     "label": "tap on at Hurstville, tap off at Parramatta"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-hurstville-marg",
+     "node": "report-0",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 144,
+    "xp": 412,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-035",
+   "act": 3,
+   "title": "The Hurstville Oval Tab",
+   "blurb": "It has been three weeks. Two chippies off the Hurstville Oval job have run a tab in Hurstville since Easter Saturday. I have got a photo on my phone but it is useless. They drove past at ten past ten without looking in, so settle it in cash. If anyone asks, you were never here.",
+   "giver": "qgb-hurstville-marg",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near Hurstville Oval"
+    },
+    {
+     "kind": "earn",
+     "dollars": 52,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 160,
+    "xp": 431,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-036",
+   "act": 3,
+   "title": "Trouble at Kempt Field",
+   "blurb": "I have been putting it off since Easter. Two lads and their mate decided at closing that Kempt Field is theirs. I would not ask if there was anyone else about. The rest of Hurstville disagrees, so explain the disagreement. Be polite about it. It costs nothing.",
+   "giver": "qgb-hurstville-jacinta",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Kempt Field"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 146,
+    "xp": 403,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-037",
+   "act": 3,
+   "title": "Something From Crofts Avenue",
+   "blurb": "You are the first person to stop all morning. The stall at Crofts Avenue has run out and the customers keep coming. I am aware how that sounds. Find something round Hurstville that'll do before the the change of shift rush. I would rather know than wonder.",
+   "giver": "qgb-hurstville-jason-b",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near Crofts Avenue"
+    },
+    {
+     "kind": "goto",
+     "x": -9616,
+     "z": 11333,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 160,
+    "xp": 407,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-hurstville-038",
+   "act": 3,
+   "title": "Before They Touch the Hurstville Aquatic Centre",
+   "blurb": "My knees are gone, so. They start on the Hurstville Aquatic Centre on Anzac Day and the orange fencing goes up. Everyone I have told has looked at me the way you are now. I want Hurstville on record before it does. Half now if you want it. Most people don't.",
+   "giver": "qgb-hurstville-jason-b",
+   "level": 7,
+   "requires": [
+    "qgb-l7-hurstville-037"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -10089,
+     "z": 10963,
+     "radius": 40,
+     "label": "photograph the state of the Hurstville Aquatic Centre"
+    },
+    {
+     "kind": "goto",
+     "x": -10042,
+     "z": 10788,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 209,
+    "xp": 553,
+    "unlock": []
+   }
+  }
+ ]
+}

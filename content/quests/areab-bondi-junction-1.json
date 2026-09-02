@@ -1,0 +1,1296 @@
+{
+ "pack": "areab-bondi-junction-1",
+ "quests": [
+  {
+   "id": "qgb-l5-bondi-junction-001",
+   "act": 3,
+   "title": "Proof of Bronte Road",
+   "blurb": "You look like you have twenty minutes. Nobody in Bondi Junction believes what Bronte Road looks like at half two. It started small, the way these things do. Get me a photo close enough that council can't say it's somewhere else. That's the whole job. No catch.",
+   "giver": "qgb-bondi-junction-bluey",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 3913,
+     "z": 2120,
+     "radius": 40,
+     "label": "get a picture of Bronte Road before they fix it"
+    }
+   ],
+   "reward": {
+    "cash": 132,
+    "xp": 337,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-002",
+   "act": 3,
+   "title": "The Bronte Road Tab",
+   "blurb": "My knees are gone, so. Two chippies off the Bronte Road job have run a tab in Bondi Junction since Monday. Half the street knows and half the street is pretending not to. They drove past at the arvo without looking in, so settle it in cash. Do not let them talk you into anything.",
+   "giver": "qgb-bondi-junction-brett",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near Bronte Road"
+    },
+    {
+     "kind": "earn",
+     "dollars": 44,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 323,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-003",
+   "act": 3,
+   "title": "The the Tea Gardens Complaint",
+   "blurb": "Someone has to, and it may as well be you. Two women in activewear have photographed my bins outside the Tea Gardens since Sunday. It might be nothing. It has not felt like nothing. One has Bondi Junction council on speed dial; sort it however you sort things. If anyone asks, you were never here.",
+   "giver": "qgb-bondi-junction-terry",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near the Tea Gardens"
+    }
+   ],
+   "reward": {
+    "cash": 129,
+    "xp": 346,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-004",
+   "act": 3,
+   "title": "Staffy Near the Bondi Road hill",
+   "blurb": "It is not a police matter and I have checked. A brindle staffy in a red bandana went over the fence at the Bondi Road hill at half two. Nobody else seems to have noticed, which is its own problem. Everyone in Bondi Junction has definitely seen it and can't say where. Come and find me after, either way.",
+   "giver": "qgb-bondi-junction-pita",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 4033,
+     "z": 2738,
+     "radius": 30,
+     "label": "check the off-leash bit near the Bondi Road hill"
+    },
+    {
+     "kind": "photo",
+     "x": 4207,
+     "z": 2605,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-bondi-junction-pita",
+     "node": "report-1",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 113,
+    "xp": 320,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-005",
+   "act": 3,
+   "title": "Two From Spring Street",
+   "blurb": "I am told you do odd jobs. Two of whatever's going near Spring Street, here, hot, before the footy at half six. You will see what I mean the second you get there. It's Bondi Junction; I'm not asking for much. Be polite about it. It costs nothing.",
+   "giver": "qgb-bondi-junction-eddie",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near Spring Street"
+    },
+    {
+     "kind": "goto",
+     "x": 3796,
+     "z": 2416,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 123,
+    "xp": 341,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-006",
+   "act": 3,
+   "title": "Meat Tray at Spring Street",
+   "blurb": "I have written it down twice and lost it twice. The Spring Street raffle is thirty-five short of a meat tray and the draw is at the change of shift. I would not ask if there was anyone else about. Find it in Bondi Junction and put it in the tin. I would rather know than wonder.",
+   "giver": "qgb-bondi-junction-eddie",
+   "level": 5,
+   "requires": [
+    "qgb-l5-bondi-junction-005"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 52,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": 4095,
+     "z": 2296,
+     "radius": 30,
+     "label": "and drop it at Spring Street"
+    }
+   ],
+   "reward": {
+    "cash": 168,
+    "xp": 438,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-007",
+   "act": 3,
+   "title": "Seven a.m. At Westfield Bondi Junction",
+   "blurb": "You will think I am making this up. The site at Westfield Bondi Junction starts its jackhammer at half two on a Easter Saturday, which is illegal and loud. I am aware how that sounds. Photograph it running and have a word with the Bondi Junction foreman. Half now if you want it. Most people don't.",
+   "giver": "qgb-bondi-junction-eddie",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 3967,
+     "z": 1974,
+     "radius": 40,
+     "label": "photograph the noise from Westfield Bondi Junction"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 118,
+    "xp": 344,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-008",
+   "act": 3,
+   "title": "RBT on Westfield Bondi Junction",
+   "blurb": "Two people have already said no. There's a breath test set up on Westfield Bondi Junction since half six. There is a version of this where I am the unreasonable one. My brother-in-law needs the ute at the far end of Bondi Junction without a conversation. I will owe you one, and I pay those.",
+   "giver": "qgb-bondi-junction-barry",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on Westfield Bondi Junction"
+    },
+    {
+     "kind": "goto",
+     "x": 3850,
+     "z": 2404,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 115,
+    "xp": 347,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-009",
+   "act": 3,
+   "title": "The the 333 bus Float",
+   "blurb": "This is going to sound small. The till at the 333 bus opens Thursday with an empty float because somebody took it to the pub. The paperwork says one thing and my eyes say another. Sixty before the first Bondi Junction customer, and I'll never say who. I'll put the kettle on for when you're back.",
+   "giver": "qgb-bondi-junction-clementine",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 89,
+     "label": "clear sixty for the the 333 bus float"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-bondi-junction-clementine",
+     "node": "report-1",
+     "label": "hand it over at the counter"
+    }
+   ],
+   "reward": {
+    "cash": 132,
+    "xp": 332,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-010",
+   "act": 3,
+   "title": "Probationary at the Eastgate",
+   "blurb": "I would do it myself if I could leave the counter. A young constable has been doing his first solo patrol round the Eastgate since the long weekend. I would have sorted it myself a year ago. He's decided Bondi Junction is his, so give him a story for the sergeant. There is no rush, but there is a Friday.",
+   "giver": "qgb-bondi-junction-gav",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "lose the probationary constable near the Eastgate"
+    }
+   ],
+   "reward": {
+    "cash": 126,
+    "xp": 323,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-011",
+   "act": 3,
+   "title": "Counting the Tea Gardens",
+   "blurb": "You are the first person to stop all morning. Council says the the Tea Gardens car park is never full and I say it's full by eleven. Half the street knows and half the street is pretending not to. Count both Bondi Junction car parks, photograph whichever one makes me right. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qgb-bondi-junction-fay",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 3568,
+     "z": 2565,
+     "radius": 30,
+     "label": "count the cars at the Tea Gardens"
+    },
+    {
+     "kind": "goto",
+     "x": 3870,
+     "z": 2705,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": 3568,
+     "z": 2565,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 117,
+    "xp": 337,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-012",
+   "act": 3,
+   "title": "One Stop From Spring Street",
+   "blurb": "Honestly, I am past caring how it looks. I need to know the train from Bondi Junction stops at Randwick and doesn't sail through like it did on Wednesday. I have got no proof, which is exactly why I am asking. Ride it at three in the morning and photograph the sign. Do not let them talk you into anything.",
+   "giver": "qgb-bondi-junction-brooke",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Bondi Junction",
+     "to": "Randwick",
+     "label": "take the train to Randwick"
+    },
+    {
+     "kind": "photo",
+     "x": 3003,
+     "z": 5333,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 113,
+    "xp": 312,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-013",
+   "act": 3,
+   "title": "Trouble at Spring Street",
+   "blurb": "I'll be straight with you. Two lads and their mate decided at first thing that Spring Street is theirs. I did try the official route, for what that was worth. The rest of Bondi Junction disagrees, so explain the disagreement. Do that and we're square.",
+   "giver": "qgb-bondi-junction-prue",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Spring Street"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 119,
+    "xp": 321,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-014",
+   "act": 3,
+   "title": "Proof of Spring Street",
+   "blurb": "There is no clever way to say this. Nobody in Bondi Junction believes what Spring Street looks like at school pick-up. There is probably a simple explanation and I would love to hear it. Get me a photo close enough that council can't say it's somewhere else. Say nothing to anyone on the way.",
+   "giver": "qgb-bondi-junction-prue",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 3709,
+     "z": 2820,
+     "radius": 40,
+     "label": "get a picture of Spring Street before they fix it"
+    }
+   ],
+   "reward": {
+    "cash": 118,
+    "xp": 343,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-015",
+   "act": 3,
+   "title": "The Centennial Park Complaint",
+   "blurb": "Two people have already said no. Two women in activewear have photographed my bins outside Centennial Park since Tuesday. You can tell me I am imagining it. Tell me after. One has Bondi Junction council on speed dial; sort it however you sort things. There's cash in it. Not a lot.",
+   "giver": "qgb-bondi-junction-digby",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near Centennial Park"
+    }
+   ],
+   "reward": {
+    "cash": 124,
+    "xp": 347,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-016",
+   "act": 3,
+   "title": "Something From the Eastgate",
+   "blurb": "Keep it between us for now. The stall at the Eastgate has run out and the customers keep coming. My wife says I should let it go. My wife is wrong. Find something round Bondi Junction that'll do before the dawn rush. I will owe you one, and I pay those.",
+   "giver": "qgb-bondi-junction-jason",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near the Eastgate"
+    },
+    {
+     "kind": "goto",
+     "x": 3920,
+     "z": 2754,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 125,
+    "xp": 335,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-017",
+   "act": 3,
+   "title": "Staffy Near Bronte Road",
+   "blurb": "Before you say anything: yes, I know. A brindle staffy in a red bandana went over the fence at Bronte Road at bin night. This is the third time I have had this conversation. Everyone in Bondi Junction has definitely seen it and can't say where. Come back and tell me straight.",
+   "giver": "qgb-bondi-junction-matilda",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 3767,
+     "z": 1989,
+     "radius": 30,
+     "label": "check the off-leash bit near Bronte Road"
+    },
+    {
+     "kind": "photo",
+     "x": 3878,
+     "z": 1887,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-bondi-junction-matilda",
+     "node": "report-0",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 115,
+    "xp": 321,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-018",
+   "act": 3,
+   "title": "Two From Bronte Road",
+   "blurb": "Not being dramatic about this. Two of whatever's going near Bronte Road, here, hot, before the footy at five. The paperwork says one thing and my eyes say another. It's Bondi Junction; I'm not asking for much. Do not make a scene about it.",
+   "giver": "qgb-bondi-junction-matilda",
+   "level": 5,
+   "requires": [
+    "qgb-l5-bondi-junction-017"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near Bronte Road"
+    },
+    {
+     "kind": "goto",
+     "x": 3937,
+     "z": 2275,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 152,
+    "xp": 413,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-019",
+   "act": 3,
+   "title": "The the Tea Gardens Sparky",
+   "blurb": "It has been three weeks. The sparky off the the Tea Gardens job has owed me since the bathroom and drinks in Bondi Junction from dawn. It started small, the way these things do. Forty will do and I'll write off the rest. There is no rush, but there is a Friday.",
+   "giver": "qgb-bondi-junction-mitch",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for the Tea Gardens"
+    },
+    {
+     "kind": "earn",
+     "dollars": 59,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 115,
+    "xp": 341,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-020",
+   "act": 3,
+   "title": "The the Tea Gardens Order",
+   "blurb": "You look like you have twenty minutes. The the Tea Gardens order came to seventy more than I'd budgeted and the supplier wants it by closing. It is not the money. It has stopped being the money. Find seventy in Bondi Junction and photograph the receipt. Whatever you find, bring it to me first.",
+   "giver": "qgb-bondi-junction-toby",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 104,
+     "label": "square the seventy for the the Tea Gardens order"
+    },
+    {
+     "kind": "photo",
+     "x": 3570,
+     "z": 2986,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 115,
+    "xp": 349,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-021",
+   "act": 3,
+   "title": "Lads Off Spring Street",
+   "blurb": "Do not laugh. Three of them in TNs on the Spring Street steps, flogging vapes to schoolkids at half seven. There is probably a simple explanation and I would love to hear it. Bondi Junction used to move them on itself and now it rings me. Do that and we're square.",
+   "giver": "qgb-bondi-junction-salote",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Spring Street"
+    }
+   ],
+   "reward": {
+    "cash": 117,
+    "xp": 327,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-022",
+   "act": 3,
+   "title": "Counting Spring Street",
+   "blurb": "There is no clever way to say this. Council says the Spring Street car park is never full and I say it's full by ten past ten. It might be nothing. It has not felt like nothing. Count both Bondi Junction car parks, photograph whichever one makes me right. Ask for me by name at the counter.",
+   "giver": "qgb-bondi-junction-salote",
+   "level": 5,
+   "requires": [
+    "qgb-l5-bondi-junction-021"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 3130,
+     "z": 2344,
+     "radius": 30,
+     "label": "count the cars at Spring Street"
+    },
+    {
+     "kind": "goto",
+     "x": 3264,
+     "z": 2491,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": 3130,
+     "z": 2344,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 151,
+    "xp": 417,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-023",
+   "act": 3,
+   "title": "One Stop From the 333 bus",
+   "blurb": "The council knows and the council does not care. I need to know the train from Bondi Junction stops at Randwick and doesn't sail through like it did on Easter Saturday. I have got a photo on my phone but it is useless. Ride it at bin night and photograph the sign. Say nothing to anyone on the way.",
+   "giver": "qgb-bondi-junction-salote",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Bondi Junction",
+     "to": "Randwick",
+     "label": "take the train to Randwick"
+    },
+    {
+     "kind": "photo",
+     "x": 3003,
+     "z": 5333,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 120,
+    "xp": 343,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-024",
+   "act": 3,
+   "title": "Ask Around at Randwick",
+   "blurb": "Someone has to, and it may as well be you. There's work going outside Randwick station and nobody at the 333 bus can tell me what. Nobody else seems to have noticed, which is its own problem. Ride over at the last train, get the shape of it, come back. Just do not come back empty-handed.",
+   "giver": "qgb-bondi-junction-val",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Bondi Junction",
+     "to": "Randwick",
+     "label": "take the train to Randwick"
+    },
+    {
+     "kind": "goto",
+     "x": 3003,
+     "z": 5333,
+     "radius": 30,
+     "label": "find the people outside Randwick station"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-bondi-junction-val",
+     "node": "report-0",
+     "label": "then come back and tell me what they said"
+    }
+   ],
+   "reward": {
+    "cash": 113,
+    "xp": 331,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-025",
+   "act": 3,
+   "title": "Proof of Oxford Street",
+   "blurb": "I am told you do odd jobs. Nobody in Bondi Junction believes what Oxford Street looks like at knock-off. I am aware how that sounds. Get me a photo close enough that council can't say it's somewhere else. That's it. That's the whole ask.",
+   "giver": "qgb-bondi-junction-cooper",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 3974,
+     "z": 2131,
+     "radius": 40,
+     "label": "get a picture of Oxford Street before they fix it"
+    }
+   ],
+   "reward": {
+    "cash": 118,
+    "xp": 339,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-026",
+   "act": 3,
+   "title": "Before They Touch the 333 bus",
+   "blurb": "You will think I am making this up. They start on the 333 bus on Anzac Day and the orange fencing goes up. There is a version of this where I am the unreasonable one. I want Bondi Junction on record before it does. Be polite about it. It costs nothing.",
+   "giver": "qgb-bondi-junction-luke",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 3658,
+     "z": 2459,
+     "radius": 40,
+     "label": "photograph the state of the 333 bus"
+    },
+    {
+     "kind": "goto",
+     "x": 3633,
+     "z": 2272,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 120,
+    "xp": 326,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-027",
+   "act": 3,
+   "title": "Cover at Centennial Park",
+   "blurb": "Keep it between us for now. I've got nobody for the Centennial Park shift at half seven and a room full of Bondi Junction people who've paid. This is the third time I have had this conversation. Fifty of trade and one difficult person at the door. There's cash in it. Not a lot.",
+   "giver": "qgb-bondi-junction-craig",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 74,
+     "label": "cover the fifty for the shift"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 1,
+     "label": "and handle whoever's at the door"
+    }
+   ],
+   "reward": {
+    "cash": 116,
+    "xp": 320,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-028",
+   "act": 3,
+   "title": "Left It Near Bronte Road",
+   "blurb": "Before you say anything: yes, I know. I left something on the bench at Bronte Road at nine sharp. The paperwork says one thing and my eyes say another. By the time I got back to Bondi Junction it had walked, so look where I'd have dropped it. I will owe you one, and I pay those.",
+   "giver": "qgb-bondi-junction-trish",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 3519,
+     "z": 2215,
+     "radius": 30,
+     "label": "check the bench near Bronte Road"
+    },
+    {
+     "kind": "photo",
+     "x": 3323,
+     "z": 1946,
+     "radius": 40,
+     "label": "photograph the bins behind it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-bondi-junction-trish",
+     "node": "report-0",
+     "label": "tell me what you found"
+    }
+   ],
+   "reward": {
+    "cash": 121,
+    "xp": 332,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-029",
+   "act": 3,
+   "title": "Race Four, Waverley Oval",
+   "blurb": "This is going to sound small. There's a horse in race four at half six that a bloke at Waverley Oval swears by. I have rung the number on the letter four times. Turn it into fifty-five somewhere in Bondi Junction and tell me if it came in. Do not make a scene about it.",
+   "giver": "qgb-bondi-junction-mele",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 81,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-bondi-junction-mele",
+     "node": "report-0",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 121,
+    "xp": 316,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-030",
+   "act": 3,
+   "title": "Staffy Near Waverley Oval",
+   "blurb": "It has been three weeks. A brindle staffy in a red bandana went over the fence at Waverley Oval at the last train. It has been going on longer than I have admitted to anyone. Everyone in Bondi Junction has definitely seen it and can't say where. I'll put the kettle on for when you're back.",
+   "giver": "qgb-bondi-junction-mele",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 3753,
+     "z": 2733,
+     "radius": 30,
+     "label": "check the off-leash bit near Waverley Oval"
+    },
+    {
+     "kind": "photo",
+     "x": 3561,
+     "z": 2531,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-bondi-junction-mele",
+     "node": "report-2",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 113,
+    "xp": 339,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-031",
+   "act": 3,
+   "title": "Two From the Tea Gardens",
+   "blurb": "It is the sort of thing you notice or you do not. Two of whatever's going near the Tea Gardens, here, hot, before the footy at half four. It is not the money. It has stopped being the money. It's Bondi Junction; I'm not asking for much. There is no rush, but there is a Friday.",
+   "giver": "qgb-bondi-junction-shirl",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near the Tea Gardens"
+    },
+    {
+     "kind": "goto",
+     "x": 3549,
+     "z": 2320,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 129,
+    "xp": 313,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-032",
+   "act": 3,
+   "title": "Bin Night, Westfield Bondi Junction",
+   "blurb": "Do not laugh. Somebody moves the bins on Westfield Bondi Junction in front of my drive every Saturday night. It might be nothing. It has not felt like nothing. Photograph the evidence and have a word; Bondi Junction knows who. Do not let them talk you into anything.",
+   "giver": "qgb-bondi-junction-rod",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 3694,
+     "z": 2142,
+     "radius": 40,
+     "label": "photograph the bins at Westfield Bondi Junction"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 132,
+    "xp": 329,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-033",
+   "act": 3,
+   "title": "The the 333 bus Lift",
+   "blurb": "You will think I am making this up. The lift at Bondi Junction station has been out since the Easter Show and I'm told Randwick is worse. You can tell me I am imagining it. Tell me after. Check both Melbourne Cup day and tell me which takes a pram. Come and find me after, either way.",
+   "giver": "qgb-bondi-junction-lachlan",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 3641,
+     "z": 2393,
+     "radius": 30,
+     "label": "check the lift at Bondi Junction station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Bondi Junction",
+     "to": "Randwick",
+     "label": "then ride to Randwick and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-bondi-junction-lachlan",
+     "node": "report-2",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 129,
+    "xp": 337,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-034",
+   "act": 3,
+   "title": "The the Eastgate Tab",
+   "blurb": "Before you say anything: yes, I know. Two chippies off the the Eastgate job have run a tab in Bondi Junction since Monday. I would have sorted it myself a year ago. They drove past at half four without looking in, so settle it in cash. There's cash in it. Not a lot.",
+   "giver": "qgb-bondi-junction-sharon",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Eastgate"
+    },
+    {
+     "kind": "earn",
+     "dollars": 44,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 127,
+    "xp": 333,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-035",
+   "act": 3,
+   "title": "Cover at Bronte Road",
+   "blurb": "This is going to sound small. I've got nobody for the Bronte Road shift at eleven and a room full of Bondi Junction people who've paid. It started small, the way these things do. Fifty of trade and one difficult person at the door. Come back and tell me straight.",
+   "giver": "qgb-bondi-junction-wayne",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 74,
+     "label": "cover the fifty for the shift"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 1,
+     "label": "and handle whoever's at the door"
+    }
+   ],
+   "reward": {
+    "cash": 115,
+    "xp": 343,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-036",
+   "act": 3,
+   "title": "The Bronte Road Course",
+   "blurb": "I would do it myself if I could leave the counter. A bloke near Bronte Road runs a ninety-minute course he bills at four hundred, and I've paid. It has been going on longer than I have admitted to anyone. Sit it Easter Saturday, then come back to Bondi Junction and prove it did something. Do not make a scene about it.",
+   "giver": "qgb-bondi-junction-wayne",
+   "level": 5,
+   "requires": [
+    "qgb-l5-bondi-junction-035"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near Bronte Road"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 157,
+    "xp": 428,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-037",
+   "act": 3,
+   "title": "Race Four, the Tea Gardens",
+   "blurb": "You look like you have twenty minutes. There's a horse in race four at first thing that a bloke at the Tea Gardens swears by. It is the not knowing that has got me, honestly. Turn it into fifty-five somewhere in Bondi Junction and tell me if it came in. There is no rush, but there is a Friday.",
+   "giver": "qgb-bondi-junction-narelle",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 81,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-bondi-junction-narelle",
+     "node": "report-0",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 118,
+    "xp": 321,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-038",
+   "act": 3,
+   "title": "Something From the Bondi Road hill",
+   "blurb": "I have been putting it off since Easter. The stall at the Bondi Road hill has run out and the customers keep coming. I have got no proof, which is exactly why I am asking. Find something round Bondi Junction that'll do before the eleven rush. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-bondi-junction-narelle",
+   "level": 5,
+   "requires": [
+    "qgb-l5-bondi-junction-037"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near the Bondi Road hill"
+    },
+    {
+     "kind": "goto",
+     "x": 3618,
+     "z": 2468,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 147,
+    "xp": 446,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l5-bondi-junction-039",
+   "act": 3,
+   "title": "Meat Tray at Westfield Bondi Junction",
+   "blurb": "You are the first person to stop all morning. The Westfield Bondi Junction raffle is thirty-five short of a meat tray and the draw is at five. I did try the official route, for what that was worth. Find it in Bondi Junction and put it in the tin. Whatever you find, bring it to me first.",
+   "giver": "qgb-bondi-junction-tahlia",
+   "level": 5,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 52,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": 4161,
+     "z": 2556,
+     "radius": 30,
+     "label": "and drop it at Westfield Bondi Junction"
+    }
+   ],
+   "reward": {
+    "cash": 114,
+    "xp": 335,
+    "unlock": []
+   }
+  }
+ ]
+}

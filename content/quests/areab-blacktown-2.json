@@ -1,0 +1,1027 @@
+{
+ "pack": "areab-blacktown-2",
+ "quests": [
+  {
+   "id": "qgb-l10-blacktown-037",
+   "act": 3,
+   "title": "Something From Francis Park",
+   "blurb": "It is not a police matter and I have checked. The stall at Francis Park has run out and the customers keep coming. The paperwork says one thing and my eyes say another. Find something round Blacktown that'll do before the lunchtime rush. That's the whole job. No catch.",
+   "giver": "qgb-blacktown-fiona",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near Francis Park"
+    },
+    {
+     "kind": "goto",
+     "x": -28258,
+     "z": -10685,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 186,
+    "xp": 557,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-038",
+   "act": 3,
+   "title": "The the Blacktown International Sportspark Camera",
+   "blurb": "You will think I am making this up. A new speed camera near the Blacktown International Sportspark has fined half of Blacktown since grand final day. It started small, the way these things do. Photograph it for the appeal, then prove the train to Hornsby is faster anyway. Do not let them talk you into anything.",
+   "giver": "qgb-blacktown-ray",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -28164,
+     "z": -10900,
+     "radius": 40,
+     "label": "photograph the camera near the Blacktown International Sportspark"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Blacktown",
+     "to": "Hornsby",
+     "label": "then take the train instead, to Hornsby"
+    }
+   ],
+   "reward": {
+    "cash": 198,
+    "xp": 550,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-039",
+   "act": 3,
+   "title": "Probationary at Westpoint",
+   "blurb": "I have been putting it off since Easter. A young constable has been doing his first solo patrol round Westpoint since Wednesday. Nobody else seems to have noticed, which is its own problem. He's decided Blacktown is his, so give him a story for the sergeant. Half now if you want it. Most people don't.",
+   "giver": "qgb-blacktown-terry",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "lose the probationary constable near Westpoint"
+    }
+   ],
+   "reward": {
+    "cash": 190,
+    "xp": 540,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-040",
+   "act": 3,
+   "title": "The the Blacktown Bowlo Complaint",
+   "blurb": "Two people have already said no. Two women in activewear have photographed my bins outside the Blacktown Bowlo since Anzac Day. Half the street knows and half the street is pretending not to. One has Blacktown council on speed dial; sort it however you sort things. Do that and we're square.",
+   "giver": "qgb-blacktown-shirl",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near the Blacktown Bowlo"
+    }
+   ],
+   "reward": {
+    "cash": 186,
+    "xp": 570,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-041",
+   "act": 3,
+   "title": "The Length of the Rooty Hill RSL",
+   "blurb": "Not being dramatic about this. I haven't walked the Rooty Hill RSL end to end since the light rail came to Blacktown. I did try the official route, for what that was worth. Do it Melbourne Cup day for me and photograph what's at the far end now. Just do not come back empty-handed.",
+   "giver": "qgb-blacktown-bassam",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -28187,
+     "z": -10566,
+     "radius": 30,
+     "label": "walk the length of the Rooty Hill RSL"
+    },
+    {
+     "kind": "goto",
+     "x": -28497,
+     "z": -10632,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -28497,
+     "z": -10632,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 193,
+    "xp": 530,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-042",
+   "act": 3,
+   "title": "The Westpoint Tab",
+   "blurb": "It is the sort of thing you notice or you do not. Two chippies off the Westpoint job have run a tab in Blacktown since Thursday. I have got a photo on my phone but it is useless. They drove past at the arvo without looking in, so settle it in cash. Come and find me after, either way.",
+   "giver": "qgb-blacktown-jarrod",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near Westpoint"
+    },
+    {
+     "kind": "earn",
+     "dollars": 62,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 186,
+    "xp": 570,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-043",
+   "act": 3,
+   "title": "Cover at Mount Druitt Westfield",
+   "blurb": "You look like you have twenty minutes. I've got nobody for the Mount Druitt Westfield shift at after the footy and a room full of Blacktown people who've paid. Nobody else seems to have noticed, which is its own problem. Fifty of trade and one difficult person at the door. Be polite about it. It costs nothing.",
+   "giver": "qgb-blacktown-tevita",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 104,
+     "label": "cover the fifty for the shift"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 1,
+     "label": "and handle whoever's at the door"
+    }
+   ],
+   "reward": {
+    "cash": 199,
+    "xp": 566,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-044",
+   "act": 3,
+   "title": "Trolley Run, Main Street",
+   "blurb": "You are the first person to stop all morning. A Woolies trolley from Main Street gets walked to the creek every grand final day. I would not ask if there was anyone else about. Find where it ends up in Blacktown and make the deposit back. Half now if you want it. Most people don't.",
+   "giver": "qgb-blacktown-tevita",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -27748,
+     "z": -10540,
+     "radius": 30,
+     "label": "find the trolley near Main Street"
+    },
+    {
+     "kind": "photo",
+     "x": -27748,
+     "z": -10540,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 52,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 194,
+    "xp": 566,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-045",
+   "act": 3,
+   "title": "The the Blacktown Workers Club Order",
+   "blurb": "My knees are gone, so. The the Blacktown Workers Club order came to seventy more than I'd budgeted and the supplier wants it by school pick-up. I am aware how that sounds. Find seventy in Blacktown and photograph the receipt. There's cash in it. Not a lot.",
+   "giver": "qgb-blacktown-jason",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 146,
+     "label": "square the seventy for the the Blacktown Workers Club order"
+    },
+    {
+     "kind": "photo",
+     "x": -27640,
+     "z": -10882,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 192,
+    "xp": 558,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-046",
+   "act": 3,
+   "title": "The Flushcombe Road Lift",
+   "blurb": "Someone has to, and it may as well be you. The lift at Blacktown station has been out since the Easter Show and I'm told Hornsby is worse. The paperwork says one thing and my eyes say another. Check both Saturday and tell me which takes a pram. There is no rush, but there is a Friday.",
+   "giver": "qgb-blacktown-pam",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -28190,
+     "z": -10660,
+     "radius": 30,
+     "label": "check the lift at Blacktown station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Blacktown",
+     "to": "Hornsby",
+     "label": "then ride to Hornsby and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-blacktown-pam",
+     "node": "report-0",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 196,
+    "xp": 538,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-047",
+   "act": 3,
+   "title": "Seven a.m. At Flushcombe Road",
+   "blurb": "Right. Since you asked. The site at Flushcombe Road starts its jackhammer at nine sharp on a Melbourne Cup day, which is illegal and loud. I would have sorted it myself a year ago. Photograph it running and have a word with the Blacktown foreman. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-blacktown-pam",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -27919,
+     "z": -10278,
+     "radius": 40,
+     "label": "photograph the noise from Flushcombe Road"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 199,
+    "xp": 557,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-048",
+   "act": 3,
+   "title": "Meat Tray at the Blacktown Workers Club",
+   "blurb": "I would do it myself if I could leave the counter. The the Blacktown Workers Club raffle is thirty-five short of a meat tray and the draw is at half six. It might be nothing. It has not felt like nothing. Find it in Blacktown and put it in the tin. I'll see you right for it.",
+   "giver": "qgb-blacktown-denise",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 73,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -28268,
+     "z": -11028,
+     "radius": 30,
+     "label": "and drop it at the Blacktown Workers Club"
+    }
+   ],
+   "reward": {
+    "cash": 194,
+    "xp": 547,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-049",
+   "act": 3,
+   "title": "Proof of the Rooty Hill RSL",
+   "blurb": "It is the sort of thing you notice or you do not. Nobody in Blacktown believes what the Rooty Hill RSL looks like at three in the morning. Nobody else seems to have noticed, which is its own problem. Get me a photo close enough that council can't say it's somewhere else. That's it. That's the whole ask.",
+   "giver": "qgb-blacktown-kai",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -27826,
+     "z": -11119,
+     "radius": 40,
+     "label": "get a picture of the Rooty Hill RSL before they fix it"
+    }
+   ],
+   "reward": {
+    "cash": 192,
+    "xp": 564,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-050",
+   "act": 3,
+   "title": "Closing Time at the Blacktown International Sportspark",
+   "blurb": "You look like you have twenty minutes. Two blokes have slept in my doorway on the Blacktown International Sportspark since the pub shut. You will see what I mean the second you get there. The Blacktown delivery's at half four, so get them up and show me the step empty. Come and find me after, either way.",
+   "giver": "qgb-blacktown-kai",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off the Blacktown International Sportspark"
+    },
+    {
+     "kind": "photo",
+     "x": -27946,
+     "z": -10775,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 189,
+    "xp": 536,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-051",
+   "act": 3,
+   "title": "Trolley Run, the Blacktown International Sportspark",
+   "blurb": "You are the first person to stop all morning. A Woolies trolley from the Blacktown International Sportspark gets walked to the creek every the King's Birthday. I am aware how that sounds. Find where it ends up in Blacktown and make the deposit back. I would rather know than wonder.",
+   "giver": "qgb-blacktown-toby",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -28249,
+     "z": -10642,
+     "radius": 30,
+     "label": "find the trolley near the Blacktown International Sportspark"
+    },
+    {
+     "kind": "photo",
+     "x": -28249,
+     "z": -10642,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 52,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 190,
+    "xp": 566,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-052",
+   "act": 3,
+   "title": "Before They Touch the Blacktown Bowlo",
+   "blurb": "Do not laugh. They start on the Blacktown Bowlo on Friday and the orange fencing goes up. My wife says I should let it go. My wife is wrong. I want Blacktown on record before it does. Come back and tell me straight.",
+   "giver": "qgb-blacktown-maya",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -28199,
+     "z": -10132,
+     "radius": 40,
+     "label": "photograph the state of the Blacktown Bowlo"
+    },
+    {
+     "kind": "goto",
+     "x": -28055,
+     "z": -10409,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 191,
+    "xp": 546,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-053",
+   "act": 3,
+   "title": "Trouble at the Blacktown International Sportspark",
+   "blurb": "You will think I am making this up. Two lads and their mate decided at peak hour that the Blacktown International Sportspark is theirs. Half the street knows and half the street is pretending not to. The rest of Blacktown disagrees, so explain the disagreement. That's the whole job. No catch.",
+   "giver": "qgb-blacktown-kylie",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near the Blacktown International Sportspark"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 197,
+    "xp": 557,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-054",
+   "act": 3,
+   "title": "The Francis Park Camera",
+   "blurb": "Two people have already said no. A new speed camera near Francis Park has fined half of Blacktown since the King's Birthday. I have got no proof, which is exactly why I am asking. Photograph it for the appeal, then prove the train to Hornsby is faster anyway. You'll know it when you see it.",
+   "giver": "qgb-blacktown-narelle",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -27718,
+     "z": -10881,
+     "radius": 40,
+     "label": "photograph the camera near Francis Park"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Blacktown",
+     "to": "Hornsby",
+     "label": "then take the train instead, to Hornsby"
+    }
+   ],
+   "reward": {
+    "cash": 203,
+    "xp": 550,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-055",
+   "act": 3,
+   "title": "The the Blacktown International Sportspark Complaint",
+   "blurb": "Keep it between us for now. Two women in activewear have photographed my bins outside the Blacktown International Sportspark since Wednesday. I did try the official route, for what that was worth. One has Blacktown council on speed dial; sort it however you sort things. Do not let them talk you into anything.",
+   "giver": "qgb-blacktown-sienna",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near the Blacktown International Sportspark"
+    }
+   ],
+   "reward": {
+    "cash": 199,
+    "xp": 538,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-056",
+   "act": 3,
+   "title": "Closing Time at Mount Druitt Westfield",
+   "blurb": "You look like you have twenty minutes. Two blokes have slept in my doorway on Mount Druitt Westfield since the pub shut. I would not ask if there was anyone else about. The Blacktown delivery's at ten past ten, so get them up and show me the step empty. That's it. That's the whole ask.",
+   "giver": "qgb-blacktown-salote",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off Mount Druitt Westfield"
+    },
+    {
+     "kind": "photo",
+     "x": -28720,
+     "z": -10640,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 187,
+    "xp": 554,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-057",
+   "act": 3,
+   "title": "Something From the Blacktown Workers Club",
+   "blurb": "The council knows and the council does not care. The stall at the Blacktown Workers Club has run out and the customers keep coming. I would have sorted it myself a year ago. Find something round Blacktown that'll do before the six in the morning rush. Do not make a scene about it.",
+   "giver": "qgb-blacktown-wayne",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near the Blacktown Workers Club"
+    },
+    {
+     "kind": "goto",
+     "x": -28355,
+     "z": -10007,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 188,
+    "xp": 550,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-058",
+   "act": 3,
+   "title": "Two From Flushcombe Road",
+   "blurb": "Two people have already said no. Two of whatever's going near Flushcombe Road, here, hot, before the footy at lunchtime. I did try the official route, for what that was worth. It's Blacktown; I'm not asking for much. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qgb-blacktown-elie",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near Flushcombe Road"
+    },
+    {
+     "kind": "goto",
+     "x": -28030,
+     "z": -10515,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 199,
+    "xp": 563,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-059",
+   "act": 3,
+   "title": "The Main Street Lift",
+   "blurb": "It is the sort of thing you notice or you do not. The lift at Blacktown station has been out since the Easter Show and I'm told Hornsby is worse. I would not ask if there was anyone else about. Check both Sunday and tell me which takes a pram. I'll see you right for it.",
+   "giver": "qgb-blacktown-bruce",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -28190,
+     "z": -10660,
+     "radius": 30,
+     "label": "check the lift at Blacktown station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Blacktown",
+     "to": "Hornsby",
+     "label": "then ride to Hornsby and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-blacktown-bruce",
+     "node": "report-0",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 199,
+    "xp": 565,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-060",
+   "act": 3,
+   "title": "Seven a.m. At Main Street",
+   "blurb": "You look like you have twenty minutes. The site at Main Street starts its jackhammer at closing on a Melbourne Cup day, which is illegal and loud. I am aware how that sounds. Photograph it running and have a word with the Blacktown foreman. If anyone asks, you were never here.",
+   "giver": "qgb-blacktown-bruce",
+   "level": 10,
+   "requires": [
+    "qgb-l10-blacktown-059"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -28301,
+     "z": -10703,
+     "radius": 40,
+     "label": "photograph the noise from Main Street"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 265,
+    "xp": 712,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-061",
+   "act": 3,
+   "title": "The the Blacktown Workers Club Course",
+   "blurb": "You are the first person to stop all morning. A bloke near the Blacktown Workers Club runs a ninety-minute course he bills at four hundred, and I've paid. There is a version of this where I am the unreasonable one. Sit it Monday, then come back to Blacktown and prove it did something. Come and find me after, either way.",
+   "giver": "qgb-blacktown-thelma",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near the Blacktown Workers Club"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 204,
+    "xp": 550,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-062",
+   "act": 3,
+   "title": "Lads Off the Blacktown International Sportspark",
+   "blurb": "Someone has to, and it may as well be you. Three of them in TNs on the the Blacktown International Sportspark steps, flogging vapes to schoolkids at knock-off. It started small, the way these things do. Blacktown used to move them on itself and now it rings me. Do not make a scene about it.",
+   "giver": "qgb-blacktown-neville",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from the Blacktown International Sportspark"
+    }
+   ],
+   "reward": {
+    "cash": 197,
+    "xp": 530,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-063",
+   "act": 3,
+   "title": "Francis Park Pub Crawl",
+   "blurb": "I have written it down twice and lost it twice. A bucks started at Francis Park at noon and it's now three blokes, one pair of pants and a tab. It is the not knowing that has got me, honestly. Recover the tab by the arvo; Blacktown can keep the dignity. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-blacktown-scott",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 3,
+     "label": "sort the three from the Francis Park crawl"
+    },
+    {
+     "kind": "earn",
+     "dollars": 42,
+     "label": "and get the twenty they owe"
+    }
+   ],
+   "reward": {
+    "cash": 188,
+    "xp": 533,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-064",
+   "act": 3,
+   "title": "Before They Touch Mount Druitt Westfield",
+   "blurb": "Nobody else has offered, so. They start on Mount Druitt Westfield on Monday and the orange fencing goes up. I did try the official route, for what that was worth. I want Blacktown on record before it does. Take your time. Do not take a week.",
+   "giver": "qgb-blacktown-merv",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -28604,
+     "z": -10379,
+     "radius": 40,
+     "label": "photograph the state of Mount Druitt Westfield"
+    },
+    {
+     "kind": "goto",
+     "x": -28464,
+     "z": -10265,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 198,
+    "xp": 547,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-065",
+   "act": 3,
+   "title": "The the Blacktown Workers Club Sparky",
+   "blurb": "It has been three weeks. The sparky off the the Blacktown Workers Club job has owed me since the bathroom and drinks in Blacktown from nine sharp. I would not ask if there was anyone else about. Forty will do and I'll write off the rest. Say nothing to anyone on the way.",
+   "giver": "qgb-blacktown-ahmed",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for the Blacktown Workers Club"
+    },
+    {
+     "kind": "earn",
+     "dollars": 83,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 190,
+    "xp": 539,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-066",
+   "act": 3,
+   "title": "The the Blacktown International Sportspark Fence",
+   "blurb": "You are the first person to stop all morning. My neighbour at the Blacktown International Sportspark says the tree is on my side and the fence says otherwise. You can tell me I am imagining it. Tell me after. Look at it Easter Saturday with Blacktown eyes and tell me the truth. That's it. That's the whole ask.",
+   "giver": "qgb-blacktown-junior-a",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -28283,
+     "z": -10955,
+     "radius": 30,
+     "label": "go and look at the fence at the Blacktown International Sportspark"
+    },
+    {
+     "kind": "photo",
+     "x": -28283,
+     "z": -10955,
+     "radius": 40,
+     "label": "photograph the tree over it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-blacktown-junior-a",
+     "node": "report-1",
+     "label": "tell me whose side it's on"
+    }
+   ],
+   "reward": {
+    "cash": 189,
+    "xp": 546,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-blacktown-067",
+   "act": 3,
+   "title": "The the Rooty Hill RSL Tab",
+   "blurb": "Honestly, I am past caring how it looks. Two chippies off the the Rooty Hill RSL job have run a tab in Blacktown since the last Sunday of the month. This is the third time I have had this conversation. They drove past at after the footy without looking in, so settle it in cash. Be polite about it. It costs nothing.",
+   "giver": "qgb-blacktown-joyce",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Rooty Hill RSL"
+    },
+    {
+     "kind": "earn",
+     "dollars": 62,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 203,
+    "xp": 566,
+    "unlock": []
+   }
+  }
+ ]
+}

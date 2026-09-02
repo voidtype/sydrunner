@@ -1,0 +1,1413 @@
+{
+ "pack": "areab-redfern-1",
+ "quests": [
+  {
+   "id": "qgb-l2-redfern-001",
+   "act": 3,
+   "title": "Something From Eveleigh",
+   "blurb": "I would do it myself if I could leave the counter. The stall at Eveleigh has run out and the customers keep coming. It is not the money. It has stopped being the money. Find something round Redfern that'll do before the half two rush. I will know if you skipped a bit.",
+   "giver": "qgb-redfern-dwayne",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near Eveleigh"
+    },
+    {
+     "kind": "goto",
+     "x": -914,
+     "z": 2208,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 79,
+    "xp": 181,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-002",
+   "act": 3,
+   "title": "Closing Time at Carriageworks",
+   "blurb": "I have been putting it off since Easter. Two blokes have slept in my doorway on Carriageworks since the pub shut. I did try the official route, for what that was worth. The Redfern delivery's at midnight, so get them up and show me the step empty. Whatever you find, bring it to me first.",
+   "giver": "qgb-redfern-brett-c",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off Carriageworks"
+    },
+    {
+     "kind": "photo",
+     "x": -968,
+     "z": 2501,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 183,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-003",
+   "act": 3,
+   "title": "Staffy Near Eveleigh",
+   "blurb": "You are the first person to stop all morning. A brindle staffy in a red bandana went over the fence at Eveleigh at the last train. I am not after trouble. I am after an answer. Everyone in Redfern has definitely seen it and can't say where. Take your time. Do not take a week.",
+   "giver": "qgb-redfern-brett-c",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1364,
+     "z": 2581,
+     "radius": 30,
+     "label": "check the off-leash bit near Eveleigh"
+    },
+    {
+     "kind": "photo",
+     "x": -1563,
+     "z": 2437,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-redfern-brett-c",
+     "node": "report-2",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 69,
+    "xp": 210,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-004",
+   "act": 3,
+   "title": "Ask Around at Central",
+   "blurb": "I'll be straight with you. There's work going outside Central station and nobody at Abercrombie Street can tell me what. I have got a photo on my phone but it is useless. Ride over at half two, get the shape of it, come back. You'll know it when you see it.",
+   "giver": "qgb-redfern-michelle-d",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Redfern",
+     "to": "Central",
+     "label": "take the train to Central"
+    },
+    {
+     "kind": "goto",
+     "x": -286,
+     "z": 1661,
+     "radius": 30,
+     "label": "find the people outside Central station"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-redfern-michelle-d",
+     "node": "report-2",
+     "label": "then come back and tell me what they said"
+    }
+   ],
+   "reward": {
+    "cash": 80,
+    "xp": 210,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-005",
+   "act": 3,
+   "title": "Seven a.m. At the Redfern Tent Embassy",
+   "blurb": "Do not laugh. The site at the Redfern Tent Embassy starts its jackhammer at school pick-up on a Anzac Day, which is illegal and loud. Nobody else seems to have noticed, which is its own problem. Photograph it running and have a word with the Redfern foreman. Do not let them talk you into anything.",
+   "giver": "qgb-redfern-rocco-f",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -866,
+     "z": 2704,
+     "radius": 40,
+     "label": "photograph the noise from the Redfern Tent Embassy"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 195,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-006",
+   "act": 3,
+   "title": "Left It Near the Redfern Tent Embassy",
+   "blurb": "The council knows and the council does not care. I left something on the bench at the Redfern Tent Embassy at the change of shift. I would not ask if there was anyone else about. By the time I got back to Redfern it had walked, so look where I'd have dropped it. Ask for me by name at the counter.",
+   "giver": "qgb-redfern-rocco-f",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1045,
+     "z": 2816,
+     "radius": 30,
+     "label": "check the bench near the Redfern Tent Embassy"
+    },
+    {
+     "kind": "photo",
+     "x": -891,
+     "z": 2957,
+     "radius": 40,
+     "label": "photograph the bins behind it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-redfern-rocco-f",
+     "node": "report-2",
+     "label": "tell me what you found"
+    }
+   ],
+   "reward": {
+    "cash": 76,
+    "xp": 191,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-007",
+   "act": 3,
+   "title": "Lads Off Abercrombie Street",
+   "blurb": "Someone has to, and it may as well be you. Three of them in TNs on the Abercrombie Street steps, flogging vapes to schoolkids at peak hour. I am aware how that sounds. Redfern used to move them on itself and now it rings me. Say nothing to anyone on the way.",
+   "giver": "qgb-redfern-karen-a",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Abercrombie Street"
+    }
+   ],
+   "reward": {
+    "cash": 73,
+    "xp": 182,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-008",
+   "act": 3,
+   "title": "Before They Touch the Bearded Tit",
+   "blurb": "I am told you do odd jobs. They start on the Bearded Tit on the long weekend and the orange fencing goes up. You can tell me I am imagining it. Tell me after. I want Redfern on record before it does. If anyone asks, you were never here.",
+   "giver": "qgb-redfern-tyson",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -1016,
+     "z": 2739,
+     "radius": 40,
+     "label": "photograph the state of the Bearded Tit"
+    },
+    {
+     "kind": "goto",
+     "x": -1086,
+     "z": 2866,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 75,
+    "xp": 181,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-009",
+   "act": 3,
+   "title": "Trolley Run, Redfern Street",
+   "blurb": "Nobody else has offered, so. A Woolies trolley from Redfern Street gets walked to the creek every grand final day. The paperwork says one thing and my eyes say another. Find where it ends up in Redfern and make the deposit back. Be polite about it. It costs nothing.",
+   "giver": "qgb-redfern-pam-b",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -780,
+     "z": 2653,
+     "radius": 30,
+     "label": "find the trolley near Redfern Street"
+    },
+    {
+     "kind": "photo",
+     "x": -780,
+     "z": 2653,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 28,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 71,
+    "xp": 196,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-010",
+   "act": 3,
+   "title": "Race Four, Redfern Street",
+   "blurb": "Two people have already said no. There's a horse in race four at first thing that a bloke at Redfern Street swears by. I would have sorted it myself a year ago. Turn it into fifty-five somewhere in Redfern and tell me if it came in. I would rather know than wonder.",
+   "giver": "qgb-redfern-ray-b",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 62,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-redfern-ray-b",
+     "node": "report-0",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 87,
+    "xp": 206,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-011",
+   "act": 3,
+   "title": "The the Rabbitohs Camera",
+   "blurb": "I would do it myself if I could leave the counter. A new speed camera near the Rabbitohs has fined half of Redfern since Anzac Day. Half the street knows and half the street is pretending not to. Photograph it for the appeal, then prove the train to Central is faster anyway. Do not make a scene about it.",
+   "giver": "qgb-redfern-trish-b",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -1509,
+     "z": 2616,
+     "radius": 40,
+     "label": "photograph the camera near the Rabbitohs"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Redfern",
+     "to": "Central",
+     "label": "then take the train instead, to Central"
+    }
+   ],
+   "reward": {
+    "cash": 75,
+    "xp": 202,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-012",
+   "act": 3,
+   "title": "The Carriageworks Tab",
+   "blurb": "It has been three weeks. Two chippies off the Carriageworks job have run a tab in Redfern since Melbourne Cup day. It is the not knowing that has got me, honestly. They drove past at eight at night without looking in, so settle it in cash. I will know if you skipped a bit.",
+   "giver": "qgb-redfern-uncle-col",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near Carriageworks"
+    },
+    {
+     "kind": "earn",
+     "dollars": 34,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 78,
+    "xp": 205,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-013",
+   "act": 3,
+   "title": "One Stop From Eveleigh",
+   "blurb": "It is the sort of thing you notice or you do not. I need to know the train from Redfern stops at Central and doesn't sail through like it did on Wednesday. I have got no proof, which is exactly why I am asking. Ride it at peak hour and photograph the sign. I'll put the kettle on for when you're back.",
+   "giver": "qgb-redfern-uncle-col",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Redfern",
+     "to": "Central",
+     "label": "take the train to Central"
+    },
+    {
+     "kind": "photo",
+     "x": -286,
+     "z": 1661,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 78,
+    "xp": 210,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-014",
+   "act": 3,
+   "title": "The Carriageworks Order",
+   "blurb": "I have been putting it off since Easter. The Carriageworks order came to seventy more than I'd budgeted and the supplier wants it by six in the morning. I am not after trouble. I am after an answer. Find seventy in Redfern and photograph the receipt. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-redfern-tahlia-a",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 78,
+     "label": "square the seventy for the Carriageworks order"
+    },
+    {
+     "kind": "photo",
+     "x": -942,
+     "z": 2307,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 87,
+    "xp": 206,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-015",
+   "act": 3,
+   "title": "Trouble at the Redfern Tent Embassy",
+   "blurb": "My knees are gone, so. Two lads and their mate decided at lunchtime that the Redfern Tent Embassy is theirs. It might be nothing. It has not felt like nothing. The rest of Redfern disagrees, so explain the disagreement. Take your time. Do not take a week.",
+   "giver": "qgb-redfern-angus-b",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near the Redfern Tent Embassy"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 85,
+    "xp": 196,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-016",
+   "act": 3,
+   "title": "Probationary at Prince Alfred Park pool",
+   "blurb": "There is no clever way to say this. A young constable has been doing his first solo patrol round Prince Alfred Park pool since the King's Birthday. I would not ask if there was anyone else about. He's decided Redfern is his, so give him a story for the sergeant. Do not let them talk you into anything.",
+   "giver": "qgb-redfern-rocco-g",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "lose the probationary constable near Prince Alfred Park pool"
+    }
+   ],
+   "reward": {
+    "cash": 71,
+    "xp": 211,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-017",
+   "act": 3,
+   "title": "Sightline at Prince Alfred Park pool",
+   "blurb": "The council knows and the council does not care. Insurance says nobody could have seen the ute hit the fence at Prince Alfred Park pool on Sunday. I am aware how that sounds. Stand where I stood in Redfern, photograph the view, tell me if I'm lying. Do that and we're square.",
+   "giver": "qgb-redfern-rocco-g",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -753,
+     "z": 2911,
+     "radius": 30,
+     "label": "stand where it happened at Prince Alfred Park pool"
+    },
+    {
+     "kind": "photo",
+     "x": -753,
+     "z": 2911,
+     "radius": 40,
+     "label": "photograph the corner"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-redfern-rocco-g",
+     "node": "report-2",
+     "label": "describe the sightline"
+    }
+   ],
+   "reward": {
+    "cash": 77,
+    "xp": 181,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-018",
+   "act": 3,
+   "title": "Rent Money, the Block",
+   "blurb": "I have written it down twice and lost it twice. I'm forty-five short on the the Block rent and the agent doesn't take stories. This is the third time I have had this conversation. Make it somewhere in Redfern by five; I'm not fussy how. If anyone asks, you were never here.",
+   "giver": "qgb-redfern-thelma-a",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 50,
+     "label": "earn forty-five somewhere in Redfern"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 215,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-019",
+   "act": 3,
+   "title": "The Eveleigh Sparky",
+   "blurb": "Two people have already said no. The sparky off the Eveleigh job has owed me since the bathroom and drinks in Redfern from knock-off. I have rung the number on the letter four times. Forty will do and I'll write off the rest. Be polite about it. It costs nothing.",
+   "giver": "qgb-redfern-leanne-b",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for Eveleigh"
+    },
+    {
+     "kind": "earn",
+     "dollars": 45,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 76,
+    "xp": 203,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-020",
+   "act": 3,
+   "title": "A Flat White From Carriageworks",
+   "blurb": "I would do it myself if I could leave the counter. I want a flat white from the place near Carriageworks, not the one next to it. It is the not knowing that has got me, honestly. Here by closing, while it's still coffee and Redfern still has some. Come back and tell me straight.",
+   "giver": "qgb-redfern-renee-d",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near Carriageworks"
+    },
+    {
+     "kind": "goto",
+     "x": -1152,
+     "z": 2014,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 81,
+    "xp": 205,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-021",
+   "act": 3,
+   "title": "Trolley Run, the Redfern Tent Embassy",
+   "blurb": "It is the sort of thing you notice or you do not. A Woolies trolley from the Redfern Tent Embassy gets walked to the creek every Australia Day. I did try the official route, for what that was worth. Find where it ends up in Redfern and make the deposit back. I will know if you skipped a bit.",
+   "giver": "qgb-redfern-uncle-col-a",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -939,
+     "z": 2656,
+     "radius": 30,
+     "label": "find the trolley near the Redfern Tent Embassy"
+    },
+    {
+     "kind": "photo",
+     "x": -939,
+     "z": 2656,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 28,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 85,
+    "xp": 192,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-022",
+   "act": 3,
+   "title": "Bin Night, Abercrombie Street",
+   "blurb": "I have been putting it off since Easter. Somebody moves the bins on Abercrombie Street in front of my drive every the last Sunday of the month night. There is probably a simple explanation and I would love to hear it. Photograph the evidence and have a word; Redfern knows who. There is no rush, but there is a Friday.",
+   "giver": "qgb-redfern-kylie-anne-c",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -747,
+     "z": 2762,
+     "radius": 40,
+     "label": "photograph the bins at Abercrombie Street"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 197,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-023",
+   "act": 3,
+   "title": "The Prince Alfred Park pool Lift",
+   "blurb": "You are the first person to stop all morning. The lift at Redfern station has been out since the Easter Show and I'm told Central is worse. It might be nothing. It has not felt like nothing. Check both Wednesday and tell me which takes a pram. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-redfern-graham-e",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -972,
+     "z": 2673,
+     "radius": 30,
+     "label": "check the lift at Redfern station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Redfern",
+     "to": "Central",
+     "label": "then ride to Central and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-redfern-graham-e",
+     "node": "report-0",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 78,
+    "xp": 190,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-024",
+   "act": 3,
+   "title": "Counting Prince Alfred Park pool",
+   "blurb": "My knees are gone, so. Council says the Prince Alfred Park pool car park is never full and I say it's full by the last train. I have got a photo on my phone but it is useless. Count both Redfern car parks, photograph whichever one makes me right. Whatever you find, bring it to me first.",
+   "giver": "qgb-redfern-graham-e",
+   "level": 2,
+   "requires": [
+    "qgb-l2-redfern-023"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1211,
+     "z": 2511,
+     "radius": 30,
+     "label": "count the cars at Prince Alfred Park pool"
+    },
+    {
+     "kind": "goto",
+     "x": -1264,
+     "z": 2244,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": -1211,
+     "z": 2511,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 107,
+    "xp": 261,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-025",
+   "act": 3,
+   "title": "The Carriageworks Course",
+   "blurb": "It is not a police matter and I have checked. A bloke near Carriageworks runs a ninety-minute course he bills at four hundred, and I've paid. My wife says I should let it go. My wife is wrong. Sit it the last Sunday of the month, then come back to Redfern and prove it did something. Say nothing to anyone on the way.",
+   "giver": "qgb-redfern-joyce-d",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near Carriageworks"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 200,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-026",
+   "act": 3,
+   "title": "Probationary at Redfern Oval",
+   "blurb": "I am told you do odd jobs. A young constable has been doing his first solo patrol round Redfern Oval since Tuesday. This is the third time I have had this conversation. He's decided Redfern is his, so give him a story for the sergeant. Just do not come back empty-handed.",
+   "giver": "qgb-redfern-dwayne-a",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "lose the probationary constable near Redfern Oval"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 202,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-027",
+   "act": 3,
+   "title": "Sightline at Redfern Oval",
+   "blurb": "I have written it down twice and lost it twice. Insurance says nobody could have seen the ute hit the fence at Redfern Oval on the long weekend. The paperwork says one thing and my eyes say another. Stand where I stood in Redfern, photograph the view, tell me if I'm lying. I'll see you right for it.",
+   "giver": "qgb-redfern-dwayne-a",
+   "level": 2,
+   "requires": [
+    "qgb-l2-redfern-026"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -994,
+     "z": 2532,
+     "radius": 30,
+     "label": "stand where it happened at Redfern Oval"
+    },
+    {
+     "kind": "photo",
+     "x": -994,
+     "z": 2532,
+     "radius": 40,
+     "label": "photograph the corner"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-redfern-dwayne-a",
+     "node": "report-1",
+     "label": "describe the sightline"
+    }
+   ],
+   "reward": {
+    "cash": 95,
+    "xp": 273,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-028",
+   "act": 3,
+   "title": "A Flat White From Prince Alfred Park pool",
+   "blurb": "I have been putting it off since Easter. I want a flat white from the place near Prince Alfred Park pool, not the one next to it. It might be nothing. It has not felt like nothing. Here by nine sharp, while it's still coffee and Redfern still has some. I'll put the kettle on for when you're back.",
+   "giver": "qgb-redfern-uncle-col-b",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near Prince Alfred Park pool"
+    },
+    {
+     "kind": "goto",
+     "x": -689,
+     "z": 2970,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 211,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-029",
+   "act": 3,
+   "title": "Trolley Run, the Bearded Tit",
+   "blurb": "My knees are gone, so. A Woolies trolley from the Bearded Tit gets walked to the creek every Monday. Nobody else seems to have noticed, which is its own problem. Find where it ends up in Redfern and make the deposit back. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-redfern-shirl-d",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -445,
+     "z": 2561,
+     "radius": 30,
+     "label": "find the trolley near the Bearded Tit"
+    },
+    {
+     "kind": "photo",
+     "x": -445,
+     "z": 2561,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 28,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 187,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-030",
+   "act": 3,
+   "title": "Race Four, the Bearded Tit",
+   "blurb": "Honestly, I am past caring how it looks. There's a horse in race four at after the footy that a bloke at the Bearded Tit swears by. You will see what I mean the second you get there. Turn it into fifty-five somewhere in Redfern and tell me if it came in. Whatever you find, bring it to me first.",
+   "giver": "qgb-redfern-shirl-d",
+   "level": 2,
+   "requires": [
+    "qgb-l2-redfern-029"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 62,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-redfern-shirl-d",
+     "node": "report-1",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 241,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-031",
+   "act": 3,
+   "title": "Bin Night, Redfern Street",
+   "blurb": "I'll be straight with you. Somebody moves the bins on Redfern Street in front of my drive every Easter Saturday night. I would not ask if there was anyone else about. Photograph the evidence and have a word; Redfern knows who. Take your time. Do not take a week.",
+   "giver": "qgb-redfern-reg-c",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -796,
+     "z": 2806,
+     "radius": 40,
+     "label": "photograph the bins at Redfern Street"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 75,
+    "xp": 193,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-032",
+   "act": 3,
+   "title": "The Redfern Street Lift",
+   "blurb": "Do not laugh. The lift at Redfern station has been out since the Easter Show and I'm told Central is worse. I am aware how that sounds. Check both Monday and tell me which takes a pram. That's the whole job. No catch.",
+   "giver": "qgb-redfern-reg-c",
+   "level": 2,
+   "requires": [
+    "qgb-l2-redfern-031"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -972,
+     "z": 2673,
+     "radius": 30,
+     "label": "check the lift at Redfern station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Redfern",
+     "to": "Central",
+     "label": "then ride to Central and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-redfern-reg-c",
+     "node": "report-1",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 98,
+    "xp": 276,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-033",
+   "act": 3,
+   "title": "Counting Redfern Street",
+   "blurb": "There is no clever way to say this. Council says the Redfern Street car park is never full and I say it's full by after the footy. Everyone I have told has looked at me the way you are now. Count both Redfern car parks, photograph whichever one makes me right. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qgb-redfern-reg-c",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -1030,
+     "z": 2831,
+     "radius": 30,
+     "label": "count the cars at Redfern Street"
+    },
+    {
+     "kind": "goto",
+     "x": -1373,
+     "z": 2927,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": -1030,
+     "z": 2831,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 72,
+    "xp": 183,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-034",
+   "act": 3,
+   "title": "The the Block Camera",
+   "blurb": "Someone has to, and it may as well be you. A new speed camera near the Block has fined half of Redfern since Easter Saturday. You can tell me I am imagining it. Tell me after. Photograph it for the appeal, then prove the train to Central is faster anyway. Do not let them talk you into anything.",
+   "giver": "qgb-redfern-kylie-c",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -1146,
+     "z": 2501,
+     "radius": 40,
+     "label": "photograph the camera near the Block"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Redfern",
+     "to": "Central",
+     "label": "then take the train instead, to Central"
+    }
+   ],
+   "reward": {
+    "cash": 85,
+    "xp": 178,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-035",
+   "act": 3,
+   "title": "The Redfern Oval Tab",
+   "blurb": "Right. Since you asked. Two chippies off the Redfern Oval job have run a tab in Redfern since Monday. My wife says I should let it go. My wife is wrong. They drove past at school pick-up without looking in, so settle it in cash. Do that and we're square.",
+   "giver": "qgb-redfern-kylie-c",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near Redfern Oval"
+    },
+    {
+     "kind": "earn",
+     "dollars": 34,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 85,
+    "xp": 216,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-036",
+   "act": 3,
+   "title": "The Length of the Rabbitohs",
+   "blurb": "I am told you do odd jobs. I haven't walked the Rabbitohs end to end since the light rail came to Redfern. The paperwork says one thing and my eyes say another. Do it Friday for me and photograph what's at the far end now. Say nothing to anyone on the way.",
+   "giver": "qgb-redfern-sharon-d",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -982,
+     "z": 2337,
+     "radius": 30,
+     "label": "walk the length of the Rabbitohs"
+    },
+    {
+     "kind": "goto",
+     "x": -1144,
+     "z": 2314,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -1144,
+     "z": 2314,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 71,
+    "xp": 202,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-037",
+   "act": 3,
+   "title": "The Eveleigh Order",
+   "blurb": "I have written it down twice and lost it twice. The Eveleigh order came to seventy more than I'd budgeted and the supplier wants it by dawn. I would have sorted it myself a year ago. Find seventy in Redfern and photograph the receipt. Just do not come back empty-handed.",
+   "giver": "qgb-redfern-dwayne-b",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 78,
+     "label": "square the seventy for the Eveleigh order"
+    },
+    {
+     "kind": "photo",
+     "x": -970,
+     "z": 3133,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 207,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-038",
+   "act": 3,
+   "title": "Two From Eveleigh",
+   "blurb": "You will think I am making this up. Two of whatever's going near Eveleigh, here, hot, before the footy at six in the morning. I have rung the number on the letter four times. It's Redfern; I'm not asking for much. I'll see you right for it.",
+   "giver": "qgb-redfern-dwayne-b",
+   "level": 2,
+   "requires": [
+    "qgb-l2-redfern-037"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near Eveleigh"
+    },
+    {
+     "kind": "goto",
+     "x": -1050,
+     "z": 2394,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 95,
+    "xp": 282,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-039",
+   "act": 3,
+   "title": "The the Redfern Tent Embassy Complaint",
+   "blurb": "Not being dramatic about this. Two women in activewear have photographed my bins outside the Redfern Tent Embassy since Thursday. It is the not knowing that has got me, honestly. One has Redfern council on speed dial; sort it however you sort things. I would rather know than wonder.",
+   "giver": "qgb-redfern-luke-c",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near the Redfern Tent Embassy"
+    }
+   ],
+   "reward": {
+    "cash": 84,
+    "xp": 197,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-040",
+   "act": 3,
+   "title": "Closing Time at Abercrombie Street",
+   "blurb": "This is going to sound small. Two blokes have slept in my doorway on Abercrombie Street since the pub shut. I have got no proof, which is exactly why I am asking. The Redfern delivery's at ten past ten, so get them up and show me the step empty. Half now if you want it. Most people don't.",
+   "giver": "qgb-redfern-elaine-c",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off Abercrombie Street"
+    },
+    {
+     "kind": "photo",
+     "x": -1321,
+     "z": 2717,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 218,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-redfern-041",
+   "act": 3,
+   "title": "Seven a.m. At the Bearded Tit",
+   "blurb": "You look like you have twenty minutes. The site at the Bearded Tit starts its jackhammer at six in the morning on a the last Sunday of the month, which is illegal and loud. It might be nothing. It has not felt like nothing. Photograph it running and have a word with the Redfern foreman. Do not make a scene about it.",
+   "giver": "qgb-redfern-val-d",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -758,
+     "z": 2646,
+     "radius": 40,
+     "label": "photograph the noise from the Bearded Tit"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 87,
+    "xp": 180,
+    "unlock": []
+   }
+  }
+ ]
+}

@@ -1,0 +1,1612 @@
+{
+ "pack": "areab-newtown-2",
+ "npcs": [
+  {
+   "id": "qgb-newtown-sienna-c",
+   "name": "Sienna C., uni student, three jobs",
+   "x": -2608,
+   "z": 3001,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Newtown rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Newtown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Camperdown Memorial Rest Park is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Lads Off Gould's Book Arcade",
+       "accept": "qgb-l1-newtown-045",
+       "denyFlag": "w:qgb-l1-newtown-045"
+      },
+      {
+       "text": "A Flat White From Gould's Book Arcade",
+       "accept": "qgb-l1-newtown-046",
+       "denyFlag": "w:qgb-l1-newtown-046",
+       "needFlag": "w:qgb-l1-newtown-045"
+      },
+      {
+       "text": "The Gould's Book Arcade Lift",
+       "accept": "qgb-l1-newtown-047",
+       "denyFlag": "w:qgb-l1-newtown-047"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Sienna C. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About lads off gould's book arcade.",
+       "turnin": "qgb-l1-newtown-045"
+      },
+      {
+       "text": "About a flat white from gould's book arcade.",
+       "turnin": "qgb-l1-newtown-046"
+      },
+      {
+       "text": "About the gould's book arcade lift.",
+       "turnin": "qgb-l1-newtown-047"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Camperdown Memorial Rest Park that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Sienna C., uni student, three jobs in Newtown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Camperdown Memorial Rest Park like everyone knows it.",
+      "context": "Someone has asked what Newtown is like these days. You are standing near Camperdown Memorial Rest Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-2",
+     "line": "Right. And you're sure it was Gould's Book Arcade? People say Gould's Book Arcade when they mean the bit next to it. -- Sienna C. writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-newtown-kai-a",
+   "name": "Kai A., busker, one amp",
+   "x": -3047,
+   "z": 3393,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hold that thought, the council's coming past. Right. Newtown, what a crowd.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Newtown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I play the same six songs at Gould's Book Arcade and nobody has ever complained. Nobody has ever paid, either.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch black star pastry.",
+     "choices": [
+      {
+       "text": "Before They Touch Black Star Pastry",
+       "accept": "qgb-l1-newtown-048",
+       "denyFlag": "w:qgb-l1-newtown-048"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Kai A. looks it over the way Newtown looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About before they touch black star pastry.",
+       "turnin": "qgb-l1-newtown-048"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good pitch is outside Gould's Book Arcade between four and six. After six it's the bloke with the didgeridoo and a Bluetooth speaker.",
+     "improv": {
+      "persona": "Kai A., busker, one amp in Newtown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Gould's Book Arcade like everyone knows it.",
+      "context": "Someone has asked what Newtown is like these days. You are standing near Gould's Book Arcade."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-newtown-rupert-c",
+   "name": "Rupert C., vet nurse",
+   "x": -2409,
+   "z": 3657,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If that's a cat in a bag, bring it round the side. Newtown vet, we're always open in spirit.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Newtown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Cats, greyhounds, the odd cockatoo somebody found. the I Have a Dream mural sends us more staffies than the rest of Sydney.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the better read than dead order.",
+     "choices": [
+      {
+       "text": "The Better Read Than Dead Order",
+       "accept": "qgb-l1-newtown-049",
+       "denyFlag": "w:qgb-l1-newtown-049"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Rupert C. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the better read than dead order.",
+       "turnin": "qgb-l1-newtown-049"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every second dog in Newtown is called Frankie. We've stopped correcting people.",
+     "improv": {
+      "persona": "Rupert C., vet nurse in Newtown, Sydney. Dry, specific, local; never says g'day or crikey; talks about the I Have a Dream mural like everyone knows it.",
+      "context": "Someone has asked what Newtown is like these days. You are standing near the I Have a Dream mural."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-newtown-harriet-c",
+   "name": "Harriet C., tattooist",
+   "x": -2787,
+   "z": 3557,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Walk-ins after two. You're not a walk-in, you've got that look. Newtown, yeah?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Newtown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twenty years on Better Read Than Dead. I've done every Southern Cross in the inner west and then covered half of them up.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the length of king street.",
+     "choices": [
+      {
+       "text": "The Length of King Street",
+       "accept": "qgb-l1-newtown-050",
+       "denyFlag": "w:qgb-l1-newtown-050"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Harriet C. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the length of king street.",
+       "turnin": "qgb-l1-newtown-050"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best coffee is next door. The worst decision you ever made is on your calf. Both are fixable.",
+     "improv": {
+      "persona": "Harriet C., tattooist in Newtown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Better Read Than Dead like everyone knows it.",
+      "context": "Someone has asked what Newtown is like these days. You are standing near Better Read Than Dead."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-newtown-franco-a",
+   "name": "Franco A., barista, own cafe",
+   "x": -2825,
+   "z": 2913,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flat white? Everyone in Newtown wants a flat white. Give me a sec, the grinder's sulking.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Newtown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I own the place. Own it, run it, sweep it. Black Star Pastry foot traffic pays the rent and the regulars pay for the machine.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trolley run, king street.",
+     "choices": [
+      {
+       "text": "Trolley Run, King Street",
+       "accept": "qgb-l1-newtown-051",
+       "denyFlag": "w:qgb-l1-newtown-051"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Franco A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About trolley run, king street.",
+       "turnin": "qgb-l1-newtown-051"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There are eleven cafes on this strip and we all buy beans off the same bloke in Black Star Pastry. Don't tell anyone.",
+     "improv": {
+      "persona": "Franco A., barista, own cafe in Newtown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Black Star Pastry like everyone knows it.",
+      "context": "Someone has asked what Newtown is like these days. You are standing near Black Star Pastry."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-newtown-fay-b",
+   "name": "Fay B., Vinnies volunteer",
+   "x": -2819,
+   "z": 3432,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bag goes on the counter, love, not the floor. Welcome to Newtown.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Newtown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I sort what Newtown throws out. Half of it is jeans, a quarter is a bread maker, and once a fortnight it's something someone will come back crying for.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Something From Enmore Road",
+       "accept": "qgb-l1-newtown-052",
+       "denyFlag": "w:qgb-l1-newtown-052"
+      },
+      {
+       "text": "The Enmore Road Complaint",
+       "accept": "qgb-l1-newtown-053",
+       "denyFlag": "w:qgb-l1-newtown-053",
+       "needFlag": "w:qgb-l1-newtown-052"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Fay B. counts it out without looking up. -- Don't spend it all at King Street.",
+     "choices": [
+      {
+       "text": "About something from enmore road.",
+       "turnin": "qgb-l1-newtown-052"
+      },
+      {
+       "text": "About the enmore road complaint.",
+       "turnin": "qgb-l1-newtown-053"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good stuff at King Street goes before ten. The people who know, know.",
+     "improv": {
+      "persona": "Fay B., Vinnies volunteer in Newtown, Sydney. Dry, specific, local; never says g'day or crikey; talks about King Street like everyone knows it.",
+      "context": "Someone has asked what Newtown is like these days. You are standing near King Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-newtown-jacinta-c",
+   "name": "Jacinta C., busker, one amp",
+   "x": -2803,
+   "z": 3342,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hold that thought, the council's coming past. Right. Newtown, what a crowd.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Newtown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I play the same six songs at the Marly and nobody has ever complained. Nobody has ever paid, either.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's closing time at gould's book arcade.",
+     "choices": [
+      {
+       "text": "Closing Time at Gould's Book Arcade",
+       "accept": "qgb-l1-newtown-054",
+       "denyFlag": "w:qgb-l1-newtown-054"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Jacinta C. counts it out without looking up. -- Don't spend it all at the Marly.",
+     "choices": [
+      {
+       "text": "About closing time at gould's book arcade.",
+       "turnin": "qgb-l1-newtown-054"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good pitch is outside the Marly between four and six. After six it's the bloke with the didgeridoo and a Bluetooth speaker.",
+     "improv": {
+      "persona": "Jacinta C., busker, one amp in Newtown, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Marly like everyone knows it.",
+      "context": "Someone has asked what Newtown is like these days. You are standing near the Marly."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-newtown-glenn-c",
+   "name": "Glenn C., publican",
+   "x": -2472,
+   "z": 3328,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "We're not open. We're never not open. What'll it be, Newtown?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Newtown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I run the pub. Schooners, the meat raffle, the trivia on Wednesdays that started as a joke. the Enmore Theatre keeps me in business and out of the papers.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Left It Near Camperdown Memorial Rest Park",
+       "accept": "qgb-l1-newtown-055",
+       "denyFlag": "w:qgb-l1-newtown-055"
+      },
+      {
+       "text": "The Camperdown Memorial Rest Park Tab",
+       "accept": "qgb-l1-newtown-056",
+       "denyFlag": "w:qgb-l1-newtown-056",
+       "needFlag": "w:qgb-l1-newtown-055"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Glenn C. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About left it near camperdown memorial rest park.",
+       "turnin": "qgb-l1-newtown-055"
+      },
+      {
+       "text": "About the camperdown memorial rest park tab.",
+       "turnin": "qgb-l1-newtown-056"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Tooheys New, seven dollars, and if you ask for a craft beer I'll point you back toward the Enmore Theatre.",
+     "improv": {
+      "persona": "Glenn C., publican in Newtown, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Enmore Theatre like everyone knows it.",
+      "context": "Someone has asked what Newtown is like these days. You are standing near the Enmore Theatre."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Glenn C. listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-newtown-kerry-c",
+   "name": "Kerry C., vet nurse",
+   "x": -3146,
+   "z": 3372,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If that's a cat in a bag, bring it round the side. Newtown vet, we're always open in spirit.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Newtown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Cats, greyhounds, the odd cockatoo somebody found. Camperdown Memorial Rest Park sends us more staffies than the rest of Sydney.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rent money, gould's book arcade.",
+     "choices": [
+      {
+       "text": "Rent Money, Gould's Book Arcade",
+       "accept": "qgb-l1-newtown-057",
+       "denyFlag": "w:qgb-l1-newtown-057"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Kerry C. looks it over the way Newtown looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About rent money, gould's book arcade.",
+       "turnin": "qgb-l1-newtown-057"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every second dog in Newtown is called Frankie. We've stopped correcting people.",
+     "improv": {
+      "persona": "Kerry C., vet nurse in Newtown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Camperdown Memorial Rest Park like everyone knows it.",
+      "context": "Someone has asked what Newtown is like these days. You are standing near Camperdown Memorial Rest Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-newtown-carmela-a",
+   "name": "Carmela A., barista, own cafe",
+   "x": -2969,
+   "z": 3147,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flat white? Everyone in Newtown wants a flat white. Give me a sec, the grinder's sulking.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Newtown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I own the place. Own it, run it, sweep it. the Courthouse Hotel foot traffic pays the rent and the regulars pay for the machine.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's tap on at the i have a dream mural.",
+     "choices": [
+      {
+       "text": "Tap On at the I Have a Dream mural",
+       "accept": "qgb-l1-newtown-058",
+       "denyFlag": "w:qgb-l1-newtown-058"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Carmela A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About tap on at the i have a dream mural.",
+       "turnin": "qgb-l1-newtown-058"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There are eleven cafes on this strip and we all buy beans off the same bloke in the Courthouse Hotel. Don't tell anyone.",
+     "improv": {
+      "persona": "Carmela A., barista, own cafe in Newtown, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Courthouse Hotel like everyone knows it.",
+      "context": "Someone has asked what Newtown is like these days. You are standing near the Courthouse Hotel."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Newtown would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-newtown-bruce-c",
+   "name": "Bruce C., busker, one amp",
+   "x": -2928,
+   "z": 3414,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hold that thought, the council's coming past. Right. Newtown, what a crowd.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Newtown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I play the same six songs at Black Star Pastry and nobody has ever complained. Nobody has ever paid, either.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the enmore road lift.",
+     "choices": [
+      {
+       "text": "The Enmore Road Lift",
+       "accept": "qgb-l1-newtown-059",
+       "denyFlag": "w:qgb-l1-newtown-059"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Bruce C. looks it over the way Newtown looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the enmore road lift.",
+       "turnin": "qgb-l1-newtown-059"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good pitch is outside Black Star Pastry between four and six. After six it's the bloke with the didgeridoo and a Bluetooth speaker.",
+     "improv": {
+      "persona": "Bruce C., busker, one amp in Newtown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Black Star Pastry like everyone knows it.",
+      "context": "Someone has asked what Newtown is like these days. You are standing near Black Star Pastry."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Newtown would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-newtown-prue-b",
+   "name": "Prue B., busker, one amp",
+   "x": -2928,
+   "z": 3200,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hold that thought, the council's coming past. Right. Newtown, what a crowd.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Newtown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I play the same six songs at the Courthouse Hotel and nobody has ever complained. Nobody has ever paid, either.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Black Star Pastry Camera",
+       "accept": "qgb-l1-newtown-060",
+       "denyFlag": "w:qgb-l1-newtown-060"
+      },
+      {
+       "text": "Trolley Run, the I Have a Dream mural",
+       "accept": "qgb-l1-newtown-061",
+       "denyFlag": "w:qgb-l1-newtown-061",
+       "needFlag": "w:qgb-l1-newtown-060"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Prue B. counts it out without looking up. -- Don't spend it all at the Courthouse Hotel.",
+     "choices": [
+      {
+       "text": "About the black star pastry camera.",
+       "turnin": "qgb-l1-newtown-060"
+      },
+      {
+       "text": "About trolley run, the i have a dream mural.",
+       "turnin": "qgb-l1-newtown-061"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good pitch is outside the Courthouse Hotel between four and six. After six it's the bloke with the didgeridoo and a Bluetooth speaker.",
+     "improv": {
+      "persona": "Prue B., busker, one amp in Newtown, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Courthouse Hotel like everyone knows it.",
+      "context": "Someone has asked what Newtown is like these days. You are standing near the Courthouse Hotel."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-newtown-toby-b",
+   "name": "Toby B., publican",
+   "x": -2328,
+   "z": 3367,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "We're not open. We're never not open. What'll it be, Newtown?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Newtown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I run the pub. Schooners, the meat raffle, the trivia on Wednesdays that started as a joke. the I Have a Dream mural keeps me in business and out of the papers.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Something From Black Star Pastry",
+       "accept": "qgb-l1-newtown-062",
+       "denyFlag": "w:qgb-l1-newtown-062"
+      },
+      {
+       "text": "The Better Read Than Dead Complaint",
+       "accept": "qgb-l1-newtown-063",
+       "denyFlag": "w:qgb-l1-newtown-063",
+       "needFlag": "w:qgb-l1-newtown-062"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Toby B. counts it out without looking up. -- Don't spend it all at the I Have a Dream mural.",
+     "choices": [
+      {
+       "text": "About something from black star pastry.",
+       "turnin": "qgb-l1-newtown-062"
+      },
+      {
+       "text": "About the better read than dead complaint.",
+       "turnin": "qgb-l1-newtown-063"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Tooheys New, seven dollars, and if you ask for a craft beer I'll point you back toward the I Have a Dream mural.",
+     "improv": {
+      "persona": "Toby B., publican in Newtown, Sydney. Dry, specific, local; never says g'day or crikey; talks about the I Have a Dream mural like everyone knows it.",
+      "context": "Someone has asked what Newtown is like these days. You are standing near the I Have a Dream mural."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-newtown-dot-a",
+   "name": "Dot A., vet nurse",
+   "x": -2397,
+   "z": 3033,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "If that's a cat in a bag, bring it round the side. Newtown vet, we're always open in spirit.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Newtown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Cats, greyhounds, the odd cockatoo somebody found. Better Read Than Dead sends us more staffies than the rest of Sydney.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's counting king street.",
+     "choices": [
+      {
+       "text": "Counting King Street",
+       "accept": "qgb-l1-newtown-064",
+       "denyFlag": "w:qgb-l1-newtown-064"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Dot A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About counting king street.",
+       "turnin": "qgb-l1-newtown-064"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every second dog in Newtown is called Frankie. We've stopped correcting people.",
+     "improv": {
+      "persona": "Dot A., vet nurse in Newtown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Better Read Than Dead like everyone knows it.",
+      "context": "Someone has asked what Newtown is like these days. You are standing near Better Read Than Dead."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-newtown-clive-a",
+   "name": "Clive A., tattooist",
+   "x": -3025,
+   "z": 3476,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Walk-ins after two. You're not a walk-in, you've got that look. Newtown, yeah?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Newtown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twenty years on Black Star Pastry. I've done every Southern Cross in the inner west and then covered half of them up.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Two From Enmore Road",
+       "accept": "qgb-l1-newtown-065",
+       "denyFlag": "w:qgb-l1-newtown-065"
+      },
+      {
+       "text": "Race Four, Enmore Road",
+       "accept": "qgb-l1-newtown-066",
+       "denyFlag": "w:qgb-l1-newtown-066",
+       "needFlag": "w:qgb-l1-newtown-065"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Clive A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About two from enmore road.",
+       "turnin": "qgb-l1-newtown-065"
+      },
+      {
+       "text": "About race four, enmore road.",
+       "turnin": "qgb-l1-newtown-066"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best coffee is next door. The worst decision you ever made is on your calf. Both are fixable.",
+     "improv": {
+      "persona": "Clive A., tattooist in Newtown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Black Star Pastry like everyone knows it.",
+      "context": "Someone has asked what Newtown is like these days. You are standing near Black Star Pastry."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-2",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Clive A. listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-newtown-rosa-a",
+   "name": "Rosa A., barista, own cafe",
+   "x": -2581,
+   "z": 3130,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flat white? Everyone in Newtown wants a flat white. Give me a sec, the grinder's sulking.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Newtown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I own the place. Own it, run it, sweep it. King Street foot traffic pays the rent and the regulars pay for the machine.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rbt on gould's book arcade.",
+     "choices": [
+      {
+       "text": "RBT on Gould's Book Arcade",
+       "accept": "qgb-l1-newtown-067",
+       "denyFlag": "w:qgb-l1-newtown-067"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Rosa A. counts it out without looking up. -- Don't spend it all at King Street.",
+     "choices": [
+      {
+       "text": "About rbt on gould's book arcade.",
+       "turnin": "qgb-l1-newtown-067"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There are eleven cafes on this strip and we all buy beans off the same bloke in King Street. Don't tell anyone.",
+     "improv": {
+      "persona": "Rosa A., barista, own cafe in Newtown, Sydney. Dry, specific, local; never says g'day or crikey; talks about King Street like everyone knows it.",
+      "context": "Someone has asked what Newtown is like these days. You are standing near King Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

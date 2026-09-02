@@ -1,0 +1,1331 @@
+{
+ "pack": "areab-central-1",
+ "quests": [
+  {
+   "id": "qgb-l3-central-001",
+   "act": 3,
+   "title": "The the Capitol Theatre Course",
+   "blurb": "I would do it myself if I could leave the counter. A bloke near the Capitol Theatre runs a ninety-minute course he bills at four hundred, and I've paid. You will see what I mean the second you get there. Sit it the long weekend, then come back to Central and prove it did something. I'll put the kettle on for when you're back.",
+   "giver": "qgb-central-vivian",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near the Capitol Theatre"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 252,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-002",
+   "act": 3,
+   "title": "Left It Near the Capitol Theatre",
+   "blurb": "It has been three weeks. I left something on the bench at the Capitol Theatre at eight at night. I would not ask if there was anyone else about. By the time I got back to Central it had walked, so look where I'd have dropped it. There is no rush, but there is a Friday.",
+   "giver": "qgb-central-narelle-a",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -80,
+     "z": 1807,
+     "radius": 30,
+     "label": "check the bench near the Capitol Theatre"
+    },
+    {
+     "kind": "photo",
+     "x": -198,
+     "z": 2036,
+     "radius": 40,
+     "label": "photograph the bins behind it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-central-narelle-a",
+     "node": "report-0",
+     "label": "tell me what you found"
+    }
+   ],
+   "reward": {
+    "cash": 91,
+    "xp": 227,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-003",
+   "act": 3,
+   "title": "The Capitol Theatre Pub Crawl",
+   "blurb": "It is the sort of thing you notice or you do not. A bucks started at the Capitol Theatre at noon and it's now three blokes, one pair of pants and a tab. I am aware how that sounds. Recover the tab by peak hour; Central can keep the dignity. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-central-narelle-a",
+   "level": 3,
+   "requires": [
+    "qgb-l3-central-002"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 3,
+     "label": "sort the three from the the Capitol Theatre crawl"
+    },
+    {
+     "kind": "earn",
+     "dollars": 25,
+     "label": "and get the twenty they owe"
+    }
+   ],
+   "reward": {
+    "cash": 124,
+    "xp": 320,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-004",
+   "act": 3,
+   "title": "Before They Touch Eddy Avenue",
+   "blurb": "You are the first person to stop all morning. They start on Eddy Avenue on Saturday and the orange fencing goes up. You can tell me I am imagining it. Tell me after. I want Central on record before it does. That's the whole job. No catch.",
+   "giver": "qgb-central-hala",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -358,
+     "z": 1425,
+     "radius": 40,
+     "label": "photograph the state of Eddy Avenue"
+    },
+    {
+     "kind": "goto",
+     "x": -338,
+     "z": 1707,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 262,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-005",
+   "act": 3,
+   "title": "Sightline at Central's clock tower",
+   "blurb": "Honestly, I am past caring how it looks. Insurance says nobody could have seen the ute hit the fence at Central's clock tower on Easter Saturday. This is the third time I have had this conversation. Stand where I stood in Central, photograph the view, tell me if I'm lying. You'll know it when you see it.",
+   "giver": "qgb-central-karen-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -129,
+     "z": 1860,
+     "radius": 30,
+     "label": "stand where it happened at Central's clock tower"
+    },
+    {
+     "kind": "photo",
+     "x": -129,
+     "z": 1860,
+     "radius": 40,
+     "label": "photograph the corner"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-central-karen-b",
+     "node": "report-0",
+     "label": "describe the sightline"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 247,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-006",
+   "act": 3,
+   "title": "Parcel for Town Hall",
+   "blurb": "The council knows and the council does not care. A parcel from the Devonshire Street tunnel has to be at Town Hall by dawn and Australia Post quoted me the King's Birthday. It started small, the way these things do. Take the train and hand it to the people outside the station. Say nothing to anyone on the way.",
+   "giver": "qgb-central-ken",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Central",
+     "to": "Town Hall",
+     "label": "carry it on the train to Town Hall"
+    },
+    {
+     "kind": "goto",
+     "x": -244,
+     "z": 605,
+     "radius": 30,
+     "label": "hand it over outside the station, where the crowd is"
+    }
+   ],
+   "reward": {
+    "cash": 97,
+    "xp": 259,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-007",
+   "act": 3,
+   "title": "Lads Off Chinatown",
+   "blurb": "I am told you do odd jobs. Three of them in TNs on the Chinatown steps, flogging vapes to schoolkids at bin night. It is the not knowing that has got me, honestly. Central used to move them on itself and now it rings me. That's it. That's the whole ask.",
+   "giver": "qgb-central-maureen-a",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Chinatown"
+    }
+   ],
+   "reward": {
+    "cash": 95,
+    "xp": 233,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-008",
+   "act": 3,
+   "title": "Bin Night, the Capitol Theatre",
+   "blurb": "I have written it down twice and lost it twice. Somebody moves the bins on the Capitol Theatre in front of my drive every Easter Saturday night. I have got no proof, which is exactly why I am asking. Photograph the evidence and have a word; Central knows who. Come and find me after, either way.",
+   "giver": "qgb-central-maureen-a",
+   "level": 3,
+   "requires": [
+    "qgb-l3-central-007"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -314,
+     "z": 1536,
+     "radius": 40,
+     "label": "photograph the bins at the Capitol Theatre"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 126,
+    "xp": 319,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-009",
+   "act": 3,
+   "title": "The Length of Paddy's Markets",
+   "blurb": "You will think I am making this up. I haven't walked Paddy's Markets end to end since the light rail came to Central. I did try the official route, for what that was worth. Do it Monday for me and photograph what's at the far end now. Be polite about it. It costs nothing.",
+   "giver": "qgb-central-maureen-a",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -247,
+     "z": 1571,
+     "radius": 30,
+     "label": "walk the length of Paddy's Markets"
+    },
+    {
+     "kind": "goto",
+     "x": -414,
+     "z": 1505,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -414,
+     "z": 1505,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 98,
+    "xp": 245,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-010",
+   "act": 3,
+   "title": "The Paddy's Markets Complaint",
+   "blurb": "Nobody else has offered, so. Two women in activewear have photographed my bins outside Paddy's Markets since Thursday. I am not after trouble. I am after an answer. One has Central council on speed dial; sort it however you sort things. I would rather know than wonder.",
+   "giver": "qgb-central-nadia",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near Paddy's Markets"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 222,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-011",
+   "act": 3,
+   "title": "Rent Money, Eddy Avenue",
+   "blurb": "This is going to sound small. I'm forty-five short on the Eddy Avenue rent and the agent doesn't take stories. You will see what I mean the second you get there. Make it somewhere in Central by half seven; I'm not fussy how. Do not make a scene about it.",
+   "giver": "qgb-central-yan",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 56,
+     "label": "earn forty-five somewhere in Central"
+    }
+   ],
+   "reward": {
+    "cash": 84,
+    "xp": 251,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-012",
+   "act": 3,
+   "title": "Seven a.m. At Eddy Avenue",
+   "blurb": "It has been three weeks. The site at Eddy Avenue starts its jackhammer at dawn on a the King's Birthday, which is illegal and loud. I am aware how that sounds. Photograph it running and have a word with the Central foreman. I'll put the kettle on for when you're back.",
+   "giver": "qgb-central-yan",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -274,
+     "z": 1643,
+     "radius": 40,
+     "label": "photograph the noise from Eddy Avenue"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 92,
+    "xp": 255,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-013",
+   "act": 3,
+   "title": "One Stop From Central's clock tower",
+   "blurb": "Do not laugh. I need to know the train from Central stops at Town Hall and doesn't sail through like it did on Friday. I have rung the number on the letter four times. Ride it at bin night and photograph the sign. Do not let them talk you into anything.",
+   "giver": "qgb-central-layla-a",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Central",
+     "to": "Town Hall",
+     "label": "take the train to Town Hall"
+    },
+    {
+     "kind": "photo",
+     "x": -244,
+     "z": 605,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 102,
+    "xp": 240,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-014",
+   "act": 3,
+   "title": "Before They Touch Central's clock tower",
+   "blurb": "There is no clever way to say this. They start on Central's clock tower on the long weekend and the orange fencing goes up. It started small, the way these things do. I want Central on record before it does. Do that and we're square.",
+   "giver": "qgb-central-bluey-a",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -213,
+     "z": 1606,
+     "radius": 40,
+     "label": "photograph the state of Central's clock tower"
+    },
+    {
+     "kind": "goto",
+     "x": -140,
+     "z": 1461,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 95,
+    "xp": 253,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-015",
+   "act": 3,
+   "title": "Trouble at the Devonshire Street tunnel",
+   "blurb": "Right. Since you asked. Two lads and their mate decided at knock-off that the Devonshire Street tunnel is theirs. Half the street knows and half the street is pretending not to. The rest of Central disagrees, so explain the disagreement. Just do not come back empty-handed.",
+   "giver": "qgb-central-thelma-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near the Devonshire Street tunnel"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 246,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-016",
+   "act": 3,
+   "title": "Closing Time at Chinatown",
+   "blurb": "I am told you do odd jobs. Two blokes have slept in my doorway on Chinatown since the pub shut. I have got no proof, which is exactly why I am asking. The Central delivery's at the arvo, so get them up and show me the step empty. If anyone asks, you were never here.",
+   "giver": "qgb-central-trent-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off Chinatown"
+    },
+    {
+     "kind": "photo",
+     "x": -365,
+     "z": 1767,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 92,
+    "xp": 241,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-017",
+   "act": 3,
+   "title": "The the Capitol Theatre Order",
+   "blurb": "Two people have already said no. The the Capitol Theatre order came to seventy more than I'd budgeted and the supplier wants it by the change of shift. It might be nothing. It has not felt like nothing. Find seventy in Central and photograph the receipt. I would rather know than wonder.",
+   "giver": "qgb-central-renee-e",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 87,
+     "label": "square the seventy for the the Capitol Theatre order"
+    },
+    {
+     "kind": "photo",
+     "x": -39,
+     "z": 1643,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 246,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-018",
+   "act": 3,
+   "title": "The Length of Eddy Avenue",
+   "blurb": "I would do it myself if I could leave the counter. I haven't walked Eddy Avenue end to end since the light rail came to Central. I am aware how that sounds. Do it grand final day for me and photograph what's at the far end now. Do not make a scene about it.",
+   "giver": "qgb-central-kylie-anne-a",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -288,
+     "z": 1510,
+     "radius": 30,
+     "label": "walk the length of Eddy Avenue"
+    },
+    {
+     "kind": "goto",
+     "x": -387,
+     "z": 1603,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -387,
+     "z": 1603,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 88,
+    "xp": 231,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-019",
+   "act": 3,
+   "title": "The Thomas Street Camera",
+   "blurb": "You look like you have twenty minutes. A new speed camera near Thomas Street has fined half of Central since Monday. You can tell me I am imagining it. Tell me after. Photograph it for the appeal, then prove the train to Town Hall is faster anyway. There is no rush, but there is a Friday.",
+   "giver": "qgb-central-beryl-d",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -166,
+     "z": 2120,
+     "radius": 40,
+     "label": "photograph the camera near Thomas Street"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Central",
+     "to": "Town Hall",
+     "label": "then take the train instead, to Town Hall"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 225,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-020",
+   "act": 3,
+   "title": "Two From Thomas Street",
+   "blurb": "You are the first person to stop all morning. Two of whatever's going near Thomas Street, here, hot, before the footy at the last train. This is the third time I have had this conversation. It's Central; I'm not asking for much. Whatever you find, bring it to me first.",
+   "giver": "qgb-central-beryl-d",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near Thomas Street"
+    },
+    {
+     "kind": "goto",
+     "x": -404,
+     "z": 1748,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 256,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-021",
+   "act": 3,
+   "title": "Rent Money, the Haymarket paifang",
+   "blurb": "Honestly, I am past caring how it looks. I'm forty-five short on the the Haymarket paifang rent and the agent doesn't take stories. I would have sorted it myself a year ago. Make it somewhere in Central by nine sharp; I'm not fussy how. That's the whole job. No catch.",
+   "giver": "qgb-central-jenny",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 56,
+     "label": "earn forty-five somewhere in Central"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 249,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-022",
+   "act": 3,
+   "title": "Trolley Run, Central's clock tower",
+   "blurb": "I'll be straight with you. A Woolies trolley from Central's clock tower gets walked to the creek every the King's Birthday. I have rung the number on the letter four times. Find where it ends up in Central and make the deposit back. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qgb-central-joyce-e",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -6,
+     "z": 1761,
+     "radius": 30,
+     "label": "find the trolley near Central's clock tower"
+    },
+    {
+     "kind": "photo",
+     "x": -6,
+     "z": 1761,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 31,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 102,
+    "xp": 237,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-023",
+   "act": 3,
+   "title": "Ask Around at Town Hall",
+   "blurb": "Do not laugh. There's work going outside Town Hall station and nobody at Chinatown can tell me what. It started small, the way these things do. Ride over at after the footy, get the shape of it, come back. You'll know it when you see it.",
+   "giver": "qgb-central-joyce-e",
+   "level": 3,
+   "requires": [
+    "qgb-l3-central-022"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Central",
+     "to": "Town Hall",
+     "label": "take the train to Town Hall"
+    },
+    {
+     "kind": "goto",
+     "x": -244,
+     "z": 605,
+     "radius": 30,
+     "label": "find the people outside Town Hall station"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-central-joyce-e",
+     "node": "report-1",
+     "label": "then come back and tell me what they said"
+    }
+   ],
+   "reward": {
+    "cash": 129,
+    "xp": 317,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-024",
+   "act": 3,
+   "title": "Cover at Chinatown",
+   "blurb": "The council knows and the council does not care. I've got nobody for the Chinatown shift at half four and a room full of Central people who've paid. It is not the money. It has stopped being the money. Fifty of trade and one difficult person at the door. Do that and we're square.",
+   "giver": "qgb-central-nour-a",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 62,
+     "label": "cover the fifty for the shift"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 1,
+     "label": "and handle whoever's at the door"
+    }
+   ],
+   "reward": {
+    "cash": 95,
+    "xp": 239,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-025",
+   "act": 3,
+   "title": "Probationary at Paddy's Markets",
+   "blurb": "Right. Since you asked. A young constable has been doing his first solo patrol round Paddy's Markets since the last Sunday of the month. It is the not knowing that has got me, honestly. He's decided Central is his, so give him a story for the sergeant. Say nothing to anyone on the way.",
+   "giver": "qgb-central-cooper-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "lose the probationary constable near Paddy's Markets"
+    }
+   ],
+   "reward": {
+    "cash": 97,
+    "xp": 255,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-026",
+   "act": 3,
+   "title": "Dixon Street Pub Crawl",
+   "blurb": "I have written it down twice and lost it twice. A bucks started at Dixon Street at noon and it's now three blokes, one pair of pants and a tab. I am not after trouble. I am after an answer. Recover the tab by eight at night; Central can keep the dignity. If anyone asks, you were never here.",
+   "giver": "qgb-central-imogen-c",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 3,
+     "label": "sort the three from the Dixon Street crawl"
+    },
+    {
+     "kind": "earn",
+     "dollars": 25,
+     "label": "and get the twenty they owe"
+    }
+   ],
+   "reward": {
+    "cash": 98,
+    "xp": 233,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-027",
+   "act": 3,
+   "title": "The the Capitol Theatre Tab",
+   "blurb": "Two people have already said no. Two chippies off the the Capitol Theatre job have run a tab in Central since Australia Day. I have got a photo on my phone but it is useless. They drove past at peak hour without looking in, so settle it in cash. Be polite about it. It costs nothing.",
+   "giver": "qgb-central-fergus-c",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Capitol Theatre"
+    },
+    {
+     "kind": "earn",
+     "dollars": 37,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 100,
+    "xp": 223,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-028",
+   "act": 3,
+   "title": "Trouble at Belmore Park",
+   "blurb": "Keep it between us for now. Two lads and their mate decided at six in the morning that Belmore Park is theirs. Nobody else seems to have noticed, which is its own problem. The rest of Central disagrees, so explain the disagreement. I would rather know than wonder.",
+   "giver": "qgb-central-jun",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Belmore Park"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 88,
+    "xp": 255,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-029",
+   "act": 3,
+   "title": "Counting the Haymarket paifang",
+   "blurb": "Not being dramatic about this. Council says the the Haymarket paifang car park is never full and I say it's full by five. I would not ask if there was anyone else about. Count both Central car parks, photograph whichever one makes me right. There's cash in it. Not a lot.",
+   "giver": "qgb-central-eddie-b",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -413,
+     "z": 1773,
+     "radius": 30,
+     "label": "count the cars at the Haymarket paifang"
+    },
+    {
+     "kind": "goto",
+     "x": -383,
+     "z": 2036,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": -413,
+     "z": 1773,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 102,
+    "xp": 253,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-030",
+   "act": 3,
+   "title": "The Eddy Avenue Order",
+   "blurb": "This is going to sound small. The Eddy Avenue order came to seventy more than I'd budgeted and the supplier wants it by first thing. I am aware how that sounds. Find seventy in Central and photograph the receipt. I will owe you one, and I pay those.",
+   "giver": "qgb-central-eddie-b",
+   "level": 3,
+   "requires": [
+    "qgb-l3-central-029"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 87,
+     "label": "square the seventy for the Eddy Avenue order"
+    },
+    {
+     "kind": "photo",
+     "x": -485,
+     "z": 1755,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 114,
+    "xp": 334,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-031",
+   "act": 3,
+   "title": "Bin Night, Central's clock tower",
+   "blurb": "I have been putting it off since Easter. Somebody moves the bins on Central's clock tower in front of my drive every grand final day night. This is the third time I have had this conversation. Photograph the evidence and have a word; Central knows who. There is no rush, but there is a Friday.",
+   "giver": "qgb-central-elie-a",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -590,
+     "z": 1882,
+     "radius": 40,
+     "label": "photograph the bins at Central's clock tower"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 84,
+    "xp": 260,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-032",
+   "act": 3,
+   "title": "The Length of the Haymarket paifang",
+   "blurb": "My knees are gone, so. I haven't walked the Haymarket paifang end to end since the light rail came to Central. I would have sorted it myself a year ago. Do it Wednesday for me and photograph what's at the far end now. Whatever you find, bring it to me first.",
+   "giver": "qgb-central-kylie-d",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -46,
+     "z": 1637,
+     "radius": 30,
+     "label": "walk the length of the Haymarket paifang"
+    },
+    {
+     "kind": "goto",
+     "x": 20,
+     "z": 1412,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": 20,
+     "z": 1412,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 101,
+    "xp": 251,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-033",
+   "act": 3,
+   "title": "The Central's clock tower Sparky",
+   "blurb": "I'll be straight with you. The sparky off the Central's clock tower job has owed me since the bathroom and drinks in Central from ten past ten. It started small, the way these things do. Forty will do and I'll write off the rest. That's the whole job. No catch.",
+   "giver": "qgb-central-craig-a",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for Central's clock tower"
+    },
+    {
+     "kind": "earn",
+     "dollars": 50,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 90,
+    "xp": 247,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-034",
+   "act": 3,
+   "title": "Meat Tray at Chinatown",
+   "blurb": "Do not laugh. The Chinatown raffle is thirty-five short of a meat tray and the draw is at bin night. It has been going on longer than I have admitted to anyone. Find it in Central and put it in the tin. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qgb-central-craig-a",
+   "level": 3,
+   "requires": [
+    "qgb-l3-central-033"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 43,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": 26,
+     "z": 1887,
+     "radius": 30,
+     "label": "and drop it at Chinatown"
+    }
+   ],
+   "reward": {
+    "cash": 109,
+    "xp": 330,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-035",
+   "act": 3,
+   "title": "A Flat White From Chinatown",
+   "blurb": "The council knows and the council does not care. I want a flat white from the place near Chinatown, not the one next to it. Half the street knows and half the street is pretending not to. Here by half seven, while it's still coffee and Central still has some. Do not let them talk you into anything.",
+   "giver": "qgb-central-alan",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near Chinatown"
+    },
+    {
+     "kind": "goto",
+     "x": -148,
+     "z": 1489,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 238,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-036",
+   "act": 3,
+   "title": "Left It Near Eddy Avenue",
+   "blurb": "You will think I am making this up. I left something on the bench at Eddy Avenue at ten past ten. It might be nothing. It has not felt like nothing. By the time I got back to Central it had walked, so look where I'd have dropped it. If anyone asks, you were never here.",
+   "giver": "qgb-central-neville-a",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -376,
+     "z": 1699,
+     "radius": 30,
+     "label": "check the bench near Eddy Avenue"
+    },
+    {
+     "kind": "photo",
+     "x": -149,
+     "z": 1924,
+     "radius": 40,
+     "label": "photograph the bins behind it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-central-neville-a",
+     "node": "report-1",
+     "label": "tell me what you found"
+    }
+   ],
+   "reward": {
+    "cash": 92,
+    "xp": 231,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-037",
+   "act": 3,
+   "title": "One Stop From Eddy Avenue",
+   "blurb": "Keep it between us for now. I need to know the train from Central stops at Town Hall and doesn't sail through like it did on Melbourne Cup day. You will see what I mean the second you get there. Ride it at bin night and photograph the sign. Be polite about it. It costs nothing.",
+   "giver": "qgb-central-val-a",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Central",
+     "to": "Town Hall",
+     "label": "take the train to Town Hall"
+    },
+    {
+     "kind": "photo",
+     "x": -244,
+     "z": 605,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 258,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-038",
+   "act": 3,
+   "title": "Before They Touch the Grand Concourse",
+   "blurb": "Before you say anything: yes, I know. They start on the Grand Concourse on the King's Birthday and the orange fencing goes up. I would not ask if there was anyone else about. I want Central on record before it does. I would rather know than wonder.",
+   "giver": "qgb-central-barry-a",
+   "level": 3,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -647,
+     "z": 1429,
+     "radius": 40,
+     "label": "photograph the state of the Grand Concourse"
+    },
+    {
+     "kind": "goto",
+     "x": -762,
+     "z": 1739,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 89,
+    "xp": 259,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l3-central-039",
+   "act": 3,
+   "title": "The the Grand Concourse Fence",
+   "blurb": "Not being dramatic about this. My neighbour at the Grand Concourse says the tree is on my side and the fence says otherwise. I am aware how that sounds. Look at it Saturday with Central eyes and tell me the truth. Half now if you want it. Most people don't.",
+   "giver": "qgb-central-barry-a",
+   "level": 3,
+   "requires": [
+    "qgb-l3-central-038"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -330,
+     "z": 1636,
+     "radius": 30,
+     "label": "go and look at the fence at the Grand Concourse"
+    },
+    {
+     "kind": "photo",
+     "x": -330,
+     "z": 1636,
+     "radius": 40,
+     "label": "photograph the tree over it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-central-barry-a",
+     "node": "report-1",
+     "label": "tell me whose side it's on"
+    }
+   ],
+   "reward": {
+    "cash": 118,
+    "xp": 330,
+    "unlock": []
+   }
+  }
+ ]
+}

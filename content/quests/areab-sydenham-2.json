@@ -1,0 +1,967 @@
+{
+ "pack": "areab-sydenham-2",
+ "quests": [
+  {
+   "id": "qgb-l2-sydenham-039",
+   "act": 3,
+   "title": "Closing Time at Tempe Tip",
+   "blurb": "It is the sort of thing you notice or you do not. Two blokes have slept in my doorway on Tempe Tip since the pub shut. It is not the money. It has stopped being the money. The Sydenham delivery's at lunchtime, so get them up and show me the step empty. Come back and tell me straight.",
+   "giver": "qgb-sydenham-janelle-b",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off Tempe Tip"
+    },
+    {
+     "kind": "photo",
+     "x": -3704,
+     "z": 5447,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 76,
+    "xp": 194,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-040",
+   "act": 3,
+   "title": "Meat Tray at the Cooks River cycleway",
+   "blurb": "There is no clever way to say this. The the Cooks River cycleway raffle is thirty-five short of a meat tray and the draw is at ten past ten. I have got a photo on my phone but it is useless. Find it in Sydenham and put it in the tin. That's the whole job. No catch.",
+   "giver": "qgb-sydenham-poppy-b",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 39,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -3788,
+     "z": 5655,
+     "radius": 30,
+     "label": "and drop it at the Cooks River cycleway"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 211,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-041",
+   "act": 3,
+   "title": "The the Sydenham Green Fence",
+   "blurb": "The council knows and the council does not care. My neighbour at the Sydenham Green says the tree is on my side and the fence says otherwise. Nobody else seems to have noticed, which is its own problem. Look at it the last Sunday of the month with Sydenham eyes and tell me the truth. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qgb-sydenham-poppy-b",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -3292,
+     "z": 5174,
+     "radius": 30,
+     "label": "go and look at the fence at the Sydenham Green"
+    },
+    {
+     "kind": "photo",
+     "x": -3292,
+     "z": 5174,
+     "radius": 40,
+     "label": "photograph the tree over it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-sydenham-poppy-b",
+     "node": "report-2",
+     "label": "tell me whose side it's on"
+    }
+   ],
+   "reward": {
+    "cash": 84,
+    "xp": 217,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-042",
+   "act": 3,
+   "title": "Seven a.m. At the Sydenham flight path",
+   "blurb": "I am told you do odd jobs. The site at the Sydenham flight path starts its jackhammer at lunchtime on a Wednesday, which is illegal and loud. Everyone I have told has looked at me the way you are now. Photograph it running and have a word with the Sydenham foreman. Ask for me by name at the counter.",
+   "giver": "qgb-sydenham-fay-c",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -4379,
+     "z": 5188,
+     "radius": 40,
+     "label": "photograph the noise from the Sydenham flight path"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 84,
+    "xp": 197,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-043",
+   "act": 3,
+   "title": "Lads Off Tempe Tip",
+   "blurb": "I have written it down twice and lost it twice. Three of them in TNs on the Tempe Tip steps, flogging vapes to schoolkids at knock-off. There is a version of this where I am the unreasonable one. Sydenham used to move them on itself and now it rings me. Say nothing to anyone on the way.",
+   "giver": "qgb-sydenham-daz-a",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Tempe Tip"
+    }
+   ],
+   "reward": {
+    "cash": 88,
+    "xp": 207,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-044",
+   "act": 3,
+   "title": "Two Signs, Tempe Reserve",
+   "blurb": "You will think I am making this up. Two signs near Tempe Reserve say opposite things about parking and I've been fined under both. You can tell me I am imagining it. Tell me after. Get photos of each before Melbourne Cup day, when Sydenham council takes one down. Just do not come back empty-handed.",
+   "giver": "qgb-sydenham-daz-a",
+   "level": 2,
+   "requires": [
+    "qgb-l2-sydenham-043"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -4409,
+     "z": 5254,
+     "radius": 40,
+     "label": "photograph the sign at Tempe Reserve"
+    },
+    {
+     "kind": "photo",
+     "x": -4155,
+     "z": 5298,
+     "radius": 40,
+     "label": "and the one that contradicts it"
+    }
+   ],
+   "reward": {
+    "cash": 107,
+    "xp": 277,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-045",
+   "act": 3,
+   "title": "The Length of Sydenham Road",
+   "blurb": "This is going to sound small. I haven't walked Sydenham Road end to end since the light rail came to Sydenham. It started small, the way these things do. Do it Monday for me and photograph what's at the far end now. I would rather know than wonder.",
+   "giver": "qgb-sydenham-kerry-d",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -3728,
+     "z": 5484,
+     "radius": 30,
+     "label": "walk the length of Sydenham Road"
+    },
+    {
+     "kind": "goto",
+     "x": -3366,
+     "z": 5399,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -3366,
+     "z": 5399,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 73,
+    "xp": 199,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-046",
+   "act": 3,
+   "title": "Before They Touch the Sydenham Green",
+   "blurb": "It is the sort of thing you notice or you do not. They start on the Sydenham Green on Sunday and the orange fencing goes up. Half the street knows and half the street is pretending not to. I want Sydenham on record before it does. I will owe you one, and I pay those.",
+   "giver": "qgb-sydenham-sunil-a",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -3782,
+     "z": 5120,
+     "radius": 40,
+     "label": "photograph the state of the Sydenham Green"
+    },
+    {
+     "kind": "goto",
+     "x": -4069,
+     "z": 5246,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 88,
+    "xp": 191,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-047",
+   "act": 3,
+   "title": "The Unwins Bridge Road Lift",
+   "blurb": "You are the first person to stop all morning. The lift at Sydenham station has been out since the Easter Show and I'm told Marrickville is worse. I did try the official route, for what that was worth. Check both Melbourne Cup day and tell me which takes a pram. I will know if you skipped a bit.",
+   "giver": "qgb-sydenham-merv-a",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -3933,
+     "z": 5109,
+     "radius": 30,
+     "label": "check the lift at Sydenham station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Sydenham",
+     "to": "Marrickville",
+     "label": "then ride to Marrickville and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-sydenham-merv-a",
+     "node": "report-2",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 85,
+    "xp": 194,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-048",
+   "act": 3,
+   "title": "Trouble at Tempe Reserve",
+   "blurb": "I'll be straight with you. Two lads and their mate decided at the last train that Tempe Reserve is theirs. It might be nothing. It has not felt like nothing. The rest of Sydenham disagrees, so explain the disagreement. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-sydenham-cheryl-a",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Tempe Reserve"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 196,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-049",
+   "act": 3,
+   "title": "Rent Money, Sydenham Road",
+   "blurb": "There is no clever way to say this. I'm forty-five short on the Sydenham Road rent and the agent doesn't take stories. Nobody else seems to have noticed, which is its own problem. Make it somewhere in Sydenham by nine sharp; I'm not fussy how. Take your time. Do not take a week.",
+   "giver": "qgb-sydenham-vikram-b",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 50,
+     "label": "earn forty-five somewhere in Sydenham"
+    }
+   ],
+   "reward": {
+    "cash": 77,
+    "xp": 192,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-050",
+   "act": 3,
+   "title": "Bin Night, the Cooks River cycleway",
+   "blurb": "I have written it down twice and lost it twice. Somebody moves the bins on the Cooks River cycleway in front of my drive every Easter Saturday night. You can tell me I am imagining it. Tell me after. Photograph the evidence and have a word; Sydenham knows who. Ask for me by name at the counter.",
+   "giver": "qgb-sydenham-maddie-a",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -3859,
+     "z": 5477,
+     "radius": 40,
+     "label": "photograph the bins at the Cooks River cycleway"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 214,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-051",
+   "act": 3,
+   "title": "Cover at Unwins Bridge Road",
+   "blurb": "You will think I am making this up. I've got nobody for the Unwins Bridge Road shift at after the footy and a room full of Sydenham people who've paid. My wife says I should let it go. My wife is wrong. Fifty of trade and one difficult person at the door. Say nothing to anyone on the way.",
+   "giver": "qgb-sydenham-hamish-a",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 56,
+     "label": "cover the fifty for the shift"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 1,
+     "label": "and handle whoever's at the door"
+    }
+   ],
+   "reward": {
+    "cash": 72,
+    "xp": 179,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-052",
+   "act": 3,
+   "title": "Staffy Near Unwins Bridge Road",
+   "blurb": "Two people have already said no. A brindle staffy in a red bandana went over the fence at Unwins Bridge Road at half four. The paperwork says one thing and my eyes say another. Everyone in Sydenham has definitely seen it and can't say where. I'll see you right for it.",
+   "giver": "qgb-sydenham-prue-c",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -4510,
+     "z": 5100,
+     "radius": 30,
+     "label": "check the off-leash bit near Unwins Bridge Road"
+    },
+    {
+     "kind": "photo",
+     "x": -4343,
+     "z": 5160,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-sydenham-prue-c",
+     "node": "report-0",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 72,
+    "xp": 208,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-053",
+   "act": 3,
+   "title": "Trolley Run, the Sydenham Green",
+   "blurb": "Keep it between us for now. A Woolies trolley from the Sydenham Green gets walked to the creek every Anzac Day. I would have sorted it myself a year ago. Find where it ends up in Sydenham and make the deposit back. If anyone asks, you were never here.",
+   "giver": "qgb-sydenham-arun-b",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -3815,
+     "z": 5304,
+     "radius": 30,
+     "label": "find the trolley near the Sydenham Green"
+    },
+    {
+     "kind": "photo",
+     "x": -3815,
+     "z": 5304,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 28,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 75,
+    "xp": 198,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-054",
+   "act": 3,
+   "title": "A Flat White From the Sydenham flight path",
+   "blurb": "Before you say anything: yes, I know. I want a flat white from the place near the Sydenham flight path, not the one next to it. I have rung the number on the letter four times. Here by after the footy, while it's still coffee and Sydenham still has some. That's it. That's the whole ask.",
+   "giver": "qgb-sydenham-arun-b",
+   "level": 2,
+   "requires": [
+    "qgb-l2-sydenham-053"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near the Sydenham flight path"
+    },
+    {
+     "kind": "goto",
+     "x": -3985,
+     "z": 5098,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 112,
+    "xp": 270,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-055",
+   "act": 3,
+   "title": "RBT on the Princes Highway",
+   "blurb": "Not being dramatic about this. There's a breath test set up on the Princes Highway since nine sharp. It started small, the way these things do. My brother-in-law needs the ute at the far end of Sydenham without a conversation. Come and find me after, either way.",
+   "giver": "qgb-sydenham-arun-b",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on the Princes Highway"
+    },
+    {
+     "kind": "goto",
+     "x": -3680,
+     "z": 5373,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 88,
+    "xp": 190,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-056",
+   "act": 3,
+   "title": "Probationary at the Cooks River cycleway",
+   "blurb": "I have been putting it off since Easter. A young constable has been doing his first solo patrol round the Cooks River cycleway since the long weekend. I did try the official route, for what that was worth. He's decided Sydenham is his, so give him a story for the sergeant. Come back and tell me straight.",
+   "giver": "qgb-sydenham-shaz-a",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "lose the probationary constable near the Cooks River cycleway"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 189,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-057",
+   "act": 3,
+   "title": "The Tempe Reserve Fence",
+   "blurb": "You are the first person to stop all morning. My neighbour at Tempe Reserve says the tree is on my side and the fence says otherwise. I am not after trouble. I am after an answer. Look at it grand final day with Sydenham eyes and tell me the truth. Do not make a scene about it.",
+   "giver": "qgb-sydenham-shaz-a",
+   "level": 2,
+   "requires": [
+    "qgb-l2-sydenham-056"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -3994,
+     "z": 5280,
+     "radius": 30,
+     "label": "go and look at the fence at Tempe Reserve"
+    },
+    {
+     "kind": "photo",
+     "x": -3994,
+     "z": 5280,
+     "radius": 40,
+     "label": "photograph the tree over it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-sydenham-shaz-a",
+     "node": "report-1",
+     "label": "tell me whose side it's on"
+    }
+   ],
+   "reward": {
+    "cash": 96,
+    "xp": 251,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-058",
+   "act": 3,
+   "title": "Race Four, Sydenham Road",
+   "blurb": "My knees are gone, so. There's a horse in race four at first thing that a bloke at Sydenham Road swears by. There is probably a simple explanation and I would love to hear it. Turn it into fifty-five somewhere in Sydenham and tell me if it came in. I will know if you skipped a bit.",
+   "giver": "qgb-sydenham-tanya-a",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 62,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-sydenham-tanya-a",
+     "node": "report-0",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 76,
+    "xp": 204,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-059",
+   "act": 3,
+   "title": "The the Sydenham flight path Camera",
+   "blurb": "Honestly, I am past caring how it looks. A new speed camera near the Sydenham flight path has fined half of Sydenham since Sunday. It might be nothing. It has not felt like nothing. Photograph it for the appeal, then prove the train to Marrickville is faster anyway. I'll put the kettle on for when you're back.",
+   "giver": "qgb-sydenham-raj-b",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -3792,
+     "z": 5219,
+     "radius": 40,
+     "label": "photograph the camera near the Sydenham flight path"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Sydenham",
+     "to": "Marrickville",
+     "label": "then take the train instead, to Marrickville"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 201,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-060",
+   "act": 3,
+   "title": "Bin Night, the IKEA at Tempe",
+   "blurb": "Do not laugh. Somebody moves the bins on the IKEA at Tempe in front of my drive every Melbourne Cup day night. Nobody else seems to have noticed, which is its own problem. Photograph the evidence and have a word; Sydenham knows who. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-sydenham-debbie-a",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -3973,
+     "z": 5302,
+     "radius": 40,
+     "label": "photograph the bins at the IKEA at Tempe"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 82,
+    "xp": 209,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-061",
+   "act": 3,
+   "title": "Something From the Sydenham Green",
+   "blurb": "There is no clever way to say this. The stall at the Sydenham Green has run out and the customers keep coming. You will see what I mean the second you get there. Find something round Sydenham that'll do before the peak hour rush. Whatever you find, bring it to me first.",
+   "giver": "qgb-sydenham-debbie-a",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near the Sydenham Green"
+    },
+    {
+     "kind": "goto",
+     "x": -4436,
+     "z": 5353,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 84,
+    "xp": 186,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-062",
+   "act": 3,
+   "title": "The the Sydenham flight path Course",
+   "blurb": "Someone has to, and it may as well be you. A bloke near the Sydenham flight path runs a ninety-minute course he bills at four hundred, and I've paid. I am aware how that sounds. Sit it Sunday, then come back to Sydenham and prove it did something. That's the whole job. No catch.",
+   "giver": "qgb-sydenham-nathan-a",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near the Sydenham flight path"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 74,
+    "xp": 178,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-063",
+   "act": 3,
+   "title": "The the Sydenham Green Tab",
+   "blurb": "It is not a police matter and I have checked. Two chippies off the the Sydenham Green job have run a tab in Sydenham since Boxing Day. There is a version of this where I am the unreasonable one. They drove past at five without looking in, so settle it in cash. You'll know it when you see it.",
+   "giver": "qgb-sydenham-colin-a",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Sydenham Green"
+    },
+    {
+     "kind": "earn",
+     "dollars": 34,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 83,
+    "xp": 210,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-064",
+   "act": 3,
+   "title": "Trouble at the Sydenham flight path",
+   "blurb": "I am told you do odd jobs. Two lads and their mate decided at ten past ten that the Sydenham flight path is theirs. You can tell me I am imagining it. Tell me after. The rest of Sydenham disagrees, so explain the disagreement. Do not let them talk you into anything.",
+   "giver": "qgb-sydenham-terry-a",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near the Sydenham flight path"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 76,
+    "xp": 203,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-065",
+   "act": 3,
+   "title": "The the Princes Highway Complaint",
+   "blurb": "I have written it down twice and lost it twice. Two women in activewear have photographed my bins outside the Princes Highway since Friday. My wife says I should let it go. My wife is wrong. One has Sydenham council on speed dial; sort it however you sort things. Do that and we're square.",
+   "giver": "qgb-sydenham-denise-a",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near the Princes Highway"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 178,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-066",
+   "act": 3,
+   "title": "Probationary at Sydenham Road",
+   "blurb": "You will think I am making this up. A young constable has been doing his first solo patrol round Sydenham Road since Easter Saturday. This is the third time I have had this conversation. He's decided Sydenham is his, so give him a story for the sergeant. Ask for me by name at the counter.",
+   "giver": "qgb-sydenham-denise-a",
+   "level": 2,
+   "requires": [
+    "qgb-l2-sydenham-065"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "lose the probationary constable near Sydenham Road"
+    }
+   ],
+   "reward": {
+    "cash": 116,
+    "xp": 251,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l2-sydenham-067",
+   "act": 3,
+   "title": "The Tempe Reserve Sparky",
+   "blurb": "Two people have already said no. The sparky off the Tempe Reserve job has owed me since the bathroom and drinks in Sydenham from knock-off. I would have sorted it myself a year ago. Forty will do and I'll write off the rest. Just do not come back empty-handed.",
+   "giver": "qgb-sydenham-amit-c",
+   "level": 2,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for Tempe Reserve"
+    },
+    {
+     "kind": "earn",
+     "dollars": 45,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 190,
+    "unlock": []
+   }
+  }
+ ]
+}

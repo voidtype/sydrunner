@@ -1,0 +1,2875 @@
+{
+ "pack": "areab-hornsby-1",
+ "npcs": [
+  {
+   "id": "qgb-hornsby-tegan",
+   "name": "Tegan, strata committee chair",
+   "x": -10408,
+   "z": -17836,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Hornsby strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. Florence Street is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's left it near the hornsby quarry.",
+     "choices": [
+      {
+       "text": "Left It Near the Hornsby quarry",
+       "accept": "qgb-l10-hornsby-001",
+       "denyFlag": "w:qgb-l10-hornsby-001"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Tegan counts it out without looking up. -- Don't spend it all at Florence Street.",
+     "choices": [
+      {
+       "text": "About left it near the hornsby quarry.",
+       "turnin": "qgb-l10-hornsby-001"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Tegan, strata committee chair in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about Florence Street like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near Florence Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Tegan listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-terry",
+   "name": "Terry, scout leader",
+   "x": -10862,
+   "z": -18411,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Left over right. Sorry -- knots. Hornsby scouts, what's the trouble?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Thirty kids, a hall by the bush, and a camping trip nobody's parents believe in. the Hornsby quarry is our patch.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch westfield hornsby.",
+     "choices": [
+      {
+       "text": "Before They Touch Westfield Hornsby",
+       "accept": "qgb-l10-hornsby-002",
+       "denyFlag": "w:qgb-l10-hornsby-002"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Terry looks it over the way Hornsby looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About before they touch westfield hornsby.",
+       "turnin": "qgb-l10-hornsby-002"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The track behind the Hornsby quarry goes all the way to the river if you know the turn. The kids don't. That's the point.",
+     "improv": {
+      "persona": "Terry, scout leader in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hornsby quarry like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near the Hornsby quarry."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-kev",
+   "name": "Kev, real estate agent",
+   "x": -10610,
+   "z": -17928,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Hornsby is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. the Berowra bush is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Lads Off Westfield Hornsby",
+       "accept": "qgb-l10-hornsby-003",
+       "denyFlag": "w:qgb-l10-hornsby-003"
+      },
+      {
+       "text": "The Westfield Hornsby Camera",
+       "accept": "qgb-l10-hornsby-004",
+       "denyFlag": "w:qgb-l10-hornsby-004",
+       "needFlag": "w:qgb-l10-hornsby-003"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Kev looks it over the way Hornsby looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About lads off westfield hornsby.",
+       "turnin": "qgb-l10-hornsby-003"
+      },
+      {
+       "text": "About the westfield hornsby camera.",
+       "turnin": "qgb-l10-hornsby-004"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. the Berowra bush means cosy.",
+     "improv": {
+      "persona": "Kev, real estate agent in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Berowra bush like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near the Berowra bush."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-elaine",
+   "name": "Elaine, chippy off a job",
+   "x": -10415,
+   "z": -17894,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Hornsby, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The the Hornsby water clock Sparky",
+       "accept": "qgb-l10-hornsby-005",
+       "denyFlag": "w:qgb-l10-hornsby-005"
+      },
+      {
+       "text": "Tap On at the Hornsby water clock",
+       "accept": "qgb-l10-hornsby-006",
+       "denyFlag": "w:qgb-l10-hornsby-006",
+       "needFlag": "w:qgb-l10-hornsby-005"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Elaine pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the hornsby water clock sparky.",
+       "turnin": "qgb-l10-hornsby-005"
+      },
+      {
+       "text": "About tap on at the hornsby water clock.",
+       "turnin": "qgb-l10-hornsby-006"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Hornsby is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Elaine, chippy off a job in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about Westfield Hornsby like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near Westfield Hornsby."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Right. And you're sure it was the Hornsby water clock? People say the Hornsby water clock when they mean the bit next to it. -- Elaine writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-lachlan",
+   "name": "Lachlan, ocean pool regular",
+   "x": -10188,
+   "z": -18008,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Water's fourteen. Fourteen! Hornsby, you'd be mad not to.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Every morning, forty laps, rain or hail. the Hornsby water clock has a group of us who've been doing it since Whitlam.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "A Flat White From Hornsby Park",
+       "accept": "qgb-l10-hornsby-007",
+       "denyFlag": "w:qgb-l10-hornsby-007"
+      },
+      {
+       "text": "The Length of the Pacific Highway",
+       "accept": "qgb-l10-hornsby-008",
+       "denyFlag": "w:qgb-l10-hornsby-008",
+       "needFlag": "w:qgb-l10-hornsby-007"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Lachlan pays up on the spot.",
+     "choices": [
+      {
+       "text": "About a flat white from hornsby park.",
+       "turnin": "qgb-l10-hornsby-007"
+      },
+      {
+       "text": "About the length of the pacific highway.",
+       "turnin": "qgb-l10-hornsby-008"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in lane two at the Hornsby water clock has been swimming the same pace for thirty years. We call him the tide.",
+     "improv": {
+      "persona": "Lachlan, ocean pool regular in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hornsby water clock like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near the Hornsby water clock."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-colin",
+   "name": "Colin, North Shore mum, active",
+   "x": -10376,
+   "z": -18309,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry, the Kluger's on the hydrant, is that -- no? Great. Hornsby, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "School run, tennis, the P&C, a committee about the committee. the Pacific Highway is where it all gets decided.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trolley run, hornsby park.",
+     "choices": [
+      {
+       "text": "Trolley Run, Hornsby Park",
+       "accept": "qgb-l10-hornsby-009",
+       "denyFlag": "w:qgb-l10-hornsby-009"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Colin pays up on the spot.",
+     "choices": [
+      {
+       "text": "About trolley run, hornsby park.",
+       "turnin": "qgb-l10-hornsby-009"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The coffee at the Pacific Highway is fine. The parking is a war crime.",
+     "improv": {
+      "persona": "Colin, North Shore mum, active in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Pacific Highway like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near the Pacific Highway."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-kerry",
+   "name": "Kerry, council ranger",
+   "x": -10777,
+   "z": -18308,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Hornsby is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Florence Street generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's proof of the hornsby quarry.",
+     "choices": [
+      {
+       "text": "Proof of the Hornsby quarry",
+       "accept": "qgb-l10-hornsby-010",
+       "denyFlag": "w:qgb-l10-hornsby-010"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Kerry counts it out without looking up. -- Don't spend it all at Florence Street.",
+     "choices": [
+      {
+       "text": "About proof of the hornsby quarry.",
+       "turnin": "qgb-l10-hornsby-010"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Kerry, council ranger in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about Florence Street like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near Florence Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-renee",
+   "name": "Renee, strata committee chair",
+   "x": -10757,
+   "z": -17850,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Hornsby strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. the Hornsby water clock is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch the pacific highway.",
+     "choices": [
+      {
+       "text": "Before They Touch the Pacific Highway",
+       "accept": "qgb-l10-hornsby-011",
+       "denyFlag": "w:qgb-l10-hornsby-011"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Renee pays up on the spot.",
+     "choices": [
+      {
+       "text": "About before they touch the pacific highway.",
+       "turnin": "qgb-l10-hornsby-011"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Renee, strata committee chair in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hornsby water clock like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near the Hornsby water clock."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-neville",
+   "name": "Neville, real estate agent",
+   "x": -10813,
+   "z": -17977,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Hornsby is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. the Hornsby Bowlo is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the florence street sparky.",
+     "choices": [
+      {
+       "text": "The Florence Street Sparky",
+       "accept": "qgb-l10-hornsby-012",
+       "denyFlag": "w:qgb-l10-hornsby-012"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Neville counts it out without looking up. -- Don't spend it all at the Hornsby Bowlo.",
+     "choices": [
+      {
+       "text": "About the florence street sparky.",
+       "turnin": "qgb-l10-hornsby-012"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. the Hornsby Bowlo means cosy.",
+     "improv": {
+      "persona": "Neville, real estate agent in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hornsby Bowlo like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near the Hornsby Bowlo."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-hayden",
+   "name": "Hayden, North Shore mum, active",
+   "x": -10673,
+   "z": -18018,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry, the Kluger's on the hydrant, is that -- no? Great. Hornsby, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "School run, tennis, the P&C, a committee about the committee. Peats Ferry Road is where it all gets decided.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's something from westfield hornsby.",
+     "choices": [
+      {
+       "text": "Something From Westfield Hornsby",
+       "accept": "qgb-l10-hornsby-013",
+       "denyFlag": "w:qgb-l10-hornsby-013"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Hayden looks it over the way Hornsby looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About something from westfield hornsby.",
+       "turnin": "qgb-l10-hornsby-013"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The coffee at Peats Ferry Road is fine. The parking is a war crime.",
+     "improv": {
+      "persona": "Hayden, North Shore mum, active in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about Peats Ferry Road like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near Peats Ferry Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-angus",
+   "name": "Angus, scout leader",
+   "x": -10548,
+   "z": -18051,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Left over right. Sorry -- knots. Hornsby scouts, what's the trouble?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Thirty kids, a hall by the bush, and a camping trip nobody's parents believe in. Westfield Hornsby is our patch.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's seven a.m. at the hornsby water clock.",
+     "choices": [
+      {
+       "text": "Seven a.m. At the Hornsby water clock",
+       "accept": "qgb-l10-hornsby-014",
+       "denyFlag": "w:qgb-l10-hornsby-014"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Angus looks it over the way Hornsby looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About seven a.m. at the hornsby water clock.",
+       "turnin": "qgb-l10-hornsby-014"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The track behind Westfield Hornsby goes all the way to the river if you know the turn. The kids don't. That's the point.",
+     "improv": {
+      "persona": "Angus, scout leader in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about Westfield Hornsby like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near Westfield Hornsby."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-hugo",
+   "name": "Hugo, chippy off a job",
+   "x": -10748,
+   "z": -17914,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Hornsby, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two from the hornsby bowlo.",
+     "choices": [
+      {
+       "text": "Two From the Hornsby Bowlo",
+       "accept": "qgb-l10-hornsby-015",
+       "denyFlag": "w:qgb-l10-hornsby-015"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Hugo looks it over the way Hornsby looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About two from the hornsby bowlo.",
+       "turnin": "qgb-l10-hornsby-015"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Hornsby is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Hugo, chippy off a job in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about Hornsby Park like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near Hornsby Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-kai",
+   "name": "Kai, North Shore mum, active",
+   "x": -10693,
+   "z": -18627,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry, the Kluger's on the hydrant, is that -- no? Great. Hornsby, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "School run, tennis, the P&C, a committee about the committee. Florence Street is where it all gets decided.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch peats ferry road.",
+     "choices": [
+      {
+       "text": "Before They Touch Peats Ferry Road",
+       "accept": "qgb-l10-hornsby-016",
+       "denyFlag": "w:qgb-l10-hornsby-016"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Kai pays up on the spot.",
+     "choices": [
+      {
+       "text": "About before they touch peats ferry road.",
+       "turnin": "qgb-l10-hornsby-016"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The coffee at Florence Street is fine. The parking is a war crime.",
+     "improv": {
+      "persona": "Kai, North Shore mum, active in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about Florence Street like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near Florence Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-luke",
+   "name": "Luke, real estate agent",
+   "x": -10116,
+   "z": -18188,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Hornsby is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. Westfield Hornsby is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Tap On at the Pacific Highway",
+       "accept": "qgb-l10-hornsby-017",
+       "denyFlag": "w:qgb-l10-hornsby-017"
+      },
+      {
+       "text": "The Hornsby Park Tab",
+       "accept": "qgb-l10-hornsby-018",
+       "denyFlag": "w:qgb-l10-hornsby-018",
+       "needFlag": "w:qgb-l10-hornsby-017"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Luke counts it out without looking up. -- Don't spend it all at Westfield Hornsby.",
+     "choices": [
+      {
+       "text": "About tap on at the pacific highway.",
+       "turnin": "qgb-l10-hornsby-017"
+      },
+      {
+       "text": "About the hornsby park tab.",
+       "turnin": "qgb-l10-hornsby-018"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. Westfield Hornsby means cosy.",
+     "improv": {
+      "persona": "Luke, real estate agent in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about Westfield Hornsby like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near Westfield Hornsby."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Luke listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-sharon",
+   "name": "Sharon, chippy off a job",
+   "x": -10537,
+   "z": -18373,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Hornsby, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Closing Time at Florence Street",
+       "accept": "qgb-l10-hornsby-019",
+       "denyFlag": "w:qgb-l10-hornsby-019"
+      },
+      {
+       "text": "Trolley Run, the Pacific Highway",
+       "accept": "qgb-l10-hornsby-020",
+       "denyFlag": "w:qgb-l10-hornsby-020",
+       "needFlag": "w:qgb-l10-hornsby-019"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Sharon looks it over the way Hornsby looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About closing time at florence street.",
+       "turnin": "qgb-l10-hornsby-019"
+      },
+      {
+       "text": "About trolley run, the pacific highway.",
+       "turnin": "qgb-l10-hornsby-020"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Hornsby is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Sharon, chippy off a job in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hornsby water clock like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near the Hornsby water clock."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-rupert",
+   "name": "Rupert, North Shore mum, active",
+   "x": -10304,
+   "z": -18313,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry, the Kluger's on the hydrant, is that -- no? Great. Hornsby, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "School run, tennis, the P&C, a committee about the committee. Hornsby Park is where it all gets decided.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at florence street.",
+     "choices": [
+      {
+       "text": "Trouble at Florence Street",
+       "accept": "qgb-l10-hornsby-021",
+       "denyFlag": "w:qgb-l10-hornsby-021"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Rupert counts it out without looking up. -- Don't spend it all at Hornsby Park.",
+     "choices": [
+      {
+       "text": "About trouble at florence street.",
+       "turnin": "qgb-l10-hornsby-021"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The coffee at Hornsby Park is fine. The parking is a war crime.",
+     "improv": {
+      "persona": "Rupert, North Shore mum, active in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about Hornsby Park like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near Hornsby Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-fay",
+   "name": "Fay, scout leader",
+   "x": -10663,
+   "z": -18602,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Left over right. Sorry -- knots. Hornsby scouts, what's the trouble?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Thirty kids, a hall by the bush, and a camping trip nobody's parents believe in. Florence Street is our patch.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two from the hornsby quarry.",
+     "choices": [
+      {
+       "text": "Two From the Hornsby quarry",
+       "accept": "qgb-l10-hornsby-022",
+       "denyFlag": "w:qgb-l10-hornsby-022"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Fay pays up on the spot.",
+     "choices": [
+      {
+       "text": "About two from the hornsby quarry.",
+       "turnin": "qgb-l10-hornsby-022"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The track behind Florence Street goes all the way to the river if you know the turn. The kids don't. That's the point.",
+     "improv": {
+      "persona": "Fay, scout leader in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about Florence Street like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near Florence Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-karen",
+   "name": "Karen, ocean pool regular",
+   "x": -10936,
+   "z": -18500,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Water's fourteen. Fourteen! Hornsby, you'd be mad not to.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Every morning, forty laps, rain or hail. Westfield Hornsby has a group of us who've been doing it since Whitlam.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's meat tray at florence street.",
+     "choices": [
+      {
+       "text": "Meat Tray at Florence Street",
+       "accept": "qgb-l10-hornsby-023",
+       "denyFlag": "w:qgb-l10-hornsby-023"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Karen pays up on the spot.",
+     "choices": [
+      {
+       "text": "About meat tray at florence street.",
+       "turnin": "qgb-l10-hornsby-023"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in lane two at Westfield Hornsby has been swimming the same pace for thirty years. We call him the tide.",
+     "improv": {
+      "persona": "Karen, ocean pool regular in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about Westfield Hornsby like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near Westfield Hornsby."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-kylie-anne",
+   "name": "Kylie-Anne, chippy off a job",
+   "x": -10479,
+   "z": -18249,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Hornsby, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's closing time at peats ferry road.",
+     "choices": [
+      {
+       "text": "Closing Time at Peats Ferry Road",
+       "accept": "qgb-l10-hornsby-024",
+       "denyFlag": "w:qgb-l10-hornsby-024"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Kylie-Anne looks it over the way Hornsby looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About closing time at peats ferry road.",
+       "turnin": "qgb-l10-hornsby-024"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Hornsby is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Kylie-Anne, chippy off a job in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hornsby quarry like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near the Hornsby quarry."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-leanne",
+   "name": "Leanne, ocean pool regular",
+   "x": -10270,
+   "z": -18499,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Water's fourteen. Fourteen! Hornsby, you'd be mad not to.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Every morning, forty laps, rain or hail. Peats Ferry Road has a group of us who've been doing it since Whitlam.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trolley run, the berowra bush.",
+     "choices": [
+      {
+       "text": "Trolley Run, the Berowra bush",
+       "accept": "qgb-l10-hornsby-025",
+       "denyFlag": "w:qgb-l10-hornsby-025"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Leanne looks it over the way Hornsby looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About trolley run, the berowra bush.",
+       "turnin": "qgb-l10-hornsby-025"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in lane two at Peats Ferry Road has been swimming the same pace for thirty years. We call him the tide.",
+     "improv": {
+      "persona": "Leanne, ocean pool regular in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about Peats Ferry Road like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near Peats Ferry Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-debbie",
+   "name": "Debbie, North Shore mum, active",
+   "x": -10287,
+   "z": -18473,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry, the Kluger's on the hydrant, is that -- no? Great. Hornsby, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "School run, tennis, the P&C, a committee about the committee. the Berowra bush is where it all gets decided.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's bin night, westfield hornsby.",
+     "choices": [
+      {
+       "text": "Bin Night, Westfield Hornsby",
+       "accept": "qgb-l10-hornsby-026",
+       "denyFlag": "w:qgb-l10-hornsby-026"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Debbie counts it out without looking up. -- Don't spend it all at the Berowra bush.",
+     "choices": [
+      {
+       "text": "About bin night, westfield hornsby.",
+       "turnin": "qgb-l10-hornsby-026"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The coffee at the Berowra bush is fine. The parking is a war crime.",
+     "improv": {
+      "persona": "Debbie, North Shore mum, active in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Berowra bush like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near the Berowra bush."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-lorraine",
+   "name": "Lorraine, scout leader",
+   "x": -10555,
+   "z": -17953,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Left over right. Sorry -- knots. Hornsby scouts, what's the trouble?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Thirty kids, a hall by the bush, and a camping trip nobody's parents believe in. the Hornsby water clock is our patch.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at hornsby park.",
+     "choices": [
+      {
+       "text": "Trouble at Hornsby Park",
+       "accept": "qgb-l10-hornsby-027",
+       "denyFlag": "w:qgb-l10-hornsby-027"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Lorraine pays up on the spot.",
+     "choices": [
+      {
+       "text": "About trouble at hornsby park.",
+       "turnin": "qgb-l10-hornsby-027"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The track behind the Hornsby water clock goes all the way to the river if you know the turn. The kids don't. That's the point.",
+     "improv": {
+      "persona": "Lorraine, scout leader in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hornsby water clock like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near the Hornsby water clock."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-thelma",
+   "name": "Thelma, ocean pool regular",
+   "x": -10534,
+   "z": -17859,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Water's fourteen. Fourteen! Hornsby, you'd be mad not to.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Every morning, forty laps, rain or hail. Florence Street has a group of us who've been doing it since Whitlam.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the berowra bush order.",
+     "choices": [
+      {
+       "text": "The the Berowra bush Order",
+       "accept": "qgb-l10-hornsby-028",
+       "denyFlag": "w:qgb-l10-hornsby-028"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Thelma pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the berowra bush order.",
+       "turnin": "qgb-l10-hornsby-028"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in lane two at Florence Street has been swimming the same pace for thirty years. We call him the tide.",
+     "improv": {
+      "persona": "Thelma, ocean pool regular in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about Florence Street like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near Florence Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-cheryl",
+   "name": "Cheryl, North Shore mum, active",
+   "x": -10555,
+   "z": -18559,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry, the Kluger's on the hydrant, is that -- no? Great. Hornsby, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "School run, tennis, the P&C, a committee about the committee. the Hornsby quarry is where it all gets decided.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rbt on peats ferry road.",
+     "choices": [
+      {
+       "text": "RBT on Peats Ferry Road",
+       "accept": "qgb-l10-hornsby-029",
+       "denyFlag": "w:qgb-l10-hornsby-029"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Cheryl looks it over the way Hornsby looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About rbt on peats ferry road.",
+       "turnin": "qgb-l10-hornsby-029"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The coffee at the Hornsby quarry is fine. The parking is a war crime.",
+     "improv": {
+      "persona": "Cheryl, North Shore mum, active in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hornsby quarry like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near the Hornsby quarry."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-rod",
+   "name": "Rod, strata committee chair",
+   "x": -10868,
+   "z": -18176,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Hornsby strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. Peats Ferry Road is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rent money, the berowra bush.",
+     "choices": [
+      {
+       "text": "Rent Money, the Berowra bush",
+       "accept": "qgb-l10-hornsby-030",
+       "denyFlag": "w:qgb-l10-hornsby-030"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Rod counts it out without looking up. -- Don't spend it all at Peats Ferry Road.",
+     "choices": [
+      {
+       "text": "About rent money, the berowra bush.",
+       "turnin": "qgb-l10-hornsby-030"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Rod, strata committee chair in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about Peats Ferry Road like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near Peats Ferry Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-poppy",
+   "name": "Poppy, ocean pool regular",
+   "x": -10862,
+   "z": -18367,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Water's fourteen. Fourteen! Hornsby, you'd be mad not to.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Every morning, forty laps, rain or hail. Hornsby Park has a group of us who've been doing it since Whitlam.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's probationary at the hornsby bowlo.",
+     "choices": [
+      {
+       "text": "Probationary at the Hornsby Bowlo",
+       "accept": "qgb-l10-hornsby-031",
+       "denyFlag": "w:qgb-l10-hornsby-031"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Poppy looks it over the way Hornsby looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About probationary at the hornsby bowlo.",
+       "turnin": "qgb-l10-hornsby-031"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in lane two at Hornsby Park has been swimming the same pace for thirty years. We call him the tide.",
+     "improv": {
+      "persona": "Poppy, ocean pool regular in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about Hornsby Park like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near Hornsby Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-maddie",
+   "name": "Maddie, scout leader",
+   "x": -10353,
+   "z": -18252,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Left over right. Sorry -- knots. Hornsby scouts, what's the trouble?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Thirty kids, a hall by the bush, and a camping trip nobody's parents believe in. the Hornsby quarry is our patch.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the peats ferry road complaint.",
+     "choices": [
+      {
+       "text": "The Peats Ferry Road Complaint",
+       "accept": "qgb-l10-hornsby-032",
+       "denyFlag": "w:qgb-l10-hornsby-032"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Maddie looks it over the way Hornsby looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the peats ferry road complaint.",
+       "turnin": "qgb-l10-hornsby-032"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The track behind the Hornsby quarry goes all the way to the river if you know the turn. The kids don't. That's the point.",
+     "improv": {
+      "persona": "Maddie, scout leader in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hornsby quarry like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near the Hornsby quarry."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-scott",
+   "name": "Scott, council ranger",
+   "x": -11036,
+   "z": -18373,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Hornsby is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Peats Ferry Road generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's meat tray at westfield hornsby.",
+     "choices": [
+      {
+       "text": "Meat Tray at Westfield Hornsby",
+       "accept": "qgb-l10-hornsby-033",
+       "denyFlag": "w:qgb-l10-hornsby-033"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Scott pays up on the spot.",
+     "choices": [
+      {
+       "text": "About meat tray at westfield hornsby.",
+       "turnin": "qgb-l10-hornsby-033"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Scott, council ranger in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about Peats Ferry Road like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near Peats Ferry Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-maureen",
+   "name": "Maureen, chippy off a job",
+   "x": -10922,
+   "z": -18270,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Hornsby, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the pacific highway pub crawl.",
+     "choices": [
+      {
+       "text": "The Pacific Highway Pub Crawl",
+       "accept": "qgb-l10-hornsby-034",
+       "denyFlag": "w:qgb-l10-hornsby-034"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Maureen looks it over the way Hornsby looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the pacific highway pub crawl.",
+       "turnin": "qgb-l10-hornsby-034"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Hornsby is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Maureen, chippy off a job in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about Westfield Hornsby like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near Westfield Hornsby."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hornsby-imogen",
+   "name": "Imogen, North Shore mum, active",
+   "x": -10399,
+   "z": -18516,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry, the Kluger's on the hydrant, is that -- no? Great. Hornsby, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hornsby like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "School run, tennis, the P&C, a committee about the committee. the Pacific Highway is where it all gets decided.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's closing time at the hornsby quarry.",
+     "choices": [
+      {
+       "text": "Closing Time at the Hornsby quarry",
+       "accept": "qgb-l10-hornsby-035",
+       "denyFlag": "w:qgb-l10-hornsby-035"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Imogen looks it over the way Hornsby looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About closing time at the hornsby quarry.",
+       "turnin": "qgb-l10-hornsby-035"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The coffee at the Pacific Highway is fine. The parking is a war crime.",
+     "improv": {
+      "persona": "Imogen, North Shore mum, active in Hornsby, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Pacific Highway like everyone knows it.",
+      "context": "Someone has asked what Hornsby is like these days. You are standing near the Pacific Highway."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

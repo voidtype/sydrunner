@@ -1,0 +1,867 @@
+{
+ "pack": "areab-kings-cross-2",
+ "quests": [
+  {
+   "id": "qgb-l4-kings-cross-043",
+   "act": 3,
+   "title": "Bin Night, the El Alamein fountain",
+   "blurb": "I have written it down twice and lost it twice. Somebody moves the bins on the El Alamein fountain in front of my drive every Easter Saturday night. It has been going on longer than I have admitted to anyone. Photograph the evidence and have a word; Kings Cross knows who. I'll see you right for it.",
+   "giver": "qgb-kings-cross-bronwyn-b",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 1048,
+     "z": 631,
+     "radius": 40,
+     "label": "photograph the bins at the El Alamein fountain"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 116,
+    "xp": 284,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-kings-cross-044",
+   "act": 3,
+   "title": "The Macleay Street Sparky",
+   "blurb": "Not being dramatic about this. The sparky off the Macleay Street job has owed me since the bathroom and drinks in Kings Cross from first thing. I am not after trouble. I am after an answer. Forty will do and I'll write off the rest. Half now if you want it. Most people don't.",
+   "giver": "qgb-kings-cross-elaine-a",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for Macleay Street"
+    },
+    {
+     "kind": "earn",
+     "dollars": 54,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 104,
+    "xp": 273,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-kings-cross-045",
+   "act": 3,
+   "title": "Counting the Bourbon",
+   "blurb": "It has been three weeks. Council says the the Bourbon car park is never full and I say it's full by eleven. I have got a photo on my phone but it is useless. Count both Kings Cross car parks, photograph whichever one makes me right. Come back and tell me straight.",
+   "giver": "qgb-kings-cross-elie-d",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 869,
+     "z": 427,
+     "radius": 30,
+     "label": "count the cars at the Bourbon"
+    },
+    {
+     "kind": "goto",
+     "x": 606,
+     "z": 414,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": 869,
+     "z": 427,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 116,
+    "xp": 302,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-kings-cross-046",
+   "act": 3,
+   "title": "A Flat White From Harry's Cafe de Wheels",
+   "blurb": "It is the sort of thing you notice or you do not. I want a flat white from the place near Harry's Cafe de Wheels, not the one next to it. Nobody else seems to have noticed, which is its own problem. Here by five, while it's still coffee and Kings Cross still has some. Do not make a scene about it.",
+   "giver": "qgb-kings-cross-val-c",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near Harry's Cafe de Wheels"
+    },
+    {
+     "kind": "goto",
+     "x": 1041,
+     "z": 768,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 101,
+    "xp": 275,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-kings-cross-047",
+   "act": 3,
+   "title": "Lads Off Kellett Street",
+   "blurb": "You look like you have twenty minutes. Three of them in TNs on the Kellett Street steps, flogging vapes to schoolkids at dawn. You will see what I mean the second you get there. Kings Cross used to move them on itself and now it rings me. I will know if you skipped a bit.",
+   "giver": "qgb-kings-cross-barry-d",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Kellett Street"
+    }
+   ],
+   "reward": {
+    "cash": 98,
+    "xp": 282,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-kings-cross-048",
+   "act": 3,
+   "title": "Closing Time at Harry's Cafe de Wheels",
+   "blurb": "My knees are gone, so. Two blokes have slept in my doorway on Harry's Cafe de Wheels since the pub shut. Everyone I have told has looked at me the way you are now. The Kings Cross delivery's at eleven, so get them up and show me the step empty. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-kings-cross-losa-a",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off Harry's Cafe de Wheels"
+    },
+    {
+     "kind": "photo",
+     "x": 1609,
+     "z": 652,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 103,
+    "xp": 304,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-kings-cross-049",
+   "act": 3,
+   "title": "RBT on the Coke sign",
+   "blurb": "Honestly, I am past caring how it looks. There's a breath test set up on the Coke sign since lunchtime. There is a version of this where I am the unreasonable one. My brother-in-law needs the ute at the far end of Kings Cross without a conversation. Whatever you find, bring it to me first.",
+   "giver": "qgb-kings-cross-hayden-c",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on the Coke sign"
+    },
+    {
+     "kind": "goto",
+     "x": 1205,
+     "z": 877,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 117,
+    "xp": 279,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-kings-cross-050",
+   "act": 3,
+   "title": "Before They Touch the Wayside Chapel",
+   "blurb": "I'll be straight with you. They start on the Wayside Chapel on the last Sunday of the month and the orange fencing goes up. You can tell me I am imagining it. Tell me after. I want Kings Cross on record before it does. Take your time. Do not take a week.",
+   "giver": "qgb-kings-cross-hayden-c",
+   "level": 4,
+   "requires": [
+    "qgb-l4-kings-cross-049"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 814,
+     "z": 333,
+     "radius": 40,
+     "label": "photograph the state of the Wayside Chapel"
+    },
+    {
+     "kind": "goto",
+     "x": 1123,
+     "z": 449,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 153,
+    "xp": 350,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-kings-cross-051",
+   "act": 3,
+   "title": "The Victoria Street Course",
+   "blurb": "Someone has to, and it may as well be you. A bloke near Victoria Street runs a ninety-minute course he bills at four hundred, and I've paid. I would have sorted it myself a year ago. Sit it Friday, then come back to Kings Cross and prove it did something. Do not let them talk you into anything.",
+   "giver": "qgb-kings-cross-khoa",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near Victoria Street"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 118,
+    "xp": 272,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-kings-cross-052",
+   "act": 3,
+   "title": "Meat Tray at Darlinghurst Road",
+   "blurb": "Right. Since you asked. The Darlinghurst Road raffle is thirty-five short of a meat tray and the draw is at half seven. I have rung the number on the letter four times. Find it in Kings Cross and put it in the tin. Do that and we're square.",
+   "giver": "qgb-kings-cross-kai-a",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 48,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": 1109,
+     "z": 515,
+     "radius": 30,
+     "label": "and drop it at Darlinghurst Road"
+    }
+   ],
+   "reward": {
+    "cash": 112,
+    "xp": 270,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-kings-cross-053",
+   "act": 3,
+   "title": "Two From Darlinghurst Road",
+   "blurb": "It is not a police matter and I have checked. Two of whatever's going near Darlinghurst Road, here, hot, before the footy at knock-off. It started small, the way these things do. It's Kings Cross; I'm not asking for much. Ask for me by name at the counter.",
+   "giver": "qgb-kings-cross-layla-e",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near Darlinghurst Road"
+    },
+    {
+     "kind": "goto",
+     "x": 974,
+     "z": 756,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 113,
+    "xp": 280,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-kings-cross-054",
+   "act": 3,
+   "title": "Trouble at Darlinghurst Road",
+   "blurb": "I am told you do odd jobs. Two lads and their mate decided at closing that Darlinghurst Road is theirs. It has been going on longer than I have admitted to anyone. The rest of Kings Cross disagrees, so explain the disagreement. Say nothing to anyone on the way.",
+   "giver": "qgb-kings-cross-layla-e",
+   "level": 4,
+   "requires": [
+    "qgb-l4-kings-cross-053"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Darlinghurst Road"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 139,
+    "xp": 364,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-kings-cross-055",
+   "act": 3,
+   "title": "The Length of the El Alamein fountain",
+   "blurb": "I have written it down twice and lost it twice. I haven't walked the El Alamein fountain end to end since the light rail came to Kings Cross. It is not the money. It has stopped being the money. Do it Sunday for me and photograph what's at the far end now. Just do not come back empty-handed.",
+   "giver": "qgb-kings-cross-rupert-c",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 1221,
+     "z": 564,
+     "radius": 30,
+     "label": "walk the length of the El Alamein fountain"
+    },
+    {
+     "kind": "goto",
+     "x": 969,
+     "z": 384,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": 969,
+     "z": 384,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 117,
+    "xp": 283,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-kings-cross-056",
+   "act": 3,
+   "title": "Seven a.m. At Fitzroy Gardens",
+   "blurb": "You will think I am making this up. The site at Fitzroy Gardens starts its jackhammer at knock-off on a Melbourne Cup day, which is illegal and loud. Half the street knows and half the street is pretending not to. Photograph it running and have a word with the Kings Cross foreman. I'll see you right for it.",
+   "giver": "qgb-kings-cross-rupert-c",
+   "level": 4,
+   "requires": [
+    "qgb-l4-kings-cross-055"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 1401,
+     "z": 663,
+     "radius": 40,
+     "label": "photograph the noise from Fitzroy Gardens"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 151,
+    "xp": 348,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-kings-cross-057",
+   "act": 3,
+   "title": "The Fitzroy Gardens Sparky",
+   "blurb": "Nobody else has offered, so. The sparky off the Fitzroy Gardens job has owed me since the bathroom and drinks in Kings Cross from midnight. It is the not knowing that has got me, honestly. Forty will do and I'll write off the rest. If anyone asks, you were never here.",
+   "giver": "qgb-kings-cross-harriet-c",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for Fitzroy Gardens"
+    },
+    {
+     "kind": "earn",
+     "dollars": 54,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 114,
+    "xp": 297,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-kings-cross-058",
+   "act": 3,
+   "title": "A Flat White From the Bourbon",
+   "blurb": "This is going to sound small. I want a flat white from the place near the Bourbon, not the one next to it. It might be nothing. It has not felt like nothing. Here by the last train, while it's still coffee and Kings Cross still has some. Half now if you want it. Most people don't.",
+   "giver": "qgb-kings-cross-sienna",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near the Bourbon"
+    },
+    {
+     "kind": "goto",
+     "x": 1422,
+     "z": 218,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 103,
+    "xp": 305,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-kings-cross-059",
+   "act": 3,
+   "title": "Left It Near Kellett Street",
+   "blurb": "It is the sort of thing you notice or you do not. I left something on the bench at Kellett Street at knock-off. You will see what I mean the second you get there. By the time I got back to Kings Cross it had walked, so look where I'd have dropped it. Come back and tell me straight.",
+   "giver": "qgb-kings-cross-ngoc",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 1308,
+     "z": 987,
+     "radius": 30,
+     "label": "check the bench near Kellett Street"
+    },
+    {
+     "kind": "photo",
+     "x": 1137,
+     "z": 705,
+     "radius": 40,
+     "label": "photograph the bins behind it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-kings-cross-ngoc",
+     "node": "report-2",
+     "label": "tell me what you found"
+    }
+   ],
+   "reward": {
+    "cash": 100,
+    "xp": 302,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-kings-cross-060",
+   "act": 3,
+   "title": "Two Signs, the Wayside Chapel",
+   "blurb": "I have been putting it off since Easter. Two signs near the Wayside Chapel say opposite things about parking and I've been fined under both. I am aware how that sounds. Get photos of each before Monday, when Kings Cross council takes one down. I will know if you skipped a bit.",
+   "giver": "qgb-kings-cross-maya",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 1261,
+     "z": 598,
+     "radius": 40,
+     "label": "photograph the sign at the Wayside Chapel"
+    },
+    {
+     "kind": "photo",
+     "x": 1483,
+     "z": 632,
+     "radius": 40,
+     "label": "and the one that contradicts it"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 272,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-kings-cross-061",
+   "act": 3,
+   "title": "The the El Alamein fountain Course",
+   "blurb": "Honestly, I am past caring how it looks. A bloke near the El Alamein fountain runs a ninety-minute course he bills at four hundred, and I've paid. You can tell me I am imagining it. Tell me after. Sit it Saturday, then come back to Kings Cross and prove it did something. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-kings-cross-kerry-b",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near the El Alamein fountain"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 107,
+    "xp": 288,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-kings-cross-062",
+   "act": 3,
+   "title": "The Length of Macleay Street",
+   "blurb": "I'll be straight with you. I haven't walked Macleay Street end to end since the light rail came to Kings Cross. My wife says I should let it go. My wife is wrong. Do it Boxing Day for me and photograph what's at the far end now. Whatever you find, bring it to me first.",
+   "giver": "qgb-kings-cross-kerry-b",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 1230,
+     "z": 730,
+     "radius": 30,
+     "label": "walk the length of Macleay Street"
+    },
+    {
+     "kind": "goto",
+     "x": 1398,
+     "z": 762,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": 1398,
+     "z": 762,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 118,
+    "xp": 284,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-kings-cross-063",
+   "act": 3,
+   "title": "The the Coke sign Tab",
+   "blurb": "Do not laugh. Two chippies off the the Coke sign job have run a tab in Kings Cross since the last Sunday of the month. This is the third time I have had this conversation. They drove past at school pick-up without looking in, so settle it in cash. Take your time. Do not take a week.",
+   "giver": "qgb-kings-cross-scott-b",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Coke sign"
+    },
+    {
+     "kind": "earn",
+     "dollars": 41,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 104,
+    "xp": 302,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-kings-cross-064",
+   "act": 3,
+   "title": "Seven a.m. At Darlinghurst Road",
+   "blurb": "The council knows and the council does not care. The site at Darlinghurst Road starts its jackhammer at three in the morning on a Thursday, which is illegal and loud. I would have sorted it myself a year ago. Photograph it running and have a word with the Kings Cross foreman. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qgb-kings-cross-ana-b",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 788,
+     "z": 501,
+     "radius": 40,
+     "label": "photograph the noise from Darlinghurst Road"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 113,
+    "xp": 301,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-kings-cross-065",
+   "act": 3,
+   "title": "Staffy Near Macleay Street",
+   "blurb": "It is not a police matter and I have checked. A brindle staffy in a red bandana went over the fence at Macleay Street at peak hour. It has been going on longer than I have admitted to anyone. Everyone in Kings Cross has definitely seen it and can't say where. Do that and we're square.",
+   "giver": "qgb-kings-cross-lan",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 964,
+     "z": 170,
+     "radius": 30,
+     "label": "check the off-leash bit near Macleay Street"
+    },
+    {
+     "kind": "photo",
+     "x": 1068,
+     "z": 501,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-kings-cross-lan",
+     "node": "report-0",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 110,
+    "xp": 299,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-kings-cross-066",
+   "act": 3,
+   "title": "The Kellett Street Lift",
+   "blurb": "Keep it between us for now. The lift at Kings Cross station has been out since the Easter Show and I'm told Bondi Junction is worse. I am not after trouble. I am after an answer. Check both the last Sunday of the month and tell me which takes a pram. That's it. That's the whole ask.",
+   "giver": "qgb-kings-cross-phil-c",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 1157,
+     "z": 645,
+     "radius": 30,
+     "label": "check the lift at Kings Cross station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Kings Cross",
+     "to": "Bondi Junction",
+     "label": "then ride to Bondi Junction and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-kings-cross-phil-c",
+     "node": "report-1",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 110,
+    "xp": 278,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-kings-cross-067",
+   "act": 3,
+   "title": "One Stop From Victoria Street",
+   "blurb": "This is going to sound small. I need to know the train from Kings Cross stops at Bondi Junction and doesn't sail through like it did on Wednesday. I have got a photo on my phone but it is useless. Ride it at eight at night and photograph the sign. I would rather know than wonder.",
+   "giver": "qgb-kings-cross-maddie-a",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Kings Cross",
+     "to": "Bondi Junction",
+     "label": "take the train to Bondi Junction"
+    },
+    {
+     "kind": "photo",
+     "x": 3641,
+     "z": 2393,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 114,
+    "xp": 269,
+    "unlock": []
+   }
+  }
+ ]
+}

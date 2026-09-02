@@ -1,0 +1,1153 @@
+{
+ "pack": "areab-hornsby-1",
+ "quests": [
+  {
+   "id": "qgb-l10-hornsby-001",
+   "act": 3,
+   "title": "Left It Near the Hornsby quarry",
+   "blurb": "The council knows and the council does not care. I left something on the bench at the Hornsby quarry at eight at night. It might be nothing. It has not felt like nothing. By the time I got back to Hornsby it had walked, so look where I'd have dropped it. Take your time. Do not take a week.",
+   "giver": "qgb-hornsby-tegan",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10311,
+     "z": -17895,
+     "radius": 30,
+     "label": "check the bench near the Hornsby quarry"
+    },
+    {
+     "kind": "photo",
+     "x": -10191,
+     "z": -18060,
+     "radius": 40,
+     "label": "photograph the bins behind it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-hornsby-tegan",
+     "node": "report-0",
+     "label": "tell me what you found"
+    }
+   ],
+   "reward": {
+    "cash": 190,
+    "xp": 545,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-002",
+   "act": 3,
+   "title": "Before They Touch Westfield Hornsby",
+   "blurb": "It is not a police matter and I have checked. They start on Westfield Hornsby on Australia Day and the orange fencing goes up. You will see what I mean the second you get there. I want Hornsby on record before it does. You'll know it when you see it.",
+   "giver": "qgb-hornsby-terry",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -10664,
+     "z": -18348,
+     "radius": 40,
+     "label": "photograph the state of Westfield Hornsby"
+    },
+    {
+     "kind": "goto",
+     "x": -10557,
+     "z": -18013,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 192,
+    "xp": 570,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-003",
+   "act": 3,
+   "title": "Lads Off Westfield Hornsby",
+   "blurb": "Two people have already said no. Three of them in TNs on the Westfield Hornsby steps, flogging vapes to schoolkids at six in the morning. You can tell me I am imagining it. Tell me after. Hornsby used to move them on itself and now it rings me. Just do not come back empty-handed.",
+   "giver": "qgb-hornsby-kev",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Westfield Hornsby"
+    }
+   ],
+   "reward": {
+    "cash": 200,
+    "xp": 554,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-004",
+   "act": 3,
+   "title": "The Westfield Hornsby Camera",
+   "blurb": "Keep it between us for now. A new speed camera near Westfield Hornsby has fined half of Hornsby since Friday. My wife says I should let it go. My wife is wrong. Photograph it for the appeal, then prove the train to St Peters is faster anyway. I'll see you right for it.",
+   "giver": "qgb-hornsby-kev",
+   "level": 10,
+   "requires": [
+    "qgb-l10-hornsby-003"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -10975,
+     "z": -18037,
+     "radius": 40,
+     "label": "photograph the camera near Westfield Hornsby"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Hornsby",
+     "to": "St Peters",
+     "label": "then take the train instead, to St Peters"
+    }
+   ],
+   "reward": {
+    "cash": 264,
+    "xp": 689,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-005",
+   "act": 3,
+   "title": "The the Hornsby water clock Sparky",
+   "blurb": "Not being dramatic about this. The sparky off the the Hornsby water clock job has owed me since the bathroom and drinks in Hornsby from dawn. The paperwork says one thing and my eyes say another. Forty will do and I'll write off the rest. That's it. That's the whole ask.",
+   "giver": "qgb-hornsby-elaine",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for the Hornsby water clock"
+    },
+    {
+     "kind": "earn",
+     "dollars": 83,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 189,
+    "xp": 537,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-006",
+   "act": 3,
+   "title": "Tap On at the Hornsby water clock",
+   "blurb": "This is going to sound small. My Opal says I owe nineteen dollars for a trip from Hornsby I never took on the last Sunday of the month. I would have sorted it myself a year ago. Take the same one to St Peters and tell me what it charged you. Come and find me after, either way.",
+   "giver": "qgb-hornsby-elaine",
+   "level": 10,
+   "requires": [
+    "qgb-l10-hornsby-005"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Hornsby",
+     "to": "St Peters",
+     "label": "tap on at Hornsby, tap off at St Peters"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-hornsby-elaine",
+     "node": "report-1",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 241,
+    "xp": 732,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-007",
+   "act": 3,
+   "title": "A Flat White From Hornsby Park",
+   "blurb": "It has been three weeks. I want a flat white from the place near Hornsby Park, not the one next to it. It started small, the way these things do. Here by lunchtime, while it's still coffee and Hornsby still has some. I would rather know than wonder.",
+   "giver": "qgb-hornsby-lachlan",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near Hornsby Park"
+    },
+    {
+     "kind": "goto",
+     "x": -10373,
+     "z": -18271,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 203,
+    "xp": 538,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-008",
+   "act": 3,
+   "title": "The Length of the Pacific Highway",
+   "blurb": "You look like you have twenty minutes. I haven't walked the Pacific Highway end to end since the light rail came to Hornsby. It is not the money. It has stopped being the money. Do it Australia Day for me and photograph what's at the far end now. There's cash in it. Not a lot.",
+   "giver": "qgb-hornsby-lachlan",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10344,
+     "z": -17739,
+     "radius": 30,
+     "label": "walk the length of the Pacific Highway"
+    },
+    {
+     "kind": "goto",
+     "x": -10690,
+     "z": -17622,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -10690,
+     "z": -17622,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 195,
+    "xp": 544,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-009",
+   "act": 3,
+   "title": "Trolley Run, Hornsby Park",
+   "blurb": "You are the first person to stop all morning. A Woolies trolley from Hornsby Park gets walked to the creek every grand final day. It is the not knowing that has got me, honestly. Find where it ends up in Hornsby and make the deposit back. Come back and tell me straight.",
+   "giver": "qgb-hornsby-colin",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10635,
+     "z": -18185,
+     "radius": 30,
+     "label": "find the trolley near Hornsby Park"
+    },
+    {
+     "kind": "photo",
+     "x": -10635,
+     "z": -18185,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 52,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 192,
+    "xp": 534,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-010",
+   "act": 3,
+   "title": "Proof of the Hornsby quarry",
+   "blurb": "There is no clever way to say this. Nobody in Hornsby believes what the Hornsby quarry looks like at half seven. It might be nothing. It has not felt like nothing. Get me a photo close enough that council can't say it's somewhere else. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-hornsby-kerry",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -10628,
+     "z": -18277,
+     "radius": 40,
+     "label": "get a picture of the Hornsby quarry before they fix it"
+    }
+   ],
+   "reward": {
+    "cash": 187,
+    "xp": 553,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-011",
+   "act": 3,
+   "title": "Before They Touch the Pacific Highway",
+   "blurb": "Two people have already said no. They start on the Pacific Highway on Sunday and the orange fencing goes up. My wife says I should let it go. My wife is wrong. I want Hornsby on record before it does. Say nothing to anyone on the way.",
+   "giver": "qgb-hornsby-renee",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -10551,
+     "z": -18086,
+     "radius": 40,
+     "label": "photograph the state of the Pacific Highway"
+    },
+    {
+     "kind": "goto",
+     "x": -10626,
+     "z": -18218,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 193,
+    "xp": 531,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-012",
+   "act": 3,
+   "title": "The Florence Street Sparky",
+   "blurb": "I would do it myself if I could leave the counter. The sparky off the Florence Street job has owed me since the bathroom and drinks in Hornsby from bin night. It started small, the way these things do. Forty will do and I'll write off the rest. Come and find me after, either way.",
+   "giver": "qgb-hornsby-neville",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for Florence Street"
+    },
+    {
+     "kind": "earn",
+     "dollars": 83,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 205,
+    "xp": 535,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-013",
+   "act": 3,
+   "title": "Something From Westfield Hornsby",
+   "blurb": "Honestly, I am past caring how it looks. The stall at Westfield Hornsby has run out and the customers keep coming. I am not after trouble. I am after an answer. Find something round Hornsby that'll do before the lunchtime rush. Do not make a scene about it.",
+   "giver": "qgb-hornsby-hayden",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near Westfield Hornsby"
+    },
+    {
+     "kind": "goto",
+     "x": -10557,
+     "z": -17804,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 188,
+    "xp": 569,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-014",
+   "act": 3,
+   "title": "Seven a.m. At the Hornsby water clock",
+   "blurb": "The council knows and the council does not care. The site at the Hornsby water clock starts its jackhammer at half two on a Saturday, which is illegal and loud. Nobody else seems to have noticed, which is its own problem. Photograph it running and have a word with the Hornsby foreman. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-hornsby-angus",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -10878,
+     "z": -18061,
+     "radius": 40,
+     "label": "photograph the noise from the Hornsby water clock"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 203,
+    "xp": 554,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-015",
+   "act": 3,
+   "title": "Two From the Hornsby Bowlo",
+   "blurb": "Two people have already said no. Two of whatever's going near the Hornsby Bowlo, here, hot, before the footy at the arvo. This is the third time I have had this conversation. It's Hornsby; I'm not asking for much. Ask for me by name at the counter.",
+   "giver": "qgb-hornsby-hugo",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near the Hornsby Bowlo"
+    },
+    {
+     "kind": "goto",
+     "x": -10882,
+     "z": -17955,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 187,
+    "xp": 556,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-016",
+   "act": 3,
+   "title": "Before They Touch Peats Ferry Road",
+   "blurb": "This is going to sound small. They start on Peats Ferry Road on Monday and the orange fencing goes up. It started small, the way these things do. I want Hornsby on record before it does. If anyone asks, you were never here.",
+   "giver": "qgb-hornsby-kai",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -10705,
+     "z": -18473,
+     "radius": 40,
+     "label": "photograph the state of Peats Ferry Road"
+    },
+    {
+     "kind": "goto",
+     "x": -10644,
+     "z": -18221,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 200,
+    "xp": 544,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-017",
+   "act": 3,
+   "title": "Tap On at the Pacific Highway",
+   "blurb": "My knees are gone, so. My Opal says I owe nineteen dollars for a trip from Hornsby I never took on Friday. I am not after trouble. I am after an answer. Take the same one to St Peters and tell me what it charged you. I will owe you one, and I pay those.",
+   "giver": "qgb-hornsby-luke",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Hornsby",
+     "to": "St Peters",
+     "label": "tap on at Hornsby, tap off at St Peters"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-hornsby-luke",
+     "node": "report-0",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 203,
+    "xp": 537,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-018",
+   "act": 3,
+   "title": "The Hornsby Park Tab",
+   "blurb": "I'll be straight with you. Two chippies off the Hornsby Park job have run a tab in Hornsby since Boxing Day. It might be nothing. It has not felt like nothing. They drove past at the arvo without looking in, so settle it in cash. Do not make a scene about it.",
+   "giver": "qgb-hornsby-luke",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near Hornsby Park"
+    },
+    {
+     "kind": "earn",
+     "dollars": 62,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 192,
+    "xp": 533,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-019",
+   "act": 3,
+   "title": "Closing Time at Florence Street",
+   "blurb": "There is no clever way to say this. Two blokes have slept in my doorway on Florence Street since the pub shut. Nobody else seems to have noticed, which is its own problem. The Hornsby delivery's at the change of shift, so get them up and show me the step empty. I'll put the kettle on for when you're back.",
+   "giver": "qgb-hornsby-sharon",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off Florence Street"
+    },
+    {
+     "kind": "photo",
+     "x": -10639,
+     "z": -18160,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 192,
+    "xp": 543,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-020",
+   "act": 3,
+   "title": "Trolley Run, the Pacific Highway",
+   "blurb": "The council knows and the council does not care. A Woolies trolley from the Pacific Highway gets walked to the creek every Saturday. You will see what I mean the second you get there. Find where it ends up in Hornsby and make the deposit back. There is no rush, but there is a Friday.",
+   "giver": "qgb-hornsby-sharon",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10550,
+     "z": -18052,
+     "radius": 30,
+     "label": "find the trolley near the Pacific Highway"
+    },
+    {
+     "kind": "photo",
+     "x": -10550,
+     "z": -18052,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 52,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 203,
+    "xp": 550,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-021",
+   "act": 3,
+   "title": "Trouble at Florence Street",
+   "blurb": "I have written it down twice and lost it twice. Two lads and their mate decided at midnight that Florence Street is theirs. You can tell me I am imagining it. Tell me after. The rest of Hornsby disagrees, so explain the disagreement. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qgb-hornsby-rupert",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Florence Street"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 187,
+    "xp": 551,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-022",
+   "act": 3,
+   "title": "Two From the Hornsby quarry",
+   "blurb": "Two people have already said no. Two of whatever's going near the Hornsby quarry, here, hot, before the footy at three in the morning. The paperwork says one thing and my eyes say another. It's Hornsby; I'm not asking for much. Do that and we're square.",
+   "giver": "qgb-hornsby-fay",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near the Hornsby quarry"
+    },
+    {
+     "kind": "goto",
+     "x": -10711,
+     "z": -18241,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 188,
+    "xp": 543,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-023",
+   "act": 3,
+   "title": "Meat Tray at Florence Street",
+   "blurb": "I would do it myself if I could leave the counter. The Florence Street raffle is thirty-five short of a meat tray and the draw is at peak hour. It is not the money. It has stopped being the money. Find it in Hornsby and put it in the tin. If anyone asks, you were never here.",
+   "giver": "qgb-hornsby-karen",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 73,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -10849,
+     "z": -18131,
+     "radius": 30,
+     "label": "and drop it at Florence Street"
+    }
+   ],
+   "reward": {
+    "cash": 200,
+    "xp": 548,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-024",
+   "act": 3,
+   "title": "Closing Time at Peats Ferry Road",
+   "blurb": "The council knows and the council does not care. Two blokes have slept in my doorway on Peats Ferry Road since the pub shut. I would not ask if there was anyone else about. The Hornsby delivery's at half six, so get them up and show me the step empty. I'll put the kettle on for when you're back.",
+   "giver": "qgb-hornsby-kylie-anne",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off Peats Ferry Road"
+    },
+    {
+     "kind": "photo",
+     "x": -10629,
+     "z": -18156,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 192,
+    "xp": 533,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-025",
+   "act": 3,
+   "title": "Trolley Run, the Berowra bush",
+   "blurb": "Someone has to, and it may as well be you. A Woolies trolley from the Berowra bush gets walked to the creek every Melbourne Cup day. I am aware how that sounds. Find where it ends up in Hornsby and make the deposit back. There is no rush, but there is a Friday.",
+   "giver": "qgb-hornsby-leanne",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10615,
+     "z": -18381,
+     "radius": 30,
+     "label": "find the trolley near the Berowra bush"
+    },
+    {
+     "kind": "photo",
+     "x": -10615,
+     "z": -18381,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 52,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 196,
+    "xp": 562,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-026",
+   "act": 3,
+   "title": "Bin Night, Westfield Hornsby",
+   "blurb": "I am told you do odd jobs. Somebody moves the bins on Westfield Hornsby in front of my drive every Wednesday night. You can tell me I am imagining it. Tell me after. Photograph the evidence and have a word; Hornsby knows who. Take your time. Do not take a week.",
+   "giver": "qgb-hornsby-debbie",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -9978,
+     "z": -18210,
+     "radius": 40,
+     "label": "photograph the bins at Westfield Hornsby"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 189,
+    "xp": 561,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-027",
+   "act": 3,
+   "title": "Trouble at Hornsby Park",
+   "blurb": "Two people have already said no. Two lads and their mate decided at eleven that Hornsby Park is theirs. I would have sorted it myself a year ago. The rest of Hornsby disagrees, so explain the disagreement. Do not let them talk you into anything.",
+   "giver": "qgb-hornsby-lorraine",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Hornsby Park"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 193,
+    "xp": 538,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-028",
+   "act": 3,
+   "title": "The the Berowra bush Order",
+   "blurb": "It is the sort of thing you notice or you do not. The the Berowra bush order came to seventy more than I'd budgeted and the supplier wants it by five. I have got no proof, which is exactly why I am asking. Find seventy in Hornsby and photograph the receipt. That's it. That's the whole ask.",
+   "giver": "qgb-hornsby-thelma",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 146,
+     "label": "square the seventy for the the Berowra bush order"
+    },
+    {
+     "kind": "photo",
+     "x": -10904,
+     "z": -17957,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 198,
+    "xp": 544,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-029",
+   "act": 3,
+   "title": "RBT on Peats Ferry Road",
+   "blurb": "I have been putting it off since Easter. There's a breath test set up on Peats Ferry Road since dawn. I am not after trouble. I am after an answer. My brother-in-law needs the ute at the far end of Hornsby without a conversation. Be polite about it. It costs nothing.",
+   "giver": "qgb-hornsby-cheryl",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on Peats Ferry Road"
+    },
+    {
+     "kind": "goto",
+     "x": -10406,
+     "z": -18434,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 197,
+    "xp": 543,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-030",
+   "act": 3,
+   "title": "Rent Money, the Berowra bush",
+   "blurb": "My knees are gone, so. I'm forty-five short on the the Berowra bush rent and the agent doesn't take stories. It might be nothing. It has not felt like nothing. Make it somewhere in Hornsby by six in the morning; I'm not fussy how. Half now if you want it. Most people don't.",
+   "giver": "qgb-hornsby-rod",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 94,
+     "label": "earn forty-five somewhere in Hornsby"
+    }
+   ],
+   "reward": {
+    "cash": 189,
+    "xp": 551,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-031",
+   "act": 3,
+   "title": "Probationary at the Hornsby Bowlo",
+   "blurb": "Two people have already said no. A young constable has been doing his first solo patrol round the Hornsby Bowlo since Melbourne Cup day. I have rung the number on the letter four times. He's decided Hornsby is his, so give him a story for the sergeant. You'll know it when you see it.",
+   "giver": "qgb-hornsby-poppy",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "lose the probationary constable near the Hornsby Bowlo"
+    }
+   ],
+   "reward": {
+    "cash": 204,
+    "xp": 542,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-032",
+   "act": 3,
+   "title": "The Peats Ferry Road Complaint",
+   "blurb": "It is the sort of thing you notice or you do not. Two women in activewear have photographed my bins outside Peats Ferry Road since Monday. I did try the official route, for what that was worth. One has Hornsby council on speed dial; sort it however you sort things. If anyone asks, you were never here.",
+   "giver": "qgb-hornsby-maddie",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near Peats Ferry Road"
+    }
+   ],
+   "reward": {
+    "cash": 195,
+    "xp": 550,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-033",
+   "act": 3,
+   "title": "Meat Tray at Westfield Hornsby",
+   "blurb": "You look like you have twenty minutes. The Westfield Hornsby raffle is thirty-five short of a meat tray and the draw is at closing. I am not after trouble. I am after an answer. Find it in Hornsby and put it in the tin. That's it. That's the whole ask.",
+   "giver": "qgb-hornsby-scott",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 73,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -10741,
+     "z": -18408,
+     "radius": 30,
+     "label": "and drop it at Westfield Hornsby"
+    }
+   ],
+   "reward": {
+    "cash": 189,
+    "xp": 556,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-034",
+   "act": 3,
+   "title": "The Pacific Highway Pub Crawl",
+   "blurb": "Honestly, I am past caring how it looks. A bucks started at the Pacific Highway at noon and it's now three blokes, one pair of pants and a tab. Nobody else seems to have noticed, which is its own problem. Recover the tab by half seven; Hornsby can keep the dignity. Half now if you want it. Most people don't.",
+   "giver": "qgb-hornsby-maureen",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 3,
+     "label": "sort the three from the the Pacific Highway crawl"
+    },
+    {
+     "kind": "earn",
+     "dollars": 42,
+     "label": "and get the twenty they owe"
+    }
+   ],
+   "reward": {
+    "cash": 200,
+    "xp": 554,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l10-hornsby-035",
+   "act": 3,
+   "title": "Closing Time at the Hornsby quarry",
+   "blurb": "There is no clever way to say this. Two blokes have slept in my doorway on the Hornsby quarry since the pub shut. I am aware how that sounds. The Hornsby delivery's at dawn, so get them up and show me the step empty. Come back and tell me straight.",
+   "giver": "qgb-hornsby-imogen",
+   "level": 10,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off the Hornsby quarry"
+    },
+    {
+     "kind": "photo",
+     "x": -10389,
+     "z": -18183,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 186,
+    "xp": 548,
+    "unlock": []
+   }
+  }
+ ]
+}

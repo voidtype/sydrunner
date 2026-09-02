@@ -1,0 +1,2965 @@
+{
+ "pack": "areab-glebe-1",
+ "npcs": [
+  {
+   "id": "qgb-glebe-karen",
+   "name": "Karen, TAB regular",
+   "x": -1884,
+   "z": 538,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Race four's off. Sorry, race four. Glebe, you want a tip?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I've had a system since 1988. It doesn't work. Jubilee Park has a screen and a stool and that's all a man needs.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "One Stop From the Tramsheds",
+       "accept": "qgb-l3-glebe-001",
+       "denyFlag": "w:qgb-l3-glebe-001"
+      },
+      {
+       "text": "Counting the Tramsheds",
+       "accept": "qgb-l3-glebe-002",
+       "denyFlag": "w:qgb-l3-glebe-002",
+       "needFlag": "w:qgb-l3-glebe-001"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Karen counts it out without looking up. -- Don't spend it all at Jubilee Park.",
+     "choices": [
+      {
+       "text": "About one stop from the tramsheds.",
+       "turnin": "qgb-l3-glebe-001"
+      },
+      {
+       "text": "About counting the tramsheds.",
+       "turnin": "qgb-l3-glebe-002"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never back a horse called anything with 'Lucky' in it. I learned that at Jubilee Park.",
+     "improv": {
+      "persona": "Karen, TAB regular in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about Jubilee Park like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near Jubilee Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-hamish",
+   "name": "Hamish, dog walker, four leads",
+   "x": -2160,
+   "z": 680,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hang on, hang on -- sit. Not you. Sorry, Glebe at this hour is chaos. What's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six dogs, three suburbs, one car park at the Tramsheds. Two of them aren't mine and one of them isn't a dog, legally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the length of glebe markets.",
+     "choices": [
+      {
+       "text": "The Length of Glebe Markets",
+       "accept": "qgb-l3-glebe-003",
+       "denyFlag": "w:qgb-l3-glebe-003"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Hamish pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the length of glebe markets.",
+       "turnin": "qgb-l3-glebe-003"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The off-leash bit at the Tramsheds is fine until the magpies come back. Then nothing is fine.",
+     "improv": {
+      "persona": "Hamish, dog walker, four leads in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Tramsheds like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near the Tramsheds."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-michelle-a",
+   "name": "Michelle A., publican",
+   "x": -1798,
+   "z": 551,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "We're not open. We're never not open. What'll it be, Glebe?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I run the pub. Schooners, the meat raffle, the trivia on Wednesdays that started as a joke. Glebe Markets keeps me in business and out of the papers.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch wentworth park dogs.",
+     "choices": [
+      {
+       "text": "Before They Touch Wentworth Park dogs",
+       "accept": "qgb-l3-glebe-004",
+       "denyFlag": "w:qgb-l3-glebe-004"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Michelle A. looks it over the way Glebe looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About before they touch wentworth park dogs.",
+       "turnin": "qgb-l3-glebe-004"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Tooheys New, seven dollars, and if you ask for a craft beer I'll point you back toward Glebe Markets.",
+     "improv": {
+      "persona": "Michelle A., publican in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about Glebe Markets like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near Glebe Markets."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-mick-a",
+   "name": "Mick A., greyhound trainer",
+   "x": -2082,
+   "z": 831,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Mind the dog. He's retired, he's just not sure of it yet. Glebe, yeah.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Wentworth Park on a Saturday and the couch the rest of the week. Bicentennial Park has walked more greyhounds than it has people.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Closing Time at the Fish Markets",
+       "accept": "qgb-l3-glebe-005",
+       "denyFlag": "w:qgb-l3-glebe-005"
+      },
+      {
+       "text": "Two From Wentworth Park dogs",
+       "accept": "qgb-l3-glebe-006",
+       "denyFlag": "w:qgb-l3-glebe-006",
+       "needFlag": "w:qgb-l3-glebe-005"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Mick A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About closing time at the fish markets.",
+       "turnin": "qgb-l3-glebe-005"
+      },
+      {
+       "text": "About two from wentworth park dogs.",
+       "turnin": "qgb-l3-glebe-006"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "They sleep twenty hours a day. The other four they want to be at Bicentennial Park.",
+     "improv": {
+      "persona": "Mick A., greyhound trainer in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about Bicentennial Park like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near Bicentennial Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-fotini",
+   "name": "Fotini, fishmonger, Fish Markets",
+   "x": -1684,
+   "z": 816,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Four a.m. start. It's now one in the afternoon. Talk fast. Glebe.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Snapper, prawns, whatever came off the boat. the Fish Markets buys what the restaurants don't.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the glebe point road tab.",
+     "choices": [
+      {
+       "text": "The Glebe Point Road Tab",
+       "accept": "qgb-l3-glebe-007",
+       "denyFlag": "w:qgb-l3-glebe-007"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Fotini pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the glebe point road tab.",
+       "turnin": "qgb-l3-glebe-007"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Christmas Eve at the Fish Markets is thirty-six hours straight and someone always faints near the Fish Markets.",
+     "improv": {
+      "persona": "Fotini, fishmonger, Fish Markets in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Fish Markets like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near the Fish Markets."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-pam-c",
+   "name": "Pam C., uni student, three jobs",
+   "x": -2094,
+   "z": 1348,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Glebe rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Sappho Books is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at the nag's head.",
+     "choices": [
+      {
+       "text": "Trouble at the Nag's Head",
+       "accept": "qgb-l3-glebe-008",
+       "denyFlag": "w:qgb-l3-glebe-008"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Pam C. counts it out without looking up. -- Don't spend it all at Sappho Books.",
+     "choices": [
+      {
+       "text": "About trouble at the nag's head.",
+       "turnin": "qgb-l3-glebe-008"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Sappho Books that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Pam C., uni student, three jobs in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about Sappho Books like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near Sappho Books."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-ray-c",
+   "name": "Ray C., TAB regular",
+   "x": -2073,
+   "z": 1208,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Race four's off. Sorry, race four. Glebe, you want a tip?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I've had a system since 1988. It doesn't work. the Nag's Head has a screen and a stool and that's all a man needs.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Race Four, Glebe Point Road",
+       "accept": "qgb-l3-glebe-009",
+       "denyFlag": "w:qgb-l3-glebe-009"
+      },
+      {
+       "text": "A Flat White From the Toxteth",
+       "accept": "qgb-l3-glebe-010",
+       "denyFlag": "w:qgb-l3-glebe-010",
+       "needFlag": "w:qgb-l3-glebe-009"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Ray C. looks it over the way Glebe looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About race four, glebe point road.",
+       "turnin": "qgb-l3-glebe-009"
+      },
+      {
+       "text": "About a flat white from the toxteth.",
+       "turnin": "qgb-l3-glebe-010"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never back a horse called anything with 'Lucky' in it. I learned that at the Nag's Head.",
+     "improv": {
+      "persona": "Ray C., TAB regular in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Nag's Head like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near the Nag's Head."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Ray C. listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-maureen-b",
+   "name": "Maureen B., dog walker, four leads",
+   "x": -1908,
+   "z": 878,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hang on, hang on -- sit. Not you. Sorry, Glebe at this hour is chaos. What's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six dogs, three suburbs, one car park at Glebe Point Road. Two of them aren't mine and one of them isn't a dog, legally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the toxteth complaint.",
+     "choices": [
+      {
+       "text": "The the Toxteth Complaint",
+       "accept": "qgb-l3-glebe-011",
+       "denyFlag": "w:qgb-l3-glebe-011"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Maureen B. counts it out without looking up. -- Don't spend it all at Glebe Point Road.",
+     "choices": [
+      {
+       "text": "About the the toxteth complaint.",
+       "turnin": "qgb-l3-glebe-011"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The off-leash bit at Glebe Point Road is fine until the magpies come back. Then nothing is fine.",
+     "improv": {
+      "persona": "Maureen B., dog walker, four leads in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about Glebe Point Road like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near Glebe Point Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-stuart-a",
+   "name": "Stuart A., publican",
+   "x": -1898,
+   "z": 1098,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "We're not open. We're never not open. What'll it be, Glebe?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I run the pub. Schooners, the meat raffle, the trivia on Wednesdays that started as a joke. the Toxteth keeps me in business and out of the papers.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's seven a.m. at jubilee park.",
+     "choices": [
+      {
+       "text": "Seven a.m. At Jubilee Park",
+       "accept": "qgb-l3-glebe-012",
+       "denyFlag": "w:qgb-l3-glebe-012"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Stuart A. looks it over the way Glebe looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About seven a.m. at jubilee park.",
+       "turnin": "qgb-l3-glebe-012"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Tooheys New, seven dollars, and if you ask for a craft beer I'll point you back toward the Toxteth.",
+     "improv": {
+      "persona": "Stuart A., publican in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Toxteth like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near the Toxteth."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-tahlia-d",
+   "name": "Tahlia D., council ranger",
+   "x": -1598,
+   "z": 772,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Glebe is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Glebe Markets generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Length of Bicentennial Park",
+       "accept": "qgb-l3-glebe-013",
+       "denyFlag": "w:qgb-l3-glebe-013"
+      },
+      {
+       "text": "Bin Night, Bicentennial Park",
+       "accept": "qgb-l3-glebe-014",
+       "denyFlag": "w:qgb-l3-glebe-014",
+       "needFlag": "w:qgb-l3-glebe-013"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Tahlia D. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the length of bicentennial park.",
+       "turnin": "qgb-l3-glebe-013"
+      },
+      {
+       "text": "About bin night, bicentennial park.",
+       "turnin": "qgb-l3-glebe-014"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Tahlia D., council ranger in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about Glebe Markets like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near Glebe Markets."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-angus-c",
+   "name": "Angus C., uni student, three jobs",
+   "x": -1780,
+   "z": 850,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Glebe rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Bicentennial Park is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Staffy Near Wentworth Park dogs",
+       "accept": "qgb-l3-glebe-015",
+       "denyFlag": "w:qgb-l3-glebe-015"
+      },
+      {
+       "text": "Before They Touch the Fish Markets",
+       "accept": "qgb-l3-glebe-016",
+       "denyFlag": "w:qgb-l3-glebe-016",
+       "needFlag": "w:qgb-l3-glebe-015"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Angus C. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About staffy near wentworth park dogs.",
+       "turnin": "qgb-l3-glebe-015"
+      },
+      {
+       "text": "About before they touch the fish markets.",
+       "turnin": "qgb-l3-glebe-016"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Bicentennial Park that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Angus C., uni student, three jobs in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about Bicentennial Park like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near Bicentennial Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Glebe would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-matilda-c",
+   "name": "Matilda C., TAB regular",
+   "x": -2084,
+   "z": 889,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Race four's off. Sorry, race four. Glebe, you want a tip?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I've had a system since 1988. It doesn't work. the Fish Markets has a screen and a stool and that's all a man needs.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's closing time at wentworth park dogs.",
+     "choices": [
+      {
+       "text": "Closing Time at Wentworth Park dogs",
+       "accept": "qgb-l3-glebe-017",
+       "denyFlag": "w:qgb-l3-glebe-017"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Matilda C. looks it over the way Glebe looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About closing time at wentworth park dogs.",
+       "turnin": "qgb-l3-glebe-017"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never back a horse called anything with 'Lucky' in it. I learned that at the Fish Markets.",
+     "improv": {
+      "persona": "Matilda C., TAB regular in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Fish Markets like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near the Fish Markets."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-hugo-c",
+   "name": "Hugo C., dog walker, four leads",
+   "x": -2266,
+   "z": 1268,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hang on, hang on -- sit. Not you. Sorry, Glebe at this hour is chaos. What's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six dogs, three suburbs, one car park at Wentworth Park dogs. Two of them aren't mine and one of them isn't a dog, legally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two from sappho books.",
+     "choices": [
+      {
+       "text": "Two From Sappho Books",
+       "accept": "qgb-l3-glebe-018",
+       "denyFlag": "w:qgb-l3-glebe-018"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Hugo C. looks it over the way Glebe looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About two from sappho books.",
+       "turnin": "qgb-l3-glebe-018"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The off-leash bit at Wentworth Park dogs is fine until the magpies come back. Then nothing is fine.",
+     "improv": {
+      "persona": "Hugo C., dog walker, four leads in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about Wentworth Park dogs like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near Wentworth Park dogs."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-bluey-c",
+   "name": "Bluey C., greyhound trainer",
+   "x": -1821,
+   "z": 1053,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Mind the dog. He's retired, he's just not sure of it yet. Glebe, yeah.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Wentworth Park on a Saturday and the couch the rest of the week. the Nag's Head has walked more greyhounds than it has people.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's left it near the toxteth.",
+     "choices": [
+      {
+       "text": "Left It Near the Toxteth",
+       "accept": "qgb-l3-glebe-019",
+       "denyFlag": "w:qgb-l3-glebe-019"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Bluey C. looks it over the way Glebe looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About left it near the toxteth.",
+       "turnin": "qgb-l3-glebe-019"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "They sleep twenty hours a day. The other four they want to be at the Nag's Head.",
+     "improv": {
+      "persona": "Bluey C., greyhound trainer in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Nag's Head like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near the Nag's Head."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Right. And you're sure it was the Toxteth? People say the Toxteth when they mean the bit next to it. -- Bluey C. writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-nick",
+   "name": "Nick, fishmonger, Fish Markets",
+   "x": -1543,
+   "z": 837,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Four a.m. start. It's now one in the afternoon. Talk fast. Glebe.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Snapper, prawns, whatever came off the boat. Glebe Point Road buys what the restaurants don't.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the toxteth camera.",
+     "choices": [
+      {
+       "text": "The the Toxteth Camera",
+       "accept": "qgb-l3-glebe-020",
+       "denyFlag": "w:qgb-l3-glebe-020"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Nick looks it over the way Glebe looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the toxteth camera.",
+       "turnin": "qgb-l3-glebe-020"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Christmas Eve at the Fish Markets is thirty-six hours straight and someone always faints near Glebe Point Road.",
+     "improv": {
+      "persona": "Nick, fishmonger, Fish Markets in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about Glebe Point Road like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near Glebe Point Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-trent-a",
+   "name": "Trent A., council ranger",
+   "x": -1850,
+   "z": 1167,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Glebe is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. the Toxteth generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's tap on at jubilee park.",
+     "choices": [
+      {
+       "text": "Tap On at Jubilee Park",
+       "accept": "qgb-l3-glebe-021",
+       "denyFlag": "w:qgb-l3-glebe-021"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Trent A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About tap on at jubilee park.",
+       "turnin": "qgb-l3-glebe-021"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Trent A., council ranger in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Toxteth like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near the Toxteth."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Glebe would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-dean-b",
+   "name": "Dean B., TAB regular",
+   "x": -1748,
+   "z": 914,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Race four's off. Sorry, race four. Glebe, you want a tip?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I've had a system since 1988. It doesn't work. the Tramsheds has a screen and a stool and that's all a man needs.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the glebe markets order.",
+     "choices": [
+      {
+       "text": "The Glebe Markets Order",
+       "accept": "qgb-l3-glebe-022",
+       "denyFlag": "w:qgb-l3-glebe-022"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Dean B. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the glebe markets order.",
+       "turnin": "qgb-l3-glebe-022"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never back a horse called anything with 'Lucky' in it. I learned that at the Tramsheds.",
+     "improv": {
+      "persona": "Dean B., TAB regular in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Tramsheds like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near the Tramsheds."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-chrissy",
+   "name": "Chrissy, fishmonger, Fish Markets",
+   "x": -1943,
+   "z": 600,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Four a.m. start. It's now one in the afternoon. Talk fast. Glebe.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Snapper, prawns, whatever came off the boat. Wentworth Park dogs buys what the restaurants don't.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Proof of Sappho Books",
+       "accept": "qgb-l3-glebe-023",
+       "denyFlag": "w:qgb-l3-glebe-023"
+      },
+      {
+       "text": "Seven a.m. At Sappho Books",
+       "accept": "qgb-l3-glebe-024",
+       "denyFlag": "w:qgb-l3-glebe-024",
+       "needFlag": "w:qgb-l3-glebe-023"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Chrissy counts it out without looking up. -- Don't spend it all at Wentworth Park dogs.",
+     "choices": [
+      {
+       "text": "About proof of sappho books.",
+       "turnin": "qgb-l3-glebe-023"
+      },
+      {
+       "text": "About seven a.m. at sappho books.",
+       "turnin": "qgb-l3-glebe-024"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Christmas Eve at the Fish Markets is thirty-six hours straight and someone always faints near Wentworth Park dogs.",
+     "improv": {
+      "persona": "Chrissy, fishmonger, Fish Markets in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about Wentworth Park dogs like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near Wentworth Park dogs."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-kev-b",
+   "name": "Kev B., uni student, three jobs",
+   "x": -2299,
+   "z": 1250,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Glebe rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the Nag's Head is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's counting glebe point road.",
+     "choices": [
+      {
+       "text": "Counting Glebe Point Road",
+       "accept": "qgb-l3-glebe-025",
+       "denyFlag": "w:qgb-l3-glebe-025"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Kev B. looks it over the way Glebe looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About counting glebe point road.",
+       "turnin": "qgb-l3-glebe-025"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the Nag's Head that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Kev B., uni student, three jobs in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Nag's Head like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near the Nag's Head."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-tahlia",
+   "name": "Tahlia, TAB regular",
+   "x": -2232,
+   "z": 539,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Race four's off. Sorry, race four. Glebe, you want a tip?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I've had a system since 1988. It doesn't work. Glebe Point Road has a screen and a stool and that's all a man needs.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the jubilee park lift.",
+     "choices": [
+      {
+       "text": "The Jubilee Park Lift",
+       "accept": "qgb-l3-glebe-026",
+       "denyFlag": "w:qgb-l3-glebe-026"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Tahlia counts it out without looking up. -- Don't spend it all at Glebe Point Road.",
+     "choices": [
+      {
+       "text": "About the jubilee park lift.",
+       "turnin": "qgb-l3-glebe-026"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never back a horse called anything with 'Lucky' in it. I learned that at Glebe Point Road.",
+     "improv": {
+      "persona": "Tahlia, TAB regular in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about Glebe Point Road like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near Glebe Point Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Right. And you're sure it was Jubilee Park? People say Jubilee Park when they mean the bit next to it. -- Tahlia writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-warwick-d",
+   "name": "Warwick D., dog walker, four leads",
+   "x": -1756,
+   "z": 624,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hang on, hang on -- sit. Not you. Sorry, Glebe at this hour is chaos. What's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six dogs, three suburbs, one car park at the Toxteth. Two of them aren't mine and one of them isn't a dog, legally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Closing Time at Glebe Markets",
+       "accept": "qgb-l3-glebe-027",
+       "denyFlag": "w:qgb-l3-glebe-027"
+      },
+      {
+       "text": "Trolley Run, Jubilee Park",
+       "accept": "qgb-l3-glebe-028",
+       "denyFlag": "w:qgb-l3-glebe-028",
+       "needFlag": "w:qgb-l3-glebe-027"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Warwick D. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About closing time at glebe markets.",
+       "turnin": "qgb-l3-glebe-027"
+      },
+      {
+       "text": "About trolley run, jubilee park.",
+       "turnin": "qgb-l3-glebe-028"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The off-leash bit at the Toxteth is fine until the magpies come back. Then nothing is fine.",
+     "improv": {
+      "persona": "Warwick D., dog walker, four leads in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Toxteth like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near the Toxteth."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-eleni",
+   "name": "Eleni, fishmonger, Fish Markets",
+   "x": -1610,
+   "z": 693,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Four a.m. start. It's now one in the afternoon. Talk fast. Glebe.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Snapper, prawns, whatever came off the boat. Glebe Markets buys what the restaurants don't.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's left it near the fish markets.",
+     "choices": [
+      {
+       "text": "Left It Near the Fish Markets",
+       "accept": "qgb-l3-glebe-029",
+       "denyFlag": "w:qgb-l3-glebe-029"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Eleni looks it over the way Glebe looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About left it near the fish markets.",
+       "turnin": "qgb-l3-glebe-029"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Christmas Eve at the Fish Markets is thirty-six hours straight and someone always faints near Glebe Markets.",
+     "improv": {
+      "persona": "Eleni, fishmonger, Fish Markets in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about Glebe Markets like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near Glebe Markets."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Right. And you're sure it was the Fish Markets? People say the Fish Markets when they mean the bit next to it. -- Eleni writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-fergus-e",
+   "name": "Fergus E., council ranger",
+   "x": -1934,
+   "z": 899,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Glebe is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Bicentennial Park generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the fish markets camera.",
+     "choices": [
+      {
+       "text": "The the Fish Markets Camera",
+       "accept": "qgb-l3-glebe-030",
+       "denyFlag": "w:qgb-l3-glebe-030"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Fergus E. counts it out without looking up. -- Don't spend it all at Bicentennial Park.",
+     "choices": [
+      {
+       "text": "About the the fish markets camera.",
+       "turnin": "qgb-l3-glebe-030"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Fergus E., council ranger in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about Bicentennial Park like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near Bicentennial Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-annabel-c",
+   "name": "Annabel C., uni student, three jobs",
+   "x": -1614,
+   "z": 1285,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Glebe rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the Fish Markets is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Wentworth Park dogs Float",
+       "accept": "qgb-l3-glebe-031",
+       "denyFlag": "w:qgb-l3-glebe-031"
+      },
+      {
+       "text": "Tap On at Wentworth Park dogs",
+       "accept": "qgb-l3-glebe-032",
+       "denyFlag": "w:qgb-l3-glebe-032",
+       "needFlag": "w:qgb-l3-glebe-031"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Annabel C. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the wentworth park dogs float.",
+       "turnin": "qgb-l3-glebe-031"
+      },
+      {
+       "text": "About tap on at wentworth park dogs.",
+       "turnin": "qgb-l3-glebe-032"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the Fish Markets that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Annabel C., uni student, three jobs in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Fish Markets like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near the Fish Markets."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Annabel C. listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Glebe would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-eddie-a",
+   "name": "Eddie A., TAB regular",
+   "x": -1926,
+   "z": 1168,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Race four's off. Sorry, race four. Glebe, you want a tip?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I've had a system since 1988. It doesn't work. Wentworth Park dogs has a screen and a stool and that's all a man needs.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the sappho books fence.",
+     "choices": [
+      {
+       "text": "The Sappho Books Fence",
+       "accept": "qgb-l3-glebe-033",
+       "denyFlag": "w:qgb-l3-glebe-033"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Eddie A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the sappho books fence.",
+       "turnin": "qgb-l3-glebe-033"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never back a horse called anything with 'Lucky' in it. I learned that at Wentworth Park dogs.",
+     "improv": {
+      "persona": "Eddie A., TAB regular in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about Wentworth Park dogs like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near Wentworth Park dogs."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Glebe would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-shirl-e",
+   "name": "Shirl E., dog walker, four leads",
+   "x": -1858,
+   "z": 940,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hang on, hang on -- sit. Not you. Sorry, Glebe at this hour is chaos. What's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six dogs, three suburbs, one car park at Sappho Books. Two of them aren't mine and one of them isn't a dog, legally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's probationary at the nag's head.",
+     "choices": [
+      {
+       "text": "Probationary at the Nag's Head",
+       "accept": "qgb-l3-glebe-034",
+       "denyFlag": "w:qgb-l3-glebe-034"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Shirl E. counts it out without looking up. -- Don't spend it all at Sappho Books.",
+     "choices": [
+      {
+       "text": "About probationary at the nag's head.",
+       "turnin": "qgb-l3-glebe-034"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The off-leash bit at Sappho Books is fine until the magpies come back. Then nothing is fine.",
+     "improv": {
+      "persona": "Shirl E., dog walker, four leads in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about Sappho Books like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near Sappho Books."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-troy",
+   "name": "Troy, greyhound trainer",
+   "x": -2427,
+   "z": 1019,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Mind the dog. He's retired, he's just not sure of it yet. Glebe, yeah.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Wentworth Park on a Saturday and the couch the rest of the week. Glebe Point Road has walked more greyhounds than it has people.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two signs, the toxteth.",
+     "choices": [
+      {
+       "text": "Two Signs, the Toxteth",
+       "accept": "qgb-l3-glebe-035",
+       "denyFlag": "w:qgb-l3-glebe-035"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Troy pays up on the spot.",
+     "choices": [
+      {
+       "text": "About two signs, the toxteth.",
+       "turnin": "qgb-l3-glebe-035"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "They sleep twenty hours a day. The other four they want to be at Glebe Point Road.",
+     "improv": {
+      "persona": "Troy, greyhound trainer in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about Glebe Point Road like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near Glebe Point Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-thelma",
+   "name": "Thelma, council ranger",
+   "x": -2391,
+   "z": 668,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Glebe is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Jubilee Park generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rbt on the tramsheds.",
+     "choices": [
+      {
+       "text": "RBT on the Tramsheds",
+       "accept": "qgb-l3-glebe-036",
+       "denyFlag": "w:qgb-l3-glebe-036"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Thelma looks it over the way Glebe looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About rbt on the tramsheds.",
+       "turnin": "qgb-l3-glebe-036"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Thelma, council ranger in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about Jubilee Park like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near Jubilee Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-gav-a",
+   "name": "Gav A., uni student, three jobs",
+   "x": -2216,
+   "z": 1094,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Glebe rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the Tramsheds is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's one stop from glebe markets.",
+     "choices": [
+      {
+       "text": "One Stop From Glebe Markets",
+       "accept": "qgb-l3-glebe-037",
+       "denyFlag": "w:qgb-l3-glebe-037"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Gav A. counts it out without looking up. -- Don't spend it all at the Tramsheds.",
+     "choices": [
+      {
+       "text": "About one stop from glebe markets.",
+       "turnin": "qgb-l3-glebe-037"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the Tramsheds that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Gav A., uni student, three jobs in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Tramsheds like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near the Tramsheds."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-glebe-elaine-a",
+   "name": "Elaine A., publican",
+   "x": -2218,
+   "z": 907,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "We're not open. We're never not open. What'll it be, Glebe?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Glebe like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I run the pub. Schooners, the meat raffle, the trivia on Wednesdays that started as a joke. the Fish Markets keeps me in business and out of the papers.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at wentworth park dogs.",
+     "choices": [
+      {
+       "text": "Trouble at Wentworth Park dogs",
+       "accept": "qgb-l3-glebe-038",
+       "denyFlag": "w:qgb-l3-glebe-038"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Elaine A. counts it out without looking up. -- Don't spend it all at the Fish Markets.",
+     "choices": [
+      {
+       "text": "About trouble at wentworth park dogs.",
+       "turnin": "qgb-l3-glebe-038"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Tooheys New, seven dollars, and if you ask for a craft beer I'll point you back toward the Fish Markets.",
+     "improv": {
+      "persona": "Elaine A., publican in Glebe, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Fish Markets like everyone knows it.",
+      "context": "Someone has asked what Glebe is like these days. You are standing near the Fish Markets."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

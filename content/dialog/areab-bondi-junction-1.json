@@ -1,0 +1,2973 @@
+{
+ "pack": "areab-bondi-junction-1",
+ "npcs": [
+  {
+   "id": "qgb-bondi-junction-bluey",
+   "name": "Bluey, real estate agent",
+   "x": 3820,
+   "z": 2390,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Bondi Junction is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. Centennial Park is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's proof of bronte road.",
+     "choices": [
+      {
+       "text": "Proof of Bronte Road",
+       "accept": "qgb-l5-bondi-junction-001",
+       "denyFlag": "w:qgb-l5-bondi-junction-001"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Bluey looks it over the way Bondi Junction looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About proof of bronte road.",
+       "turnin": "qgb-l5-bondi-junction-001"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. Centennial Park means cosy.",
+     "improv": {
+      "persona": "Bluey, real estate agent in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about Centennial Park like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near Centennial Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-brett",
+   "name": "Brett, surfer, dawn patrol",
+   "x": 3659,
+   "z": 2565,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Onshore. Absolutely cooked. Bondi Junction is flat as a tack, mate.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Check the cam, drive down, paddle out, get skunked. the Eastgate on a good day is why people move here.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the bronte road tab.",
+     "choices": [
+      {
+       "text": "The Bronte Road Tab",
+       "accept": "qgb-l5-bondi-junction-002",
+       "denyFlag": "w:qgb-l5-bondi-junction-002"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Brett pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the bronte road tab.",
+       "turnin": "qgb-l5-bondi-junction-002"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The car park at the Eastgate has a bloke who's been there since 1994. He's fine. Don't move his cone.",
+     "improv": {
+      "persona": "Brett, surfer, dawn patrol in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Eastgate like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near the Eastgate."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-terry",
+   "name": "Terry, backpacker on a working visa",
+   "x": 3684,
+   "z": 2295,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Alright? Sorry, you're not the hostel guy. Bondi Junction's wild, man.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Eighty-eight days of farm work done, now I'm pouring beers near Waverley Oval and sleeping eight to a room.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the tea gardens complaint.",
+     "choices": [
+      {
+       "text": "The the Tea Gardens Complaint",
+       "accept": "qgb-l5-bondi-junction-003",
+       "denyFlag": "w:qgb-l5-bondi-junction-003"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Terry pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the tea gardens complaint.",
+       "turnin": "qgb-l5-bondi-junction-003"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a goon bag somewhere near Waverley Oval that has my name on it, literally, I wrote it.",
+     "improv": {
+      "persona": "Terry, backpacker on a working visa in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about Waverley Oval like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near Waverley Oval."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-pita",
+   "name": "Pita, security guard",
+   "x": 3763,
+   "z": 2515,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bags open, please. Thanks, bro. Welcome to Bondi Junction.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve-hour shifts standing near the Tea Gardens watching people not steal things. Mostly.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's staffy near the bondi road hill.",
+     "choices": [
+      {
+       "text": "Staffy Near the Bondi Road hill",
+       "accept": "qgb-l5-bondi-junction-004",
+       "denyFlag": "w:qgb-l5-bondi-junction-004"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Pita looks it over the way Bondi Junction looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About staffy near the bondi road hill.",
+       "turnin": "qgb-l5-bondi-junction-004"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a bench near the Tea Gardens where the whole shift eats lunch. We've named the pigeons.",
+     "improv": {
+      "persona": "Pita, security guard in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Tea Gardens like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near the Tea Gardens."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Bondi Junction would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-eddie",
+   "name": "Eddie, nanny, two families",
+   "x": 3975,
+   "z": 2155,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Shh, she's finally asleep. In the pram. In Bondi Junction. Hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Two families, four kids, one Volvo. the Bondi Road hill is where the playground fights happen and I mean the parents.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Two From Spring Street",
+       "accept": "qgb-l5-bondi-junction-005",
+       "denyFlag": "w:qgb-l5-bondi-junction-005"
+      },
+      {
+       "text": "Meat Tray at Spring Street",
+       "accept": "qgb-l5-bondi-junction-006",
+       "denyFlag": "w:qgb-l5-bondi-junction-006",
+       "needFlag": "w:qgb-l5-bondi-junction-005"
+      },
+      {
+       "text": "Seven a.m. At Westfield Bondi Junction",
+       "accept": "qgb-l5-bondi-junction-007",
+       "denyFlag": "w:qgb-l5-bondi-junction-007"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Eddie counts it out without looking up. -- Don't spend it all at the Bondi Road hill.",
+     "choices": [
+      {
+       "text": "About two from spring street.",
+       "turnin": "qgb-l5-bondi-junction-005"
+      },
+      {
+       "text": "About meat tray at spring street.",
+       "turnin": "qgb-l5-bondi-junction-006"
+      },
+      {
+       "text": "About seven a.m. at westfield bondi junction.",
+       "turnin": "qgb-l5-bondi-junction-007"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every mother at the Bondi Road hill has an opinion about sleep training and none of them have slept.",
+     "improv": {
+      "persona": "Eddie, nanny, two families in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Bondi Road hill like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near the Bondi Road hill."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-barry",
+   "name": "Barry, corporate, on a break",
+   "x": 3712,
+   "z": 2505,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I've got eleven minutes. Sorry -- nine. Bondi Junction, what do you need?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Consulting. I consult. On what, nobody's sure, including me. Spring Street is where I pretend to have lunch.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rbt on westfield bondi junction.",
+     "choices": [
+      {
+       "text": "RBT on Westfield Bondi Junction",
+       "accept": "qgb-l5-bondi-junction-008",
+       "denyFlag": "w:qgb-l5-bondi-junction-008"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Barry pays up on the spot.",
+     "choices": [
+      {
+       "text": "About rbt on westfield bondi junction.",
+       "turnin": "qgb-l5-bondi-junction-008"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The coffee near Spring Street is eight dollars. I expense it. I'm not proud.",
+     "improv": {
+      "persona": "Barry, corporate, on a break in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about Spring Street like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near Spring Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-clementine",
+   "name": "Clementine, surfer, dawn patrol",
+   "x": 3678,
+   "z": 2718,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Onshore. Absolutely cooked. Bondi Junction is flat as a tack, mate.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Check the cam, drive down, paddle out, get skunked. Oxford Street on a good day is why people move here.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the 333 bus float.",
+     "choices": [
+      {
+       "text": "The the 333 bus Float",
+       "accept": "qgb-l5-bondi-junction-009",
+       "denyFlag": "w:qgb-l5-bondi-junction-009"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Clementine counts it out without looking up. -- Don't spend it all at Oxford Street.",
+     "choices": [
+      {
+       "text": "About the the 333 bus float.",
+       "turnin": "qgb-l5-bondi-junction-009"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The car park at Oxford Street has a bloke who's been there since 1994. He's fine. Don't move his cone.",
+     "improv": {
+      "persona": "Clementine, surfer, dawn patrol in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about Oxford Street like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near Oxford Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Right. And you're sure it was the 333 bus? People say the 333 bus when they mean the bit next to it. -- Clementine writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-gav",
+   "name": "Gav, personal trainer",
+   "x": 3406,
+   "z": 2504,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Squats. No -- sorry. Habit. Bondi Junction, what's the goal?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bootcamp at six in the 333 bus, then clients until the park kicks us out. Bondi Junction's abs are my doing.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's probationary at the eastgate.",
+     "choices": [
+      {
+       "text": "Probationary at the Eastgate",
+       "accept": "qgb-l5-bondi-junction-010",
+       "denyFlag": "w:qgb-l5-bondi-junction-010"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Gav counts it out without looking up. -- Don't spend it all at the 333 bus.",
+     "choices": [
+      {
+       "text": "About probationary at the eastgate.",
+       "turnin": "qgb-l5-bondi-junction-010"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The stairs at the 333 bus are the best free gym in the east. The council keeps trying to put a rail on them.",
+     "improv": {
+      "persona": "Gav, personal trainer in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about the 333 bus like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near the 333 bus."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-fay",
+   "name": "Fay, corporate, on a break",
+   "x": 3638,
+   "z": 2379,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I've got eleven minutes. Sorry -- nine. Bondi Junction, what do you need?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Consulting. I consult. On what, nobody's sure, including me. Waverley Oval is where I pretend to have lunch.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's counting the tea gardens.",
+     "choices": [
+      {
+       "text": "Counting the Tea Gardens",
+       "accept": "qgb-l5-bondi-junction-011",
+       "denyFlag": "w:qgb-l5-bondi-junction-011"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Fay counts it out without looking up. -- Don't spend it all at Waverley Oval.",
+     "choices": [
+      {
+       "text": "About counting the tea gardens.",
+       "turnin": "qgb-l5-bondi-junction-011"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The coffee near Waverley Oval is eight dollars. I expense it. I'm not proud.",
+     "improv": {
+      "persona": "Fay, corporate, on a break in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about Waverley Oval like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near Waverley Oval."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-brooke",
+   "name": "Brooke, real estate agent",
+   "x": 3699,
+   "z": 2576,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Bondi Junction is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. the Tea Gardens is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's one stop from spring street.",
+     "choices": [
+      {
+       "text": "One Stop From Spring Street",
+       "accept": "qgb-l5-bondi-junction-012",
+       "denyFlag": "w:qgb-l5-bondi-junction-012"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Brooke counts it out without looking up. -- Don't spend it all at the Tea Gardens.",
+     "choices": [
+      {
+       "text": "About one stop from spring street.",
+       "turnin": "qgb-l5-bondi-junction-012"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. the Tea Gardens means cosy.",
+     "improv": {
+      "persona": "Brooke, real estate agent in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Tea Gardens like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near the Tea Gardens."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-prue",
+   "name": "Prue, surfer, dawn patrol",
+   "x": 3509,
+   "z": 2687,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Onshore. Absolutely cooked. Bondi Junction is flat as a tack, mate.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Check the cam, drive down, paddle out, get skunked. the Bondi Road hill on a good day is why people move here.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Trouble at Spring Street",
+       "accept": "qgb-l5-bondi-junction-013",
+       "denyFlag": "w:qgb-l5-bondi-junction-013"
+      },
+      {
+       "text": "Proof of Spring Street",
+       "accept": "qgb-l5-bondi-junction-014",
+       "denyFlag": "w:qgb-l5-bondi-junction-014",
+       "needFlag": "w:qgb-l5-bondi-junction-013"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Prue looks it over the way Bondi Junction looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About trouble at spring street.",
+       "turnin": "qgb-l5-bondi-junction-013"
+      },
+      {
+       "text": "About proof of spring street.",
+       "turnin": "qgb-l5-bondi-junction-014"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The car park at the Bondi Road hill has a bloke who's been there since 1994. He's fine. Don't move his cone.",
+     "improv": {
+      "persona": "Prue, surfer, dawn patrol in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Bondi Road hill like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near the Bondi Road hill."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-digby",
+   "name": "Digby, nanny, two families",
+   "x": 3463,
+   "z": 2123,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Shh, she's finally asleep. In the pram. In Bondi Junction. Hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Two families, four kids, one Volvo. the 333 bus is where the playground fights happen and I mean the parents.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the centennial park complaint.",
+     "choices": [
+      {
+       "text": "The Centennial Park Complaint",
+       "accept": "qgb-l5-bondi-junction-015",
+       "denyFlag": "w:qgb-l5-bondi-junction-015"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Digby looks it over the way Bondi Junction looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the centennial park complaint.",
+       "turnin": "qgb-l5-bondi-junction-015"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every mother at the 333 bus has an opinion about sleep training and none of them have slept.",
+     "improv": {
+      "persona": "Digby, nanny, two families in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about the 333 bus like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near the 333 bus."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-jason",
+   "name": "Jason, corporate, on a break",
+   "x": 3808,
+   "z": 2450,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I've got eleven minutes. Sorry -- nine. Bondi Junction, what do you need?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Consulting. I consult. On what, nobody's sure, including me. Centennial Park is where I pretend to have lunch.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's something from the eastgate.",
+     "choices": [
+      {
+       "text": "Something From the Eastgate",
+       "accept": "qgb-l5-bondi-junction-016",
+       "denyFlag": "w:qgb-l5-bondi-junction-016"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Jason looks it over the way Bondi Junction looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About something from the eastgate.",
+       "turnin": "qgb-l5-bondi-junction-016"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The coffee near Centennial Park is eight dollars. I expense it. I'm not proud.",
+     "improv": {
+      "persona": "Jason, corporate, on a break in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about Centennial Park like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near Centennial Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-matilda",
+   "name": "Matilda, real estate agent",
+   "x": 3923,
+   "z": 1980,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Bondi Junction is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. the Eastgate is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Staffy Near Bronte Road",
+       "accept": "qgb-l5-bondi-junction-017",
+       "denyFlag": "w:qgb-l5-bondi-junction-017"
+      },
+      {
+       "text": "Two From Bronte Road",
+       "accept": "qgb-l5-bondi-junction-018",
+       "denyFlag": "w:qgb-l5-bondi-junction-018",
+       "needFlag": "w:qgb-l5-bondi-junction-017"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Matilda looks it over the way Bondi Junction looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About staffy near bronte road.",
+       "turnin": "qgb-l5-bondi-junction-017"
+      },
+      {
+       "text": "About two from bronte road.",
+       "turnin": "qgb-l5-bondi-junction-018"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. the Eastgate means cosy.",
+     "improv": {
+      "persona": "Matilda, real estate agent in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Eastgate like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near the Eastgate."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Right. And you're sure it was Bronte Road? People say Bronte Road when they mean the bit next to it. -- Matilda writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-mitch",
+   "name": "Mitch, surfer, dawn patrol",
+   "x": 3792,
+   "z": 1986,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Onshore. Absolutely cooked. Bondi Junction is flat as a tack, mate.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Check the cam, drive down, paddle out, get skunked. Bronte Road on a good day is why people move here.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the tea gardens sparky.",
+     "choices": [
+      {
+       "text": "The the Tea Gardens Sparky",
+       "accept": "qgb-l5-bondi-junction-019",
+       "denyFlag": "w:qgb-l5-bondi-junction-019"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Mitch pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the tea gardens sparky.",
+       "turnin": "qgb-l5-bondi-junction-019"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The car park at Bronte Road has a bloke who's been there since 1994. He's fine. Don't move his cone.",
+     "improv": {
+      "persona": "Mitch, surfer, dawn patrol in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about Bronte Road like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near Bronte Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-toby",
+   "name": "Toby, personal trainer",
+   "x": 3464,
+   "z": 2791,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Squats. No -- sorry. Habit. Bondi Junction, what's the goal?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bootcamp at six in Waverley Oval, then clients until the park kicks us out. Bondi Junction's abs are my doing.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the tea gardens order.",
+     "choices": [
+      {
+       "text": "The the Tea Gardens Order",
+       "accept": "qgb-l5-bondi-junction-020",
+       "denyFlag": "w:qgb-l5-bondi-junction-020"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Toby pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the tea gardens order.",
+       "turnin": "qgb-l5-bondi-junction-020"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The stairs at Waverley Oval are the best free gym in the east. The council keeps trying to put a rail on them.",
+     "improv": {
+      "persona": "Toby, personal trainer in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about Waverley Oval like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near Waverley Oval."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-salote",
+   "name": "Salote, security guard",
+   "x": 3261,
+   "z": 2603,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bags open, please. Thanks, bro. Welcome to Bondi Junction.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve-hour shifts standing near the Bondi Road hill watching people not steal things. Mostly.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Lads Off Spring Street",
+       "accept": "qgb-l5-bondi-junction-021",
+       "denyFlag": "w:qgb-l5-bondi-junction-021"
+      },
+      {
+       "text": "Counting Spring Street",
+       "accept": "qgb-l5-bondi-junction-022",
+       "denyFlag": "w:qgb-l5-bondi-junction-022",
+       "needFlag": "w:qgb-l5-bondi-junction-021"
+      },
+      {
+       "text": "One Stop From the 333 bus",
+       "accept": "qgb-l5-bondi-junction-023",
+       "denyFlag": "w:qgb-l5-bondi-junction-023"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Salote pays up on the spot.",
+     "choices": [
+      {
+       "text": "About lads off spring street.",
+       "turnin": "qgb-l5-bondi-junction-021"
+      },
+      {
+       "text": "About counting spring street.",
+       "turnin": "qgb-l5-bondi-junction-022"
+      },
+      {
+       "text": "About one stop from the 333 bus.",
+       "turnin": "qgb-l5-bondi-junction-023"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a bench near the Bondi Road hill where the whole shift eats lunch. We've named the pigeons.",
+     "improv": {
+      "persona": "Salote, security guard in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Bondi Road hill like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near the Bondi Road hill."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-val",
+   "name": "Val, nanny, two families",
+   "x": 3510,
+   "z": 2818,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Shh, she's finally asleep. In the pram. In Bondi Junction. Hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Two families, four kids, one Volvo. Spring Street is where the playground fights happen and I mean the parents.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's ask around at randwick.",
+     "choices": [
+      {
+       "text": "Ask Around at Randwick",
+       "accept": "qgb-l5-bondi-junction-024",
+       "denyFlag": "w:qgb-l5-bondi-junction-024"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Val pays up on the spot.",
+     "choices": [
+      {
+       "text": "About ask around at randwick.",
+       "turnin": "qgb-l5-bondi-junction-024"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every mother at Spring Street has an opinion about sleep training and none of them have slept.",
+     "improv": {
+      "persona": "Val, nanny, two families in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about Spring Street like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near Spring Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Bondi Junction would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-cooper",
+   "name": "Cooper, corporate, on a break",
+   "x": 3856,
+   "z": 2498,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I've got eleven minutes. Sorry -- nine. Bondi Junction, what do you need?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Consulting. I consult. On what, nobody's sure, including me. Westfield Bondi Junction is where I pretend to have lunch.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's proof of oxford street.",
+     "choices": [
+      {
+       "text": "Proof of Oxford Street",
+       "accept": "qgb-l5-bondi-junction-025",
+       "denyFlag": "w:qgb-l5-bondi-junction-025"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Cooper counts it out without looking up. -- Don't spend it all at Westfield Bondi Junction.",
+     "choices": [
+      {
+       "text": "About proof of oxford street.",
+       "turnin": "qgb-l5-bondi-junction-025"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The coffee near Westfield Bondi Junction is eight dollars. I expense it. I'm not proud.",
+     "improv": {
+      "persona": "Cooper, corporate, on a break in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about Westfield Bondi Junction like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near Westfield Bondi Junction."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-luke",
+   "name": "Luke, real estate agent",
+   "x": 3709,
+   "z": 2761,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Bondi Junction is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. Oxford Street is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch the 333 bus.",
+     "choices": [
+      {
+       "text": "Before They Touch the 333 bus",
+       "accept": "qgb-l5-bondi-junction-026",
+       "denyFlag": "w:qgb-l5-bondi-junction-026"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Luke looks it over the way Bondi Junction looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About before they touch the 333 bus.",
+       "turnin": "qgb-l5-bondi-junction-026"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. Oxford Street means cosy.",
+     "improv": {
+      "persona": "Luke, real estate agent in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about Oxford Street like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near Oxford Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-craig",
+   "name": "Craig, surfer, dawn patrol",
+   "x": 3698,
+   "z": 2189,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Onshore. Absolutely cooked. Bondi Junction is flat as a tack, mate.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Check the cam, drive down, paddle out, get skunked. the 333 bus on a good day is why people move here.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's cover at centennial park.",
+     "choices": [
+      {
+       "text": "Cover at Centennial Park",
+       "accept": "qgb-l5-bondi-junction-027",
+       "denyFlag": "w:qgb-l5-bondi-junction-027"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Craig counts it out without looking up. -- Don't spend it all at the 333 bus.",
+     "choices": [
+      {
+       "text": "About cover at centennial park.",
+       "turnin": "qgb-l5-bondi-junction-027"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The car park at the 333 bus has a bloke who's been there since 1994. He's fine. Don't move his cone.",
+     "improv": {
+      "persona": "Craig, surfer, dawn patrol in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about the 333 bus like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near the 333 bus."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-trish",
+   "name": "Trish, personal trainer",
+   "x": 3287,
+   "z": 2174,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Squats. No -- sorry. Habit. Bondi Junction, what's the goal?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bootcamp at six in Centennial Park, then clients until the park kicks us out. Bondi Junction's abs are my doing.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's left it near bronte road.",
+     "choices": [
+      {
+       "text": "Left It Near Bronte Road",
+       "accept": "qgb-l5-bondi-junction-028",
+       "denyFlag": "w:qgb-l5-bondi-junction-028"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Trish counts it out without looking up. -- Don't spend it all at Centennial Park.",
+     "choices": [
+      {
+       "text": "About left it near bronte road.",
+       "turnin": "qgb-l5-bondi-junction-028"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The stairs at Centennial Park are the best free gym in the east. The council keeps trying to put a rail on them.",
+     "improv": {
+      "persona": "Trish, personal trainer in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about Centennial Park like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near Centennial Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Bondi Junction would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-mele",
+   "name": "Mele, security guard",
+   "x": 3994,
+   "z": 2401,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bags open, please. Thanks, bro. Welcome to Bondi Junction.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve-hour shifts standing near Bronte Road watching people not steal things. Mostly.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Race Four, Waverley Oval",
+       "accept": "qgb-l5-bondi-junction-029",
+       "denyFlag": "w:qgb-l5-bondi-junction-029"
+      },
+      {
+       "text": "Staffy Near Waverley Oval",
+       "accept": "qgb-l5-bondi-junction-030",
+       "denyFlag": "w:qgb-l5-bondi-junction-030",
+       "needFlag": "w:qgb-l5-bondi-junction-029"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Mele pays up on the spot.",
+     "choices": [
+      {
+       "text": "About race four, waverley oval.",
+       "turnin": "qgb-l5-bondi-junction-029"
+      },
+      {
+       "text": "About staffy near waverley oval.",
+       "turnin": "qgb-l5-bondi-junction-030"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a bench near Bronte Road where the whole shift eats lunch. We've named the pigeons.",
+     "improv": {
+      "persona": "Mele, security guard in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about Bronte Road like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near Bronte Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Bondi Junction would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-2",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Bondi Junction would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-shirl",
+   "name": "Shirl, nanny, two families",
+   "x": 3569,
+   "z": 2449,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Shh, she's finally asleep. In the pram. In Bondi Junction. Hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Two families, four kids, one Volvo. Waverley Oval is where the playground fights happen and I mean the parents.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two from the tea gardens.",
+     "choices": [
+      {
+       "text": "Two From the Tea Gardens",
+       "accept": "qgb-l5-bondi-junction-031",
+       "denyFlag": "w:qgb-l5-bondi-junction-031"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Shirl looks it over the way Bondi Junction looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About two from the tea gardens.",
+       "turnin": "qgb-l5-bondi-junction-031"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every mother at Waverley Oval has an opinion about sleep training and none of them have slept.",
+     "improv": {
+      "persona": "Shirl, nanny, two families in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about Waverley Oval like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near Waverley Oval."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-rod",
+   "name": "Rod, surfer, dawn patrol",
+   "x": 3353,
+   "z": 2035,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Onshore. Absolutely cooked. Bondi Junction is flat as a tack, mate.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Check the cam, drive down, paddle out, get skunked. Spring Street on a good day is why people move here.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's bin night, westfield bondi junction.",
+     "choices": [
+      {
+       "text": "Bin Night, Westfield Bondi Junction",
+       "accept": "qgb-l5-bondi-junction-032",
+       "denyFlag": "w:qgb-l5-bondi-junction-032"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Rod counts it out without looking up. -- Don't spend it all at Spring Street.",
+     "choices": [
+      {
+       "text": "About bin night, westfield bondi junction.",
+       "turnin": "qgb-l5-bondi-junction-032"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The car park at Spring Street has a bloke who's been there since 1994. He's fine. Don't move his cone.",
+     "improv": {
+      "persona": "Rod, surfer, dawn patrol in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about Spring Street like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near Spring Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-lachlan",
+   "name": "Lachlan, backpacker on a working visa",
+   "x": 3549,
+   "z": 2095,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Alright? Sorry, you're not the hostel guy. Bondi Junction's wild, man.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Eighty-eight days of farm work done, now I'm pouring beers near Oxford Street and sleeping eight to a room.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the 333 bus lift.",
+     "choices": [
+      {
+       "text": "The the 333 bus Lift",
+       "accept": "qgb-l5-bondi-junction-033",
+       "denyFlag": "w:qgb-l5-bondi-junction-033"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Lachlan pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the 333 bus lift.",
+       "turnin": "qgb-l5-bondi-junction-033"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a goon bag somewhere near Oxford Street that has my name on it, literally, I wrote it.",
+     "improv": {
+      "persona": "Lachlan, backpacker on a working visa in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about Oxford Street like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near Oxford Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-2",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Bondi Junction would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-sharon",
+   "name": "Sharon, nanny, two families",
+   "x": 3478,
+   "z": 2680,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Shh, she's finally asleep. In the pram. In Bondi Junction. Hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Two families, four kids, one Volvo. Centennial Park is where the playground fights happen and I mean the parents.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the eastgate tab.",
+     "choices": [
+      {
+       "text": "The the Eastgate Tab",
+       "accept": "qgb-l5-bondi-junction-034",
+       "denyFlag": "w:qgb-l5-bondi-junction-034"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Sharon pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the eastgate tab.",
+       "turnin": "qgb-l5-bondi-junction-034"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every mother at Centennial Park has an opinion about sleep training and none of them have slept.",
+     "improv": {
+      "persona": "Sharon, nanny, two families in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about Centennial Park like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near Centennial Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-wayne",
+   "name": "Wayne, corporate, on a break",
+   "x": 3746,
+   "z": 2783,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I've got eleven minutes. Sorry -- nine. Bondi Junction, what do you need?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Consulting. I consult. On what, nobody's sure, including me. the Eastgate is where I pretend to have lunch.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Cover at Bronte Road",
+       "accept": "qgb-l5-bondi-junction-035",
+       "denyFlag": "w:qgb-l5-bondi-junction-035"
+      },
+      {
+       "text": "The Bronte Road Course",
+       "accept": "qgb-l5-bondi-junction-036",
+       "denyFlag": "w:qgb-l5-bondi-junction-036",
+       "needFlag": "w:qgb-l5-bondi-junction-035"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Wayne counts it out without looking up. -- Don't spend it all at the Eastgate.",
+     "choices": [
+      {
+       "text": "About cover at bronte road.",
+       "turnin": "qgb-l5-bondi-junction-035"
+      },
+      {
+       "text": "About the bronte road course.",
+       "turnin": "qgb-l5-bondi-junction-036"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The coffee near the Eastgate is eight dollars. I expense it. I'm not proud.",
+     "improv": {
+      "persona": "Wayne, corporate, on a break in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Eastgate like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near the Eastgate."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-narelle",
+   "name": "Narelle, surfer, dawn patrol",
+   "x": 3425,
+   "z": 2735,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Onshore. Absolutely cooked. Bondi Junction is flat as a tack, mate.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Check the cam, drive down, paddle out, get skunked. Waverley Oval on a good day is why people move here.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Race Four, the Tea Gardens",
+       "accept": "qgb-l5-bondi-junction-037",
+       "denyFlag": "w:qgb-l5-bondi-junction-037"
+      },
+      {
+       "text": "Something From the Bondi Road hill",
+       "accept": "qgb-l5-bondi-junction-038",
+       "denyFlag": "w:qgb-l5-bondi-junction-038",
+       "needFlag": "w:qgb-l5-bondi-junction-037"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Narelle looks it over the way Bondi Junction looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About race four, the tea gardens.",
+       "turnin": "qgb-l5-bondi-junction-037"
+      },
+      {
+       "text": "About something from the bondi road hill.",
+       "turnin": "qgb-l5-bondi-junction-038"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The car park at Waverley Oval has a bloke who's been there since 1994. He's fine. Don't move his cone.",
+     "improv": {
+      "persona": "Narelle, surfer, dawn patrol in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about Waverley Oval like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near Waverley Oval."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Narelle listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-bondi-junction-tahlia",
+   "name": "Tahlia, personal trainer",
+   "x": 4081,
+   "z": 2385,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Squats. No -- sorry. Habit. Bondi Junction, what's the goal?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Bondi Junction like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bootcamp at six in the Tea Gardens, then clients until the park kicks us out. Bondi Junction's abs are my doing.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's meat tray at westfield bondi junction.",
+     "choices": [
+      {
+       "text": "Meat Tray at Westfield Bondi Junction",
+       "accept": "qgb-l5-bondi-junction-039",
+       "denyFlag": "w:qgb-l5-bondi-junction-039"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Tahlia looks it over the way Bondi Junction looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About meat tray at westfield bondi junction.",
+       "turnin": "qgb-l5-bondi-junction-039"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The stairs at the Tea Gardens are the best free gym in the east. The council keeps trying to put a rail on them.",
+     "improv": {
+      "persona": "Tahlia, personal trainer in Bondi Junction, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Tea Gardens like everyone knows it.",
+      "context": "Someone has asked what Bondi Junction is like these days. You are standing near the Tea Gardens."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,1273 @@
+{
+ "pack": "areab-lakemba-1",
+ "quests": [
+  {
+   "id": "qgb-l7-lakemba-001",
+   "act": 3,
+   "title": "A Flat White From the Ramadan night markets",
+   "blurb": "Right. Since you asked. I want a flat white from the place near the Ramadan night markets, not the one next to it. I would have sorted it myself a year ago. Here by eight at night, while it's still coffee and Lakemba still has some. Do not let them talk you into anything.",
+   "giver": "qgb-lakemba-nusrat-a",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near the Ramadan night markets"
+    },
+    {
+     "kind": "goto",
+     "x": -12202,
+     "z": 5856,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 142,
+    "xp": 421,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-002",
+   "act": 3,
+   "title": "Before They Touch the Lakemba Mosque",
+   "blurb": "It is not a police matter and I have checked. They start on the Lakemba Mosque on Saturday and the orange fencing goes up. I have rung the number on the letter four times. I want Lakemba on record before it does. Do that and we're square.",
+   "giver": "qgb-lakemba-nusrat-a",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -12639,
+     "z": 5555,
+     "radius": 40,
+     "label": "photograph the state of the Lakemba Mosque"
+    },
+    {
+     "kind": "goto",
+     "x": -12664,
+     "z": 5773,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 161,
+    "xp": 398,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-003",
+   "act": 3,
+   "title": "Tap On at the Lakemba Hotel",
+   "blurb": "I have written it down twice and lost it twice. My Opal says I owe nineteen dollars for a trip from Lakemba I never took on Australia Day. It has been going on longer than I have admitted to anyone. Take the same one to Hurstville and tell me what it charged you. Say nothing to anyone on the way.",
+   "giver": "qgb-lakemba-omar",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Lakemba",
+     "to": "Hurstville",
+     "label": "tap on at Lakemba, tap off at Hurstville"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-lakemba-omar",
+     "node": "report-1",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 150,
+    "xp": 403,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-004",
+   "act": 3,
+   "title": "Closing Time at Railway Parade",
+   "blurb": "Not being dramatic about this. Two blokes have slept in my doorway on Railway Parade since the pub shut. I am not after trouble. I am after an answer. The Lakemba delivery's at lunchtime, so get them up and show me the step empty. Be polite about it. It costs nothing.",
+   "giver": "qgb-lakemba-elie",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off Railway Parade"
+    },
+    {
+     "kind": "photo",
+     "x": -12816,
+     "z": 6016,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 142,
+    "xp": 416,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-005",
+   "act": 3,
+   "title": "Ask Around at Hurstville",
+   "blurb": "Do not laugh. There's work going outside Hurstville station and nobody at the Lakemba Hotel can tell me what. My wife says I should let it go. My wife is wrong. Ride over at dawn, get the shape of it, come back. Whatever you find, bring it to me first.",
+   "giver": "qgb-lakemba-lorraine",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Lakemba",
+     "to": "Hurstville",
+     "label": "take the train to Hurstville"
+    },
+    {
+     "kind": "goto",
+     "x": -9680,
+     "z": 11150,
+     "radius": 30,
+     "label": "find the people outside Hurstville station"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-lakemba-lorraine",
+     "node": "report-1",
+     "label": "then come back and tell me what they said"
+    }
+   ],
+   "reward": {
+    "cash": 145,
+    "xp": 413,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-006",
+   "act": 3,
+   "title": "The Haldon Street Order",
+   "blurb": "You will think I am making this up. The Haldon Street order came to seventy more than I'd budgeted and the supplier wants it by bin night. Half the street knows and half the street is pretending not to. Find seventy in Lakemba and photograph the receipt. Say nothing to anyone on the way.",
+   "giver": "qgb-lakemba-bazza",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 120,
+     "label": "square the seventy for the Haldon Street order"
+    },
+    {
+     "kind": "photo",
+     "x": -12004,
+     "z": 5944,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 145,
+    "xp": 432,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-007",
+   "act": 3,
+   "title": "Staffy Near the Lebanese bakeries",
+   "blurb": "Nobody else has offered, so. A brindle staffy in a red bandana went over the fence at the Lebanese bakeries at half seven. It is the not knowing that has got me, honestly. Everyone in Lakemba has definitely seen it and can't say where. Just do not come back empty-handed.",
+   "giver": "qgb-lakemba-nour-a",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -11996,
+     "z": 5348,
+     "radius": 30,
+     "label": "check the off-leash bit near the Lebanese bakeries"
+    },
+    {
+     "kind": "photo",
+     "x": -11957,
+     "z": 5529,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-lakemba-nour-a",
+     "node": "report-0",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 144,
+    "xp": 416,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-008",
+   "act": 3,
+   "title": "Closing Time at the Ramadan night markets",
+   "blurb": "Keep it between us for now. Two blokes have slept in my doorway on the Ramadan night markets since the pub shut. I did try the official route, for what that was worth. The Lakemba delivery's at dawn, so get them up and show me the step empty. If anyone asks, you were never here.",
+   "giver": "qgb-lakemba-nour-a",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off the Ramadan night markets"
+    },
+    {
+     "kind": "photo",
+     "x": -12176,
+     "z": 6112,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 153,
+    "xp": 429,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-009",
+   "act": 3,
+   "title": "Trouble at the Lakemba Mosque",
+   "blurb": "Before you say anything: yes, I know. Two lads and their mate decided at the arvo that the Lakemba Mosque is theirs. I am not after trouble. I am after an answer. The rest of Lakemba disagrees, so explain the disagreement. That's it. That's the whole ask.",
+   "giver": "qgb-lakemba-hamish",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near the Lakemba Mosque"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 161,
+    "xp": 436,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-010",
+   "act": 3,
+   "title": "The the Lakemba Hotel Complaint",
+   "blurb": "It is the sort of thing you notice or you do not. Two women in activewear have photographed my bins outside the Lakemba Hotel since Melbourne Cup day. You will see what I mean the second you get there. One has Lakemba council on speed dial; sort it however you sort things. There's cash in it. Not a lot.",
+   "giver": "qgb-lakemba-imran-a",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near the Lakemba Hotel"
+    }
+   ],
+   "reward": {
+    "cash": 151,
+    "xp": 406,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-011",
+   "act": 3,
+   "title": "Cover at Railway Parade",
+   "blurb": "You look like you have twenty minutes. I've got nobody for the Railway Parade shift at half two and a room full of Lakemba people who've paid. I would not ask if there was anyone else about. Fifty of trade and one difficult person at the door. I will owe you one, and I pay those.",
+   "giver": "qgb-lakemba-nour-b",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 86,
+     "label": "cover the fifty for the shift"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 1,
+     "label": "and handle whoever's at the door"
+    }
+   ],
+   "reward": {
+    "cash": 154,
+    "xp": 421,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-012",
+   "act": 3,
+   "title": "The Railway Parade Camera",
+   "blurb": "I have been putting it off since Easter. A new speed camera near Railway Parade has fined half of Lakemba since Sunday. I am aware how that sounds. Photograph it for the appeal, then prove the train to Hurstville is faster anyway. Come back and tell me straight.",
+   "giver": "qgb-lakemba-nour-b",
+   "level": 7,
+   "requires": [
+    "qgb-l7-lakemba-011"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -12382,
+     "z": 6152,
+     "radius": 40,
+     "label": "photograph the camera near Railway Parade"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Lakemba",
+     "to": "Hurstville",
+     "label": "then take the train instead, to Hurstville"
+    }
+   ],
+   "reward": {
+    "cash": 191,
+    "xp": 523,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-013",
+   "act": 3,
+   "title": "Two From Wangee Road",
+   "blurb": "I'll be straight with you. Two of whatever's going near Wangee Road, here, hot, before the footy at the change of shift. My wife says I should let it go. My wife is wrong. It's Lakemba; I'm not asking for much. There is no rush, but there is a Friday.",
+   "giver": "qgb-lakemba-bruce",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near Wangee Road"
+    },
+    {
+     "kind": "goto",
+     "x": -11915,
+     "z": 6313,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 158,
+    "xp": 414,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-014",
+   "act": 3,
+   "title": "The Haldon Street Course",
+   "blurb": "It is not a police matter and I have checked. A bloke near Haldon Street runs a ninety-minute course he bills at four hundred, and I've paid. It has been going on longer than I have admitted to anyone. Sit it Monday, then come back to Lakemba and prove it did something. You'll know it when you see it.",
+   "giver": "qgb-lakemba-rhonda",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near Haldon Street"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 402,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-015",
+   "act": 3,
+   "title": "Before They Touch Parry Park",
+   "blurb": "You will think I am making this up. They start on Parry Park on Sunday and the orange fencing goes up. It is the not knowing that has got me, honestly. I want Lakemba on record before it does. Ask for me by name at the counter.",
+   "giver": "qgb-lakemba-tony-a",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -12241,
+     "z": 5959,
+     "radius": 40,
+     "label": "photograph the state of Parry Park"
+    },
+    {
+     "kind": "goto",
+     "x": -12190,
+     "z": 5795,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 154,
+    "xp": 418,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-016",
+   "act": 3,
+   "title": "Bin Night, the Lebanese bakeries",
+   "blurb": "You look like you have twenty minutes. Somebody moves the bins on the Lebanese bakeries in front of my drive every Easter Saturday night. I am aware how that sounds. Photograph the evidence and have a word; Lakemba knows who. There's cash in it. Not a lot.",
+   "giver": "qgb-lakemba-layla-a",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -12236,
+     "z": 5835,
+     "radius": 40,
+     "label": "photograph the bins at the Lebanese bakeries"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 154,
+    "xp": 434,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-017",
+   "act": 3,
+   "title": "The the Lakemba Hotel Tab",
+   "blurb": "You are the first person to stop all morning. Two chippies off the the Lakemba Hotel job have run a tab in Lakemba since the last Sunday of the month. There is a version of this where I am the unreasonable one. They drove past at half four without looking in, so settle it in cash. Come back and tell me straight.",
+   "giver": "qgb-lakemba-pam",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Lakemba Hotel"
+    },
+    {
+     "kind": "earn",
+     "dollars": 52,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 144,
+    "xp": 432,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-018",
+   "act": 3,
+   "title": "Seven a.m. At Haldon Street",
+   "blurb": "Do not laugh. The site at Haldon Street starts its jackhammer at half six on a Friday, which is illegal and loud. The paperwork says one thing and my eyes say another. Photograph it running and have a word with the Lakemba foreman. There is no rush, but there is a Friday.",
+   "giver": "qgb-lakemba-rafi-a",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -12455,
+     "z": 5435,
+     "radius": 40,
+     "label": "photograph the noise from Haldon Street"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 155,
+    "xp": 426,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-019",
+   "act": 3,
+   "title": "Something From the Ramadan night markets",
+   "blurb": "There is no clever way to say this. The stall at the Ramadan night markets has run out and the customers keep coming. I would have sorted it myself a year ago. Find something round Lakemba that'll do before the the change of shift rush. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-lakemba-rafi-a",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near the Ramadan night markets"
+    },
+    {
+     "kind": "goto",
+     "x": -12239,
+     "z": 5874,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 143,
+    "xp": 416,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-020",
+   "act": 3,
+   "title": "The the Lakemba Mosque Fence",
+   "blurb": "The council knows and the council does not care. My neighbour at the Lakemba Mosque says the tree is on my side and the fence says otherwise. I have rung the number on the letter four times. Look at it grand final day with Lakemba eyes and tell me the truth. Whatever you find, bring it to me first.",
+   "giver": "qgb-lakemba-layla-b",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -12228,
+     "z": 5817,
+     "radius": 30,
+     "label": "go and look at the fence at the Lakemba Mosque"
+    },
+    {
+     "kind": "photo",
+     "x": -12228,
+     "z": 5817,
+     "radius": 40,
+     "label": "photograph the tree over it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-lakemba-layla-b",
+     "node": "report-0",
+     "label": "tell me whose side it's on"
+    }
+   ],
+   "reward": {
+    "cash": 150,
+    "xp": 412,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-021",
+   "act": 3,
+   "title": "Two Signs, the Lebanese bakeries",
+   "blurb": "Someone has to, and it may as well be you. Two signs near the Lebanese bakeries say opposite things about parking and I've been fined under both. It started small, the way these things do. Get photos of each before Thursday, when Lakemba council takes one down. Take your time. Do not take a week.",
+   "giver": "qgb-lakemba-layla-b",
+   "level": 7,
+   "requires": [
+    "qgb-l7-lakemba-020"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -12016,
+     "z": 5563,
+     "radius": 40,
+     "label": "photograph the sign at the Lebanese bakeries"
+    },
+    {
+     "kind": "photo",
+     "x": -12355,
+     "z": 5648,
+     "radius": 40,
+     "label": "and the one that contradicts it"
+    }
+   ],
+   "reward": {
+    "cash": 195,
+    "xp": 540,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-022",
+   "act": 3,
+   "title": "Bin Night, Wangee Road",
+   "blurb": "This is going to sound small. Somebody moves the bins on Wangee Road in front of my drive every the long weekend night. Nobody else seems to have noticed, which is its own problem. Photograph the evidence and have a word; Lakemba knows who. That's it. That's the whole ask.",
+   "giver": "qgb-lakemba-nusrat-b",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -12153,
+     "z": 5831,
+     "radius": 40,
+     "label": "photograph the bins at Wangee Road"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 422,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-023",
+   "act": 3,
+   "title": "Two Signs, Parry Park",
+   "blurb": "Do not laugh. Two signs near Parry Park say opposite things about parking and I've been fined under both. I would have sorted it myself a year ago. Get photos of each before Melbourne Cup day, when Lakemba council takes one down. I'll put the kettle on for when you're back.",
+   "giver": "qgb-lakemba-kev",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -12053,
+     "z": 6339,
+     "radius": 40,
+     "label": "photograph the sign at Parry Park"
+    },
+    {
+     "kind": "photo",
+     "x": -12043,
+     "z": 6066,
+     "radius": 40,
+     "label": "and the one that contradicts it"
+    }
+   ],
+   "reward": {
+    "cash": 142,
+    "xp": 431,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-024",
+   "act": 3,
+   "title": "Probationary at Railway Parade",
+   "blurb": "There is no clever way to say this. A young constable has been doing his first solo patrol round Railway Parade since Wednesday. I have rung the number on the letter four times. He's decided Lakemba is his, so give him a story for the sergeant. There is no rush, but there is a Friday.",
+   "giver": "qgb-lakemba-kev",
+   "level": 7,
+   "requires": [
+    "qgb-l7-lakemba-023"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "police",
+     "count": 1,
+     "label": "lose the probationary constable near Railway Parade"
+    }
+   ],
+   "reward": {
+    "cash": 192,
+    "xp": 553,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-025",
+   "act": 3,
+   "title": "Closing Time at the Lakemba Hotel",
+   "blurb": "Right. Since you asked. Two blokes have slept in my doorway on the Lakemba Hotel since the pub shut. It is not the money. It has stopped being the money. The Lakemba delivery's at eight at night, so get them up and show me the step empty. Take your time. Do not take a week.",
+   "giver": "qgb-lakemba-layla-c",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off the Lakemba Hotel"
+    },
+    {
+     "kind": "photo",
+     "x": -11873,
+     "z": 5997,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 145,
+    "xp": 431,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-026",
+   "act": 3,
+   "title": "Lads Off Railway Parade",
+   "blurb": "Two people have already said no. Three of them in TNs on the Railway Parade steps, flogging vapes to schoolkids at first thing. There is probably a simple explanation and I would love to hear it. Lakemba used to move them on itself and now it rings me. Ask for me by name at the counter.",
+   "giver": "qgb-lakemba-prue",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Railway Parade"
+    }
+   ],
+   "reward": {
+    "cash": 145,
+    "xp": 425,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-027",
+   "act": 3,
+   "title": "The Wangee Road Sparky",
+   "blurb": "Keep it between us for now. The sparky off the Wangee Road job has owed me since the bathroom and drinks in Lakemba from eleven. It might be nothing. It has not felt like nothing. Forty will do and I'll write off the rest. Say nothing to anyone on the way.",
+   "giver": "qgb-lakemba-prue",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for Wangee Road"
+    },
+    {
+     "kind": "earn",
+     "dollars": 69,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 152,
+    "xp": 427,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-028",
+   "act": 3,
+   "title": "Trolley Run, the knafeh stand",
+   "blurb": "Before you say anything: yes, I know. A Woolies trolley from the knafeh stand gets walked to the creek every Saturday. I have got a photo on my phone but it is useless. Find where it ends up in Lakemba and make the deposit back. Just do not come back empty-handed.",
+   "giver": "qgb-lakemba-annabel",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -12482,
+     "z": 5624,
+     "radius": 30,
+     "label": "find the trolley near the knafeh stand"
+    },
+    {
+     "kind": "photo",
+     "x": -12482,
+     "z": 5624,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 43,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 148,
+    "xp": 413,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-029",
+   "act": 3,
+   "title": "The the knafeh stand Lift",
+   "blurb": "Not being dramatic about this. The lift at Lakemba station has been out since the Easter Show and I'm told Hurstville is worse. Nobody else seems to have noticed, which is its own problem. Check both Melbourne Cup day and tell me which takes a pram. I'll see you right for it.",
+   "giver": "qgb-lakemba-annabel",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -12259,
+     "z": 5890,
+     "radius": 30,
+     "label": "check the lift at Lakemba station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Lakemba",
+     "to": "Hurstville",
+     "label": "then ride to Hurstville and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-lakemba-annabel",
+     "node": "report-2",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 156,
+    "xp": 436,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-030",
+   "act": 3,
+   "title": "The the Ramadan night markets Course",
+   "blurb": "This is going to sound small. A bloke near the Ramadan night markets runs a ninety-minute course he bills at four hundred, and I've paid. You will see what I mean the second you get there. Sit it Monday, then come back to Lakemba and prove it did something. If anyone asks, you were never here.",
+   "giver": "qgb-lakemba-elie-a",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near the Ramadan night markets"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 143,
+    "xp": 434,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-031",
+   "act": 3,
+   "title": "Before They Touch the Lakemba Hotel",
+   "blurb": "It is the sort of thing you notice or you do not. They start on the Lakemba Hotel on Friday and the orange fencing goes up. Everyone I have told has looked at me the way you are now. I want Lakemba on record before it does. Be polite about it. It costs nothing.",
+   "giver": "qgb-lakemba-tony-b",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -12276,
+     "z": 6065,
+     "radius": 40,
+     "label": "photograph the state of the Lakemba Hotel"
+    },
+    {
+     "kind": "goto",
+     "x": -12471,
+     "z": 5891,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 155,
+    "xp": 417,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-032",
+   "act": 3,
+   "title": "Race Four, the Lakemba Hotel",
+   "blurb": "Honestly, I am past caring how it looks. There's a horse in race four at ten past ten that a bloke at the Lakemba Hotel swears by. The paperwork says one thing and my eyes say another. Turn it into fifty-five somewhere in Lakemba and tell me if it came in. Come back and tell me straight.",
+   "giver": "qgb-lakemba-elie-b",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 95,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-lakemba-elie-b",
+     "node": "report-1",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 161,
+    "xp": 408,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-033",
+   "act": 3,
+   "title": "Sightline at Railway Parade",
+   "blurb": "Do not laugh. Insurance says nobody could have seen the ute hit the fence at Railway Parade on the last Sunday of the month. I have rung the number on the letter four times. Stand where I stood in Lakemba, photograph the view, tell me if I'm lying. I will know if you skipped a bit.",
+   "giver": "qgb-lakemba-fergus",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -12495,
+     "z": 5933,
+     "radius": 30,
+     "label": "stand where it happened at Railway Parade"
+    },
+    {
+     "kind": "photo",
+     "x": -12495,
+     "z": 5933,
+     "radius": 40,
+     "label": "photograph the corner"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-lakemba-fergus",
+     "node": "report-0",
+     "label": "describe the sightline"
+    }
+   ],
+   "reward": {
+    "cash": 160,
+    "xp": 406,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-034",
+   "act": 3,
+   "title": "Trouble at the Lebanese bakeries",
+   "blurb": "Someone has to, and it may as well be you. Two lads and their mate decided at half seven that the Lebanese bakeries is theirs. It is not the money. It has stopped being the money. The rest of Lakemba disagrees, so explain the disagreement. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-lakemba-kai",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near the Lebanese bakeries"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 156,
+    "xp": 427,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-035",
+   "act": 3,
+   "title": "Proof of Haldon Street",
+   "blurb": "Two people have already said no. Nobody in Lakemba believes what Haldon Street looks like at ten past ten. It might be nothing. It has not felt like nothing. Get me a photo close enough that council can't say it's somewhere else. Do that and we're square.",
+   "giver": "qgb-lakemba-nour-c",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -11860,
+     "z": 5615,
+     "radius": 40,
+     "label": "get a picture of Haldon Street before they fix it"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 414,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-036",
+   "act": 3,
+   "title": "One Stop From the Lebanese bakeries",
+   "blurb": "I have been putting it off since Easter. I need to know the train from Lakemba stops at Hurstville and doesn't sail through like it did on the last Sunday of the month. My wife says I should let it go. My wife is wrong. Ride it at the arvo and photograph the sign. I would rather know than wonder.",
+   "giver": "qgb-lakemba-ray",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Lakemba",
+     "to": "Hurstville",
+     "label": "take the train to Hurstville"
+    },
+    {
+     "kind": "photo",
+     "x": -9680,
+     "z": 11150,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 145,
+    "xp": 435,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-037",
+   "act": 3,
+   "title": "Seven a.m. At the knafeh stand",
+   "blurb": "Do not laugh. The site at the knafeh stand starts its jackhammer at the last train on a Thursday, which is illegal and loud. It started small, the way these things do. Photograph it running and have a word with the Lakemba foreman. Do not make a scene about it.",
+   "giver": "qgb-lakemba-tasnim-a",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -12570,
+     "z": 6255,
+     "radius": 40,
+     "label": "photograph the noise from the knafeh stand"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 150,
+    "xp": 409,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l7-lakemba-038",
+   "act": 3,
+   "title": "Something From Haldon Street",
+   "blurb": "The council knows and the council does not care. The stall at Haldon Street has run out and the customers keep coming. It is not the money. It has stopped being the money. Find something round Lakemba that'll do before the nine sharp rush. I'll put the kettle on for when you're back.",
+   "giver": "qgb-lakemba-tony-c",
+   "level": 7,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near Haldon Street"
+    },
+    {
+     "kind": "goto",
+     "x": -12225,
+     "z": 5823,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 154,
+    "xp": 429,
+    "unlock": []
+   }
+  }
+ ]
+}

@@ -1,0 +1,2586 @@
+{
+ "pack": "areab-blacktown-2",
+ "npcs": [
+  {
+   "id": "qgb-blacktown-fiona",
+   "name": "Fiona, uni student, three jobs",
+   "x": -28664,
+   "z": -10588,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Blacktown rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Main Street is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's something from francis park.",
+     "choices": [
+      {
+       "text": "Something From Francis Park",
+       "accept": "qgb-l10-blacktown-037",
+       "denyFlag": "w:qgb-l10-blacktown-037"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Fiona pays up on the spot.",
+     "choices": [
+      {
+       "text": "About something from francis park.",
+       "turnin": "qgb-l10-blacktown-037"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Main Street that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Fiona, uni student, three jobs in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Main Street like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near Main Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-ray",
+   "name": "Ray, proud westie",
+   "x": -27930,
+   "z": -10823,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Westie and proud, mate. Say it. Blacktown. Yeah.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Born at Nepean, work at Penrith, drive a ute with a P plate I should've taken off ten years ago. Francis Park is home.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the blacktown international sportspark camera.",
+     "choices": [
+      {
+       "text": "The the Blacktown International Sportspark Camera",
+       "accept": "qgb-l10-blacktown-038",
+       "denyFlag": "w:qgb-l10-blacktown-038"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Ray pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the blacktown international sportspark camera.",
+       "turnin": "qgb-l10-blacktown-038"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The M4 at five is a car park. The M4 at six is a slower car park. Francis Park's the shortcut. Don't tell anyone.",
+     "improv": {
+      "persona": "Ray, proud westie in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Francis Park like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near Francis Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-terry",
+   "name": "Terry, probationary constable",
+   "x": -28390,
+   "z": -10817,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Blacktown LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of Mount Druitt Westfield. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's probationary at westpoint.",
+     "choices": [
+      {
+       "text": "Probationary at Westpoint",
+       "accept": "qgb-l10-blacktown-039",
+       "denyFlag": "w:qgb-l10-blacktown-039"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Terry counts it out without looking up. -- Don't spend it all at Mount Druitt Westfield.",
+     "choices": [
+      {
+       "text": "About probationary at westpoint.",
+       "turnin": "qgb-l10-blacktown-039"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about Mount Druitt Westfield. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Terry, probationary constable in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Mount Druitt Westfield like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near Mount Druitt Westfield."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-shirl",
+   "name": "Shirl, council ranger",
+   "x": -28349,
+   "z": -10960,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Blacktown is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Flushcombe Road generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the blacktown bowlo complaint.",
+     "choices": [
+      {
+       "text": "The the Blacktown Bowlo Complaint",
+       "accept": "qgb-l10-blacktown-040",
+       "denyFlag": "w:qgb-l10-blacktown-040"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Shirl looks it over the way Blacktown looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the blacktown bowlo complaint.",
+       "turnin": "qgb-l10-blacktown-040"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Shirl, council ranger in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Flushcombe Road like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near Flushcombe Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-bassam",
+   "name": "Bassam, mechanic, own shop",
+   "x": -28508,
+   "z": -10364,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "It's the timing belt. I haven't looked. It's always the timing belt. Blacktown, what've you got?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Commodores, Hiluxes, the odd Alfa from a man who should know better. Mount Druitt Westfield is where they die.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the length of the rooty hill rsl.",
+     "choices": [
+      {
+       "text": "The Length of the Rooty Hill RSL",
+       "accept": "qgb-l10-blacktown-041",
+       "denyFlag": "w:qgb-l10-blacktown-041"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Bassam looks it over the way Blacktown looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the length of the rooty hill rsl.",
+       "turnin": "qgb-l10-blacktown-041"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never buy a car off Mount Druitt Westfield. Never. I've seen where they've been.",
+     "improv": {
+      "persona": "Bassam, mechanic, own shop in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Mount Druitt Westfield like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near Mount Druitt Westfield."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-jarrod",
+   "name": "Jarrod, uni student, three jobs",
+   "x": -28064,
+   "z": -10455,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Blacktown rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the Rooty Hill RSL is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the westpoint tab.",
+     "choices": [
+      {
+       "text": "The Westpoint Tab",
+       "accept": "qgb-l10-blacktown-042",
+       "denyFlag": "w:qgb-l10-blacktown-042"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Jarrod counts it out without looking up. -- Don't spend it all at the Rooty Hill RSL.",
+     "choices": [
+      {
+       "text": "About the westpoint tab.",
+       "turnin": "qgb-l10-blacktown-042"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the Rooty Hill RSL that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Jarrod, uni student, three jobs in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Rooty Hill RSL like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near the Rooty Hill RSL."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-tevita",
+   "name": "Tevita, church youth leader",
+   "x": -27834,
+   "z": -10288,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bro. Sis. Welcome, welcome. Blacktown Sunday, the whole family's here.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Youth group, choir, the rugby on Saturdays. Westpoint feeds four hundred after the service and nobody goes home hungry.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Cover at Mount Druitt Westfield",
+       "accept": "qgb-l10-blacktown-043",
+       "denyFlag": "w:qgb-l10-blacktown-043"
+      },
+      {
+       "text": "Trolley Run, Main Street",
+       "accept": "qgb-l10-blacktown-044",
+       "denyFlag": "w:qgb-l10-blacktown-044",
+       "needFlag": "w:qgb-l10-blacktown-043"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Tevita looks it over the way Blacktown looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About cover at mount druitt westfield.",
+       "turnin": "qgb-l10-blacktown-043"
+      },
+      {
+       "text": "About trolley run, main street.",
+       "turnin": "qgb-l10-blacktown-044"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best feed in Blacktown is the hall at Westpoint after church. You don't need an invitation. You're invited.",
+     "improv": {
+      "persona": "Tevita, church youth leader in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Westpoint like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near Westpoint."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-jason",
+   "name": "Jason, proud westie",
+   "x": -27899,
+   "z": -10597,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Westie and proud, mate. Say it. Blacktown. Yeah.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Born at Nepean, work at Penrith, drive a ute with a P plate I should've taken off ten years ago. Main Street is home.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the blacktown workers club order.",
+     "choices": [
+      {
+       "text": "The the Blacktown Workers Club Order",
+       "accept": "qgb-l10-blacktown-045",
+       "denyFlag": "w:qgb-l10-blacktown-045"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Jason pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the blacktown workers club order.",
+       "turnin": "qgb-l10-blacktown-045"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The M4 at five is a car park. The M4 at six is a slower car park. Main Street's the shortcut. Don't tell anyone.",
+     "improv": {
+      "persona": "Jason, proud westie in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Main Street like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near Main Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-pam",
+   "name": "Pam, council ranger",
+   "x": -27871,
+   "z": -10546,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Blacktown is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. the Blacktown International Sportspark generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Flushcombe Road Lift",
+       "accept": "qgb-l10-blacktown-046",
+       "denyFlag": "w:qgb-l10-blacktown-046"
+      },
+      {
+       "text": "Seven a.m. At Flushcombe Road",
+       "accept": "qgb-l10-blacktown-047",
+       "denyFlag": "w:qgb-l10-blacktown-047",
+       "needFlag": "w:qgb-l10-blacktown-046"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Pam counts it out without looking up. -- Don't spend it all at the Blacktown International Sportspark.",
+     "choices": [
+      {
+       "text": "About the flushcombe road lift.",
+       "turnin": "qgb-l10-blacktown-046"
+      },
+      {
+       "text": "About seven a.m. at flushcombe road.",
+       "turnin": "qgb-l10-blacktown-047"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Pam, council ranger in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Blacktown International Sportspark like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near the Blacktown International Sportspark."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Pam listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-denise",
+   "name": "Denise, chippy off a job",
+   "x": -28303,
+   "z": -10686,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Blacktown, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's meat tray at the blacktown workers club.",
+     "choices": [
+      {
+       "text": "Meat Tray at the Blacktown Workers Club",
+       "accept": "qgb-l10-blacktown-048",
+       "denyFlag": "w:qgb-l10-blacktown-048"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Denise looks it over the way Blacktown looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About meat tray at the blacktown workers club.",
+       "turnin": "qgb-l10-blacktown-048"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Blacktown is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Denise, chippy off a job in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Main Street like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near Main Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-kai",
+   "name": "Kai, RSL sub-branch secretary",
+   "x": -28204,
+   "z": -10986,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sign in, love. Everyone signs in. Blacktown RSL, you're very welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Raffles, Anzac Day, the bistro's schnitzel and a room full of pokies I have opinions about. the Blacktown Workers Club sends us its regulars.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Proof of the Rooty Hill RSL",
+       "accept": "qgb-l10-blacktown-049",
+       "denyFlag": "w:qgb-l10-blacktown-049"
+      },
+      {
+       "text": "Closing Time at the Blacktown International Sportspark",
+       "accept": "qgb-l10-blacktown-050",
+       "denyFlag": "w:qgb-l10-blacktown-050",
+       "needFlag": "w:qgb-l10-blacktown-049"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Kai looks it over the way Blacktown looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About proof of the rooty hill rsl.",
+       "turnin": "qgb-l10-blacktown-049"
+      },
+      {
+       "text": "About closing time at the blacktown international sportspark.",
+       "turnin": "qgb-l10-blacktown-050"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The cheapest schooner in Blacktown is at the sub-branch, six o'clock, before the Ode. Stand up for the Ode.",
+     "improv": {
+      "persona": "Kai, RSL sub-branch secretary in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Blacktown Workers Club like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near the Blacktown Workers Club."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-toby",
+   "name": "Toby, council ranger",
+   "x": -28278,
+   "z": -10886,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Blacktown is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Francis Park generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trolley run, the blacktown international sportspark.",
+     "choices": [
+      {
+       "text": "Trolley Run, the Blacktown International Sportspark",
+       "accept": "qgb-l10-blacktown-051",
+       "denyFlag": "w:qgb-l10-blacktown-051"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Toby pays up on the spot.",
+     "choices": [
+      {
+       "text": "About trolley run, the blacktown international sportspark.",
+       "turnin": "qgb-l10-blacktown-051"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Toby, council ranger in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Francis Park like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near Francis Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-maya",
+   "name": "Maya, mechanic, own shop",
+   "x": -28296,
+   "z": -10277,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "It's the timing belt. I haven't looked. It's always the timing belt. Blacktown, what've you got?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Commodores, Hiluxes, the odd Alfa from a man who should know better. Flushcombe Road is where they die.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch the blacktown bowlo.",
+     "choices": [
+      {
+       "text": "Before They Touch the Blacktown Bowlo",
+       "accept": "qgb-l10-blacktown-052",
+       "denyFlag": "w:qgb-l10-blacktown-052"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Maya counts it out without looking up. -- Don't spend it all at Flushcombe Road.",
+     "choices": [
+      {
+       "text": "About before they touch the blacktown bowlo.",
+       "turnin": "qgb-l10-blacktown-052"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never buy a car off Flushcombe Road. Never. I've seen where they've been.",
+     "improv": {
+      "persona": "Maya, mechanic, own shop in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Flushcombe Road like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near Flushcombe Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-kylie",
+   "name": "Kylie, RSL sub-branch secretary",
+   "x": -28192,
+   "z": -10806,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sign in, love. Everyone signs in. Blacktown RSL, you're very welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Raffles, Anzac Day, the bistro's schnitzel and a room full of pokies I have opinions about. Main Street sends us its regulars.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at the blacktown international sportspark.",
+     "choices": [
+      {
+       "text": "Trouble at the Blacktown International Sportspark",
+       "accept": "qgb-l10-blacktown-053",
+       "denyFlag": "w:qgb-l10-blacktown-053"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Kylie looks it over the way Blacktown looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About trouble at the blacktown international sportspark.",
+       "turnin": "qgb-l10-blacktown-053"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The cheapest schooner in Blacktown is at the sub-branch, six o'clock, before the Ode. Stand up for the Ode.",
+     "improv": {
+      "persona": "Kylie, RSL sub-branch secretary in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Main Street like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near Main Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-narelle",
+   "name": "Narelle, council ranger",
+   "x": -27918,
+   "z": -10707,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Blacktown is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. the Blacktown Workers Club generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the francis park camera.",
+     "choices": [
+      {
+       "text": "The Francis Park Camera",
+       "accept": "qgb-l10-blacktown-054",
+       "denyFlag": "w:qgb-l10-blacktown-054"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Narelle counts it out without looking up. -- Don't spend it all at the Blacktown Workers Club.",
+     "choices": [
+      {
+       "text": "About the francis park camera.",
+       "turnin": "qgb-l10-blacktown-054"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Narelle, council ranger in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Blacktown Workers Club like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near the Blacktown Workers Club."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-sienna",
+   "name": "Sienna, probationary constable",
+   "x": -27774,
+   "z": -10879,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Blacktown LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of Francis Park. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the blacktown international sportspark complaint.",
+     "choices": [
+      {
+       "text": "The the Blacktown International Sportspark Complaint",
+       "accept": "qgb-l10-blacktown-055",
+       "denyFlag": "w:qgb-l10-blacktown-055"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Sienna pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the blacktown international sportspark complaint.",
+       "turnin": "qgb-l10-blacktown-055"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about Francis Park. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Sienna, probationary constable in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Francis Park like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near Francis Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-salote",
+   "name": "Salote, church youth leader",
+   "x": -28613,
+   "z": -10705,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bro. Sis. Welcome, welcome. Blacktown Sunday, the whole family's here.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Youth group, choir, the rugby on Saturdays. the Blacktown Bowlo feeds four hundred after the service and nobody goes home hungry.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's closing time at mount druitt westfield.",
+     "choices": [
+      {
+       "text": "Closing Time at Mount Druitt Westfield",
+       "accept": "qgb-l10-blacktown-056",
+       "denyFlag": "w:qgb-l10-blacktown-056"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Salote pays up on the spot.",
+     "choices": [
+      {
+       "text": "About closing time at mount druitt westfield.",
+       "turnin": "qgb-l10-blacktown-056"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best feed in Blacktown is the hall at the Blacktown Bowlo after church. You don't need an invitation. You're invited.",
+     "improv": {
+      "persona": "Salote, church youth leader in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Blacktown Bowlo like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near the Blacktown Bowlo."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-wayne",
+   "name": "Wayne, chippy off a job",
+   "x": -28464,
+   "z": -10240,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Blacktown, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's something from the blacktown workers club.",
+     "choices": [
+      {
+       "text": "Something From the Blacktown Workers Club",
+       "accept": "qgb-l10-blacktown-057",
+       "denyFlag": "w:qgb-l10-blacktown-057"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Wayne looks it over the way Blacktown looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About something from the blacktown workers club.",
+       "turnin": "qgb-l10-blacktown-057"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Blacktown is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Wayne, chippy off a job in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Rooty Hill RSL like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near the Rooty Hill RSL."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-elie",
+   "name": "Elie, mechanic, own shop",
+   "x": -28003,
+   "z": -10152,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "It's the timing belt. I haven't looked. It's always the timing belt. Blacktown, what've you got?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Commodores, Hiluxes, the odd Alfa from a man who should know better. Francis Park is where they die.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two from flushcombe road.",
+     "choices": [
+      {
+       "text": "Two From Flushcombe Road",
+       "accept": "qgb-l10-blacktown-058",
+       "denyFlag": "w:qgb-l10-blacktown-058"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Elie looks it over the way Blacktown looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About two from flushcombe road.",
+       "turnin": "qgb-l10-blacktown-058"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never buy a car off Francis Park. Never. I've seen where they've been.",
+     "improv": {
+      "persona": "Elie, mechanic, own shop in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Francis Park like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near Francis Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-bruce",
+   "name": "Bruce, council ranger",
+   "x": -28352,
+   "z": -10288,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council Blacktown is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. Westpoint generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Main Street Lift",
+       "accept": "qgb-l10-blacktown-059",
+       "denyFlag": "w:qgb-l10-blacktown-059"
+      },
+      {
+       "text": "Seven a.m. At Main Street",
+       "accept": "qgb-l10-blacktown-060",
+       "denyFlag": "w:qgb-l10-blacktown-060",
+       "needFlag": "w:qgb-l10-blacktown-059"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Bruce pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the main street lift.",
+       "turnin": "qgb-l10-blacktown-059"
+      },
+      {
+       "text": "About seven a.m. at main street.",
+       "turnin": "qgb-l10-blacktown-060"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Bruce, council ranger in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Westpoint like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near Westpoint."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Bruce listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-thelma",
+   "name": "Thelma, probationary constable",
+   "x": -28209,
+   "z": -10717,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Blacktown LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of Main Street. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the blacktown workers club course.",
+     "choices": [
+      {
+       "text": "The the Blacktown Workers Club Course",
+       "accept": "qgb-l10-blacktown-061",
+       "denyFlag": "w:qgb-l10-blacktown-061"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Thelma looks it over the way Blacktown looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the blacktown workers club course.",
+       "turnin": "qgb-l10-blacktown-061"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about Main Street. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Thelma, probationary constable in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Main Street like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near Main Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-neville",
+   "name": "Neville, uni student, three jobs",
+   "x": -28499,
+   "z": -10991,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Blacktown rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Francis Park is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's lads off the blacktown international sportspark.",
+     "choices": [
+      {
+       "text": "Lads Off the Blacktown International Sportspark",
+       "accept": "qgb-l10-blacktown-062",
+       "denyFlag": "w:qgb-l10-blacktown-062"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Neville pays up on the spot.",
+     "choices": [
+      {
+       "text": "About lads off the blacktown international sportspark.",
+       "turnin": "qgb-l10-blacktown-062"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Francis Park that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Neville, uni student, three jobs in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Francis Park like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near Francis Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-scott",
+   "name": "Scott, proud westie",
+   "x": -28113,
+   "z": -10711,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Westie and proud, mate. Say it. Blacktown. Yeah.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Born at Nepean, work at Penrith, drive a ute with a P plate I should've taken off ten years ago. Flushcombe Road is home.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's francis park pub crawl.",
+     "choices": [
+      {
+       "text": "Francis Park Pub Crawl",
+       "accept": "qgb-l10-blacktown-063",
+       "denyFlag": "w:qgb-l10-blacktown-063"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Scott looks it over the way Blacktown looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About francis park pub crawl.",
+       "turnin": "qgb-l10-blacktown-063"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The M4 at five is a car park. The M4 at six is a slower car park. Flushcombe Road's the shortcut. Don't tell anyone.",
+     "improv": {
+      "persona": "Scott, proud westie in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Flushcombe Road like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near Flushcombe Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-merv",
+   "name": "Merv, chippy off a job",
+   "x": -28466,
+   "z": -10522,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Blacktown, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch mount druitt westfield.",
+     "choices": [
+      {
+       "text": "Before They Touch Mount Druitt Westfield",
+       "accept": "qgb-l10-blacktown-064",
+       "denyFlag": "w:qgb-l10-blacktown-064"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Merv pays up on the spot.",
+     "choices": [
+      {
+       "text": "About before they touch mount druitt westfield.",
+       "turnin": "qgb-l10-blacktown-064"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Blacktown is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Merv, chippy off a job in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Blacktown Bowlo like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near the Blacktown Bowlo."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-ahmed",
+   "name": "Ahmed, mechanic, own shop",
+   "x": -28234,
+   "z": -11114,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "It's the timing belt. I haven't looked. It's always the timing belt. Blacktown, what've you got?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Commodores, Hiluxes, the odd Alfa from a man who should know better. Main Street is where they die.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the blacktown workers club sparky.",
+     "choices": [
+      {
+       "text": "The the Blacktown Workers Club Sparky",
+       "accept": "qgb-l10-blacktown-065",
+       "denyFlag": "w:qgb-l10-blacktown-065"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Ahmed looks it over the way Blacktown looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the blacktown workers club sparky.",
+       "turnin": "qgb-l10-blacktown-065"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Never buy a car off Main Street. Never. I've seen where they've been.",
+     "improv": {
+      "persona": "Ahmed, mechanic, own shop in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Main Street like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near Main Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-junior-a",
+   "name": "Junior A., church youth leader",
+   "x": -27962,
+   "z": -10842,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bro. Sis. Welcome, welcome. Blacktown Sunday, the whole family's here.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Youth group, choir, the rugby on Saturdays. Francis Park feeds four hundred after the service and nobody goes home hungry.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the blacktown international sportspark fence.",
+     "choices": [
+      {
+       "text": "The the Blacktown International Sportspark Fence",
+       "accept": "qgb-l10-blacktown-066",
+       "denyFlag": "w:qgb-l10-blacktown-066"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Junior A. looks it over the way Blacktown looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the blacktown international sportspark fence.",
+       "turnin": "qgb-l10-blacktown-066"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best feed in Blacktown is the hall at Francis Park after church. You don't need an invitation. You're invited.",
+     "improv": {
+      "persona": "Junior A., church youth leader in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Francis Park like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near Francis Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Junior A. listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-blacktown-joyce",
+   "name": "Joyce, chippy off a job",
+   "x": -27979,
+   "z": -10626,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. Blacktown, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Blacktown like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the rooty hill rsl tab.",
+     "choices": [
+      {
+       "text": "The the Rooty Hill RSL Tab",
+       "accept": "qgb-l10-blacktown-067",
+       "denyFlag": "w:qgb-l10-blacktown-067"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Joyce pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the rooty hill rsl tab.",
+       "turnin": "qgb-l10-blacktown-067"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round Blacktown is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Joyce, chippy off a job in Blacktown, Sydney. Dry, specific, local; never says g'day or crikey; talks about Flushcombe Road like everyone knows it.",
+      "context": "Someone has asked what Blacktown is like these days. You are standing near Flushcombe Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

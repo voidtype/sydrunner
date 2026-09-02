@@ -1,0 +1,1336 @@
+{
+ "pack": "areab-circular-quay-1",
+ "quests": [
+  {
+   "id": "qgb-l4-circular-quay-001",
+   "act": 3,
+   "title": "Lads Off the Museum of Contemporary Art",
+   "blurb": "Right. Since you asked. Three of them in TNs on the the Museum of Contemporary Art steps, flogging vapes to schoolkids at lunchtime. I have rung the number on the letter four times. Circular Quay used to move them on itself and now it rings me. That's it. That's the whole ask.",
+   "giver": "qgb-circular-quay-graham",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from the Museum of Contemporary Art"
+    }
+   ],
+   "reward": {
+    "cash": 117,
+    "xp": 302,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-002",
+   "act": 3,
+   "title": "Bin Night, the Fortune of War",
+   "blurb": "You will think I am making this up. Somebody moves the bins on the Fortune of War in front of my drive every the last Sunday of the month night. Half the street knows and half the street is pretending not to. Photograph the evidence and have a word; Circular Quay knows who. Half now if you want it. Most people don't.",
+   "giver": "qgb-circular-quay-kai",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -306,
+     "z": -842,
+     "radius": 40,
+     "label": "photograph the bins at the Fortune of War"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 111,
+    "xp": 272,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-003",
+   "act": 3,
+   "title": "Seven a.m. At the Fortune of War",
+   "blurb": "Nobody else has offered, so. The site at the Fortune of War starts its jackhammer at six in the morning on a Friday, which is illegal and loud. It is the not knowing that has got me, honestly. Photograph it running and have a word with the Circular Quay foreman. There's cash in it. Not a lot.",
+   "giver": "qgb-circular-quay-kai",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 1,
+     "z": -694,
+     "radius": 40,
+     "label": "photograph the noise from the Fortune of War"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 100,
+    "xp": 269,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-004",
+   "act": 3,
+   "title": "Counting the Hero of Waterloo",
+   "blurb": "Not being dramatic about this. Council says the the Hero of Waterloo car park is never full and I say it's full by lunchtime. There is probably a simple explanation and I would love to hear it. Count both Circular Quay car parks, photograph whichever one makes me right. I will know if you skipped a bit.",
+   "giver": "qgb-circular-quay-ana-a",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -26,
+     "z": -938,
+     "radius": 30,
+     "label": "count the cars at the Hero of Waterloo"
+    },
+    {
+     "kind": "goto",
+     "x": 92,
+     "z": -619,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": -26,
+     "z": -938,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 292,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-005",
+   "act": 3,
+   "title": "The the Hero of Waterloo Complaint",
+   "blurb": "This is going to sound small. Two women in activewear have photographed my bins outside the Hero of Waterloo since the last Sunday of the month. It might be nothing. It has not felt like nothing. One has Circular Quay council on speed dial; sort it however you sort things. I'll put the kettle on for when you're back.",
+   "giver": "qgb-circular-quay-ana-a",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near the Hero of Waterloo"
+    }
+   ],
+   "reward": {
+    "cash": 106,
+    "xp": 287,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-006",
+   "act": 3,
+   "title": "Ask Around at Milsons Point",
+   "blurb": "I would do it myself if I could leave the counter. There's work going outside Milsons Point station and nobody at the Manly ferry can tell me what. I have got a photo on my phone but it is useless. Ride over at the arvo, get the shape of it, come back. There is no rush, but there is a Friday.",
+   "giver": "qgb-circular-quay-bluey",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Circular Quay",
+     "to": "Milsons Point",
+     "label": "take the train to Milsons Point"
+    },
+    {
+     "kind": "goto",
+     "x": 145,
+     "z": -2496,
+     "radius": 30,
+     "label": "find the people outside Milsons Point station"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-circular-quay-bluey",
+     "node": "report-0",
+     "label": "then come back and tell me what they said"
+    }
+   ],
+   "reward": {
+    "cash": 117,
+    "xp": 300,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-007",
+   "act": 3,
+   "title": "Two From the Opera House",
+   "blurb": "It has been three weeks. Two of whatever's going near the Opera House, here, hot, before the footy at half seven. Nobody else seems to have noticed, which is its own problem. It's Circular Quay; I'm not asking for much. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-circular-quay-bluey",
+   "level": 4,
+   "requires": [
+    "qgb-l4-circular-quay-006"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near the Opera House"
+    },
+    {
+     "kind": "goto",
+     "x": -487,
+     "z": -925,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 152,
+    "xp": 378,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-008",
+   "act": 3,
+   "title": "Cover at the Opera House",
+   "blurb": "It is the sort of thing you notice or you do not. I've got nobody for the the Opera House shift at ten past ten and a room full of Circular Quay people who've paid. You will see what I mean the second you get there. Fifty of trade and one difficult person at the door. Whatever you find, bring it to me first.",
+   "giver": "qgb-circular-quay-bluey",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 68,
+     "label": "cover the fifty for the shift"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 1,
+     "label": "and handle whoever's at the door"
+    }
+   ],
+   "reward": {
+    "cash": 109,
+    "xp": 289,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-009",
+   "act": 3,
+   "title": "The the Harbour Bridge Order",
+   "blurb": "You look like you have twenty minutes. The the Harbour Bridge order came to seventy more than I'd budgeted and the supplier wants it by midnight. I would not ask if there was anyone else about. Find seventy in Circular Quay and photograph the receipt. Take your time. Do not take a week.",
+   "giver": "qgb-circular-quay-colin",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 95,
+     "label": "square the seventy for the the Harbour Bridge order"
+    },
+    {
+     "kind": "photo",
+     "x": -336,
+     "z": -656,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 114,
+    "xp": 270,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-010",
+   "act": 3,
+   "title": "Trouble at Wharf 5",
+   "blurb": "Right. Since you asked. Two lads and their mate decided at the change of shift that Wharf 5 is theirs. It started small, the way these things do. The rest of Circular Quay disagrees, so explain the disagreement. If anyone asks, you were never here.",
+   "giver": "qgb-circular-quay-tevita-b",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Wharf 5"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 109,
+    "xp": 272,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-011",
+   "act": 3,
+   "title": "Closing Time at the Museum of Contemporary Art",
+   "blurb": "It is not a police matter and I have checked. Two blokes have slept in my doorway on the Museum of Contemporary Art since the pub shut. It has been going on longer than I have admitted to anyone. The Circular Quay delivery's at nine sharp, so get them up and show me the step empty. That's it. That's the whole ask.",
+   "giver": "qgb-circular-quay-shirl",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off the Museum of Contemporary Art"
+    },
+    {
+     "kind": "photo",
+     "x": -10,
+     "z": -1041,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 104,
+    "xp": 296,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-012",
+   "act": 3,
+   "title": "Before They Touch the Museum of Contemporary Art",
+   "blurb": "I am told you do odd jobs. They start on the Museum of Contemporary Art on Monday and the orange fencing goes up. It is not the money. It has stopped being the money. I want Circular Quay on record before it does. Come and find me after, either way.",
+   "giver": "qgb-circular-quay-shirl",
+   "level": 4,
+   "requires": [
+    "qgb-l4-circular-quay-011"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 236,
+     "z": -951,
+     "radius": 40,
+     "label": "photograph the state of the Museum of Contemporary Art"
+    },
+    {
+     "kind": "goto",
+     "x": 160,
+     "z": -702,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 133,
+    "xp": 393,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-013",
+   "act": 3,
+   "title": "Something From the Fortune of War",
+   "blurb": "I have written it down twice and lost it twice. The stall at the Fortune of War has run out and the customers keep coming. Half the street knows and half the street is pretending not to. Find something round Circular Quay that'll do before the after the footy rush. Be polite about it. It costs nothing.",
+   "giver": "qgb-circular-quay-toby",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near the Fortune of War"
+    },
+    {
+     "kind": "goto",
+     "x": 55,
+     "z": -806,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 110,
+    "xp": 268,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-014",
+   "act": 3,
+   "title": "The the Hero of Waterloo Camera",
+   "blurb": "Before you say anything: yes, I know. A new speed camera near the Hero of Waterloo has fined half of Circular Quay since Australia Day. There is probably a simple explanation and I would love to hear it. Photograph it for the appeal, then prove the train to Milsons Point is faster anyway. Come back and tell me straight.",
+   "giver": "qgb-circular-quay-annabel",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -10,
+     "z": -1301,
+     "radius": 40,
+     "label": "photograph the camera near the Hero of Waterloo"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Circular Quay",
+     "to": "Milsons Point",
+     "label": "then take the train instead, to Milsons Point"
+    }
+   ],
+   "reward": {
+    "cash": 105,
+    "xp": 268,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-015",
+   "act": 3,
+   "title": "Seven a.m. At the Cahill Expressway",
+   "blurb": "It is the sort of thing you notice or you do not. The site at the Cahill Expressway starts its jackhammer at half six on a the King's Birthday, which is illegal and loud. I would not ask if there was anyone else about. Photograph it running and have a word with the Circular Quay foreman. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-circular-quay-fergus",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 206,
+     "z": -395,
+     "radius": 40,
+     "label": "photograph the noise from the Cahill Expressway"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 105,
+    "xp": 278,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-016",
+   "act": 3,
+   "title": "The the Manly ferry Lift",
+   "blurb": "You look like you have twenty minutes. The lift at Circular Quay station has been out since the Easter Show and I'm told Milsons Point is worse. I am aware how that sounds. Check both Thursday and tell me which takes a pram. Whatever you find, bring it to me first.",
+   "giver": "qgb-circular-quay-mele-b",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 103,
+     "z": -863,
+     "radius": 30,
+     "label": "check the lift at Circular Quay station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Circular Quay",
+     "to": "Milsons Point",
+     "label": "then ride to Milsons Point and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-circular-quay-mele-b",
+     "node": "report-0",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 103,
+    "xp": 276,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-017",
+   "act": 3,
+   "title": "Two From Customs House",
+   "blurb": "My knees are gone, so. Two of whatever's going near Customs House, here, hot, before the footy at peak hour. You can tell me I am imagining it. Tell me after. It's Circular Quay; I'm not asking for much. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qgb-circular-quay-jason",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near Customs House"
+    },
+    {
+     "kind": "goto",
+     "x": 304,
+     "z": -946,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 110,
+    "xp": 279,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-018",
+   "act": 3,
+   "title": "Cover at the Cahill Expressway",
+   "blurb": "Honestly, I am past caring how it looks. I've got nobody for the the Cahill Expressway shift at school pick-up and a room full of Circular Quay people who've paid. My wife says I should let it go. My wife is wrong. Fifty of trade and one difficult person at the door. You'll know it when you see it.",
+   "giver": "qgb-circular-quay-jason",
+   "level": 4,
+   "requires": [
+    "qgb-l4-circular-quay-017"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 68,
+     "label": "cover the fifty for the shift"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 1,
+     "label": "and handle whoever's at the door"
+    }
+   ],
+   "reward": {
+    "cash": 144,
+    "xp": 391,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-019",
+   "act": 3,
+   "title": "The the Hero of Waterloo Tab",
+   "blurb": "The council knows and the council does not care. Two chippies off the the Hero of Waterloo job have run a tab in Circular Quay since Wednesday. I have rung the number on the letter four times. They drove past at eight at night without looking in, so settle it in cash. Say nothing to anyone on the way.",
+   "giver": "qgb-circular-quay-tahlia",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Hero of Waterloo"
+    },
+    {
+     "kind": "earn",
+     "dollars": 41,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 290,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-020",
+   "act": 3,
+   "title": "Race Four, the Hero of Waterloo",
+   "blurb": "You will think I am making this up. There's a horse in race four at peak hour that a bloke at the Hero of Waterloo swears by. I have got no proof, which is exactly why I am asking. Turn it into fifty-five somewhere in Circular Quay and tell me if it came in. Be polite about it. It costs nothing.",
+   "giver": "qgb-circular-quay-renee-a",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 75,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-circular-quay-renee-a",
+     "node": "report-1",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 107,
+    "xp": 298,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-021",
+   "act": 3,
+   "title": "Counting the Opera House",
+   "blurb": "You look like you have twenty minutes. Council says the the Opera House car park is never full and I say it's full by school pick-up. Everyone I have told has looked at me the way you are now. Count both Circular Quay car parks, photograph whichever one makes me right. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-circular-quay-graham-b",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 612,
+     "z": -558,
+     "radius": 30,
+     "label": "count the cars at the Opera House"
+    },
+    {
+     "kind": "goto",
+     "x": 292,
+     "z": -760,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": 612,
+     "z": -558,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 98,
+    "xp": 286,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-022",
+   "act": 3,
+   "title": "Cover at the Manly ferry",
+   "blurb": "You are the first person to stop all morning. I've got nobody for the the Manly ferry shift at eight at night and a room full of Circular Quay people who've paid. You can tell me I am imagining it. Tell me after. Fifty of trade and one difficult person at the door. Take your time. Do not take a week.",
+   "giver": "qgb-circular-quay-riley",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 68,
+     "label": "cover the fifty for the shift"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 1,
+     "label": "and handle whoever's at the door"
+    }
+   ],
+   "reward": {
+    "cash": 111,
+    "xp": 269,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-023",
+   "act": 3,
+   "title": "A Flat White From the Rocks",
+   "blurb": "Honestly, I am past caring how it looks. I want a flat white from the place near the Rocks, not the one next to it. This is the third time I have had this conversation. Here by dawn, while it's still coffee and Circular Quay still has some. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qgb-circular-quay-chantelle",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near the Rocks"
+    },
+    {
+     "kind": "goto",
+     "x": 429,
+     "z": -1219,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 110,
+    "xp": 291,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-024",
+   "act": 3,
+   "title": "Left It Near the Manly ferry",
+   "blurb": "I'll be straight with you. I left something on the bench at the Manly ferry at six in the morning. The paperwork says one thing and my eyes say another. By the time I got back to Circular Quay it had walked, so look where I'd have dropped it. You'll know it when you see it.",
+   "giver": "qgb-circular-quay-chantelle",
+   "level": 4,
+   "requires": [
+    "qgb-l4-circular-quay-023"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -67,
+     "z": -869,
+     "radius": 30,
+     "label": "check the bench near the Manly ferry"
+    },
+    {
+     "kind": "photo",
+     "x": 183,
+     "z": -963,
+     "radius": 40,
+     "label": "photograph the bins behind it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-circular-quay-chantelle",
+     "node": "report-1",
+     "label": "tell me what you found"
+    }
+   ],
+   "reward": {
+    "cash": 148,
+    "xp": 387,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-025",
+   "act": 3,
+   "title": "Sightline at the Cahill Expressway",
+   "blurb": "The council knows and the council does not care. Insurance says nobody could have seen the ute hit the fence at the Cahill Expressway on Tuesday. It started small, the way these things do. Stand where I stood in Circular Quay, photograph the view, tell me if I'm lying. Ask for me by name at the counter.",
+   "giver": "qgb-circular-quay-joyce-b",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -202,
+     "z": -1156,
+     "radius": 30,
+     "label": "stand where it happened at the Cahill Expressway"
+    },
+    {
+     "kind": "photo",
+     "x": -202,
+     "z": -1156,
+     "radius": 40,
+     "label": "photograph the corner"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-circular-quay-joyce-b",
+     "node": "report-1",
+     "label": "describe the sightline"
+    }
+   ],
+   "reward": {
+    "cash": 116,
+    "xp": 299,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-026",
+   "act": 3,
+   "title": "Trouble at Customs House",
+   "blurb": "It is not a police matter and I have checked. Two lads and their mate decided at ten past ten that Customs House is theirs. Half the street knows and half the street is pretending not to. The rest of Circular Quay disagrees, so explain the disagreement. I'll see you right for it.",
+   "giver": "qgb-circular-quay-tui-c",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Customs House"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 102,
+    "xp": 268,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-027",
+   "act": 3,
+   "title": "Before They Touch Wharf 5",
+   "blurb": "I have written it down twice and lost it twice. They start on Wharf 5 on Easter Saturday and the orange fencing goes up. I have got no proof, which is exactly why I am asking. I want Circular Quay on record before it does. That's it. That's the whole ask.",
+   "giver": "qgb-circular-quay-jacinta",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -128,
+     "z": -771,
+     "radius": 40,
+     "label": "photograph the state of Wharf 5"
+    },
+    {
+     "kind": "goto",
+     "x": -353,
+     "z": -1027,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 106,
+    "xp": 270,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-028",
+   "act": 3,
+   "title": "One Stop From the Opera House",
+   "blurb": "I would do it myself if I could leave the counter. I need to know the train from Circular Quay stops at Milsons Point and doesn't sail through like it did on the King's Birthday. I would not ask if there was anyone else about. Ride it at half seven and photograph the sign. Do not make a scene about it.",
+   "giver": "qgb-circular-quay-eddie-c",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Circular Quay",
+     "to": "Milsons Point",
+     "label": "take the train to Milsons Point"
+    },
+    {
+     "kind": "photo",
+     "x": 145,
+     "z": -2496,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 106,
+    "xp": 292,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-029",
+   "act": 3,
+   "title": "Trolley Run, the Opera House",
+   "blurb": "It has been three weeks. A Woolies trolley from the Opera House gets walked to the creek every Friday. I am aware how that sounds. Find where it ends up in Circular Quay and make the deposit back. I will know if you skipped a bit.",
+   "giver": "qgb-circular-quay-shirl-a",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 488,
+     "z": -1005,
+     "radius": 30,
+     "label": "find the trolley near the Opera House"
+    },
+    {
+     "kind": "photo",
+     "x": 488,
+     "z": -1005,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 34,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 100,
+    "xp": 302,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-030",
+   "act": 3,
+   "title": "A Flat White From Wharf 5",
+   "blurb": "There is no clever way to say this. I want a flat white from the place near Wharf 5, not the one next to it. It started small, the way these things do. Here by closing, while it's still coffee and Circular Quay still has some. Do not let them talk you into anything.",
+   "giver": "qgb-circular-quay-gav-a",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near Wharf 5"
+    },
+    {
+     "kind": "goto",
+     "x": 162,
+     "z": -745,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 101,
+    "xp": 290,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-031",
+   "act": 3,
+   "title": "The Wharf 5 Tab",
+   "blurb": "It is not a police matter and I have checked. Two chippies off the Wharf 5 job have run a tab in Circular Quay since Monday. It is the not knowing that has got me, honestly. They drove past at lunchtime without looking in, so settle it in cash. Just do not come back empty-handed.",
+   "giver": "qgb-circular-quay-karen",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near Wharf 5"
+    },
+    {
+     "kind": "earn",
+     "dollars": 41,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 111,
+    "xp": 276,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-032",
+   "act": 3,
+   "title": "Trouble at the Fortune of War",
+   "blurb": "Nobody else has offered, so. Two lads and their mate decided at half two that the Fortune of War is theirs. There is probably a simple explanation and I would love to hear it. The rest of Circular Quay disagrees, so explain the disagreement. Come and find me after, either way.",
+   "giver": "qgb-circular-quay-lupe-b",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near the Fortune of War"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 98,
+    "xp": 292,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-033",
+   "act": 3,
+   "title": "Before They Touch the Fortune of War",
+   "blurb": "Keep it between us for now. They start on the Fortune of War on Easter Saturday and the orange fencing goes up. I have got a photo on my phone but it is useless. I want Circular Quay on record before it does. I would rather know than wonder.",
+   "giver": "qgb-circular-quay-lupe-b",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": 382,
+     "z": -580,
+     "radius": 40,
+     "label": "photograph the state of the Fortune of War"
+    },
+    {
+     "kind": "goto",
+     "x": 154,
+     "z": -794,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 112,
+    "xp": 292,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-034",
+   "act": 3,
+   "title": "The Customs House Lift",
+   "blurb": "I have been putting it off since Easter. The lift at Circular Quay station has been out since the Easter Show and I'm told Milsons Point is worse. My wife says I should let it go. My wife is wrong. Check both the last Sunday of the month and tell me which takes a pram. There is no rush, but there is a Friday.",
+   "giver": "qgb-circular-quay-janelle-a",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 103,
+     "z": -863,
+     "radius": 30,
+     "label": "check the lift at Circular Quay station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Circular Quay",
+     "to": "Milsons Point",
+     "label": "then ride to Milsons Point and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-circular-quay-janelle-a",
+     "node": "report-1",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 100,
+    "xp": 273,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-035",
+   "act": 3,
+   "title": "The the Rocks Sparky",
+   "blurb": "You are the first person to stop all morning. The sparky off the the Rocks job has owed me since the bathroom and drinks in Circular Quay from nine sharp. This is the third time I have had this conversation. Forty will do and I'll write off the rest. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-circular-quay-hayden-b",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for the Rocks"
+    },
+    {
+     "kind": "earn",
+     "dollars": 54,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 99,
+    "xp": 287,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-036",
+   "act": 3,
+   "title": "Two From the Rocks",
+   "blurb": "I'll be straight with you. Two of whatever's going near the Rocks, here, hot, before the footy at midnight. I have rung the number on the letter four times. It's Circular Quay; I'm not asking for much. That's the whole job. No catch.",
+   "giver": "qgb-circular-quay-rhonda",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near the Rocks"
+    },
+    {
+     "kind": "goto",
+     "x": -36,
+     "z": -1253,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 108,
+    "xp": 301,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-037",
+   "act": 3,
+   "title": "The Customs House Order",
+   "blurb": "Do not laugh. The Customs House order came to seventy more than I'd budgeted and the supplier wants it by after the footy. It started small, the way these things do. Find seventy in Circular Quay and photograph the receipt. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qgb-circular-quay-manu-c",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 95,
+     "label": "square the seventy for the Customs House order"
+    },
+    {
+     "kind": "photo",
+     "x": -77,
+     "z": -746,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 105,
+    "xp": 304,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-038",
+   "act": 3,
+   "title": "A Flat White From Customs House",
+   "blurb": "The council knows and the council does not care. I want a flat white from the place near Customs House, not the one next to it. It is not the money. It has stopped being the money. Here by half two, while it's still coffee and Circular Quay still has some. Do not let them talk you into anything.",
+   "giver": "qgb-circular-quay-manu-c",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near Customs House"
+    },
+    {
+     "kind": "goto",
+     "x": -170,
+     "z": -698,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 100,
+    "xp": 285,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l4-circular-quay-039",
+   "act": 3,
+   "title": "The Wharf 5 Fence",
+   "blurb": "Right. Since you asked. My neighbour at Wharf 5 says the tree is on my side and the fence says otherwise. It is the not knowing that has got me, honestly. Look at it the long weekend with Circular Quay eyes and tell me the truth. Ask for me by name at the counter.",
+   "giver": "qgb-circular-quay-poppy-a",
+   "level": 4,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": 123,
+     "z": -640,
+     "radius": 30,
+     "label": "go and look at the fence at Wharf 5"
+    },
+    {
+     "kind": "photo",
+     "x": 123,
+     "z": -640,
+     "radius": 40,
+     "label": "photograph the tree over it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-circular-quay-poppy-a",
+     "node": "report-1",
+     "label": "tell me whose side it's on"
+    }
+   ],
+   "reward": {
+    "cash": 116,
+    "xp": 278,
+    "unlock": []
+   }
+  }
+ ]
+}

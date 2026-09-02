@@ -1,0 +1,2130 @@
+{
+ "pack": "areab-circular-quay-2",
+ "npcs": [
+  {
+   "id": "qgb-circular-quay-norm-b",
+   "name": "Norm B., ferry deckhand",
+   "x": 154,
+   "z": -532,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Stand clear of the gap. Force of habit. Circular Quay, you're on the wrong side of the wharf for Manly.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Circular Quay like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Ropes, gangways, the Manly run in a southerly. the Museum of Contemporary Art is the best view in the city and I get paid to look at it.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's something from macquarie place.",
+     "choices": [
+      {
+       "text": "Something From Macquarie Place",
+       "accept": "qgb-l4-circular-quay-040",
+       "denyFlag": "w:qgb-l4-circular-quay-040"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Norm B. counts it out without looking up. -- Don't spend it all at the Museum of Contemporary Art.",
+     "choices": [
+      {
+       "text": "About something from macquarie place.",
+       "turnin": "qgb-l4-circular-quay-040"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Freshwater's rolled more tourists than a pub crawl. Sit in the middle. Trust me.",
+     "improv": {
+      "persona": "Norm B., ferry deckhand in Circular Quay, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Museum of Contemporary Art like everyone knows it.",
+      "context": "Someone has asked what Circular Quay is like these days. You are standing near the Museum of Contemporary Art."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-circular-quay-fay-a",
+   "name": "Fay A., tourist, lost",
+   "x": -35,
+   "z": -717,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Excuse me -- oh, you're local? Is this Circular Quay? The map says it's Circular Quay.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Circular Quay like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I've been to the bridge and the Opera House and now I'm just standing near the Fortune of War. Is that it? Is that Sydney?",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's proof of macquarie place.",
+     "choices": [
+      {
+       "text": "Proof of Macquarie Place",
+       "accept": "qgb-l4-circular-quay-041",
+       "denyFlag": "w:qgb-l4-circular-quay-041"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Fay A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About proof of macquarie place.",
+       "turnin": "qgb-l4-circular-quay-041"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Everyone told me about the Fortune of War. Nobody told me it would be this expensive.",
+     "improv": {
+      "persona": "Fay A., tourist, lost in Circular Quay, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Fortune of War like everyone knows it.",
+      "context": "Someone has asked what Circular Quay is like these days. You are standing near the Fortune of War."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-circular-quay-daz-a",
+   "name": "Daz A., busker, one amp",
+   "x": 93,
+   "z": -721,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hold that thought, the council's coming past. Right. Circular Quay, what a crowd.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Circular Quay like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I play the same six songs at Macquarie Place and nobody has ever complained. Nobody has ever paid, either.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rent money, the manly ferry.",
+     "choices": [
+      {
+       "text": "Rent Money, the Manly ferry",
+       "accept": "qgb-l4-circular-quay-042",
+       "denyFlag": "w:qgb-l4-circular-quay-042"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Daz A. looks it over the way Circular Quay looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About rent money, the manly ferry.",
+       "turnin": "qgb-l4-circular-quay-042"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good pitch is outside Macquarie Place between four and six. After six it's the bloke with the didgeridoo and a Bluetooth speaker.",
+     "improv": {
+      "persona": "Daz A., busker, one amp in Circular Quay, Sydney. Dry, specific, local; never says g'day or crikey; talks about Macquarie Place like everyone knows it.",
+      "context": "Someone has asked what Circular Quay is like these days. You are standing near Macquarie Place."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-circular-quay-salote-c",
+   "name": "Salote C., security guard",
+   "x": -340,
+   "z": -805,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bags open, please. Thanks, bro. Welcome to Circular Quay.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Circular Quay like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve-hour shifts standing near the Hero of Waterloo watching people not steal things. Mostly.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the harbour bridge complaint.",
+     "choices": [
+      {
+       "text": "The the Harbour Bridge Complaint",
+       "accept": "qgb-l4-circular-quay-043",
+       "denyFlag": "w:qgb-l4-circular-quay-043"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Salote C. looks it over the way Circular Quay looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the harbour bridge complaint.",
+       "turnin": "qgb-l4-circular-quay-043"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a bench near the Hero of Waterloo where the whole shift eats lunch. We've named the pigeons.",
+     "improv": {
+      "persona": "Salote C., security guard in Circular Quay, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hero of Waterloo like everyone knows it.",
+      "context": "Someone has asked what Circular Quay is like these days. You are standing near the Hero of Waterloo."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-circular-quay-scott-a",
+   "name": "Scott A., bridge climb guide",
+   "x": 33,
+   "z": -1026,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Harnesses off, phones away. Sorry, day job. Circular Quay, welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Circular Quay like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six climbs a day up the arch. the Manly ferry looks different from a hundred and thirty metres, mostly smaller.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at the rocks.",
+     "choices": [
+      {
+       "text": "Trouble at the Rocks",
+       "accept": "qgb-l4-circular-quay-044",
+       "denyFlag": "w:qgb-l4-circular-quay-044"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Scott A. counts it out without looking up. -- Don't spend it all at the Manly ferry.",
+     "choices": [
+      {
+       "text": "About trouble at the rocks.",
+       "turnin": "qgb-l4-circular-quay-044"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bit nobody tells you: it's the wind at the Manly ferry that gets you, not the height.",
+     "improv": {
+      "persona": "Scott A., bridge climb guide in Circular Quay, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Manly ferry like everyone knows it.",
+      "context": "Someone has asked what Circular Quay is like these days. You are standing near the Manly ferry."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-circular-quay-merv-a",
+   "name": "Merv A., tourist, lost",
+   "x": -114,
+   "z": -695,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Excuse me -- oh, you're local? Is this Circular Quay? The map says it's Circular Quay.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Circular Quay like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I've been to the bridge and the Opera House and now I'm just standing near the Cahill Expressway. Is that it? Is that Sydney?",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Something From Customs House",
+       "accept": "qgb-l4-circular-quay-045",
+       "denyFlag": "w:qgb-l4-circular-quay-045"
+      },
+      {
+       "text": "The Length of Customs House",
+       "accept": "qgb-l4-circular-quay-046",
+       "denyFlag": "w:qgb-l4-circular-quay-046",
+       "needFlag": "w:qgb-l4-circular-quay-045"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Merv A. looks it over the way Circular Quay looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About something from customs house.",
+       "turnin": "qgb-l4-circular-quay-045"
+      },
+      {
+       "text": "About the length of customs house.",
+       "turnin": "qgb-l4-circular-quay-046"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Everyone told me about the Cahill Expressway. Nobody told me it would be this expensive.",
+     "improv": {
+      "persona": "Merv A., tourist, lost in Circular Quay, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Cahill Expressway like everyone knows it.",
+      "context": "Someone has asked what Circular Quay is like these days. You are standing near the Cahill Expressway."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-circular-quay-pita-b",
+   "name": "Pita B., security guard",
+   "x": -117,
+   "z": -1108,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bags open, please. Thanks, bro. Welcome to Circular Quay.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Circular Quay like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve-hour shifts standing near Wharf 5 watching people not steal things. Mostly.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Proof of the Museum of Contemporary Art",
+       "accept": "qgb-l4-circular-quay-047",
+       "denyFlag": "w:qgb-l4-circular-quay-047"
+      },
+      {
+       "text": "Race Four, the Fortune of War",
+       "accept": "qgb-l4-circular-quay-048",
+       "denyFlag": "w:qgb-l4-circular-quay-048",
+       "needFlag": "w:qgb-l4-circular-quay-047"
+      },
+      {
+       "text": "The the Museum of Contemporary Art Camera",
+       "accept": "qgb-l4-circular-quay-049",
+       "denyFlag": "w:qgb-l4-circular-quay-049"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Pita B. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About proof of the museum of contemporary art.",
+       "turnin": "qgb-l4-circular-quay-047"
+      },
+      {
+       "text": "About race four, the fortune of war.",
+       "turnin": "qgb-l4-circular-quay-048"
+      },
+      {
+       "text": "About the the museum of contemporary art camera.",
+       "turnin": "qgb-l4-circular-quay-049"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a bench near Wharf 5 where the whole shift eats lunch. We've named the pigeons.",
+     "improv": {
+      "persona": "Pita B., security guard in Circular Quay, Sydney. Dry, specific, local; never says g'day or crikey; talks about Wharf 5 like everyone knows it.",
+      "context": "Someone has asked what Circular Quay is like these days. You are standing near Wharf 5."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Pita B. listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-circular-quay-phil-b",
+   "name": "Phil B., probationary constable",
+   "x": 46,
+   "z": -434,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Circular Quay LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Circular Quay like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of the Fortune of War. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Lads Off Macquarie Place",
+       "accept": "qgb-l4-circular-quay-050",
+       "denyFlag": "w:qgb-l4-circular-quay-050"
+      },
+      {
+       "text": "One Stop From Macquarie Place",
+       "accept": "qgb-l4-circular-quay-051",
+       "denyFlag": "w:qgb-l4-circular-quay-051",
+       "needFlag": "w:qgb-l4-circular-quay-050"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Phil B. counts it out without looking up. -- Don't spend it all at the Fortune of War.",
+     "choices": [
+      {
+       "text": "About lads off macquarie place.",
+       "turnin": "qgb-l4-circular-quay-050"
+      },
+      {
+       "text": "About one stop from macquarie place.",
+       "turnin": "qgb-l4-circular-quay-051"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about the Fortune of War. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Phil B., probationary constable in Circular Quay, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Fortune of War like everyone knows it.",
+      "context": "Someone has asked what Circular Quay is like these days. You are standing near the Fortune of War."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-circular-quay-maddie-c",
+   "name": "Maddie C., tourist, lost",
+   "x": 203,
+   "z": -433,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Excuse me -- oh, you're local? Is this Circular Quay? The map says it's Circular Quay.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Circular Quay like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I've been to the bridge and the Opera House and now I'm just standing near the Opera House. Is that it? Is that Sydney?",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's probationary at the harbour bridge.",
+     "choices": [
+      {
+       "text": "Probationary at the Harbour Bridge",
+       "accept": "qgb-l4-circular-quay-052",
+       "denyFlag": "w:qgb-l4-circular-quay-052"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Maddie C. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About probationary at the harbour bridge.",
+       "turnin": "qgb-l4-circular-quay-052"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Everyone told me about the Opera House. Nobody told me it would be this expensive.",
+     "improv": {
+      "persona": "Maddie C., tourist, lost in Circular Quay, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Opera House like everyone knows it.",
+      "context": "Someone has asked what Circular Quay is like these days. You are standing near the Opera House."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-circular-quay-dot-a",
+   "name": "Dot A., probationary constable",
+   "x": 90,
+   "z": -979,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Circular Quay LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Circular Quay like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of the Cahill Expressway. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the customs house tab.",
+     "choices": [
+      {
+       "text": "The Customs House Tab",
+       "accept": "qgb-l4-circular-quay-053",
+       "denyFlag": "w:qgb-l4-circular-quay-053"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Dot A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the customs house tab.",
+       "turnin": "qgb-l4-circular-quay-053"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about the Cahill Expressway. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Dot A., probationary constable in Circular Quay, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Cahill Expressway like everyone knows it.",
+      "context": "Someone has asked what Circular Quay is like these days. You are standing near the Cahill Expressway."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-circular-quay-clive-a",
+   "name": "Clive A., bridge climb guide",
+   "x": -270,
+   "z": -927,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Harnesses off, phones away. Sorry, day job. Circular Quay, welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Circular Quay like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six climbs a day up the arch. Customs House looks different from a hundred and thirty metres, mostly smaller.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the length of the hero of waterloo.",
+     "choices": [
+      {
+       "text": "The Length of the Hero of Waterloo",
+       "accept": "qgb-l4-circular-quay-054",
+       "denyFlag": "w:qgb-l4-circular-quay-054"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Clive A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the length of the hero of waterloo.",
+       "turnin": "qgb-l4-circular-quay-054"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bit nobody tells you: it's the wind at Customs House that gets you, not the height.",
+     "improv": {
+      "persona": "Clive A., bridge climb guide in Circular Quay, Sydney. Dry, specific, local; never says g'day or crikey; talks about Customs House like everyone knows it.",
+      "context": "Someone has asked what Circular Quay is like these days. You are standing near Customs House."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-circular-quay-wayne-b",
+   "name": "Wayne B., tourist, lost",
+   "x": 56,
+   "z": -649,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Excuse me -- oh, you're local? Is this Circular Quay? The map says it's Circular Quay.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Circular Quay like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I've been to the bridge and the Opera House and now I'm just standing near the Museum of Contemporary Art. Is that it? Is that Sydney?",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rent money, macquarie place.",
+     "choices": [
+      {
+       "text": "Rent Money, Macquarie Place",
+       "accept": "qgb-l4-circular-quay-055",
+       "denyFlag": "w:qgb-l4-circular-quay-055"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Wayne B. counts it out without looking up. -- Don't spend it all at the Museum of Contemporary Art.",
+     "choices": [
+      {
+       "text": "About rent money, macquarie place.",
+       "turnin": "qgb-l4-circular-quay-055"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Everyone told me about the Museum of Contemporary Art. Nobody told me it would be this expensive.",
+     "improv": {
+      "persona": "Wayne B., tourist, lost in Circular Quay, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Museum of Contemporary Art like everyone knows it.",
+      "context": "Someone has asked what Circular Quay is like these days. You are standing near the Museum of Contemporary Art."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-circular-quay-tanya-a",
+   "name": "Tanya A., busker, one amp",
+   "x": 153,
+   "z": -399,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hold that thought, the council's coming past. Right. Circular Quay, what a crowd.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Circular Quay like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I play the same six songs at the Fortune of War and nobody has ever complained. Nobody has ever paid, either.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Bin Night, the Manly ferry",
+       "accept": "qgb-l4-circular-quay-056",
+       "denyFlag": "w:qgb-l4-circular-quay-056"
+      },
+      {
+       "text": "Seven a.m. At Macquarie Place",
+       "accept": "qgb-l4-circular-quay-057",
+       "denyFlag": "w:qgb-l4-circular-quay-057",
+       "needFlag": "w:qgb-l4-circular-quay-056"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Tanya A. counts it out without looking up. -- Don't spend it all at the Fortune of War.",
+     "choices": [
+      {
+       "text": "About bin night, the manly ferry.",
+       "turnin": "qgb-l4-circular-quay-056"
+      },
+      {
+       "text": "About seven a.m. at macquarie place.",
+       "turnin": "qgb-l4-circular-quay-057"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good pitch is outside the Fortune of War between four and six. After six it's the bloke with the didgeridoo and a Bluetooth speaker.",
+     "improv": {
+      "persona": "Tanya A., busker, one amp in Circular Quay, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Fortune of War like everyone knows it.",
+      "context": "Someone has asked what Circular Quay is like these days. You are standing near the Fortune of War."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-circular-quay-debbie-a",
+   "name": "Debbie A., publican",
+   "x": -77,
+   "z": -865,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "We're not open. We're never not open. What'll it be, Circular Quay?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Circular Quay like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I run the pub. Schooners, the meat raffle, the trivia on Wednesdays that started as a joke. the Hero of Waterloo keeps me in business and out of the papers.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two from the manly ferry.",
+     "choices": [
+      {
+       "text": "Two From the Manly ferry",
+       "accept": "qgb-l4-circular-quay-058",
+       "denyFlag": "w:qgb-l4-circular-quay-058"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Debbie A. counts it out without looking up. -- Don't spend it all at the Hero of Waterloo.",
+     "choices": [
+      {
+       "text": "About two from the manly ferry.",
+       "turnin": "qgb-l4-circular-quay-058"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Tooheys New, seven dollars, and if you ask for a craft beer I'll point you back toward the Hero of Waterloo.",
+     "improv": {
+      "persona": "Debbie A., publican in Circular Quay, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hero of Waterloo like everyone knows it.",
+      "context": "Someone has asked what Circular Quay is like these days. You are standing near the Hero of Waterloo."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-circular-quay-colin-a",
+   "name": "Colin A., bridge climb guide",
+   "x": 32,
+   "z": -858,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Harnesses off, phones away. Sorry, day job. Circular Quay, welcome.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Circular Quay like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six climbs a day up the arch. the Harbour Bridge looks different from a hundred and thirty metres, mostly smaller.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rbt on the manly ferry.",
+     "choices": [
+      {
+       "text": "RBT on the Manly ferry",
+       "accept": "qgb-l4-circular-quay-059",
+       "denyFlag": "w:qgb-l4-circular-quay-059"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Colin A. looks it over the way Circular Quay looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About rbt on the manly ferry.",
+       "turnin": "qgb-l4-circular-quay-059"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bit nobody tells you: it's the wind at the Harbour Bridge that gets you, not the height.",
+     "improv": {
+      "persona": "Colin A., bridge climb guide in Circular Quay, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Harbour Bridge like everyone knows it.",
+      "context": "Someone has asked what Circular Quay is like these days. You are standing near the Harbour Bridge."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-circular-quay-chantelle-a",
+   "name": "Chantelle A., probationary constable",
+   "x": -252,
+   "z": -990,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Circular Quay LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Circular Quay like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of the Museum of Contemporary Art. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The the Opera House Camera",
+       "accept": "qgb-l4-circular-quay-060",
+       "denyFlag": "w:qgb-l4-circular-quay-060"
+      },
+      {
+       "text": "Rent Money, the Fortune of War",
+       "accept": "qgb-l4-circular-quay-061",
+       "denyFlag": "w:qgb-l4-circular-quay-061",
+       "needFlag": "w:qgb-l4-circular-quay-060"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Chantelle A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the opera house camera.",
+       "turnin": "qgb-l4-circular-quay-060"
+      },
+      {
+       "text": "About rent money, the fortune of war.",
+       "turnin": "qgb-l4-circular-quay-061"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about the Museum of Contemporary Art. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Chantelle A., probationary constable in Circular Quay, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Museum of Contemporary Art like everyone knows it.",
+      "context": "Someone has asked what Circular Quay is like these days. You are standing near the Museum of Contemporary Art."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-circular-quay-georgie-a",
+   "name": "Georgie A., ferry deckhand",
+   "x": 375,
+   "z": -730,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Stand clear of the gap. Force of habit. Circular Quay, you're on the wrong side of the wharf for Manly.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Circular Quay like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Ropes, gangways, the Manly run in a southerly. Macquarie Place is the best view in the city and I get paid to look at it.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the museum of contemporary art sparky.",
+     "choices": [
+      {
+       "text": "The the Museum of Contemporary Art Sparky",
+       "accept": "qgb-l4-circular-quay-062",
+       "denyFlag": "w:qgb-l4-circular-quay-062"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Georgie A. counts it out without looking up. -- Don't spend it all at Macquarie Place.",
+     "choices": [
+      {
+       "text": "About the the museum of contemporary art sparky.",
+       "turnin": "qgb-l4-circular-quay-062"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Freshwater's rolled more tourists than a pub crawl. Sit in the middle. Trust me.",
+     "improv": {
+      "persona": "Georgie A., ferry deckhand in Circular Quay, Sydney. Dry, specific, local; never says g'day or crikey; talks about Macquarie Place like everyone knows it.",
+      "context": "Someone has asked what Circular Quay is like these days. You are standing near Macquarie Place."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-circular-quay-clementine-a",
+   "name": "Clementine A., busker, one amp",
+   "x": -103,
+   "z": -1019,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hold that thought, the council's coming past. Right. Circular Quay, what a crowd.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Circular Quay like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I play the same six songs at the Opera House and nobody has ever complained. Nobody has ever paid, either.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the harbour bridge tab.",
+     "choices": [
+      {
+       "text": "The the Harbour Bridge Tab",
+       "accept": "qgb-l4-circular-quay-063",
+       "denyFlag": "w:qgb-l4-circular-quay-063"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Clementine A. looks it over the way Circular Quay looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the harbour bridge tab.",
+       "turnin": "qgb-l4-circular-quay-063"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good pitch is outside the Opera House between four and six. After six it's the bloke with the didgeridoo and a Bluetooth speaker.",
+     "improv": {
+      "persona": "Clementine A., busker, one amp in Circular Quay, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Opera House like everyone knows it.",
+      "context": "Someone has asked what Circular Quay is like these days. You are standing near the Opera House."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-circular-quay-bazza-a",
+   "name": "Bazza A., probationary constable",
+   "x": -186,
+   "z": -1211,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Circular Quay LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Circular Quay like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of the Rocks. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the length of the cahill expressway.",
+     "choices": [
+      {
+       "text": "The Length of the Cahill Expressway",
+       "accept": "qgb-l4-circular-quay-064",
+       "denyFlag": "w:qgb-l4-circular-quay-064"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Bazza A. looks it over the way Circular Quay looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the length of the cahill expressway.",
+       "turnin": "qgb-l4-circular-quay-064"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about the Rocks. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Bazza A., probationary constable in Circular Quay, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Rocks like everyone knows it.",
+      "context": "Someone has asked what Circular Quay is like these days. You are standing near the Rocks."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-circular-quay-brett-a",
+   "name": "Brett A., ferry deckhand",
+   "x": 316,
+   "z": -692,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Stand clear of the gap. Force of habit. Circular Quay, you're on the wrong side of the wharf for Manly.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Circular Quay like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Ropes, gangways, the Manly run in a southerly. Customs House is the best view in the city and I get paid to look at it.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's race four, the museum of contemporary art.",
+     "choices": [
+      {
+       "text": "Race Four, the Museum of Contemporary Art",
+       "accept": "qgb-l4-circular-quay-065",
+       "denyFlag": "w:qgb-l4-circular-quay-065"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Brett A. counts it out without looking up. -- Don't spend it all at Customs House.",
+     "choices": [
+      {
+       "text": "About race four, the museum of contemporary art.",
+       "turnin": "qgb-l4-circular-quay-065"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Freshwater's rolled more tourists than a pub crawl. Sit in the middle. Trust me.",
+     "improv": {
+      "persona": "Brett A., ferry deckhand in Circular Quay, Sydney. Dry, specific, local; never says g'day or crikey; talks about Customs House like everyone knows it.",
+      "context": "Someone has asked what Circular Quay is like these days. You are standing near Customs House."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-2",
+     "line": "Right. And you're sure it was the Museum of Contemporary Art? People say the Museum of Contemporary Art when they mean the bit next to it. -- Brett A. writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-circular-quay-rhonda-c",
+   "name": "Rhonda C., publican",
+   "x": -248,
+   "z": -533,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "We're not open. We're never not open. What'll it be, Circular Quay?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Circular Quay like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I run the pub. Schooners, the meat raffle, the trivia on Wednesdays that started as a joke. Macquarie Place keeps me in business and out of the papers.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the hero of waterloo sparky.",
+     "choices": [
+      {
+       "text": "The the Hero of Waterloo Sparky",
+       "accept": "qgb-l4-circular-quay-066",
+       "denyFlag": "w:qgb-l4-circular-quay-066"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Rhonda C. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the hero of waterloo sparky.",
+       "turnin": "qgb-l4-circular-quay-066"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Tooheys New, seven dollars, and if you ask for a craft beer I'll point you back toward Macquarie Place.",
+     "improv": {
+      "persona": "Rhonda C., publican in Circular Quay, Sydney. Dry, specific, local; never says g'day or crikey; talks about Macquarie Place like everyone knows it.",
+      "context": "Someone has asked what Circular Quay is like these days. You are standing near Macquarie Place."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-circular-quay-pam-a",
+   "name": "Pam A., probationary constable",
+   "x": -41,
+   "z": -617,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Circular Quay LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Circular Quay like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of the Hero of Waterloo. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's cover at the rocks.",
+     "choices": [
+      {
+       "text": "Cover at the Rocks",
+       "accept": "qgb-l4-circular-quay-067",
+       "denyFlag": "w:qgb-l4-circular-quay-067"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Pam A. looks it over the way Circular Quay looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About cover at the rocks.",
+       "turnin": "qgb-l4-circular-quay-067"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about the Hero of Waterloo. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Pam A., probationary constable in Circular Quay, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hero of Waterloo like everyone knows it.",
+      "context": "Someone has asked what Circular Quay is like these days. You are standing near the Hero of Waterloo."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

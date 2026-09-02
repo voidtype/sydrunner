@@ -1,0 +1,2925 @@
+{
+ "pack": "areab-burwood-1",
+ "npcs": [
+  {
+   "id": "qgb-burwood-wei-e",
+   "name": "Wei E., dumpling house owner",
+   "x": -9417,
+   "z": 1377,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table for one? Sit anywhere. Not that one, that's the boss's. Welcome to Burwood.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Xiao long bao, hand-made, eleven a.m. till the dough runs out. Burwood Girls queues down the street on Sundays.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's tap on at the emerald hill.",
+     "choices": [
+      {
+       "text": "Tap On at the Emerald Hill",
+       "accept": "qgb-l6-burwood-001",
+       "denyFlag": "w:qgb-l6-burwood-001"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Wei E. counts it out without looking up. -- Don't spend it all at Burwood Girls.",
+     "choices": [
+      {
+       "text": "About tap on at the emerald hill.",
+       "turnin": "qgb-l6-burwood-001"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best dumplings in Burwood are at the place with the worst sign. Everyone knows. Nobody says.",
+     "improv": {
+      "persona": "Wei E., dumpling house owner in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about Burwood Girls like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near Burwood Girls."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Right. And you're sure it was the Emerald Hill? People say the Emerald Hill when they mean the bit next to it. -- Wei E. writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-eun-b",
+   "name": "Eun B., Korean BBQ owner",
+   "x": -9737,
+   "z": 1035,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table? Grill's hot. Mind the smoke. Welcome to Burwood.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Pork belly, kimchi, soju until the last train. the Emerald Hill is Strathfield's real main street.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's one stop from burwood park.",
+     "choices": [
+      {
+       "text": "One Stop From Burwood Park",
+       "accept": "qgb-l6-burwood-002",
+       "denyFlag": "w:qgb-l6-burwood-002"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Eun B. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About one stop from burwood park.",
+       "turnin": "qgb-l6-burwood-002"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The karaoke room behind the Emerald Hill has a Bon Jovi problem. It's not the customers. It's my father.",
+     "improv": {
+      "persona": "Eun B., Korean BBQ owner in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Emerald Hill like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near the Emerald Hill."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-elaine",
+   "name": "Elaine, real estate agent",
+   "x": -9703,
+   "z": 947,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Burwood is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. Burwood Road is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Burwood Park Complaint",
+       "accept": "qgb-l6-burwood-003",
+       "denyFlag": "w:qgb-l6-burwood-003"
+      },
+      {
+       "text": "Lads Off Westfield Burwood",
+       "accept": "qgb-l6-burwood-004",
+       "denyFlag": "w:qgb-l6-burwood-004",
+       "needFlag": "w:qgb-l6-burwood-003"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Elaine pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the burwood park complaint.",
+       "turnin": "qgb-l6-burwood-003"
+      },
+      {
+       "text": "About lads off westfield burwood.",
+       "turnin": "qgb-l6-burwood-004"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. Burwood Road means cosy.",
+     "improv": {
+      "persona": "Elaine, real estate agent in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about Burwood Road like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near Burwood Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-craig",
+   "name": "Craig, uni student, three jobs",
+   "x": -10121,
+   "z": 1146,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Burwood rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Westfield Burwood is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trolley run, burwood park.",
+     "choices": [
+      {
+       "text": "Trolley Run, Burwood Park",
+       "accept": "qgb-l6-burwood-005",
+       "denyFlag": "w:qgb-l6-burwood-005"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Craig counts it out without looking up. -- Don't spend it all at Westfield Burwood.",
+     "choices": [
+      {
+       "text": "About trolley run, burwood park.",
+       "turnin": "qgb-l6-burwood-005"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Westfield Burwood that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Craig, uni student, three jobs in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about Westfield Burwood like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near Westfield Burwood."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-wei-f",
+   "name": "Wei F., chemist",
+   "x": -9697,
+   "z": 1459,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Script or a chat? Both's fine. Burwood pharmacy, we do both.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Scripts, flu shots, and every man in Burwood asking quietly about the same thing. Burwood Park keeps me in Panadol.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch the burwood chinatown.",
+     "choices": [
+      {
+       "text": "Before They Touch the Burwood Chinatown",
+       "accept": "qgb-l6-burwood-006",
+       "denyFlag": "w:qgb-l6-burwood-006"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Wei F. looks it over the way Burwood looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About before they touch the burwood chinatown.",
+       "turnin": "qgb-l6-burwood-006"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Chemist Warehouse near Burwood Park sells everything cheaper and nobody there knows your name.",
+     "improv": {
+      "persona": "Wei F., chemist in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about Burwood Park like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near Burwood Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-joon-b",
+   "name": "Joon B., HSC tutor",
+   "x": -9847,
+   "z": 980,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Band six or nothing. Sorry, that's the brochure talking. Burwood, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Maths extension two, Saturdays, forty kids and their mothers in the corridor. Belmore Street has three of us on one block.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's closing time at the burwood hotel.",
+     "choices": [
+      {
+       "text": "Closing Time at the Burwood Hotel",
+       "accept": "qgb-l6-burwood-007",
+       "denyFlag": "w:qgb-l6-burwood-007"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Joon B. counts it out without looking up. -- Don't spend it all at Belmore Street.",
+     "choices": [
+      {
+       "text": "About closing time at the burwood hotel.",
+       "turnin": "qgb-l6-burwood-007"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every second shopfront near Belmore Street is a tutoring college. The first one is a bubble tea.",
+     "improv": {
+      "persona": "Joon B., HSC tutor in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about Belmore Street like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near Belmore Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-yan-a",
+   "name": "Yan A., dumpling house owner",
+   "x": -9837,
+   "z": 1330,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table for one? Sit anywhere. Not that one, that's the boss's. Welcome to Burwood.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Xiao long bao, hand-made, eleven a.m. till the dough runs out. the Burwood Hotel queues down the street on Sundays.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two from wilga street.",
+     "choices": [
+      {
+       "text": "Two From Wilga Street",
+       "accept": "qgb-l6-burwood-008",
+       "denyFlag": "w:qgb-l6-burwood-008"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Yan A. looks it over the way Burwood looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About two from wilga street.",
+       "turnin": "qgb-l6-burwood-008"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best dumplings in Burwood are at the place with the worst sign. Everyone knows. Nobody says.",
+     "improv": {
+      "persona": "Yan A., dumpling house owner in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Burwood Hotel like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near the Burwood Hotel."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-sung-a",
+   "name": "Sung A., Korean BBQ owner",
+   "x": -10201,
+   "z": 1049,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table? Grill's hot. Mind the smoke. Welcome to Burwood.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Pork belly, kimchi, soju until the last train. Wilga Street is Strathfield's real main street.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two signs, the emerald hill.",
+     "choices": [
+      {
+       "text": "Two Signs, the Emerald Hill",
+       "accept": "qgb-l6-burwood-009",
+       "denyFlag": "w:qgb-l6-burwood-009"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Sung A. counts it out without looking up. -- Don't spend it all at Wilga Street.",
+     "choices": [
+      {
+       "text": "About two signs, the emerald hill.",
+       "turnin": "qgb-l6-burwood-009"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The karaoke room behind Wilga Street has a Bon Jovi problem. It's not the customers. It's my father.",
+     "improv": {
+      "persona": "Sung A., Korean BBQ owner in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about Wilga Street like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near Wilga Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-annabel",
+   "name": "Annabel, uni student, three jobs",
+   "x": -9804,
+   "z": 812,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Burwood rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the Emerald Hill is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the burwood road tab.",
+     "choices": [
+      {
+       "text": "The Burwood Road Tab",
+       "accept": "qgb-l6-burwood-010",
+       "denyFlag": "w:qgb-l6-burwood-010"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Annabel pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the burwood road tab.",
+       "turnin": "qgb-l6-burwood-010"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the Emerald Hill that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Annabel, uni student, three jobs in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Emerald Hill like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near the Emerald Hill."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-yan-b",
+   "name": "Yan B., chemist",
+   "x": -9718,
+   "z": 836,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Script or a chat? Both's fine. Burwood pharmacy, we do both.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Scripts, flu shots, and every man in Burwood asking quietly about the same thing. Burwood Road keeps me in Panadol.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Something From Burwood Park",
+       "accept": "qgb-l6-burwood-011",
+       "denyFlag": "w:qgb-l6-burwood-011"
+      },
+      {
+       "text": "Trouble at Westfield Burwood",
+       "accept": "qgb-l6-burwood-012",
+       "denyFlag": "w:qgb-l6-burwood-012",
+       "needFlag": "w:qgb-l6-burwood-011"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Yan B. counts it out without looking up. -- Don't spend it all at Burwood Road.",
+     "choices": [
+      {
+       "text": "About something from burwood park.",
+       "turnin": "qgb-l6-burwood-011"
+      },
+      {
+       "text": "About trouble at westfield burwood.",
+       "turnin": "qgb-l6-burwood-012"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Chemist Warehouse near Burwood Road sells everything cheaper and nobody there knows your name.",
+     "improv": {
+      "persona": "Yan B., chemist in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about Burwood Road like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near Burwood Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-tui",
+   "name": "Tui, security guard",
+   "x": -9954,
+   "z": 1514,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bags open, please. Thanks, bro. Welcome to Burwood.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve-hour shifts standing near Westfield Burwood watching people not steal things. Mostly.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's race four, burwood park.",
+     "choices": [
+      {
+       "text": "Race Four, Burwood Park",
+       "accept": "qgb-l6-burwood-013",
+       "denyFlag": "w:qgb-l6-burwood-013"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Tui pays up on the spot.",
+     "choices": [
+      {
+       "text": "About race four, burwood park.",
+       "turnin": "qgb-l6-burwood-013"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a bench near Westfield Burwood where the whole shift eats lunch. We've named the pigeons.",
+     "improv": {
+      "persona": "Tui, security guard in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about Westfield Burwood like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near Westfield Burwood."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Burwood would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-matilda",
+   "name": "Matilda, uni student, three jobs",
+   "x": -9426,
+   "z": 892,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Burwood rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Wilga Street is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the burwood girls order.",
+     "choices": [
+      {
+       "text": "The Burwood Girls Order",
+       "accept": "qgb-l6-burwood-014",
+       "denyFlag": "w:qgb-l6-burwood-014"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Matilda pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the burwood girls order.",
+       "turnin": "qgb-l6-burwood-014"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Wilga Street that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Matilda, uni student, three jobs in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about Wilga Street like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near Wilga Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-jason-b",
+   "name": "Jason B., chemist",
+   "x": -9793,
+   "z": 723,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Script or a chat? Both's fine. Burwood pharmacy, we do both.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Scripts, flu shots, and every man in Burwood asking quietly about the same thing. Burwood Girls keeps me in Panadol.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch the emerald hill.",
+     "choices": [
+      {
+       "text": "Before They Touch the Emerald Hill",
+       "accept": "qgb-l6-burwood-015",
+       "denyFlag": "w:qgb-l6-burwood-015"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Jason B. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About before they touch the emerald hill.",
+       "turnin": "qgb-l6-burwood-015"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Chemist Warehouse near Burwood Girls sells everything cheaper and nobody there knows your name.",
+     "improv": {
+      "persona": "Jason B., chemist in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about Burwood Girls like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near Burwood Girls."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-sung-b",
+   "name": "Sung B., HSC tutor",
+   "x": -9879,
+   "z": 835,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Band six or nothing. Sorry, that's the brochure talking. Burwood, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Maths extension two, Saturdays, forty kids and their mothers in the corridor. Burwood Road has three of us on one block.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's meat tray at westfield burwood.",
+     "choices": [
+      {
+       "text": "Meat Tray at Westfield Burwood",
+       "accept": "qgb-l6-burwood-016",
+       "denyFlag": "w:qgb-l6-burwood-016"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Sung B. looks it over the way Burwood looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About meat tray at westfield burwood.",
+       "turnin": "qgb-l6-burwood-016"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every second shopfront near Burwood Road is a tutoring college. The first one is a bubble tea.",
+     "improv": {
+      "persona": "Sung B., HSC tutor in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about Burwood Road like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near Burwood Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-seo-yeon-b",
+   "name": "Seo-yeon B., Korean BBQ owner",
+   "x": -10099,
+   "z": 1238,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table? Grill's hot. Mind the smoke. Welcome to Burwood.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Pork belly, kimchi, soju until the last train. Burwood Park is Strathfield's real main street.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The the Burwood Chinatown Camera",
+       "accept": "qgb-l6-burwood-017",
+       "denyFlag": "w:qgb-l6-burwood-017"
+      },
+      {
+       "text": "Two Signs, the Burwood Chinatown",
+       "accept": "qgb-l6-burwood-018",
+       "denyFlag": "w:qgb-l6-burwood-018",
+       "needFlag": "w:qgb-l6-burwood-017"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Seo-yeon B. looks it over the way Burwood looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the burwood chinatown camera.",
+       "turnin": "qgb-l6-burwood-017"
+      },
+      {
+       "text": "About two signs, the burwood chinatown.",
+       "turnin": "qgb-l6-burwood-018"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The karaoke room behind Burwood Park has a Bon Jovi problem. It's not the customers. It's my father.",
+     "improv": {
+      "persona": "Seo-yeon B., Korean BBQ owner in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about Burwood Park like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near Burwood Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-xiu-c",
+   "name": "Xiu C., chemist",
+   "x": -9420,
+   "z": 1047,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Script or a chat? Both's fine. Burwood pharmacy, we do both.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Scripts, flu shots, and every man in Burwood asking quietly about the same thing. the Burwood Hotel keeps me in Panadol.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Burwood Girls Tab",
+       "accept": "qgb-l6-burwood-019",
+       "denyFlag": "w:qgb-l6-burwood-019"
+      },
+      {
+       "text": "The Burwood Road Course",
+       "accept": "qgb-l6-burwood-020",
+       "denyFlag": "w:qgb-l6-burwood-020",
+       "needFlag": "w:qgb-l6-burwood-019"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Xiu C. counts it out without looking up. -- Don't spend it all at the Burwood Hotel.",
+     "choices": [
+      {
+       "text": "About the burwood girls tab.",
+       "turnin": "qgb-l6-burwood-019"
+      },
+      {
+       "text": "About the burwood road course.",
+       "turnin": "qgb-l6-burwood-020"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Chemist Warehouse near the Burwood Hotel sells everything cheaper and nobody there knows your name.",
+     "improv": {
+      "persona": "Xiu C., chemist in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Burwood Hotel like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near the Burwood Hotel."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-hyun-b",
+   "name": "Hyun B., HSC tutor",
+   "x": -9557,
+   "z": 645,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Band six or nothing. Sorry, that's the brochure talking. Burwood, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Maths extension two, Saturdays, forty kids and their mothers in the corridor. Burwood Girls has three of us on one block.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rbt on burwood road.",
+     "choices": [
+      {
+       "text": "RBT on Burwood Road",
+       "accept": "qgb-l6-burwood-021",
+       "denyFlag": "w:qgb-l6-burwood-021"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Hyun B. counts it out without looking up. -- Don't spend it all at Burwood Girls.",
+     "choices": [
+      {
+       "text": "About rbt on burwood road.",
+       "turnin": "qgb-l6-burwood-021"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every second shopfront near Burwood Girls is a tutoring college. The first one is a bubble tea.",
+     "improv": {
+      "persona": "Hyun B., HSC tutor in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about Burwood Girls like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near Burwood Girls."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-wei-g",
+   "name": "Wei G., dumpling house owner",
+   "x": -9818,
+   "z": 1125,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table for one? Sit anywhere. Not that one, that's the boss's. Welcome to Burwood.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Xiao long bao, hand-made, eleven a.m. till the dough runs out. the Emerald Hill queues down the street on Sundays.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the westfield burwood complaint.",
+     "choices": [
+      {
+       "text": "The Westfield Burwood Complaint",
+       "accept": "qgb-l6-burwood-022",
+       "denyFlag": "w:qgb-l6-burwood-022"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Wei G. counts it out without looking up. -- Don't spend it all at the Emerald Hill.",
+     "choices": [
+      {
+       "text": "About the westfield burwood complaint.",
+       "turnin": "qgb-l6-burwood-022"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best dumplings in Burwood are at the place with the worst sign. Everyone knows. Nobody says.",
+     "improv": {
+      "persona": "Wei G., dumpling house owner in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Emerald Hill like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near the Emerald Hill."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-fetu",
+   "name": "Fetu, security guard",
+   "x": -9757,
+   "z": 799,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bags open, please. Thanks, bro. Welcome to Burwood.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve-hour shifts standing near Belmore Street watching people not steal things. Mostly.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Staffy Near Wilga Street",
+       "accept": "qgb-l6-burwood-023",
+       "denyFlag": "w:qgb-l6-burwood-023"
+      },
+      {
+       "text": "The Wilga Street Camera",
+       "accept": "qgb-l6-burwood-024",
+       "denyFlag": "w:qgb-l6-burwood-024",
+       "needFlag": "w:qgb-l6-burwood-023"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Fetu counts it out without looking up. -- Don't spend it all at Belmore Street.",
+     "choices": [
+      {
+       "text": "About staffy near wilga street.",
+       "turnin": "qgb-l6-burwood-023"
+      },
+      {
+       "text": "About the wilga street camera.",
+       "turnin": "qgb-l6-burwood-024"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a bench near Belmore Street where the whole shift eats lunch. We've named the pigeons.",
+     "improv": {
+      "persona": "Fetu, security guard in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about Belmore Street like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near Belmore Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Right. And you're sure it was Wilga Street? People say Wilga Street when they mean the bit next to it. -- Fetu writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-yan-c",
+   "name": "Yan C., dumpling house owner",
+   "x": -9874,
+   "z": 1400,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table for one? Sit anywhere. Not that one, that's the boss's. Welcome to Burwood.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Xiao long bao, hand-made, eleven a.m. till the dough runs out. Wilga Street queues down the street on Sundays.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's cover at the emerald hill.",
+     "choices": [
+      {
+       "text": "Cover at the Emerald Hill",
+       "accept": "qgb-l6-burwood-025",
+       "denyFlag": "w:qgb-l6-burwood-025"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Yan C. counts it out without looking up. -- Don't spend it all at Wilga Street.",
+     "choices": [
+      {
+       "text": "About cover at the emerald hill.",
+       "turnin": "qgb-l6-burwood-025"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best dumplings in Burwood are at the place with the worst sign. Everyone knows. Nobody says.",
+     "improv": {
+      "persona": "Yan C., dumpling house owner in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about Wilga Street like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near Wilga Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-min-jun-b",
+   "name": "Min-jun B., Korean BBQ owner",
+   "x": -9701,
+   "z": 671,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table? Grill's hot. Mind the smoke. Welcome to Burwood.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Pork belly, kimchi, soju until the last train. Burwood Girls is Strathfield's real main street.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the emerald hill tab.",
+     "choices": [
+      {
+       "text": "The the Emerald Hill Tab",
+       "accept": "qgb-l6-burwood-026",
+       "denyFlag": "w:qgb-l6-burwood-026"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Min-jun B. counts it out without looking up. -- Don't spend it all at Burwood Girls.",
+     "choices": [
+      {
+       "text": "About the the emerald hill tab.",
+       "turnin": "qgb-l6-burwood-026"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The karaoke room behind Burwood Girls has a Bon Jovi problem. It's not the customers. It's my father.",
+     "improv": {
+      "persona": "Min-jun B., Korean BBQ owner in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about Burwood Girls like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near Burwood Girls."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-kai",
+   "name": "Kai, real estate agent",
+   "x": -10161,
+   "z": 1104,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Burwood is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. the Emerald Hill is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Westfield Burwood Course",
+       "accept": "qgb-l6-burwood-027",
+       "denyFlag": "w:qgb-l6-burwood-027"
+      },
+      {
+       "text": "Race Four, Burwood Road",
+       "accept": "qgb-l6-burwood-028",
+       "denyFlag": "w:qgb-l6-burwood-028",
+       "needFlag": "w:qgb-l6-burwood-027"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Kai counts it out without looking up. -- Don't spend it all at the Emerald Hill.",
+     "choices": [
+      {
+       "text": "About the westfield burwood course.",
+       "turnin": "qgb-l6-burwood-027"
+      },
+      {
+       "text": "About race four, burwood road.",
+       "turnin": "qgb-l6-burwood-028"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. the Emerald Hill means cosy.",
+     "improv": {
+      "persona": "Kai, real estate agent in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Emerald Hill like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near the Emerald Hill."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Burwood would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-maureen",
+   "name": "Maureen, uni student, three jobs",
+   "x": -9561,
+   "z": 1550,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Burwood rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Burwood Road is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "A Flat White From Westfield Burwood",
+       "accept": "qgb-l6-burwood-029",
+       "denyFlag": "w:qgb-l6-burwood-029"
+      },
+      {
+       "text": "Bin Night, Westfield Burwood",
+       "accept": "qgb-l6-burwood-030",
+       "denyFlag": "w:qgb-l6-burwood-030",
+       "needFlag": "w:qgb-l6-burwood-029"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Maureen counts it out without looking up. -- Don't spend it all at Burwood Road.",
+     "choices": [
+      {
+       "text": "About a flat white from westfield burwood.",
+       "turnin": "qgb-l6-burwood-029"
+      },
+      {
+       "text": "About bin night, westfield burwood.",
+       "turnin": "qgb-l6-burwood-030"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Burwood Road that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Maureen, uni student, three jobs in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about Burwood Road like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near Burwood Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-tony",
+   "name": "Tony, dumpling house owner",
+   "x": -9836,
+   "z": 826,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table for one? Sit anywhere. Not that one, that's the boss's. Welcome to Burwood.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Xiao long bao, hand-made, eleven a.m. till the dough runs out. Belmore Street queues down the street on Sundays.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Trolley Run, the Burwood Hotel",
+       "accept": "qgb-l6-burwood-031",
+       "denyFlag": "w:qgb-l6-burwood-031"
+      },
+      {
+       "text": "The the Burwood Hotel Order",
+       "accept": "qgb-l6-burwood-032",
+       "denyFlag": "w:qgb-l6-burwood-032",
+       "needFlag": "w:qgb-l6-burwood-031"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Tony pays up on the spot.",
+     "choices": [
+      {
+       "text": "About trolley run, the burwood hotel.",
+       "turnin": "qgb-l6-burwood-031"
+      },
+      {
+       "text": "About the the burwood hotel order.",
+       "turnin": "qgb-l6-burwood-032"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best dumplings in Burwood are at the place with the worst sign. Everyone knows. Nobody says.",
+     "improv": {
+      "persona": "Tony, dumpling house owner in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about Belmore Street like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near Belmore Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-yuna-b",
+   "name": "Yuna B., Korean BBQ owner",
+   "x": -10158,
+   "z": 1196,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table? Grill's hot. Mind the smoke. Welcome to Burwood.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Pork belly, kimchi, soju until the last train. the Burwood Hotel is Strathfield's real main street.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch wilga street.",
+     "choices": [
+      {
+       "text": "Before They Touch Wilga Street",
+       "accept": "qgb-l6-burwood-033",
+       "denyFlag": "w:qgb-l6-burwood-033"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Yuna B. looks it over the way Burwood looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About before they touch wilga street.",
+       "turnin": "qgb-l6-burwood-033"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The karaoke room behind the Burwood Hotel has a Bon Jovi problem. It's not the customers. It's my father.",
+     "improv": {
+      "persona": "Yuna B., Korean BBQ owner in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Burwood Hotel like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near the Burwood Hotel."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-ken",
+   "name": "Ken, chemist",
+   "x": -10085,
+   "z": 1044,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Script or a chat? Both's fine. Burwood pharmacy, we do both.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Scripts, flu shots, and every man in Burwood asking quietly about the same thing. the Emerald Hill keeps me in Panadol.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two from burwood road.",
+     "choices": [
+      {
+       "text": "Two From Burwood Road",
+       "accept": "qgb-l6-burwood-034",
+       "denyFlag": "w:qgb-l6-burwood-034"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Ken looks it over the way Burwood looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About two from burwood road.",
+       "turnin": "qgb-l6-burwood-034"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Chemist Warehouse near the Emerald Hill sells everything cheaper and nobody there knows your name.",
+     "improv": {
+      "persona": "Ken, chemist in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Emerald Hill like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near the Emerald Hill."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-manu",
+   "name": "Manu, security guard",
+   "x": -9950,
+   "z": 1213,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bags open, please. Thanks, bro. Welcome to Burwood.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve-hour shifts standing near Burwood Road watching people not steal things. Mostly.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Westfield Burwood Camera",
+       "accept": "qgb-l6-burwood-035",
+       "denyFlag": "w:qgb-l6-burwood-035"
+      },
+      {
+       "text": "Counting Westfield Burwood",
+       "accept": "qgb-l6-burwood-036",
+       "denyFlag": "w:qgb-l6-burwood-036",
+       "needFlag": "w:qgb-l6-burwood-035"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Manu pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the westfield burwood camera.",
+       "turnin": "qgb-l6-burwood-035"
+      },
+      {
+       "text": "About counting westfield burwood.",
+       "turnin": "qgb-l6-burwood-036"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a bench near Burwood Road where the whole shift eats lunch. We've named the pigeons.",
+     "improv": {
+      "persona": "Manu, security guard in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about Burwood Road like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near Burwood Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-min-jun-c",
+   "name": "Min-jun C., HSC tutor",
+   "x": -9660,
+   "z": 1496,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Band six or nothing. Sorry, that's the brochure talking. Burwood, hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Maths extension two, Saturdays, forty kids and their mothers in the corridor. Westfield Burwood has three of us on one block.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's seven a.m. at burwood park.",
+     "choices": [
+      {
+       "text": "Seven a.m. At Burwood Park",
+       "accept": "qgb-l6-burwood-037",
+       "denyFlag": "w:qgb-l6-burwood-037"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Min-jun C. looks it over the way Burwood looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About seven a.m. at burwood park.",
+       "turnin": "qgb-l6-burwood-037"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every second shopfront near Westfield Burwood is a tutoring college. The first one is a bubble tea.",
+     "improv": {
+      "persona": "Min-jun C., HSC tutor in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about Westfield Burwood like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near Westfield Burwood."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-jae-b",
+   "name": "Jae B., Korean BBQ owner",
+   "x": -9401,
+   "z": 1224,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table? Grill's hot. Mind the smoke. Welcome to Burwood.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Pork belly, kimchi, soju until the last train. the Burwood Chinatown is Strathfield's real main street.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at belmore street.",
+     "choices": [
+      {
+       "text": "Trouble at Belmore Street",
+       "accept": "qgb-l6-burwood-038",
+       "denyFlag": "w:qgb-l6-burwood-038"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Jae B. looks it over the way Burwood looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About trouble at belmore street.",
+       "turnin": "qgb-l6-burwood-038"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The karaoke room behind the Burwood Chinatown has a Bon Jovi problem. It's not the customers. It's my father.",
+     "improv": {
+      "persona": "Jae B., Korean BBQ owner in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Burwood Chinatown like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near the Burwood Chinatown."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-burwood-chantelle",
+   "name": "Chantelle, uni student, three jobs",
+   "x": -9832,
+   "z": 1384,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Burwood rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Burwood like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the Burwood Hotel is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's one stop from wilga street.",
+     "choices": [
+      {
+       "text": "One Stop From Wilga Street",
+       "accept": "qgb-l6-burwood-039",
+       "denyFlag": "w:qgb-l6-burwood-039"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Chantelle looks it over the way Burwood looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About one stop from wilga street.",
+       "turnin": "qgb-l6-burwood-039"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the Burwood Hotel that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Chantelle, uni student, three jobs in Burwood, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Burwood Hotel like everyone knows it.",
+      "context": "Someone has asked what Burwood is like these days. You are standing near the Burwood Hotel."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

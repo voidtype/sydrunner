@@ -1,0 +1,2945 @@
+{
+ "pack": "areab-st-peters-1",
+ "npcs": [
+  {
+   "id": "qgb-st-peters-narelle-a",
+   "name": "Narelle A., dog walker, four leads",
+   "x": -2470,
+   "z": 4500,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hang on, hang on -- sit. Not you. Sorry, St Peters at this hour is chaos. What's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six dogs, three suburbs, one car park at the Princes Highway. Two of them aren't mine and one of them isn't a dog, legally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Lads Off King Street south end",
+       "accept": "qgb-l1-st-peters-001",
+       "denyFlag": "w:qgb-l1-st-peters-001"
+      },
+      {
+       "text": "One Stop From King Street south end",
+       "accept": "qgb-l1-st-peters-002",
+       "denyFlag": "w:qgb-l1-st-peters-002",
+       "needFlag": "w:qgb-l1-st-peters-001"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Narelle A. counts it out without looking up. -- Don't spend it all at the Princes Highway.",
+     "choices": [
+      {
+       "text": "About lads off king street south end.",
+       "turnin": "qgb-l1-st-peters-001"
+      },
+      {
+       "text": "About one stop from king street south end.",
+       "turnin": "qgb-l1-st-peters-002"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The off-leash bit at the Princes Highway is fine until the magpies come back. Then nothing is fine.",
+     "improv": {
+      "persona": "Narelle A., dog walker, four leads in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Princes Highway like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near the Princes Highway."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-michelle-a",
+   "name": "Michelle A., council ranger",
+   "x": -2134,
+   "z": 4436,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council St Peters is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. the Camdenville oval generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Trouble at the WestConnex vent stack",
+       "accept": "qgb-l1-st-peters-003",
+       "denyFlag": "w:qgb-l1-st-peters-003"
+      },
+      {
+       "text": "Ask Around at Marrickville",
+       "accept": "qgb-l1-st-peters-004",
+       "denyFlag": "w:qgb-l1-st-peters-004",
+       "needFlag": "w:qgb-l1-st-peters-003"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Michelle A. counts it out without looking up. -- Don't spend it all at the Camdenville oval.",
+     "choices": [
+      {
+       "text": "About trouble at the westconnex vent stack.",
+       "turnin": "qgb-l1-st-peters-003"
+      },
+      {
+       "text": "About ask around at marrickville.",
+       "turnin": "qgb-l1-st-peters-004"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Michelle A., council ranger in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Camdenville oval like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near the Camdenville oval."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-2",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Michelle A. listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-ravi",
+   "name": "Ravi, servo night shift",
+   "x": -2891,
+   "z": 4668,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Pump four's off. Pump four's been off since May. Welcome to St Peters.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Ten hours, one register, and the pie warmer. You learn who St Peters is at three in the morning.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Sydney Park Course",
+       "accept": "qgb-l1-st-peters-005",
+       "denyFlag": "w:qgb-l1-st-peters-005"
+      },
+      {
+       "text": "Rent Money, May Street",
+       "accept": "qgb-l1-st-peters-006",
+       "denyFlag": "w:qgb-l1-st-peters-006",
+       "needFlag": "w:qgb-l1-st-peters-005"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Ravi looks it over the way St Peters looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the sydney park course.",
+       "turnin": "qgb-l1-st-peters-005"
+      },
+      {
+       "text": "About rent money, may street.",
+       "turnin": "qgb-l1-st-peters-006"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good pie is the one at the back of the WestConnex vent stack's warmer. The front ones have been there since the shift before me.",
+     "improv": {
+      "persona": "Ravi, servo night shift in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about the WestConnex vent stack like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near the WestConnex vent stack."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-karen-a",
+   "name": "Karen A., uni student, three jobs",
+   "x": -2872,
+   "z": 4473,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. St Peters rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. May Street is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the sydney park tab.",
+     "choices": [
+      {
+       "text": "The Sydney Park Tab",
+       "accept": "qgb-l1-st-peters-007",
+       "denyFlag": "w:qgb-l1-st-peters-007"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Karen A. counts it out without looking up. -- Don't spend it all at May Street.",
+     "choices": [
+      {
+       "text": "About the sydney park tab.",
+       "turnin": "qgb-l1-st-peters-007"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near May Street that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Karen A., uni student, three jobs in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about May Street like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near May Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-rhonda-a",
+   "name": "Rhonda A., chippy off a job",
+   "x": -2135,
+   "z": 4490,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. St Peters, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Counting Sydney Park",
+       "accept": "qgb-l1-st-peters-008",
+       "denyFlag": "w:qgb-l1-st-peters-008"
+      },
+      {
+       "text": "Trolley Run, Sydney Park",
+       "accept": "qgb-l1-st-peters-009",
+       "denyFlag": "w:qgb-l1-st-peters-009",
+       "needFlag": "w:qgb-l1-st-peters-008"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Rhonda A. looks it over the way St Peters looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About counting sydney park.",
+       "turnin": "qgb-l1-st-peters-008"
+      },
+      {
+       "text": "About trolley run, sydney park.",
+       "turnin": "qgb-l1-st-peters-009"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round St Peters is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Rhonda A., chippy off a job in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about the St Peters interchange like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near the St Peters interchange."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-pam-a",
+   "name": "Pam A., dog walker, four leads",
+   "x": -2411,
+   "z": 3945,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hang on, hang on -- sit. Not you. Sorry, St Peters at this hour is chaos. What's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six dogs, three suburbs, one car park at Sydney Park. Two of them aren't mine and one of them isn't a dog, legally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's proof of the princes highway.",
+     "choices": [
+      {
+       "text": "Proof of the Princes Highway",
+       "accept": "qgb-l1-st-peters-010",
+       "denyFlag": "w:qgb-l1-st-peters-010"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Pam A. looks it over the way St Peters looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About proof of the princes highway.",
+       "turnin": "qgb-l1-st-peters-010"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The off-leash bit at Sydney Park is fine until the magpies come back. Then nothing is fine.",
+     "improv": {
+      "persona": "Pam A., dog walker, four leads in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about Sydney Park like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near Sydney Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-maureen-a",
+   "name": "Maureen A., council ranger",
+   "x": -2874,
+   "z": 4331,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council St Peters is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. the Princes Highway generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Something From King Street south end",
+       "accept": "qgb-l1-st-peters-011",
+       "denyFlag": "w:qgb-l1-st-peters-011"
+      },
+      {
+       "text": "Staffy Near King Street south end",
+       "accept": "qgb-l1-st-peters-012",
+       "denyFlag": "w:qgb-l1-st-peters-012",
+       "needFlag": "w:qgb-l1-st-peters-011"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Maureen A. looks it over the way St Peters looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About something from king street south end.",
+       "turnin": "qgb-l1-st-peters-011"
+      },
+      {
+       "text": "About staffy near king street south end.",
+       "turnin": "qgb-l1-st-peters-012"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Maureen A., council ranger in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Princes Highway like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near the Princes Highway."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "That's what I thought. That's exactly what I thought and nobody in St Peters would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-sunil",
+   "name": "Sunil, servo night shift",
+   "x": -2866,
+   "z": 4242,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Pump four's off. Pump four's been off since May. Welcome to St Peters.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Ten hours, one register, and the pie warmer. You learn who St Peters is at three in the morning.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Meat Tray at the Camdenville oval",
+       "accept": "qgb-l1-st-peters-013",
+       "denyFlag": "w:qgb-l1-st-peters-013"
+      },
+      {
+       "text": "The the Camdenville oval Camera",
+       "accept": "qgb-l1-st-peters-014",
+       "denyFlag": "w:qgb-l1-st-peters-014",
+       "needFlag": "w:qgb-l1-st-peters-013"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Sunil looks it over the way St Peters looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About meat tray at the camdenville oval.",
+       "turnin": "qgb-l1-st-peters-013"
+      },
+      {
+       "text": "About the the camdenville oval camera.",
+       "turnin": "qgb-l1-st-peters-014"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good pie is the one at the back of King Street south end's warmer. The front ones have been there since the shift before me.",
+     "improv": {
+      "persona": "Sunil, servo night shift in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about King Street south end like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near King Street south end."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-jarrod-b",
+   "name": "Jarrod B., chippy off a job",
+   "x": -2754,
+   "z": 4113,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. St Peters, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "A Flat White From May Street",
+       "accept": "qgb-l1-st-peters-015",
+       "denyFlag": "w:qgb-l1-st-peters-015"
+      },
+      {
+       "text": "The May Street Complaint",
+       "accept": "qgb-l1-st-peters-016",
+       "denyFlag": "w:qgb-l1-st-peters-016",
+       "needFlag": "w:qgb-l1-st-peters-015"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Jarrod B. looks it over the way St Peters looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About a flat white from may street.",
+       "turnin": "qgb-l1-st-peters-015"
+      },
+      {
+       "text": "About the may street complaint.",
+       "turnin": "qgb-l1-st-peters-016"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round St Peters is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Jarrod B., chippy off a job in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about the WestConnex vent stack like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near the WestConnex vent stack."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-tahlia-b",
+   "name": "Tahlia B., dog walker, four leads",
+   "x": -2811,
+   "z": 4446,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hang on, hang on -- sit. Not you. Sorry, St Peters at this hour is chaos. What's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six dogs, three suburbs, one car park at May Street. Two of them aren't mine and one of them isn't a dog, legally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's lads off the st peters interchange.",
+     "choices": [
+      {
+       "text": "Lads Off the St Peters interchange",
+       "accept": "qgb-l1-st-peters-017",
+       "denyFlag": "w:qgb-l1-st-peters-017"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Tahlia B. counts it out without looking up. -- Don't spend it all at May Street.",
+     "choices": [
+      {
+       "text": "About lads off the st peters interchange.",
+       "turnin": "qgb-l1-st-peters-017"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The off-leash bit at May Street is fine until the magpies come back. Then nothing is fine.",
+     "improv": {
+      "persona": "Tahlia B., dog walker, four leads in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about May Street like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near May Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-arun",
+   "name": "Arun, servo night shift",
+   "x": -2205,
+   "z": 4040,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Pump four's off. Pump four's been off since May. Welcome to St Peters.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Ten hours, one register, and the pie warmer. You learn who St Peters is at three in the morning.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at king street south end.",
+     "choices": [
+      {
+       "text": "Trouble at King Street south end",
+       "accept": "qgb-l1-st-peters-018",
+       "denyFlag": "w:qgb-l1-st-peters-018"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Arun counts it out without looking up. -- Don't spend it all at the brick kilns.",
+     "choices": [
+      {
+       "text": "About trouble at king street south end.",
+       "turnin": "qgb-l1-st-peters-018"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good pie is the one at the back of the brick kilns's warmer. The front ones have been there since the shift before me.",
+     "improv": {
+      "persona": "Arun, servo night shift in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about the brick kilns like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near the brick kilns."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-marg-a",
+   "name": "Marg A., uni student, three jobs",
+   "x": -2383,
+   "z": 4318,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. St Peters rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the Princes Highway is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's closing time at king street south end.",
+     "choices": [
+      {
+       "text": "Closing Time at King Street south end",
+       "accept": "qgb-l1-st-peters-019",
+       "denyFlag": "w:qgb-l1-st-peters-019"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Marg A. looks it over the way St Peters looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About closing time at king street south end.",
+       "turnin": "qgb-l1-st-peters-019"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the Princes Highway that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Marg A., uni student, three jobs in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Princes Highway like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near the Princes Highway."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-bluey-a",
+   "name": "Bluey A., chippy off a job",
+   "x": -2268,
+   "z": 4186,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. St Peters, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the length of the camdenville oval.",
+     "choices": [
+      {
+       "text": "The Length of the Camdenville oval",
+       "accept": "qgb-l1-st-peters-020",
+       "denyFlag": "w:qgb-l1-st-peters-020"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Bluey A. looks it over the way St Peters looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the length of the camdenville oval.",
+       "turnin": "qgb-l1-st-peters-020"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round St Peters is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Bluey A., chippy off a job in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about King Street south end like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near King Street south end."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-trent-a",
+   "name": "Trent A., Vinnies volunteer",
+   "x": -2537,
+   "z": 3834,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bag goes on the counter, love, not the floor. Welcome to St Peters.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I sort what St Peters throws out. Half of it is jeans, a quarter is a bread maker, and once a fortnight it's something someone will come back crying for.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trolley run, may street.",
+     "choices": [
+      {
+       "text": "Trolley Run, May Street",
+       "accept": "qgb-l1-st-peters-021",
+       "denyFlag": "w:qgb-l1-st-peters-021"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Trent A. looks it over the way St Peters looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About trolley run, may street.",
+       "turnin": "qgb-l1-st-peters-021"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good stuff at the WestConnex vent stack goes before ten. The people who know, know.",
+     "improv": {
+      "persona": "Trent A., Vinnies volunteer in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about the WestConnex vent stack like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near the WestConnex vent stack."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-renee-b",
+   "name": "Renee B., uni student, three jobs",
+   "x": -2311,
+   "z": 4562,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. St Peters rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Sydney Park is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The the brick kilns Order",
+       "accept": "qgb-l1-st-peters-022",
+       "denyFlag": "w:qgb-l1-st-peters-022"
+      },
+      {
+       "text": "Something From the brick kilns",
+       "accept": "qgb-l1-st-peters-023",
+       "denyFlag": "w:qgb-l1-st-peters-023",
+       "needFlag": "w:qgb-l1-st-peters-022"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Renee B. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the brick kilns order.",
+       "turnin": "qgb-l1-st-peters-022"
+      },
+      {
+       "text": "About something from the brick kilns.",
+       "turnin": "qgb-l1-st-peters-023"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Sydney Park that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Renee B., uni student, three jobs in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about Sydney Park like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near Sydney Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-kylie-anne-a",
+   "name": "Kylie-Anne A., dog walker, four leads",
+   "x": -2578,
+   "z": 4505,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hang on, hang on -- sit. Not you. Sorry, St Peters at this hour is chaos. What's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six dogs, three suburbs, one car park at the Princes Highway. Two of them aren't mine and one of them isn't a dog, legally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's race four, king street south end.",
+     "choices": [
+      {
+       "text": "Race Four, King Street south end",
+       "accept": "qgb-l1-st-peters-024",
+       "denyFlag": "w:qgb-l1-st-peters-024"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Kylie-Anne A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About race four, king street south end.",
+       "turnin": "qgb-l1-st-peters-024"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The off-leash bit at the Princes Highway is fine until the magpies come back. Then nothing is fine.",
+     "improv": {
+      "persona": "Kylie-Anne A., dog walker, four leads in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Princes Highway like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near the Princes Highway."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "That's what I thought. That's exactly what I thought and nobody in St Peters would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-graham-b",
+   "name": "Graham B., Vinnies volunteer",
+   "x": -2724,
+   "z": 4064,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bag goes on the counter, love, not the floor. Welcome to St Peters.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I sort what St Peters throws out. Half of it is jeans, a quarter is a bread maker, and once a fortnight it's something someone will come back crying for.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's a flat white from the camdenville oval.",
+     "choices": [
+      {
+       "text": "A Flat White From the Camdenville oval",
+       "accept": "qgb-l1-st-peters-025",
+       "denyFlag": "w:qgb-l1-st-peters-025"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Graham B. counts it out without looking up. -- Don't spend it all at King Street south end.",
+     "choices": [
+      {
+       "text": "About a flat white from the camdenville oval.",
+       "turnin": "qgb-l1-st-peters-025"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good stuff at King Street south end goes before ten. The people who know, know.",
+     "improv": {
+      "persona": "Graham B., Vinnies volunteer in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about King Street south end like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near King Street south end."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-beryl-a",
+   "name": "Beryl A., council ranger",
+   "x": -2781,
+   "z": 4475,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council St Peters is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. the Camdenville oval generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The the WestConnex vent stack Complaint",
+       "accept": "qgb-l1-st-peters-026",
+       "denyFlag": "w:qgb-l1-st-peters-026"
+      },
+      {
+       "text": "One Stop From May Street",
+       "accept": "qgb-l1-st-peters-027",
+       "denyFlag": "w:qgb-l1-st-peters-027",
+       "needFlag": "w:qgb-l1-st-peters-026"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Beryl A. counts it out without looking up. -- Don't spend it all at the Camdenville oval.",
+     "choices": [
+      {
+       "text": "About the the westconnex vent stack complaint.",
+       "turnin": "qgb-l1-st-peters-026"
+      },
+      {
+       "text": "About one stop from may street.",
+       "turnin": "qgb-l1-st-peters-027"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Beryl A., council ranger in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Camdenville oval like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near the Camdenville oval."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-raj",
+   "name": "Raj, servo night shift",
+   "x": -2736,
+   "z": 4213,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Pump four's off. Pump four's been off since May. Welcome to St Peters.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Ten hours, one register, and the pie warmer. You learn who St Peters is at three in the morning.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's seven a.m. at may street.",
+     "choices": [
+      {
+       "text": "Seven a.m. At May Street",
+       "accept": "qgb-l1-st-peters-028",
+       "denyFlag": "w:qgb-l1-st-peters-028"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Raj pays up on the spot.",
+     "choices": [
+      {
+       "text": "About seven a.m. at may street.",
+       "turnin": "qgb-l1-st-peters-028"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good pie is the one at the back of the WestConnex vent stack's warmer. The front ones have been there since the shift before me.",
+     "improv": {
+      "persona": "Raj, servo night shift in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about the WestConnex vent stack like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near the WestConnex vent stack."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-joyce-b",
+   "name": "Joyce B., uni student, three jobs",
+   "x": -2646,
+   "z": 4405,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. St Peters rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. May Street is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch the st peters interchange.",
+     "choices": [
+      {
+       "text": "Before They Touch the St Peters interchange",
+       "accept": "qgb-l1-st-peters-029",
+       "denyFlag": "w:qgb-l1-st-peters-029"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Joyce B. counts it out without looking up. -- Don't spend it all at May Street.",
+     "choices": [
+      {
+       "text": "About before they touch the st peters interchange.",
+       "turnin": "qgb-l1-st-peters-029"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near May Street that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Joyce B., uni student, three jobs in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about May Street like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near May Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-warwick-b",
+   "name": "Warwick B., chippy off a job",
+   "x": -2333,
+   "z": 4359,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. St Peters, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at sydney park.",
+     "choices": [
+      {
+       "text": "Trouble at Sydney Park",
+       "accept": "qgb-l1-st-peters-030",
+       "denyFlag": "w:qgb-l1-st-peters-030"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Warwick B. counts it out without looking up. -- Don't spend it all at the St Peters interchange.",
+     "choices": [
+      {
+       "text": "About trouble at sydney park.",
+       "turnin": "qgb-l1-st-peters-030"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round St Peters is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Warwick B., chippy off a job in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about the St Peters interchange like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near the St Peters interchange."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-cooper-b",
+   "name": "Cooper B., Vinnies volunteer",
+   "x": -2693,
+   "z": 4411,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bag goes on the counter, love, not the floor. Welcome to St Peters.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I sort what St Peters throws out. Half of it is jeans, a quarter is a bread maker, and once a fortnight it's something someone will come back crying for.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's cover at king street south end.",
+     "choices": [
+      {
+       "text": "Cover at King Street south end",
+       "accept": "qgb-l1-st-peters-031",
+       "denyFlag": "w:qgb-l1-st-peters-031"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Cooper B. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About cover at king street south end.",
+       "turnin": "qgb-l1-st-peters-031"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good stuff at the brick kilns goes before ten. The people who know, know.",
+     "improv": {
+      "persona": "Cooper B., Vinnies volunteer in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about the brick kilns like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near the brick kilns."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-vikram",
+   "name": "Vikram, servo night shift",
+   "x": -2417,
+   "z": 4446,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Pump four's off. Pump four's been off since May. Welcome to St Peters.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Ten hours, one register, and the pie warmer. You learn who St Peters is at three in the morning.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's probationary at the westconnex vent stack.",
+     "choices": [
+      {
+       "text": "Probationary at the WestConnex vent stack",
+       "accept": "qgb-l1-st-peters-032",
+       "denyFlag": "w:qgb-l1-st-peters-032"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Vikram pays up on the spot.",
+     "choices": [
+      {
+       "text": "About probationary at the westconnex vent stack.",
+       "turnin": "qgb-l1-st-peters-032"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good pie is the one at the back of King Street south end's warmer. The front ones have been there since the shift before me.",
+     "improv": {
+      "persona": "Vikram, servo night shift in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about King Street south end like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near King Street south end."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-annabel-b",
+   "name": "Annabel B., uni student, three jobs",
+   "x": -2992,
+   "z": 4304,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. St Peters rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the Camdenville oval is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's proof of the westconnex vent stack.",
+     "choices": [
+      {
+       "text": "Proof of the WestConnex vent stack",
+       "accept": "qgb-l1-st-peters-033",
+       "denyFlag": "w:qgb-l1-st-peters-033"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Annabel B. looks it over the way St Peters looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About proof of the westconnex vent stack.",
+       "turnin": "qgb-l1-st-peters-033"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the Camdenville oval that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Annabel B., uni student, three jobs in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Camdenville oval like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near the Camdenville oval."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-eddie-a",
+   "name": "Eddie A., chippy off a job",
+   "x": -2311,
+   "z": 4678,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Yeah, g'day. Don't step on that, it's not dry. St Peters, you're in the right spot.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the may street sparky.",
+     "choices": [
+      {
+       "text": "The May Street Sparky",
+       "accept": "qgb-l1-st-peters-034",
+       "denyFlag": "w:qgb-l1-st-peters-034"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Eddie A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the may street sparky.",
+       "turnin": "qgb-l1-st-peters-034"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Best pie round St Peters is the one nobody Instagrams. Ask at the servo, not the cafe.",
+     "improv": {
+      "persona": "Eddie A., chippy off a job in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about the WestConnex vent stack like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near the WestConnex vent stack."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-shirl-b",
+   "name": "Shirl B., dog walker, four leads",
+   "x": -2485,
+   "z": 4130,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hang on, hang on -- sit. Not you. Sorry, St Peters at this hour is chaos. What's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six dogs, three suburbs, one car park at May Street. Two of them aren't mine and one of them isn't a dog, legally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two from the st peters interchange.",
+     "choices": [
+      {
+       "text": "Two From the St Peters interchange",
+       "accept": "qgb-l1-st-peters-035",
+       "denyFlag": "w:qgb-l1-st-peters-035"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Shirl B. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About two from the st peters interchange.",
+       "turnin": "qgb-l1-st-peters-035"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The off-leash bit at May Street is fine until the magpies come back. Then nothing is fine.",
+     "improv": {
+      "persona": "Shirl B., dog walker, four leads in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about May Street like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near May Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-reg-b",
+   "name": "Reg B., Vinnies volunteer",
+   "x": -2392,
+   "z": 4551,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bag goes on the counter, love, not the floor. Welcome to St Peters.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I sort what St Peters throws out. Half of it is jeans, a quarter is a bread maker, and once a fortnight it's something someone will come back crying for.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Sydney Park Order",
+       "accept": "qgb-l1-st-peters-036",
+       "denyFlag": "w:qgb-l1-st-peters-036"
+      },
+      {
+       "text": "Something From Sydney Park",
+       "accept": "qgb-l1-st-peters-037",
+       "denyFlag": "w:qgb-l1-st-peters-037",
+       "needFlag": "w:qgb-l1-st-peters-036"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Reg B. counts it out without looking up. -- Don't spend it all at the St Peters interchange.",
+     "choices": [
+      {
+       "text": "About the sydney park order.",
+       "turnin": "qgb-l1-st-peters-036"
+      },
+      {
+       "text": "About something from sydney park.",
+       "turnin": "qgb-l1-st-peters-037"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good stuff at the St Peters interchange goes before ten. The people who know, know.",
+     "improv": {
+      "persona": "Reg B., Vinnies volunteer in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about the St Peters interchange like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near the St Peters interchange."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-harpreet-a",
+   "name": "Harpreet A., servo night shift",
+   "x": -2490,
+   "z": 4543,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Pump four's off. Pump four's been off since May. Welcome to St Peters.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Ten hours, one register, and the pie warmer. You learn who St Peters is at three in the morning.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Lads Off the Princes Highway",
+       "accept": "qgb-l1-st-peters-038",
+       "denyFlag": "w:qgb-l1-st-peters-038"
+      },
+      {
+       "text": "Seven a.m. At King Street south end",
+       "accept": "qgb-l1-st-peters-039",
+       "denyFlag": "w:qgb-l1-st-peters-039",
+       "needFlag": "w:qgb-l1-st-peters-038"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Harpreet A. counts it out without looking up. -- Don't spend it all at the brick kilns.",
+     "choices": [
+      {
+       "text": "About lads off the princes highway.",
+       "turnin": "qgb-l1-st-peters-038"
+      },
+      {
+       "text": "About seven a.m. at king street south end.",
+       "turnin": "qgb-l1-st-peters-039"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The good pie is the one at the back of the brick kilns's warmer. The front ones have been there since the shift before me.",
+     "improv": {
+      "persona": "Harpreet A., servo night shift in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about the brick kilns like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near the brick kilns."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-sharon-a",
+   "name": "Sharon A., uni student, three jobs",
+   "x": -2236,
+   "z": 4405,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. St Peters rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the Princes Highway is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's closing time at the camdenville oval.",
+     "choices": [
+      {
+       "text": "Closing Time at the Camdenville oval",
+       "accept": "qgb-l1-st-peters-040",
+       "denyFlag": "w:qgb-l1-st-peters-040"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Sharon A. counts it out without looking up. -- Don't spend it all at the Princes Highway.",
+     "choices": [
+      {
+       "text": "About closing time at the camdenville oval.",
+       "turnin": "qgb-l1-st-peters-040"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the Princes Highway that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Sharon A., uni student, three jobs in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Princes Highway like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near the Princes Highway."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-st-peters-elaine-a",
+   "name": "Elaine A., council ranger",
+   "x": -2511,
+   "z": 4592,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Inner West Council. Well, whichever council St Peters is this week. You're not parked on the nature strip, are you.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's St Peters like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Bins, dumping, dogs, the odd shopping trolley in the river. May Street generates more paperwork than the rest of the ward.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Counting the St Peters interchange",
+       "accept": "qgb-l1-st-peters-041",
+       "denyFlag": "w:qgb-l1-st-peters-041"
+      },
+      {
+       "text": "Trolley Run, the St Peters interchange",
+       "accept": "qgb-l1-st-peters-042",
+       "denyFlag": "w:qgb-l1-st-peters-042",
+       "needFlag": "w:qgb-l1-st-peters-041"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Elaine A. looks it over the way St Peters looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About counting the st peters interchange.",
+       "turnin": "qgb-l1-st-peters-041"
+      },
+      {
+       "text": "About trolley run, the st peters interchange.",
+       "turnin": "qgb-l1-st-peters-042"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Bin night is Tuesday. It has always been Tuesday. People still ring.",
+     "improv": {
+      "persona": "Elaine A., council ranger in St Peters, Sydney. Dry, specific, local; never says g'day or crikey; talks about May Street like everyone knows it.",
+      "context": "Someone has asked what St Peters is like these days. You are standing near May Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

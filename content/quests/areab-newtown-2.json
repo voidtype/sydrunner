@@ -1,0 +1,785 @@
+{
+ "pack": "areab-newtown-2",
+ "quests": [
+  {
+   "id": "qgb-l1-newtown-045",
+   "act": 3,
+   "title": "Lads Off Gould's Book Arcade",
+   "blurb": "I'll be straight with you. Three of them in TNs on the Gould's Book Arcade steps, flogging vapes to schoolkids at bin night. I did try the official route, for what that was worth. Newtown used to move them on itself and now it rings me. I'll put the kettle on for when you're back.",
+   "giver": "qgb-newtown-sienna-c",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Gould's Book Arcade"
+    }
+   ],
+   "reward": {
+    "cash": 57,
+    "xp": 162,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-newtown-046",
+   "act": 3,
+   "title": "A Flat White From Gould's Book Arcade",
+   "blurb": "Do not laugh. I want a flat white from the place near Gould's Book Arcade, not the one next to it. I am not after trouble. I am after an answer. Here by five, while it's still coffee and Newtown still has some. There is no rush, but there is a Friday.",
+   "giver": "qgb-newtown-sienna-c",
+   "level": 1,
+   "requires": [
+    "qgb-l1-newtown-045"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near Gould's Book Arcade"
+    },
+    {
+     "kind": "goto",
+     "x": -2726,
+     "z": 3207,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 85,
+    "xp": 179,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-newtown-047",
+   "act": 3,
+   "title": "The Gould's Book Arcade Lift",
+   "blurb": "There is no clever way to say this. The lift at Newtown station has been out since the Easter Show and I'm told Glebe is worse. There is probably a simple explanation and I would love to hear it. Check both Easter Saturday and tell me which takes a pram. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-newtown-sienna-c",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2654,
+     "z": 3311,
+     "radius": 30,
+     "label": "check the lift at Newtown station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Newtown",
+     "to": "Glebe",
+     "label": "then ride to Glebe and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-newtown-sienna-c",
+     "node": "report-2",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 143,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-newtown-048",
+   "act": 3,
+   "title": "Before They Touch Black Star Pastry",
+   "blurb": "The council knows and the council does not care. They start on Black Star Pastry on the last Sunday of the month and the orange fencing goes up. It might be nothing. It has not felt like nothing. I want Newtown on record before it does. Whatever you find, bring it to me first.",
+   "giver": "qgb-newtown-kai-a",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -3084,
+     "z": 3694,
+     "radius": 40,
+     "label": "photograph the state of Black Star Pastry"
+    },
+    {
+     "kind": "goto",
+     "x": -2963,
+     "z": 3535,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 66,
+    "xp": 156,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-newtown-049",
+   "act": 3,
+   "title": "The Better Read Than Dead Order",
+   "blurb": "I have written it down twice and lost it twice. The Better Read Than Dead order came to seventy more than I'd budgeted and the supplier wants it by lunchtime. I am aware how that sounds. Find seventy in Newtown and photograph the receipt. Do not let them talk you into anything.",
+   "giver": "qgb-newtown-rupert-c",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 70,
+     "label": "square the seventy for the Better Read Than Dead order"
+    },
+    {
+     "kind": "photo",
+     "x": -2344,
+     "z": 3404,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 56,
+    "xp": 144,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-newtown-050",
+   "act": 3,
+   "title": "The Length of King Street",
+   "blurb": "Nobody else has offered, so. I haven't walked King Street end to end since the light rail came to Newtown. There is a version of this where I am the unreasonable one. Do it Anzac Day for me and photograph what's at the far end now. Ask for me by name at the counter.",
+   "giver": "qgb-newtown-harriet-c",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2913,
+     "z": 3158,
+     "radius": 30,
+     "label": "walk the length of King Street"
+    },
+    {
+     "kind": "goto",
+     "x": -2572,
+     "z": 3201,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -2572,
+     "z": 3201,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 56,
+    "xp": 143,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-newtown-051",
+   "act": 3,
+   "title": "Trolley Run, King Street",
+   "blurb": "Keep it between us for now. A Woolies trolley from King Street gets walked to the creek every Melbourne Cup day. My wife says I should let it go. My wife is wrong. Find where it ends up in Newtown and make the deposit back. Just do not come back empty-handed.",
+   "giver": "qgb-newtown-franco-a",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2600,
+     "z": 3235,
+     "radius": 30,
+     "label": "find the trolley near King Street"
+    },
+    {
+     "kind": "photo",
+     "x": -2600,
+     "z": 3235,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 25,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 167,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-newtown-052",
+   "act": 3,
+   "title": "Something From Enmore Road",
+   "blurb": "Not being dramatic about this. The stall at Enmore Road has run out and the customers keep coming. The paperwork says one thing and my eyes say another. Find something round Newtown that'll do before the the last train rush. If anyone asks, you were never here.",
+   "giver": "qgb-newtown-fay-b",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near Enmore Road"
+    },
+    {
+     "kind": "goto",
+     "x": -2569,
+     "z": 3228,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 151,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-newtown-053",
+   "act": 3,
+   "title": "The Enmore Road Complaint",
+   "blurb": "This is going to sound small. Two women in activewear have photographed my bins outside Enmore Road since Anzac Day. I would have sorted it myself a year ago. One has Newtown council on speed dial; sort it however you sort things. That's it. That's the whole ask.",
+   "giver": "qgb-newtown-fay-b",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near Enmore Road"
+    }
+   ],
+   "reward": {
+    "cash": 59,
+    "xp": 145,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-newtown-054",
+   "act": 3,
+   "title": "Closing Time at Gould's Book Arcade",
+   "blurb": "It has been three weeks. Two blokes have slept in my doorway on Gould's Book Arcade since the pub shut. It started small, the way these things do. The Newtown delivery's at the arvo, so get them up and show me the step empty. Be polite about it. It costs nothing.",
+   "giver": "qgb-newtown-jacinta-c",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off Gould's Book Arcade"
+    },
+    {
+     "kind": "photo",
+     "x": -2931,
+     "z": 3072,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 61,
+    "xp": 169,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-newtown-055",
+   "act": 3,
+   "title": "Left It Near Camperdown Memorial Rest Park",
+   "blurb": "You look like you have twenty minutes. I left something on the bench at Camperdown Memorial Rest Park at the last train. It is not the money. It has stopped being the money. By the time I got back to Newtown it had walked, so look where I'd have dropped it. Half now if you want it. Most people don't.",
+   "giver": "qgb-newtown-glenn-c",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2713,
+     "z": 3569,
+     "radius": 30,
+     "label": "check the bench near Camperdown Memorial Rest Park"
+    },
+    {
+     "kind": "photo",
+     "x": -2737,
+     "z": 3793,
+     "radius": 40,
+     "label": "photograph the bins behind it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-newtown-glenn-c",
+     "node": "report-1",
+     "label": "tell me what you found"
+    }
+   ],
+   "reward": {
+    "cash": 60,
+    "xp": 168,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-newtown-056",
+   "act": 3,
+   "title": "The Camperdown Memorial Rest Park Tab",
+   "blurb": "I have been putting it off since Easter. Two chippies off the Camperdown Memorial Rest Park job have run a tab in Newtown since the long weekend. Half the street knows and half the street is pretending not to. They drove past at knock-off without looking in, so settle it in cash. There's cash in it. Not a lot.",
+   "giver": "qgb-newtown-glenn-c",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near Camperdown Memorial Rest Park"
+    },
+    {
+     "kind": "earn",
+     "dollars": 30,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 55,
+    "xp": 169,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-newtown-057",
+   "act": 3,
+   "title": "Rent Money, Gould's Book Arcade",
+   "blurb": "You are the first person to stop all morning. I'm forty-five short on the Gould's Book Arcade rent and the agent doesn't take stories. It is the not knowing that has got me, honestly. Make it somewhere in Newtown by half six; I'm not fussy how. I will owe you one, and I pay those.",
+   "giver": "qgb-newtown-kerry-c",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 45,
+     "label": "earn forty-five somewhere in Newtown"
+    }
+   ],
+   "reward": {
+    "cash": 65,
+    "xp": 141,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-newtown-058",
+   "act": 3,
+   "title": "Tap On at the I Have a Dream mural",
+   "blurb": "Do not laugh. My Opal says I owe nineteen dollars for a trip from Newtown I never took on the King's Birthday. There is probably a simple explanation and I would love to hear it. Take the same one to Glebe and tell me what it charged you. I'll put the kettle on for when you're back.",
+   "giver": "qgb-newtown-carmela-a",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Newtown",
+     "to": "Glebe",
+     "label": "tap on at Newtown, tap off at Glebe"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-newtown-carmela-a",
+     "node": "report-0",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 61,
+    "xp": 147,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-newtown-059",
+   "act": 3,
+   "title": "The Enmore Road Lift",
+   "blurb": "Right. Since you asked. The lift at Newtown station has been out since the Easter Show and I'm told Glebe is worse. You will see what I mean the second you get there. Check both Friday and tell me which takes a pram. Take your time. Do not take a week.",
+   "giver": "qgb-newtown-bruce-c",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2654,
+     "z": 3311,
+     "radius": 30,
+     "label": "check the lift at Newtown station"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Newtown",
+     "to": "Glebe",
+     "label": "then ride to Glebe and check theirs"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-newtown-bruce-c",
+     "node": "report-0",
+     "label": "report which one works"
+    }
+   ],
+   "reward": {
+    "cash": 67,
+    "xp": 143,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-newtown-060",
+   "act": 3,
+   "title": "The Black Star Pastry Camera",
+   "blurb": "Not being dramatic about this. A new speed camera near Black Star Pastry has fined half of Newtown since Easter Saturday. I would have sorted it myself a year ago. Photograph it for the appeal, then prove the train to Glebe is faster anyway. I'll see you right for it.",
+   "giver": "qgb-newtown-prue-b",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -2750,
+     "z": 3293,
+     "radius": 40,
+     "label": "photograph the camera near Black Star Pastry"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Newtown",
+     "to": "Glebe",
+     "label": "then take the train instead, to Glebe"
+    }
+   ],
+   "reward": {
+    "cash": 55,
+    "xp": 161,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-newtown-061",
+   "act": 3,
+   "title": "Trolley Run, the I Have a Dream mural",
+   "blurb": "This is going to sound small. A Woolies trolley from the I Have a Dream mural gets walked to the creek every Monday. I have rung the number on the letter four times. Find where it ends up in Newtown and make the deposit back. If anyone asks, you were never here.",
+   "giver": "qgb-newtown-prue-b",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -3097,
+     "z": 3543,
+     "radius": 30,
+     "label": "find the trolley near the I Have a Dream mural"
+    },
+    {
+     "kind": "photo",
+     "x": -3097,
+     "z": 3543,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 25,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 63,
+    "xp": 169,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-newtown-062",
+   "act": 3,
+   "title": "Something From Black Star Pastry",
+   "blurb": "I would do it myself if I could leave the counter. The stall at Black Star Pastry has run out and the customers keep coming. It started small, the way these things do. Find something round Newtown that'll do before the peak hour rush. That's it. That's the whole ask.",
+   "giver": "qgb-newtown-toby-b",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near Black Star Pastry"
+    },
+    {
+     "kind": "goto",
+     "x": -2315,
+     "z": 3578,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 62,
+    "xp": 158,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-newtown-063",
+   "act": 3,
+   "title": "The Better Read Than Dead Complaint",
+   "blurb": "It has been three weeks. Two women in activewear have photographed my bins outside Better Read Than Dead since Australia Day. It has been going on longer than I have admitted to anyone. One has Newtown council on speed dial; sort it however you sort things. Come and find me after, either way.",
+   "giver": "qgb-newtown-toby-b",
+   "level": 1,
+   "requires": [
+    "qgb-l1-newtown-062"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near Better Read Than Dead"
+    }
+   ],
+   "reward": {
+    "cash": 86,
+    "xp": 226,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-newtown-064",
+   "act": 3,
+   "title": "Counting King Street",
+   "blurb": "You look like you have twenty minutes. Council says the King Street car park is never full and I say it's full by three in the morning. Half the street knows and half the street is pretending not to. Count both Newtown car parks, photograph whichever one makes me right. I would rather know than wonder.",
+   "giver": "qgb-newtown-dot-a",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -2472,
+     "z": 3214,
+     "radius": 30,
+     "label": "count the cars at King Street"
+    },
+    {
+     "kind": "goto",
+     "x": -2635,
+     "z": 3456,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": -2472,
+     "z": 3214,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 70,
+    "xp": 147,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-newtown-065",
+   "act": 3,
+   "title": "Two From Enmore Road",
+   "blurb": "I have been putting it off since Easter. Two of whatever's going near Enmore Road, here, hot, before the footy at first thing. It is the not knowing that has got me, honestly. It's Newtown; I'm not asking for much. Half now if you want it. Most people don't.",
+   "giver": "qgb-newtown-clive-a",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near Enmore Road"
+    },
+    {
+     "kind": "goto",
+     "x": -3207,
+     "z": 3387,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 63,
+    "xp": 159,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-newtown-066",
+   "act": 3,
+   "title": "Race Four, Enmore Road",
+   "blurb": "My knees are gone, so. There's a horse in race four at school pick-up that a bloke at Enmore Road swears by. I did try the official route, for what that was worth. Turn it into fifty-five somewhere in Newtown and tell me if it came in. I will owe you one, and I pay those.",
+   "giver": "qgb-newtown-clive-a",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 55,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-newtown-clive-a",
+     "node": "report-2",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 63,
+    "xp": 156,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l1-newtown-067",
+   "act": 3,
+   "title": "RBT on Gould's Book Arcade",
+   "blurb": "Honestly, I am past caring how it looks. There's a breath test set up on Gould's Book Arcade since five. I am not after trouble. I am after an answer. My brother-in-law needs the ute at the far end of Newtown without a conversation. Come back and tell me straight.",
+   "giver": "qgb-newtown-rosa-a",
+   "level": 1,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act0:trained"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on Gould's Book Arcade"
+    },
+    {
+     "kind": "goto",
+     "x": -2430,
+     "z": 3417,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 71,
+    "xp": 160,
+    "unlock": []
+   }
+  }
+ ]
+}

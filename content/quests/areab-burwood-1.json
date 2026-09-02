@@ -1,0 +1,1305 @@
+{
+ "pack": "areab-burwood-1",
+ "quests": [
+  {
+   "id": "qgb-l6-burwood-001",
+   "act": 3,
+   "title": "Tap On at the Emerald Hill",
+   "blurb": "The council knows and the council does not care. My Opal says I owe nineteen dollars for a trip from Burwood I never took on Melbourne Cup day. It might be nothing. It has not felt like nothing. Take the same one to Strathfield and tell me what it charged you. Say nothing to anyone on the way.",
+   "giver": "qgb-burwood-wei-e",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Burwood",
+     "to": "Strathfield",
+     "label": "tap on at Burwood, tap off at Strathfield"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-burwood-wei-e",
+     "node": "report-0",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 130,
+    "xp": 373,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-002",
+   "act": 3,
+   "title": "One Stop From Burwood Park",
+   "blurb": "It is not a police matter and I have checked. I need to know the train from Burwood stops at Strathfield and doesn't sail through like it did on Wednesday. You will see what I mean the second you get there. Ride it at after the footy and photograph the sign. If anyone asks, you were never here.",
+   "giver": "qgb-burwood-eun-b",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Burwood",
+     "to": "Strathfield",
+     "label": "take the train to Strathfield"
+    },
+    {
+     "kind": "photo",
+     "x": -10664,
+     "z": 567,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 144,
+    "xp": 355,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-003",
+   "act": 3,
+   "title": "The Burwood Park Complaint",
+   "blurb": "I am told you do odd jobs. Two women in activewear have photographed my bins outside Burwood Park since Sunday. I would not ask if there was anyone else about. One has Burwood council on speed dial; sort it however you sort things. That's it. That's the whole ask.",
+   "giver": "qgb-burwood-elaine",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near Burwood Park"
+    }
+   ],
+   "reward": {
+    "cash": 141,
+    "xp": 357,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-004",
+   "act": 3,
+   "title": "Lads Off Westfield Burwood",
+   "blurb": "I have written it down twice and lost it twice. Three of them in TNs on the Westfield Burwood steps, flogging vapes to schoolkids at school pick-up. I am aware how that sounds. Burwood used to move them on itself and now it rings me. Come and find me after, either way.",
+   "giver": "qgb-burwood-elaine",
+   "level": 6,
+   "requires": [
+    "qgb-l6-burwood-003"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 3,
+     "label": "move the lads on from Westfield Burwood"
+    }
+   ],
+   "reward": {
+    "cash": 170,
+    "xp": 506,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-005",
+   "act": 3,
+   "title": "Trolley Run, Burwood Park",
+   "blurb": "You will think I am making this up. A Woolies trolley from Burwood Park gets walked to the creek every Monday. Everyone I have told has looked at me the way you are now. Find where it ends up in Burwood and make the deposit back. Be polite about it. It costs nothing.",
+   "giver": "qgb-burwood-craig",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10100,
+     "z": 884,
+     "radius": 30,
+     "label": "find the trolley near Burwood Park"
+    },
+    {
+     "kind": "photo",
+     "x": -10100,
+     "z": 884,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 40,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 375,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-006",
+   "act": 3,
+   "title": "Before They Touch the Burwood Chinatown",
+   "blurb": "Two people have already said no. They start on the Burwood Chinatown on Sunday and the orange fencing goes up. You can tell me I am imagining it. Tell me after. I want Burwood on record before it does. Half now if you want it. Most people don't.",
+   "giver": "qgb-burwood-wei-f",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -9858,
+     "z": 1279,
+     "radius": 40,
+     "label": "photograph the state of the Burwood Chinatown"
+    },
+    {
+     "kind": "goto",
+     "x": -9762,
+     "z": 1189,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 366,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-007",
+   "act": 3,
+   "title": "Closing Time at the Burwood Hotel",
+   "blurb": "Not being dramatic about this. Two blokes have slept in my doorway on the Burwood Hotel since the pub shut. The paperwork says one thing and my eyes say another. The Burwood delivery's at six in the morning, so get them up and show me the step empty. Come back and tell me straight.",
+   "giver": "qgb-burwood-joon-b",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 2,
+     "label": "walk the two drunks off the Burwood Hotel"
+    },
+    {
+     "kind": "photo",
+     "x": -9473,
+     "z": 961,
+     "radius": 40,
+     "label": "and show me the doorway clear"
+    }
+   ],
+   "reward": {
+    "cash": 132,
+    "xp": 368,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-008",
+   "act": 3,
+   "title": "Two From Wilga Street",
+   "blurb": "It has been three weeks. Two of whatever's going near Wilga Street, here, hot, before the footy at eight at night. It started small, the way these things do. It's Burwood; I'm not asking for much. I'll put the kettle on for when you're back.",
+   "giver": "qgb-burwood-yan-a",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near Wilga Street"
+    },
+    {
+     "kind": "goto",
+     "x": -10038,
+     "z": 1114,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 143,
+    "xp": 360,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-009",
+   "act": 3,
+   "title": "Two Signs, the Emerald Hill",
+   "blurb": "It is the sort of thing you notice or you do not. Two signs near the Emerald Hill say opposite things about parking and I've been fined under both. It has been going on longer than I have admitted to anyone. Get photos of each before Friday, when Burwood council takes one down. There is no rush, but there is a Friday.",
+   "giver": "qgb-burwood-sung-a",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -9794,
+     "z": 1126,
+     "radius": 40,
+     "label": "photograph the sign at the Emerald Hill"
+    },
+    {
+     "kind": "photo",
+     "x": -9992,
+     "z": 946,
+     "radius": 40,
+     "label": "and the one that contradicts it"
+    }
+   ],
+   "reward": {
+    "cash": 135,
+    "xp": 384,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-010",
+   "act": 3,
+   "title": "The Burwood Road Tab",
+   "blurb": "Honestly, I am past caring how it looks. Two chippies off the Burwood Road job have run a tab in Burwood since Easter Saturday. I did try the official route, for what that was worth. They drove past at six in the morning without looking in, so settle it in cash. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qgb-burwood-annabel",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near Burwood Road"
+    },
+    {
+     "kind": "earn",
+     "dollars": 48,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 128,
+    "xp": 393,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-011",
+   "act": 3,
+   "title": "Something From Burwood Park",
+   "blurb": "I'll be straight with you. The stall at Burwood Park has run out and the customers keep coming. I am not after trouble. I am after an answer. Find something round Burwood that'll do before the lunchtime rush. You'll know it when you see it.",
+   "giver": "qgb-burwood-yan-b",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near Burwood Park"
+    },
+    {
+     "kind": "goto",
+     "x": -10125,
+     "z": 928,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 136,
+    "xp": 368,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-012",
+   "act": 3,
+   "title": "Trouble at Westfield Burwood",
+   "blurb": "Do not laugh. Two lads and their mate decided at dawn that Westfield Burwood is theirs. There is probably a simple explanation and I would love to hear it. The rest of Burwood disagrees, so explain the disagreement. Do not let them talk you into anything.",
+   "giver": "qgb-burwood-yan-b",
+   "level": 6,
+   "requires": [
+    "qgb-l6-burwood-011"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Westfield Burwood"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 191,
+    "xp": 498,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-013",
+   "act": 3,
+   "title": "Race Four, Burwood Park",
+   "blurb": "The council knows and the council does not care. There's a horse in race four at bin night that a bloke at Burwood Park swears by. I have got a photo on my phone but it is useless. Turn it into fifty-five somewhere in Burwood and tell me if it came in. Ask for me by name at the counter.",
+   "giver": "qgb-burwood-tui",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 88,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-burwood-tui",
+     "node": "report-1",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 138,
+    "xp": 376,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-014",
+   "act": 3,
+   "title": "The Burwood Girls Order",
+   "blurb": "Before you say anything: yes, I know. The Burwood Girls order came to seventy more than I'd budgeted and the supplier wants it by half seven. The paperwork says one thing and my eyes say another. Find seventy in Burwood and photograph the receipt. There's cash in it. Not a lot.",
+   "giver": "qgb-burwood-matilda",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 112,
+     "label": "square the seventy for the Burwood Girls order"
+    },
+    {
+     "kind": "photo",
+     "x": -9783,
+     "z": 934,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 143,
+    "xp": 373,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-015",
+   "act": 3,
+   "title": "Before They Touch the Emerald Hill",
+   "blurb": "This is going to sound small. They start on the Emerald Hill on Wednesday and the orange fencing goes up. I have rung the number on the letter four times. I want Burwood on record before it does. Come back and tell me straight.",
+   "giver": "qgb-burwood-jason-b",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -10022,
+     "z": 567,
+     "radius": 40,
+     "label": "photograph the state of the Emerald Hill"
+    },
+    {
+     "kind": "goto",
+     "x": -10090,
+     "z": 803,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 146,
+    "xp": 393,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-016",
+   "act": 3,
+   "title": "Meat Tray at Westfield Burwood",
+   "blurb": "You look like you have twenty minutes. The Westfield Burwood raffle is thirty-five short of a meat tray and the draw is at the arvo. Half the street knows and half the street is pretending not to. Find it in Burwood and put it in the tin. There is no rush, but there is a Friday.",
+   "giver": "qgb-burwood-sung-b",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 56,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -10108,
+     "z": 852,
+     "radius": 30,
+     "label": "and drop it at Westfield Burwood"
+    }
+   ],
+   "reward": {
+    "cash": 144,
+    "xp": 380,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-017",
+   "act": 3,
+   "title": "The the Burwood Chinatown Camera",
+   "blurb": "My knees are gone, so. A new speed camera near the Burwood Chinatown has fined half of Burwood since Melbourne Cup day. I did try the official route, for what that was worth. Photograph it for the appeal, then prove the train to Strathfield is faster anyway. Take your time. Do not take a week.",
+   "giver": "qgb-burwood-seo-yeon-b",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -9759,
+     "z": 1144,
+     "radius": 40,
+     "label": "photograph the camera near the Burwood Chinatown"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Burwood",
+     "to": "Strathfield",
+     "label": "then take the train instead, to Strathfield"
+    }
+   ],
+   "reward": {
+    "cash": 131,
+    "xp": 384,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-018",
+   "act": 3,
+   "title": "Two Signs, the Burwood Chinatown",
+   "blurb": "Honestly, I am past caring how it looks. Two signs near the Burwood Chinatown say opposite things about parking and I've been fined under both. I am not after trouble. I am after an answer. Get photos of each before Wednesday, when Burwood council takes one down. That's the whole job. No catch.",
+   "giver": "qgb-burwood-seo-yeon-b",
+   "level": 6,
+   "requires": [
+    "qgb-l6-burwood-017"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -10282,
+     "z": 1394,
+     "radius": 40,
+     "label": "photograph the sign at the Burwood Chinatown"
+    },
+    {
+     "kind": "photo",
+     "x": -10218,
+     "z": 1075,
+     "radius": 40,
+     "label": "and the one that contradicts it"
+    }
+   ],
+   "reward": {
+    "cash": 178,
+    "xp": 488,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-019",
+   "act": 3,
+   "title": "The Burwood Girls Tab",
+   "blurb": "Right. Since you asked. Two chippies off the Burwood Girls job have run a tab in Burwood since Sunday. I would not ask if there was anyone else about. They drove past at midnight without looking in, so settle it in cash. Say nothing to anyone on the way.",
+   "giver": "qgb-burwood-xiu-c",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near Burwood Girls"
+    },
+    {
+     "kind": "earn",
+     "dollars": 48,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 131,
+    "xp": 369,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-020",
+   "act": 3,
+   "title": "The Burwood Road Course",
+   "blurb": "It is not a police matter and I have checked. A bloke near Burwood Road runs a ninety-minute course he bills at four hundred, and I've paid. I am aware how that sounds. Sit it Melbourne Cup day, then come back to Burwood and prove it did something. Just do not come back empty-handed.",
+   "giver": "qgb-burwood-xiu-c",
+   "level": 6,
+   "requires": [
+    "qgb-l6-burwood-019"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near Burwood Road"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 176,
+    "xp": 503,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-021",
+   "act": 3,
+   "title": "RBT on Burwood Road",
+   "blurb": "Two people have already said no. There's a breath test set up on Burwood Road since half two. This is the third time I have had this conversation. My brother-in-law needs the ute at the far end of Burwood without a conversation. Be polite about it. It costs nothing.",
+   "giver": "qgb-burwood-hyun-b",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on Burwood Road"
+    },
+    {
+     "kind": "goto",
+     "x": -9732,
+     "z": 969,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 146,
+    "xp": 355,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-022",
+   "act": 3,
+   "title": "The Westfield Burwood Complaint",
+   "blurb": "Before you say anything: yes, I know. Two women in activewear have photographed my bins outside Westfield Burwood since Sunday. I would have sorted it myself a year ago. One has Burwood council on speed dial; sort it however you sort things. Half now if you want it. Most people don't.",
+   "giver": "qgb-burwood-wei-g",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near Westfield Burwood"
+    }
+   ],
+   "reward": {
+    "cash": 145,
+    "xp": 371,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-023",
+   "act": 3,
+   "title": "Staffy Near Wilga Street",
+   "blurb": "You are the first person to stop all morning. A brindle staffy in a red bandana went over the fence at Wilga Street at after the footy. I did try the official route, for what that was worth. Everyone in Burwood has definitely seen it and can't say where. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-burwood-fetu",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -9511,
+     "z": 997,
+     "radius": 30,
+     "label": "check the off-leash bit near Wilga Street"
+    },
+    {
+     "kind": "photo",
+     "x": -9621,
+     "z": 1257,
+     "radius": 40,
+     "label": "photograph the creek end"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-burwood-fetu",
+     "node": "report-0",
+     "label": "tell me if you saw a staffy in a bandana"
+    }
+   ],
+   "reward": {
+    "cash": 143,
+    "xp": 391,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-024",
+   "act": 3,
+   "title": "The Wilga Street Camera",
+   "blurb": "My knees are gone, so. A new speed camera near Wilga Street has fined half of Burwood since Monday. I am not after trouble. I am after an answer. Photograph it for the appeal, then prove the train to Strathfield is faster anyway. Whatever you find, bring it to me first.",
+   "giver": "qgb-burwood-fetu",
+   "level": 6,
+   "requires": [
+    "qgb-l6-burwood-023"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -9894,
+     "z": 707,
+     "radius": 40,
+     "label": "photograph the camera near Wilga Street"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Burwood",
+     "to": "Strathfield",
+     "label": "then take the train instead, to Strathfield"
+    }
+   ],
+   "reward": {
+    "cash": 166,
+    "xp": 493,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-025",
+   "act": 3,
+   "title": "Cover at the Emerald Hill",
+   "blurb": "There is no clever way to say this. I've got nobody for the the Emerald Hill shift at school pick-up and a room full of Burwood people who've paid. Nobody else seems to have noticed, which is its own problem. Fifty of trade and one difficult person at the door. You'll know it when you see it.",
+   "giver": "qgb-burwood-yan-c",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 80,
+     "label": "cover the fifty for the shift"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 1,
+     "label": "and handle whoever's at the door"
+    }
+   ],
+   "reward": {
+    "cash": 139,
+    "xp": 379,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-026",
+   "act": 3,
+   "title": "The the Emerald Hill Tab",
+   "blurb": "It is not a police matter and I have checked. Two chippies off the the Emerald Hill job have run a tab in Burwood since Easter Saturday. Everyone I have told has looked at me the way you are now. They drove past at after the footy without looking in, so settle it in cash. Say nothing to anyone on the way.",
+   "giver": "qgb-burwood-min-jun-b",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Emerald Hill"
+    },
+    {
+     "kind": "earn",
+     "dollars": 48,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 127,
+    "xp": 369,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-027",
+   "act": 3,
+   "title": "The Westfield Burwood Course",
+   "blurb": "I have written it down twice and lost it twice. A bloke near Westfield Burwood runs a ninety-minute course he bills at four hundred, and I've paid. You can tell me I am imagining it. Tell me after. Sit it the last Sunday of the month, then come back to Burwood and prove it did something. I'll see you right for it.",
+   "giver": "qgb-burwood-kai",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "TRAINING",
+     "count": 1,
+     "label": "do the course they run near Westfield Burwood"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 2,
+     "label": "then show me what it taught you"
+    }
+   ],
+   "reward": {
+    "cash": 138,
+    "xp": 357,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-028",
+   "act": 3,
+   "title": "Race Four, Burwood Road",
+   "blurb": "You will think I am making this up. There's a horse in race four at school pick-up that a bloke at Burwood Road swears by. My wife says I should let it go. My wife is wrong. Turn it into fifty-five somewhere in Burwood and tell me if it came in. If anyone asks, you were never here.",
+   "giver": "qgb-burwood-kai",
+   "level": 6,
+   "requires": [
+    "qgb-l6-burwood-027"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 88,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-burwood-kai",
+     "node": "report-1",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 187,
+    "xp": 495,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-029",
+   "act": 3,
+   "title": "A Flat White From Westfield Burwood",
+   "blurb": "Nobody else has offered, so. I want a flat white from the place near Westfield Burwood, not the one next to it. This is the third time I have had this conversation. Here by eight at night, while it's still coffee and Burwood still has some. That's it. That's the whole ask.",
+   "giver": "qgb-burwood-maureen",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near Westfield Burwood"
+    },
+    {
+     "kind": "goto",
+     "x": -9269,
+     "z": 1485,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 140,
+    "xp": 389,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-030",
+   "act": 3,
+   "title": "Bin Night, Westfield Burwood",
+   "blurb": "Two people have already said no. Somebody moves the bins on Westfield Burwood in front of my drive every the last Sunday of the month night. The paperwork says one thing and my eyes say another. Photograph the evidence and have a word; Burwood knows who. Come and find me after, either way.",
+   "giver": "qgb-burwood-maureen",
+   "level": 6,
+   "requires": [
+    "qgb-l6-burwood-029"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -9739,
+     "z": 1356,
+     "radius": 40,
+     "label": "photograph the bins at Westfield Burwood"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 169,
+    "xp": 498,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-031",
+   "act": 3,
+   "title": "Trolley Run, the Burwood Hotel",
+   "blurb": "You look like you have twenty minutes. A Woolies trolley from the Burwood Hotel gets walked to the creek every Wednesday. I have got no proof, which is exactly why I am asking. Find where it ends up in Burwood and make the deposit back. I will know if you skipped a bit.",
+   "giver": "qgb-burwood-tony",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -10029,
+     "z": 1174,
+     "radius": 30,
+     "label": "find the trolley near the Burwood Hotel"
+    },
+    {
+     "kind": "photo",
+     "x": -10029,
+     "z": 1174,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 40,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 144,
+    "xp": 385,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-032",
+   "act": 3,
+   "title": "The the Burwood Hotel Order",
+   "blurb": "I have been putting it off since Easter. The the Burwood Hotel order came to seventy more than I'd budgeted and the supplier wants it by eight at night. I did try the official route, for what that was worth. Find seventy in Burwood and photograph the receipt. I'll put the kettle on for when you're back.",
+   "giver": "qgb-burwood-tony",
+   "level": 6,
+   "requires": [
+    "qgb-l6-burwood-031"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 112,
+     "label": "square the seventy for the the Burwood Hotel order"
+    },
+    {
+     "kind": "photo",
+     "x": -9765,
+     "z": 1183,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 187,
+    "xp": 489,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-033",
+   "act": 3,
+   "title": "Before They Touch Wilga Street",
+   "blurb": "My knees are gone, so. They start on Wilga Street on grand final day and the orange fencing goes up. There is probably a simple explanation and I would love to hear it. I want Burwood on record before it does. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-burwood-yuna-b",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -9840,
+     "z": 985,
+     "radius": 40,
+     "label": "photograph the state of Wilga Street"
+    },
+    {
+     "kind": "goto",
+     "x": -9701,
+     "z": 1067,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 137,
+    "xp": 388,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-034",
+   "act": 3,
+   "title": "Two From Burwood Road",
+   "blurb": "Someone has to, and it may as well be you. Two of whatever's going near Burwood Road, here, hot, before the footy at six in the morning. I am aware how that sounds. It's Burwood; I'm not asking for much. Do not let them talk you into anything.",
+   "giver": "qgb-burwood-ken",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near Burwood Road"
+    },
+    {
+     "kind": "goto",
+     "x": -9982,
+     "z": 666,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 139,
+    "xp": 354,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-035",
+   "act": 3,
+   "title": "The Westfield Burwood Camera",
+   "blurb": "Right. Since you asked. A new speed camera near Westfield Burwood has fined half of Burwood since Sunday. Everyone I have told has looked at me the way you are now. Photograph it for the appeal, then prove the train to Strathfield is faster anyway. Do that and we're square.",
+   "giver": "qgb-burwood-manu",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -10129,
+     "z": 1338,
+     "radius": 40,
+     "label": "photograph the camera near Westfield Burwood"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Burwood",
+     "to": "Strathfield",
+     "label": "then take the train instead, to Strathfield"
+    }
+   ],
+   "reward": {
+    "cash": 132,
+    "xp": 385,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-036",
+   "act": 3,
+   "title": "Counting Westfield Burwood",
+   "blurb": "I am told you do odd jobs. Council says the Westfield Burwood car park is never full and I say it's full by first thing. You can tell me I am imagining it. Tell me after. Count both Burwood car parks, photograph whichever one makes me right. Say nothing to anyone on the way.",
+   "giver": "qgb-burwood-manu",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -9709,
+     "z": 1201,
+     "radius": 30,
+     "label": "count the cars at Westfield Burwood"
+    },
+    {
+     "kind": "goto",
+     "x": -10009,
+     "z": 1149,
+     "radius": 30,
+     "label": "then the other car park"
+    },
+    {
+     "kind": "photo",
+     "x": -9709,
+     "z": 1201,
+     "radius": 40,
+     "label": "photograph the fuller one"
+    }
+   ],
+   "reward": {
+    "cash": 133,
+    "xp": 393,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-037",
+   "act": 3,
+   "title": "Seven a.m. At Burwood Park",
+   "blurb": "I have written it down twice and lost it twice. The site at Burwood Park starts its jackhammer at closing on a Monday, which is illegal and loud. My wife says I should let it go. My wife is wrong. Photograph it running and have a word with the Burwood foreman. Just do not come back empty-handed.",
+   "giver": "qgb-burwood-min-jun-c",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -9651,
+     "z": 1177,
+     "radius": 40,
+     "label": "photograph the noise from Burwood Park"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 138,
+    "xp": 384,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-038",
+   "act": 3,
+   "title": "Trouble at Belmore Street",
+   "blurb": "This is going to sound small. Two lads and their mate decided at lunchtime that Belmore Street is theirs. It is not the money. It has stopped being the money. The rest of Burwood disagrees, so explain the disagreement. Half now if you want it. Most people don't.",
+   "giver": "qgb-burwood-jae-b",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Belmore Street"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 141,
+    "xp": 367,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l6-burwood-039",
+   "act": 3,
+   "title": "One Stop From Wilga Street",
+   "blurb": "I have been putting it off since Easter. I need to know the train from Burwood stops at Strathfield and doesn't sail through like it did on Boxing Day. I am not after trouble. I am after an answer. Ride it at ten past ten and photograph the sign. I will know if you skipped a bit.",
+   "giver": "qgb-burwood-chantelle",
+   "level": 6,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Burwood",
+     "to": "Strathfield",
+     "label": "take the train to Strathfield"
+    },
+    {
+     "kind": "photo",
+     "x": -10664,
+     "z": 567,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 146,
+    "xp": 380,
+    "unlock": []
+   }
+  }
+ ]
+}

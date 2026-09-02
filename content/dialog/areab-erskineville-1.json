@@ -1,0 +1,2964 @@
+{
+ "pack": "areab-erskineville-1",
+ "npcs": [
+  {
+   "id": "qgb-erskineville-bazza-a",
+   "name": "Bazza A., publican",
+   "x": -2591,
+   "z": 3473,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "We're not open. We're never not open. What'll it be, Erskineville?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I run the pub. Schooners, the meat raffle, the trivia on Wednesdays that started as a joke. Harry Noble Reserve keeps me in business and out of the papers.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's proof of swanson street.",
+     "choices": [
+      {
+       "text": "Proof of Swanson Street",
+       "accept": "qgb-l1-erskineville-001",
+       "denyFlag": "w:qgb-l1-erskineville-001"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Bazza A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About proof of swanson street.",
+       "turnin": "qgb-l1-erskineville-001"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Tooheys New, seven dollars, and if you ask for a craft beer I'll point you back toward Harry Noble Reserve.",
+     "improv": {
+      "persona": "Bazza A., publican in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Harry Noble Reserve like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near Harry Noble Reserve."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-narelle-b",
+   "name": "Narelle B., dog walker, four leads",
+   "x": -2323,
+   "z": 3612,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hang on, hang on -- sit. Not you. Sorry, Erskineville at this hour is chaos. What's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six dogs, three suburbs, one car park at Swanson Street. Two of them aren't mine and one of them isn't a dog, legally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the rose hotel tab.",
+     "choices": [
+      {
+       "text": "The the Rose Hotel Tab",
+       "accept": "qgb-l1-erskineville-002",
+       "denyFlag": "w:qgb-l1-erskineville-002"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Narelle B. counts it out without looking up. -- Don't spend it all at Swanson Street.",
+     "choices": [
+      {
+       "text": "About the the rose hotel tab.",
+       "turnin": "qgb-l1-erskineville-002"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The off-leash bit at Swanson Street is fine until the magpies come back. Then nothing is fine.",
+     "improv": {
+      "persona": "Narelle B., dog walker, four leads in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Swanson Street like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near Swanson Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-brett-a",
+   "name": "Brett A., strata committee chair",
+   "x": -1915,
+   "z": 3277,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Erskineville strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. the Rose Hotel is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's staffy near the erskineville village shops.",
+     "choices": [
+      {
+       "text": "Staffy Near the Erskineville village shops",
+       "accept": "qgb-l1-erskineville-003",
+       "denyFlag": "w:qgb-l1-erskineville-003"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Brett A. counts it out without looking up. -- Don't spend it all at the Rose Hotel.",
+     "choices": [
+      {
+       "text": "About staffy near the erskineville village shops.",
+       "turnin": "qgb-l1-erskineville-003"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Brett A., strata committee chair in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Rose Hotel like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near the Rose Hotel."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Brett A. listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-michelle-b",
+   "name": "Michelle B., uni student, three jobs",
+   "x": -2398,
+   "z": 3555,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Erskineville rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the Erskineville village shops is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the macdonaldtown footbridge course.",
+     "choices": [
+      {
+       "text": "The the Macdonaldtown footbridge Course",
+       "accept": "qgb-l1-erskineville-004",
+       "denyFlag": "w:qgb-l1-erskineville-004"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Michelle B. looks it over the way Erskineville looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the macdonaldtown footbridge course.",
+       "turnin": "qgb-l1-erskineville-004"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the Erskineville village shops that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Michelle B., uni student, three jobs in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Erskineville village shops like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near the Erskineville village shops."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-rocco-d",
+   "name": "Rocco D., barista, own cafe",
+   "x": -1764,
+   "z": 3671,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flat white? Everyone in Erskineville wants a flat white. Give me a sec, the grinder's sulking.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I own the place. Own it, run it, sweep it. the Macdonaldtown footbridge foot traffic pays the rent and the regulars pay for the machine.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Seven a.m. At the Erko",
+       "accept": "qgb-l1-erskineville-005",
+       "denyFlag": "w:qgb-l1-erskineville-005"
+      },
+      {
+       "text": "Two From the Erko",
+       "accept": "qgb-l1-erskineville-006",
+       "denyFlag": "w:qgb-l1-erskineville-006",
+       "needFlag": "w:qgb-l1-erskineville-005"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Rocco D. looks it over the way Erskineville looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About seven a.m. at the erko.",
+       "turnin": "qgb-l1-erskineville-005"
+      },
+      {
+       "text": "About two from the erko.",
+       "turnin": "qgb-l1-erskineville-006"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There are eleven cafes on this strip and we all buy beans off the same bloke in the Macdonaldtown footbridge. Don't tell anyone.",
+     "improv": {
+      "persona": "Rocco D., barista, own cafe in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Macdonaldtown footbridge like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near the Macdonaldtown footbridge."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-rhonda-b",
+   "name": "Rhonda B., publican",
+   "x": -1943,
+   "z": 3560,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "We're not open. We're never not open. What'll it be, Erskineville?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I run the pub. Schooners, the meat raffle, the trivia on Wednesdays that started as a joke. Erskineville Road keeps me in business and out of the papers.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Harry Noble Reserve Sparky",
+       "accept": "qgb-l1-erskineville-007",
+       "denyFlag": "w:qgb-l1-erskineville-007"
+      },
+      {
+       "text": "Race Four, the Imperial",
+       "accept": "qgb-l1-erskineville-008",
+       "denyFlag": "w:qgb-l1-erskineville-008",
+       "needFlag": "w:qgb-l1-erskineville-007"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Rhonda B. counts it out without looking up. -- Don't spend it all at Erskineville Road.",
+     "choices": [
+      {
+       "text": "About the harry noble reserve sparky.",
+       "turnin": "qgb-l1-erskineville-007"
+      },
+      {
+       "text": "About race four, the imperial.",
+       "turnin": "qgb-l1-erskineville-008"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Tooheys New, seven dollars, and if you ask for a craft beer I'll point you back toward Erskineville Road.",
+     "improv": {
+      "persona": "Rhonda B., publican in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Erskineville Road like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near Erskineville Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Erskineville would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-ray-a",
+   "name": "Ray A., strata committee chair",
+   "x": -2440,
+   "z": 3808,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Erskineville strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. Harry Noble Reserve is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's probationary at swanson street.",
+     "choices": [
+      {
+       "text": "Probationary at Swanson Street",
+       "accept": "qgb-l1-erskineville-009",
+       "denyFlag": "w:qgb-l1-erskineville-009"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Ray A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About probationary at swanson street.",
+       "turnin": "qgb-l1-erskineville-009"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Ray A., strata committee chair in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Harry Noble Reserve like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near Harry Noble Reserve."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-maureen-b",
+   "name": "Maureen B., uni student, three jobs",
+   "x": -2575,
+   "z": 3912,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Erskineville rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. Swanson Street is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's closing time at the rose hotel.",
+     "choices": [
+      {
+       "text": "Closing Time at the Rose Hotel",
+       "accept": "qgb-l1-erskineville-010",
+       "denyFlag": "w:qgb-l1-erskineville-010"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Maureen B. looks it over the way Erskineville looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About closing time at the rose hotel.",
+       "turnin": "qgb-l1-erskineville-010"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near Swanson Street that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Maureen B., uni student, three jobs in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Swanson Street like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near Swanson Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-trish-a",
+   "name": "Trish A., drag queen, off duty",
+   "x": -2089,
+   "z": 3344,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Darling. Yes, it's me, no, I'm not doing the show tonight. Erskineville needs a rest and so do my feet.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Sundays at the Imperial, Thursdays wherever pays. the Erskineville village shops has seen things.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the erko camera.",
+     "choices": [
+      {
+       "text": "The the Erko Camera",
+       "accept": "qgb-l1-erskineville-011",
+       "denyFlag": "w:qgb-l1-erskineville-011"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Trish A. looks it over the way Erskineville looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the erko camera.",
+       "turnin": "qgb-l1-erskineville-011"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The heels come off at Erskineville Road and stay off until the Erskineville village shops. That's the rule.",
+     "improv": {
+      "persona": "Trish A., drag queen, off duty in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Erskineville village shops like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near the Erskineville village shops."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-jarrod-c",
+   "name": "Jarrod C., publican",
+   "x": -2250,
+   "z": 3453,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "We're not open. We're never not open. What'll it be, Erskineville?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I run the pub. Schooners, the meat raffle, the trivia on Wednesdays that started as a joke. the Macdonaldtown footbridge keeps me in business and out of the papers.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's meat tray at the erko.",
+     "choices": [
+      {
+       "text": "Meat Tray at the Erko",
+       "accept": "qgb-l1-erskineville-012",
+       "denyFlag": "w:qgb-l1-erskineville-012"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Jarrod C. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About meat tray at the erko.",
+       "turnin": "qgb-l1-erskineville-012"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Tooheys New, seven dollars, and if you ask for a craft beer I'll point you back toward the Macdonaldtown footbridge.",
+     "improv": {
+      "persona": "Jarrod C., publican in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Macdonaldtown footbridge like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near the Macdonaldtown footbridge."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-angus-a",
+   "name": "Angus A., strata committee chair",
+   "x": -2209,
+   "z": 3483,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Erskineville strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. Erskineville Road is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Proof of the Imperial",
+       "accept": "qgb-l1-erskineville-013",
+       "denyFlag": "w:qgb-l1-erskineville-013"
+      },
+      {
+       "text": "Before They Touch the Imperial",
+       "accept": "qgb-l1-erskineville-014",
+       "denyFlag": "w:qgb-l1-erskineville-014",
+       "needFlag": "w:qgb-l1-erskineville-013"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Angus A. counts it out without looking up. -- Don't spend it all at Erskineville Road.",
+     "choices": [
+      {
+       "text": "About proof of the imperial.",
+       "turnin": "qgb-l1-erskineville-013"
+      },
+      {
+       "text": "About before they touch the imperial.",
+       "turnin": "qgb-l1-erskineville-014"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Angus A., strata committee chair in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Erskineville Road like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near Erskineville Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-matilda-b",
+   "name": "Matilda B., uni student, three jobs",
+   "x": -2086,
+   "z": 3634,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Erskineville rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the Imperial is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Staffy Near Harry Noble Reserve",
+       "accept": "qgb-l1-erskineville-015",
+       "denyFlag": "w:qgb-l1-erskineville-015"
+      },
+      {
+       "text": "The Harry Noble Reserve Order",
+       "accept": "qgb-l1-erskineville-016",
+       "denyFlag": "w:qgb-l1-erskineville-016",
+       "needFlag": "w:qgb-l1-erskineville-015"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Matilda B. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About staffy near harry noble reserve.",
+       "turnin": "qgb-l1-erskineville-015"
+      },
+      {
+       "text": "About the harry noble reserve order.",
+       "turnin": "qgb-l1-erskineville-016"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the Imperial that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Matilda B., uni student, three jobs in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Imperial like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near the Imperial."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Right. And you're sure it was Harry Noble Reserve? People say Harry Noble Reserve when they mean the bit next to it. -- Matilda B. writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-bluey-b",
+   "name": "Bluey B., publican",
+   "x": -2159,
+   "z": 3741,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "We're not open. We're never not open. What'll it be, Erskineville?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I run the pub. Schooners, the meat raffle, the trivia on Wednesdays that started as a joke. the Rose Hotel keeps me in business and out of the papers.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the erskineville village shops course.",
+     "choices": [
+      {
+       "text": "The the Erskineville village shops Course",
+       "accept": "qgb-l1-erskineville-017",
+       "denyFlag": "w:qgb-l1-erskineville-017"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Bluey B. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the erskineville village shops course.",
+       "turnin": "qgb-l1-erskineville-017"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Tooheys New, seven dollars, and if you ask for a craft beer I'll point you back toward the Rose Hotel.",
+     "improv": {
+      "persona": "Bluey B., publican in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Rose Hotel like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near the Rose Hotel."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-thelma-b",
+   "name": "Thelma B., dog walker, four leads",
+   "x": -2676,
+   "z": 3548,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hang on, hang on -- sit. Not you. Sorry, Erskineville at this hour is chaos. What's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six dogs, three suburbs, one car park at the Erskineville village shops. Two of them aren't mine and one of them isn't a dog, legally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "A Flat White From the Macdonaldtown footbridge",
+       "accept": "qgb-l1-erskineville-018",
+       "denyFlag": "w:qgb-l1-erskineville-018"
+      },
+      {
+       "text": "Something From the Macdonaldtown footbridge",
+       "accept": "qgb-l1-erskineville-019",
+       "denyFlag": "w:qgb-l1-erskineville-019",
+       "needFlag": "w:qgb-l1-erskineville-018"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Thelma B. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About a flat white from the macdonaldtown footbridge.",
+       "turnin": "qgb-l1-erskineville-018"
+      },
+      {
+       "text": "About something from the macdonaldtown footbridge.",
+       "turnin": "qgb-l1-erskineville-019"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The off-leash bit at the Erskineville village shops is fine until the magpies come back. Then nothing is fine.",
+     "improv": {
+      "persona": "Thelma B., dog walker, four leads in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Erskineville village shops like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near the Erskineville village shops."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-trent-b",
+   "name": "Trent B., strata committee chair",
+   "x": -2126,
+   "z": 3560,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Erskineville strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. the Macdonaldtown footbridge is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's bin night, the erko.",
+     "choices": [
+      {
+       "text": "Bin Night, the Erko",
+       "accept": "qgb-l1-erskineville-020",
+       "denyFlag": "w:qgb-l1-erskineville-020"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Trent B. counts it out without looking up. -- Don't spend it all at the Macdonaldtown footbridge.",
+     "choices": [
+      {
+       "text": "About bin night, the erko.",
+       "turnin": "qgb-l1-erskineville-020"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Trent B., strata committee chair in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Macdonaldtown footbridge like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near the Macdonaldtown footbridge."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-enzo-c",
+   "name": "Enzo C., barista, own cafe",
+   "x": -2590,
+   "z": 3656,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flat white? Everyone in Erskineville wants a flat white. Give me a sec, the grinder's sulking.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I own the place. Own it, run it, sweep it. Erskineville Road foot traffic pays the rent and the regulars pay for the machine.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the length of the imperial.",
+     "choices": [
+      {
+       "text": "The Length of the Imperial",
+       "accept": "qgb-l1-erskineville-021",
+       "denyFlag": "w:qgb-l1-erskineville-021"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Enzo C. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the length of the imperial.",
+       "turnin": "qgb-l1-erskineville-021"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There are eleven cafes on this strip and we all buy beans off the same bloke in Erskineville Road. Don't tell anyone.",
+     "improv": {
+      "persona": "Enzo C., barista, own cafe in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Erskineville Road like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near Erskineville Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-renee-c",
+   "name": "Renee C., drag queen, off duty",
+   "x": -2276,
+   "z": 3803,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Darling. Yes, it's me, no, I'm not doing the show tonight. Erskineville needs a rest and so do my feet.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Sundays at the Imperial, Thursdays wherever pays. the Imperial has seen things.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the harry noble reserve complaint.",
+     "choices": [
+      {
+       "text": "The Harry Noble Reserve Complaint",
+       "accept": "qgb-l1-erskineville-022",
+       "denyFlag": "w:qgb-l1-erskineville-022"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Renee C. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the harry noble reserve complaint.",
+       "turnin": "qgb-l1-erskineville-022"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The heels come off at Erskineville Road and stay off until the Imperial. That's the rule.",
+     "improv": {
+      "persona": "Renee C., drag queen, off duty in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Imperial like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near the Imperial."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-jason-b",
+   "name": "Jason B., publican",
+   "x": -2291,
+   "z": 3966,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "We're not open. We're never not open. What'll it be, Erskineville?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I run the pub. Schooners, the meat raffle, the trivia on Wednesdays that started as a joke. Harry Noble Reserve keeps me in business and out of the papers.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's closing time at swanson street.",
+     "choices": [
+      {
+       "text": "Closing Time at Swanson Street",
+       "accept": "qgb-l1-erskineville-023",
+       "denyFlag": "w:qgb-l1-erskineville-023"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Jason B. counts it out without looking up. -- Don't spend it all at Harry Noble Reserve.",
+     "choices": [
+      {
+       "text": "About closing time at swanson street.",
+       "turnin": "qgb-l1-erskineville-023"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Tooheys New, seven dollars, and if you ask for a craft beer I'll point you back toward Harry Noble Reserve.",
+     "improv": {
+      "persona": "Jason B., publican in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Harry Noble Reserve like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near Harry Noble Reserve."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-kylie-anne-b",
+   "name": "Kylie-Anne B., dog walker, four leads",
+   "x": -2195,
+   "z": 3721,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hang on, hang on -- sit. Not you. Sorry, Erskineville at this hour is chaos. What's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six dogs, three suburbs, one car park at Swanson Street. Two of them aren't mine and one of them isn't a dog, legally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at the rose hotel.",
+     "choices": [
+      {
+       "text": "Trouble at the Rose Hotel",
+       "accept": "qgb-l1-erskineville-024",
+       "denyFlag": "w:qgb-l1-erskineville-024"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Kylie-Anne B. counts it out without looking up. -- Don't spend it all at Swanson Street.",
+     "choices": [
+      {
+       "text": "About trouble at the rose hotel.",
+       "turnin": "qgb-l1-erskineville-024"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The off-leash bit at Swanson Street is fine until the magpies come back. Then nothing is fine.",
+     "improv": {
+      "persona": "Kylie-Anne B., dog walker, four leads in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Swanson Street like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near Swanson Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-graham-c",
+   "name": "Graham C., strata committee chair",
+   "x": -2607,
+   "z": 3524,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Erskineville strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. the Rose Hotel is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Lads Off the Erskineville village shops",
+       "accept": "qgb-l1-erskineville-025",
+       "denyFlag": "w:qgb-l1-erskineville-025"
+      },
+      {
+       "text": "One Stop From the Erskineville village shops",
+       "accept": "qgb-l1-erskineville-026",
+       "denyFlag": "w:qgb-l1-erskineville-026",
+       "needFlag": "w:qgb-l1-erskineville-025"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Graham C. counts it out without looking up. -- Don't spend it all at the Rose Hotel.",
+     "choices": [
+      {
+       "text": "About lads off the erskineville village shops.",
+       "turnin": "qgb-l1-erskineville-025"
+      },
+      {
+       "text": "About one stop from the erskineville village shops.",
+       "turnin": "qgb-l1-erskineville-026"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Graham C., strata committee chair in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Rose Hotel like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near the Rose Hotel."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-beryl-c",
+   "name": "Beryl C., uni student, three jobs",
+   "x": -1673,
+   "z": 3444,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Erskineville rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the Erskineville village shops is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two signs, erskineville road.",
+     "choices": [
+      {
+       "text": "Two Signs, Erskineville Road",
+       "accept": "qgb-l1-erskineville-027",
+       "denyFlag": "w:qgb-l1-erskineville-027"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Beryl C. looks it over the way Erskineville looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About two signs, erskineville road.",
+       "turnin": "qgb-l1-erskineville-027"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the Erskineville village shops that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Beryl C., uni student, three jobs in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Erskineville village shops like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near the Erskineville village shops."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-rocco-e",
+   "name": "Rocco E., barista, own cafe",
+   "x": -2254,
+   "z": 3569,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flat white? Everyone in Erskineville wants a flat white. Give me a sec, the grinder's sulking.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I own the place. Own it, run it, sweep it. the Macdonaldtown footbridge foot traffic pays the rent and the regulars pay for the machine.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trolley run, erskineville road.",
+     "choices": [
+      {
+       "text": "Trolley Run, Erskineville Road",
+       "accept": "qgb-l1-erskineville-028",
+       "denyFlag": "w:qgb-l1-erskineville-028"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Rocco E. looks it over the way Erskineville looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About trolley run, erskineville road.",
+       "turnin": "qgb-l1-erskineville-028"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There are eleven cafes on this strip and we all buy beans off the same bloke in the Macdonaldtown footbridge. Don't tell anyone.",
+     "improv": {
+      "persona": "Rocco E., barista, own cafe in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Macdonaldtown footbridge like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near the Macdonaldtown footbridge."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-enzo-d",
+   "name": "Enzo D., barista, own cafe",
+   "x": -2200,
+   "z": 3400,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Flat white? Everyone in Erskineville wants a flat white. Give me a sec, the grinder's sulking.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I own the place. Own it, run it, sweep it. the Rose Hotel foot traffic pays the rent and the regulars pay for the machine.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Two From the Macdonaldtown footbridge",
+       "accept": "qgb-l1-erskineville-029",
+       "denyFlag": "w:qgb-l1-erskineville-029"
+      },
+      {
+       "text": "Something From the Erskineville village shops",
+       "accept": "qgb-l1-erskineville-030",
+       "denyFlag": "w:qgb-l1-erskineville-030",
+       "needFlag": "w:qgb-l1-erskineville-029"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Enzo D. looks it over the way Erskineville looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About two from the macdonaldtown footbridge.",
+       "turnin": "qgb-l1-erskineville-029"
+      },
+      {
+       "text": "About something from the erskineville village shops.",
+       "turnin": "qgb-l1-erskineville-030"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There are eleven cafes on this strip and we all buy beans off the same bloke in the Rose Hotel. Don't tell anyone.",
+     "improv": {
+      "persona": "Enzo D., barista, own cafe in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Rose Hotel like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near the Rose Hotel."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-annabel-c",
+   "name": "Annabel C., drag queen, off duty",
+   "x": -2605,
+   "z": 3870,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Darling. Yes, it's me, no, I'm not doing the show tonight. Erskineville needs a rest and so do my feet.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Sundays at the Imperial, Thursdays wherever pays. the Erskineville village shops has seen things.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's counting the macdonaldtown footbridge.",
+     "choices": [
+      {
+       "text": "Counting the Macdonaldtown footbridge",
+       "accept": "qgb-l1-erskineville-031",
+       "denyFlag": "w:qgb-l1-erskineville-031"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Annabel C. counts it out without looking up. -- Don't spend it all at the Erskineville village shops.",
+     "choices": [
+      {
+       "text": "About counting the macdonaldtown footbridge.",
+       "turnin": "qgb-l1-erskineville-031"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The heels come off at Erskineville Road and stay off until the Erskineville village shops. That's the rule.",
+     "improv": {
+      "persona": "Annabel C., drag queen, off duty in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Erskineville village shops like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near the Erskineville village shops."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-shirl-c",
+   "name": "Shirl C., dog walker, four leads",
+   "x": -1691,
+   "z": 3517,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hang on, hang on -- sit. Not you. Sorry, Erskineville at this hour is chaos. What's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six dogs, three suburbs, one car park at the Erko. Two of them aren't mine and one of them isn't a dog, legally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Tap On at the Rose Hotel",
+       "accept": "qgb-l1-erskineville-032",
+       "denyFlag": "w:qgb-l1-erskineville-032"
+      },
+      {
+       "text": "Lads Off the Imperial",
+       "accept": "qgb-l1-erskineville-033",
+       "denyFlag": "w:qgb-l1-erskineville-033",
+       "needFlag": "w:qgb-l1-erskineville-032"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Shirl C. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About tap on at the rose hotel.",
+       "turnin": "qgb-l1-erskineville-032"
+      },
+      {
+       "text": "About lads off the imperial.",
+       "turnin": "qgb-l1-erskineville-033"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The off-leash bit at the Erko is fine until the magpies come back. Then nothing is fine.",
+     "improv": {
+      "persona": "Shirl C., dog walker, four leads in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Erko like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near the Erko."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Erskineville would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-kylie-b",
+   "name": "Kylie B., uni student, three jobs",
+   "x": -1877,
+   "z": 3979,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Sorry -- yep -- hi. I'm between shifts. Erskineville rent, you know how it is.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. the Imperial is where I sleep, technically.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the harry noble reserve camera.",
+     "choices": [
+      {
+       "text": "The Harry Noble Reserve Camera",
+       "accept": "qgb-l1-erskineville-034",
+       "denyFlag": "w:qgb-l1-erskineville-034"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Kylie B. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the harry noble reserve camera.",
+       "turnin": "qgb-l1-erskineville-034"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a cafe near the Imperial that does a five dollar long black if you look sad enough. I always look sad enough.",
+     "improv": {
+      "persona": "Kylie B., uni student, three jobs in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Imperial like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near the Imperial."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-sharon-b",
+   "name": "Sharon B., drag queen, off duty",
+   "x": -2412,
+   "z": 3466,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Darling. Yes, it's me, no, I'm not doing the show tonight. Erskineville needs a rest and so do my feet.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Sundays at the Imperial, Thursdays wherever pays. Swanson Street has seen things.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Proof of the Rose Hotel",
+       "accept": "qgb-l1-erskineville-035",
+       "denyFlag": "w:qgb-l1-erskineville-035"
+      },
+      {
+       "text": "Rent Money, the Erskineville village shops",
+       "accept": "qgb-l1-erskineville-036",
+       "denyFlag": "w:qgb-l1-erskineville-036",
+       "needFlag": "w:qgb-l1-erskineville-035"
+      },
+      {
+       "text": "Before They Touch the Rose Hotel",
+       "accept": "qgb-l1-erskineville-037",
+       "denyFlag": "w:qgb-l1-erskineville-037"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Sharon B. looks it over the way Erskineville looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About proof of the rose hotel.",
+       "turnin": "qgb-l1-erskineville-035"
+      },
+      {
+       "text": "About rent money, the erskineville village shops.",
+       "turnin": "qgb-l1-erskineville-036"
+      },
+      {
+       "text": "About before they touch the rose hotel.",
+       "turnin": "qgb-l1-erskineville-037"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The heels come off at Erskineville Road and stay off until Swanson Street. That's the rule.",
+     "improv": {
+      "persona": "Sharon B., drag queen, off duty in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Swanson Street like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near Swanson Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-gav-a",
+   "name": "Gav A., publican",
+   "x": -2069,
+   "z": 3874,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "We're not open. We're never not open. What'll it be, Erskineville?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I run the pub. Schooners, the meat raffle, the trivia on Wednesdays that started as a joke. the Rose Hotel keeps me in business and out of the papers.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The the Macdonaldtown footbridge Order",
+       "accept": "qgb-l1-erskineville-038",
+       "denyFlag": "w:qgb-l1-erskineville-038"
+      },
+      {
+       "text": "Cover at the Erskineville village shops",
+       "accept": "qgb-l1-erskineville-039",
+       "denyFlag": "w:qgb-l1-erskineville-039",
+       "needFlag": "w:qgb-l1-erskineville-038"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Gav A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the macdonaldtown footbridge order.",
+       "turnin": "qgb-l1-erskineville-038"
+      },
+      {
+       "text": "About cover at the erskineville village shops.",
+       "turnin": "qgb-l1-erskineville-039"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Tooheys New, seven dollars, and if you ask for a craft beer I'll point you back toward the Rose Hotel.",
+     "improv": {
+      "persona": "Gav A., publican in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Rose Hotel like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near the Rose Hotel."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-bronwyn-a",
+   "name": "Bronwyn A., dog walker, four leads",
+   "x": -2365,
+   "z": 3616,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Hang on, hang on -- sit. Not you. Sorry, Erskineville at this hour is chaos. What's up?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Six dogs, three suburbs, one car park at the Erskineville village shops. Two of them aren't mine and one of them isn't a dog, legally.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Two From Erskineville Road",
+       "accept": "qgb-l1-erskineville-040",
+       "denyFlag": "w:qgb-l1-erskineville-040"
+      },
+      {
+       "text": "Something From the Erko",
+       "accept": "qgb-l1-erskineville-041",
+       "denyFlag": "w:qgb-l1-erskineville-041",
+       "needFlag": "w:qgb-l1-erskineville-040"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Bronwyn A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About two from erskineville road.",
+       "turnin": "qgb-l1-erskineville-040"
+      },
+      {
+       "text": "About something from the erko.",
+       "turnin": "qgb-l1-erskineville-041"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The off-leash bit at the Erskineville village shops is fine until the magpies come back. Then nothing is fine.",
+     "improv": {
+      "persona": "Bronwyn A., dog walker, four leads in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Erskineville village shops like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near the Erskineville village shops."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-erskineville-luke-a",
+   "name": "Luke A., strata committee chair",
+   "x": -2039,
+   "z": 3462,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Erskineville strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Erskineville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. the Macdonaldtown footbridge is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Counting the Erko",
+       "accept": "qgb-l1-erskineville-042",
+       "denyFlag": "w:qgb-l1-erskineville-042"
+      },
+      {
+       "text": "The Erskineville Road Sparky",
+       "accept": "qgb-l1-erskineville-043",
+       "denyFlag": "w:qgb-l1-erskineville-043",
+       "needFlag": "w:qgb-l1-erskineville-042"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Luke A. counts it out without looking up. -- Don't spend it all at the Macdonaldtown footbridge.",
+     "choices": [
+      {
+       "text": "About counting the erko.",
+       "turnin": "qgb-l1-erskineville-042"
+      },
+      {
+       "text": "About the erskineville road sparky.",
+       "turnin": "qgb-l1-erskineville-043"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Luke A., strata committee chair in Erskineville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Macdonaldtown footbridge like everyone knows it.",
+      "context": "Someone has asked what Erskineville is like these days. You are standing near the Macdonaldtown footbridge."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

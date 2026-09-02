@@ -1,0 +1,2955 @@
+{
+ "pack": "areab-milsons-point-1",
+ "npcs": [
+  {
+   "id": "qgb-milsons-point-nathan",
+   "name": "Nathan, corporate, on a break",
+   "x": 516,
+   "z": -2706,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I've got eleven minutes. Sorry -- nine. Milsons Point, what do you need?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Consulting. I consult. On what, nobody's sure, including me. Luna Park is where I pretend to have lunch.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the north sydney olympic pool tab.",
+     "choices": [
+      {
+       "text": "The the North Sydney Olympic Pool Tab",
+       "accept": "qgb-l5-milsons-point-001",
+       "denyFlag": "w:qgb-l5-milsons-point-001"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Nathan looks it over the way Milsons Point looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the north sydney olympic pool tab.",
+       "turnin": "qgb-l5-milsons-point-001"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The coffee near Luna Park is eight dollars. I expense it. I'm not proud.",
+     "improv": {
+      "persona": "Nathan, corporate, on a break in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about Luna Park like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near Luna Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-debbie",
+   "name": "Debbie, ocean pool regular",
+   "x": -71,
+   "z": -2626,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Water's fourteen. Fourteen! Milsons Point, you'd be mad not to.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Every morning, forty laps, rain or hail. the North Sydney Olympic Pool has a group of us who've been doing it since Whitlam.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's seven a.m. at the bridge's northern pylon.",
+     "choices": [
+      {
+       "text": "Seven a.m. At the Bridge's northern pylon",
+       "accept": "qgb-l5-milsons-point-002",
+       "denyFlag": "w:qgb-l5-milsons-point-002"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Debbie counts it out without looking up. -- Don't spend it all at the North Sydney Olympic Pool.",
+     "choices": [
+      {
+       "text": "About seven a.m. at the bridge's northern pylon.",
+       "turnin": "qgb-l5-milsons-point-002"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in lane two at the North Sydney Olympic Pool has been swimming the same pace for thirty years. We call him the tide.",
+     "improv": {
+      "persona": "Debbie, ocean pool regular in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about the North Sydney Olympic Pool like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near the North Sydney Olympic Pool."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-michelle",
+   "name": "Michelle, Luna Park ride operator",
+   "x": 18,
+   "z": -2411,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Keep your arms inside the -- sorry, day job. Milsons Point, what's the story?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "The Wild Mouse, the Ferris wheel, the face that gives children nightmares. Kirribilli is a dream job with a rollercoaster in it.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Something From the Bridge's northern pylon",
+       "accept": "qgb-l5-milsons-point-003",
+       "denyFlag": "w:qgb-l5-milsons-point-003"
+      },
+      {
+       "text": "Before They Touch the Bridge's northern pylon",
+       "accept": "qgb-l5-milsons-point-004",
+       "denyFlag": "w:qgb-l5-milsons-point-004",
+       "needFlag": "w:qgb-l5-milsons-point-003"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Michelle pays up on the spot.",
+     "choices": [
+      {
+       "text": "About something from the bridge's northern pylon.",
+       "turnin": "qgb-l5-milsons-point-003"
+      },
+      {
+       "text": "About before they touch the bridge's northern pylon.",
+       "turnin": "qgb-l5-milsons-point-004"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Coney Island slides at Kirribilli have burnt the same patch of my elbow since I was nine.",
+     "improv": {
+      "persona": "Michelle, Luna Park ride operator in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about Kirribilli like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near Kirribilli."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-lupe",
+   "name": "Lupe, security guard",
+   "x": 1,
+   "z": -2343,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bags open, please. Thanks, bro. Welcome to Milsons Point.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve-hour shifts standing near the Bridge's northern pylon watching people not steal things. Mostly.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Lavender Bay Complaint",
+       "accept": "qgb-l5-milsons-point-005",
+       "denyFlag": "w:qgb-l5-milsons-point-005"
+      },
+      {
+       "text": "Race Four, Lavender Bay",
+       "accept": "qgb-l5-milsons-point-006",
+       "denyFlag": "w:qgb-l5-milsons-point-006",
+       "needFlag": "w:qgb-l5-milsons-point-005"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Lupe counts it out without looking up. -- Don't spend it all at the Bridge's northern pylon.",
+     "choices": [
+      {
+       "text": "About the lavender bay complaint.",
+       "turnin": "qgb-l5-milsons-point-005"
+      },
+      {
+       "text": "About race four, lavender bay.",
+       "turnin": "qgb-l5-milsons-point-006"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a bench near the Bridge's northern pylon where the whole shift eats lunch. We've named the pigeons.",
+     "improv": {
+      "persona": "Lupe, security guard in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Bridge's northern pylon like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near the Bridge's northern pylon."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Right. And you're sure it was Lavender Bay? People say Lavender Bay when they mean the bit next to it. -- Lupe writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-scott",
+   "name": "Scott, nanny, two families",
+   "x": 52,
+   "z": -2667,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Shh, she's finally asleep. In the pram. In Milsons Point. Hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Two families, four kids, one Volvo. Bradfield Park is where the playground fights happen and I mean the parents.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trolley run, blues point.",
+     "choices": [
+      {
+       "text": "Trolley Run, Blues Point",
+       "accept": "qgb-l5-milsons-point-007",
+       "denyFlag": "w:qgb-l5-milsons-point-007"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Scott looks it over the way Milsons Point looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About trolley run, blues point.",
+       "turnin": "qgb-l5-milsons-point-007"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every mother at Bradfield Park has an opinion about sleep training and none of them have slept.",
+     "improv": {
+      "persona": "Scott, nanny, two families in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about Bradfield Park like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near Bradfield Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-les",
+   "name": "Les, probationary constable",
+   "x": 699,
+   "z": -2607,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Milsons Point LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of Blues Point. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The the Kirribilli markets Order",
+       "accept": "qgb-l5-milsons-point-008",
+       "denyFlag": "w:qgb-l5-milsons-point-008"
+      },
+      {
+       "text": "The Miller Street Course",
+       "accept": "qgb-l5-milsons-point-009",
+       "denyFlag": "w:qgb-l5-milsons-point-009",
+       "needFlag": "w:qgb-l5-milsons-point-008"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Les counts it out without looking up. -- Don't spend it all at Blues Point.",
+     "choices": [
+      {
+       "text": "About the the kirribilli markets order.",
+       "turnin": "qgb-l5-milsons-point-008"
+      },
+      {
+       "text": "About the miller street course.",
+       "turnin": "qgb-l5-milsons-point-009"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about Blues Point. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Les, probationary constable in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about Blues Point like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near Blues Point."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-terry",
+   "name": "Terry, Luna Park ride operator",
+   "x": -85,
+   "z": -2315,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Keep your arms inside the -- sorry, day job. Milsons Point, what's the story?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "The Wild Mouse, the Ferris wheel, the face that gives children nightmares. the Greenwood is a dream job with a rollercoaster in it.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the north sydney olympic pool float.",
+     "choices": [
+      {
+       "text": "The the North Sydney Olympic Pool Float",
+       "accept": "qgb-l5-milsons-point-010",
+       "denyFlag": "w:qgb-l5-milsons-point-010"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Terry counts it out without looking up. -- Don't spend it all at the Greenwood.",
+     "choices": [
+      {
+       "text": "About the the north sydney olympic pool float.",
+       "turnin": "qgb-l5-milsons-point-010"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Coney Island slides at the Greenwood have burnt the same patch of my elbow since I was nine.",
+     "improv": {
+      "persona": "Terry, Luna Park ride operator in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Greenwood like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near the Greenwood."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Right. And you're sure it was the North Sydney Olympic Pool? People say the North Sydney Olympic Pool when they mean the bit next to it. -- Terry writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-fiona",
+   "name": "Fiona, strata committee chair",
+   "x": -219,
+   "z": -2524,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Milsons Point strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. the North Sydney Olympic Pool is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's ask around at ashfield.",
+     "choices": [
+      {
+       "text": "Ask Around at Ashfield",
+       "accept": "qgb-l5-milsons-point-011",
+       "denyFlag": "w:qgb-l5-milsons-point-011"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Fiona counts it out without looking up. -- Don't spend it all at the North Sydney Olympic Pool.",
+     "choices": [
+      {
+       "text": "About ask around at ashfield.",
+       "turnin": "qgb-l5-milsons-point-011"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Fiona, strata committee chair in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about the North Sydney Olympic Pool like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near the North Sydney Olympic Pool."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Milsons Point would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-brooke",
+   "name": "Brooke, nanny, two families",
+   "x": 193,
+   "z": -2952,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Shh, she's finally asleep. In the pram. In Milsons Point. Hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Two families, four kids, one Volvo. Kirribilli is where the playground fights happen and I mean the parents.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's closing time at the bridge's northern pylon.",
+     "choices": [
+      {
+       "text": "Closing Time at the Bridge's northern pylon",
+       "accept": "qgb-l5-milsons-point-012",
+       "denyFlag": "w:qgb-l5-milsons-point-012"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Brooke looks it over the way Milsons Point looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About closing time at the bridge's northern pylon.",
+       "turnin": "qgb-l5-milsons-point-012"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every mother at Kirribilli has an opinion about sleep training and none of them have slept.",
+     "improv": {
+      "persona": "Brooke, nanny, two families in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about Kirribilli like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near Kirribilli."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-clive",
+   "name": "Clive, probationary constable",
+   "x": 174,
+   "z": -2651,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Milsons Point LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of the Bridge's northern pylon. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at lavender bay.",
+     "choices": [
+      {
+       "text": "Trouble at Lavender Bay",
+       "accept": "qgb-l5-milsons-point-013",
+       "denyFlag": "w:qgb-l5-milsons-point-013"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Clive looks it over the way Milsons Point looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About trouble at lavender bay.",
+       "turnin": "qgb-l5-milsons-point-013"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about the Bridge's northern pylon. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Clive, probationary constable in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Bridge's northern pylon like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near the Bridge's northern pylon."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-rupert",
+   "name": "Rupert, Luna Park ride operator",
+   "x": -159,
+   "z": -2322,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Keep your arms inside the -- sorry, day job. Milsons Point, what's the story?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "The Wild Mouse, the Ferris wheel, the face that gives children nightmares. Blues Point is a dream job with a rollercoaster in it.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's proof of luna park.",
+     "choices": [
+      {
+       "text": "Proof of Luna Park",
+       "accept": "qgb-l5-milsons-point-014",
+       "denyFlag": "w:qgb-l5-milsons-point-014"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Rupert counts it out without looking up. -- Don't spend it all at Blues Point.",
+     "choices": [
+      {
+       "text": "About proof of luna park.",
+       "turnin": "qgb-l5-milsons-point-014"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Coney Island slides at Blues Point have burnt the same patch of my elbow since I was nine.",
+     "improv": {
+      "persona": "Rupert, Luna Park ride operator in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about Blues Point like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near Blues Point."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-sione",
+   "name": "Sione, security guard",
+   "x": -275,
+   "z": -2422,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bags open, please. Thanks, bro. Welcome to Milsons Point.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve-hour shifts standing near the Kirribilli markets watching people not steal things. Mostly.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Counting Miller Street",
+       "accept": "qgb-l5-milsons-point-015",
+       "denyFlag": "w:qgb-l5-milsons-point-015"
+      },
+      {
+       "text": "Lads Off Miller Street",
+       "accept": "qgb-l5-milsons-point-016",
+       "denyFlag": "w:qgb-l5-milsons-point-016",
+       "needFlag": "w:qgb-l5-milsons-point-015"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Sione pays up on the spot.",
+     "choices": [
+      {
+       "text": "About counting miller street.",
+       "turnin": "qgb-l5-milsons-point-015"
+      },
+      {
+       "text": "About lads off miller street.",
+       "turnin": "qgb-l5-milsons-point-016"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a bench near the Kirribilli markets where the whole shift eats lunch. We've named the pigeons.",
+     "improv": {
+      "persona": "Sione, security guard in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Kirribilli markets like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near the Kirribilli markets."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-daz",
+   "name": "Daz, strata committee chair",
+   "x": 542,
+   "z": -2687,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Milsons Point strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. Miller Street is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the luna park camera.",
+     "choices": [
+      {
+       "text": "The Luna Park Camera",
+       "accept": "qgb-l5-milsons-point-017",
+       "denyFlag": "w:qgb-l5-milsons-point-017"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Daz pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the luna park camera.",
+       "turnin": "qgb-l5-milsons-point-017"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Daz, strata committee chair in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about Miller Street like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near Miller Street."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-cooper",
+   "name": "Cooper, nanny, two families",
+   "x": 325,
+   "z": -2599,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Shh, she's finally asleep. In the pram. In Milsons Point. Hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Two families, four kids, one Volvo. the Greenwood is where the playground fights happen and I mean the parents.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two from the north sydney olympic pool.",
+     "choices": [
+      {
+       "text": "Two From the North Sydney Olympic Pool",
+       "accept": "qgb-l5-milsons-point-018",
+       "denyFlag": "w:qgb-l5-milsons-point-018"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Cooper pays up on the spot.",
+     "choices": [
+      {
+       "text": "About two from the north sydney olympic pool.",
+       "turnin": "qgb-l5-milsons-point-018"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every mother at the Greenwood has an opinion about sleep training and none of them have slept.",
+     "improv": {
+      "persona": "Cooper, nanny, two families in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Greenwood like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near the Greenwood."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-warwick",
+   "name": "Warwick, probationary constable",
+   "x": 273,
+   "z": -2964,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Milsons Point LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of Luna Park. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Bin Night, Kirribilli",
+       "accept": "qgb-l5-milsons-point-019",
+       "denyFlag": "w:qgb-l5-milsons-point-019"
+      },
+      {
+       "text": "Staffy Near the North Sydney Olympic Pool",
+       "accept": "qgb-l5-milsons-point-020",
+       "denyFlag": "w:qgb-l5-milsons-point-020",
+       "needFlag": "w:qgb-l5-milsons-point-019"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Warwick pays up on the spot.",
+     "choices": [
+      {
+       "text": "About bin night, kirribilli.",
+       "turnin": "qgb-l5-milsons-point-019"
+      },
+      {
+       "text": "About staffy near the north sydney olympic pool.",
+       "turnin": "qgb-l5-milsons-point-020"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about Luna Park. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Warwick, probationary constable in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about Luna Park like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near Luna Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Warwick listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-sione-a",
+   "name": "Sione A., security guard",
+   "x": 360,
+   "z": -2214,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bags open, please. Thanks, bro. Welcome to Milsons Point.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve-hour shifts standing near Lavender Bay watching people not steal things. Mostly.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at bradfield park.",
+     "choices": [
+      {
+       "text": "Trouble at Bradfield Park",
+       "accept": "qgb-l5-milsons-point-021",
+       "denyFlag": "w:qgb-l5-milsons-point-021"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Sione A. counts it out without looking up. -- Don't spend it all at Lavender Bay.",
+     "choices": [
+      {
+       "text": "About trouble at bradfield park.",
+       "turnin": "qgb-l5-milsons-point-021"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a bench near Lavender Bay where the whole shift eats lunch. We've named the pigeons.",
+     "improv": {
+      "persona": "Sione A., security guard in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about Lavender Bay like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near Lavender Bay."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-neville",
+   "name": "Neville, strata committee chair",
+   "x": 313,
+   "z": -2117,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Milsons Point strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. Bradfield Park is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Blues Point Sparky",
+       "accept": "qgb-l5-milsons-point-022",
+       "denyFlag": "w:qgb-l5-milsons-point-022"
+      },
+      {
+       "text": "The Blues Point Tab",
+       "accept": "qgb-l5-milsons-point-023",
+       "denyFlag": "w:qgb-l5-milsons-point-023",
+       "needFlag": "w:qgb-l5-milsons-point-022"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Neville pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the blues point sparky.",
+       "turnin": "qgb-l5-milsons-point-022"
+      },
+      {
+       "text": "About the blues point tab.",
+       "turnin": "qgb-l5-milsons-point-023"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Neville, strata committee chair in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about Bradfield Park like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near Bradfield Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-angus",
+   "name": "Angus, nanny, two families",
+   "x": 350,
+   "z": -2679,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Shh, she's finally asleep. In the pram. In Milsons Point. Hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Two families, four kids, one Volvo. Blues Point is where the playground fights happen and I mean the parents.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "RBT on the Kirribilli markets",
+       "accept": "qgb-l5-milsons-point-024",
+       "denyFlag": "w:qgb-l5-milsons-point-024"
+      },
+      {
+       "text": "Tap On at the Kirribilli markets",
+       "accept": "qgb-l5-milsons-point-025",
+       "denyFlag": "w:qgb-l5-milsons-point-025",
+       "needFlag": "w:qgb-l5-milsons-point-024"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Angus counts it out without looking up. -- Don't spend it all at Blues Point.",
+     "choices": [
+      {
+       "text": "About rbt on the kirribilli markets.",
+       "turnin": "qgb-l5-milsons-point-024"
+      },
+      {
+       "text": "About tap on at the kirribilli markets.",
+       "turnin": "qgb-l5-milsons-point-025"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every mother at Blues Point has an opinion about sleep training and none of them have slept.",
+     "improv": {
+      "persona": "Angus, nanny, two families in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about Blues Point like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near Blues Point."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-2",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Angus listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-poppy",
+   "name": "Poppy, probationary constable",
+   "x": 381,
+   "z": -2521,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Milsons Point LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of the Kirribilli markets. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's seven a.m. at miller street.",
+     "choices": [
+      {
+       "text": "Seven a.m. At Miller Street",
+       "accept": "qgb-l5-milsons-point-026",
+       "denyFlag": "w:qgb-l5-milsons-point-026"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Poppy counts it out without looking up. -- Don't spend it all at the Kirribilli markets.",
+     "choices": [
+      {
+       "text": "About seven a.m. at miller street.",
+       "turnin": "qgb-l5-milsons-point-026"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about the Kirribilli markets. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Poppy, probationary constable in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Kirribilli markets like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near the Kirribilli markets."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-renee",
+   "name": "Renee, ocean pool regular",
+   "x": 279,
+   "z": -2547,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Water's fourteen. Fourteen! Milsons Point, you'd be mad not to.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Every morning, forty laps, rain or hail. the Greenwood has a group of us who've been doing it since Whitlam.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's meat tray at luna park.",
+     "choices": [
+      {
+       "text": "Meat Tray at Luna Park",
+       "accept": "qgb-l5-milsons-point-027",
+       "denyFlag": "w:qgb-l5-milsons-point-027"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Renee counts it out without looking up. -- Don't spend it all at the Greenwood.",
+     "choices": [
+      {
+       "text": "About meat tray at luna park.",
+       "turnin": "qgb-l5-milsons-point-027"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in lane two at the Greenwood has been swimming the same pace for thirty years. We call him the tide.",
+     "improv": {
+      "persona": "Renee, ocean pool regular in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Greenwood like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near the Greenwood."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-warwick-a",
+   "name": "Warwick A., Luna Park ride operator",
+   "x": -248,
+   "z": -2440,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Keep your arms inside the -- sorry, day job. Milsons Point, what's the story?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "The Wild Mouse, the Ferris wheel, the face that gives children nightmares. Luna Park is a dream job with a rollercoaster in it.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's proof of the north sydney olympic pool.",
+     "choices": [
+      {
+       "text": "Proof of the North Sydney Olympic Pool",
+       "accept": "qgb-l5-milsons-point-028",
+       "denyFlag": "w:qgb-l5-milsons-point-028"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Warwick A. looks it over the way Milsons Point looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About proof of the north sydney olympic pool.",
+       "turnin": "qgb-l5-milsons-point-028"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Coney Island slides at Luna Park have burnt the same patch of my elbow since I was nine.",
+     "improv": {
+      "persona": "Warwick A., Luna Park ride operator in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about Luna Park like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near Luna Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-tui-a",
+   "name": "Tui A., security guard",
+   "x": 240,
+   "z": -2323,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Bags open, please. Thanks, bro. Welcome to Milsons Point.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Twelve-hour shifts standing near the North Sydney Olympic Pool watching people not steal things. Mostly.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's a flat white from kirribilli.",
+     "choices": [
+      {
+       "text": "A Flat White From Kirribilli",
+       "accept": "qgb-l5-milsons-point-029",
+       "denyFlag": "w:qgb-l5-milsons-point-029"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Tui A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About a flat white from kirribilli.",
+       "turnin": "qgb-l5-milsons-point-029"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "There's a bench near the North Sydney Olympic Pool where the whole shift eats lunch. We've named the pigeons.",
+     "improv": {
+      "persona": "Tui A., security guard in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about the North Sydney Olympic Pool like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near the North Sydney Olympic Pool."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-cooper-a",
+   "name": "Cooper A., strata committee chair",
+   "x": -152,
+   "z": -2264,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Milsons Point strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. Kirribilli is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trolley run, the bridge's northern pylon.",
+     "choices": [
+      {
+       "text": "Trolley Run, the Bridge's northern pylon",
+       "accept": "qgb-l5-milsons-point-030",
+       "denyFlag": "w:qgb-l5-milsons-point-030"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Cooper A. looks it over the way Milsons Point looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About trolley run, the bridge's northern pylon.",
+       "turnin": "qgb-l5-milsons-point-030"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Cooper A., strata committee chair in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about Kirribilli like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near Kirribilli."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-fergus-a",
+   "name": "Fergus A., probationary constable",
+   "x": 10,
+   "z": -2310,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Milsons Point LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of Lavender Bay. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's two from blues point.",
+     "choices": [
+      {
+       "text": "Two From Blues Point",
+       "accept": "qgb-l5-milsons-point-031",
+       "denyFlag": "w:qgb-l5-milsons-point-031"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Fergus A. counts it out without looking up. -- Don't spend it all at Lavender Bay.",
+     "choices": [
+      {
+       "text": "About two from blues point.",
+       "turnin": "qgb-l5-milsons-point-031"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about Lavender Bay. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Fergus A., probationary constable in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about Lavender Bay like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near Lavender Bay."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-annabel-a",
+   "name": "Annabel A., corporate, on a break",
+   "x": 533,
+   "z": -2787,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I've got eleven minutes. Sorry -- nine. Milsons Point, what do you need?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Consulting. I consult. On what, nobody's sure, including me. Bradfield Park is where I pretend to have lunch.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Bin Night, Blues Point",
+       "accept": "qgb-l5-milsons-point-032",
+       "denyFlag": "w:qgb-l5-milsons-point-032"
+      },
+      {
+       "text": "Staffy Near Blues Point",
+       "accept": "qgb-l5-milsons-point-033",
+       "denyFlag": "w:qgb-l5-milsons-point-033",
+       "needFlag": "w:qgb-l5-milsons-point-032"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Annabel A. looks it over the way Milsons Point looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About bin night, blues point.",
+       "turnin": "qgb-l5-milsons-point-032"
+      },
+      {
+       "text": "About staffy near blues point.",
+       "turnin": "qgb-l5-milsons-point-033"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The coffee near Bradfield Park is eight dollars. I expense it. I'm not proud.",
+     "improv": {
+      "persona": "Annabel A., corporate, on a break in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about Bradfield Park like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near Bradfield Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-2",
+     "line": "Right. And you're sure it was Blues Point? People say Blues Point when they mean the bit next to it. -- Annabel A. writes something down anyway.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-eddie-a",
+   "name": "Eddie A., ocean pool regular",
+   "x": 461,
+   "z": -2285,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Water's fourteen. Fourteen! Milsons Point, you'd be mad not to.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Every morning, forty laps, rain or hail. Blues Point has a group of us who've been doing it since Whitlam.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Length of the Kirribilli markets",
+       "accept": "qgb-l5-milsons-point-034",
+       "denyFlag": "w:qgb-l5-milsons-point-034"
+      },
+      {
+       "text": "Two Signs, the Kirribilli markets",
+       "accept": "qgb-l5-milsons-point-035",
+       "denyFlag": "w:qgb-l5-milsons-point-035",
+       "needFlag": "w:qgb-l5-milsons-point-034"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Eddie A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the length of the kirribilli markets.",
+       "turnin": "qgb-l5-milsons-point-034"
+      },
+      {
+       "text": "About two signs, the kirribilli markets.",
+       "turnin": "qgb-l5-milsons-point-035"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in lane two at Blues Point has been swimming the same pace for thirty years. We call him the tide.",
+     "improv": {
+      "persona": "Eddie A., ocean pool regular in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about Blues Point like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near Blues Point."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-nola",
+   "name": "Nola, strata committee chair",
+   "x": 461,
+   "z": -2477,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Milsons Point strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. the Greenwood is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Rent Money, the North Sydney Olympic Pool",
+       "accept": "qgb-l5-milsons-point-036",
+       "denyFlag": "w:qgb-l5-milsons-point-036"
+      },
+      {
+       "text": "Closing Time at the North Sydney Olympic Pool",
+       "accept": "qgb-l5-milsons-point-037",
+       "denyFlag": "w:qgb-l5-milsons-point-037",
+       "needFlag": "w:qgb-l5-milsons-point-036"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Nola counts it out without looking up. -- Don't spend it all at the Greenwood.",
+     "choices": [
+      {
+       "text": "About rent money, the north sydney olympic pool.",
+       "turnin": "qgb-l5-milsons-point-036"
+      },
+      {
+       "text": "About closing time at the north sydney olympic pool.",
+       "turnin": "qgb-l5-milsons-point-037"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Nola, strata committee chair in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Greenwood like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near the Greenwood."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-craig-a",
+   "name": "Craig A., nanny, two families",
+   "x": 81,
+   "z": -2747,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Shh, she's finally asleep. In the pram. In Milsons Point. Hi.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Two families, four kids, one Volvo. Luna Park is where the playground fights happen and I mean the parents.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the north sydney olympic pool pub crawl.",
+     "choices": [
+      {
+       "text": "The North Sydney Olympic Pool Pub Crawl",
+       "accept": "qgb-l5-milsons-point-038",
+       "denyFlag": "w:qgb-l5-milsons-point-038"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Craig A. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the north sydney olympic pool pub crawl.",
+       "turnin": "qgb-l5-milsons-point-038"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Every mother at Luna Park has an opinion about sleep training and none of them have slept.",
+     "improv": {
+      "persona": "Craig A., nanny, two families in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about Luna Park like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near Luna Park."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-sharon-a",
+   "name": "Sharon A., probationary constable",
+   "x": 233,
+   "z": -2627,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Milsons Point LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of the North Sydney Olympic Pool. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the bridge's northern pylon tab.",
+     "choices": [
+      {
+       "text": "The the Bridge's northern pylon Tab",
+       "accept": "qgb-l5-milsons-point-039",
+       "denyFlag": "w:qgb-l5-milsons-point-039"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Sharon A. looks it over the way Milsons Point looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About the the bridge's northern pylon tab.",
+       "turnin": "qgb-l5-milsons-point-039"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about the North Sydney Olympic Pool. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Sharon A., probationary constable in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about the North Sydney Olympic Pool like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near the North Sydney Olympic Pool."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-milsons-point-gav-b",
+   "name": "Gav B., corporate, on a break",
+   "x": -50,
+   "z": -2485,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "I've got eleven minutes. Sorry -- nine. Milsons Point, what do you need?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Milsons Point like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Consulting. I consult. On what, nobody's sure, including me. Kirribilli is where I pretend to have lunch.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's something from lavender bay.",
+     "choices": [
+      {
+       "text": "Something From Lavender Bay",
+       "accept": "qgb-l5-milsons-point-040",
+       "denyFlag": "w:qgb-l5-milsons-point-040"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Gav B. looks it over the way Milsons Point looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About something from lavender bay.",
+       "turnin": "qgb-l5-milsons-point-040"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The coffee near Kirribilli is eight dollars. I expense it. I'm not proud.",
+     "improv": {
+      "persona": "Gav B., corporate, on a break in Milsons Point, Sydney. Dry, specific, local; never says g'day or crikey; talks about Kirribilli like everyone knows it.",
+      "context": "Someone has asked what Milsons Point is like these days. You are standing near Kirribilli."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

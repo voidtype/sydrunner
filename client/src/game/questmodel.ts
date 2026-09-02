@@ -224,8 +224,8 @@ export const MAX_CHOICES = 6;
  * writing down: `/content` is 2.2 MB raw, 316 KB gzipped, fetched once at boot
  * and parsed by every client. That is the number to watch if this grows again.
  */
-export const MAX_QUESTS_PER_BUNDLE = 6144;
-export const MAX_NPCS_PER_BUNDLE = 4096;
+export const MAX_QUESTS_PER_BUNDLE = 8192;
+export const MAX_NPCS_PER_BUNDLE = 8192;
 
 /** Text caps. Generous for a line, tight for an id. */
 export const MAX_ID_CHARS = 48;

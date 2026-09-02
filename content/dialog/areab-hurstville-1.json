@@ -1,0 +1,2945 @@
+{
+ "pack": "areab-hurstville-1",
+ "npcs": [
+  {
+   "id": "qgb-hurstville-chantelle",
+   "name": "Chantelle, bowling club greenkeeper",
+   "x": -9562,
+   "z": 11109,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Boots off the green. Boots OFF the green. Sorry. Welcome to Hurstville bowlo.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Two greens, one of them dying, and a committee that thinks I'm inventing it. Crofts Avenue comes for the schnitzel and stays for the raffle.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the hurstville aquatic centre sparky.",
+     "choices": [
+      {
+       "text": "The the Hurstville Aquatic Centre Sparky",
+       "accept": "qgb-l7-hurstville-001",
+       "denyFlag": "w:qgb-l7-hurstville-001"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Chantelle counts it out without looking up. -- Don't spend it all at Crofts Avenue.",
+     "choices": [
+      {
+       "text": "About the the hurstville aquatic centre sparky.",
+       "turnin": "qgb-l7-hurstville-001"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Barefoot bowls on a Sunday is what pays for the green you're standing on. I have mixed feelings.",
+     "improv": {
+      "persona": "Chantelle, bowling club greenkeeper in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Crofts Avenue like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near Crofts Avenue."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-hayden",
+   "name": "Hayden, real estate agent",
+   "x": -9534.4,
+   "z": 10750.2,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Hurstville is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. the Hurstville Aquatic Centre is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's one stop from forest road.",
+     "choices": [
+      {
+       "text": "One Stop From Forest Road",
+       "accept": "qgb-l7-hurstville-002",
+       "denyFlag": "w:qgb-l7-hurstville-002"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Hayden pays up on the spot.",
+     "choices": [
+      {
+       "text": "About one stop from forest road.",
+       "turnin": "qgb-l7-hurstville-002"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. the Hurstville Aquatic Centre means cosy.",
+     "improv": {
+      "persona": "Hayden, real estate agent in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hurstville Aquatic Centre like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near the Hurstville Aquatic Centre."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-yan",
+   "name": "Yan, chemist",
+   "x": -9655,
+   "z": 11064,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Script or a chat? Both's fine. Hurstville pharmacy, we do both.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Scripts, flu shots, and every man in Hurstville asking quietly about the same thing. the Hurstville Bowlo keeps me in Panadol.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the forest road course.",
+     "choices": [
+      {
+       "text": "The Forest Road Course",
+       "accept": "qgb-l7-hurstville-003",
+       "denyFlag": "w:qgb-l7-hurstville-003"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Yan pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the forest road course.",
+       "turnin": "qgb-l7-hurstville-003"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Chemist Warehouse near the Hurstville Bowlo sells everything cheaper and nobody there knows your name.",
+     "improv": {
+      "persona": "Yan, chemist in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hurstville Bowlo like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near the Hurstville Bowlo."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-michelle",
+   "name": "Michelle, probationary constable",
+   "x": -9726,
+   "z": 11316,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Hurstville LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of Westfield Hurstville. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's closing time at the hurstville chinese strip.",
+     "choices": [
+      {
+       "text": "Closing Time at the Hurstville Chinese strip",
+       "accept": "qgb-l7-hurstville-004",
+       "denyFlag": "w:qgb-l7-hurstville-004"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Michelle counts it out without looking up. -- Don't spend it all at Westfield Hurstville.",
+     "choices": [
+      {
+       "text": "About closing time at the hurstville chinese strip.",
+       "turnin": "qgb-l7-hurstville-004"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about Westfield Hurstville. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Michelle, probationary constable in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Westfield Hurstville like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near Westfield Hurstville."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-lachlan",
+   "name": "Lachlan, Dragons member",
+   "x": -9960,
+   "z": 11517,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Red V. Since '99. Don't. Hurstville, mate, what?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Kogarah on a Saturday and the St George Leagues Club after. Hurstville Oval has more Dragons flags than a Dragons game.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's rbt on the st george dragons.",
+     "choices": [
+      {
+       "text": "RBT on the St George Dragons",
+       "accept": "qgb-l7-hurstville-005",
+       "denyFlag": "w:qgb-l7-hurstville-005"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Lachlan counts it out without looking up. -- Don't spend it all at Hurstville Oval.",
+     "choices": [
+      {
+       "text": "About rbt on the st george dragons.",
+       "turnin": "qgb-l7-hurstville-005"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The club at Hurstville Oval does a $12 roast on Sundays and the whole of the Shire drives up for it.",
+     "improv": {
+      "persona": "Lachlan, Dragons member in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Hurstville Oval like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near Hurstville Oval."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-barry",
+   "name": "Barry, real estate agent",
+   "x": -9598,
+   "z": 10965,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Hurstville is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. Kempt Field is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's meat tray at crofts avenue.",
+     "choices": [
+      {
+       "text": "Meat Tray at Crofts Avenue",
+       "accept": "qgb-l7-hurstville-006",
+       "denyFlag": "w:qgb-l7-hurstville-006"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Barry pays up on the spot.",
+     "choices": [
+      {
+       "text": "About meat tray at crofts avenue.",
+       "turnin": "qgb-l7-hurstville-006"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. Kempt Field means cosy.",
+     "improv": {
+      "persona": "Barry, real estate agent in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Kempt Field like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near Kempt Field."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-ken",
+   "name": "Ken, chemist",
+   "x": -9987,
+   "z": 11490,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Script or a chat? Both's fine. Hurstville pharmacy, we do both.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Scripts, flu shots, and every man in Hurstville asking quietly about the same thing. Crofts Avenue keeps me in Panadol.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The the Hurstville Aquatic Centre Tab",
+       "accept": "qgb-l7-hurstville-007",
+       "denyFlag": "w:qgb-l7-hurstville-007"
+      },
+      {
+       "text": "Bin Night, the Hurstville Bowlo",
+       "accept": "qgb-l7-hurstville-008",
+       "denyFlag": "w:qgb-l7-hurstville-008",
+       "needFlag": "w:qgb-l7-hurstville-007"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Ken counts it out without looking up. -- Don't spend it all at Crofts Avenue.",
+     "choices": [
+      {
+       "text": "About the the hurstville aquatic centre tab.",
+       "turnin": "qgb-l7-hurstville-007"
+      },
+      {
+       "text": "About bin night, the hurstville bowlo.",
+       "turnin": "qgb-l7-hurstville-008"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Chemist Warehouse near Crofts Avenue sells everything cheaper and nobody there knows your name.",
+     "improv": {
+      "persona": "Ken, chemist in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Crofts Avenue like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near Crofts Avenue."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-colin",
+   "name": "Colin, strata committee chair",
+   "x": -9990,
+   "z": 11251,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Hurstville strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. the Hurstville Aquatic Centre is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at the hurstville bowlo.",
+     "choices": [
+      {
+       "text": "Trouble at the Hurstville Bowlo",
+       "accept": "qgb-l7-hurstville-009",
+       "denyFlag": "w:qgb-l7-hurstville-009"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Colin counts it out without looking up. -- Don't spend it all at the Hurstville Aquatic Centre.",
+     "choices": [
+      {
+       "text": "About trouble at the hurstville bowlo.",
+       "turnin": "qgb-l7-hurstville-009"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Colin, strata committee chair in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hurstville Aquatic Centre like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near the Hurstville Aquatic Centre."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-gail",
+   "name": "Gail, probationary constable",
+   "x": -9616,
+   "z": 11411,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Hurstville LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of the Hurstville Bowlo. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch forest road.",
+     "choices": [
+      {
+       "text": "Before They Touch Forest Road",
+       "accept": "qgb-l7-hurstville-010",
+       "denyFlag": "w:qgb-l7-hurstville-010"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Gail looks it over the way Hurstville looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About before they touch forest road.",
+       "turnin": "qgb-l7-hurstville-010"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about the Hurstville Bowlo. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Gail, probationary constable in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hurstville Bowlo like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near the Hurstville Bowlo."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-hao",
+   "name": "Hao, dumpling house owner",
+   "x": -9382,
+   "z": 11140,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table for one? Sit anywhere. Not that one, that's the boss's. Welcome to Hurstville.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Xiao long bao, hand-made, eleven a.m. till the dough runs out. Forest Road queues down the street on Sundays.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Two From the Hurstville Chinese strip",
+       "accept": "qgb-l7-hurstville-011",
+       "denyFlag": "w:qgb-l7-hurstville-011"
+      },
+      {
+       "text": "Left It Near Westfield Hurstville",
+       "accept": "qgb-l7-hurstville-012",
+       "denyFlag": "w:qgb-l7-hurstville-012",
+       "needFlag": "w:qgb-l7-hurstville-011"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Hao counts it out without looking up. -- Don't spend it all at Forest Road.",
+     "choices": [
+      {
+       "text": "About two from the hurstville chinese strip.",
+       "turnin": "qgb-l7-hurstville-011"
+      },
+      {
+       "text": "About left it near westfield hurstville.",
+       "turnin": "qgb-l7-hurstville-012"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best dumplings in Hurstville are at the place with the worst sign. Everyone knows. Nobody says.",
+     "improv": {
+      "persona": "Hao, dumpling house owner in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Forest Road like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near Forest Road."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Hurstville would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-harriet",
+   "name": "Harriet, bowling club greenkeeper",
+   "x": -9630,
+   "z": 10862,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Boots off the green. Boots OFF the green. Sorry. Welcome to Hurstville bowlo.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Two greens, one of them dying, and a committee that thinks I'm inventing it. the Hurstville Chinese strip comes for the schnitzel and stays for the raffle.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's lads off hurstville oval.",
+     "choices": [
+      {
+       "text": "Lads Off Hurstville Oval",
+       "accept": "qgb-l7-hurstville-013",
+       "denyFlag": "w:qgb-l7-hurstville-013"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Harriet pays up on the spot.",
+     "choices": [
+      {
+       "text": "About lads off hurstville oval.",
+       "turnin": "qgb-l7-hurstville-013"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Barefoot bowls on a Sunday is what pays for the green you're standing on. I have mixed feelings.",
+     "improv": {
+      "persona": "Harriet, bowling club greenkeeper in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hurstville Chinese strip like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near the Hurstville Chinese strip."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-imogen",
+   "name": "Imogen, real estate agent",
+   "x": -9378,
+   "z": 11198,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Hurstville is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. Hurstville Oval is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Two Signs, the St George Dragons",
+       "accept": "qgb-l7-hurstville-014",
+       "denyFlag": "w:qgb-l7-hurstville-014"
+      },
+      {
+       "text": "The Kempt Field Complaint",
+       "accept": "qgb-l7-hurstville-015",
+       "denyFlag": "w:qgb-l7-hurstville-015",
+       "needFlag": "w:qgb-l7-hurstville-014"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Imogen pays up on the spot.",
+     "choices": [
+      {
+       "text": "About two signs, the st george dragons.",
+       "turnin": "qgb-l7-hurstville-014"
+      },
+      {
+       "text": "About the kempt field complaint.",
+       "turnin": "qgb-l7-hurstville-015"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. Hurstville Oval means cosy.",
+     "improv": {
+      "persona": "Imogen, real estate agent in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Hurstville Oval like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near Hurstville Oval."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-li",
+   "name": "Li, chemist",
+   "x": -9479,
+   "z": 11407,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Script or a chat? Both's fine. Hurstville pharmacy, we do both.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Scripts, flu shots, and every man in Hurstville asking quietly about the same thing. the St George Dragons keeps me in Panadol.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the hurstville bowlo course.",
+     "choices": [
+      {
+       "text": "The the Hurstville Bowlo Course",
+       "accept": "qgb-l7-hurstville-016",
+       "denyFlag": "w:qgb-l7-hurstville-016"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Li pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the hurstville bowlo course.",
+       "turnin": "qgb-l7-hurstville-016"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Chemist Warehouse near the St George Dragons sells everything cheaper and nobody there knows your name.",
+     "improv": {
+      "persona": "Li, chemist in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the St George Dragons like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near the St George Dragons."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-joyce",
+   "name": "Joyce, strata committee chair",
+   "x": -9215,
+   "z": 11062,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Hurstville strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. Kempt Field is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's closing time at crofts avenue.",
+     "choices": [
+      {
+       "text": "Closing Time at Crofts Avenue",
+       "accept": "qgb-l7-hurstville-017",
+       "denyFlag": "w:qgb-l7-hurstville-017"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Joyce looks it over the way Hurstville looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About closing time at crofts avenue.",
+       "turnin": "qgb-l7-hurstville-017"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Joyce, strata committee chair in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Kempt Field like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near Kempt Field."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-bronwyn",
+   "name": "Bronwyn, probationary constable",
+   "x": -9633,
+   "z": 10673,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Hurstville LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of Crofts Avenue. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's cover at the hurstville aquatic centre.",
+     "choices": [
+      {
+       "text": "Cover at the Hurstville Aquatic Centre",
+       "accept": "qgb-l7-hurstville-018",
+       "denyFlag": "w:qgb-l7-hurstville-018"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Bronwyn looks it over the way Hurstville looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About cover at the hurstville aquatic centre.",
+       "turnin": "qgb-l7-hurstville-018"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about Crofts Avenue. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Bronwyn, probationary constable in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Crofts Avenue like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near Crofts Avenue."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-shirl",
+   "name": "Shirl, Dragons member",
+   "x": -9476,
+   "z": 11547,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Red V. Since '99. Don't. Hurstville, mate, what?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Kogarah on a Saturday and the St George Leagues Club after. the Hurstville Bowlo has more Dragons flags than a Dragons game.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Tap On at Forest Road",
+       "accept": "qgb-l7-hurstville-019",
+       "denyFlag": "w:qgb-l7-hurstville-019"
+      },
+      {
+       "text": "The Forest Road Tab",
+       "accept": "qgb-l7-hurstville-020",
+       "denyFlag": "w:qgb-l7-hurstville-020",
+       "needFlag": "w:qgb-l7-hurstville-019"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Shirl counts it out without looking up. -- Don't spend it all at the Hurstville Bowlo.",
+     "choices": [
+      {
+       "text": "About tap on at forest road.",
+       "turnin": "qgb-l7-hurstville-019"
+      },
+      {
+       "text": "About the forest road tab.",
+       "turnin": "qgb-l7-hurstville-020"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The club at the Hurstville Bowlo does a $12 roast on Sundays and the whole of the Shire drives up for it.",
+     "improv": {
+      "persona": "Shirl, Dragons member in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hurstville Bowlo like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near the Hurstville Bowlo."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Hurstville would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-dean",
+   "name": "Dean, real estate agent",
+   "x": -10053,
+   "z": 11410,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Hurstville is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. Westfield Hurstville is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Something From the Hurstville Chinese strip",
+       "accept": "qgb-l7-hurstville-021",
+       "denyFlag": "w:qgb-l7-hurstville-021"
+      },
+      {
+       "text": "Race Four, the Hurstville Chinese strip",
+       "accept": "qgb-l7-hurstville-022",
+       "denyFlag": "w:qgb-l7-hurstville-022",
+       "needFlag": "w:qgb-l7-hurstville-021"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Dean pays up on the spot.",
+     "choices": [
+      {
+       "text": "About something from the hurstville chinese strip.",
+       "turnin": "qgb-l7-hurstville-021"
+      },
+      {
+       "text": "About race four, the hurstville chinese strip.",
+       "turnin": "qgb-l7-hurstville-022"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. Westfield Hurstville means cosy.",
+     "improv": {
+      "persona": "Dean, real estate agent in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Westfield Hurstville like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near Westfield Hurstville."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-1",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Hurstville would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-ling",
+   "name": "Ling, chemist",
+   "x": -10090,
+   "z": 11064,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Script or a chat? Both's fine. Hurstville pharmacy, we do both.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Scripts, flu shots, and every man in Hurstville asking quietly about the same thing. the Hurstville Chinese strip keeps me in Panadol.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's before they touch hurstville oval.",
+     "choices": [
+      {
+       "text": "Before They Touch Hurstville Oval",
+       "accept": "qgb-l7-hurstville-023",
+       "denyFlag": "w:qgb-l7-hurstville-023"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Ling counts it out without looking up. -- Don't spend it all at the Hurstville Chinese strip.",
+     "choices": [
+      {
+       "text": "About before they touch hurstville oval.",
+       "turnin": "qgb-l7-hurstville-023"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Chemist Warehouse near the Hurstville Chinese strip sells everything cheaper and nobody there knows your name.",
+     "improv": {
+      "persona": "Ling, chemist in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hurstville Chinese strip like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near the Hurstville Chinese strip."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-rod",
+   "name": "Rod, probationary constable",
+   "x": -9511,
+   "z": 11149,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Hurstville LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of the St George Dragons. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trolley run, kempt field.",
+     "choices": [
+      {
+       "text": "Trolley Run, Kempt Field",
+       "accept": "qgb-l7-hurstville-024",
+       "denyFlag": "w:qgb-l7-hurstville-024"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Rod counts it out without looking up. -- Don't spend it all at the St George Dragons.",
+     "choices": [
+      {
+       "text": "About trolley run, kempt field.",
+       "turnin": "qgb-l7-hurstville-024"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about the St George Dragons. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Rod, probationary constable in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the St George Dragons like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near the St George Dragons."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-mei",
+   "name": "Mei, dumpling house owner",
+   "x": -9999,
+   "z": 11450,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table for one? Sit anywhere. Not that one, that's the boss's. Welcome to Hurstville.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Xiao long bao, hand-made, eleven a.m. till the dough runs out. Kempt Field queues down the street on Sundays.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's lads off crofts avenue.",
+     "choices": [
+      {
+       "text": "Lads Off Crofts Avenue",
+       "accept": "qgb-l7-hurstville-025",
+       "denyFlag": "w:qgb-l7-hurstville-025"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Mei pays up on the spot.",
+     "choices": [
+      {
+       "text": "About lads off crofts avenue.",
+       "turnin": "qgb-l7-hurstville-025"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best dumplings in Hurstville are at the place with the worst sign. Everyone knows. Nobody says.",
+     "improv": {
+      "persona": "Mei, dumpling house owner in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Kempt Field like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near Kempt Field."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-merv",
+   "name": "Merv, real estate agent",
+   "x": -10017,
+   "z": 10832,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Hurstville is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. the Hurstville Bowlo is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the forest road lift.",
+     "choices": [
+      {
+       "text": "The Forest Road Lift",
+       "accept": "qgb-l7-hurstville-026",
+       "denyFlag": "w:qgb-l7-hurstville-026"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Merv counts it out without looking up. -- Don't spend it all at the Hurstville Bowlo.",
+     "choices": [
+      {
+       "text": "About the forest road lift.",
+       "turnin": "qgb-l7-hurstville-026"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. the Hurstville Bowlo means cosy.",
+     "improv": {
+      "persona": "Merv, real estate agent in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hurstville Bowlo like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near the Hurstville Bowlo."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Merv listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-sienna",
+   "name": "Sienna, strata committee chair",
+   "x": -9392,
+   "z": 10842,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Hurstville strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. Westfield Hurstville is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's seven a.m. at the hurstville chinese strip.",
+     "choices": [
+      {
+       "text": "Seven a.m. At the Hurstville Chinese strip",
+       "accept": "qgb-l7-hurstville-027",
+       "denyFlag": "w:qgb-l7-hurstville-027"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Sienna counts it out without looking up. -- Don't spend it all at Westfield Hurstville.",
+     "choices": [
+      {
+       "text": "About seven a.m. at the hurstville chinese strip.",
+       "turnin": "qgb-l7-hurstville-027"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Sienna, strata committee chair in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Westfield Hurstville like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near Westfield Hurstville."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-terry",
+   "name": "Terry, probationary constable",
+   "x": -10125,
+   "z": 11332,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Everything alright here? Good. Hurstville LAC, just doing the rounds.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Foot patrol, paperwork, the occasional RBT out the front of the Hurstville Chinese strip. Mostly it's people's bins.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's counting the st george dragons.",
+     "choices": [
+      {
+       "text": "Counting the St George Dragons",
+       "accept": "qgb-l7-hurstville-028",
+       "denyFlag": "w:qgb-l7-hurstville-028"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Terry looks it over the way Hurstville looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About counting the st george dragons.",
+       "turnin": "qgb-l7-hurstville-028"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The sergeant has a thing about the Hurstville Chinese strip. Don't ask me. Don't ask him either.",
+     "improv": {
+      "persona": "Terry, probationary constable in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hurstville Chinese strip like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near the Hurstville Chinese strip."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-yan-a",
+   "name": "Yan A., dumpling house owner",
+   "x": -9752.5,
+   "z": 11136,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table for one? Sit anywhere. Not that one, that's the boss's. Welcome to Hurstville.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Xiao long bao, hand-made, eleven a.m. till the dough runs out. Hurstville Oval queues down the street on Sundays.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "The Crofts Avenue Order",
+       "accept": "qgb-l7-hurstville-029",
+       "denyFlag": "w:qgb-l7-hurstville-029"
+      },
+      {
+       "text": "Race Four, Kempt Field",
+       "accept": "qgb-l7-hurstville-030",
+       "denyFlag": "w:qgb-l7-hurstville-030",
+       "needFlag": "w:qgb-l7-hurstville-029"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Took your time. -- Yan A. counts it out without looking up. -- Don't spend it all at Hurstville Oval.",
+     "choices": [
+      {
+       "text": "About the crofts avenue order.",
+       "turnin": "qgb-l7-hurstville-029"
+      },
+      {
+       "text": "About race four, kempt field.",
+       "turnin": "qgb-l7-hurstville-030"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best dumplings in Hurstville are at the place with the worst sign. Everyone knows. Nobody says.",
+     "improv": {
+      "persona": "Yan A., dumpling house owner in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Hurstville Oval like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near Hurstville Oval."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-2",
+     "line": "That's what I thought. That's exactly what I thought and nobody in Hurstville would say it to my face. Ta.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-yan-b",
+   "name": "Yan B., chemist",
+   "x": -9939,
+   "z": 11151,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Script or a chat? Both's fine. Hurstville pharmacy, we do both.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Scripts, flu shots, and every man in Hurstville asking quietly about the same thing. the Hurstville Aquatic Centre keeps me in Panadol.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's the the hurstville chinese strip course.",
+     "choices": [
+      {
+       "text": "The the Hurstville Chinese strip Course",
+       "accept": "qgb-l7-hurstville-031",
+       "denyFlag": "w:qgb-l7-hurstville-031"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Yan B. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About the the hurstville chinese strip course.",
+       "turnin": "qgb-l7-hurstville-031"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Chemist Warehouse near the Hurstville Aquatic Centre sells everything cheaper and nobody there knows your name.",
+     "improv": {
+      "persona": "Yan B., chemist in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hurstville Aquatic Centre like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near the Hurstville Aquatic Centre."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-glenn",
+   "name": "Glenn, strata committee chair",
+   "x": -9651,
+   "z": 11195,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "You're not from the managing agent, are you? No? Good. Sit. Hurstville strata, twelve lots, one lift.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "I chair the committee. The AGM ran four hours last month, three of them about the bins. the Hurstville Bowlo is a sinking fund with a building attached.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's closing time at forest road.",
+     "choices": [
+      {
+       "text": "Closing Time at Forest Road",
+       "accept": "qgb-l7-hurstville-032",
+       "denyFlag": "w:qgb-l7-hurstville-032"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Glenn looks it over the way Hurstville looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About closing time at forest road.",
+       "turnin": "qgb-l7-hurstville-032"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes.",
+     "improv": {
+      "persona": "Glenn, strata committee chair in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hurstville Bowlo like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near the Hurstville Bowlo."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-jason-a",
+   "name": "Jason A., dumpling house owner",
+   "x": -9859,
+   "z": 11034,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Table for one? Sit anywhere. Not that one, that's the boss's. Welcome to Hurstville.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Xiao long bao, hand-made, eleven a.m. till the dough runs out. Westfield Hurstville queues down the street on Sundays.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's staffy near the hurstville chinese strip.",
+     "choices": [
+      {
+       "text": "Staffy Near the Hurstville Chinese strip",
+       "accept": "qgb-l7-hurstville-033",
+       "denyFlag": "w:qgb-l7-hurstville-033"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Jason A. looks it over the way Hurstville looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About staffy near the hurstville chinese strip.",
+       "turnin": "qgb-l7-hurstville-033"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The best dumplings in Hurstville are at the place with the worst sign. Everyone knows. Nobody says.",
+     "improv": {
+      "persona": "Jason A., dumpling house owner in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Westfield Hurstville like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near Westfield Hurstville."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Jason A. listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-marg",
+   "name": "Marg, Dragons member",
+   "x": -9618,
+   "z": 11111,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Red V. Since '99. Don't. Hurstville, mate, what?",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Kogarah on a Saturday and the St George Leagues Club after. the Hurstville Chinese strip has more Dragons flags than a Dragons game.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Tap On at Hurstville Oval",
+       "accept": "qgb-l7-hurstville-034",
+       "denyFlag": "w:qgb-l7-hurstville-034"
+      },
+      {
+       "text": "The Hurstville Oval Tab",
+       "accept": "qgb-l7-hurstville-035",
+       "denyFlag": "w:qgb-l7-hurstville-035",
+       "needFlag": "w:qgb-l7-hurstville-034"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Marg pays up on the spot.",
+     "choices": [
+      {
+       "text": "About tap on at hurstville oval.",
+       "turnin": "qgb-l7-hurstville-034"
+      },
+      {
+       "text": "About the hurstville oval tab.",
+       "turnin": "qgb-l7-hurstville-035"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The club at the Hurstville Chinese strip does a $12 roast on Sundays and the whole of the Shire drives up for it.",
+     "improv": {
+      "persona": "Marg, Dragons member in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the Hurstville Chinese strip like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near the Hurstville Chinese strip."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "report-0",
+     "line": "Go on then. Slowly. I want the version you'd tell the police, not the one you'd tell the pub. -- Marg listens with both arms folded.",
+     "choices": [
+      {
+       "text": "That's the lot.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-jacinta",
+   "name": "Jacinta, real estate agent",
+   "x": -10068,
+   "z": 11175,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Are you here for the open? No? You should be. Hurstville is moving.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Rentals, sales, the odd auction on a Saturday where someone cries. the St George Dragons is the most-searched street on the site.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "One thing, and it's trouble at kempt field.",
+     "choices": [
+      {
+       "text": "Trouble at Kempt Field",
+       "accept": "qgb-l7-hurstville-036",
+       "denyFlag": "w:qgb-l7-hurstville-036"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Show me. -- Jacinta looks it over the way Hurstville looks over a new cafe. -- That'll do. Here.",
+     "choices": [
+      {
+       "text": "About trouble at kempt field.",
+       "turnin": "qgb-l7-hurstville-036"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "Sun-drenched means west-facing. Cosy means small. the St George Dragons means cosy.",
+     "improv": {
+      "persona": "Jacinta, real estate agent in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about the St George Dragons like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near the St George Dragons."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "qgb-hurstville-jason-b",
+   "name": "Jason B., chemist",
+   "x": -9731,
+   "z": 10991,
+   "radius": 5,
+   "root": "hello",
+   "nodes": [
+    {
+     "id": "hello",
+     "line": "Script or a chat? Both's fine. Hurstville pharmacy, we do both.",
+     "choices": [
+      {
+       "text": "What is it you do round here?",
+       "goto": "what"
+      },
+      {
+       "text": "Got any work going?",
+       "goto": "jobs"
+      },
+      {
+       "text": "I've done what you asked.",
+       "goto": "done"
+      },
+      {
+       "text": "What's Hurstville like these days?",
+       "goto": "small"
+      },
+      {
+       "text": "Nothing. Carry on.",
+       "goto": ""
+      }
+     ]
+    },
+    {
+     "id": "what",
+     "line": "Scripts, flu shots, and every man in Hurstville asking quietly about the same thing. Kempt Field keeps me in Panadol.",
+     "choices": [
+      {
+       "text": "Right. Anything I can do?",
+       "goto": "jobs"
+      },
+      {
+       "text": "Fair enough.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "jobs",
+     "line": "A couple of things, if you're serious. Start with the first; the rest follow.",
+     "choices": [
+      {
+       "text": "Something From Crofts Avenue",
+       "accept": "qgb-l7-hurstville-037",
+       "denyFlag": "w:qgb-l7-hurstville-037"
+      },
+      {
+       "text": "Before They Touch the Hurstville Aquatic Centre",
+       "accept": "qgb-l7-hurstville-038",
+       "denyFlag": "w:qgb-l7-hurstville-038",
+       "needFlag": "w:qgb-l7-hurstville-037"
+      },
+      {
+       "text": "Not today.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "done",
+     "line": "Good. Now I owe you and I hate that. -- Jason B. pays up on the spot.",
+     "choices": [
+      {
+       "text": "About something from crofts avenue.",
+       "turnin": "qgb-l7-hurstville-037"
+      },
+      {
+       "text": "About before they touch the hurstville aquatic centre.",
+       "turnin": "qgb-l7-hurstville-038"
+      },
+      {
+       "text": "Not finished yet.",
+       "goto": "hello"
+      }
+     ]
+    },
+    {
+     "id": "small",
+     "line": "The Chemist Warehouse near Kempt Field sells everything cheaper and nobody there knows your name.",
+     "improv": {
+      "persona": "Jason B., chemist in Hurstville, Sydney. Dry, specific, local; never says g'day or crikey; talks about Kempt Field like everyone knows it.",
+      "context": "Someone has asked what Hurstville is like these days. You are standing near Kempt Field."
+     },
+     "choices": [
+      {
+       "text": "Ha. Cheers.",
+       "goto": "hello"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

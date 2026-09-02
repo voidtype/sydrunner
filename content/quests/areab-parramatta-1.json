@@ -1,0 +1,1188 @@
+{
+ "pack": "areab-parramatta-1",
+ "quests": [
+  {
+   "id": "qgb-l8-parramatta-001",
+   "act": 3,
+   "title": "Rent Money, Parramatta Square",
+   "blurb": "I have been putting it off since Easter. I'm forty-five short on the Parramatta Square rent and the agent doesn't take stories. It is the not knowing that has got me, honestly. Make it somewhere in Parramatta by knock-off; I'm not fussy how. There's cash in it. Not a lot.",
+   "giver": "qgb-parramatta-trent",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 83,
+     "label": "earn forty-five somewhere in Parramatta"
+    }
+   ],
+   "reward": {
+    "cash": 161,
+    "xp": 452,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-002",
+   "act": 3,
+   "title": "Something From Church Street",
+   "blurb": "My knees are gone, so. The stall at Church Street has run out and the customers keep coming. I did try the official route, for what that was worth. Find something round Parramatta that'll do before the the arvo rush. Come back and tell me straight.",
+   "giver": "qgb-parramatta-elie",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 1,
+     "label": "pick something up near Church Street"
+    },
+    {
+     "kind": "goto",
+     "x": -19155,
+     "z": -5336,
+     "radius": 30,
+     "label": "bring it to the stall"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 477,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-003",
+   "act": 3,
+   "title": "Trouble at Eat Street",
+   "blurb": "The council knows and the council does not care. Two lads and their mate decided at the last train that Eat Street is theirs. Nobody else seems to have noticed, which is its own problem. The rest of Parramatta disagrees, so explain the disagreement. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-parramatta-jason",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Eat Street"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 162,
+    "xp": 472,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-004",
+   "act": 3,
+   "title": "Two Signs, Eat Street",
+   "blurb": "Someone has to, and it may as well be you. Two signs near Eat Street say opposite things about parking and I've been fined under both. You will see what I mean the second you get there. Get photos of each before Monday, when Parramatta council takes one down. Whatever you find, bring it to me first.",
+   "giver": "qgb-parramatta-jason",
+   "level": 8,
+   "requires": [
+    "qgb-l8-parramatta-003"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -19122,
+     "z": -5503,
+     "radius": 40,
+     "label": "photograph the sign at Eat Street"
+    },
+    {
+     "kind": "photo",
+     "x": -19229,
+     "z": -5221,
+     "radius": 40,
+     "label": "and the one that contradicts it"
+    }
+   ],
+   "reward": {
+    "cash": 221,
+    "xp": 577,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-005",
+   "act": 3,
+   "title": "Seven a.m. At Centenary Square",
+   "blurb": "It is the sort of thing you notice or you do not. The site at Centenary Square starts its jackhammer at midnight on a Friday, which is illegal and loud. Half the street knows and half the street is pretending not to. Photograph it running and have a word with the Parramatta foreman. Be polite about it. It costs nothing.",
+   "giver": "qgb-parramatta-lupe",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -18707,
+     "z": -5570,
+     "radius": 40,
+     "label": "photograph the noise from Centenary Square"
+    },
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "and have a word with the foreman"
+    }
+   ],
+   "reward": {
+    "cash": 170,
+    "xp": 460,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-006",
+   "act": 3,
+   "title": "Ask Around at Auburn",
+   "blurb": "You are the first person to stop all morning. There's work going outside Auburn station and nobody at Parramatta Park can tell me what. I did try the official route, for what that was worth. Ride over at the change of shift, get the shape of it, come back. There's cash in it. Not a lot.",
+   "giver": "qgb-parramatta-dot",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Parramatta",
+     "to": "Auburn",
+     "label": "take the train to Auburn"
+    },
+    {
+     "kind": "goto",
+     "x": -16408,
+     "z": -1863,
+     "radius": 30,
+     "label": "find the people outside Auburn station"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-parramatta-dot",
+     "node": "report-0",
+     "label": "then come back and tell me what they said"
+    }
+   ],
+   "reward": {
+    "cash": 161,
+    "xp": 453,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-007",
+   "act": 3,
+   "title": "The Parramatta Park Complaint",
+   "blurb": "I'll be straight with you. Two women in activewear have photographed my bins outside Parramatta Park since the King's Birthday. It might be nothing. It has not felt like nothing. One has Parramatta council on speed dial; sort it however you sort things. Do not make a scene about it.",
+   "giver": "qgb-parramatta-elaine",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 2,
+     "label": "deal with the two of them near Parramatta Park"
+    }
+   ],
+   "reward": {
+    "cash": 161,
+    "xp": 470,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-008",
+   "act": 3,
+   "title": "The CommBank Stadium Tab",
+   "blurb": "Someone has to, and it may as well be you. Two chippies off the CommBank Stadium job have run a tab in Parramatta since Thursday. I would not ask if there was anyone else about. They drove past at half six without looking in, so settle it in cash. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-parramatta-debbie",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near CommBank Stadium"
+    },
+    {
+     "kind": "earn",
+     "dollars": 55,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 172,
+    "xp": 456,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-009",
+   "act": 3,
+   "title": "The Length of CommBank Stadium",
+   "blurb": "You will think I am making this up. I haven't walked CommBank Stadium end to end since the light rail came to Parramatta. My wife says I should let it go. My wife is wrong. Do it Easter Saturday for me and photograph what's at the far end now. You'll know it when you see it.",
+   "giver": "qgb-parramatta-bassam",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18999,
+     "z": -5174,
+     "radius": 30,
+     "label": "walk the length of CommBank Stadium"
+    },
+    {
+     "kind": "goto",
+     "x": -18855,
+     "z": -5125,
+     "radius": 30,
+     "label": "to the far end"
+    },
+    {
+     "kind": "photo",
+     "x": -18855,
+     "z": -5125,
+     "radius": 40,
+     "label": "photograph what's there now"
+    }
+   ],
+   "reward": {
+    "cash": 157,
+    "xp": 462,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-010",
+   "act": 3,
+   "title": "The Eat Street Sparky",
+   "blurb": "It is the sort of thing you notice or you do not. The sparky off the Eat Street job has owed me since the bathroom and drinks in Parramatta from half four. It is the not knowing that has got me, honestly. Forty will do and I'll write off the rest. Come and find me after, either way.",
+   "giver": "qgb-parramatta-denise",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for Eat Street"
+    },
+    {
+     "kind": "earn",
+     "dollars": 74,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 458,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-011",
+   "act": 3,
+   "title": "A Flat White From Centenary Square",
+   "blurb": "I have been putting it off since Easter. I want a flat white from the place near Centenary Square, not the one next to it. I did try the official route, for what that was worth. Here by midnight, while it's still coffee and Parramatta still has some. I would rather know than wonder.",
+   "giver": "qgb-parramatta-nathan",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near Centenary Square"
+    },
+    {
+     "kind": "goto",
+     "x": -19152,
+     "z": -5124,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 174,
+    "xp": 444,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-012",
+   "act": 3,
+   "title": "The Eat Street Camera",
+   "blurb": "You are the first person to stop all morning. A new speed camera near Eat Street has fined half of Parramatta since Anzac Day. I am not after trouble. I am after an answer. Photograph it for the appeal, then prove the train to Auburn is faster anyway. Half now if you want it. Most people don't.",
+   "giver": "qgb-parramatta-barry",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -19111,
+     "z": -5215,
+     "radius": 40,
+     "label": "photograph the camera near Eat Street"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Parramatta",
+     "to": "Auburn",
+     "label": "then take the train instead, to Auburn"
+    }
+   ],
+   "reward": {
+    "cash": 174,
+    "xp": 466,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-013",
+   "act": 3,
+   "title": "Race Four, the Eels",
+   "blurb": "Honestly, I am past caring how it looks. There's a horse in race four at half four that a bloke at the Eels swears by. It might be nothing. It has not felt like nothing. Turn it into fifty-five somewhere in Parramatta and tell me if it came in. I will owe you one, and I pay those.",
+   "giver": "qgb-parramatta-fadi",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 101,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-parramatta-fadi",
+     "node": "report-1",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 158,
+    "xp": 480,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-014",
+   "act": 3,
+   "title": "The the Eels Tab",
+   "blurb": "Someone has to, and it may as well be you. Two chippies off the the Eels job have run a tab in Parramatta since Wednesday. I am aware how that sounds. They drove past at school pick-up without looking in, so settle it in cash. There is no rush, but there is a Friday.",
+   "giver": "qgb-parramatta-bazza",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Eels"
+    },
+    {
+     "kind": "earn",
+     "dollars": 55,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 165,
+    "xp": 458,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-015",
+   "act": 3,
+   "title": "Trolley Run, Westfield Parramatta",
+   "blurb": "It is not a police matter and I have checked. A Woolies trolley from Westfield Parramatta gets walked to the creek every the long weekend. There is a version of this where I am the unreasonable one. Find where it ends up in Parramatta and make the deposit back. Whatever you find, bring it to me first.",
+   "giver": "qgb-parramatta-mele",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -19139,
+     "z": -5006,
+     "radius": 30,
+     "label": "find the trolley near Westfield Parramatta"
+    },
+    {
+     "kind": "photo",
+     "x": -19139,
+     "z": -5006,
+     "radius": 40,
+     "label": "photograph where it ended up"
+    },
+    {
+     "kind": "earn",
+     "dollars": 46,
+     "label": "and earn the deposit back"
+    }
+   ],
+   "reward": {
+    "cash": 157,
+    "xp": 455,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-016",
+   "act": 3,
+   "title": "Trouble at Old Government House",
+   "blurb": "Nobody else has offered, so. Two lads and their mate decided at peak hour that Old Government House is theirs. The paperwork says one thing and my eyes say another. The rest of Parramatta disagrees, so explain the disagreement. You'll know it when you see it.",
+   "giver": "qgb-parramatta-nola",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "eshay",
+     "count": 2,
+     "label": "sort the pair near Old Government House"
+    },
+    {
+     "kind": "ko",
+     "npc": "drunk",
+     "count": 1,
+     "label": "and the mate who joined in"
+    }
+   ],
+   "reward": {
+    "cash": 172,
+    "xp": 446,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-017",
+   "act": 3,
+   "title": "Tap On at Old Government House",
+   "blurb": "Keep it between us for now. My Opal says I owe nineteen dollars for a trip from Parramatta I never took on Wednesday. I have rung the number on the letter four times. Take the same one to Auburn and tell me what it charged you. Do that and we're square.",
+   "giver": "qgb-parramatta-bluey",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Parramatta",
+     "to": "Auburn",
+     "label": "tap on at Parramatta, tap off at Auburn"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-parramatta-bluey",
+     "node": "report-2",
+     "label": "come back and tell me the fare"
+    }
+   ],
+   "reward": {
+    "cash": 168,
+    "xp": 457,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-018",
+   "act": 3,
+   "title": "Before They Touch the Parramatta River ferry",
+   "blurb": "Before you say anything: yes, I know. They start on the Parramatta River ferry on Sunday and the orange fencing goes up. It started small, the way these things do. I want Parramatta on record before it does. Ask for me by name at the counter.",
+   "giver": "qgb-parramatta-luke",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -19211,
+     "z": -5635,
+     "radius": 40,
+     "label": "photograph the state of the Parramatta River ferry"
+    },
+    {
+     "kind": "goto",
+     "x": -18937,
+     "z": -5374,
+     "radius": 30,
+     "label": "then the other end of it"
+    }
+   ],
+   "reward": {
+    "cash": 162,
+    "xp": 478,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-019",
+   "act": 3,
+   "title": "The Parramatta Square Order",
+   "blurb": "This is going to sound small. The Parramatta Square order came to seventy more than I'd budgeted and the supplier wants it by dawn. It is not the money. It has stopped being the money. Find seventy in Parramatta and photograph the receipt. Just do not come back empty-handed.",
+   "giver": "qgb-parramatta-dina",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 129,
+     "label": "square the seventy for the Parramatta Square order"
+    },
+    {
+     "kind": "photo",
+     "x": -19182,
+     "z": -5261,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 162,
+    "xp": 458,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-020",
+   "act": 3,
+   "title": "Bin Night, Parramatta Park",
+   "blurb": "My knees are gone, so. Somebody moves the bins on Parramatta Park in front of my drive every the King's Birthday night. It might be nothing. It has not felt like nothing. Photograph the evidence and have a word; Parramatta knows who. Half now if you want it. Most people don't.",
+   "giver": "qgb-parramatta-pita",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -18935,
+     "z": -5408,
+     "radius": 40,
+     "label": "photograph the bins at Parramatta Park"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 173,
+    "xp": 465,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-021",
+   "act": 3,
+   "title": "The Parramatta Park Sparky",
+   "blurb": "Honestly, I am past caring how it looks. The sparky off the Parramatta Park job has owed me since the bathroom and drinks in Parramatta from five. I have got a photo on my phone but it is useless. Forty will do and I'll write off the rest. There's cash in it. Not a lot.",
+   "giver": "qgb-parramatta-pita",
+   "level": 8,
+   "requires": [
+    "qgb-l8-parramatta-020"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for Parramatta Park"
+    },
+    {
+     "kind": "earn",
+     "dollars": 74,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 213,
+    "xp": 619,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-022",
+   "act": 3,
+   "title": "A Flat White From the Eels",
+   "blurb": "There is no clever way to say this. I want a flat white from the place near the Eels, not the one next to it. I would not ask if there was anyone else about. Here by ten past ten, while it's still coffee and Parramatta still has some. Do not make a scene about it.",
+   "giver": "qgb-parramatta-gav",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "FLAT WHITE",
+     "count": 1,
+     "label": "get a flat white from the cafe near the Eels"
+    },
+    {
+     "kind": "goto",
+     "x": -19063,
+     "z": -5266,
+     "radius": 30,
+     "label": "and bring it back before it's lukewarm"
+    }
+   ],
+   "reward": {
+    "cash": 167,
+    "xp": 465,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-023",
+   "act": 3,
+   "title": "The CommBank Stadium Camera",
+   "blurb": "Someone has to, and it may as well be you. A new speed camera near CommBank Stadium has fined half of Parramatta since Monday. Everyone I have told has looked at me the way you are now. Photograph it for the appeal, then prove the train to Auburn is faster anyway. I'll put the kettle on for when you're back.",
+   "giver": "qgb-parramatta-kerry",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -18988,
+     "z": -5304,
+     "radius": 40,
+     "label": "photograph the camera near CommBank Stadium"
+    },
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Parramatta",
+     "to": "Auburn",
+     "label": "then take the train instead, to Auburn"
+    }
+   ],
+   "reward": {
+    "cash": 167,
+    "xp": 466,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-024",
+   "act": 3,
+   "title": "RBT on Westfield Parramatta",
+   "blurb": "It is not a police matter and I have checked. There's a breath test set up on Westfield Parramatta since five. You can tell me I am imagining it. Tell me after. My brother-in-law needs the ute at the far end of Parramatta without a conversation. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-parramatta-troy",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on Westfield Parramatta"
+    },
+    {
+     "kind": "goto",
+     "x": -18864,
+     "z": -5129,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 175,
+    "xp": 468,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-025",
+   "act": 3,
+   "title": "Race Four, the Riverside Theatres",
+   "blurb": "I have written it down twice and lost it twice. There's a horse in race four at ten past ten that a bloke at the Riverside Theatres swears by. This is the third time I have had this conversation. Turn it into fifty-five somewhere in Parramatta and tell me if it came in. Take your time. Do not take a week.",
+   "giver": "qgb-parramatta-tony",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 101,
+     "label": "turn the tip into fifty-five"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-parramatta-tony",
+     "node": "report-1",
+     "label": "tell me if it came in"
+    }
+   ],
+   "reward": {
+    "cash": 165,
+    "xp": 461,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-026",
+   "act": 3,
+   "title": "Two From the Riverside Theatres",
+   "blurb": "You will think I am making this up. Two of whatever's going near the Riverside Theatres, here, hot, before the footy at bin night. The paperwork says one thing and my eyes say another. It's Parramatta; I'm not asking for much. That's the whole job. No catch.",
+   "giver": "qgb-parramatta-tony",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "buy",
+     "powerup": "any",
+     "count": 2,
+     "label": "pick up two from near the Riverside Theatres"
+    },
+    {
+     "kind": "goto",
+     "x": -18935,
+     "z": -5434,
+     "radius": 30,
+     "label": "and get them here hot"
+    }
+   ],
+   "reward": {
+    "cash": 170,
+    "xp": 444,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-027",
+   "act": 3,
+   "title": "Rent Money, Old Government House",
+   "blurb": "Nobody else has offered, so. I'm forty-five short on the Old Government House rent and the agent doesn't take stories. I would have sorted it myself a year ago. Make it somewhere in Parramatta by the last train; I'm not fussy how. Whatever it costs you, tell me and I will cover it.",
+   "giver": "qgb-parramatta-craig",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 83,
+     "label": "earn forty-five somewhere in Parramatta"
+    }
+   ],
+   "reward": {
+    "cash": 173,
+    "xp": 474,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-028",
+   "act": 3,
+   "title": "One Stop From Old Government House",
+   "blurb": "Two people have already said no. I need to know the train from Parramatta stops at Auburn and doesn't sail through like it did on Anzac Day. I have rung the number on the letter four times. Ride it at knock-off and photograph the sign. You'll know it when you see it.",
+   "giver": "qgb-parramatta-craig",
+   "level": 8,
+   "requires": [
+    "qgb-l8-parramatta-027"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ride",
+     "line": -1,
+     "from": "Parramatta",
+     "to": "Auburn",
+     "label": "take the train to Auburn"
+    },
+    {
+     "kind": "photo",
+     "x": -16408,
+     "z": -1863,
+     "radius": 40,
+     "label": "and photograph the platform sign"
+    }
+   ],
+   "reward": {
+    "cash": 225,
+    "xp": 593,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-029",
+   "act": 3,
+   "title": "The the Parramatta River ferry Tab",
+   "blurb": "Before you say anything: yes, I know. Two chippies off the the Parramatta River ferry job have run a tab in Parramatta since Melbourne Cup day. It has been going on longer than I have admitted to anyone. They drove past at midnight without looking in, so settle it in cash. Do that and we're square.",
+   "giver": "qgb-parramatta-janelle",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 2,
+     "label": "collect from the two chippies near the Parramatta River ferry"
+    },
+    {
+     "kind": "earn",
+     "dollars": 55,
+     "label": "and bring back thirty of it"
+    }
+   ],
+   "reward": {
+    "cash": 159,
+    "xp": 475,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-030",
+   "act": 3,
+   "title": "Cover at Parramatta Park",
+   "blurb": "Honestly, I am past caring how it looks. I've got nobody for the Parramatta Park shift at the last train and a room full of Parramatta people who've paid. Nobody else seems to have noticed, which is its own problem. Fifty of trade and one difficult person at the door. Half now if you want it. Most people don't.",
+   "giver": "qgb-parramatta-clementine",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 92,
+     "label": "cover the fifty for the shift"
+    },
+    {
+     "kind": "ko",
+     "npc": "any",
+     "count": 1,
+     "label": "and handle whoever's at the door"
+    }
+   ],
+   "reward": {
+    "cash": 158,
+    "xp": 461,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-031",
+   "act": 3,
+   "title": "The the Eels Order",
+   "blurb": "I'll be straight with you. The the Eels order came to seventy more than I'd budgeted and the supplier wants it by nine sharp. You will see what I mean the second you get there. Find seventy in Parramatta and photograph the receipt. There's cash in it. Not a lot.",
+   "giver": "qgb-parramatta-sam",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 129,
+     "label": "square the seventy for the the Eels order"
+    },
+    {
+     "kind": "photo",
+     "x": -19226,
+     "z": -5544,
+     "radius": 40,
+     "label": "then photograph the receipt on the counter"
+    }
+   ],
+   "reward": {
+    "cash": 170,
+    "xp": 482,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-032",
+   "act": 3,
+   "title": "The the Eels Fence",
+   "blurb": "There is no clever way to say this. My neighbour at the Eels says the tree is on my side and the fence says otherwise. I am aware how that sounds. Look at it grand final day with Parramatta eyes and tell me the truth. Come back and tell me straight.",
+   "giver": "qgb-parramatta-sam",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "goto",
+     "x": -18873,
+     "z": -5451,
+     "radius": 30,
+     "label": "go and look at the fence at the Eels"
+    },
+    {
+     "kind": "photo",
+     "x": -18873,
+     "z": -5451,
+     "radius": 40,
+     "label": "photograph the tree over it"
+    },
+    {
+     "kind": "dialog",
+     "npc": "qgb-parramatta-sam",
+     "node": "report-2",
+     "label": "tell me whose side it's on"
+    }
+   ],
+   "reward": {
+    "cash": 176,
+    "xp": 472,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-033",
+   "act": 3,
+   "title": "Bin Night, Old Government House",
+   "blurb": "I am told you do odd jobs. Somebody moves the bins on Old Government House in front of my drive every Monday night. This is the third time I have had this conversation. Photograph the evidence and have a word; Parramatta knows who. If it's nothing, it's nothing. Tell me anyway.",
+   "giver": "qgb-parramatta-sione",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "photo",
+     "x": -18802,
+     "z": -5057,
+     "radius": 40,
+     "label": "photograph the bins at Old Government House"
+    },
+    {
+     "kind": "ko",
+     "npc": "karen",
+     "count": 1,
+     "label": "and the woman who moved them"
+    }
+   ],
+   "reward": {
+    "cash": 167,
+    "xp": 456,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-034",
+   "act": 3,
+   "title": "The Old Government House Sparky",
+   "blurb": "You will think I am making this up. The sparky off the Old Government House job has owed me since the bathroom and drinks in Parramatta from half four. I would have sorted it myself a year ago. Forty will do and I'll write off the rest. Take your time. Do not take a week.",
+   "giver": "qgb-parramatta-jarrod",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "tradie",
+     "count": 1,
+     "label": "find the sparky who owes for Old Government House"
+    },
+    {
+     "kind": "earn",
+     "dollars": 74,
+     "label": "and get forty of it"
+    }
+   ],
+   "reward": {
+    "cash": 161,
+    "xp": 466,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-035",
+   "act": 3,
+   "title": "Meat Tray at Parramatta Square",
+   "blurb": "Keep it between us for now. The Parramatta Square raffle is thirty-five short of a meat tray and the draw is at school pick-up. It has been going on longer than I have admitted to anyone. Find it in Parramatta and put it in the tin. You'll know it when you see it.",
+   "giver": "qgb-parramatta-digby",
+   "level": 8,
+   "requires": [],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "earn",
+     "dollars": 64,
+     "label": "raise thirty-five for the meat tray"
+    },
+    {
+     "kind": "goto",
+     "x": -18774,
+     "z": -5392,
+     "radius": 30,
+     "label": "and drop it at Parramatta Square"
+    }
+   ],
+   "reward": {
+    "cash": 174,
+    "xp": 461,
+    "unlock": []
+   }
+  },
+  {
+   "id": "qgb-l8-parramatta-036",
+   "act": 3,
+   "title": "RBT on Church Street",
+   "blurb": "Before you say anything: yes, I know. There's a breath test set up on Church Street since after the footy. It is not the money. It has stopped being the money. My brother-in-law needs the ute at the far end of Parramatta without a conversation. Do not let them talk you into anything.",
+   "giver": "qgb-parramatta-digby",
+   "level": 8,
+   "requires": [
+    "qgb-l8-parramatta-035"
+   ],
+   "repeatable": true,
+   "needFlags": [
+    "act1:open"
+   ],
+   "steps": [
+    {
+     "kind": "ko",
+     "npc": "rbt",
+     "count": 1,
+     "label": "get past the breath test on Church Street"
+    },
+    {
+     "kind": "goto",
+     "x": -18964,
+     "z": -5452,
+     "radius": 30,
+     "label": "then meet the ute at the far end"
+    }
+   ],
+   "reward": {
+    "cash": 217,
+    "xp": 627,
+    "unlock": []
+   }
+  }
+ ]
+}
