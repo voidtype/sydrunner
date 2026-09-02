@@ -377,6 +377,13 @@ export interface CarModelEntry {
   tris: number;
   lengthM: number;
   tint: 'multiply' | 'none';
+  /**
+   * The model's share of its body class, in whole points: the pool repeats
+   * it this many times, and `identity % pool.length` does the rest. The
+   * Sydney mix's real cars carry the owner's road shares (a Ranger 8, a
+   * Triton 4); a generic filler is 1. Absent means 1.
+   */
+  weight?: number;
   license: string;
   attribution: string;
 }
@@ -1020,7 +1027,7 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
     this.meshes.push(mesh);
 
     const pool = this.pools.get(body) ?? [];
-    pool.push({
+    const slot = {
       file: entry.file,
       mesh,
       box: merged.box,
@@ -1028,7 +1035,11 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
       claims: [],
       dirty: false,
       triangles: merged.triangles,
-    });
+    };
+    // Weighted by repetition, so a Ranger is picked eight times as often as
+    // a filler without a second lookup at claim time. See `CarModelEntry.weight`.
+    const weight = Math.max(1, Math.min(16, Math.round(entry.weight ?? 1)));
+    for (let i = 0; i < weight; i++) pool.push(slot);
     this.pools.set(body, pool);
     this.loadedFiles.push(entry.file);
     // Only the ones that were actually wrong, and only past a millimetre --

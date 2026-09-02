@@ -48,7 +48,11 @@
  */
 
 import { NodeIO, getBounds } from '@gltf-transform/core';
-import { weld, flatten, prune, dedup, quantize, transformMesh } from '@gltf-transform/functions';
+import { weld, unweld, flatten, prune, dedup, quantize, transformMesh, join } from '@gltf-transform/functions';
+// The decimator. meshoptimizer is a dependency of three in the client tree
+// rather than of this script, so it is reached by path; see the decimation
+// stage in `processFile` for why it is here at all now.
+import { MeshoptSimplifier } from '../client/node_modules/meshoptimizer/index.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -76,9 +80,19 @@ const BODY_NAMES = ['sedan', 'hatch', 'suv', 'ute', 'van'];
 // --- Curation limits -------------------------------------------------------------
 
 const MAX_TRIS = 8000;
-const MAX_TOTAL_BYTES = 6 * 1024 * 1024;
+/**
+ * The sourced photoreal models (the Sydney mix of 2026-09: Ranger, HiLux,
+ * Corolla and the rest) arrive at 180k-1.2M triangles and are decimated
+ * to this before the gate runs. Higher than `MAX_TRIS` because a real car's
+ * silhouette needs a few more triangles than a Kenney box does to stay a
+ * Ranger, and lower than any of the "detailed showcase" rejects the header
+ * talks about. A catalog row sets `decimate: true` to opt in.
+ */
+const DECIMATE_TO = 12000;
+const DECIMATE_ERROR = 0.02;
+const MAX_TOTAL_BYTES = 16 * 1024 * 1024; // was 6; eleven textured real cars at ~0.5-1 MB each
 const MIN_PER_CLASS = 3;
-const MAX_PER_CLASS = 6;
+const MAX_PER_CLASS = 8; // was 6; the real cars come first and the generics fill behind them
 const LENGTH_TOLERANCE = 0.02; // 2%, per the verification brief
 const Y_TOLERANCE = 0.02; // 2 cm, per the verification brief
 
@@ -95,6 +109,23 @@ const Y_TOLERANCE = 0.02; // 2 cm, per the verification brief
  * do, so instead they are listed, attempted, and rejected on the record.
  */
 const CATALOG = [
+  // --- The Sydney mix, sourced 2026-09 (data/vehicles/sourcing-2026-09-sydney-mix.csv):
+  // the cars that are actually on the road here, one model year each, ahead
+  // of every generic. `decimate` opts the row into the decimation stage.
+  // `weight` is the car's share of the road in whole points (the owner's
+  // list: Ranger 8, HiLux 8, ...); `carlod` repeats a model in its body's
+  // pool that many times, and the generics below get 1 each.
+  { file: 'ford_ranger_2023.glb', body: 3, priority: 0, decimate: true, weight: 8 },
+  { file: 'toyota_hilux_2021.glb', body: 3, priority: 0, decimate: true, weight: 8 },
+  { file: 'mitsubishi_l200_dh.glb', body: 3, priority: 0, decimate: true, weight: 4 },
+  { file: 'mazda_cx5_tnnv.glb', body: 2, priority: 0, decimate: true, weight: 5 },
+  { file: 'nissan_xtrail_2023.glb', body: 2, priority: 0, decimate: true, weight: 4 },
+  { file: 'hyundai_tucson_2015.glb', body: 2, priority: 0, decimate: true, weight: 3 },
+  { file: 'toyota_prado_2013.glb', body: 2, priority: 0, decimate: true, weight: 5 },
+  { file: 'toyota_corolla_2020.glb', body: 1, priority: 0, decimate: true, weight: 5 },
+  { file: 'tesla_model_3.glb', body: 0, priority: 0, decimate: true, weight: 4 },
+  { file: 'toyota_camry_2020.glb', body: 0, priority: 0, decimate: true, weight: 6 },
+  { file: 'toyota_hiace_2020.glb', body: 4, priority: 0, decimate: true, weight: 8 },
   // --- sedan (0) --- CC0 first, then CC-BY, roughly by cleanliness/size.
   { file: 'sedan_filler.glb', body: 0, priority: 1 },
   { file: 'sedan_generic_b.glb', body: 0, priority: 2 },
@@ -199,7 +230,9 @@ const INTERIOR_RE = /seat|interior|steering|dash(?:board)?|chair/i;
  */
 const FRONT_RE = new RegExp(
   ['front', 'bonnet', 'hood', 'headlight', 'head[_ -]?light', 'windshield', 'windscreen', 'wiper', 'grille?',
-    short('fl'), short('fr'), short('fwd')].join('|'),
+    short('fl'), short('fr'), short('fwd'), short('flw'), short('frw'), short('fli'), short('fri'),
+    // French: phare = headlight. The L200's materials are French.
+    'phare'].join('|'),
   'i',
 );
 /**
@@ -210,7 +243,9 @@ const FRONT_RE = new RegExp(
  */
 const REAR_RE = new RegExp(
   ['rear', '(?<!hatch)back', 'boot', 'trunk', 'tail[_ -]?light', 'brake[_ -]?light', 'exhaust', 'spoiler',
-    short('rl'), short('rr'), short('bk')].join('|'),
+    short('rl'), short('rr'), short('bk'), short('rlw'), short('rrw'), short('rli'), short('rri'),
+    // French: feux (rouges) = tail lights.
+    'feux'].join('|'),
   'i',
 );
 
@@ -283,6 +318,25 @@ function dropNonGeometryNodes(doc) {
   for (const node of [...scene.listChildren()]) {
     if (!node.getMesh()) node.dispose();
   }
+}
+
+/** The steering wheel's centre across the car (+Z right), from node/mesh names, or null when no node is one. */
+const STEERING_RE = /steer|driving[_ -]?wheel|volant|lenkrad/i;
+function steeringWheelZ(doc) {
+  const scene = doc.getRoot().listScenes()[0];
+  let sum = 0;
+  let count = 0;
+  for (const node of scene.listChildren()) {
+    const mesh = node.getMesh();
+    if (!mesh) continue;
+    const blob = [node.getName(), mesh.getName()].filter(Boolean).join(' ');
+    if (!STEERING_RE.test(blob)) continue;
+    const b = getBounds(node);
+    if (!Number.isFinite(b.min[2])) continue;
+    sum += (b.min[2] + b.max[2]) / 2;
+    count++;
+  }
+  return count === 0 ? null : sum / count;
 }
 
 /** Drop separable interior geometry (seats, dash, steering wheel); returns the names dropped. */
@@ -402,9 +456,30 @@ function detectDirection(doc) {
     sign = rearSum / rearCount > center ? -1 : 1;
     confidence = 'rear name markers only';
   } else {
-    sign = 1;
-    confidence = 'NONE (no directional names found) -- defaulted, unverified';
+    // No names. The shape, in order of trust: the glass (the windscreen is
+    // the big pane facing along the car), then the roof rake (the climb to
+    // the roof is longer at the windscreen), then the widest slice (the
+    // mirrors sit forward of the middle). Every cue is reported, so a wrong
+    // guess is a line in the log, not a mystery on the road.
+    const glass = glassSign(doc, axisIdx);
+    const rake = rakeSign(doc, axisIdx);
+    const widest = widestSliceSign(doc, axisIdx);
+    const cues = `glass ${glass.sign > 0 ? '+' : glass.sign < 0 ? '-' : '?'}x${glass.ratio.toFixed(1)}, rake ${rake.lo}/${rake.hi} at -/+, widest at ${(widest.along * 100).toFixed(0)}%`;
+    if (glass.sign !== 0) {
+      sign = glass.sign;
+      confidence = `by the glass (${cues}), no directional names`;
+    } else if (rake.sign !== 0) {
+      sign = rake.sign;
+      confidence = `by the roof rake (${cues}), no directional names`;
+    } else {
+      sign = widest.sign;
+      confidence = `by the widest slice (${cues}), no directional names -- UNVERIFIED`;
+    }
   }
+  // The glass cue as a cross-check on the named ones, for the log.
+  const check = glassSign(doc, axisIdx);
+  if (check.sign !== 0 && check.sign !== sign) confidence += ` [glass disagrees: ${check.sign > 0 ? '+' : '-'} x${check.ratio.toFixed(1)}]`;
+  else if (check.sign !== 0) confidence += ` [glass agrees x${check.ratio.toFixed(1)}]`;
   return { axis, sign, confidence, overall };
 }
 
@@ -445,6 +520,173 @@ function normalize(doc, direction, targetLength) {
   }
 }
 
+/** Sit the mesh on y=0 again, re-centre it in x/z and put its length back to the target, after anything that moved vertices. */
+function reground(doc, targetLength) {
+  const scene = doc.getRoot().listScenes()[0];
+  const b = getBounds(scene);
+  const k = targetLength / (b.max[0] - b.min[0]);
+  const t = [-k * (b.min[0] + b.max[0]) / 2, -k * b.min[1], -k * (b.min[2] + b.max[2]) / 2];
+  const M = [k, 0, 0, 0, 0, k, 0, 0, 0, 0, k, 0, t[0], t[1], t[2], 1];
+  for (const node of scene.listChildren()) {
+    const mesh = node.getMesh();
+    if (mesh) transformMesh(mesh, M);
+  }
+}
+
+/**
+ * Every vertex of the scene in world space, through each node's world
+ * matrix -- the raw POSITION arrays are in node space, and a Sketchfab
+ * export's root carries the author's rotation and a centimetre scale.
+ */
+function eachWorldVertex(scene, fn) {
+  const v = [0, 0, 0];
+  for (const node of scene.listChildren()) {
+    const mesh = node.getMesh();
+    if (!mesh) continue;
+    const m = node.getWorldMatrix();
+    for (const prim of mesh.listPrimitives()) {
+      const pos = prim.getAttribute('POSITION');
+      if (!pos) continue;
+      for (let i = 0; i < pos.getCount(); i++) {
+        pos.getElement(i, v);
+        const x = m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12];
+        const y = m[1] * v[0] + m[5] * v[1] + m[9] * v[2] + m[13];
+        const z = m[2] * v[0] + m[6] * v[1] + m[10] * v[2] + m[14];
+        fn(x, y, z);
+      }
+    }
+  }
+}
+
+/**
+ * The nose, from the glass: the windscreen is the largest pane facing along
+ * the car, and the rear glass is smaller on a sedan, a hatch, an SUV and a
+ * dual-cab alike. Glass is found by what a material *is* -- blended, or
+ * transmissive, or a base colour with alpha under 0.9 -- not by its name,
+ * because half the corpus names its materials "Index_0_2". Returns the sign
+ * of the end with more along-facing glass area and the ratio, or 0 when
+ * there is no glass or the two ends are within 25% of each other.
+ */
+function glassSign(doc, axisIdx) {
+  const scene = doc.getRoot().listScenes()[0];
+  const overall = getBounds(scene);
+  const mid = (overall.min[axisIdx] + overall.max[axisIdx]) / 2;
+  let plus = 0;
+  let minus = 0;
+  const isGlass = (mat) => {
+    if (!mat) return false;
+    if (mat.getAlphaMode() === 'BLEND') return true;
+    const c = mat.getBaseColorFactor();
+    if (c && c[3] < 0.9) return true;
+    if (mat.getExtension('KHR_materials_transmission')) return true;
+    return /glass|vitre|windshield|windscreen|window/i.test(mat.getName() || '');
+  };
+  const a = [0, 0, 0], b = [0, 0, 0], c = [0, 0, 0];
+  for (const node of scene.listChildren()) {
+    const mesh = node.getMesh();
+    if (!mesh) continue;
+    const m = node.getWorldMatrix();
+    const xf = (v, out) => {
+      out[0] = m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12];
+      out[1] = m[1] * v[0] + m[5] * v[1] + m[9] * v[2] + m[13];
+      out[2] = m[2] * v[0] + m[6] * v[1] + m[10] * v[2] + m[14];
+    };
+    for (const prim of mesh.listPrimitives()) {
+      if (!isGlass(prim.getMaterial())) continue;
+      const pos = prim.getAttribute('POSITION');
+      const idx = prim.getIndices();
+      if (!pos) continue;
+      const n = idx ? idx.getCount() : pos.getCount();
+      const get = (k) => (idx ? idx.getScalar(k) : k);
+      const va = [0, 0, 0], vb = [0, 0, 0], vc = [0, 0, 0];
+      for (let t = 0; t + 2 < n; t += 3) {
+        pos.getElement(get(t), va); pos.getElement(get(t + 1), vb); pos.getElement(get(t + 2), vc);
+        xf(va, a); xf(vb, b); xf(vc, c);
+        const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+        const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+        const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+        const area2 = Math.sqrt(nx * nx + ny * ny + nz * nz);
+        if (area2 < 1e-12) continue;
+        const along = axisIdx === 0 ? nx : nz;
+        const facing = Math.abs(along) / area2;
+        if (facing < 0.4) continue;
+        const centre = (a[axisIdx] + b[axisIdx] + c[axisIdx]) / 3;
+        if (centre > mid) plus += area2 * facing;
+        else minus += area2 * facing;
+      }
+    }
+  }
+  if (plus === 0 && minus === 0) return { sign: 0, ratio: 0 };
+  const ratio = plus > minus ? plus / Math.max(minus, 1e-9) : minus / Math.max(plus, 1e-9);
+  if (ratio < 1.25) return { sign: 0, ratio };
+  return { sign: plus > minus ? 1 : -1, ratio };
+}
+
+/**
+ * The nose, from the shape alone, for a file whose names say nothing: the
+ * widest point of a car including its mirrors is at the A-pillar, well
+ * forward of the middle, so the end the widest slice is nearer is the nose.
+ * Returns +1 when the widest slice sits toward +axis, -1 toward -axis, and
+ * how far along (0..1 from the -axis end) it was, for the report.
+ */
+function widestSliceSign(doc, axisIdx) {
+  const scene = doc.getRoot().listScenes()[0];
+  const overall = getBounds(scene);
+  const lo = overall.min[axisIdx];
+  const span = overall.max[axisIdx] - lo;
+  const latIdx = axisIdx === 0 ? 2 : 0;
+  const BINS = 20;
+  const width = new Float64Array(BINS);
+  const latMid = (overall.min[latIdx] + overall.max[latIdx]) / 2;
+  eachWorldVertex(scene, (x, y, z) => {
+    const p = [x, y, z];
+    const bin = Math.min(BINS - 1, Math.max(0, Math.floor(((p[axisIdx] - lo) / span) * BINS)));
+    const w = Math.abs(p[latIdx] - latMid);
+    if (w > width[bin]) width[bin] = w;
+  });
+  let best = 0;
+  for (let i = 1; i < BINS; i++) if (width[i] > width[best]) best = i;
+  const along = (best + 0.5) / BINS;
+  return { sign: along < 0.5 ? -1 : 1, along };
+}
+
+/**
+ * The climb to the roof at each end, in slices: from the roof plateau's
+ * edge outward until the profile drops under 70% of the car's height. The
+ * longer climb is the windscreen. Returns +1 when the +axis end climbs
+ * longer, -1 the other way, 0 when they are within a slice of each other.
+ */
+function rakeSign(doc, axisIdx) {
+  const scene = doc.getRoot().listScenes()[0];
+  const overall = getBounds(scene);
+  const lo = overall.min[axisIdx];
+  const span = overall.max[axisIdx] - lo;
+  const BINS = 40;
+  const top = new Float64Array(BINS).fill(-Infinity);
+  eachWorldVertex(scene, (x, y, z) => {
+    const p = [x, y, z];
+    const bin = Math.min(BINS - 1, Math.max(0, Math.floor(((p[axisIdx] - lo) / span) * BINS)));
+    if (y > top[bin]) top[bin] = y;
+  });
+  let peak = -Infinity;
+  for (let i = 0; i < BINS; i++) if (top[i] > peak) peak = top[i];
+  const base = overall.min[1];
+  const height = peak - base;
+  const roof = base + 0.94 * height;
+  const low = base + 0.7 * height;
+  let first = 0;
+  while (first < BINS && top[first] < roof) first++;
+  let last = BINS - 1;
+  while (last >= 0 && top[last] < roof) last--;
+  if (first >= last) return { sign: 0, lo: 0, hi: 0 };
+  let loRun = 0;
+  for (let i = first - 1; i >= 0 && top[i] >= low; i--) loRun++;
+  let hiRun = 0;
+  for (let i = last + 1; i < BINS && top[i] >= low; i++) hiRun++;
+  if (Math.abs(loRun - hiRun) <= 1) return { sign: 0, lo: loRun, hi: hiRun };
+  return { sign: loRun > hiRun ? -1 : 1, lo: loRun, hi: hiRun };
+}
+
 // --- Measurement ---------------------------------------------------------------------
 
 function countTris(doc) {
@@ -478,12 +720,9 @@ async function processFile(entry, srcMeta) {
 
   await doc.transform(weld({ overwrite: true }), flatten());
   dropNonGeometryNodes(doc);
-  const droppedInterior = dropInteriorNodes(doc);
-  result.droppedInterior = droppedInterior;
-
-  if (doc.getRoot().listScenes()[0].listChildren().length === 0) {
-    return { ...result, status: 'rejected', reason: 'no geometry left after cleanup' };
-  }
+  // The interior nodes are dropped *after* normalisation now, because the
+  // steering wheel among them is what decides the right-hand-drive mirror
+  // below; see there.
 
   // Direction detection runs *before* prune/dedup, not after: `dedup()`
   // merges materials that are value-identical, keeping only one of their
@@ -508,6 +747,80 @@ async function processFile(entry, srcMeta) {
 
   normalize(doc, direction, targetLength);
 
+  // **Right-hand drive.** With the car in the game's frame (+Z is its right),
+  // a steering wheel left of the centreline is a left-hand-drive model, and
+  // the owner asked for the mirror: *"mirror the car to make RHD if needed"*.
+  // Decided on the wheel while it is still in the file, applied to every
+  // mesh (the winding flips with the determinant, in `transformMesh`), and
+  // only then are the interior nodes dropped -- a car with no named wheel is
+  // left alone, because a guess would mirror half the fleet the wrong way.
+  const wheelZ = steeringWheelZ(doc);
+  result.steeringZ = wheelZ;
+  result.mirrored = false;
+  if (wheelZ !== null && wheelZ < -0.15) {
+    const MIRROR_Z = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1];
+    for (const node of doc.getRoot().listScenes()[0].listChildren()) {
+      const mesh = node.getMesh();
+      if (mesh) transformMesh(mesh, MIRROR_Z);
+    }
+    result.mirrored = true;
+  }
+  const droppedInterior = dropInteriorNodes(doc);
+  result.droppedInterior = droppedInterior;
+  if (doc.getRoot().listScenes()[0].listChildren().length === 0) {
+    return { ...result, status: 'rejected', reason: 'no geometry left after cleanup' };
+  }
+
+  // **The decimation stage**, for the rows that ask for it. Names are done
+  // with (the nose and the wheel are decided above), so the primitives are
+  // joined per material first -- the simplifier works per primitive and a
+  // 345-mesh HiLux would otherwise keep a triangle per mesh and stall at
+  // 3,000 -- then reduced toward `DECIMATE_TO`, in passes, because one pass
+  // at a 0.7% ratio under an error bound rarely lands.
+  if (entry.decimate) {
+    await doc.transform(prune(), join({ keepNamed: false }), weld({ overwrite: true }));
+    await MeshoptSimplifier.ready;
+    let have = countTris(doc);
+    result.trisBefore = have;
+    // The error bound loosens pass by pass: a Prado at 189k triangles does
+    // not reach 12k inside 2% of its extent, and a parked car ten metres
+    // away does not need it to.
+    // Straight to meshoptimizer rather than through `simplify()`, for one
+    // flag it does not pass: `Prune`. A real car is thousands of islands --
+    // every bolt, badge letter and grille cell its own closed mesh -- and a
+    // collapse that has to keep each island keeps 90,000 triangles of a
+    // Ranger whatever the ratio. `Prune` lets an island go, which is the
+    // whole of what a car ten metres away wants.
+    for (let pass = 0; pass < 3 && have > DECIMATE_TO; pass++) {
+      const ratio = Math.max(0.002, (DECIMATE_TO * 0.9) / have);
+      for (const mesh of doc.getRoot().listMeshes()) {
+        for (const prim of mesh.listPrimitives()) {
+          const idx = prim.getIndices();
+          const pos = prim.getAttribute('POSITION');
+          if (!idx || !pos) continue;
+          const indices = new Uint32Array(idx.getArray());
+          const positions = new Float32Array(pos.getArray());
+          const target = Math.max(3, Math.round((indices.length / 3) * ratio) * 3);
+          const [out] = MeshoptSimplifier.simplify(indices, positions, 3, target, 1.0, ['Prune']);
+          const next = doc.createAccessor().setType('SCALAR').setArray(out).setBuffer(idx.getBuffer());
+          prim.setIndices(next);
+        }
+      }
+      // Drop the vertices nothing indexes any more: unweld writes a vertex per
+      // index, weld merges them back, and the old accessors are pruned.
+      await doc.transform(unweld(), weld({ overwrite: true }), prune());
+      const now = countTris(doc);
+      if (now >= have * 0.98) break;
+      have = now;
+    }
+    await doc.transform(prune(), dedup());
+    // Decimation moves the lowest vertices: the wheels' contact patch is the
+    // first detail to go, and the car floats a few centimetres. Grounded and
+    // re-centred again, on the decimated mesh, so the gate below measures
+    // what ships.
+    reground(doc, targetLength);
+  }
+
   await doc.transform(quantize({ pattern: /^(POSITION|NORMAL)$/ }));
 
   fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -529,7 +842,7 @@ async function processFile(entry, srcMeta) {
   const axisOk = lengthAxisExtent > widthAxisExtent;
   const yOk = Math.abs(minY) <= Y_TOLERANCE;
   const lengthOk = Math.abs(lengthAxisExtent - targetLength) <= targetLength * LENGTH_TOLERANCE;
-  const trisOk = tris <= MAX_TRIS;
+  const trisOk = tris <= (entry.decimate ? DECIMATE_TO : MAX_TRIS);
 
   result.tris = tris;
   result.lengthM = Math.round(lengthAxisExtent * 1000) / 1000;
@@ -542,13 +855,14 @@ async function processFile(entry, srcMeta) {
     if (!axisOk) reasons.push(`forward axis wrong (length ${lengthAxisExtent.toFixed(2)} <= width ${widthAxisExtent.toFixed(2)})`);
     if (!yOk) reasons.push(`min y = ${minY.toFixed(3)} (want ~0, tol ${Y_TOLERANCE})`);
     if (!lengthOk) reasons.push(`length ${lengthAxisExtent.toFixed(3)}m vs target ${targetLength}m (tol ${LENGTH_TOLERANCE * 100}%)`);
-    if (!trisOk) reasons.push(`${tris} tris > ${MAX_TRIS} limit`);
+    if (!trisOk) reasons.push(`${tris} tris > ${entry.decimate ? DECIMATE_TO : MAX_TRIS} limit`);
     fs.unlinkSync(outPath);
     return { ...result, status: 'rejected', reason: reasons.join('; ') };
   }
 
   const meta = srcMeta[entry.file];
   result.status = 'passed';
+  result.weight = entry.weight ?? 1;
   result.license = meta.license;
   result.attribution = meta.attribution;
   result.source_url = meta.source_url;
@@ -606,7 +920,7 @@ function escapeHtml(s) {
 }
 
 function buildCreditsHtml(manifest) {
-  const ccBy = manifest.filter((m) => m.license === 'CC-BY 3.0');
+  const ccBy = manifest.filter((m) => /^CC-BY/.test(m.license));
   const cc0Count = manifest.filter((m) => m.license === 'CC0 1.0').length;
   const rows = ccBy
     .map(
@@ -645,7 +959,7 @@ function buildCreditsHtml(manifest) {
 <p class="note">Generated by <code>scripts/prep-car-models.mjs</code> from <code>client/public/cars/manifest.json</code>. Do not hand-edit.</p>
 
 <h2>Vehicle models</h2>
-<p>${manifest.length} car models ship in this build, sourced from Kenney's Car Kit and from Poly Pizza uploads. ${ccBy.length} are licensed CC-BY 3.0 and require the attribution below; the remaining ${cc0Count} are CC0 1.0 and are used without attribution requirement.</p>
+<p>${manifest.length} car models ship in this build, sourced from Kenney's Car Kit, from Poly Pizza uploads and from Sketchfab (the Sydney mix of 2026-09). ${ccBy.length} are licensed CC-BY (3.0 or 4.0) and require the attribution below; the remaining ${cc0Count} are CC0 1.0 and are used without attribution requirement.</p>
 <ul>
 ${rows}
 </ul>
@@ -658,7 +972,7 @@ ${rows}
 }
 
 function buildCreditsMd(manifest) {
-  const ccBy = manifest.filter((m) => m.license === 'CC-BY 3.0');
+  const ccBy = manifest.filter((m) => /^CC-BY/.test(m.license));
   const cc0Count = manifest.filter((m) => m.license === 'CC0 1.0').length;
   const rows = ccBy.map((m) => `- **${m.file}** — ${m.attribution}\n  ${m.source_url}`).join('\n');
   return `# SYDNEY — third-party assets
@@ -667,7 +981,7 @@ Generated by \`scripts/prep-car-models.mjs\` from \`client/public/cars/manifest.
 
 ## Vehicle models
 
-${manifest.length} car models ship in this build, sourced from Kenney's Car Kit and from Poly Pizza uploads. ${ccBy.length} are licensed CC-BY 3.0 and require the attribution below; the remaining ${cc0Count} are CC0 1.0 and are used without attribution requirement.
+${manifest.length} car models ship in this build, sourced from Kenney's Car Kit, from Poly Pizza uploads and from Sketchfab (the Sydney mix of 2026-09). ${ccBy.length} are licensed CC-BY (3.0 or 4.0) and require the attribution below; the remaining ${cc0Count} are CC0 1.0 and are used without attribution requirement.
 
 ${rows}
 
@@ -685,7 +999,7 @@ function printReport(results) {
 
   console.log('\n=== Verification table (shipped models) ===');
   console.log(
-    ['file', 'body', 'tris', 'lengthM', 'minY', 'axis/sign', 'direction confidence'].join(' | '),
+    ['file', 'body', 'tris', 'lengthM', 'minY', 'axis/sign', 'direction confidence', 'wheel z / mirrored / tris before'].join(' | '),
   );
   for (const r of shipped.sort((a, b) => a.file.localeCompare(b.file))) {
     console.log(
@@ -697,6 +1011,7 @@ function printReport(results) {
         r.minY,
         `${r.axis}${r.sign > 0 ? '+' : '-'}`,
         r.directionConfidence,
+        `${r.steeringZ === null || r.steeringZ === undefined ? '-' : r.steeringZ.toFixed(2)} / ${r.mirrored ? 'yes' : 'no'} / ${r.trisBefore ?? '-'}`,
       ].join(' | '),
     );
   }
@@ -719,7 +1034,7 @@ function printReport(results) {
 
   const totalBytes = shipped.reduce((s, r) => s + r.bytes, 0);
   console.log(`\nTotal shipped: ${shipped.length} models`);
-  console.log(`Licences: CC0 ${shipped.filter((r) => r.license === 'CC0 1.0').length}, CC-BY ${shipped.filter((r) => r.license === 'CC-BY 3.0').length}`);
+  console.log(`Licences: CC0 ${shipped.filter((r) => r.license === 'CC0 1.0').length}, CC-BY ${shipped.filter((r) => /^CC-BY/.test(r.license)).length}`);
   console.log(`Model bytes total: ${(totalBytes / 1024 / 1024).toFixed(3)} MB`);
 
   const interiorDrops = results.filter((r) => r.droppedInterior?.length);
@@ -791,6 +1106,7 @@ async function main() {
       tris: r.tris,
       lengthM: r.lengthM,
       tint: tintFor(r.body),
+      weight: r.weight,
       license: r.license,
       attribution: r.attribution,
       source_url: r.source_url,
