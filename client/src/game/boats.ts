@@ -46,21 +46,32 @@
  * band). And the **tinnie** -- a 4.5 m aluminium runabout -- docked at the
  * bay wharves, which is the boat "where it makes sense": nobody moors a
  * Freshwater at Double Bay. `world/boats.ts` draws all four.
+ *
+ * And the **jetskis**, the other half of the suggestion. A jetski is a route
+ * like a ferry's -- `J1` to `J5` in `boatroutes.ts`, out and back between two
+ * wharves over the same water-only paths -- at thirty knots with no calls in
+ * between, so the timetable, the berthing and the docked bob are the ferry's
+ * own arithmetic and nothing here is stepped for them either. Five runs:
+ * Rose Bay to Watsons Bay, Double Bay across to the Zoo, Balmain to
+ * Drummoyne, Manly to Watsons Bay across the Heads, Neutral Bay to
+ * Kirribilli. A rider is part of the mesh; an empty jetski at thirty knots is
+ * a ghost story.
  */
 import { BOAT_ROUTES, WHARVES, SEA_Y, type BoatRoute } from './boatroutes.ts';
 
-export const BOAT_KIND = { FRESHWATER: 0, HARBOUR: 1, RIVERCAT: 2, TINNIE: 3 } as const;
+export const BOAT_KIND = { FRESHWATER: 0, HARBOUR: 1, RIVERCAT: 2, TINNIE: 3, JETSKI: 4 } as const;
 export type BoatKind = (typeof BOAT_KIND)[keyof typeof BOAT_KIND];
 
 /** Which kind runs which route, by the route's own id. */
 export function kindForRoute(id: string): BoatKind {
   if (id === 'F1') return BOAT_KIND.FRESHWATER;
   if (id === 'F3') return BOAT_KIND.RIVERCAT;
+  if (id.startsWith('J')) return BOAT_KIND.JETSKI;
   return BOAT_KIND.HARBOUR;
 }
 
 /** Metres per second, by kind. Sydney's: 20 knots, 16 knots, 18 knots. */
-export const SPEED: Readonly<Record<BoatKind, number>> = { 0: 10.3, 1: 8.2, 2: 9.3, 3: 0 };
+export const SPEED: Readonly<Record<BoatKind, number>> = { 0: 10.3, 1: 8.2, 2: 9.3, 3: 0, 4: 15.4 };
 /** Seconds alongside at an intermediate wharf, and at a terminal before turning. */
 export const DWELL_S = 45;
 export const TERMINAL_S = 150;
@@ -294,6 +305,12 @@ export function verifyBoats(): string[] {
   const manly = TIMETABLES.find((t) => t.route.id === 'F1');
   if (!manly) failures.push('the Manly run is missing.');
   else if (manly.kind !== BOAT_KIND.FRESHWATER) failures.push('the Manly run is not a Freshwater.');
+  const skis = TIMETABLES.filter((t) => t.kind === BOAT_KIND.JETSKI);
+  if (skis.length < 3) failures.push(`only ${skis.length} jetski runs are baked; five are generated.`);
+  for (const t of skis) {
+    if (t.route.stopIndex.length !== 2) failures.push(`${t.route.id} is a jetski run with ${t.route.stopIndex.length} stops; a jetski calls nowhere.`);
+    if (!(SPEED[t.kind] > SPEED[BOAT_KIND.FRESHWATER])) failures.push('a jetski is no faster than a Freshwater.');
+  }
   const pose = createBoatPose();
   for (let r = 0; r < TIMETABLES.length; r++) {
     const t = TIMETABLES[r];

@@ -149,6 +149,31 @@ function tinnie(): BufferGeometry {
   return b.geometry();
 }
 
+/**
+ * A jetski, with its rider: a 2.9 m hull in white with a red flank, the seat,
+ * a handlebar post, and a crouched body in a black wetsuit. Boxes, like the
+ * rest, at the same origin convention (x forward, y up from the waterline).
+ */
+function jetski(): BufferGeometry {
+  const b = new Boxes();
+  const WHITE: Rgb = { r: 0.92, g: 0.92, b: 0.9 };
+  const RED: Rgb = { r: 0.8, g: 0.12, b: 0.1 };
+  const WET: Rgb = { r: 0.08, g: 0.08, b: 0.1 };
+  const SKIN: Rgb = { r: 0.72, g: 0.52, b: 0.4 };
+  b.box(0, -0.3, 0, 2.9, 0.45, 1.05, WHITE);
+  b.box(0.2, -0.32, 0, 2.2, 0.5, 1.12, RED, 0.95);
+  b.box(0.9, 0.15, 0, 1.0, 0.3, 0.8, WHITE, 0.9);
+  b.box(-0.4, 0.15, 0, 1.3, 0.32, 0.55, DARK);
+  b.box(0.75, 0.45, 0, 0.12, 0.45, 0.12, DARK);
+  b.box(0.75, 0.88, 0, 0.12, 0.08, 0.6, DARK);
+  b.box(-0.35, 0.47, 0, 0.5, 0.55, 0.42, WET);
+  b.box(-0.1, 0.6, 0, 0.3, 0.42, 0.34, WET, 0.9);
+  b.box(-0.1, 1.02, 0, 0.24, 0.24, 0.22, SKIN);
+  b.box(-0.5, 0.15, 0.28, 0.5, 0.4, 0.14, WET);
+  b.box(-0.5, 0.15, -0.28, 0.5, 0.4, 0.14, WET);
+  return b.geometry();
+}
+
 export class BoatFleet extends Group {
   private readonly material = new MeshStandardNodeMaterial({ vertexColors: true, roughness: 0.75, metalness: 0.05 });
   private readonly geometries: Record<BoatKind, BufferGeometry>;
@@ -162,7 +187,7 @@ export class BoatFleet extends Group {
   constructor() {
     super();
     this.name = 'boats';
-    this.geometries = { 0: freshwater(), 1: harbour(), 2: rivercat(), 3: tinnie() };
+    this.geometries = { 0: freshwater(), 1: harbour(), 2: rivercat(), 3: tinnie(), 4: jetski() };
     for (const f of this.ferryList) {
       const mesh = new Mesh(this.geometries[f.kind], this.material);
       mesh.frustumCulled = true;
