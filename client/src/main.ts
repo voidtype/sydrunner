@@ -50,7 +50,7 @@ import { fetchWorldAsset, verifyCdn } from './world/cdn.ts';
 // as the player approaches it -- see `world/hexes.ts`.
 import { hexContract, hexesArmed, hexesNear, onHexTiles } from './world/hexes.ts';
 import { createFacadeGlobals } from './world/facade.ts';
-import { loadFarLayer } from './world/far.ts';
+import { loadFarLayer, setSlabDaylight } from './world/far.ts';
 import { loadLandmarks, verifyLandmarks } from './world/landmarks.ts';
 import { createFarGround } from './world/ground.ts';
 import { verifyCanopy } from './world/cover.ts';
@@ -762,6 +762,7 @@ import {
   createCharacterPose,
   dayAtTick,
   daylight,
+  slabLight,
   forEachCharacterNear,
   saturdayAt,
   AGENT_APPLAUSE_LINE,
@@ -12503,6 +12504,8 @@ async function main(): Promise<void> {
     // otherwise be the first thing to compose them, one call too late.
     camera.updateMatrixWorld();
     sky.update(camera);
+    // The far city takes the sky's light: pastel by day, a silhouette by night.
+    setSlabDaylight(slabLight(sky.now.phase));
     // The clock, fed the sky's own instant rather than reading `Date.now()` for
     // itself -- which is what makes the HUD agree with the window while somebody
     // is scrubbing from a console. Cheap by construction: it compares four

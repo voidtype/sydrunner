@@ -1227,7 +1227,21 @@ export function weeklyFlag(questId: string): string {
  * reverse. See the header's "two completion marks".
  */
 export function doneFlag(quest: Quest): string {
-  return quest.repeatable ? weeklyFlag(quest.id) : completionFlag(quest.id);
+  return isWeekly(quest) ? weeklyFlag(quest.id) : completionFlag(quest.id);
+}
+
+/**
+ * Which quests the week resets. The owner: *"quests should reset every week
+ * too please, make sure that happens (and reset all quests)"*.
+ *
+ * DESIGN.md rule 3 -- the week is the epic, the story is what persists -- is
+ * the line drawn here: Acts 0 and 1 are the story and their marks stay; the
+ * Act 2 register and the Act 3 menu are the week's work and come back every
+ * Monday, whatever their `repeatable` field says. `repeatable` still means
+ * what it meant for the story acts.
+ */
+export function isWeekly(quest: Quest): boolean {
+  return quest.repeatable || quest.act >= 2;
 }
 
 /**

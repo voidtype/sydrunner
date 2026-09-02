@@ -75,6 +75,7 @@ import {
   float,
   mix,
   smoothstep,
+  uniform,
   vec3,
 } from 'three/tsl';
 import {
@@ -467,6 +468,22 @@ function hash(...parts: number[]): number {
  * a light. It also keeps the far city out of the lighting cost entirely: no N.L,
  * no hemisphere, no bounce, no shadow lookup.
  */
+/**
+ * How much of the day is on the far city, 0..1. One uniform shared by every
+ * slab material, written once a frame by `setSlabDaylight` from the sky's own
+ * phase. The slabs are unlit by design (the header's cost argument), and unlit
+ * meant they kept their 3 pm albedo all night: a horizon of pastel boxes over
+ * a dark harbour, reported as "LOD buildings on the horizon". The real
+ * buildings go dark because the scene's lights do; this is the same fact
+ * applied by hand, and it costs one multiply. `game/characters.slabLight`
+ * decides the number, so the curve is checked on both boot lists.
+ */
+const SLAB_LIGHT = uniform(1.0);
+
+export function setSlabDaylight(k: number): void {
+  SLAB_LIGHT.value = Math.max(0, Math.min(1, k));
+}
+
 function createSlabMaterial(): MeshBasicNodeMaterial {
   const material = new MeshBasicNodeMaterial();
   material.name = 'far-city';
@@ -485,7 +502,7 @@ function createSlabMaterial(): MeshBasicNodeMaterial {
       float(BASE_SHADE),
       float(1.0),
       smoothstep(float(0.0), float(BASE_SHADE_TOP), attribute<'float'>(SLAB_Y, 'float')),
-    );
+    ).mul(SLAB_LIGHT);
     return vec3(shade, shade, shade);
   })();
   material.vertexColors = true;

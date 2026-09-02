@@ -118,6 +118,27 @@ import { weekKey } from './suggestions.ts';
 // module is three-free and content-free at this level; see `sanitiseCursor`.
 import { WEEKLY_FLAG_PREFIX, completionFlag, sanitiseCursor, type QuestCursor } from '../game/questmodel.ts';
 
+/**
+ * Flags the week sweeps besides the `w:` ones: the completion marks and the
+ * unlock flags of every weekly quest, which the content decides and this file
+ * cannot see. The server calls `setWeeklySweep` whenever a content bundle goes
+ * live; before it has, only the prefix is swept, which is what it always was.
+ */
+let weeklySweep: ReadonlySet<string> = new Set();
+export function setWeeklySweep(flags: ReadonlySet<string>): void {
+  weeklySweep = flags;
+}
+function sweptByTheWeek(flag: string): boolean {
+  return flag.startsWith(WEEKLY_FLAG_PREFIX) || weeklySweep.has(flag);
+}
+
+/**
+ * The one-off. Bumped when the owner asks for every quest to be reset for
+ * everybody at once ("and reset all quests"); a record below it is swept on
+ * its next load whatever the calendar says.
+ */
+export const QUESTS_EPOCH = 1;
+
 // --- Handles -------------------------------------------------------------------
 
 /**
@@ -530,6 +551,8 @@ export interface AccountRecord {
   level: number;
   /** The `weekOf` the kills above were counted in. */
   levelWeek: string;
+  /** `QUESTS_EPOCH` when this record was last given the one-off quest reset. */
+  questsEpoch: number;
   /**
    * Where this account logged off, or null.
    *
@@ -706,8 +729,19 @@ export interface AccountFile {
  */
 export function resetIfNewWeek(record: AccountRecord, at: number | Date = Date.now()): boolean {
   const week = weekOf(at);
-  if (record.levelWeek === week) return false;
+  if (record.levelWeek === week) {
+    // Not a new week, but a record from before the owner asked for every
+    // quest to be reset once: the quest half of Monday, today.
+    if (record.questsEpoch < QUESTS_EPOCH) {
+      record.questsEpoch = QUESTS_EPOCH;
+      record.quests = {};
+      record.story = record.story.filter((flag) => !sweptByTheWeek(flag));
+      return true;
+    }
+    return false;
+  }
   record.levelWeek = week;
+  record.questsEpoch = QUESTS_EPOCH;
   record.kills = 0;
   // The ladder currency itself, which *is* the level -- see `XP_PER_LEVEL`.
   // Zeroed beside the kills rather than derived from them, because after
@@ -722,8 +756,8 @@ export function resetIfNewWeek(record: AccountRecord, at: number | Date = Date.n
   // header. Reassigned only when something actually goes, so the ordinary
   // Monday for a player with no repeatables behind them costs one walk and no
   // allocation.
-  if (record.story.some((flag) => flag.startsWith(WEEKLY_FLAG_PREFIX))) {
-    record.story = record.story.filter((flag) => !flag.startsWith(WEEKLY_FLAG_PREFIX));
+  if (record.story.some(sweptByTheWeek)) {
+    record.story = record.story.filter((flag) => !sweptByTheWeek(flag));
   }
   // *"persisted to end of week"*, and this is the end of the week. Cleared in
   // the same three lines as the ladder rather than in a rule of its own, so
@@ -819,6 +853,7 @@ export function sanitiseAccount(value: unknown, now = Date.now()): AccountRecord
     // disagreed with the xp beside it is the one number a player checks.
     level: 1,
     levelWeek: typeof raw.levelWeek === 'string' ? raw.levelWeek : '',
+    questsEpoch: typeof raw.questsEpoch === 'number' && Number.isFinite(raw.questsEpoch) ? Math.trunc(raw.questsEpoch) : 0,
     // **Absent is the ordinary case, not an error.** Every account written
     // before this feature existed has no `lastPos`, and so does every account
     // that has never logged off since the last Monday. A parser that treated a
@@ -1408,7 +1443,8 @@ export function verifyAccounts(): string[] {
         kills: 25,
         level: 99,
         levelWeek: weekOf(now),
-      },
+    questsEpoch: QUESTS_EPOCH,
+              },
       now,
     );
     if (!good) {
@@ -1718,6 +1754,7 @@ function fakeAccount(now: number): AccountRecord {
     xp: 0,
     level: 1,
     levelWeek: weekOf(now),
+    questsEpoch: QUESTS_EPOCH,
     lastPos: null,
     team: TEAM.NONE,
     talents: { ...EMPTY_MASK },

@@ -1651,26 +1651,29 @@ stopped rather than starting over.
 
 ## Data and attribution
 
-The city is a derivative of open geodata, and the licences below travel with it. This
-applies to everything under `client/public/world/` and to everything published in the data
-repo [voidtype/sydrunner-world](https://github.com/voidtype/sydrunner-world) — that world
-data is a **processed derivative** of the sources named here (reprojected to EPSG:7856,
-merged, simplified and tiled), redistributed under **ODbL**.
+Every source the game is built from, in one table, so the next person can find
+it. The world data under `client/public/world/` and in
+[voidtype/sydrunner-world](https://github.com/voidtype/sydrunner-world) is a
+**processed derivative** of the geodata rows (reprojected to EPSG:7856, merged,
+simplified and tiled) and is redistributed under **ODbL**; carry the same
+attribution and share alike if you redistribute it.
 
-- **Map data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors**,
-  available under the [Open Database License (ODbL)](https://opendatacommons.org/licenses/odbl/).
-  OSM is the primary source for buildings, roads, water, parks, landmarks and street names.
-- **Building footprints** are partly
-  [Microsoft Building Footprints](https://github.com/microsoft/GlobalMLBuildingFootprints),
-  released under ODbL, used to fill gaps outside the OSM-complete inner ring
-  (7,990 of 29,790 buildings — see *Decisions that departed from the spec* above).
-- **Terrain** is derived from [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/)
-  (Mapzen `terrarium` encoding), itself an assembly of public-domain and open national
-  elevation sources; see the [Terrain Tiles attribution](https://github.com/tilezen/joerd/blob/master/docs/attribution.md)
-  for the per-source list.
-
-If you redistribute the world data, or a world you build with this pipeline, you must carry
-the same attribution and share alike under ODbL.
+| source | what SYDNEY takes from it | where to get it, and the licence |
+|---|---|---|
+| **OpenStreetMap** | Building footprints and tags (the primary footprint source, see *Decisions that departed from the spec*), roads and street names, the railway and its stations, water, parks and green, power poles, points of interest, and the suburb label nodes that become `world/suburbs.json` and the hero line | [openstreetmap.org/copyright](https://www.openstreetmap.org/copyright) — extracts via the Overpass API and Geofabrik; © OpenStreetMap contributors, [ODbL](https://opendatacommons.org/licenses/odbl/) |
+| **Microsoft Building Footprints** | ML-segmented footprints that fill the suburbs OSM has not hand-mapped (7,990 of the inner ring's 29,790 buildings); `pipeline/sydney/merge.py` resolves them against OSM | [github.com/microsoft/GlobalMLBuildingFootprints](https://github.com/microsoft/GlobalMLBuildingFootprints) — ODbL |
+| **AWS Terrain Tiles** (Mapzen `terrarium`) | The digital elevation model everything drapes on; `pipeline/sydney/terrain.py` | [registry.opendata.aws/terrain-tiles](https://registry.opendata.aws/terrain-tiles/) at `s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png`; per-source attribution in [tilezen/joerd](https://github.com/tilezen/joerd/blob/master/docs/attribution.md) |
+| **Transport for NSW Open Data — level crossings** | Where the railway crosses a public road at grade, so the corridor is fenced everywhere else; `pipeline/sydney/rail.py` | [opendata.transport.nsw.gov.au](https://opendata.transport.nsw.gov.au/data/dataset/nsw-level-crossings-on-public-roads) — CC BY 4.0 |
+| **nswrail.net — tunnels** | The list of rail tunnels and their portals, which decides where the line goes underground | [nswrail.net/infrastructure/tunnel.php](https://www.nswrail.net/infrastructure/tunnel.php) — reference site, read by hand into `pipeline/sydney/rail.py` |
+| **Published landmark dimensions** | The truth figures the three parametric landmarks are checked against — the Harbour Bridge's arch and pylons, the Opera House's shells, Sydney Tower's 309 m — `LANDMARK_TRUTH` in `pipeline/sydney/cli.py` | Public engineering figures (Wikipedia and the operators' own sites); the meshes are built by `pipeline/sydney/landmarks.py`, not downloaded |
+| **Transport for NSW mode colours** | The interface's semantic colours: train orange, bus blue, ferry green, light-rail red (`UI.md`) | [transportnsw.info key to icons](https://transportnsw.info/plan/instructions-planning-guides/key-to-icons-line-codes); the colours are used, the trademarked symbols are not |
+| **Public Sans** | The interface typeface, the NSW Government's own digital face | [github.com/uswds/public-sans](https://github.com/uswds/public-sans) via Google Fonts — SIL OFL 1.1; self-hosted in `client/public/fonts/` |
+| **Jost** | The display typeface: the hero line, the wordmark, every label | [indestructibletype.com/Jost](https://indestructibletype.com/Jost.html) via Google Fonts — SIL OFL 1.1; self-hosted |
+| **Kenney Car Kit** | 17 of the 29 car models | [kenney.nl/assets/car-kit](https://kenney.nl/assets/car-kit) — CC0 1.0 |
+| **Poly Pizza models** | 12 car and bus models, each credited by author in `client/public/credits.html` (generated by `scripts/prep-car-models.mjs` from `client/public/cars/manifest.json`) | [poly.pizza](https://poly.pizza) — CC BY 3.0, attribution shipped in-game at `/credits.html` |
+| **Pixabay — door** | The door sound, `client/public/audio/door/open.mp3` | [pixabay.com](https://pixabay.com) ("Opening door", Dragon Studio) — Pixabay Content Licence |
+| **In-house audio** | The police, drunk and methhead barks (`client/public/audio/*.wav`), the sun's screams (`audio/sun/`), the station departure chime (`audio/rail/`), and the rave tracks in `audio/dj/` (see that folder's README for how to add your own) | Recorded and produced for the game; ship with the repository |
+| **The players' suggestion board** | Half the design ledger in `DESIGN.md`; the board itself is a GitHub issue label on this repository | [github.com/voidtype/sydrunner/issues](https://github.com/voidtype/sydrunner/issues) |
 
 **The code** in this repository has **no licence granted yet** — it is published to be read
 and to serve the world assets, not (for now) to be reused. Ask if you want it under

@@ -1,0 +1,835 @@
+{
+ "note": "The ladder: ten rungs of three areas, from the spawn at St Peters outward. `station` is the anchor the givers stand round (place-clear keeps them in reach of it); `sydney` is what the area is actually known for, and every quest drawn there names one of them; `people` are the archetype keys that live there; `next` is where its breadcrumbs lead.",
+ "radiusM": 520,
+ "areas": [
+  {
+   "id": "st-peters",
+   "name": "St Peters",
+   "station": "St Peters",
+   "level": 1,
+   "next": "marrickville",
+   "sydney": [
+    "Sydney Park",
+    "the brick kilns",
+    "the Princes Highway",
+    "King Street south end",
+    "the Camdenville oval",
+    "the WestConnex vent stack",
+    "May Street",
+    "the St Peters interchange"
+   ],
+   "people": [
+    "tradie",
+    "dogwalker",
+    "opshop",
+    "council",
+    "servo",
+    "student"
+   ]
+  },
+  {
+   "id": "erskineville",
+   "name": "Erskineville",
+   "station": "Erskineville",
+   "level": 1,
+   "next": "redfern",
+   "sydney": [
+    "the Erko",
+    "Erskineville Road",
+    "the Imperial",
+    "Harry Noble Reserve",
+    "Swanson Street",
+    "the Rose Hotel",
+    "the Erskineville village shops",
+    "the Macdonaldtown footbridge"
+   ],
+   "people": [
+    "publican",
+    "dogwalker",
+    "strata",
+    "student",
+    "barista",
+    "drag"
+   ]
+  },
+  {
+   "id": "newtown",
+   "name": "Newtown",
+   "station": "Newtown",
+   "level": 1,
+   "next": "glebe",
+   "sydney": [
+    "King Street",
+    "Enmore Road",
+    "the Marly",
+    "the Enmore Theatre",
+    "Camperdown Memorial Rest Park",
+    "Gould's Book Arcade",
+    "the Courthouse Hotel",
+    "the I Have a Dream mural",
+    "Better Read Than Dead",
+    "Black Star Pastry"
+   ],
+   "people": [
+    "barista",
+    "opshop",
+    "student",
+    "busker",
+    "publican",
+    "vet",
+    "tattooist"
+   ]
+  },
+  {
+   "id": "marrickville",
+   "name": "Marrickville",
+   "station": "Marrickville",
+   "level": 2,
+   "next": "surry-hills",
+   "sydney": [
+    "Marrickville Road",
+    "Illawarra Road",
+    "the Marrickville Metro",
+    "Hellenic Bakery",
+    "the Henson",
+    "Addison Road markets",
+    "the Cooks River",
+    "Marrickville Bowlo",
+    "Enmore Park",
+    "Batch Brewing",
+    "the pho strip"
+   ],
+   "people": [
+    "viet",
+    "greek",
+    "brewer",
+    "bowlo",
+    "tradie",
+    "council",
+    "cyclist"
+   ]
+  },
+  {
+   "id": "redfern",
+   "name": "Redfern",
+   "station": "Redfern",
+   "level": 2,
+   "next": "central",
+   "sydney": [
+    "Redfern Street",
+    "the Block",
+    "Redfern Oval",
+    "the Rabbitohs",
+    "Eveleigh",
+    "Carriageworks",
+    "the Redfern Tent Embassy",
+    "Abercrombie Street",
+    "Prince Alfred Park pool",
+    "the Bearded Tit"
+   ],
+   "people": [
+    "koori",
+    "rabbitohs",
+    "council",
+    "student",
+    "barista",
+    "tradie"
+   ]
+  },
+  {
+   "id": "sydenham",
+   "name": "Sydenham and Tempe",
+   "station": "Sydenham",
+   "level": 2,
+   "next": "marrickville",
+   "sydney": [
+    "the Sydenham flight path",
+    "Tempe Tip",
+    "Tempe Reserve",
+    "the Princes Highway",
+    "Sydenham Road",
+    "the Cooks River cycleway",
+    "the IKEA at Tempe",
+    "Unwins Bridge Road",
+    "the Sydenham Green"
+   ],
+   "people": [
+    "tradie",
+    "cyclist",
+    "servo",
+    "dogwalker",
+    "council",
+    "ikea"
+   ]
+  },
+  {
+   "id": "central",
+   "name": "Central and Haymarket",
+   "station": "Central",
+   "level": 3,
+   "next": "town-hall",
+   "sydney": [
+    "Central's clock tower",
+    "the Devonshire Street tunnel",
+    "Chinatown",
+    "Paddy's Markets",
+    "Dixon Street",
+    "the Capitol Theatre",
+    "Belmore Park",
+    "Eddy Avenue",
+    "the Grand Concourse",
+    "Thomas Street",
+    "the Haymarket paifang"
+   ],
+   "people": [
+    "chinese",
+    "backpacker",
+    "busker",
+    "cabbie",
+    "cop",
+    "student",
+    "lostproperty"
+   ]
+  },
+  {
+   "id": "surry-hills",
+   "name": "Surry Hills",
+   "station": "Surry Hills",
+   "level": 3,
+   "next": "kings-cross",
+   "sydney": [
+    "Crown Street",
+    "Bourke Street",
+    "the Clock Hotel",
+    "Shannon Reserve",
+    "Ward Park",
+    "Bourke Street Bakery",
+    "the Shakespeare",
+    "Riley Street",
+    "the Surry Hills Library",
+    "Cleveland Street"
+   ],
+   "people": [
+    "barista",
+    "agency",
+    "dogwalker",
+    "publican",
+    "strata",
+    "designer",
+    "tattooist"
+   ]
+  },
+  {
+   "id": "glebe",
+   "name": "Glebe",
+   "station": "Glebe",
+   "level": 3,
+   "next": "central",
+   "sydney": [
+    "Glebe Point Road",
+    "the Toxteth",
+    "Jubilee Park",
+    "the Tramsheds",
+    "Glebe Markets",
+    "Bicentennial Park",
+    "the Fish Markets",
+    "Wentworth Park dogs",
+    "Sappho Books",
+    "the Nag's Head"
+   ],
+   "people": [
+    "student",
+    "tab",
+    "dogwalker",
+    "publican",
+    "greyhound",
+    "fishmonger",
+    "council"
+   ]
+  },
+  {
+   "id": "town-hall",
+   "name": "Town Hall and the CBD",
+   "station": "Town Hall",
+   "level": 4,
+   "next": "circular-quay",
+   "sydney": [
+    "Town Hall steps",
+    "the QVB",
+    "George Street",
+    "Pitt Street Mall",
+    "Hyde Park",
+    "the Archibald Fountain",
+    "Martin Place",
+    "the Strand Arcade",
+    "Angel Place",
+    "World Square",
+    "the light rail"
+   ],
+   "people": [
+    "suit",
+    "cop",
+    "busker",
+    "cabbie",
+    "security",
+    "barista",
+    "courier"
+   ]
+  },
+  {
+   "id": "circular-quay",
+   "name": "Circular Quay and the Rocks",
+   "station": "Circular Quay",
+   "level": 4,
+   "next": "milsons-point",
+   "sydney": [
+    "the Opera House",
+    "the Harbour Bridge",
+    "the Manly ferry",
+    "the Rocks",
+    "the Cahill Expressway",
+    "Customs House",
+    "Wharf 5",
+    "the Museum of Contemporary Art",
+    "the Fortune of War",
+    "Macquarie Place",
+    "the Hero of Waterloo"
+   ],
+   "people": [
+    "deckhand",
+    "tourist",
+    "busker",
+    "security",
+    "publican",
+    "cop",
+    "bridgeclimb"
+   ]
+  },
+  {
+   "id": "kings-cross",
+   "name": "Kings Cross and Potts Point",
+   "station": "Kings Cross",
+   "level": 4,
+   "next": "bondi-junction",
+   "sydney": [
+    "the Coke sign",
+    "Darlinghurst Road",
+    "the El Alamein fountain",
+    "Macleay Street",
+    "Fitzroy Gardens",
+    "the Bourbon",
+    "Kellett Street",
+    "Harry's Cafe de Wheels",
+    "the Wayside Chapel",
+    "Victoria Street"
+   ],
+   "people": [
+    "bouncer",
+    "backpacker",
+    "nurse",
+    "cop",
+    "cabbie",
+    "agency",
+    "chaplain"
+   ]
+  },
+  {
+   "id": "bondi-junction",
+   "name": "Bondi Junction",
+   "station": "Bondi Junction",
+   "level": 5,
+   "next": "randwick",
+   "sydney": [
+    "Westfield Bondi Junction",
+    "Oxford Street",
+    "the 333 bus",
+    "Centennial Park",
+    "the Eastgate",
+    "Bronte Road",
+    "Waverley Oval",
+    "the Tea Gardens",
+    "the Bondi Road hill",
+    "Spring Street"
+   ],
+   "people": [
+    "agency",
+    "surfer",
+    "personaltrainer",
+    "backpacker",
+    "security",
+    "nanny",
+    "suit"
+   ]
+  },
+  {
+   "id": "randwick",
+   "name": "Randwick and Kensington",
+   "station": "Randwick",
+   "level": 5,
+   "next": "milsons-point",
+   "sydney": [
+    "Royal Randwick",
+    "the Prince of Wales",
+    "the Spot",
+    "the Ritz cinema",
+    "Anzac Parade",
+    "UNSW",
+    "the Randwick Ritz",
+    "Belmore Road",
+    "Coogee Bay Road",
+    "the Doncaster"
+   ],
+   "people": [
+    "punter",
+    "nurse",
+    "student",
+    "trainer",
+    "strapper",
+    "bowlo",
+    "barista"
+   ]
+  },
+  {
+   "id": "milsons-point",
+   "name": "Milsons Point and North Sydney",
+   "station": "Milsons Point",
+   "level": 5,
+   "next": "ashfield",
+   "sydney": [
+    "Luna Park",
+    "the North Sydney Olympic Pool",
+    "Kirribilli",
+    "the Bridge's northern pylon",
+    "Lavender Bay",
+    "Bradfield Park",
+    "Blues Point",
+    "the Kirribilli markets",
+    "Miller Street",
+    "the Greenwood"
+   ],
+   "people": [
+    "suit",
+    "swimmer",
+    "lunapark",
+    "security",
+    "strata",
+    "nanny",
+    "cop"
+   ]
+  },
+  {
+   "id": "ashfield",
+   "name": "Ashfield",
+   "station": "Ashfield",
+   "level": 6,
+   "next": "burwood",
+   "sydney": [
+    "Liverpool Road",
+    "Ashfield Mall",
+    "the Shanghai dumpling strip",
+    "Ashfield Park",
+    "the Ashfield Aquatic Centre",
+    "Hercules Street",
+    "the Ashfield Bowlo",
+    "Pratten Park",
+    "Elizabeth Street"
+   ],
+   "people": [
+    "chinese",
+    "bowlo",
+    "council",
+    "swimmer",
+    "strata",
+    "tradie",
+    "pharmacist"
+   ]
+  },
+  {
+   "id": "burwood",
+   "name": "Burwood",
+   "station": "Burwood",
+   "level": 6,
+   "next": "strathfield",
+   "sydney": [
+    "Burwood Road",
+    "Westfield Burwood",
+    "Burwood Park",
+    "the Burwood Chinatown",
+    "Belmore Street",
+    "the Burwood Hotel",
+    "Wilga Street",
+    "Burwood Girls",
+    "the Emerald Hill"
+   ],
+   "people": [
+    "chinese",
+    "korean",
+    "agency",
+    "student",
+    "pharmacist",
+    "security",
+    "tutor"
+   ]
+  },
+  {
+   "id": "strathfield",
+   "name": "Strathfield",
+   "station": "Strathfield",
+   "level": 6,
+   "next": "bankstown",
+   "sydney": [
+    "Strathfield Square",
+    "the Korean strip",
+    "The Boulevarde",
+    "Strathfield Park",
+    "Albert Road",
+    "the Strathfield interchange",
+    "Churchill Avenue",
+    "Strathfield Plaza",
+    "Cooper Street"
+   ],
+   "people": [
+    "korean",
+    "tutor",
+    "commuter",
+    "agency",
+    "strata",
+    "cop",
+    "student"
+   ]
+  },
+  {
+   "id": "bankstown",
+   "name": "Bankstown",
+   "station": "Bankstown",
+   "level": 7,
+   "next": "lakemba",
+   "sydney": [
+    "Bankstown Central",
+    "the Bankstown Sports Club",
+    "Paul Keating Park",
+    "Chapel Road",
+    "Old Town Plaza",
+    "the Bankstown Bulldogs",
+    "the Bankstown pho strip",
+    "Restwell Street",
+    "Jacobs Street",
+    "the Bankstown Arts Centre"
+   ],
+   "people": [
+    "viet",
+    "leb",
+    "bulldogs",
+    "tradie",
+    "rsl",
+    "council",
+    "mechanic"
+   ]
+  },
+  {
+   "id": "lakemba",
+   "name": "Lakemba",
+   "station": "Lakemba",
+   "level": 7,
+   "next": "hurstville",
+   "sydney": [
+    "Haldon Street",
+    "the Ramadan night markets",
+    "the Lakemba Mosque",
+    "Parry Park",
+    "the Lakemba Hotel",
+    "Railway Parade",
+    "the Lebanese bakeries",
+    "Wangee Road",
+    "the knafeh stand"
+   ],
+   "people": [
+    "leb",
+    "bangla",
+    "baker",
+    "tradie",
+    "council",
+    "mechanic",
+    "student"
+   ]
+  },
+  {
+   "id": "hurstville",
+   "name": "Hurstville",
+   "station": "Hurstville",
+   "level": 7,
+   "next": "parramatta",
+   "sydney": [
+    "Forest Road",
+    "Westfield Hurstville",
+    "the Hurstville Chinese strip",
+    "Hurstville Oval",
+    "the St George Dragons",
+    "Kempt Field",
+    "Crofts Avenue",
+    "the Hurstville Aquatic Centre",
+    "the Hurstville Bowlo"
+   ],
+   "people": [
+    "chinese",
+    "dragons",
+    "bowlo",
+    "agency",
+    "pharmacist",
+    "strata",
+    "cop"
+   ]
+  },
+  {
+   "id": "parramatta",
+   "name": "Parramatta",
+   "station": "Parramatta",
+   "level": 8,
+   "next": "auburn",
+   "sydney": [
+    "Church Street",
+    "Eat Street",
+    "Parramatta Park",
+    "the Eels",
+    "CommBank Stadium",
+    "Westfield Parramatta",
+    "the Riverside Theatres",
+    "Old Government House",
+    "the Parramatta River ferry",
+    "Parramatta Square",
+    "Centenary Square"
+   ],
+   "people": [
+    "eels",
+    "suit",
+    "council",
+    "cabbie",
+    "student",
+    "cop",
+    "security",
+    "tradie"
+   ]
+  },
+  {
+   "id": "harris-park",
+   "name": "Harris Park",
+   "station": "Harris Park",
+   "level": 8,
+   "next": "parramatta",
+   "sydney": [
+    "Wigram Street",
+    "Little India",
+    "the Harris Park chaat strip",
+    "Marion Street",
+    "Robin Thomas Reserve",
+    "the Diwali lights",
+    "Station Street East",
+    "Hassall Street",
+    "the Harris Park Bowlo"
+   ],
+   "people": [
+    "indian",
+    "baker",
+    "tutor",
+    "agency",
+    "tradie",
+    "council",
+    "student"
+   ]
+  },
+  {
+   "id": "auburn",
+   "name": "Auburn",
+   "station": "Auburn",
+   "level": 8,
+   "next": "cabramatta",
+   "sydney": [
+    "Auburn Road",
+    "the Auburn Gallipoli Mosque",
+    "the Auburn Botanic Gardens",
+    "the cherry blossoms",
+    "Rawson Street",
+    "the Turkish pide strip",
+    "Auburn Central",
+    "Wyatt Park",
+    "the Auburn Lidcombe Bowlo"
+   ],
+   "people": [
+    "turkish",
+    "afghan",
+    "baker",
+    "mechanic",
+    "council",
+    "tradie",
+    "gardener"
+   ]
+  },
+  {
+   "id": "cabramatta",
+   "name": "Cabramatta",
+   "station": "Cabramatta",
+   "level": 9,
+   "next": "liverpool",
+   "sydney": [
+    "John Street",
+    "the Freedom Gate",
+    "Cabramatta Plaza",
+    "the pho strip",
+    "Cabra-Vale Diggers",
+    "Hughes Street",
+    "the Moon Festival",
+    "Dutton Lane",
+    "the Cabramatta Bowlo"
+   ],
+   "people": [
+    "viet",
+    "khmer",
+    "diggers",
+    "baker",
+    "council",
+    "cop",
+    "mechanic"
+   ]
+  },
+  {
+   "id": "liverpool",
+   "name": "Liverpool",
+   "station": "Liverpool",
+   "level": 9,
+   "next": "cronulla",
+   "sydney": [
+    "Macquarie Street Mall",
+    "Westfield Liverpool",
+    "Bigge Park",
+    "Liverpool Hospital",
+    "the Liverpool Catholic Club",
+    "Elizabeth Street",
+    "the Georges River",
+    "Woodward Park",
+    "Collimore Park",
+    "the Hume"
+   ],
+   "people": [
+    "nurse",
+    "tradie",
+    "rsl",
+    "council",
+    "cop",
+    "mechanic",
+    "student"
+   ]
+  },
+  {
+   "id": "cronulla",
+   "name": "Cronulla",
+   "station": "Cronulla",
+   "level": 9,
+   "next": "penrith",
+   "sydney": [
+    "Cronulla Mall",
+    "North Cronulla",
+    "the Alley",
+    "Wanda",
+    "the Cronulla RSL",
+    "the Cronulla Sharks",
+    "Gunnamatta Bay",
+    "the Bundeena ferry",
+    "Kingsway",
+    "the Northies",
+    "the Cronulla surf club"
+   ],
+   "people": [
+    "surfer",
+    "nipper",
+    "sharks",
+    "rsl",
+    "tradie",
+    "agency",
+    "shire"
+   ]
+  },
+  {
+   "id": "penrith",
+   "name": "Penrith",
+   "station": "Penrith",
+   "level": 10,
+   "next": "blacktown",
+   "sydney": [
+    "the Panthers",
+    "Penrith Plaza",
+    "the Nepean River",
+    "Tench Reserve",
+    "High Street",
+    "the Penrith Whitewater stadium",
+    "Mulgoa Road",
+    "the Log Cabin",
+    "Penrith Paceway",
+    "the Great Western Highway"
+   ],
+   "people": [
+    "panthers",
+    "tradie",
+    "rsl",
+    "council",
+    "cop",
+    "mechanic",
+    "westie"
+   ]
+  },
+  {
+   "id": "blacktown",
+   "name": "Blacktown and Mount Druitt",
+   "station": "Blacktown",
+   "level": 10,
+   "next": "hornsby",
+   "sydney": [
+    "Westpoint",
+    "Main Street",
+    "the Blacktown Workers Club",
+    "Francis Park",
+    "the Blacktown International Sportspark",
+    "Flushcombe Road",
+    "the Blacktown Bowlo",
+    "Mount Druitt Westfield",
+    "the Rooty Hill RSL"
+   ],
+   "people": [
+    "islander",
+    "westie",
+    "tradie",
+    "rsl",
+    "council",
+    "cop",
+    "mechanic",
+    "student"
+   ]
+  },
+  {
+   "id": "hornsby",
+   "name": "Hornsby",
+   "station": "Hornsby",
+   "level": 10,
+   "next": "st-peters",
+   "sydney": [
+    "Westfield Hornsby",
+    "the Hornsby water clock",
+    "the Pacific Highway",
+    "Hornsby Park",
+    "the Hornsby Bowlo",
+    "Florence Street",
+    "the Hornsby quarry",
+    "Peats Ferry Road",
+    "the Berowra bush"
+   ],
+   "people": [
+    "strata",
+    "scout",
+    "council",
+    "agency",
+    "tradie",
+    "swimmer",
+    "northshore"
+   ]
+  }
+ ]
+}

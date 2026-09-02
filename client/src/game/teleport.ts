@@ -179,7 +179,36 @@ export function teleportNotFound(query: string, radiusM: number): string {
 }
 
 /** `/tp` with no argument. */
-export const TELEPORT_NO_QUERY = 'name a suburb — try /tp lane cove';
+export const TELEPORT_NO_QUERY = 'name a suburb or a player — try /tp lane cove';
+
+/** `/msg`, `/w`, `/tell`: a line to one player. */
+export const MESSAGE_COMMANDS: readonly string[] = ['/msg', '/w', '/tell', '/whisper'];
+
+/**
+ * A name the way a URL would have it: lower case, letters and digits, one dash
+ * between words. "Big Kez" and "big-kez" and "BIG_KEZ" are one player, which
+ * is how `/tp` and `/msg` find them without anyone typing an exact name.
+ */
+export function urlSafeName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+/** `/msg bazza get to the servo` -> the player and the line; null if not a message command. */
+export function parseMessage(text: string): { to: string; text: string } | null {
+  const trimmed = text.trim();
+  const space = trimmed.search(/\s/);
+  const head = (space < 0 ? trimmed : trimmed.slice(0, space)).toLowerCase();
+  if (!MESSAGE_COMMANDS.includes(head)) return null;
+  const rest = space < 0 ? '' : trimmed.slice(space + 1).trim();
+  const gap = rest.search(/\s/);
+  if (gap < 0) return { to: rest, text: '' };
+  return { to: rest.slice(0, gap), text: rest.slice(gap + 1).trim() };
+}
+
+export const MESSAGE_NO_TARGET = 'say who — /msg bazza get to the servo';
+export function messageNotFound(name: string): string {
+  return `nobody called ${name} is on`;
+}
 
 /** Arrived. `distance` is how far they travelled, which is the fun part. */
 export function teleportReply(place: Place, distanceM: number): string {
@@ -200,6 +229,16 @@ export function verifyTeleport(): string[] {
     { name: 'North Bondi', x: 6275.0, z: 1395.9 },
     { name: 'Bondi', x: 5043.9, z: 2604.1 },
   ];
+
+  // --- /msg parsing, and the URL-safe name it matches on.
+  if (urlSafeName('Big Kez') !== 'big-kez' || urlSafeName('  BIG_KEZ!! ') !== 'big-kez' || urlSafeName('bazza') !== 'bazza') {
+    failures.push('urlSafeName does not fold a name the way a URL would.');
+  }
+  const dm = parseMessage('/msg Bazza get to the servo');
+  if (dm === null || dm.to !== 'Bazza' || dm.text !== 'get to the servo') failures.push('/msg did not parse into a player and a line.');
+  if (parseMessage('/w shaz')?.text !== '' || parseMessage('/tell')?.to !== '') failures.push('/w and /tell with nothing after them did not parse as empty.');
+  if (parseMessage('hello /msg you') !== null || parseMessage('/msgs bazza hi') !== null) failures.push('a line that merely contains /msg parsed as one.');
+  if (MESSAGE_COMMANDS.some((c) => TELEPORT_COMMANDS.includes(c))) failures.push('a command name is claimed by both /msg and /tp.');
 
   const cases: Array<[string, string | null]> = [
     ['lane cove', 'Lane Cove'],

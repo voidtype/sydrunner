@@ -1,0 +1,1600 @@
+{
+ "note": "The people and the goals. An archetype is who is standing there: a role (the second half of the giver's name), the name pool they draw a first name from, and three lines in their own mouth -- hello, what they do, small talk -- with {place} and {specific} filled from areas.json. A goal is what they want: a step pattern, a title, a core sentence, and the labels the tracker draws. Nothing in here is a costume: the voice is dry, local and specific.",
+ "names": {
+  "anglo": [
+   "Bazza",
+   "Shaz",
+   "Daz",
+   "Kylie",
+   "Trent",
+   "Narelle",
+   "Wayne",
+   "Jacinta",
+   "Craig",
+   "Leanne",
+   "Brett",
+   "Tanya",
+   "Glenn",
+   "Sharon",
+   "Dean",
+   "Michelle",
+   "Troy",
+   "Kerry",
+   "Gav",
+   "Renee",
+   "Mick",
+   "Debbie",
+   "Scott",
+   "Bronwyn",
+   "Jason",
+   "Karen",
+   "Nathan",
+   "Fiona",
+   "Luke",
+   "Kylie-Anne",
+   "Rhonda",
+   "Colin",
+   "Merv",
+   "Elaine",
+   "Graham",
+   "Pam",
+   "Terry",
+   "Lorraine",
+   "Neville",
+   "Beryl",
+   "Ray",
+   "Denise",
+   "Bruce",
+   "Val",
+   "Kev",
+   "Maureen",
+   "Rod",
+   "Cheryl",
+   "Barry",
+   "Joyce",
+   "Stuart",
+   "Gail",
+   "Phil",
+   "Janelle",
+   "Warwick",
+   "Trish",
+   "Lachlan",
+   "Brooke",
+   "Hayden",
+   "Tegan",
+   "Jarrod",
+   "Chantelle",
+   "Mitch",
+   "Sienna",
+   "Cooper",
+   "Tahlia",
+   "Riley",
+   "Maddie",
+   "Kai",
+   "Imogen",
+   "Angus",
+   "Georgie",
+   "Hamish",
+   "Poppy",
+   "Fergus",
+   "Matilda",
+   "Digby",
+   "Prue",
+   "Rupert",
+   "Annabel",
+   "Hugo",
+   "Clementine",
+   "Toby",
+   "Harriet",
+   "Eddie",
+   "Marg",
+   "Les",
+   "Dot",
+   "Norm",
+   "Shirl",
+   "Bluey",
+   "Nola",
+   "Clive",
+   "Fay",
+   "Reg",
+   "Thelma"
+  ],
+  "greek": [
+   "Yiannis",
+   "Despina",
+   "Kosta",
+   "Eleni",
+   "Spiro",
+   "Voula",
+   "Nick",
+   "Toula",
+   "Manoli",
+   "Sophia",
+   "Stavros",
+   "Chrissy",
+   "Dimitri",
+   "Fotini",
+   "Andreas",
+   "Maria"
+  ],
+  "italian": [
+   "Sal",
+   "Rosa",
+   "Enzo",
+   "Carmela",
+   "Franco",
+   "Lucia",
+   "Tony",
+   "Angela",
+   "Rocco",
+   "Pina",
+   "Nino",
+   "Grazia"
+  ],
+  "viet": [
+   "Thanh",
+   "Linh",
+   "Minh",
+   "Hoa",
+   "Tuan",
+   "Mai",
+   "Duc",
+   "Trang",
+   "Khoa",
+   "Ngoc",
+   "Bao",
+   "Thu",
+   "Hung",
+   "Kim",
+   "Phuc",
+   "Lan",
+   "Vinh",
+   "Yen"
+  ],
+  "chinese": [
+   "Wei",
+   "Mei",
+   "Jun",
+   "Ling",
+   "Hao",
+   "Xiu",
+   "Kevin",
+   "Cindy",
+   "Tony",
+   "Vivian",
+   "Jason",
+   "Grace",
+   "Alan",
+   "Fiona",
+   "Li",
+   "Yan",
+   "Ken",
+   "Jenny",
+   "Eric",
+   "Amy"
+  ],
+  "korean": [
+   "Min-jun",
+   "Ji-woo",
+   "Seo-yeon",
+   "Hyun",
+   "Sung",
+   "Eun",
+   "Joon",
+   "Hana",
+   "Danny",
+   "Soo",
+   "Jae",
+   "Yuna"
+  ],
+  "leb": [
+   "Tony",
+   "Rania",
+   "Sam",
+   "Nadia",
+   "Joe",
+   "Layla",
+   "George",
+   "Hala",
+   "Charbel",
+   "Rima",
+   "Elie",
+   "Maya",
+   "Bassam",
+   "Dina",
+   "Fadi",
+   "Nour",
+   "Omar",
+   "Zeina",
+   "Ahmed",
+   "Mariam"
+  ],
+  "indian": [
+   "Raj",
+   "Priya",
+   "Arun",
+   "Deepa",
+   "Vikram",
+   "Anjali",
+   "Sunil",
+   "Kavya",
+   "Harpreet",
+   "Simran",
+   "Gurpreet",
+   "Neha",
+   "Ravi",
+   "Pooja",
+   "Amit",
+   "Shreya"
+  ],
+  "turkish": [
+   "Mehmet",
+   "Ayse",
+   "Emre",
+   "Zeynep",
+   "Mustafa",
+   "Elif",
+   "Serkan",
+   "Derya",
+   "Hakan",
+   "Selin"
+  ],
+  "afghan": [
+   "Hamid",
+   "Farida",
+   "Zahra",
+   "Nasir",
+   "Fatima",
+   "Yusuf",
+   "Laila",
+   "Karim"
+  ],
+  "khmer": [
+   "Sokha",
+   "Chantha",
+   "Bopha",
+   "Vanna",
+   "Dara",
+   "Sopheap"
+  ],
+  "bangla": [
+   "Rafi",
+   "Tasnim",
+   "Imran",
+   "Farhana",
+   "Sajid",
+   "Nusrat"
+  ],
+  "islander": [
+   "Sione",
+   "Mele",
+   "Tevita",
+   "Ana",
+   "Junior",
+   "Losa",
+   "Pita",
+   "Salote",
+   "Manu",
+   "Lupe",
+   "Fetu",
+   "Tui"
+  ],
+  "koori": [
+   "Uncle Col",
+   "Aunty Bev",
+   "Jarrah",
+   "Kirra",
+   "Tyson",
+   "Alinta",
+   "Dwayne",
+   "Marlee",
+   "Nathan",
+   "Talia",
+   "Uncle Ray",
+   "Aunty Fran"
+  ]
+ },
+ "archetypes": {
+  "tradie": {
+   "role": "chippy off a job",
+   "pool": "anglo",
+   "hello": "Yeah, g'day. Don't step on that, it's not dry. {place}, you're in the right spot.",
+   "what": "I do fit-outs. Kitchens mostly, a deck when someone's had a bonus. The ute's full and the client's not answering.",
+   "small": "Best pie round {place} is the one nobody Instagrams. Ask at the servo, not the cafe."
+  },
+  "dogwalker": {
+   "role": "dog walker, four leads",
+   "pool": "anglo",
+   "hello": "Hang on, hang on -- sit. Not you. Sorry, {place} at this hour is chaos. What's up?",
+   "what": "Six dogs, three suburbs, one car park at {specific}. Two of them aren't mine and one of them isn't a dog, legally.",
+   "small": "The off-leash bit at {specific} is fine until the magpies come back. Then nothing is fine."
+  },
+  "opshop": {
+   "role": "Vinnies volunteer",
+   "pool": "anglo",
+   "hello": "Bag goes on the counter, love, not the floor. Welcome to {place}.",
+   "what": "I sort what {place} throws out. Half of it is jeans, a quarter is a bread maker, and once a fortnight it's something someone will come back crying for.",
+   "small": "The good stuff at {specific} goes before ten. The people who know, know."
+  },
+  "council": {
+   "role": "council ranger",
+   "pool": "anglo",
+   "hello": "Inner West Council. Well, whichever council {place} is this week. You're not parked on the nature strip, are you.",
+   "what": "Bins, dumping, dogs, the odd shopping trolley in the river. {specific} generates more paperwork than the rest of the ward.",
+   "small": "Bin night is Tuesday. It has always been Tuesday. People still ring."
+  },
+  "servo": {
+   "role": "servo night shift",
+   "pool": "indian",
+   "hello": "Pump four's off. Pump four's been off since May. Welcome to {place}.",
+   "what": "Ten hours, one register, and the pie warmer. You learn who {place} is at three in the morning.",
+   "small": "The good pie is the one at the back of {specific}'s warmer. The front ones have been there since the shift before me."
+  },
+  "student": {
+   "role": "uni student, three jobs",
+   "pool": "anglo",
+   "hello": "Sorry -- yep -- hi. I'm between shifts. {place} rent, you know how it is.",
+   "what": "Arts at Sydney Uni, hospo at nights, and a thing on the weekend I'm not allowed to describe. {specific} is where I sleep, technically.",
+   "small": "There's a cafe near {specific} that does a five dollar long black if you look sad enough. I always look sad enough."
+  },
+  "publican": {
+   "role": "publican",
+   "pool": "anglo",
+   "hello": "We're not open. We're never not open. What'll it be, {place}?",
+   "what": "I run the pub. Schooners, the meat raffle, the trivia on Wednesdays that started as a joke. {specific} keeps me in business and out of the papers.",
+   "small": "Tooheys New, seven dollars, and if you ask for a craft beer I'll point you back toward {specific}."
+  },
+  "strata": {
+   "role": "strata committee chair",
+   "pool": "anglo",
+   "hello": "You're not from the managing agent, are you? No? Good. Sit. {place} strata, twelve lots, one lift.",
+   "what": "I chair the committee. The AGM ran four hours last month, three of them about the bins. {specific} is a sinking fund with a building attached.",
+   "small": "The bloke in 4B has a hot tub on his balcony. The engineer says no. The hot tub says yes."
+  },
+  "barista": {
+   "role": "barista, own cafe",
+   "pool": "italian",
+   "hello": "Flat white? Everyone in {place} wants a flat white. Give me a sec, the grinder's sulking.",
+   "what": "I own the place. Own it, run it, sweep it. {specific} foot traffic pays the rent and the regulars pay for the machine.",
+   "small": "There are eleven cafes on this strip and we all buy beans off the same bloke in {specific}. Don't tell anyone."
+  },
+  "drag": {
+   "role": "drag queen, off duty",
+   "pool": "anglo",
+   "hello": "Darling. Yes, it's me, no, I'm not doing the show tonight. {place} needs a rest and so do my feet.",
+   "what": "Sundays at the Imperial, Thursdays wherever pays. {specific} has seen things.",
+   "small": "The heels come off at Erskineville Road and stay off until {specific}. That's the rule."
+  },
+  "busker": {
+   "role": "busker, one amp",
+   "pool": "anglo",
+   "hello": "Hold that thought, the council's coming past. Right. {place}, what a crowd.",
+   "what": "I play the same six songs at {specific} and nobody has ever complained. Nobody has ever paid, either.",
+   "small": "The good pitch is outside {specific} between four and six. After six it's the bloke with the didgeridoo and a Bluetooth speaker."
+  },
+  "vet": {
+   "role": "vet nurse",
+   "pool": "anglo",
+   "hello": "If that's a cat in a bag, bring it round the side. {place} vet, we're always open in spirit.",
+   "what": "Cats, greyhounds, the odd cockatoo somebody found. {specific} sends us more staffies than the rest of Sydney.",
+   "small": "Every second dog in {place} is called Frankie. We've stopped correcting people."
+  },
+  "tattooist": {
+   "role": "tattooist",
+   "pool": "anglo",
+   "hello": "Walk-ins after two. You're not a walk-in, you've got that look. {place}, yeah?",
+   "what": "Twenty years on {specific}. I've done every Southern Cross in the inner west and then covered half of them up.",
+   "small": "The best coffee is next door. The worst decision you ever made is on your calf. Both are fixable."
+  },
+  "viet": {
+   "role": "pho shop owner",
+   "pool": "viet",
+   "hello": "Sit, sit. Small or large? It's the same price for you, you look hungry. Welcome to {place}.",
+   "what": "My mother's recipe, my landlord's rent. {specific} is a hundred metres of pho and every bowl is a family argument.",
+   "small": "Eat at the place with the queue of nurses. Nurses know. {specific}, past the pharmacy."
+  },
+  "greek": {
+   "role": "bakery owner",
+   "pool": "greek",
+   "hello": "Take a number. There's no numbers, I just like saying it. {place}, how are you.",
+   "what": "Spanakopita at six, custard by nine, sold out by two. {specific} has bought its lunch here since 1974.",
+   "small": "My father built {specific}'s counter with his own hands. Then the council made him move it eleven centimetres."
+  },
+  "brewer": {
+   "role": "head brewer",
+   "pool": "anglo",
+   "hello": "Mind the hose. Everyone in {place} has a brewery now, ours is the one with the hose.",
+   "what": "Hazy this, sour that. The one people actually drink is the lager. {specific} keeps the taproom full on Fridays.",
+   "small": "The bowlo's cheaper. Don't tell my investors that; they think {specific} is the future."
+  },
+  "bowlo": {
+   "role": "bowling club greenkeeper",
+   "pool": "anglo",
+   "hello": "Boots off the green. Boots OFF the green. Sorry. Welcome to {place} bowlo.",
+   "what": "Two greens, one of them dying, and a committee that thinks I'm inventing it. {specific} comes for the schnitzel and stays for the raffle.",
+   "small": "Barefoot bowls on a Sunday is what pays for the green you're standing on. I have mixed feelings."
+  },
+  "cyclist": {
+   "role": "cycleway campaigner",
+   "pool": "anglo",
+   "hello": "You didn't drive here, did you? Sorry. Reflex. {place} is nearly bike-friendly.",
+   "what": "Twelve years lobbying council for a painted line along {specific}. We got the paint. It's a sharrow.",
+   "small": "The Cooks River path is beautiful until it isn't. Watch for the bit near {specific} where the path just ends."
+  },
+  "koori": {
+   "role": "community elder",
+   "pool": "koori",
+   "hello": "You're on Gadigal land. Sit down, you're making the place look untidy. {place}, eh.",
+   "what": "I've been on {specific} longer than the cafes have. I keep an eye on things. Somebody has to.",
+   "small": "The mob at {specific} do a feed on Fridays. Bring something, don't just turn up."
+  },
+  "rabbitohs": {
+   "role": "Rabbitohs tragic",
+   "pool": "anglo",
+   "hello": "Red and green, mate. Red and green. {place} bleeds it. You're not a Roosters man, are you.",
+   "what": "Fifty years a member. I've seen premierships and I've seen 2006. {specific} is holy ground.",
+   "small": "The Redfern Oval clubhouse does a schnitty that'll set you up for a fortnight."
+  },
+  "ikea": {
+   "role": "IKEA flatpack assembler",
+   "pool": "anglo",
+   "hello": "Allen key. Never leave home without it. {place}, nice to meet you.",
+   "what": "People buy the wardrobe, get it home, and ring me. Every second house in {place} has a KALLAX I built.",
+   "small": "{specific}'s car park at four on a Sunday is a war. Bring water."
+  },
+  "chinese": {
+   "role": "dumpling house owner",
+   "pool": "chinese",
+   "hello": "Table for one? Sit anywhere. Not that one, that's the boss's. Welcome to {place}.",
+   "what": "Xiao long bao, hand-made, eleven a.m. till the dough runs out. {specific} queues down the street on Sundays.",
+   "small": "The best dumplings in {place} are at the place with the worst sign. Everyone knows. Nobody says."
+  },
+  "backpacker": {
+   "role": "backpacker on a working visa",
+   "pool": "anglo",
+   "hello": "Alright? Sorry, you're not the hostel guy. {place}'s wild, man.",
+   "what": "Eighty-eight days of farm work done, now I'm pouring beers near {specific} and sleeping eight to a room.",
+   "small": "There's a goon bag somewhere near {specific} that has my name on it, literally, I wrote it."
+  },
+  "cabbie": {
+   "role": "cabbie, twenty years",
+   "pool": "leb",
+   "hello": "Where to? Oh, you're not a fare. Fair enough. {place}, I know every gutter.",
+   "what": "Twenty years on the rank. Uber took half of it and the tunnel took the rest. {specific} is still cash, thank god.",
+   "small": "Never go via {specific} after five. Never. I don't care what the app says."
+  },
+  "cop": {
+   "role": "probationary constable",
+   "pool": "anglo",
+   "hello": "Everything alright here? Good. {place} LAC, just doing the rounds.",
+   "what": "Foot patrol, paperwork, the occasional RBT out the front of {specific}. Mostly it's people's bins.",
+   "small": "The sergeant has a thing about {specific}. Don't ask me. Don't ask him either."
+  },
+  "lostproperty": {
+   "role": "lost property clerk",
+   "pool": "anglo",
+   "hello": "Describe it. No, before you tell me where you lost it, describe it. {place} lost property.",
+   "what": "Umbrellas, phones, one prosthetic leg. {specific} produces more forgotten laptops than anywhere in the network.",
+   "small": "Nobody comes back for the umbrellas. Six hundred umbrellas. I've started a collection."
+  },
+  "agency": {
+   "role": "real estate agent",
+   "pool": "anglo",
+   "hello": "Are you here for the open? No? You should be. {place} is moving.",
+   "what": "Rentals, sales, the odd auction on a Saturday where someone cries. {specific} is the most-searched street on the site.",
+   "small": "Sun-drenched means west-facing. Cosy means small. {specific} means cosy."
+  },
+  "designer": {
+   "role": "graphic designer, freelance",
+   "pool": "anglo",
+   "hello": "Sorry, one sec, the client wants the logo bigger. Okay. {place}, hi.",
+   "what": "Logos for cafes that will close in a year. {specific} has had four different fonts on its awning since I moved here.",
+   "small": "The laneway behind {specific} has the good light for shoots. The rats also know."
+  },
+  "tab": {
+   "role": "TAB regular",
+   "pool": "anglo",
+   "hello": "Race four's off. Sorry, race four. {place}, you want a tip?",
+   "what": "I've had a system since 1988. It doesn't work. {specific} has a screen and a stool and that's all a man needs.",
+   "small": "Never back a horse called anything with 'Lucky' in it. I learned that at {specific}."
+  },
+  "greyhound": {
+   "role": "greyhound trainer",
+   "pool": "anglo",
+   "hello": "Mind the dog. He's retired, he's just not sure of it yet. {place}, yeah.",
+   "what": "Wentworth Park on a Saturday and the couch the rest of the week. {specific} has walked more greyhounds than it has people.",
+   "small": "They sleep twenty hours a day. The other four they want to be at {specific}."
+  },
+  "fishmonger": {
+   "role": "fishmonger, Fish Markets",
+   "pool": "greek",
+   "hello": "Four a.m. start. It's now one in the afternoon. Talk fast. {place}.",
+   "what": "Snapper, prawns, whatever came off the boat. {specific} buys what the restaurants don't.",
+   "small": "Christmas Eve at the Fish Markets is thirty-six hours straight and someone always faints near {specific}."
+  },
+  "suit": {
+   "role": "corporate, on a break",
+   "pool": "anglo",
+   "hello": "I've got eleven minutes. Sorry -- nine. {place}, what do you need?",
+   "what": "Consulting. I consult. On what, nobody's sure, including me. {specific} is where I pretend to have lunch.",
+   "small": "The coffee near {specific} is eight dollars. I expense it. I'm not proud."
+  },
+  "security": {
+   "role": "security guard",
+   "pool": "islander",
+   "hello": "Bags open, please. Thanks, bro. Welcome to {place}.",
+   "what": "Twelve-hour shifts standing near {specific} watching people not steal things. Mostly.",
+   "small": "There's a bench near {specific} where the whole shift eats lunch. We've named the pigeons."
+  },
+  "courier": {
+   "role": "bike courier",
+   "pool": "anglo",
+   "hello": "Can't stop -- actually can, the app's crashed. {place}, what's up?",
+   "what": "Deliveries across the city on a bike with one brake. {specific} is a fifteen-minute pickup that takes forty.",
+   "small": "The lift at {specific} takes longer than the ride from Central. I've timed it."
+  },
+  "deckhand": {
+   "role": "ferry deckhand",
+   "pool": "anglo",
+   "hello": "Stand clear of the gap. Force of habit. {place}, you're on the wrong side of the wharf for Manly.",
+   "what": "Ropes, gangways, the Manly run in a southerly. {specific} is the best view in the city and I get paid to look at it.",
+   "small": "The Freshwater's rolled more tourists than a pub crawl. Sit in the middle. Trust me."
+  },
+  "tourist": {
+   "role": "tourist, lost",
+   "pool": "anglo",
+   "hello": "Excuse me -- oh, you're local? Is this {place}? The map says it's {place}.",
+   "what": "I've been to the bridge and the Opera House and now I'm just standing near {specific}. Is that it? Is that Sydney?",
+   "small": "Everyone told me about {specific}. Nobody told me it would be this expensive."
+  },
+  "bridgeclimb": {
+   "role": "bridge climb guide",
+   "pool": "anglo",
+   "hello": "Harnesses off, phones away. Sorry, day job. {place}, welcome.",
+   "what": "Six climbs a day up the arch. {specific} looks different from a hundred and thirty metres, mostly smaller.",
+   "small": "The bit nobody tells you: it's the wind at {specific} that gets you, not the height."
+  },
+  "bouncer": {
+   "role": "bouncer, the Cross",
+   "pool": "islander",
+   "hello": "ID. Nah, I'm joking, you're fine. {place}, mate. Slow night.",
+   "what": "Doors on Darlinghurst Road since the lockouts. {specific} used to be a war zone. Now it's brunch.",
+   "small": "The Coke sign has watched me lose three girlfriends. It doesn't say anything. I appreciate that."
+  },
+  "nurse": {
+   "role": "night-shift nurse",
+   "pool": "viet",
+   "hello": "Sorry, just off a double. Twelve hours. {place}, hi, what's wrong?",
+   "what": "Emergency. Everything comes through the door at {specific}: footballers, grandmothers, a man with a fork. Never a dull shift.",
+   "small": "The good coffee near {specific} opens at five. The nurses are there at four fifty-nine."
+  },
+  "chaplain": {
+   "role": "Wayside Chapel volunteer",
+   "pool": "anglo",
+   "hello": "Come in, there's soup. There's always soup. {place} looks after its own.",
+   "what": "Beds, showers, a cuppa, someone to talk to. {specific} gets busier every winter.",
+   "small": "Everyone's got a story at {specific}. Most of them are true. Some of them are better than true."
+  },
+  "surfer": {
+   "role": "surfer, dawn patrol",
+   "pool": "anglo",
+   "hello": "Onshore. Absolutely cooked. {place} is flat as a tack, mate.",
+   "what": "Check the cam, drive down, paddle out, get skunked. {specific} on a good day is why people move here.",
+   "small": "The car park at {specific} has a bloke who's been there since 1994. He's fine. Don't move his cone."
+  },
+  "personaltrainer": {
+   "role": "personal trainer",
+   "pool": "anglo",
+   "hello": "Squats. No -- sorry. Habit. {place}, what's the goal?",
+   "what": "Bootcamp at six in {specific}, then clients until the park kicks us out. Bondi Junction's abs are my doing.",
+   "small": "The stairs at {specific} are the best free gym in the east. The council keeps trying to put a rail on them."
+  },
+  "nanny": {
+   "role": "nanny, two families",
+   "pool": "anglo",
+   "hello": "Shh, she's finally asleep. In the pram. In {place}. Hi.",
+   "what": "Two families, four kids, one Volvo. {specific} is where the playground fights happen and I mean the parents.",
+   "small": "Every mother at {specific} has an opinion about sleep training and none of them have slept."
+  },
+  "punter": {
+   "role": "racegoer, day off",
+   "pool": "anglo",
+   "hello": "Fancy anything in the fourth? No? Sensible. {place}, mate.",
+   "what": "Randwick on a Saturday, the TAB on a Tuesday, the fridge in between. {specific} has taken more of my money than my ex.",
+   "small": "The members' stand at {specific} has better carpet than my house. I've measured."
+  },
+  "trainer": {
+   "role": "racehorse trainer",
+   "pool": "anglo",
+   "hello": "Four a.m. trackwork, then this. {place}, you're standing on my lucky patch.",
+   "what": "Twelve horses, eleven owners, one that wins. {specific} stables have been here longer than the suburb.",
+   "small": "A horse knows if you're nervous. So does the bloke at {specific} who takes the bets."
+  },
+  "strapper": {
+   "role": "strapper",
+   "pool": "anglo",
+   "hello": "Don't stand behind him. He kicks. {place}, yeah, what?",
+   "what": "I brush, I walk, I hold the head while the vet does the thing. {specific} at dawn is the best job in the world for the money it doesn't pay.",
+   "small": "The best feed is the trackies' canteen at {specific}, half six, before the owners arrive."
+  },
+  "swimmer": {
+   "role": "ocean pool regular",
+   "pool": "anglo",
+   "hello": "Water's fourteen. Fourteen! {place}, you'd be mad not to.",
+   "what": "Every morning, forty laps, rain or hail. {specific} has a group of us who've been doing it since Whitlam.",
+   "small": "The bloke in lane two at {specific} has been swimming the same pace for thirty years. We call him the tide."
+  },
+  "lunapark": {
+   "role": "Luna Park ride operator",
+   "pool": "anglo",
+   "hello": "Keep your arms inside the -- sorry, day job. {place}, what's the story?",
+   "what": "The Wild Mouse, the Ferris wheel, the face that gives children nightmares. {specific} is a dream job with a rollercoaster in it.",
+   "small": "The Coney Island slides at {specific} have burnt the same patch of my elbow since I was nine."
+  },
+  "pharmacist": {
+   "role": "chemist",
+   "pool": "chinese",
+   "hello": "Script or a chat? Both's fine. {place} pharmacy, we do both.",
+   "what": "Scripts, flu shots, and every man in {place} asking quietly about the same thing. {specific} keeps me in Panadol.",
+   "small": "The Chemist Warehouse near {specific} sells everything cheaper and nobody there knows your name."
+  },
+  "korean": {
+   "role": "Korean BBQ owner",
+   "pool": "korean",
+   "hello": "Table? Grill's hot. Mind the smoke. Welcome to {place}.",
+   "what": "Pork belly, kimchi, soju until the last train. {specific} is Strathfield's real main street.",
+   "small": "The karaoke room behind {specific} has a Bon Jovi problem. It's not the customers. It's my father."
+  },
+  "tutor": {
+   "role": "HSC tutor",
+   "pool": "korean",
+   "hello": "Band six or nothing. Sorry, that's the brochure talking. {place}, hi.",
+   "what": "Maths extension two, Saturdays, forty kids and their mothers in the corridor. {specific} has three of us on one block.",
+   "small": "Every second shopfront near {specific} is a tutoring college. The first one is a bubble tea."
+  },
+  "commuter": {
+   "role": "commuter of long standing",
+   "pool": "anglo",
+   "hello": "The 7:42's late. It's always late. {place}, welcome to my life.",
+   "what": "Forty years on the Western line. {specific} platform 3 has a seat with my name on it, figuratively, and one day literally.",
+   "small": "The quiet carriage at {specific} is a myth. It's a suggestion. It's a war."
+  },
+  "leb": {
+   "role": "Lebanese bakery owner",
+   "pool": "leb",
+   "hello": "Manoush? Zaatar or cheese? Both. Sit. Welcome to {place}.",
+   "what": "The oven's been going since 1979 and so has my father. {specific} runs on our bread and doesn't know it.",
+   "small": "Ramadan nights at {specific} you can't move. Come at midnight. Bring cash. Bring an appetite."
+  },
+  "bulldogs": {
+   "role": "Bulldogs supporter",
+   "pool": "leb",
+   "hello": "Blue and white, habibi. Blue and white. {place}, you here for the game?",
+   "what": "Every home game since I was six. My dad, my uncles, the whole family in the Belmore stand at {specific}.",
+   "small": "The best kebab in {place} is next to the worst car park in Sydney. {specific}. Both are famous."
+  },
+  "rsl": {
+   "role": "RSL sub-branch secretary",
+   "pool": "anglo",
+   "hello": "Sign in, love. Everyone signs in. {place} RSL, you're very welcome.",
+   "what": "Raffles, Anzac Day, the bistro's schnitzel and a room full of pokies I have opinions about. {specific} sends us its regulars.",
+   "small": "The cheapest schooner in {place} is at the sub-branch, six o'clock, before the Ode. Stand up for the Ode."
+  },
+  "mechanic": {
+   "role": "mechanic, own shop",
+   "pool": "leb",
+   "hello": "It's the timing belt. I haven't looked. It's always the timing belt. {place}, what've you got?",
+   "what": "Commodores, Hiluxes, the odd Alfa from a man who should know better. {specific} is where they die.",
+   "small": "Never buy a car off {specific}. Never. I've seen where they've been."
+  },
+  "bangla": {
+   "role": "grocer",
+   "pool": "bangla",
+   "hello": "Fresh coriander, best in {place}. You didn't come for coriander. Sit.",
+   "what": "Rice, spices, the fish your mother would know. {specific} shops with me on Thursdays, all of it.",
+   "small": "The best biryani in {place} is at the place near {specific} that doesn't have a sign. Follow the taxis."
+  },
+  "baker": {
+   "role": "baker",
+   "pool": "leb",
+   "hello": "Flour on everything, sorry. Welcome to {place}. Something warm?",
+   "what": "Up at three, done by noon, asleep by nine. {specific} eats what I make and I never see them awake.",
+   "small": "The knafeh at {specific} is my cousin's. Better than mine. Don't tell him."
+  },
+  "dragons": {
+   "role": "Dragons member",
+   "pool": "anglo",
+   "hello": "Red V. Since '99. Don't. {place}, mate, what?",
+   "what": "Kogarah on a Saturday and the St George Leagues Club after. {specific} has more Dragons flags than a Dragons game.",
+   "small": "The club at {specific} does a $12 roast on Sundays and the whole of the Shire drives up for it."
+  },
+  "eels": {
+   "role": "Eels supporter",
+   "pool": "anglo",
+   "hello": "Blue and gold, brother. Parra. {place}. You bleed it or you don't.",
+   "what": "Every home game at CommBank, every away game on the phone at work. {specific} is Eels country and always was.",
+   "small": "Church Street after a win is the best place in Australia. After a loss, go to {specific}."
+  },
+  "indian": {
+   "role": "chaat shop owner",
+   "pool": "indian",
+   "hello": "Pani puri? Six for you, six for me. Welcome to {place}, uncle's shop.",
+   "what": "Chaat, dosa, the best chai on Wigram Street. {specific} on Diwali is a hundred thousand people and one register.",
+   "small": "The good sweets at {specific} are in the second cabinet. The first cabinet is for tourists."
+  },
+  "turkish": {
+   "role": "pide shop owner",
+   "pool": "turkish",
+   "hello": "Pide's out of the oven in two minutes. Sit. {place}, welcome.",
+   "what": "Pide, kebab, baklava my wife won't let me sell. {specific} eats here after Friday prayers.",
+   "small": "The gardens at {specific} in August are the cherry blossoms. Everyone comes. Nobody buys pide."
+  },
+  "afghan": {
+   "role": "carpet shop owner",
+   "pool": "afghan",
+   "hello": "Come in, look, no buying. Tea? Tea. {place}, you're welcome here.",
+   "what": "Rugs from home, twenty years in {place}. {specific} customers come for the tea and leave with a rug.",
+   "small": "The kabuli near {specific} is the closest thing to my mother's cooking in this hemisphere."
+  },
+  "gardener": {
+   "role": "botanic gardens groundskeeper",
+   "pool": "anglo",
+   "hello": "Off the grass. That grass. This grass is fine. {place} gardens, welcome.",
+   "what": "Cherry trees, koi, and every wedding photographer in western Sydney. {specific} in August is my Christmas.",
+   "small": "The ibis at {specific} have worked out the bins. They're smarter than the council."
+  },
+  "khmer": {
+   "role": "Cambodian restaurant owner",
+   "pool": "khmer",
+   "hello": "Amok? You want the amok. Sit down. Welcome to {place}.",
+   "what": "My parents came in '83 with nothing. {specific} was the nothing. Now it's this.",
+   "small": "The best coffee in {place} is Vietnamese iced and it's at {specific} and it's four dollars."
+  },
+  "diggers": {
+   "role": "Diggers club duty manager",
+   "pool": "anglo",
+   "hello": "Members and guests. You're a guest. Sign here. {place} Diggers.",
+   "what": "The bistro, the bowls, the Anzac service, the raffle that funds the lot. {specific} keeps us honest.",
+   "small": "The $10 steak night at {specific} is the reason half of Cabra has a Tuesday."
+  },
+  "nipper": {
+   "role": "nippers parent, on the sand",
+   "pool": "anglo",
+   "hello": "Sunscreen! Sorry, not you. Six-year-olds. {place}, what's happening?",
+   "what": "Every Sunday at seven, forty kids in pink caps and their parents in the surf club. {specific} is where I lost my voice.",
+   "small": "The bacon and egg roll at {specific}'s surf club is the best in the Shire. Fight me."
+  },
+  "sharks": {
+   "role": "Sharks supporter",
+   "pool": "anglo",
+   "hello": "Up, up Cronulla. 2016, mate. Never forget. {place}, what's up?",
+   "what": "Shark Park, every home game, since the seats were bleachers. {specific} is where we drank after the grand final.",
+   "small": "The best thing about the Shire is you never have to leave. The worst thing is {specific} on a long weekend."
+  },
+  "shire": {
+   "role": "Shire local, never left",
+   "pool": "anglo",
+   "hello": "You're not from here. It's fine. {place}. Everyone's welcome, sort of.",
+   "what": "Born at Sutherland, school at Cronulla, married at the RSL. {specific} is my whole world and I'm happy with it.",
+   "small": "There's a bloke at {specific} who's been surfing the same break since the Whitlam dismissal. He's fine."
+  },
+  "panthers": {
+   "role": "Panthers supporter",
+   "pool": "anglo",
+   "hello": "Four in a row. FOUR. {place}, you here for the game?",
+   "what": "Panthers member since the Leagues Club was a shed. {specific} is where the whole of the west turns up on a Friday.",
+   "small": "The Log Cabin at {specific} has seen every grand final and most of the divorces."
+  },
+  "westie": {
+   "role": "proud westie",
+   "pool": "anglo",
+   "hello": "Westie and proud, mate. Say it. {place}. Yeah.",
+   "what": "Born at Nepean, work at Penrith, drive a ute with a P plate I should've taken off ten years ago. {specific} is home.",
+   "small": "The M4 at five is a car park. The M4 at six is a slower car park. {specific}'s the shortcut. Don't tell anyone."
+  },
+  "islander": {
+   "role": "church youth leader",
+   "pool": "islander",
+   "hello": "Bro. Sis. Welcome, welcome. {place} Sunday, the whole family's here.",
+   "what": "Youth group, choir, the rugby on Saturdays. {specific} feeds four hundred after the service and nobody goes home hungry.",
+   "small": "The best feed in {place} is the hall at {specific} after church. You don't need an invitation. You're invited."
+  },
+  "scout": {
+   "role": "scout leader",
+   "pool": "anglo",
+   "hello": "Left over right. Sorry -- knots. {place} scouts, what's the trouble?",
+   "what": "Thirty kids, a hall by the bush, and a camping trip nobody's parents believe in. {specific} is our patch.",
+   "small": "The track behind {specific} goes all the way to the river if you know the turn. The kids don't. That's the point."
+  },
+  "northshore": {
+   "role": "North Shore mum, active",
+   "pool": "anglo",
+   "hello": "Sorry, the Kluger's on the hydrant, is that -- no? Great. {place}, hi.",
+   "what": "School run, tennis, the P&C, a committee about the committee. {specific} is where it all gets decided.",
+   "small": "The coffee at {specific} is fine. The parking is a war crime."
+  }
+ },
+ "goals": {
+  "note": "kinds: goto | photo | ko | buy | ride | earn | dialog. A {spot} is a point in the area (the generator places it); {next} is the next rung's station. `line` per step is the tracker label. Titles and cores name {place} or {specific}. Categories keep the spread honest.",
+  "list": [
+   {
+    "key": "the-proof",
+    "cat": "photo",
+    "steps": [
+     [
+      "photo",
+      "{spot}",
+      "get a picture of {specific} before they fix it"
+     ]
+    ],
+    "title": "Proof of {specific}",
+    "core": "Nobody in {place} believes what {specific} looks like at {when}. Get me a photo close enough that council can't say it's somewhere else."
+   },
+   {
+    "key": "the-before",
+    "cat": "photo",
+    "steps": [
+     [
+      "photo",
+      "{spot}",
+      "photograph the state of {specific}"
+     ],
+     [
+      "goto",
+      "{spot2}",
+      "then the other end of it"
+     ]
+    ],
+    "title": "Before They Touch {specific}",
+    "core": "They start on {specific} on {day} and the orange fencing goes up. I want {place} on record before it does."
+   },
+   {
+    "key": "the-lost-thing",
+    "cat": "walk",
+    "steps": [
+     [
+      "goto",
+      "{spot}",
+      "check the bench near {specific}"
+     ],
+     [
+      "photo",
+      "{spot2}",
+      "photograph the bins behind it"
+     ],
+     [
+      "dialog",
+      "back",
+      "tell me what you found"
+     ]
+    ],
+    "title": "Left It Near {specific}",
+    "core": "I left something on the bench at {specific} at {when}. By the time I got back to {place} it had walked, so look where I'd have dropped it."
+   },
+   {
+    "key": "the-karen",
+    "cat": "muscle",
+    "steps": [
+     [
+      "ko",
+      "karen",
+      2,
+      "deal with the two of them near {specific}"
+     ]
+    ],
+    "title": "The {specific} Complaint",
+    "core": "Two women in activewear have photographed my bins outside {specific} since {day}. One has {place} council on speed dial; sort it however you sort things."
+   },
+   {
+    "key": "the-eshays",
+    "cat": "muscle",
+    "steps": [
+     [
+      "ko",
+      "eshay",
+      3,
+      "move the lads on from {specific}"
+     ]
+    ],
+    "title": "Lads Off {specific}",
+    "core": "Three of them in TNs on the {specific} steps, flogging vapes to schoolkids at {when}. {place} used to move them on itself and now it rings me."
+   },
+   {
+    "key": "the-drunks",
+    "cat": "muscle",
+    "steps": [
+     [
+      "ko",
+      "drunk",
+      2,
+      "walk the two drunks off {specific}"
+     ],
+     [
+      "photo",
+      "{spot}",
+      "and show me the doorway clear"
+     ]
+    ],
+    "title": "Closing Time at {specific}",
+    "core": "Two blokes have slept in my doorway on {specific} since the pub shut. The {place} delivery's at {when}, so get them up and show me the step empty."
+   },
+   {
+    "key": "the-tradie-tab",
+    "cat": "muscle",
+    "steps": [
+     [
+      "ko",
+      "tradie",
+      2,
+      "collect from the two chippies near {specific}"
+     ],
+     [
+      "earn",
+      30,
+      "and bring back thirty of it"
+     ]
+    ],
+    "title": "The {specific} Tab",
+    "core": "Two chippies off the {specific} job have run a tab in {place} since {day}. They drove past at {when} without looking in, so settle it in cash."
+   },
+   {
+    "key": "the-rbt",
+    "cat": "muscle",
+    "steps": [
+     [
+      "ko",
+      "rbt",
+      1,
+      "get past the breath test on {specific}"
+     ],
+     [
+      "goto",
+      "{spot2}",
+      "then meet the ute at the far end"
+     ]
+    ],
+    "title": "RBT on {specific}",
+    "core": "There's a breath test set up on {specific} since {when}. My brother-in-law needs the ute at the far end of {place} without a conversation."
+   },
+   {
+    "key": "the-cop-shop",
+    "cat": "muscle",
+    "steps": [
+     [
+      "ko",
+      "police",
+      1,
+      "lose the probationary constable near {specific}"
+     ]
+    ],
+    "title": "Probationary at {specific}",
+    "core": "A young constable has been doing his first solo patrol round {specific} since {day}. He's decided {place} is his, so give him a story for the sergeant."
+   },
+   {
+    "key": "the-flat-white",
+    "cat": "buy",
+    "steps": [
+     [
+      "buy",
+      "FLAT WHITE",
+      1,
+      "get a flat white from the cafe near {specific}"
+     ],
+     [
+      "goto",
+      "{spot}",
+      "and bring it back before it's lukewarm"
+     ]
+    ],
+    "title": "A Flat White From {specific}",
+    "core": "I want a flat white from the place near {specific}, not the one next to it. Here by {when}, while it's still coffee and {place} still has some."
+   },
+   {
+    "key": "the-training",
+    "cat": "buy",
+    "steps": [
+     [
+      "buy",
+      "TRAINING",
+      1,
+      "do the course they run near {specific}"
+     ],
+     [
+      "ko",
+      "any",
+      2,
+      "then show me what it taught you"
+     ]
+    ],
+    "title": "The {specific} Course",
+    "core": "A bloke near {specific} runs a ninety-minute course he bills at four hundred, and I've paid. Sit it {day}, then come back to {place} and prove it did something."
+   },
+   {
+    "key": "the-fare",
+    "cat": "earn",
+    "steps": [
+     [
+      "earn",
+      45,
+      "earn forty-five somewhere in {place}"
+     ]
+    ],
+    "title": "Rent Money, {specific}",
+    "core": "I'm forty-five short on the {specific} rent and the agent doesn't take stories. Make it somewhere in {place} by {when}; I'm not fussy how."
+   },
+   {
+    "key": "the-float",
+    "cat": "earn",
+    "steps": [
+     [
+      "earn",
+      60,
+      "clear sixty for the {specific} float"
+     ],
+     [
+      "dialog",
+      "back",
+      "hand it over at the counter"
+     ]
+    ],
+    "title": "The {specific} Float",
+    "core": "The till at {specific} opens {day} with an empty float because somebody took it to the pub. Sixty before the first {place} customer, and I'll never say who."
+   },
+   {
+    "key": "the-raffle",
+    "cat": "earn",
+    "steps": [
+     [
+      "earn",
+      35,
+      "raise thirty-five for the meat tray"
+     ],
+     [
+      "goto",
+      "{spot}",
+      "and drop it at {specific}"
+     ]
+    ],
+    "title": "Meat Tray at {specific}",
+    "core": "The {specific} raffle is thirty-five short of a meat tray and the draw is at {when}. Find it in {place} and put it in the tin."
+   },
+   {
+    "key": "the-train-north",
+    "cat": "ride",
+    "steps": [
+     [
+      "ride",
+      "{station}",
+      "{next}",
+      "take the train to {next}"
+     ],
+     [
+      "photo",
+      "{nextspot}",
+      "and photograph the platform sign"
+     ]
+    ],
+    "title": "One Stop From {specific}",
+    "core": "I need to know the train from {place} stops at {next} and doesn't sail through like it did on {day}. Ride it at {when} and photograph the sign."
+   },
+   {
+    "key": "the-opal",
+    "cat": "ride",
+    "steps": [
+     [
+      "ride",
+      "{station}",
+      "{next}",
+      "tap on at {place}, tap off at {next}"
+     ],
+     [
+      "dialog",
+      "back",
+      "come back and tell me the fare"
+     ]
+    ],
+    "title": "Tap On at {specific}",
+    "core": "My Opal says I owe nineteen dollars for a trip from {place} I never took on {day}. Take the same one to {next} and tell me what it charged you."
+   },
+   {
+    "key": "the-courier",
+    "cat": "crumb",
+    "steps": [
+     [
+      "ride",
+      "{station}",
+      "{next}",
+      "carry it on the train to {next}"
+     ],
+     [
+      "goto",
+      "{nextspot}",
+      "hand it over outside the station, where the crowd is"
+     ]
+    ],
+    "title": "Parcel for {next}",
+    "core": "A parcel from {specific} has to be at {next} by {when} and Australia Post quoted me {day}. Take the train and hand it to the people outside the station."
+   },
+   {
+    "key": "the-breadcrumb",
+    "cat": "crumb",
+    "steps": [
+     [
+      "ride",
+      "{station}",
+      "{next}",
+      "take the train to {next}"
+     ],
+     [
+      "goto",
+      "{nextspot}",
+      "find the people outside {next} station"
+     ],
+     [
+      "dialog",
+      "back",
+      "then come back and tell me what they said"
+     ]
+    ],
+    "title": "Ask Around at {next}",
+    "core": "There's work going outside {next} station and nobody at {specific} can tell me what. Ride over at {when}, get the shape of it, come back."
+   },
+   {
+    "key": "the-count",
+    "cat": "walk",
+    "steps": [
+     [
+      "goto",
+      "{spot}",
+      "count the cars at {specific}"
+     ],
+     [
+      "goto",
+      "{spot2}",
+      "then the other car park"
+     ],
+     [
+      "photo",
+      "{spot}",
+      "photograph the fuller one"
+     ]
+    ],
+    "title": "Counting {specific}",
+    "core": "Council says the {specific} car park is never full and I say it's full by {when}. Count both {place} car parks, photograph whichever one makes me right."
+   },
+   {
+    "key": "the-sign",
+    "cat": "photo",
+    "steps": [
+     [
+      "photo",
+      "{spot}",
+      "photograph the sign at {specific}"
+     ],
+     [
+      "photo",
+      "{spot2}",
+      "and the one that contradicts it"
+     ]
+    ],
+    "title": "Two Signs, {specific}",
+    "core": "Two signs near {specific} say opposite things about parking and I've been fined under both. Get photos of each before {day}, when {place} council takes one down."
+   },
+   {
+    "key": "the-dog",
+    "cat": "walk",
+    "steps": [
+     [
+      "goto",
+      "{spot}",
+      "check the off-leash bit near {specific}"
+     ],
+     [
+      "photo",
+      "{spot2}",
+      "photograph the creek end"
+     ],
+     [
+      "dialog",
+      "back",
+      "tell me if you saw a staffy in a bandana"
+     ]
+    ],
+    "title": "Staffy Near {specific}",
+    "core": "A brindle staffy in a red bandana went over the fence at {specific} at {when}. Everyone in {place} has definitely seen it and can't say where."
+   },
+   {
+    "key": "the-pub-crawl",
+    "cat": "muscle",
+    "steps": [
+     [
+      "ko",
+      "drunk",
+      3,
+      "sort the three from the {specific} crawl"
+     ],
+     [
+      "earn",
+      20,
+      "and get the twenty they owe"
+     ]
+    ],
+    "title": "{specific} Pub Crawl",
+    "core": "A bucks started at {specific} at noon and it's now three blokes, one pair of pants and a tab. Recover the tab by {when}; {place} can keep the dignity."
+   },
+   {
+    "key": "the-photo-fine",
+    "cat": "photo",
+    "steps": [
+     [
+      "photo",
+      "{spot}",
+      "photograph the camera near {specific}"
+     ],
+     [
+      "ride",
+      "{station}",
+      "{next}",
+      "then take the train instead, to {next}"
+     ]
+    ],
+    "title": "The {specific} Camera",
+    "core": "A new speed camera near {specific} has fined half of {place} since {day}. Photograph it for the appeal, then prove the train to {next} is faster anyway."
+   },
+   {
+    "key": "the-witness",
+    "cat": "walk",
+    "steps": [
+     [
+      "goto",
+      "{spot}",
+      "stand where it happened at {specific}"
+     ],
+     [
+      "photo",
+      "{spot}",
+      "photograph the corner"
+     ],
+     [
+      "dialog",
+      "back",
+      "describe the sightline"
+     ]
+    ],
+    "title": "Sightline at {specific}",
+    "core": "Insurance says nobody could have seen the ute hit the fence at {specific} on {day}. Stand where I stood in {place}, photograph the view, tell me if I'm lying."
+   },
+   {
+    "key": "the-collection",
+    "cat": "earn",
+    "steps": [
+     [
+      "ko",
+      "tradie",
+      1,
+      "find the sparky who owes for {specific}"
+     ],
+     [
+      "earn",
+      40,
+      "and get forty of it"
+     ]
+    ],
+    "title": "The {specific} Sparky",
+    "core": "The sparky off the {specific} job has owed me since the bathroom and drinks in {place} from {when}. Forty will do and I'll write off the rest."
+   },
+   {
+    "key": "the-markets",
+    "cat": "buy",
+    "steps": [
+     [
+      "buy",
+      "any",
+      1,
+      "pick something up near {specific}"
+     ],
+     [
+      "goto",
+      "{spot}",
+      "bring it to the stall"
+     ]
+    ],
+    "title": "Something From {specific}",
+    "core": "The stall at {specific} has run out and the customers keep coming. Find something round {place} that'll do before the {when} rush."
+   },
+   {
+    "key": "the-longwalk",
+    "cat": "walk",
+    "steps": [
+     [
+      "goto",
+      "{spot}",
+      "walk the length of {specific}"
+     ],
+     [
+      "goto",
+      "{spot2}",
+      "to the far end"
+     ],
+     [
+      "photo",
+      "{spot2}",
+      "photograph what's there now"
+     ]
+    ],
+    "title": "The Length of {specific}",
+    "core": "I haven't walked {specific} end to end since the light rail came to {place}. Do it {day} for me and photograph what's at the far end now."
+   },
+   {
+    "key": "the-shift",
+    "cat": "earn",
+    "steps": [
+     [
+      "earn",
+      50,
+      "cover the fifty for the shift"
+     ],
+     [
+      "ko",
+      "any",
+      1,
+      "and handle whoever's at the door"
+     ]
+    ],
+    "title": "Cover at {specific}",
+    "core": "I've got nobody for the {specific} shift at {when} and a room full of {place} people who've paid. Fifty of trade and one difficult person at the door."
+   },
+   {
+    "key": "the-bins",
+    "cat": "photo",
+    "steps": [
+     [
+      "photo",
+      "{spot}",
+      "photograph the bins at {specific}"
+     ],
+     [
+      "ko",
+      "karen",
+      1,
+      "and the woman who moved them"
+     ]
+    ],
+    "title": "Bin Night, {specific}",
+    "core": "Somebody moves the bins on {specific} in front of my drive every {day} night. Photograph the evidence and have a word; {place} knows who."
+   },
+   {
+    "key": "the-station-fix",
+    "cat": "ride",
+    "steps": [
+     [
+      "goto",
+      "{stationspot}",
+      "check the lift at {place} station"
+     ],
+     [
+      "ride",
+      "{station}",
+      "{next}",
+      "then ride to {next} and check theirs"
+     ],
+     [
+      "dialog",
+      "back",
+      "report which one works"
+     ]
+    ],
+    "title": "The {specific} Lift",
+    "core": "The lift at {place} station has been out since the Easter Show and I'm told {next} is worse. Check both {day} and tell me which takes a pram."
+   },
+   {
+    "key": "the-kebab",
+    "cat": "buy",
+    "steps": [
+     [
+      "buy",
+      "any",
+      2,
+      "pick up two from near {specific}"
+     ],
+     [
+      "goto",
+      "{spot}",
+      "and get them here hot"
+     ]
+    ],
+    "title": "Two From {specific}",
+    "core": "Two of whatever's going near {specific}, here, hot, before the footy at {when}. It's {place}; I'm not asking for much."
+   },
+   {
+    "key": "the-new-arrival",
+    "cat": "crumb",
+    "steps": [
+     [
+      "ride",
+      "{station}",
+      "{next}",
+      "take the train to {next}"
+     ],
+     [
+      "photo",
+      "{nextspot}",
+      "photograph the station front"
+     ],
+     [
+      "dialog",
+      "back",
+      "tell me if it's worth the move"
+     ]
+    ],
+    "title": "Is {next} Any Good",
+    "core": "The agent says I should move to {next} and I haven't been since the nineties. Ride over {day}, photograph the station front, tell me honestly."
+   },
+   {
+    "key": "the-double",
+    "cat": "muscle",
+    "steps": [
+     [
+      "ko",
+      "eshay",
+      2,
+      "sort the pair near {specific}"
+     ],
+     [
+      "ko",
+      "drunk",
+      1,
+      "and the mate who joined in"
+     ]
+    ],
+    "title": "Trouble at {specific}",
+    "core": "Two lads and their mate decided at {when} that {specific} is theirs. The rest of {place} disagrees, so explain the disagreement."
+   },
+   {
+    "key": "the-ledger",
+    "cat": "earn",
+    "steps": [
+     [
+      "earn",
+      70,
+      "square the seventy for the {specific} order"
+     ],
+     [
+      "photo",
+      "{spot}",
+      "then photograph the receipt on the counter"
+     ]
+    ],
+    "title": "The {specific} Order",
+    "core": "The {specific} order came to seventy more than I'd budgeted and the supplier wants it by {when}. Find seventy in {place} and photograph the receipt."
+   },
+   {
+    "key": "the-neighbour",
+    "cat": "walk",
+    "steps": [
+     [
+      "goto",
+      "{spot}",
+      "go and look at the fence at {specific}"
+     ],
+     [
+      "photo",
+      "{spot}",
+      "photograph the tree over it"
+     ],
+     [
+      "dialog",
+      "back",
+      "tell me whose side it's on"
+     ]
+    ],
+    "title": "The {specific} Fence",
+    "core": "My neighbour at {specific} says the tree is on my side and the fence says otherwise. Look at it {day} with {place} eyes and tell me the truth."
+   },
+   {
+    "key": "the-quiet",
+    "cat": "photo",
+    "steps": [
+     [
+      "photo",
+      "{spot}",
+      "photograph the noise from {specific}"
+     ],
+     [
+      "ko",
+      "tradie",
+      1,
+      "and have a word with the foreman"
+     ]
+    ],
+    "title": "Seven a.m. at {specific}",
+    "core": "The site at {specific} starts its jackhammer at {when} on a {day}, which is illegal and loud. Photograph it running and have a word with the {place} foreman."
+   },
+   {
+    "key": "the-trolley",
+    "cat": "walk",
+    "steps": [
+     [
+      "goto",
+      "{spot}",
+      "find the trolley near {specific}"
+     ],
+     [
+      "photo",
+      "{spot}",
+      "photograph where it ended up"
+     ],
+     [
+      "earn",
+      25,
+      "and earn the deposit back"
+     ]
+    ],
+    "title": "Trolley Run, {specific}",
+    "core": "A Woolies trolley from {specific} gets walked to the creek every {day}. Find where it ends up in {place} and make the deposit back."
+   },
+   {
+    "key": "the-tab-tip",
+    "cat": "earn",
+    "steps": [
+     [
+      "earn",
+      55,
+      "turn the tip into fifty-five"
+     ],
+     [
+      "dialog",
+      "back",
+      "tell me if it came in"
+     ]
+    ],
+    "title": "Race Four, {specific}",
+    "core": "There's a horse in race four at {when} that a bloke at {specific} swears by. Turn it into fifty-five somewhere in {place} and tell me if it came in."
+   }
+  ]
+ },
+ "when": [
+  "six in the morning",
+  "half seven",
+  "nine sharp",
+  "eleven",
+  "lunchtime",
+  "half two",
+  "school pick-up",
+  "five",
+  "knock-off",
+  "half six",
+  "eight at night",
+  "ten past ten",
+  "midnight",
+  "three in the morning",
+  "dawn",
+  "the arvo",
+  "after the footy",
+  "first thing",
+  "closing",
+  "the change of shift",
+  "peak hour",
+  "bin night",
+  "the last train",
+  "half four"
+ ],
+ "day": [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+  "the long weekend",
+  "Anzac Day",
+  "Australia Day",
+  "Easter Saturday",
+  "Boxing Day",
+  "Melbourne Cup day",
+  "grand final day",
+  "the last Sunday of the month",
+  "the King's Birthday"
+ ]
+}

@@ -409,18 +409,25 @@
       #clock.dread .edge { fill: var(--warn); }
       #clock.dread .dial { animation: sundown 2s ease-in-out infinite; }
       @keyframes sundown { 0%, 100% { opacity: 1; } 50% { opacity: .84; } }
+      /* The waypoint: the needle, the job, the distance. No pill -- a lozenge
+         under the compass read as a second clock. The name is Jost in the
+         quest's gold with a hard halo so it survives a noon sky, the range is
+         cream tabular figures under it, and the needle is the only shape. */
       #waypoint {
         position: fixed; top: 15vh; left: 50%; transform: translate(-50%, -12px);
-        display: flex; align-items: center; gap: 14px; padding: 8px 24px 8px 18px;
-        background: var(--wash); border: 1px solid var(--edge-strong); border-radius: var(--r-pill);
+        display: flex; align-items: center; gap: calc(12px * var(--ui));
         pointer-events: none; z-index: 2; opacity: 0; visibility: hidden;
         transition: opacity var(--m-calm) var(--m-ease), transform var(--m-calm) var(--m-ease), visibility 0s linear var(--m-calm);
       }
       #waypoint.shown { opacity: 1; visibility: visible; transform: translate(-50%, 0); transition: opacity var(--m-calm) var(--m-ease), transform var(--m-calm) var(--m-ease), visibility 0s; }
-      #waypoint-needle { width: 34px; height: 34px; flex: 0 0 auto; fill: var(--quest); filter: drop-shadow(0 0 3px rgba(6,10,16,.95)) drop-shadow(0 2px 4px rgba(0,0,0, .75)); }
-      #waypoint-body { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
-      #waypoint-text { font: 500 20px/1.15 var(--f-display); letter-spacing: .12em; text-transform: uppercase; color: var(--quest); text-shadow: var(--lift-big); max-width: min(34ch, 74vw); white-space: normal; overflow-wrap: break-word; text-wrap: balance; }
-      #waypoint-range { font-size: var(--t-lead); font-variant-numeric: tabular-nums; color: var(--cream); opacity: .85; text-shadow: var(--lift-big); }
+      #waypoint-needle { width: calc(30px * var(--ui)); height: calc(30px * var(--ui)); flex: 0 0 auto; fill: var(--quest); filter: drop-shadow(0 0 2px rgba(6,10,16,1)) drop-shadow(0 2px 6px rgba(0,0,0, .8)); }
+      #waypoint-body { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.1; min-width: 0; gap: calc(3px * var(--ui)); }
+      #waypoint-text {
+        font: 500 calc(22px * var(--ui))/1.1 var(--f-display); letter-spacing: .14em; text-transform: uppercase; padding-left: .14em;
+        color: var(--quest); text-shadow: 0 0 2px rgba(0,0,0,1), 0 2px 10px rgba(0,0,0, .85);
+        max-width: min(30ch, 70vw); white-space: normal; overflow-wrap: break-word; text-wrap: balance;
+      }
+      #waypoint-range { font: 500 calc(15px * var(--ui))/1 var(--f-ui); font-variant-numeric: tabular-nums; letter-spacing: .04em; color: var(--cream); text-shadow: 0 0 2px rgba(0,0,0,1), 0 2px 8px rgba(0,0,0, .85); }
       #waypoint-range:empty { display: none; }
       /* The hero line. `client/src/arealine.ts` writes opacity, the rule's
          width and a slow drift each frame; nothing here animates. */
@@ -1075,6 +1082,8 @@
         <div><kbd>i</kbd>say something</div>
         <div><kbd>enter</kbd>send · <kbd>esc</kbd>cancel</div>
         <div>everyone on the server hears it, in every room</div>
+        <div><kbd>/msg bazza</kbd>then your line — only Bazza hears it</div>
+        <div><kbd>/tp bazza</kbd>puts you near Bazza, if you share a room</div>
       </section>
       <!-- Its own section rather than a fourth line under `chat`, on that
            section's own argument: this is a topic somebody looks up ("I am

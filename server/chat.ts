@@ -103,6 +103,10 @@ import {
   findPlace,
   parsePlatform,
   parseTeleport,
+  parseMessage,
+  urlSafeName,
+  MESSAGE_NO_TARGET,
+  messageNotFound,
   platformNotFound,
   platformReply,
   splitPlatformQuery,
@@ -224,6 +228,8 @@ export class ChatHub {
     if (unstuckCommand(text)) return this.unstuck(host, ws, now);
     const destination = parseTeleport(text);
     if (destination !== null) return this.teleport(host, ws, now, destination);
+    const dm = parseMessage(text);
+    if (dm !== null) return this.whisper(host, ws, dm);
     const station = parsePlatform(text);
     if (station !== null) return this.platform(host, ws, now, station);
 
@@ -318,7 +324,24 @@ export class ChatHub {
       return 'command';
     }
 
-    const place = findPlace(query, room.sim.world.places);
+    // A suburb first, then a player by name: `/tp bazza` puts you on a road
+    // within reach of wherever Bazza is standing, if Bazza is in this room.
+    // Another room is another simulation and a body cannot be handed across;
+    // the notice says which room, so the two of them can meet in one.
+    let place = findPlace(query, room.sim.world.places);
+    if (!place) {
+      const found = this.findPlayer(host, query);
+      if (found !== null && found.room !== conn.room) {
+        this.unstuckRefused++;
+        this.notify(ws, `${found.name} is in another room — you would need to join room ${found.room}`);
+        return 'command';
+      }
+      if (found !== null && found.id === p.id) {
+        this.notify(ws, 'you are already there');
+        return 'command';
+      }
+      if (found !== null) place = { name: found.name, x: found.x, z: found.z };
+    }
     if (!place) {
       this.unstuckRefused++;
       // The radius the build actually covers, not a constant: this message is
@@ -368,6 +391,48 @@ export class ChatHub {
    * the same reason: for the next 250 ms an unseeded history would adjudicate
    * punches against wherever this player used to be.
    */
+  /** A player on any room of this host, by URL-safe name. */
+  private findPlayer(host: RoomHost, query: string): { id: number; name: string; room: number; x: number; z: number; ws: Socket } | null {
+    const want = urlSafeName(query);
+    if (want === '') return null;
+    for (const room of host.rooms) {
+      for (const other of room.conns) {
+        const q = other.data.participant;
+        if (!q || q.gone || q.bot !== null) continue;
+        if (urlSafeName(q.name) !== want) continue;
+        return { id: q.id, name: q.name, room: other.data.room, x: q.combat.body.position.x, z: q.combat.body.position.z, ws: other };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * `/msg name line`: one line to one player, on any room. Both ends see it
+   * as a private line carrying the sender's name, so the receiver can answer
+   * with `/msg` back. The sender's copy says who it went to. Not rate-gated
+   * separately from chat: it goes through the same gate as a said line.
+   */
+  private whisper(host: RoomHost, ws: Socket, dm: { to: string; text: string }): 'command' {
+    const p = ws.data.participant;
+    if (!p) return 'command';
+    if (dm.to === '' || dm.text === '') {
+      this.notify(ws, MESSAGE_NO_TARGET);
+      return 'command';
+    }
+    const found = this.findPlayer(host, dm.to);
+    if (found === null) {
+      this.notify(ws, messageNotFound(dm.to));
+      return 'command';
+    }
+    const line = (text: string): ArrayBuffer =>
+      encodeChatLine({ sender: p.id, room: CHAT_ROOM_NONE, flags: CHAT_FLAG.PRIVATE, name: p.name, text });
+    found.ws.send(line(`(to you) ${dm.text}`));
+    ws.send(line(`(to ${found.name}) ${dm.text}`));
+    this.sends += 2;
+    this.lines++;
+    return 'command';
+  }
+
   private platform(host: RoomHost, ws: Socket, now: number, query: string): 'command' {
     const conn = ws.data;
     const p = conn.participant;

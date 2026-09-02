@@ -256,6 +256,22 @@ export function daylight(phase: number): boolean {
   return phase >= SUNRISE_PHASE && phase < SUNSET_PHASE;
 }
 
+/**
+ * How lit the far city's slabs are at this phase, 0..1: full by day, a
+ * fraction at night, and a short ramp either side of sunrise and sunset so
+ * the horizon dims with the sky rather than switching. `NIGHT_SLAB` is not
+ * zero: a black slab against a dark sky is a hole in the skyline, and the
+ * city's own glow keeps a silhouette readable. `world/far.ts` applies it.
+ */
+export const NIGHT_SLAB = 0.14;
+export const SLAB_RAMP = 0.02;
+export function slabLight(phase: number): number {
+  const p = ((phase % 1) + 1) % 1;
+  const ramp = (edge: number, t: number): number => Math.max(0, Math.min(1, (t - edge) / SLAB_RAMP + 0.5));
+  const day = Math.min(ramp(SUNRISE_PHASE, p), 1 - ramp(SUNSET_PHASE, p));
+  return NIGHT_SLAB + (1 - NIGHT_SLAB) * day;
+}
+
 // --- The stations ------------------------------------------------------------------------
 
 /**
@@ -2688,6 +2704,22 @@ export function characterStruck(actor: NpcActor, attackerId: number): void {
  */
 export function verifyCharacters(): string[] {
   const failures: string[] = [];
+  // --- The far city's light follows the sky: full at noon, a fraction at
+  // midnight, and never a step.
+  {
+    const noon = slabLight((SUNRISE_PHASE + SUNSET_PHASE) / 2);
+    const midnight = slabLight(((SUNSET_PHASE + 1 + SUNRISE_PHASE) / 2) % 1);
+    if (noon !== 1) failures.push(`the far city is ${noon} lit at noon, not 1.`);
+    if (Math.abs(midnight - NIGHT_SLAB) > 1e-9) failures.push(`the far city is ${midnight} lit at midnight, not ${NIGHT_SLAB}.`);
+    let prev = slabLight(0);
+    let jump = 0;
+    for (let i = 1; i <= 2000; i++) {
+      const v = slabLight(i / 2000);
+      jump = Math.max(jump, Math.abs(v - prev));
+      prev = v;
+    }
+    if (jump > 0.06) failures.push(`the far city's light steps by ${jump.toFixed(3)} in a two-thousandth of a day.`);
+  }
 
   // --- The two epochs. See `dayAt`.
   if (TRAFFIC_EPOCH_MS !== CYCLE_EPOCH_MS) {

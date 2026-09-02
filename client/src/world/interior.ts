@@ -213,6 +213,14 @@ export const CORE_RUN_MIN_M = 5.0;
 export const CORE_RUN_MAX_M = 8.0;
 
 /**
+ * A lift cab's depth, metres. A lift is not a run: it needs a body's worth of
+ * floor and no more, which is why a tower with 7 m rooms -- half the CBD --
+ * gets a lift where it could never fit a flight. Barangaroo's 247 m tower
+ * shipped with one floor for want of this.
+ */
+export const CAB_DEPTH_M = 2.4;
+
+/**
  * Room kept clear round the core on every level, metres.
  *
  * The core is placed this far from the room's walls and the shell on the
@@ -1153,11 +1161,14 @@ function placeCore(
     const longHalf = Math.max(r.ex, r.ez);
     const shortHalf = Math.min(r.ex, r.ez);
     if (shortHalf * 2 < CORE_WIDTH_M + 2 * CORE_MARGIN_M) continue;
-    const run = Math.min(CORE_RUN_MAX_M, longHalf * 2 - 2 * CORE_LANDING_M);
-    if (run < CORE_RUN_MIN_M) continue;
+    const run =
+      kind === CORE.LIFT
+        ? Math.min(CAB_DEPTH_M, longHalf * 2 - 2 * CORE_MARGIN_M)
+        : Math.min(CORE_RUN_MAX_M, longHalf * 2 - 2 * CORE_LANDING_M);
+    if (run < (kind === CORE.LIFT ? CAB_DEPTH_M : CORE_RUN_MIN_M)) continue;
     const hr = run / 2;
     const acrossPlay = shortHalf - CORE_MARGIN_M - hw;
-    const runPlay = longHalf - CORE_LANDING_M - hr;
+    const runPlay = longHalf - (kind === CORE.LIFT ? CORE_MARGIN_M : CORE_LANDING_M) - hr;
     for (const across of [-acrossPlay, acrossPlay, 0]) {
       for (const along of [0, -runPlay, runPlay]) {
         const cu = alongU ? r.u + along : r.u + across;
@@ -1365,7 +1376,9 @@ export function buildInterior(
   let cut: CoreCut | null = null;
   if (wanted >= 2) {
     const kind = wanted > STAIR_MAX_STOREYS || deck !== undefined ? CORE.LIFT : CORE.STAIR;
-    const placed = placeCore(ground, box, planes, kind);
+    // A stair that will not fit becomes a lift, which fits nearly anywhere:
+    // a two-storey terrace too narrow for a flight still has an upstairs.
+    const placed = placeCore(ground, box, planes, kind) ?? (kind === CORE.STAIR ? placeCore(ground, box, planes, CORE.LIFT) : null);
     if (placed !== null) {
       core = placed.core;
       cut = placed.cut;

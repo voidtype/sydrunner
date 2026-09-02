@@ -63,7 +63,7 @@
  * conversation cannot be reached at all by anybody who has not loaded the page.
  */
 
-import {
+import { QUESTS_EPOCH,
   AUTH_PER_MIN,
   CHECK_PER_MIN,
   MAX_OPEN_QUESTS,
@@ -484,6 +484,7 @@ export class AccountStore {
       xp: kills * XP_PER_KO,
       level: levelFor(kills * XP_PER_KO),
       levelWeek: weekOf(now),
+      questsEpoch: QUESTS_EPOCH,
       lastPos: spot,
       // No side and nothing spent. A guest cannot have chosen -- the choice is
       // gated at level 2 and a guest cannot reach it -- so there is nothing to

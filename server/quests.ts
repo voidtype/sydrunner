@@ -117,7 +117,7 @@ import { TEAM_NAME, type Team } from '../client/src/game/teams.ts';
 import { npcKinds } from '../client/src/game/factions.ts';
 import { KIND_NAME } from '../client/src/game/powerups.ts';
 import { weekKey } from '../client/src/net/suggestions.ts';
-import {
+import { isWeekly, completionFlag,
   EMPTY_BUNDLE,
   STEP_KIND,
   addProgress,
@@ -143,7 +143,7 @@ import {
   type QuestCursors,
 } from '../client/src/game/questmodel.ts';
 import { NODE_OPENED, QUEST_OP, encodeQuestState, type QuestStateFrame, type WireCursor } from '../client/src/net/quests.ts';
-import { MAX_STORY_FLAGS, type AccountRecord } from '../client/src/net/accounts.ts';
+import { setWeeklySweep, MAX_STORY_FLAGS, type AccountRecord } from '../client/src/net/accounts.ts';
 import type { AccountStore } from './accounts.ts';
 import { FloodGuard } from './suggestions.ts';
 
@@ -325,6 +325,23 @@ interface LedgerFile {
 /**
  * The packs, wherever they came from, and the machinery that keeps them fresh.
  */
+/**
+ * Tell the week which flags it sweeps: the completion marks and the unlock
+ * flags of every weekly quest in the live bundle. `net/accounts.resetIfNewWeek`
+ * reads the set on every Monday and on the one-off reset; without this it
+ * would clear a weekly job's `w:` mark and leave the unlock flag its offer is
+ * denied on, which is a job done once and never offered again.
+ */
+function announceWeekly(bundle: ContentBundle): void {
+  const flags = new Set<string>();
+  for (const q of bundle.quests) {
+    if (!isWeekly(q)) continue;
+    flags.add(completionFlag(q.id));
+    for (const f of q.reward.unlock) if (!f.startsWith('act')) flags.add(f);
+  }
+  setWeeklySweep(flags);
+}
+
 export class ContentStore {
   private readonly ledgerPath: string;
   private readonly repo: string;
@@ -408,6 +425,7 @@ export class ContentStore {
     }
     this.files = disk;
     this.live = built.bundle;
+    announceWeekly(this.live);
 
     if (!this.local) {
       const stored = await this.readLedger();
@@ -416,6 +434,7 @@ export class ContentStore {
         if (fromLedger.errors.length === 0) {
           this.files = stored.files;
           this.live = fromLedger.bundle;
+          announceWeekly(this.live);
           this.lastFetchMs = stored.fetchedMs;
           console.log(`[sydney] quests: serving rev ${this.revision} from the ledger (fetched ${new Date(stored.fetchedMs).toISOString()})`);
         } else {
@@ -513,6 +532,7 @@ export class ContentStore {
       }
       this.files = fetched;
       this.live = built.bundle;
+    announceWeekly(this.live);
       await this.writeLedger();
       console.log(
         `[sydney] quests: rev ${revision} live — ${built.bundle.quests.length} quest(s), ${built.bundle.npcs.length} npc(s)`,
