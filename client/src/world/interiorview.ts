@@ -135,6 +135,32 @@ export class InteriorView {
   }
 
   /** Is an interior currently being drawn? */
+  /**
+   * A hole in the world that is not a building: a set of planes in three's
+   * convention, from `riding.trenchPlanes`, cut out of the same group by the
+   * same mechanism as `setWorldHole`. Null closes it.
+   *
+   * **Yields to a room.** While an interior is shown the group belongs to the
+   * building's shell, and a station mouth sixty metres away has no claim on
+   * it -- `main.ts` only asks for this when there is no interior, and this
+   * refuses anyway, because two callers each certain they own a shared
+   * resource is how the shell went missing last time.
+   */
+  setWorldCut(planes: ReadonlyArray<{ nx: number; ny: number; nz: number; constant: number }> | null): void {
+    const world = this.world;
+    if (world === null || this.mesh !== null) return;
+    if (planes === null || planes.length === 0) {
+      world.enabled = false;
+      return;
+    }
+    const out: Plane[] = [];
+    for (const p of planes.slice(0, WORLD_HOLE_PLANES)) out.push(new Plane(new Vector3(p.nx, p.ny, p.nz), p.constant));
+    while (out.length < WORLD_HOLE_PLANES) out.push(new Plane(new Vector3(0, 1, 0), -1e9));
+    world.clippingPlanes = out;
+    world.clipIntersection = true;
+    world.enabled = true;
+  }
+
   get active(): boolean {
     return this.mesh !== null;
   }

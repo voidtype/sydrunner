@@ -2214,6 +2214,82 @@ export function windOutward(inside: Vec3, a: Vec3, b: Vec3, c: Vec3, d: Vec3): [
   return dot > 0 ? [a, d, c, b] : [a, b, c, d];
 }
 
+/**
+ * A clipping plane in three's own convention -- `dot(normal, p) + constant`
+ * is negative on the side that gets clipped -- carried as numbers so this
+ * file stays three-free and `verifyStationAccess` can test the arithmetic.
+ */
+export interface CutPlane {
+  nx: number;
+  ny: number;
+  nz: number;
+  constant: number;
+}
+
+/**
+ * The hole in the paving over a station mouth, as clipping planes.
+ *
+ * `accessCutAt` carves the **terrain mesh**, and it does: measured at Wynyard
+ * the carve runs 6.5 m down the incline. But the footpath, the kerb and the
+ * road are not the terrain. They are baked into the tile by the pipeline as
+ * `footpath_concrete`, `kerb_sandstone` and `road_asphalt`, laid 0.02-0.15 m
+ * over the ground, and no runtime carve touches a tile's triangles -- so the
+ * trench was cut and the paving bridged it, and a player standing on the
+ * totem saw *"just normal floor tiles, no opening"*.
+ *
+ * The client already has one way to take a piece out of the world's own
+ * geometry: the `ClippingGroup` every tile lives in, which `InteriorView`
+ * hands a building's shell so the city stops drawing inside it. This is the
+ * same tool pointed at the trench. Five planes bound the open part of the
+ * incline -- the four sides and a floor under the ramp -- and nothing on top,
+ * because above the street there is nothing to keep. With `clipIntersection`
+ * a fragment goes only when it is inside all five, so the box takes exactly
+ * the paving over the trench and not a metre of footpath beside it.
+ *
+ * The rail chunks are drawn outside that group (`main.ts` flags their root
+ * `unclipped` for this reason), so the shaft's lining, the apron and the
+ * totem stand in the hole rather than being cut with the pavement.
+ *
+ * Only the open trench, `0 .. cutLen`, is cut: past that the lid is under the
+ * street and the paving over it is meant to be there.
+ */
+export function trenchPlanes(plan: AccessPlan, cutLen: number): CutPlane[] {
+  const dx = plan.dirX;
+  const dz = plan.dirZ;
+  const nx = -dz;
+  const nz = dx;
+  const slope = (plan.mouthY - plan.floorY) / Math.max(plan.inclineM, 1e-6);
+  // A little past the lip each way and a little wider than the passage, so the
+  // paving's own edge does not show as a sliver along the trench.
+  const d0 = -0.3;
+  const d1 = Math.max(cutLen, 0) + 0.3;
+  const w = ACCESS_HALF_W + 0.3;
+  const floor = plan.mouthY - slope * d1 - 0.5;
+  const face = (ox: number, oy: number, oz: number, cx: number, cy: number, cz: number): CutPlane => ({
+    nx: ox, ny: oy, nz: oz, constant: -(ox * cx + oy * cy + oz * cz),
+  });
+  const mx = plan.mouthX;
+  const mz = plan.mouthZ;
+  return [
+    // the two ends, outward along the incline's axis
+    face(-dx, 0, -dz, mx + dx * d0, 0, mz + dz * d0),
+    face(dx, 0, dz, mx + dx * d1, 0, mz + dz * d1),
+    // the two sides, outward across it
+    face(-nx, 0, -nz, mx - nx * w, 0, mz - nz * w),
+    face(nx, 0, nz, mx + nx * w, 0, mz + nz * w),
+    // and a floor under the ramp, pointing down
+    face(0, -1, 0, 0, floor, 0),
+  ];
+}
+
+/** Whether a point is inside every plane's clipped side -- what the group would cut. */
+export function insideCut(planes: readonly CutPlane[], x: number, y: number, z: number): boolean {
+  for (const p of planes) {
+    if (p.nx * x + p.ny * y + p.nz * z + p.constant >= 0) return false;
+  }
+  return true;
+}
+
 export function accessCutLength(plan: AccessPlan, groundAt: ((x: number, z: number) => number) | undefined): number {
   const slope = (plan.mouthY - plan.floorY) / Math.max(plan.inclineM, 1e-6);
   if (groundAt === undefined) return Math.min(plan.inclineM, (ACCESS_HEIGHT_M + ACCESS_LID_COVER_M) / Math.max(slope, 1e-6));
@@ -4302,6 +4378,38 @@ export function verifyStationAccess(): string[] {
       const same = [p, q, r, t].every((v) => [a, b, c, d].some((w) => w[0] === v[0] && w[1] === v[1] && w[2] === v[2]));
       if (!same) failures.push(`the ${name} came back with corners that were not the ones given.`);
     }
+  }
+
+  // --- The hole in the paving over a mouth takes the trench and nothing else.
+  //     See `trenchPlanes`: the paving is in the tile, the terrain carve
+  //     cannot reach it, and this is the box the clipping group cuts.
+  {
+    const plan: AccessPlan = {
+      mouthX: 100, mouthZ: 200, mouthY: 10, dirX: 0, dirZ: 1, inclineM: 18.9,
+      footX: 100, footZ: 218.9, floorY: -4.15, tunDirX: 1, tunDirZ: 0, tunnelM: 8,
+    };
+    const cutLen = 6.5;
+    const planes = trenchPlanes(plan, cutLen);
+    if (planes.length !== 5) failures.push(`${planes.length} planes bound the trench; five do.`);
+    for (const p of planes) {
+      const len = Math.hypot(p.nx, p.ny, p.nz);
+      if (Math.abs(len - 1) > 1e-9) failures.push('a trench plane normal is not unit length.');
+    }
+    // Paving over the trench: at the street, halfway down, on the centreline.
+    if (!insideCut(planes, 100, 10.1, 203)) failures.push('the paving over the middle of the trench is not cut.');
+    // The footpath a metre to the side of the passage is kept.
+    if (insideCut(planes, 100 + ACCESS_HALF_W + 1, 10.1, 203)) failures.push('footpath beside the trench was cut.');
+    // The paving past the open trench, over the lid, is kept.
+    if (insideCut(planes, 100, 10.1, 200 + cutLen + 1)) failures.push('paving over the lid, past the open trench, was cut.');
+    // The street in front of the mouth is kept.
+    if (insideCut(planes, 100, 10.1, 198)) failures.push('the street in front of the mouth was cut.');
+    // The shaft itself, well under the ramp floor, is below the box.
+    if (insideCut(planes, 100, -20, 203)) failures.push('the cut reaches down into the shaft; the lining would go with the paving.');
+    // The sky over it is open: nothing above is kept out of the box on purpose.
+    if (!insideCut(planes, 100, 30, 203)) failures.push('the box has a lid; the trench should be open to the sky.');
+    // A zero-length trench cuts (almost) nothing.
+    const none = trenchPlanes(plan, 0);
+    if (insideCut(none, 100, 10.1, 203)) failures.push('a mouth with no open trench still cut the paving three metres in.');
   }
 
   // --- The field's plans are addressable by name, which is what lets the

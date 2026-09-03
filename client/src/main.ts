@@ -712,6 +712,7 @@ import {
   type PlatformField,
   type Stand,
   type StationBoxField,
+  trenchPlanes, accessCutLength,
 } from './game/riding.ts';
 import { SPAN_TUNNEL, railSeconds, verifyRail } from './game/rail.ts';
 // What the train is saying, which is a lookup on the same timetable the train
@@ -4943,6 +4944,52 @@ async function main(): Promise<void> {
       }
     }
   };
+  /**
+   * The hole in the paving over the nearest station mouth.
+   *
+   * The terrain under a mouth is carved (`RailCut.setAccess`, and the streamer
+   * re-cuts it), but the footpath, kerb and road are baked into the tile by
+   * the pipeline and no carve reaches them -- so the trench was open and the
+   * pavement bridged it, and the owner stood on the totem looking at *"just
+   * normal floor tiles, no opening"*. This takes the paving out with the same
+   * clipping group a building's shell uses, over the open part of the incline
+   * only, for the one mouth within `MOUTH_CUT_M`; the railway is drawn outside
+   * the group so the shaft stands in the hole. See `riding.trenchPlanes`.
+   *
+   * Yields to a room: an interior owns the group while it is shown, and the
+   * view refuses a cut then anyway. `mouthCutOn` is reset while inside so the
+   * cut is re-armed on the way out.
+   */
+  const MOUTH_CUT_M = 60;
+  let mouthCutOn: string | null = null;
+  const refreshMouthCut = (): void => {
+    if (interior !== null || stationBoxes === null) {
+      mouthCutOn = null;
+      return;
+    }
+    let best: { name: string; x: number; z: number } | null = null;
+    let bestD = MOUTH_CUT_M;
+    for (const m of stationBoxes.mouths) {
+      const d = Math.hypot(m.x - player.position.x, m.z - player.position.z);
+      if (d < bestD) {
+        bestD = d;
+        best = m;
+      }
+    }
+    if (best === null) {
+      if (mouthCutOn !== null) {
+        mouthCutOn = null;
+        interiorView.setWorldCut(null);
+      }
+      return;
+    }
+    if (mouthCutOn === best.name) return;
+    const plan = stationBoxes.planFor(best.name);
+    if (plan === null) return;
+    mouthCutOn = best.name;
+    interiorView.setWorldCut(trenchPlanes(plan, accessCutLength(plan, rawGroundAt)));
+  };
+
   const refreshVessels = (): void => {
     if (!vesselsEnabled() || railBake === null || streamer.ground === null) return;
     const resident = streamer.ground.loadedTiles;
@@ -5006,7 +5053,16 @@ async function main(): Promise<void> {
     railNetwork === null
       ? null
       : new RailWorld(railNetwork, railAssets, wildGround, collision, railCut, rawGroundAt);
-  if (railWorld) scene.add(railWorld.group);
+  if (railWorld) {
+    // Outside the clipping group, on purpose. The group is how a hole is cut
+    // in the world -- a building's shell for an interior, and now the trench
+    // over a station mouth (`riding.trenchPlanes`). The shaft's lining, the
+    // apron and the totem stand *in* that trench and must not go with the
+    // paving; and no railway is ever inside a building's footprint, so the
+    // interior hole loses nothing by not clipping it.
+    railWorld.group.userData.unclipped = true;
+    scene.add(railWorld.group);
+  }
   /**
    * WORKSTREAM AI: and the lights inside the tunnels it draws.
    *
@@ -14044,6 +14100,7 @@ async function main(): Promise<void> {
         // landed since the last one. See `refreshVessels`.
         refreshVessels();
         refreshStationBoxes();
+        refreshMouthCut();
       }
 
     }
