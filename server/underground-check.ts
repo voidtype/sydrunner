@@ -157,4 +157,36 @@ for (const st of bake.stations) {
 }
 console.log(rows.join('\n'));
 console.log(`${pass} of ${rows.length} underground stations walk from the street to the platform`);
-process.exit(pass === rows.length ? 0 : 1);
+
+/*
+ * --- And the field the server is actually holding, which is not the same thing.
+ *
+ * Every check above builds its own plan, freshly, from an `AccessWorld` that
+ * has the whole city resident. That is the *function* under test, and the
+ * function was never wrong. What was wrong was **when it got called**:
+ * `loadWorld` built the station boxes before the envelope had carved the
+ * prisms, so the mouth-walks-out-of-the-building search was asked at a moment
+ * when `baseAt` could not see a building anywhere, found no intrusion, and
+ * left all twenty-eight mouths where the bake put them. Seven finished under a
+ * roof -- Wynyard's under thirty-six metres of tower, its approach blocked at
+ * every distance from twelve metres out, which is the owner's *"struggling to
+ * find station entry at wynyard"*.
+ *
+ * A driver that only ever rebuilds the answer cannot see that class of bug at
+ * all. So this reads `world.stationBoxes` -- the object the simulation and the
+ * carve are using -- and asks the one question the shipped world got wrong.
+ */
+const held = world.stationBoxes;
+let roofed = 0;
+if (!held) {
+  console.log('no station box field on the world; nothing to audit');
+} else {
+  for (const m of held.mouths) {
+    const roof = world.collision.roofHeight(m.x, m.z, m.y + 1);
+    if (roof === Infinity || roof <= m.y + 2) continue;
+    roofed++;
+    console.log(`FAIL ${m.name.padEnd(22)} the field's own mouth at (${m.x.toFixed(0)}, ${m.z.toFixed(0)}) has ${(roof - m.y).toFixed(0)} m of building over it`);
+  }
+  console.log(`${held.mouths.length - roofed} of ${held.mouths.length} mouths on the field the server holds are under open sky`);
+}
+process.exit(pass === rows.length && roofed === 0 ? 0 : 1);

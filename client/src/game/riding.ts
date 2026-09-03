@@ -4185,6 +4185,57 @@ export function verifyStationAccess(): string[] {
   if (flat.floorAt(10, 0, 7) !== 7 || flat.floorAt(-10, 0, 7) !== 7) {
     failures.push('an unsloped box no longer answers one height across its length.');
   }
+  // --- **The mouth walks out of the building it lands in** -- and it can only
+  //     do that if it is asked when the buildings are actually there.
+  //
+  // Half the CBD's OSM entrance nodes are inside a tower's footprint, which is
+  // true of the real city: Wynyard's entrances are inside Wynyard Place. The
+  // search above exists for exactly that and works. What went wrong on the
+  // shipped world is that `loadWorld` built the field before the prisms were
+  // carved, so `baseAt` answered "nothing there" for every candidate, the
+  // intrusion read zero, and the search never ran -- seven of twenty-eight
+  // mouths ended up under a roof, Wynyard's under thirty-six metres of tower
+  // with no way in at all. Both halves are asserted here: a world that can see
+  // the building moves the mouth out of it, and a world that cannot leaves it
+  // exactly where the bake put it, which is the shape of the bug.
+  {
+    const st = like({ entranceX: 0, entranceZ: 0, entranceY: 20 });
+    const HALF = 20;
+    const inTower = (x: number, z: number): boolean =>
+      x >= -HALF && x <= HALF && z >= -HALF && z <= HALF;
+    // A tower over the entrance whose base is two metres under the street, so
+    // a body at the pad is inside its walls rather than under its soffit.
+    const seeing: AccessWorld = {
+      baseAt: (x, z) => (inTower(x, z) ? 18 : Number.NaN),
+      groundAt: () => 20,
+    };
+    const blind: AccessWorld = { groundAt: () => 20 };
+
+    const moved = stationAccessPlan(st, seeing);
+    if (moved === null) failures.push('a station with a tower over its entrance produced no plan at all.');
+    else {
+      if (inTower(moved.mouthX, moved.mouthZ)) {
+        failures.push(`the mouth stayed inside the tower at (${moved.mouthX.toFixed(1)}, ${moved.mouthZ.toFixed(1)}).`);
+      }
+      const out = Math.hypot(moved.mouthX - st.entranceX, moved.mouthZ - st.entranceZ);
+      if (out > 90) failures.push(`the mouth moved ${out.toFixed(0)} m, past the search's own reach.`);
+      // And the first metres of the incline are clear too, not just the pad --
+      // a mouth on the kerb with the ramp still under the tower is no better.
+      for (let d = 0; d <= 6; d += 1) {
+        if (inTower(moved.mouthX + moved.dirX * d, moved.mouthZ + moved.dirZ * d)) {
+          failures.push(`${d} m down the incline is still inside the tower.`);
+          break;
+        }
+      }
+    }
+
+    const stuck = stationAccessPlan(st, blind);
+    if (stuck === null) failures.push('the same station produced no plan against a world with no buildings in it.');
+    else if (Math.abs(stuck.mouthX - st.entranceX) > 1e-9 || Math.abs(stuck.mouthZ - st.entranceZ) > 1e-9) {
+      failures.push('a world that cannot see buildings moved the mouth anyway; the search is reading something else.');
+    }
+  }
+
   return failures;
 }
 

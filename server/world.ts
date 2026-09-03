@@ -2578,6 +2578,33 @@ export async function loadWorld(
   // stay each other's business or not. See `game/staticcars.ts` section 3.
   staticCars.groundAt = groundFor(world).groundHeight;
 
+  // --- And the ways into the underground stations, **again**.
+  //
+  // They were built a few hundred lines up, in the order the fields depend on
+  // each other -- and that order puts them before the envelope has carved the
+  // prisms the mouth has to be planned around. `stationAccessPlan`'s whole job
+  // is to walk a mouth out of the building it lands in, and it asks
+  // `AccessWorld.baseAt`, which asks the collision prisms; asked too early it
+  // is told there is nothing there, reports no intrusion, and leaves every
+  // mouth exactly where the bake put it.
+  //
+  // Measured on the shipped world: **seven of the twenty-eight mouths had a
+  // roof over them**, Wynyard's under thirty-six metres of tower with the
+  // approach blocked at every distance from twelve metres out -- the owner,
+  // *"struggling to find station entry at wynyard"*, and there was none to
+  // find. Rebuilt here, with the prisms as they finally are, none of the
+  // twenty-eight is roofed and eleven have moved; Wynyard's steps twenty-four
+  // metres east onto open street.
+  //
+  // Cheap enough to do unconditionally: twenty-eight stations, once, at boot.
+  // `boxesOf` does the same thing later when a region lands, and this is the
+  // same call -- it is only that nothing was making it before something asked.
+  if (world.rail) {
+    world.stationBoxes = buildStationBoxes(world.rail, accessWorldOf(world));
+    if (world.railCut) world.railCut.setAccess(world.stationBoxes.plans, (x, z) => world.terrain.height(x, z));
+    world.stationBoxesTiles = world.collision.tileCount;
+  }
+
   return world;
 }
 
