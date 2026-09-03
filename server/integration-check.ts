@@ -6930,9 +6930,11 @@ async function checkPolice(): Promise<void> {
       one.strikeNpc(field, cop, 1, 'Bazza', 1, 101);
       const last = one.strikeNpc(field, cop, 1, 'Bazza', 1, 102);
       check(last.down, 'the third landed strike put them on the ground');
+      // Since the 2026-09 round a decked officer does not get up: the sweep
+      // despawns them (health -2) and two more come for whoever did it. The
+      // owner: "it should despawn that cop, but make 2 more cops come".
       check(
-        last.feed === 'Bazza got done by the cops'.replace('got done by the cops', 'got done by the cops') &&
-          last.feed.includes('Bazza'),
+        last.feed.includes('Bazza') && last.feed.includes('decked a cop') && last.feed.includes('backup'),
         `and produced the feed line "${last.feed}"`,
       );
       check(
@@ -6940,8 +6942,12 @@ async function checkPolice(): Promise<void> {
         'somebody already on the ground cannot be hit again',
       );
       check(
-        cop.health === one.POLICE_MAX_HEALTH,
-        'a downed officer gets their pips back for when they stand up -- hardy, not immortal',
+        cop.health === -2 && one.POLICE_DOWN_SECONDS === 0,
+        `a decked officer is marked for the despawn sweep (health ${cop.health}) rather than getting up`,
+      );
+      check(
+        (field.reinforcementDebt.get(1) ?? 0) === 2,
+        `and the suspect now owes ${field.reinforcementDebt.get(1) ?? 0} more pursuers -- two per officer decked`,
       );
     }
   }
