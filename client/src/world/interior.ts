@@ -232,6 +232,14 @@ export const CAB_DEPTH_M = 2.4;
  */
 const CORE_MARGIN_M = 1.1;
 const CORE_CUT_M = 1.0;
+/**
+ * How far a doorway keeps from the core's walls, metres. A door beside a
+ * lift is a door beside a lift; a door *into* the cab is a hole. So the
+ * clearance is a jamb's worth and not `CORE_CUT_M`, which is how far the
+ * partitions themselves are cut back round the core. See `wallsFor`.
+ * (`DOOR_CLEAR_M`, further down, is the front door's own clearance.)
+ */
+const CORE_DOOR_CLEAR_M = 0.4;
 
 /**
  * The landing: room kept beyond each end of a flight, metres.
@@ -1111,6 +1119,32 @@ export function liftLandingMesh(core: Core): { positions: Float32Array; normals:
 }
 
 /** The end of the core level `k` opens onto, as the sign of the run. */
+/**
+ * Where the word goes: one sign per level over the core's mouth, facing the
+ * way the mouth opens, at the centre of the green board `interiorMesh`
+ * draws there. `world/interiorview.ts` puts the letters on it -- the mesh
+ * itself is colour-per-vertex and cannot write. `half` is the board's half
+ * width, `height` the band the letters may fill.
+ */
+export function liftSignsOf(it: Interior): Array<{ x: number; y: number; z: number; nx: number; nz: number; half: number; height: number; text: string }> {
+  const core = it.core;
+  if (core === null) return [];
+  const out: Array<{ x: number; y: number; z: number; nx: number; nz: number; half: number; height: number; text: string }> = [];
+  for (let k = 0; k < it.levels.length; k++) {
+    const floorY = it.levels[k].y;
+    const ceilY = floorY + CEILING_M;
+    const open = coreOpenEnd(core, k);
+    const nx = open * core.lx;
+    const nz = open * core.lz;
+    const x = core.x + core.lx * (open * (core.hr + 0.02)) + nx * 0.05;
+    const z = core.z + core.lz * (open * (core.hr + 0.02)) + nz * 0.05;
+    const bottom = floorY + 2.42;
+    const top = ceilY - 0.02;
+    out.push({ x, y: (bottom + top) / 2, z, nx, nz, half: Math.min(0.9, core.hw * 0.8), height: (top - bottom) * 0.8, text: core.kind === CORE.LIFT ? 'LIFT' : 'STAIRS' });
+  }
+  return out;
+}
+
 export function coreOpenEnd(core: Core, k: number): -1 | 1 {
   if (core.kind === CORE.LIFT) return -1;
   return k & 1 ? 1 : -1;
@@ -1218,8 +1252,30 @@ function wallsFor(
   const contacts = contactsBetween(rooms);
   const doorways: Span[] = [];
   for (const c of contacts) {
-    const width = Math.min(DOOR_GAP_M, c.hi - c.lo - 0.1);
-    const mid = (c.lo + c.hi) / 2;
+    // The opening goes in the longest stretch of the shared wall the core
+    // does not stand on -- a lift at the end of the hallway covers the end
+    // of the rooms beside it, and a door cut where the cab is would open
+    // into the cab. Where nothing is left there is no door, which is the
+    // rarer failure and the one that reads as a cupboard rather than a hole.
+    let lo = c.lo;
+    let hi = c.hi;
+    if (cut !== null) {
+      const onCut = c.axis === 0
+        ? c.coord > cut.u0 - CORE_DOOR_CLEAR_M && c.coord < cut.u1 + CORE_DOOR_CLEAR_M
+        : c.coord > cut.v0 - CORE_DOOR_CLEAR_M && c.coord < cut.v1 + CORE_DOOR_CLEAR_M;
+      if (onCut) {
+        const b0 = (c.axis === 0 ? cut.v0 : cut.u0) - CORE_DOOR_CLEAR_M;
+        const b1 = (c.axis === 0 ? cut.v1 : cut.u1) + CORE_DOOR_CLEAR_M;
+        const before = Math.min(c.hi, b0) - c.lo;
+        const after = c.hi - Math.max(c.lo, b1);
+        if (before >= after) hi = Math.min(c.hi, b0);
+        else lo = Math.max(c.lo, b1);
+        if (hi - lo < MIN_CONTACT_M * 0.5) continue;
+      }
+    }
+    const width = Math.min(DOOR_GAP_M, hi - lo - 0.1);
+    if (width < 0.5) continue;
+    const mid = (lo + hi) / 2;
     doorways.push({ axis: c.axis, coord: c.coord, lo: mid - width / 2, hi: mid + width / 2 });
   }
 
@@ -1417,6 +1473,95 @@ function placeCore(
     }
     return true;
   };
+  // --- The core, at the end of the hallway. See `floorplan.CORRIDOR_W`: the
+  // owner asked for the hallway to run *past* the lift with it plainly
+  // marked, and a cab the width of the hallway at its far end is exactly
+  // that -- the hall is the lift lobby, the doors face down it, and every
+  // room on the floor is a walk down the hall from them. A stair goes there
+  // too, set back a landing from the end wall so the flight that opens that
+  // way has somewhere to arrive. Walked in from the end until the core's
+  // corners clear the shell and no doorway is under it.
+  {
+    const hall = ground.find((r) => r.corridor);
+    if (hall !== undefined) {
+      const alongU = hall.ex >= hall.ez;
+      const longHalf = Math.max(hall.ex, hall.ez);
+      const hw = Math.min(Math.min(hall.ex, hall.ez) - 0.05, CORE_WIDTH_M / 2);
+      const run = kind === CORE.LIFT ? CAB_DEPTH_M : Math.min(CORE_RUN_MAX_M, longHalf * 2 - 2 * CORE_LANDING_M - 2);
+      const hr = run / 2;
+      const endInset = kind === CORE.LIFT ? 0.3 : CORE_LANDING_M + 0.3;
+      if (hw * 2 >= CORE_WIDTH_M - 0.4 && run >= (kind === CORE.LIFT ? CAB_DEPTH_M : CORE_RUN_MIN_M) && longHalf * 2 >= run + endInset + 3) {
+        for (const end of [1, -1]) {
+          for (let inset = endInset; inset <= endInset + 4; inset += 0.25) {
+            const along = end * (longHalf - hr - inset);
+            const cu = alongU ? hall.u + along : hall.u;
+            const cv = alongU ? hall.v : hall.v + along;
+            const eu = alongU ? hr : hw;
+            const ev = alongU ? hw : hr;
+            const cut: CoreCut = { u0: cu - eu, u1: cu + eu, v0: cv - ev, v1: cv + ev };
+            // The cut reaches the outer wall behind the core, so no stub of
+            // hallway wall is left standing between the two -- a half-metre
+            // of partition against the shell, capped, is a face the outer
+            // wall's winding check reads as the building turned inside out.
+            if (alongU) {
+              if (end > 0) cut.u1 = hall.u + longHalf + 1;
+              else cut.u0 = hall.u - longHalf - 1;
+            } else if (end > 0) cut.v1 = hall.v + longHalf + 1;
+            else cut.v0 = hall.v - longHalf - 1;
+            let clear = true;
+            for (const [du, dv] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+              const u = cu + du * (eu + 0.15);
+              const v = cv + dv * (ev + 0.15);
+              const x = u * box.ux - v * box.uz;
+              const z = u * box.uz + v * box.ux;
+              for (const pl of planes) {
+                if (pl.nx * x + pl.nz * z - pl.d < 0) {
+                  clear = false;
+                  break;
+                }
+              }
+              if (!clear) break;
+            }
+            if (!clear) continue;
+            // Every room keeps a door somewhere: `wallsFor` moves an opening
+            // out of the core's way or drops it, so the rule here is that
+            // each room has *some* shared wall with enough left to cut one in
+            // -- a room whose whole frontage on the hall is the cab still
+            // opens into the room beside it.
+            const freeOf = (c: Contact): number => {
+              const onCut = c.axis === 0
+                ? c.coord > cut.u0 - CORE_DOOR_CLEAR_M && c.coord < cut.u1 + CORE_DOOR_CLEAR_M
+                : c.coord > cut.v0 - CORE_DOOR_CLEAR_M && c.coord < cut.v1 + CORE_DOOR_CLEAR_M;
+              if (!onCut) return c.hi - c.lo;
+              const b0 = (c.axis === 0 ? cut.v0 : cut.u0) - CORE_DOOR_CLEAR_M;
+              const b1 = (c.axis === 0 ? cut.v1 : cut.u1) + CORE_DOOR_CLEAR_M;
+              return Math.max(Math.min(c.hi, b0) - c.lo, c.hi - Math.max(c.lo, b1));
+            };
+            for (let i = 0; i < ground.length && clear; i++) {
+              let best = 0;
+              let any = false;
+              for (const c of contacts) {
+                if (c.a !== i && c.b !== i) continue;
+                any = true;
+                best = Math.max(best, freeOf(c));
+              }
+              if (any && best < DOOR_GAP_M * 0.5 + CORE_DOOR_CLEAR_M) clear = false;
+            }
+            if (!clear) continue;
+            const x = cu * box.ux - cv * box.uz;
+            const z = cu * box.uz + cv * box.ux;
+            // The core's axis points *out* of the hall, so a lift's open end
+            // (`coreOpenEnd` is -1 for a lift) faces down it; a stair's
+            // flights alternate, and the landing at the wall end is the inset.
+            const lx = end * (alongU ? box.ux : -box.uz);
+            const lz = end * (alongU ? box.uz : box.ux);
+            return { core: { kind, x, z, lx, lz, hr, hw }, cut };
+          }
+        }
+      }
+    }
+  }
+
   // Biggest room first by its short side, then its long, then plan order --
   // three keys so that two rooms of one size cannot tie.
   const order = ground
@@ -2694,6 +2839,38 @@ export function verifyInterior(): string[] {
   const failures: string[] = [];
   const poly = (...xz: number[]): Float32Array => new Float32Array(xz);
 
+  // --- The hallway and the lift at its end. A 30 x 14 block five storeys
+  // tall gets a lift, the lift stands inside the hallway at one end with its
+  // doors facing down it, and every level has a sign over the mouth.
+  {
+    const it = buildInterior(poly(0, 0, 30, 0, 30, 14, 0, 14), 10, 40, 11);
+    if (it === null) failures.push('A 30 x 14 block would not build.');
+    else {
+      const hall = it.rooms.find((r) => r.corridor);
+      if (hall === undefined) failures.push('A 30 x 14 block has no hallway.');
+      const core = it.core;
+      if (core === null || core.kind !== CORE.LIFT) failures.push(`A 40 m block got core ${core === null ? 'none' : core.kind}, not a lift.`);
+      else if (hall !== undefined) {
+        const { r, w } = coreLocal(core, hall.x, hall.z);
+        // The hall's centre is down the cab's axis from the cab, within the
+        // hall's own width, and the cab is at the hall's end.
+        if (Math.abs(w) > 0.3) failures.push(`The lift is ${w.toFixed(2)} m off the hallway's axis.`);
+        if (!(r < 0)) failures.push('The lift does not open down the hallway.');
+        const hallLong = Math.max(hall.ex, hall.ez);
+        if (!(Math.abs(r) > hallLong * 0.45)) failures.push(`The lift stands ${Math.abs(r).toFixed(2)} m from the hall's centre of a ${hallLong.toFixed(1)} m half-length; it belongs at the end.`);
+        const signs = liftSignsOf(it);
+        if (signs.length !== it.levels.length) failures.push(`${signs.length} lift signs for ${it.levels.length} levels.`);
+        else {
+          const s = signs[0];
+          // Facing down the hall: the sign's normal points from the cab to the hall's centre.
+          const toHall = (hall.x - core.x) * s.nx + (hall.z - core.z) * s.nz;
+          if (!(toHall > 0)) failures.push('The lift sign faces away from the hallway.');
+          if (s.text !== 'LIFT') failures.push(`The lift sign says "${s.text}".`);
+        }
+      }
+    }
+  }
+
   const southDoor = (points: Float32Array, base = 0, height = 7, seed = 4242): Interior | null =>
     buildInterior(points, base, height, seed);
 
@@ -2957,6 +3134,9 @@ export function verifyInterior(): string[] {
         // door; so does this.
         const mid = (c.lo + c.hi) / 2;
         const gate = c.axis === 0 ? world(c.coord, mid) : world(mid, c.coord);
+        // A contact whose middle the core stands on has its door moved along
+        // the wall (`wallsFor`); this walk aims at the middle, so it skips them.
+        if (it.core !== null && inCore(it.core, gate[0], gate[1], CORE_DOOR_CLEAR_M + DOOR_GAP_M / 2)) continue;
         let [x, z] = world(a.u, a.v);
         for (const [tx, tz] of [gate, world(b.u, b.v)]) {
           // Walk in small steps, resolving each -- which is what the controller

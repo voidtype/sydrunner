@@ -33,12 +33,14 @@ import { ClippingGroup, Plane, Vector3,
   BufferAttribute,
   BufferGeometry,
   type Camera,
+  CanvasTexture,
   DoubleSide,
   Mesh,
   MeshBasicNodeMaterial,
+  PlaneGeometry,
   type Scene,
 } from 'three/webgpu';
-import { liftCabDoorMesh, liftLandingMesh, CAB_DOOR_SLIDE, liftCabMesh, CORE, ghostMesh, interiorMesh, type Interior, type InteriorDoor } from './interior.ts';
+import { liftCabDoorMesh, liftLandingMesh, CAB_DOOR_SLIDE, liftCabMesh, CORE, ghostMesh, interiorMesh, liftSignsOf, type Interior, type InteriorDoor } from './interior.ts';
 import type { Placement } from './placeables.ts';
 
 /**
@@ -95,6 +97,9 @@ export class InteriorView {
    * anything.
    */
   private ghost: Mesh | null = null;
+  /** The word over the core's mouth on every level. See `interior.liftSignsOf`. */
+  private signs: Mesh[] = [];
+  private readonly signTextures = new Map<string, CanvasTexture>();
 
   constructor(private readonly scene: Scene, private readonly world: ClippingGroup | null = null) {}
 
@@ -270,6 +275,52 @@ export class InteriorView {
     }
   }
 
+  /**
+   * The letters on the board over the core's mouth: a canvas texture on a
+   * plane, one per level, so a player at the end of the hallway can read
+   * "LIFT" -- the owner's *"clearly saying lift"*. The green board itself is
+   * in the interior mesh; this is only the word, transparent around it.
+   */
+  private rebuildSigns(it: Interior): void {
+    for (const m of this.signs) {
+      this.scene.remove(m);
+      m.geometry.dispose();
+      (m.material as MeshBasicNodeMaterial).dispose();
+    }
+    this.signs = [];
+    for (const s of liftSignsOf(it)) {
+      let tex = this.signTextures.get(s.text);
+      if (tex === undefined) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+        if (ctx === null) continue;
+        ctx.clearRect(0, 0, 256, 64);
+        ctx.fillStyle = '#f2ead6';
+        ctx.font = 'bold 46px system-ui, Helvetica, Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(s.text, 128, 34);
+        tex = new CanvasTexture(canvas);
+        this.signTextures.set(s.text, tex);
+      }
+      const material = new MeshBasicNodeMaterial();
+      material.map = tex;
+      material.transparent = true;
+      material.depthWrite = false;
+      const mesh = new Mesh(new PlaneGeometry(s.half * 2, s.height), material);
+      mesh.position.set(s.x, s.y, s.z);
+      mesh.lookAt(s.x + s.nx, s.y, s.z + s.nz);
+      mesh.layers.set(INTERIOR_LAYER);
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 1;
+      mesh.userData.unclipped = true;
+      this.scene.add(mesh);
+      this.signs.push(mesh);
+    }
+  }
+
   rebuild(it: Interior, door: InteriorDoor = it.door): void {
     this.rebuildCab(it);
     const old = this.mesh;
@@ -278,6 +329,7 @@ export class InteriorView {
       old.geometry.dispose();
       this.mesh = null;
     }
+    this.rebuildSigns(it);
     const built = interiorMesh(it, door);
     const geometry = new BufferGeometry();
     geometry.setAttribute('position', new BufferAttribute(built.positions, 3));
@@ -336,6 +388,12 @@ export class InteriorView {
     this.setGhost(null, null, false);
     this.dropCab();
     this.setWorldHole(null);
+    for (const m of this.signs) {
+      this.scene.remove(m);
+      m.geometry.dispose();
+      (m.material as MeshBasicNodeMaterial).dispose();
+    }
+    this.signs = [];
     const mesh = this.mesh;
     if (mesh === null) return;
     this.scene.remove(mesh);

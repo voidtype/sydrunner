@@ -64,6 +64,11 @@ export interface Room {
   v: number;
   /** Which storey, 0 at the pad. */
   storey: number;
+  /**
+   * The hallway down the building: one room the length of the long axis
+   * that every other room on the floor opens onto. See `CORRIDOR_W`.
+   */
+  corridor?: boolean;
 }
 
 /** The oriented box a plan is laid out in. */
@@ -98,6 +103,26 @@ export interface FloorPlan {
  * rather than growing a 30 cm one nobody can stand in.
  */
 export const STOREY_M = 3.1;
+
+/**
+ * The hallway. The owner: *"make default inside generation have a hallway
+ * go down the building, and if lifts in building, past them with it clearly
+ * saying 'lift'"*. A plan that was only a subdivision gave a big building a
+ * maze of rooms each opening into the next; a building over `CORRIDOR_LONG_M`
+ * long and `CORRIDOR_SHORT_M` wide now gets a strip `CORRIDOR_W` wide down
+ * the middle of its long axis, and the rooms are cut on either side of it.
+ * Every room along the strip shares a wall with it, which is exactly the
+ * contact `world/interior.ts` turns into a doorway -- so the hallway is what
+ * you walk down and every door is off it. The lift stands at its end; see
+ * `interior.placeCore`.
+ *
+ * 2.6 m is a lift lobby's width and the width the cab needs (`CORE_WIDTH_M`)
+ * with a little to spare; the two thresholds are what leaves a room of at
+ * least `MIN_ROOM_M` on either side.
+ */
+export const CORRIDOR_W = 2.6;
+export const CORRIDOR_LONG_M = 12;
+export const CORRIDOR_SHORT_M = 2 * 4.0 + CORRIDOR_W;
 
 /**
  * The smallest room worth generating, metres across.
@@ -280,12 +305,37 @@ export function floorPlan(points: Float32Array, height: number, seed: number): F
   const cu = box.x * box.ux + box.z * box.uz;
   const cv = -box.x * box.uz + box.z * box.ux;
 
+  // The hallway, down the long axis, with a wing either side of it. See
+  // `CORRIDOR_W`. The wings are the cells the subdivision starts from, so
+  // nothing below knows the hallway is there; the hallway itself is a room
+  // pushed whole, on every storey.
+  const alongU = box.ex >= box.ez;
+  const longHalf = alongU ? box.ex : box.ez;
+  const shortHalf = alongU ? box.ez : box.ex;
+  const hallway = longHalf * 2 >= CORRIDOR_LONG_M && shortHalf * 2 >= CORRIDOR_SHORT_M;
+  const wingHalf = (shortHalf * 2 - CORRIDOR_W) / 4;
+  const wingOff = CORRIDOR_W / 2 + wingHalf;
+
   for (let storey = 0; storey < storeys; storey++) {
-    const cells: Array<{ x: number; z: number; ex: number; ez: number; depth: number }> = [
-      { x: cu, z: cv, ex: box.ex, ez: box.ez, depth: 0 },
-    ];
+    const cells: Array<{ x: number; z: number; ex: number; ez: number; depth: number; wing: boolean }> = hallway
+      ? alongU
+        ? [
+            { x: cu, z: cv - wingOff, ex: box.ex, ez: wingHalf, depth: 1, wing: true },
+            { x: cu, z: cv + wingOff, ex: box.ex, ez: wingHalf, depth: 1, wing: true },
+          ]
+        : [
+            { x: cu - wingOff, z: cv, ex: wingHalf, ez: box.ez, depth: 1, wing: true },
+            { x: cu + wingOff, z: cv, ex: wingHalf, ez: box.ez, depth: 1, wing: true },
+          ]
+      : [{ x: cu, z: cv, ex: box.ex, ez: box.ez, depth: 0, wing: false }];
+    if (hallway) {
+      const ex = alongU ? box.ex : CORRIDOR_W / 2;
+      const ez = alongU ? CORRIDOR_W / 2 : box.ez;
+      rooms.push({ x: box.x, z: box.z, ex, ez, u: cu, v: cv, storey, corridor: true });
+    }
     let head = 0;
-    let made = 0;
+    // The hallway counts against the floor's cap like any room.
+    let made = hallway ? 1 : 0;
     while (head < cells.length) {
       const cell = cells[head++];
       const area = cell.ex * 2 * (cell.ez * 2);
@@ -301,10 +351,16 @@ export function floorPlan(points: Float32Array, height: number, seed: number): F
       // building too big to subdivide finely gets larger rooms rather than a
       // partial floor.
       const ifKeptAll = made + 1 + (cells.length - head);
+      // A wing beside the hallway is split *along* it into rooms of at least
+      // `MIN_ROOM_M` across, whatever its depth -- the rooms off a hotel
+      // corridor are the shape of their doors' spacing, not squares -- where
+      // a room in the open plan must be `2 * MIN_ROOM_M` both ways before it
+      // is cut, so nothing becomes a cupboard.
       const splittable =
         cell.depth < MAX_DEPTH &&
-        area > SPLIT_AREA_M2 &&
-        Math.min(cell.ex, cell.ez) * 2 > MIN_ROOM_M * 2 &&
+        (cell.wing
+          ? Math.max(cell.ex, cell.ez) * 2 > MIN_ROOM_M * 2 && Math.min(cell.ex, cell.ez) * 2 >= MIN_ROOM_M * 0.85
+          : area > SPLIT_AREA_M2 && Math.min(cell.ex, cell.ez) * 2 > MIN_ROOM_M * 2) &&
         ifKeptAll + 1 <= MAX_ROOMS_PER_FLOOR;
       if (!splittable) {
         // Back to world, because the polygon is in world metres and so is
@@ -327,23 +383,25 @@ export function floorPlan(points: Float32Array, height: number, seed: number): F
       const t = 0.38 + r * 0.24;
       if (cell.ex >= cell.ez) {
         const cut = cell.ex * 2 * t;
-        cells.push({ x: cell.x - cell.ex + cut / 2, z: cell.z, ex: cut / 2, ez: cell.ez, depth: cell.depth + 1 });
+        cells.push({ x: cell.x - cell.ex + cut / 2, z: cell.z, ex: cut / 2, ez: cell.ez, depth: cell.depth + 1, wing: cell.wing });
         cells.push({
           x: cell.x - cell.ex + cut + (cell.ex * 2 - cut) / 2,
           z: cell.z,
           ex: (cell.ex * 2 - cut) / 2,
           ez: cell.ez,
           depth: cell.depth + 1,
+          wing: cell.wing,
         });
       } else {
         const cut = cell.ez * 2 * t;
-        cells.push({ x: cell.x, z: cell.z - cell.ez + cut / 2, ex: cell.ex, ez: cut / 2, depth: cell.depth + 1 });
+        cells.push({ x: cell.x, z: cell.z - cell.ez + cut / 2, ex: cell.ex, ez: cut / 2, depth: cell.depth + 1, wing: cell.wing });
         cells.push({
           x: cell.x,
           z: cell.z - cell.ez + cut + (cell.ez * 2 - cut) / 2,
           ex: cell.ex,
           ez: (cell.ez * 2 - cut) / 2,
           depth: cell.depth + 1,
+          wing: cell.wing,
         });
       }
     }
@@ -369,6 +427,32 @@ export function floorPlan(points: Float32Array, height: number, seed: number): F
 /** Self-check. On both boot lists: it is geometry and imports nothing. */
 export function verifyFloorPlan(): string[] {
   const failures: string[] = [];
+
+  // --- The hallway. A 30 x 14 block gets one strip down its long axis that
+  // every other room on the floor touches; a terrace gets none.
+  {
+    const plan = floorPlan(new Float32Array([0, 0, 30, 0, 30, 14, 0, 14]), 9, 7);
+    const halls = plan.rooms.filter((r) => r.corridor && r.storey === 0);
+    if (halls.length !== 1) failures.push(`A 30 x 14 block has ${halls.length} hallways on its ground floor, not one.`);
+    else {
+      const hall = halls[0];
+      if (Math.abs(Math.max(hall.ex, hall.ez) * 2 - 30) > 0.01 || Math.abs(Math.min(hall.ex, hall.ez) * 2 - CORRIDOR_W) > 0.01) {
+        failures.push(`The hallway is ${(hall.ex * 2).toFixed(1)} x ${(hall.ez * 2).toFixed(1)} m; it should run the 30 m and be ${CORRIDOR_W} m wide.`);
+      }
+      let off = 0;
+      for (const r of plan.rooms) {
+        if (r.storey !== 0 || r.corridor) continue;
+        // Touching the hallway: the room's near edge on the hallway's line.
+        const touch = hall.ex >= hall.ez
+          ? Math.abs(Math.abs(r.v - hall.v) - (hall.ez + r.ez)) < 0.02
+          : Math.abs(Math.abs(r.u - hall.u) - (hall.ex + r.ex)) < 0.02;
+        if (!touch) off++;
+      }
+      if (off > 0) failures.push(`${off} rooms on the ground floor do not open onto the hallway.`);
+    }
+    const terrace = floorPlan(new Float32Array([0, 0, 6, 0, 6, 18, 0, 18]), 7.4, 3);
+    if (terrace.rooms.some((r) => r.corridor)) failures.push('A 6 m terrace grew a hallway; there is no room for one.');
+  }
   const poly = (...xz: number[]): Float32Array => new Float32Array(xz);
 
   /** Every footprint shape the city can actually hand this. */
