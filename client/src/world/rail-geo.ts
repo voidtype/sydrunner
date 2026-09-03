@@ -140,8 +140,12 @@ export function setAccessWorld(world: AccessWorld): void {
  * until `main.ts` (or the server) hands one over, and re-handed on every
  * rebuild -- the same call that invalidates the chunks over a mouth that moved.
  */
-let accessPlans: { planFor(name: string): AccessPlan | null } | null = null;
-export function setAccessPlans(field: { planFor(name: string): AccessPlan | null } | null): void {
+interface AccessSource {
+  planFor(name: string): AccessPlan | null;
+  boxFor(name: string): { x: number; z: number; ux: number; uz: number; halfLength: number; halfWidth: number; floorY: number; ceilY: number } | null;
+}
+let accessPlans: AccessSource | null = null;
+export function setAccessPlans(field: AccessSource | null): void {
   accessPlans = field;
 }
 import {
@@ -4186,10 +4190,26 @@ function writeUndergroundStation(
   _boxes: readonly FrameSolid[],
   station: RailStation & { ux: number; uz: number },
 ): void {
-  const ux = station.ux;
-  const uz = station.uz;
+  // **The room is the field's box, whole: centre, axis, extents, floor and
+  // lid.** Not one number of it recomputed here.
+  //
+  // Three separate faults in this one function came of drawing something the
+  // collision had already decided, and this is the worst. `PlacedStation.x, z`
+  // is the *routed stopping anchor*; `StationBoxField` builds the room from the
+  // bake's `siteX, siteZ`, and `PlacedStation`'s own comment says the two are
+  // "as much as 248 m apart" -- at Wynyard, 59 m. So the room a player was
+  // shown and the room they walked in were different rooms: they could see the
+  // platform and the train, run into an edge with nothing drawn on it, and drop
+  // out of the world by touching a wall. The owner: *"i can see the train but i
+  // run into invis wall, also if i touch the internal wall i tp to the
+  // surface"*.
+  const roomBox = accessPlans?.boxFor(station.name) ?? null;
+  const ux = roomBox !== null ? roomBox.ux : station.ux;
+  const uz = roomBox !== null ? roomBox.uz : station.uz;
   const px = -uz;
   const pz = ux;
+  const originX = roomBox !== null ? roomBox.x : station.x;
+  const originZ = roomBox !== null ? roomBox.z : station.z;
   // **The floor is the concourse, at platform level, wall to wall.** It was
   // the ballast, 0.4 m under the railhead, with the platforms as 1.45 m
   // kerbs in it -- a step no body climbs, so a player who walked off a
@@ -4197,14 +4217,18 @@ function writeUndergroundStation(
   // number the field stands a body on; this draws it. The trains sit with
   // their wheels in the slab and their door sills at the floor, which is what
   // a platform is.
-  const floor = concourseY(station as unknown as RailStation);
+  const floor = roomBox !== null ? roomBox.floorY : concourseY(station as unknown as RailStation);
   // The lid: under the street, whatever the bake said. See `riding.roomCeilY`.
-  const roof = Math.min(floor + BOX_HEIGHT, roomCeilY(station as unknown as RailStation, accessWorld));
+  // `rail-solids`' BOX_HALF_*/BOX_HEIGHT survive only as the fallback for a
+  // caller with no field. See `riding.StationBoxField.boxFor`.
+  const roof = roomBox !== null
+    ? roomBox.ceilY
+    : Math.min(floor + BOX_HEIGHT, roomCeilY(station as unknown as RailStation, accessWorld));
   const corner = (t: number, o: number, cy: number): [number, number, number] => [
-    station.x + ux * t + px * o, cy, station.z + uz * t + pz * o,
+    originX + ux * t + px * o, cy, originZ + uz * t + pz * o,
   ];
-  const L = BOX_HALF_LENGTH;
-  const W = BOX_HALF_WIDTH;
+  const L = roomBox !== null ? roomBox.halfLength : BOX_HALF_LENGTH;
+  const W = roomBox !== null ? roomBox.halfWidth : BOX_HALF_WIDTH;
 
   // The room, seen from inside: floor up, ceiling down, four walls in. On the
   // lining material, which is the file's one `BackSide` material -- a box the

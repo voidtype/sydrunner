@@ -1678,6 +1678,25 @@ export class StationBoxField {
    * `mouths` and `plans` are pushed together and stay index-aligned; this is
    * the same pair keyed for the drawing.
    */
+  /**
+   * One box by name -- the room, its `<name> access`, or its `<name> tunnel`.
+   *
+   * Same argument as `planFor` above, for the same reason found a second time:
+   * `rail-geo` drew the station room at `rail-solids`' fixed
+   * `BOX_HALF_LENGTH`/`BOX_HALF_WIDTH`/`BOX_HEIGHT` while this field sized the
+   * collision from the bake's own per-station numbers. At Wynyard that is 88 x
+   * 13 drawn against 100.19 x 16 walked, and a roof capped 2.3 m below the
+   * field's ceiling -- so the visible walls stood twelve metres inside the box
+   * and were not walls at all. A player walked through them into undrawn space
+   * and, a few metres later, out of the box entirely, lost the floor and was
+   * put back on the street. The owner: *"i can see the train but i run into
+   * invis wall, also if i touch the internal wall i tp to the surface"*.
+   */
+  boxFor(name: string): StationBox | null {
+    for (const b of this.boxes) if (b.name === name) return b;
+    return null;
+  }
+
   planFor(name: string): AccessPlan | null {
     for (let i = 0; i < this.mouths.length; i++) {
       if (this.mouths[i].name === name) return this.plans[i] ?? null;
