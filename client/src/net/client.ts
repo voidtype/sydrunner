@@ -1439,9 +1439,10 @@ export class NetClient {
    * frame for the space we are already in, which `main.ts` applies as a
    * placement rather than a room change. Silence if we are not in a cab.
    */
-  pressLift(direction: 1 | -1): boolean {
+  /** Ask for a floor from the cab. The reply, to everyone in the building, is a `LIFT_RIDE`. */
+  pressLift(level: number): boolean {
     if (this.status !== 'online') return false;
-    this.transport.send(encodeLift(direction));
+    this.transport.send(encodeLift(level));
     return true;
   }
 

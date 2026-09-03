@@ -1106,10 +1106,10 @@ export class Room {
    * the `PLACED` that follows a door is not needed and the interest set is
    * left alone. A press outside a cab is silence, as a press at no door is.
    */
-  liftPress(ws: Socket, direction: 1 | -1): void {
+  liftPress(ws: Socket, level: number): void {
     const p = ws.data.participant;
     if (!p) return;
-    const ride = this.sim.liftPress(p.id, direction);
+    const ride = this.sim.liftPress(p.id, level);
     if (ride === null) return;
     // Everyone in the building watches the same cab.
     const buf = encodeLiftRide(ride);

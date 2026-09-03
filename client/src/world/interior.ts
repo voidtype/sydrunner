@@ -911,13 +911,21 @@ export function liftMoving(it: Interior, nowMs: number): boolean {
 }
 
 /**
- * The level a press would take a body standing at `feetY` to, or -1 at the
- * end of the shaft. Clamped, not wrapped: the owner's *"you shouldnt be able
- * to keep going thru levels by yourself past the top/bottom level."*
+ * The level a call from `from` to `level` would ride to, or -1 for a call the
+ * cab refuses: off the end of the shaft, not a whole number, or the floor it
+ * is already on. The panel offers only the real floors, and this is the check
+ * behind it on both ends -- the owner's *"you shouldnt be able to keep going
+ * thru levels by yourself past the top/bottom level."*
  */
-export function liftTarget(it: Interior, feetY: number, direction: 1 | -1): number {
-  const k = levelIndex(it.levels, feetY) + direction;
-  return k < 0 || k >= it.levels.length ? -1 : k;
+export function liftTarget(it: Interior, from: number, level: number): number {
+  if (!Number.isInteger(level) || level < 0 || level >= it.levels.length) return -1;
+  if (level === from) return -1;
+  return level;
+}
+
+/** A floor the panel can offer, for each level: its index and its name. */
+export function liftFloors(it: Interior): Array<{ level: number; name: string }> {
+  return it.levels.map((_, k) => ({ level: k, name: levelName(it, k) }));
 }
 
 /** The level's name, the way a lift's indicator and the hero line say it. */
@@ -963,55 +971,143 @@ export function slabFor(points: Float32Array, base: number, groundAt: (x: number
   return Math.max(base, Math.min(base + SLAB_MAX_M, top + 0.02));
 }
 
+/** Triangles with a colour each: the little accumulator every builder below shares. */
+class Tris {
+  readonly pos: number[] = [];
+  readonly nor: number[] = [];
+  readonly col: number[] = [];
+  tri(a: [number, number, number], b: [number, number, number], c: [number, number, number], n: [number, number, number], rgb: { r: number; g: number; b: number }, shade: number): void {
+    this.pos.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+    for (let i = 0; i < 3; i++) this.nor.push(n[0], n[1], n[2]);
+    for (let i = 0; i < 3; i++) this.col.push(rgb.r * shade, rgb.g * shade, rgb.b * shade);
+  }
+  /** p0->p1 along the bottom edge, y0 at the bottom, y1 at the top: a vertical face. */
+  wall(p0: [number, number], p1: [number, number], y0: number, y1: number, n: [number, number, number], rgb: { r: number; g: number; b: number }, shade: number): void {
+    this.tri([p0[0], y0, p0[1]], [p1[0], y0, p1[1]], [p1[0], y1, p1[1]], n, rgb, shade);
+    this.tri([p0[0], y0, p0[1]], [p1[0], y1, p1[1]], [p0[0], y1, p0[1]], n, rgb, shade);
+  }
+  /** A box between two corners of the core frame, faces out, all six sides. */
+  box(at: (r: number, w: number) => [number, number], r0: number, r1: number, w0: number, w1: number, y0: number, y1: number, lx: number, lz: number, ax: number, az: number, rgb: { r: number; g: number; b: number }, shade = 1): void {
+    const a = at(r0, w0), b = at(r1, w0), c = at(r1, w1), d = at(r0, w1);
+    this.tri([a[0], y1, a[1]], [b[0], y1, b[1]], [c[0], y1, c[1]], [0, 1, 0], rgb, shade);
+    this.tri([a[0], y1, a[1]], [c[0], y1, c[1]], [d[0], y1, d[1]], [0, 1, 0], rgb, shade);
+    this.tri([a[0], y0, a[1]], [c[0], y0, c[1]], [b[0], y0, b[1]], [0, -1, 0], rgb, shade * 0.6);
+    this.tri([a[0], y0, a[1]], [d[0], y0, d[1]], [c[0], y0, c[1]], [0, -1, 0], rgb, shade * 0.6);
+    this.wall(b, a, y0, y1, [-lx, 0, -lz], rgb, shade * 0.9);
+    this.wall(d, c, y0, y1, [lx, 0, lz], rgb, shade * 0.9);
+    this.wall(a, d, y0, y1, [-ax, 0, -az], rgb, shade * 0.8);
+    this.wall(c, b, y0, y1, [ax, 0, az], rgb, shade * 0.8);
+  }
+  out(): { positions: Float32Array; normals: Float32Array; colors: Float32Array } {
+    return { positions: new Float32Array(this.pos), normals: new Float32Array(this.nor), colors: new Float32Array(this.col) };
+  }
+}
+
+/** The cab's inside height, and the doors' height under it. */
+export const CAB_HEIGHT_M = 2.35;
+export const CAB_DOOR_HEIGHT_M = 2.15;
+/** How far a door panel slides, as a fraction of its own width, when the cab opens. */
+export const CAB_DOOR_SLIDE = 0.92;
+
+const STEEL = { r: 0.5, g: 0.51, b: 0.54 };
+const STEEL_DARK = { r: 0.36, g: 0.37, b: 0.4 };
+const CAB_FLOOR = { r: 0.16, g: 0.16, b: 0.17 };
+const CAB_LIGHT = { r: 1.0, g: 0.98, b: 0.92 };
+const CAB_PANEL = { r: 0.95, g: 0.85, b: 0.55 };
+const RAIL = { r: 0.72, g: 0.72, b: 0.74 };
+
 /**
  * The cab itself, as triangles about the core's centre with the floor at y=0:
- * a floor, three walls and a ceiling in brushed steel, a lit panel, and the
- * open side toward the corridor. `InteriorView` sets its height every frame
- * from `liftFloorY`, so the thing a rider stands in is the thing that moves.
+ * a rubber floor, brushed-steel walls with a darker dado band, a ceiling
+ * with a lit panel, a handrail on the back wall, the call panel, and the
+ * open side toward the corridor -- the doors are their own meshes
+ * (`liftCabDoorMesh`) so they can slide. `InteriorView` sets its height every
+ * frame from `liftFloorY`, so the thing a rider stands in is the thing that
+ * moves. The owner: *"make lift look more lift like too"*.
  */
 export function liftCabMesh(core: Core): { positions: Float32Array; normals: Float32Array; colors: Float32Array } {
-  const pos: number[] = [];
-  const nor: number[] = [];
-  const col: number[] = [];
-  const steel = { r: 0.46, g: 0.47, b: 0.5 };
-  const floor = { r: 0.3, g: 0.3, b: 0.32 };
-  const panel = { r: 0.95, g: 0.85, b: 0.55 };
-  const H = 2.35;
+  const t = new Tris();
+  const H = CAB_HEIGHT_M;
   const ax = -core.lz;
   const az = core.lx;
   const at = (r: number, w: number): [number, number] => [core.x + core.lx * r + ax * w, core.z + core.lz * r + az * w];
-  const tri = (a: [number, number, number], b: [number, number, number], c: [number, number, number], n: [number, number, number], rgb: { r: number; g: number; b: number }, shade: number): void => {
-    pos.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
-    for (let i = 0; i < 3; i++) nor.push(n[0], n[1], n[2]);
-    for (let i = 0; i < 3; i++) col.push(rgb.r * shade, rgb.g * shade, rgb.b * shade);
-  };
-  const quad = (p0: [number, number], p1: [number, number], p2: [number, number], p3: [number, number], y0: number, y1: number, n: [number, number, number], rgb: { r: number; g: number; b: number }, shade: number): void => {
-    // p0->p1 along the bottom edge, y0 at the bottom, y1 at the top; a vertical wall when y0 !== y1.
-    tri([p0[0], y0, p0[1]], [p1[0], y0, p1[1]], [p2[0], y1, p2[1]], n, rgb, shade);
-    tri([p0[0], y0, p0[1]], [p2[0], y1, p2[1]], [p3[0], y1, p3[1]], n, rgb, shade);
-  };
   const hr = core.hr - 0.05;
   const hw = core.hw - 0.05;
-  const back = at(hr, 0);
-  const bl = at(hr, -hw);
-  const br = at(hr, hw);
-  const fl = at(-hr, -hw);
-  const fr = at(-hr, hw);
-  // Floor and ceiling, seen from inside.
-  tri([fl[0], 0.01, fl[1]], [fr[0], 0.01, fr[1]], [br[0], 0.01, br[1]], [0, 1, 0], floor, 1);
-  tri([fl[0], 0.01, fl[1]], [br[0], 0.01, br[1]], [bl[0], 0.01, bl[1]], [0, 1, 0], floor, 1);
-  tri([fl[0], H, fl[1]], [br[0], H, br[1]], [fr[0], H, fr[1]], [0, -1, 0], steel, 0.9);
-  tri([fl[0], H, fl[1]], [bl[0], H, bl[1]], [br[0], H, br[1]], [0, -1, 0], steel, 0.9);
-  // Back wall faces the corridor (-r); side walls face inward.
-  quad(bl, br, br, bl, 0, H, [-core.lx, 0, -core.lz], steel, 0.8);
-  quad(fl, bl, bl, fl, 0, H, [ax, 0, az], steel, 0.85);
-  quad(br, fr, fr, br, 0, H, [-ax, 0, -az], steel, 0.85);
-  // The panel: a lit strip on the back wall at hand height.
-  const pa = at(hr - 0.02, -0.18);
-  const pb = at(hr - 0.02, 0.18);
-  quad(pa, pb, pb, pa, 1.1, 1.5, [-core.lx, 0, -core.lz], panel, 1);
-  void back;
-  return { positions: new Float32Array(pos), normals: new Float32Array(nor), colors: new Float32Array(col) };
+  const bl = at(hr, -hw), br = at(hr, hw), fl = at(-hr, -hw), fr = at(-hr, hw);
+  // Floor and ceiling, seen from inside; the ceiling carries a lit panel.
+  t.tri([fl[0], 0.01, fl[1]], [fr[0], 0.01, fr[1]], [br[0], 0.01, br[1]], [0, 1, 0], CAB_FLOOR, 1);
+  t.tri([fl[0], 0.01, fl[1]], [br[0], 0.01, br[1]], [bl[0], 0.01, bl[1]], [0, 1, 0], CAB_FLOOR, 1);
+  t.tri([fl[0], H, fl[1]], [br[0], H, br[1]], [fr[0], H, fr[1]], [0, -1, 0], STEEL, 0.75);
+  t.tri([fl[0], H, fl[1]], [bl[0], H, bl[1]], [br[0], H, br[1]], [0, -1, 0], STEEL, 0.75);
+  const l0 = at(-hr * 0.5, -hw * 0.45), l1 = at(hr * 0.5, -hw * 0.45), l2 = at(hr * 0.5, hw * 0.45), l3 = at(-hr * 0.5, hw * 0.45);
+  t.tri([l0[0], H - 0.02, l0[1]], [l2[0], H - 0.02, l2[1]], [l1[0], H - 0.02, l1[1]], [0, -1, 0], CAB_LIGHT, 1);
+  t.tri([l0[0], H - 0.02, l0[1]], [l3[0], H - 0.02, l3[1]], [l2[0], H - 0.02, l2[1]], [0, -1, 0], CAB_LIGHT, 1);
+  // Three walls, a darker band below hand height and brushed steel above.
+  const DADO = 0.9;
+  t.wall(bl, br, 0, DADO, [-core.lx, 0, -core.lz], STEEL_DARK, 0.9);
+  t.wall(bl, br, DADO, H, [-core.lx, 0, -core.lz], STEEL, 0.85);
+  t.wall(fl, bl, 0, DADO, [ax, 0, az], STEEL_DARK, 0.95);
+  t.wall(fl, bl, DADO, H, [ax, 0, az], STEEL, 0.9);
+  t.wall(br, fr, 0, DADO, [-ax, 0, -az], STEEL_DARK, 0.95);
+  t.wall(br, fr, DADO, H, [-ax, 0, -az], STEEL, 0.9);
+  // A handrail along the back wall, and the call panel beside the door.
+  t.box(at, hr - 0.09, hr - 0.04, -hw + 0.15, hw - 0.15, 0.93, 0.97, core.lx, core.lz, ax, az, RAIL, 1);
+  t.box(at, -hr + 0.02, -hr + 0.05, hw - 0.42, hw - 0.14, 1.0, 1.55, core.lx, core.lz, ax, az, STEEL_DARK, 1);
+  const pa = at(-hr + 0.06, hw - 0.4), pb = at(-hr + 0.06, hw - 0.16);
+  t.wall(pa, pb, 1.05, 1.5, [core.lx, 0, core.lz], CAB_PANEL, 1);
+  // The door frame: two jambs and a head over the open side.
+  t.box(at, -hr - 0.06, -hr + 0.02, -hw - 0.02, -hw + 0.1, 0, H, core.lx, core.lz, ax, az, STEEL_DARK, 1);
+  t.box(at, -hr - 0.06, -hr + 0.02, hw - 0.1, hw + 0.02, 0, H, core.lx, core.lz, ax, az, STEEL_DARK, 1);
+  t.box(at, -hr - 0.06, -hr + 0.02, -hw - 0.02, hw + 0.02, CAB_DOOR_HEIGHT_M, H, core.lx, core.lz, ax, az, STEEL_DARK, 1);
+  return t.out();
+}
+
+/**
+ * One cab door: a steel panel half the mouth wide, standing in the door
+ * plane at its closed position on `side` (-1 left, +1 right). The view
+ * slides it along the cab's across axis by `CAB_DOOR_SLIDE` of its width to
+ * open. Floor at y=0, like the cab.
+ */
+export function liftCabDoorMesh(core: Core, side: -1 | 1): { positions: Float32Array; normals: Float32Array; colors: Float32Array } {
+  const t = new Tris();
+  const ax = -core.lz;
+  const az = core.lx;
+  const at = (r: number, w: number): [number, number] => [core.x + core.lx * r + ax * w, core.z + core.lz * r + az * w];
+  const hr = core.hr - 0.05;
+  const hw = core.hw - 0.05;
+  const w0 = side < 0 ? -hw : 0.01;
+  const w1 = side < 0 ? -0.01 : hw;
+  t.box(at, -hr - 0.03, -hr + 0.0, w0, w1, 0.02, CAB_DOOR_HEIGHT_M, core.lx, core.lz, ax, az, STEEL, 1);
+  // A dark centre gasket where the two meet.
+  const g0 = side < 0 ? w1 - 0.03 : w0;
+  const g1 = side < 0 ? w1 : w0 + 0.03;
+  t.box(at, -hr - 0.035, -hr + 0.005, g0, g1, 0.02, CAB_DOOR_HEIGHT_M, core.lx, core.lz, ax, az, CAB_FLOOR, 1);
+  return t.out();
+}
+
+/**
+ * The landing at one level: the shaft's doors, closed, in the lobby's plane
+ * just outside the cab line, with a frame and a lit indicator above them.
+ * Drawn at every level the cab is *not* resting at, so a shaft with the cab
+ * elsewhere is a pair of steel doors and not a hole. Floor at y=0.
+ */
+export function liftLandingMesh(core: Core): { positions: Float32Array; normals: Float32Array; colors: Float32Array } {
+  const t = new Tris();
+  const ax = -core.lz;
+  const az = core.lx;
+  const at = (r: number, w: number): [number, number] => [core.x + core.lx * r + ax * w, core.z + core.lz * r + az * w];
+  const hr = core.hr;
+  const hw = core.hw - 0.05;
+  const H = CAB_HEIGHT_M;
+  const r0 = -hr - 0.12, r1 = -hr - 0.04;
+  t.box(at, r0, r1, -hw, -0.015, 0.02, CAB_DOOR_HEIGHT_M, core.lx, core.lz, ax, az, STEEL, 0.95);
+  t.box(at, r0, r1, 0.015, hw, 0.02, CAB_DOOR_HEIGHT_M, core.lx, core.lz, ax, az, STEEL, 0.95);
+  t.box(at, r0 - 0.02, r1 + 0.02, -hw - 0.12, -hw, 0, H + 0.1, core.lx, core.lz, ax, az, STEEL_DARK, 1);
+  t.box(at, r0 - 0.02, r1 + 0.02, hw, hw + 0.12, 0, H + 0.1, core.lx, core.lz, ax, az, STEEL_DARK, 1);
+  t.box(at, r0 - 0.02, r1 + 0.02, -hw - 0.12, hw + 0.12, CAB_DOOR_HEIGHT_M, H + 0.1, core.lx, core.lz, ax, az, STEEL_DARK, 1);
+  const i0 = at(r0 - 0.03, -0.2), i1 = at(r0 - 0.03, 0.2);
+  t.wall(i0, i1, CAB_DOOR_HEIGHT_M + 0.02, CAB_DOOR_HEIGHT_M + 0.08, [-core.lx, 0, -core.lz], CAB_PANEL, 1);
+  return t.out();
 }
 
 /** The end of the core level `k` opens onto, as the sign of the run. */
@@ -3537,9 +3633,11 @@ export function verifyInterior(): string[] {
       // --- The ride: the floor moves, monotonically, from one level to the
       // next, carries a body within a step of it, leaves a body upstairs
       // alone, and the ends of the shaft are ends.
-      if (liftTarget(it, it.levels[11].y, 1) !== -1) failures.push('the lift wraps past the top floor.');
-      if (liftTarget(it, it.levels[0].y, -1) !== -1) failures.push('the lift wraps below the ground floor.');
-      if (liftTarget(it, it.levels[3].y, 1) !== 4 || liftTarget(it, it.levels[3].y, -1) !== 2) failures.push('the lift does not go one level at a time.');
+      if (liftTarget(it, 11, 12) !== -1) failures.push('the lift accepts a floor past the top.');
+      if (liftTarget(it, 0, -1) !== -1) failures.push('the lift accepts a floor below the ground.');
+      if (liftTarget(it, 3, 3) !== -1) failures.push('the lift rides to the floor it is on.');
+      if (liftTarget(it, 3, 9) !== 9 || liftTarget(it, 9, 0) !== 0) failures.push('the lift does not go straight to a chosen floor.');
+      if (liftFloors(it).length !== 12 || liftFloors(it)[0].name !== 'GROUND FLOOR' || liftFloors(it)[11].name !== 'LEVEL 11') failures.push('the panel does not list the floors by name.');
       const durMs = liftDurationMs(it.levels, 2, 3);
       if (!(durMs > 2 * LIFT_DOORS_MS && durMs < 2 * LIFT_DOORS_MS + 5000)) failures.push(`a one-storey ride takes ${durMs} ms.`);
       it.lift = { from: 2, to: 3, startMs: 1000, durMs };
@@ -3563,6 +3661,10 @@ export function verifyInterior(): string[] {
       if (levelName(it, 0) !== 'GROUND FLOOR' || levelName(it, 5) !== 'LEVEL 5') failures.push('the levels are not named the way the indicator says them.');
       const cab = liftCabMesh(c);
       if (cab.positions.length < 9 * 12 || cab.positions.length !== cab.normals.length || cab.colors.length !== cab.positions.length) failures.push('the lift cab mesh is not a mesh.');
+      for (const [what, m] of [['a cab door', liftCabDoorMesh(c, 1)], ['the other cab door', liftCabDoorMesh(c, -1)], ['a landing', liftLandingMesh(c)]] as const) {
+        if (m.positions.length < 9 * 12 || m.positions.length !== m.normals.length || m.colors.length !== m.positions.length) failures.push(`${what} of the lift is not a mesh.`);
+        for (let i = 1; i < m.positions.length; i += 3) if (m.positions[i] < -0.01 || m.positions[i] > CAB_HEIGHT_M + 0.2) { failures.push(`${what} of the lift leaves the cab's height.`); break; }
+      }
     }
   }
   // --- The slab: a footprint on a slope floors at its high side, capped.

@@ -33,7 +33,8 @@
  */
 import { loadWorld, groundFor, accessWorldOf } from './world.ts';
 import { stationAccessPlan, roomCeilY, concourseY } from '../client/src/game/riding.ts';
-import { heightAlong } from '../client/src/game/rail.ts';
+import { heightAlong, railSeconds, sampleAlong } from '../client/src/game/rail.ts';
+import { findBoarding } from '../client/src/game/riding.ts';
 import { pointInPolygon, type Prism } from '../client/src/player/collision.ts';
 import { STEP_HEIGHT } from '../client/src/player/controller.ts';
 
@@ -106,8 +107,40 @@ for (const st of bake.stations) {
   if (over < ceil - 1) probs.push(`the street over the station answers ${over.toFixed(1)} m, under the lid at ${ceil.toFixed(1)}`);
   const onStreet = g.groundHeight(st.siteX, st.siteZ, over);
   if (Math.abs(onStreet - over) > 0.05) probs.push(`a body on the street over the station is handed ${onStreet.toFixed(1)} m`);
-  // 5. every calling platform's sill against the concourse: a note, not a failure
+  // 5. boarding: from the concourse two metres inside each calling track, a
+  //    walk along the platform meets an open door within twenty minutes.
+  //    `findBoarding` is the client's own offer, so this is the prompt the
+  //    player sees, not a stand-in for it.
   const floor = concourseY(st);
+  {
+    const pose = { x: 0, y: 0, z: 0, dx: 1, dz: 0, s: 0 } as Parameters<typeof sampleAlong>[3];
+    const offer = { line: -1, distance: Infinity } as Parameters<typeof findBoarding>[5];
+    const t0 = railSeconds(Date.now());
+    for (const line of bake.lines) {
+      for (const dir of line.dirs) {
+        const calling = dir.stops.filter((q) => q.calls);
+        for (const stop of dir.stops) {
+          if (!stop.calls || stop.name !== st.name) continue;
+          // A direction that ends here arrives and empties; nobody boards a
+          // terminating train, so the arriving side of a terminus is not asked.
+          if (calling.length > 0 && calling[calling.length - 1] === stop) continue;
+          sampleAlong(bake, dir, stop.s, pose);
+          const across = (pose.x - st.siteX) * px + (pose.z - st.siteZ) * pz;
+          const stand = across - Math.sign(across || 1) * 2.2;
+          let first = -1;
+          for (let dt = 0; dt < 1200 && first < 0; dt += 5) {
+            for (let a = -40; a <= 40; a += 1) {
+              const x = st.siteX + px * stand + st.siteDx * a;
+              const z = st.siteZ + pz * stand + st.siteDz * a;
+              if (findBoarding(bake, x, floor, z, t0 + dt, offer)) { first = dt; break; }
+            }
+          }
+          if (first < 0) probs.push(`no train door within reach on ${line.name} ${dir.index} in twenty minutes`);
+          else notes.push(`${line.name} ${dir.index} boards in ${first} s`);
+        }
+      }
+    }
+  }
   for (const line of bake.lines) {
     for (const dir of line.dirs) {
       for (const stop of dir.stops) {

@@ -18,6 +18,7 @@ import {
   Vector2,
   Vector3,
   WebGPURenderer,
+  ClippingGroup,
   type Material,
 } from 'three/webgpu';
 
@@ -125,7 +126,7 @@ import {
   verifyPlaceables,
   type Placement,
 } from './world/placeables.ts';
-import { liftFloorY, liftMoving, liftTarget, liftDurationMs, levelName, slabFor, coreOpenEnd,
+import { liftFloors, LIFT_DOORS_MS, liftFloorY, liftMoving, liftTarget, liftDurationMs, levelName, slabFor, coreOpenEnd,
   CORE,
   arrivalAt,
   buildInterior,
@@ -143,6 +144,7 @@ import { liftFloorY, liftMoving, liftTarget, liftDurationMs, levelName, slabFor,
 import { INTERIOR_LAYER, InteriorView } from './world/interiorview.ts';
 import { lostMessage, lostPlan, verifyDeviceLost } from './devicelost.ts';
 import { verifyIndexDom } from './domcheck.ts';
+import { LiftPanel } from './liftpanel.ts';
 import { verifyTilePriority } from './world/tilepriority.ts';
 import { verifyPointable } from './waypoint.ts';
 import { verifySuspension } from './game/suspension.ts';
@@ -1956,6 +1958,34 @@ async function main(): Promise<void> {
   console.debug(`[boot] texture uploader shim: ${shimStatus}`);
 
   const scene = new Scene();
+  /**
+   * **The world lives in one clipping group, and the room does not.** While a
+   * body is inside a building, `InteriorView.setWorldHole` gives this group
+   * the building's shell as clipping planes and everything the city draws --
+   * terrain, trees, bins, pedestrians, the odd parked car -- stops drawing
+   * inside the footprint, which is the owner's canopy through the ceiling on
+   * York Street. `scene.add` routes here by default; a camera, a light or
+   * anything flagged `userData.unclipped` (the interior's own meshes, your
+   * own body, the nameplates) stays on the scene root and is never cut.
+   * `scene.remove` follows the object to wherever it landed.
+   */
+  const world = new ClippingGroup();
+  world.name = 'world';
+  world.enabled = false;
+  const sceneAddRaw = scene.add.bind(scene);
+  sceneAddRaw(world);
+  scene.add = ((...objects: Object3D[]) => {
+    for (const o of objects) {
+      const raw = (o as { isCamera?: boolean }).isCamera === true || (o as { isLight?: boolean }).isLight === true || o.userData.unclipped === true;
+      if (raw) sceneAddRaw(o);
+      else world.add(o);
+    }
+    return scene;
+  }) as typeof scene.add;
+  scene.remove = ((...objects: Object3D[]) => {
+    for (const o of objects) o.removeFromParent();
+    return scene;
+  }) as typeof scene.remove;
   // The field of view is `game/feedback.ts`'s to move, not this file's: spec
   // 8.3's Flat White raises it to 80 for the duration and eases it back, so the
   // base lives beside the boosted value and the ease that connects them rather
@@ -5902,6 +5932,7 @@ async function main(): Promise<void> {
   // The field itself is built beside the warm-up, four hundred lines above, so
   // its shader is compiled behind the loading screen rather than on the frame
   // the first other player appears. Only the scene wiring is here.
+  nameplates.mesh.userData.unclipped = true;
   scene.add(nameplates.mesh);
   /** Where a plate's owner's head is. Reused every frame; never escapes the loop. */
   const plateHead = new Vector3();
@@ -5969,6 +6000,7 @@ async function main(): Promise<void> {
   const self = new CharacterActor(characters, 3);
   self.mesh.name = 'character:self';
   castShadowOnly(self.mesh, sky.sun.shadow.camera);
+  self.mesh.userData.unclipped = true;
   scene.add(self.mesh);
   // Driven from combat state like every other actor, which is what puts your own
   // swing, flinch and crumple into the shadow on the footpath in front of you.
@@ -6377,13 +6409,8 @@ async function main(): Promise<void> {
     const it = interior;
     if (it === null) return '';
     if (liftMoving(it, Date.now())) return 'lift moving';
-    const feet = player.position.y - EYE_HEIGHT;
-    const up = liftTarget(it, feet, 1) >= 0;
-    const down = liftTarget(it, feet, -1) >= 0;
-    if (up && down) return 'E — lift up  ·  Shift+E — down';
-    if (up) return 'E — lift up  ·  ground floor';
-    if (down) return 'Shift+E — lift down  ·  top floor';
-    return '';
+    if (liftPanelOpen) return 'W / S — choose a floor  ·  E — go  ·  esc — close';
+    return it.levels.length > 1 ? 'E — choose a floor' : '';
   };
   /** Standing in a lift cab this frame. See `interior.Core`. */
   let atLift = false;
@@ -7854,7 +7881,7 @@ async function main(): Promise<void> {
    * nothing else is on is exact where hiding a few dozen scene children by hand
    * would not be.
    */
-  const interiorView = new InteriorView(scene);
+  const interiorView = new InteriorView(scene, world);
 
   /**
    * A space the server has put us in that has not been built yet.
@@ -8151,20 +8178,39 @@ async function main(): Promise<void> {
    * thing offline does not have.
    */
   // The lift with no server: the same arithmetic `Simulation.liftPress` runs.
-  const pressLiftOffline = (direction: 1 | -1): void => {
+  const pressLiftOffline = (level: number): void => {
     const it = interior;
     if (it === null || it.core === null || it.core.kind !== CORE.LIFT) return;
     const now = Date.now();
     if (liftMoving(it, now)) return;
     const feet = player.position.y - EYE_HEIGHT;
     const from = levelIndex(it.levels, feet);
-    const to = liftTarget(it, feet, direction);
+    const to = liftTarget(it, from, level);
     if (to < 0) return;
     it.lift = { from, to, startMs: now, durMs: liftDurationMs(it.levels, from, to) };
     liftAnnounced = false;
   };
   /** Whether the ride under way has had its level said. See the frame step below. */
   let liftAnnounced = true;
+  /**
+   * The floor panel: open while the rider chooses. `liftPick` is the floor
+   * under the highlight; `W`/`S` move it, `E` sends it, `Esc` closes. Movement
+   * keys are the pick keys while it is up, so a rider does not walk out of
+   * the cab choosing a floor.
+   */
+  const liftPanel = new LiftPanel();
+  let liftPanelOpen = false;
+  let liftPick = 0;
+  let liftKeyUp = false;
+  let liftKeyDown = false;
+  const closeLiftPanel = (): void => {
+    liftPanelOpen = false;
+    liftPanel.hide();
+  };
+  const sendLift = (level: number): void => {
+    if (net) net.pressLift(level);
+    else pressLiftOffline(level);
+  };
   const pressDoorOffline = (): void => {
     if (interior !== null) {
       // Out, along the door's outward normal, at the city's own ground -- the
@@ -10414,10 +10460,34 @@ async function main(): Promise<void> {
         const cabY = liftFloorY(interior, nowMs);
         if (cabY !== null) interiorView.setCabY(cabY);
         // On top for the rider while it moves; see `InteriorView.setCabRiding`.
-        interiorView.setCabRiding(liftMoving(interior, nowMs) && atLift);
-        if (!liftAnnounced && !liftMoving(interior, nowMs)) {
+        const moving = liftMoving(interior, nowMs);
+        interiorView.setCabRiding(moving && atLift);
+        // The doors: shut over the first `LIFT_DOORS_MS`, open over the last.
+        const ride = interior.lift;
+        const sinceStart = nowMs - ride.startMs;
+        const untilEnd = ride.startMs + ride.durMs - nowMs;
+        const open = !moving ? 1 : sinceStart < LIFT_DOORS_MS ? 1 - sinceStart / LIFT_DOORS_MS : untilEnd < LIFT_DOORS_MS ? 1 - untilEnd / LIFT_DOORS_MS : 0;
+        interiorView.setCabState(open, moving ? -1 : ride.to);
+        if (!liftAnnounced && !moving) {
           liftAnnounced = true;
-          areaLine.announce(levelName(interior, interior.lift.to));
+          areaLine.announce(levelName(interior, ride.to));
+        }
+      } else if (interior !== null && interior.core !== null && interior.core.kind === CORE.LIFT) {
+        // A cab that has never ridden rests wherever the body is.
+        interiorView.setCabState(1, levelIndex(interior.levels, player.position.y - EYE_HEIGHT));
+      }
+      // The floor panel, while it is up.
+      if (liftPanelOpen) {
+        if (interior === null || !atLift || liftMoving(interior, Date.now()) || keys.has('Escape')) closeLiftPanel();
+        else {
+          const n = interior.levels.length;
+          const upNow = keys.has('KeyW') || keys.has('ArrowUp');
+          const downNow = keys.has('KeyS') || keys.has('ArrowDown');
+          if (upNow && !liftKeyUp) liftPick = Math.min(n - 1, liftPick + 1);
+          if (downNow && !liftKeyDown) liftPick = Math.max(0, liftPick - 1);
+          liftKeyUp = upNow;
+          liftKeyDown = downNow;
+          liftPanel.show(liftFloors(interior), levelIndex(interior.levels, player.position.y - EYE_HEIGHT), liftPick);
         }
       }
       // What the room holds, when the server says it changed. Rebuilding the
@@ -10605,10 +10675,15 @@ async function main(): Promise<void> {
       // browser that guessed at any of that would be a browser that has to be
       // dragged back out again when it guessed wrong.
       if (!pressMount() && !dialog.tryOpen()) {
-        if (atLift) {
-          const direction: 1 | -1 = keys.has('ShiftLeft') || keys.has('ShiftRight') ? -1 : 1;
-          if (net) net.pressLift(direction);
-          else pressLiftOffline(direction);
+        if (atLift && interior !== null) {
+          if (liftPanelOpen) {
+            sendLift(liftPick);
+            closeLiftPanel();
+          } else if (!liftMoving(interior, Date.now())) {
+            liftPanelOpen = true;
+            liftPick = levelIndex(interior.levels, player.position.y - EYE_HEIGHT);
+            liftKeyUp = liftKeyDown = true;
+          }
         } else if (doorSite !== null || atExit) {
           if (net) net.pressDoor();
           else pressDoorOffline();
@@ -11853,7 +11928,7 @@ async function main(): Promise<void> {
     pipeReclaim.frame(now);
     frameProfile.begin();
     frameProfile.at(FSEC.input);
-    input.forward = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
+    input.forward = liftPanelOpen ? 0 : (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
     input.jump = keys.has('Space');
     input.sprint = keys.has('ShiftLeft') || keys.has('ShiftRight');
     /*

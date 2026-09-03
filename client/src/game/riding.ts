@@ -2707,7 +2707,7 @@ export function findBoarding(
         wz + REACH < dir.minZ || wz - REACH > dir.maxZ
       ) continue;
       const live = Math.floor(dir.duration / line.period) + 2;
-      for (let j = 0; j <= live; j++) {
+      for (let j = -1; j <= live; j++) {
         const trip = Math.floor((t - dir.offset) / line.period) - j;
         if (!poseTrain(bake, dir, trip, t, _pose)) continue;
         // Doors open is the whole gate. `poseTrain` sets it only while the curve
@@ -2938,7 +2938,7 @@ export function nearestDwell(
         continue;
       }
       const live = Math.floor(dir.duration / line.period) + 2;
-      for (let j = 0; j <= live; j++) {
+      for (let j = -1; j <= live; j++) {
         const trip = Math.floor((t - dir.offset) / line.period) - j;
         if (!poseTrain(bake, dir, trip, t, _pose)) continue;
         if (!_pose.doorsOpen) continue;

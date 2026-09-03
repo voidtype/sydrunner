@@ -29,7 +29,7 @@
  * nothing added to layer 0 while the camera is on `INTERIOR_LAYER` can appear,
  * ever, whoever added it.
  */
-import {
+import { ClippingGroup, Plane, Vector3,
   BufferAttribute,
   BufferGeometry,
   type Camera,
@@ -38,7 +38,7 @@ import {
   MeshBasicNodeMaterial,
   type Scene,
 } from 'three/webgpu';
-import { liftCabMesh, CORE, ghostMesh, interiorMesh, type Interior, type InteriorDoor } from './interior.ts';
+import { liftCabDoorMesh, liftLandingMesh, CAB_DOOR_SLIDE, liftCabMesh, CORE, ghostMesh, interiorMesh, type Interior, type InteriorDoor } from './interior.ts';
 import type { Placement } from './placeables.ts';
 
 /**
@@ -55,6 +55,9 @@ import type { Placement } from './placeables.ts';
  * 2 is otherwise unused, and the shadow camera does not have it enabled, so an
  * interior casts no shadow -- which is right, because it is unlit.
  */
+/** How many planes the world's hole always has. See `InteriorView.setWorldHole`. */
+export const WORLD_HOLE_PLANES = 12;
+
 export const INTERIOR_LAYER = 2;
 
 /**
@@ -93,7 +96,38 @@ export class InteriorView {
    */
   private ghost: Mesh | null = null;
 
-  constructor(private readonly scene: Scene) {}
+  constructor(private readonly scene: Scene, private readonly world: ClippingGroup | null = null) {}
+
+  /**
+   * The hole in the world where this building is. Everything the streamer
+   * draws lives under one `ClippingGroup`, and while a body is inside, its
+   * planes are the building's shell (pointing out, intersection semantics:
+   * a fragment is cut only when it is inside every plane, that is inside the
+   * shell). The trees, bins, pedestrians and terrain that stood inside the
+   * footprint stop drawing in the room, and the view through a window is
+   * untouched -- the owner's *"outdoor floor can overlay indoor ground"* and
+   * his screenshot of a canopy through the ceiling on York Street. Always
+   * `WORLD_HOLE_PLANES` planes, padded with ones that cut nothing, so the
+   * renderer compiles one clipped variant of each material rather than one
+   * per footprint shape. Interior meshes are outside the group, so they are
+   * never cut.
+   */
+  setWorldHole(it: Interior | null): void {
+    const world = this.world;
+    if (world === null) return;
+    if (it === null) {
+      world.enabled = false;
+      return;
+    }
+    const planes: Plane[] = [];
+    const shell = it.planes.slice(0, WORLD_HOLE_PLANES);
+    for (const pl of shell) planes.push(new Plane(new Vector3(-pl.nx, 0, -pl.nz), pl.d));
+    // The padding: a plane every point is under, so it never decides.
+    while (planes.length < WORLD_HOLE_PLANES) planes.push(new Plane(new Vector3(0, 1, 0), -1e9));
+    world.clippingPlanes = planes;
+    world.clipIntersection = true;
+    world.enabled = true;
+  }
 
   /** Is an interior currently being drawn? */
   get active(): boolean {
@@ -109,6 +143,7 @@ export class InteriorView {
   show(camera: Camera, it: Interior, door: InteriorDoor = it.door): void {
     this.hide(camera);
     this.rebuild(it, door);
+    this.setWorldHole(it);
     // The room's layer *and* the city's. The windows are holes in the shell
     // now, and what is through them is the street: the owner, after a walk
     // through the city, "it would be more immersive if i could look out of
@@ -129,10 +164,35 @@ export class InteriorView {
    */
   /** The lift cab, or null for a building without one. Its height follows `liftFloorY`. */
   private cab: Mesh | null = null;
+  /** The cab's two doors, sliding along the across axis. */
+  private cabDoors: [Mesh, Mesh] | null = null;
+  /** The landing doors, one per level, drawn where the cab is not. */
+  private landings: Mesh[] = [];
+  private cabAcross: [number, number] = [1, 0];
+  private cabSlideM = 0;
 
   /** Put the cab floor at this height. Cheap: one transform. */
   setCabY(y: number): void {
     if (this.cab !== null) this.cab.position.y = y;
+    if (this.cabDoors !== null) for (const d of this.cabDoors) d.position.y = y;
+  }
+
+  /**
+   * The doors and the landings, from the ride: `open` is 0 shut to 1 open,
+   * `restLevel` the level the cab is standing at or -1 while it moves. The
+   * landing at the cab's level hides so a rider walks out through an open
+   * door and not a drawn one.
+   */
+  setCabState(open: number, restLevel: number): void {
+    if (this.cabDoors !== null) {
+      const slide = this.cabSlideM * Math.max(0, Math.min(1, open));
+      const [ax, az] = this.cabAcross;
+      this.cabDoors[0].position.x = -ax * slide;
+      this.cabDoors[0].position.z = -az * slide;
+      this.cabDoors[1].position.x = ax * slide;
+      this.cabDoors[1].position.z = az * slide;
+    }
+    for (let k = 0; k < this.landings.length; k++) this.landings[k].visible = k !== restLevel;
   }
 
   /**
@@ -152,29 +212,62 @@ export class InteriorView {
     this.cabMaterial.depthWrite = !riding;
     this.cabMaterial.needsUpdate = true;
     if (this.cab !== null) this.cab.renderOrder = riding ? 3 : 0;
+    if (this.cabDoors !== null) for (const d of this.cabDoors) d.renderOrder = riding ? 3 : 0;
   }
 
-  private rebuildCab(it: Interior): void {
-    const old = this.cab;
-    if (old !== null) {
-      this.scene.remove(old);
-      old.geometry.dispose();
-      this.cab = null;
-    }
-    const core = it.core;
-    if (core === null || core.kind !== CORE.LIFT) return;
-    const built = liftCabMesh(core);
+  private meshOf(built: { positions: Float32Array; normals: Float32Array; colors: Float32Array }, material: MeshBasicNodeMaterial): Mesh {
     const geometry = new BufferGeometry();
     geometry.setAttribute('position', new BufferAttribute(built.positions, 3));
     geometry.setAttribute('normal', new BufferAttribute(built.normals, 3));
     geometry.setAttribute('color', new BufferAttribute(built.colors, 3));
-    const mesh = new Mesh(geometry, this.cabMaterial);
+    const mesh = new Mesh(geometry, material);
     mesh.layers.set(INTERIOR_LAYER);
     mesh.frustumCulled = false;
-    mesh.renderOrder = this.cabRiding ? 3 : 0;
-    mesh.position.y = it.levels[0].y;
-    this.scene.add(mesh);
-    this.cab = mesh;
+    // Never clipped by the world's hole; see `setWorldHole`.
+    mesh.userData.unclipped = true;
+    return mesh;
+  }
+
+  private dropCab(): void {
+    const gone: Mesh[] = [];
+    if (this.cab !== null) gone.push(this.cab);
+    if (this.cabDoors !== null) gone.push(...this.cabDoors);
+    gone.push(...this.landings);
+    for (const m of gone) {
+      this.scene.remove(m);
+      m.geometry.dispose();
+    }
+    this.cab = null;
+    this.cabDoors = null;
+    this.landings = [];
+  }
+
+  private rebuildCab(it: Interior): void {
+    this.dropCab();
+    const core = it.core;
+    if (core === null || core.kind !== CORE.LIFT) return;
+    const y0 = it.levels[0].y;
+    const cab = this.meshOf(liftCabMesh(core), this.cabMaterial);
+    cab.renderOrder = this.cabRiding ? 3 : 0;
+    cab.position.y = y0;
+    this.scene.add(cab);
+    this.cab = cab;
+    const doors: [Mesh, Mesh] = [this.meshOf(liftCabDoorMesh(core, -1), this.cabMaterial), this.meshOf(liftCabDoorMesh(core, 1), this.cabMaterial)];
+    for (const d of doors) {
+      d.renderOrder = this.cabRiding ? 3 : 0;
+      d.position.y = y0;
+      this.scene.add(d);
+    }
+    this.cabDoors = doors;
+    this.cabAcross = [-core.lz, core.lx];
+    this.cabSlideM = (core.hw - 0.05) * CAB_DOOR_SLIDE;
+    const landing = liftLandingMesh(core);
+    for (const level of it.levels) {
+      const m = this.meshOf(landing, this.material);
+      m.position.y = level.y;
+      this.scene.add(m);
+      this.landings.push(m);
+    }
   }
 
   rebuild(it: Interior, door: InteriorDoor = it.door): void {
@@ -199,6 +292,7 @@ export class InteriorView {
     mesh.frustumCulled = false;
     // Nothing else is on this layer, so there is nothing to sort against.
     mesh.renderOrder = 0;
+    mesh.userData.unclipped = true;
     this.scene.add(mesh);
     this.mesh = mesh;
   }
@@ -231,6 +325,7 @@ export class InteriorView {
     // it: the two are millimetres apart and the depth test has no opinion worth
     // having about which should win.
     mesh.renderOrder = 1;
+    mesh.userData.unclipped = true;
     this.scene.add(mesh);
     this.ghost = mesh;
   }
@@ -239,12 +334,8 @@ export class InteriorView {
   hide(camera: Camera): void {
     camera.layers.set(0);
     this.setGhost(null, null, false);
-    const cab = this.cab;
-    if (cab !== null) {
-      this.scene.remove(cab);
-      cab.geometry.dispose();
-      this.cab = null;
-    }
+    this.dropCab();
+    this.setWorldHole(null);
     const mesh = this.mesh;
     if (mesh === null) return;
     this.scene.remove(mesh);

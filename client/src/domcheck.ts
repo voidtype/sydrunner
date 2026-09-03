@@ -44,6 +44,8 @@
  * ones whose absence is a `null` dereference during boot.
  */
 const REQUIRED_IDS: readonly string[] = [
+  'lift',
+  'lift-list',
   'loading',
   'loading-text',
   'nameprompt',

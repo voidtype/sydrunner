@@ -479,7 +479,7 @@ function poseAll(
     const line = bake.lines[li];
     for (const dir of line.dirs) {
       const live = liveTripCount(dir);
-      for (let j = 0; j <= live; j++) {
+      for (let j = -1; j <= live; j++) {
         const trip = tripIndexAt(dir, t, j);
         if (!poseTrain(bake, dir, trip, t, pose)) continue;
         const consist = consistOf(dir, trip);

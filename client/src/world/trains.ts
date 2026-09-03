@@ -1339,7 +1339,7 @@ export class TrainFleet {
           z + IMPOSTOR_RADIUS < dir.minZ || z - IMPOSTOR_RADIUS > dir.maxZ
         ) continue;
         const live = liveTripCount(dir);
-        for (let j = 0; j <= live; j++) {
+        for (let j = -1; j <= live; j++) {
           const trip = tripIndexAt(dir, t, j);
           // The head of the train, from the same function the server evaluates.
           // Everything after this is the consist hung off `pose.s`.

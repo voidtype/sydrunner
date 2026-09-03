@@ -192,10 +192,16 @@ The pieces, all in `world/interior.ts`:
   a flight two storeys up or into a hole. `interiorGround` picks the flight
   nearest the feet by height, never by level, so a body that jumps on a flight
   lands on the flight it jumped from.
-- **A lift** (seven storeys and up, and any building with a deck) is a cab with
-  three walls and a floor, and **the cab rides**. `E` in the cab goes up a
-  level, `Shift+E` down, and the ends of the shaft are ends: a press at the
-  top does nothing and the prompt says so. The server owns the ride
+- **A lift** (seven storeys and up, and any building with a deck) is a cab
+  that **rides to the floor you choose**. `E` in the cab opens the floor panel
+  (`liftpanel.ts`, `#lift`), `W`/`S` move the pick, `E` sends `MSG.LIFT` with
+  the floor (protocol 28: a byte, 0-254), `Esc` closes; the panel offers only
+  the real floors, so the ends of the shaft are ends. The cab is a cab
+  (`liftCabMesh`: rubber floor, dado band, lit ceiling, handrail, call panel,
+  door frame) with two doors that shut over the first `LIFT_DOORS_MS` of a
+  ride and open over the last (`liftCabDoorMesh`, `InteriorView.setCabState`),
+  and every level has landing doors (`liftLandingMesh`) drawn wherever the cab
+  is not. The server owns the ride
   (`Simulation.liftPress` → `LIFT_RIDE` to everyone in the building), but
   nothing on either end moves the body: the ride is three numbers on the
   `Interior` (`lift: { from, to, startMs, durMs }`), `interiorGround` answers
@@ -210,6 +216,15 @@ The pieces, all in `world/interior.ts`:
   looked the same, and `/kill` (an alias of `/unstuck`) moved the body to a
   road while the server still had it in the building -- `Simulation.unstuck`
   now leaves the building first and the chat sends the `SPACE` frame.
+- **The hole in the world.** Everything the city draws lives under one
+  `ClippingGroup` (`main.ts`, `world`); while a body is inside, the building's
+  shell planes clip it with intersection semantics, so the trees, bins,
+  pedestrians and terrain that stood inside the footprint stop drawing in the
+  room and the view through a window is untouched (`InteriorView.setWorldHole`,
+  always twelve planes so each material compiles one clipped variant). The
+  interior's meshes, your own body and the nameplates are flagged
+  `userData.unclipped` and stay on the scene root. The owner's screenshot on
+  York Street: a canopy through the ceiling and pedestrians in the corridor.
 - **The slab.** A building's ground floor is at the highest terrain under its
   footprint (`slabFor`, capped `SLAB_MAX_M` over the prism base), not the
   pipeline's lowest corner: on a sloping block the DEM rose through the floor

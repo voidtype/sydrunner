@@ -3077,7 +3077,7 @@ async function checkBikes(): Promise<void> {
   // the bump is one line the lead changes here and in `protocol.ts` together.
   // See `PROTOCOL_VERSION`'s v15 note. If this line is still reading 14 after
   // the batch has landed, that is the bug this check exists to catch.
-  check(PROTOCOL_VERSION === 27, `the protocol is at version ${PROTOCOL_VERSION}`);
+  check(PROTOCOL_VERSION === 28, `the protocol is at version ${PROTOCOL_VERSION}`);
   check(
     WELCOME_BYTES === 36,
     `  and a WELCOME is ${WELCOME_BYTES} bytes: 27 through v10, plus v11's f64 clock, plus v15's ` +
@@ -11590,7 +11590,7 @@ async function checkInteriors(): Promise<void> {
         up !== null && up.building === inside.seed && up.from === 0 && up.to === 1 && up.durMs > 0,
         `a press in the cab of a ${n}-level building starts a ride up one level (${up === null ? 'refused' : `${up.from} -> ${up.to}, ${up.durMs} ms`})`,
       );
-      check(s2.liftPress(who.id, 1) === null, 'a press during the ride is ignored');
+      check(s2.liftPress(who.id, 2) === null, 'a call during the ride is ignored');
       // The floor under the feet is the cab: at the end of the ride it is level 1.
       if (up !== null) {
         const feetEnd = interiorGround(inside, core.x, core.z, inside.levels[1].y, up.startMs + up.durMs + 1);
@@ -11608,12 +11608,13 @@ async function checkInteriors(): Promise<void> {
         'and nothing can be furnished from a floor above the ground',
       );
       who.combat.body.position.set(core.x, inside.levels[n - 1].y + EYE_HEIGHT, core.z);
-      check(s2.liftPress(who.id, 1) === null, 'at the top, up does nothing: the shaft has an end');
-      const down = s2.liftPress(who.id, -1);
-      check(down !== null && down.from === n - 1 && down.to === n - 2, 'and down from the top goes one level down');
+      check(s2.liftPress(who.id, n) === null, 'a floor past the top is refused: the shaft has an end');
+      check(s2.liftPress(who.id, n - 1) === null, 'and the floor the cab is on is not a ride');
+      const down = s2.liftPress(who.id, 0);
+      check(down !== null && down.from === n - 1 && down.to === 0, 'and the ground floor, chosen from the top, is one ride all the way down');
       inside.lift = null;
       who.combat.body.position.set(core.x, inside.levels[0].y + EYE_HEIGHT, core.z);
-      check(s2.liftPress(who.id, -1) === null, 'and at the ground, down does nothing');
+      check(s2.liftPress(who.id, -1) === null, 'and a floor below the ground is refused');
       who.combat.body.position.set(core.x, inside.levels[2].y + EYE_HEIGHT, core.z);
       const out = s2.doorPress(who.id);
       check(out !== null && out.space === CITY_SPACE, 'and a body two floors up can still leave by the door');

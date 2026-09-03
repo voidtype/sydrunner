@@ -1024,7 +1024,7 @@ export const MSG = {
  * the walls this server does. Two ends on different versions of a shared
  * computation is the failure the version exists to refuse.
  */
-export const PROTOCOL_VERSION = 27;
+export const PROTOCOL_VERSION = 28;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;
@@ -3845,20 +3845,26 @@ export function decodeLiftRide(buffer: ArrayBuffer): LiftRideFrame | null {
  *     u8   type = MSG.LIFT
  *     i8   direction   +1 up, -1 down; anything else is not a LIFT
  */
-export function encodeLift(direction: 1 | -1, buffer = new ArrayBuffer(LIFT_BYTES)): ArrayBuffer {
+/**
+ * A floor, 0 to 254, chosen in the cab; 255 is refused. It was a direction,
+ * up or down one level, and the owner asked for the panel: *"when in a lift i
+ * should be able to choose floor and it travels there"*.
+ */
+export const LIFT_LEVEL_MAX = 254;
+export function encodeLift(level: number, buffer = new ArrayBuffer(LIFT_BYTES)): ArrayBuffer {
   const v = new DataView(buffer);
   v.setUint8(0, MSG.LIFT);
-  v.setInt8(1, direction);
+  v.setUint8(1, Math.max(0, Math.min(LIFT_LEVEL_MAX, level | 0)));
   return buffer;
 }
 
 /** The direction of a well-formed `LIFT`, or null. */
-export function decodeLift(buffer: ArrayBuffer): 1 | -1 | null {
+export function decodeLift(buffer: ArrayBuffer): number | null {
   if (buffer.byteLength < LIFT_BYTES) return null;
   const v = new DataView(buffer);
   if (v.getUint8(0) !== MSG.LIFT) return null;
-  const d = v.getInt8(1);
-  return d === 1 ? 1 : d === -1 ? -1 : null;
+  const level = v.getUint8(1);
+  return level > LIFT_LEVEL_MAX ? null : level;
 }
 
 /** `MSG.SPACE`'s width. See `encodeSpace`. */
@@ -5705,13 +5711,14 @@ export function verifyNet(): string[] {
     if (!decodeDoor(encodeDoor())) failures.push('A DOOR did not decode as one.');
     if (decodeDoor(encodeSunPress())) failures.push('A SUN_PRESS decoded as a DOOR. The type byte is not being read.');
     if (decodeDoor(new ArrayBuffer(0))) failures.push('An empty frame decoded as a DOOR.');
-    if (decodeLift(encodeLift(1)) !== 1) failures.push('A LIFT up did not decode as up.');
-    if (decodeLift(encodeLift(-1)) !== -1) failures.push('A LIFT down did not decode as down.');
+    if (decodeLift(encodeLift(0)) !== 0) failures.push('A LIFT to the ground floor did not decode.');
+    if (decodeLift(encodeLift(12)) !== 12) failures.push('A LIFT to level 12 did not decode.');
+    if (decodeLift(encodeLift(LIFT_LEVEL_MAX)) !== LIFT_LEVEL_MAX) failures.push('A LIFT to the top of the range did not decode.');
     if (decodeLift(encodeDoor()) !== null) failures.push('A DOOR decoded as a LIFT.');
     {
       const odd = encodeLift(1);
-      new DataView(odd).setInt8(1, 5);
-      if (decodeLift(odd) !== null) failures.push('A LIFT with a direction of 5 was accepted.');
+      new DataView(odd).setUint8(1, 255);
+      if (decodeLift(odd) !== null) failures.push('A LIFT to 255 was accepted; that byte is refused.');
     }
     if (decodeLift(encodeLift(1).slice(0, 1)) !== null) failures.push('A one-byte LIFT was accepted.');
 

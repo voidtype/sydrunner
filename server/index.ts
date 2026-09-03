@@ -2011,10 +2011,10 @@ const server = Bun.serve<Conn>({
          * `SPACE` or with nothing.
          */
         case MSG.LIFT: {
-          const direction = decodeLift(frame);
-          if (direction === null) return;
+          const level = decodeLift(frame);
+          if (level === null) return;
           const room = conn.room >= 0 ? host.get(conn.room) : undefined;
-          room?.liftPress(ws, direction);
+          room?.liftPress(ws, level);
           return;
         }
         /**

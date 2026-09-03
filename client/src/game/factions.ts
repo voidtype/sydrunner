@@ -834,6 +834,20 @@ export interface NpcKindDef {
    */
   readonly aggroClips: readonly string[];
   readonly aggroCooldownSeconds: number;
+  /**
+   * The feed line when one of this kind goes *down*, `%s` the attacker. Absent
+   * means `feedKo` is reused, which is what the drunks want and the police do
+   * not: "got done by the cops" is the wrong sentence for a cop on the ground.
+   */
+  readonly feedDown?: string;
+  /**
+   * How many more pursuers an investigation wants after one of this kind is
+   * put down by its suspect. The owner: *"cops can be attacked back (it should
+   * despawn that cop, but make 2 more cops come so its bad for the user)"*.
+   * The debt is per suspect, capped in `strikeNpc`, and cleared with the
+   * investigation.
+   */
+  readonly reinforceOnDown?: number;
   /** `%s` is the victim's name. See `feedLine`. */
   readonly feedKo: string;
   /** Whether knocking one out credits a player's leaderboard row. Police: no. */
@@ -1506,7 +1520,14 @@ export function policeShotLands(
 }
 
 /** How long a batted officer stays down, seconds. They are hardy; they get up. */
-export const POLICE_DOWN_SECONDS = 5;
+/**
+ * Zero: an officer the suspect puts down is gone, not winded. It was five
+ * seconds on the ground and back up, and the owner asked for the other thing
+ * -- *"it should despawn that cop, but make 2 more cops come"* -- so a
+ * knockdown is a removal (`strikeNpc` marks the actor for the sweep) and the
+ * two are `reinforceOnDown`.
+ */
+export const POLICE_DOWN_SECONDS = 0;
 /** Pips an officer carries. Three bat swings, and the third only knocks them over. */
 export const POLICE_MAX_HEALTH = 3;
 
@@ -1514,6 +1535,8 @@ export const POLICE_MAX_HEALTH = 3;
 export const PROMOTE_RADIUS = 120;
 /** How many pursuers one investigation tries to keep on a suspect. */
 export const PURSUIT_TARGET = 4;
+/** The most extra pursuers a suspect can owe for cops they put down. See `NpcKindDef.reinforceOnDown`. */
+export const REINFORCE_DEBT_MAX = 8;
 /** Ticks between reinforcements trickling out of the nearest station. 2 s. */
 export const REINFORCE_INTERVAL_TICKS = 120;
 /**
@@ -2535,6 +2558,13 @@ export class FactionField {
 
   /** The last tick a reinforcement left a station, so the trickle is a trickle. */
   private lastReinforce = 0;
+  /**
+   * Extra pursuers owed per suspect, keyed by player id: two for every cop
+   * they put down (`NpcKindDef.reinforceOnDown`), so the pursuit that comes
+   * after a decked officer is bigger than the one before it. Read by
+   * `recruit`, cleared when the investigation closes.
+   */
+  readonly reinforcementDebt = new Map<number, number>();
 
   /** Events this tick, for the transport and the presentation. Reused; drain before the next step. */
   readonly events: FactionEvent[] = [];
@@ -2614,6 +2644,7 @@ export class FactionField {
   /** Drop an investigation outright. A respawn does not; see `stepInvestigations`. */
   clearInvestigation(playerId: number): void {
     this.investigations.delete(playerId);
+    this.reinforcementDebt.delete(playerId);
   }
 
   clear(): void {
@@ -2774,7 +2805,10 @@ export class FactionField {
   private stepInvestigations(): void {
     for (const [id, inv] of this.investigations) {
       inv.ticks--;
-      if (inv.ticks <= 0) this.investigations.delete(id);
+      if (inv.ticks <= 0) {
+        this.investigations.delete(id);
+        this.reinforcementDebt.delete(id);
+      }
     }
   }
 
@@ -2798,12 +2832,14 @@ export class FactionField {
       for (const a of this.actors) {
         if (a.target === inv.playerId && a.state !== NPC_STATE.RETURN) onIt++;
       }
-      if (onIt >= PURSUIT_TARGET) continue;
+      // Four, plus two for every officer this suspect has already put down.
+      const pursuitTarget = PURSUIT_TARGET + (this.reinforcementDebt.get(inv.playerId) ?? 0);
+      if (onIt >= pursuitTarget) continue;
 
       // --- From the beat. Everybody inside `PROMOTE_RADIUS` comes, up to the
       // shortfall, nearest first by construction of the iteration order.
       if (ctx.peds) {
-        let want = PURSUIT_TARGET - onIt;
+        let want = pursuitTarget - onIt;
         forEachPoliceNear(ctx.peds, sx, sz, PROMOTE_RADIUS, ctx.tick, this.bands, this.ped, this.beat, (p) => {
           if (want <= 0) return true;
           const actor = this.promote(NPC_KIND.POLICE, p.x, p.y, p.z, p.dx, p.dz, inv.playerId);
@@ -2813,7 +2849,7 @@ export class FactionField {
           this.bark(actor, ctx);
         });
       }
-      if (onIt >= PURSUIT_TARGET) continue;
+      if (onIt >= pursuitTarget) continue;
 
       // --- And from the nearest station, one every `REINFORCE_INTERVAL_TICKS`.
       //
@@ -3030,7 +3066,13 @@ export function strikeNpc(
   // A kind with no downtime is simply gone. `health <= -1` is the despawn flag
   // `FactionField.step` sweeps on -- see there.
   if (def.downSeconds <= 0) actor.health = -2;
-  out.feed = attackerName ? feedLine(def.feedKo, attackerName) : '';
+  out.feed = attackerName ? feedLine(def.feedDown ?? def.feedKo, attackerName) : '';
+  // The reinforcements the suspect has just earned. Capped, so a player who
+  // keeps swinging meets a pursuit that is large rather than infinite.
+  if (def.reinforceOnDown && attackerId > 0) {
+    const owed = field.reinforcementDebt.get(attackerId) ?? 0;
+    field.reinforcementDebt.set(attackerId, Math.min(REINFORCE_DEBT_MAX, owed + def.reinforceOnDown));
+  }
   field.events.push({
     kind: 'down',
     actorId: actor.id,
@@ -3225,6 +3267,8 @@ export const POLICE = registerNpcKind({
   walkSpeed: POLICE_WALK_SPEED,
   chaseSpeed: CHASE_SPEED,
   downSeconds: POLICE_DOWN_SECONDS,
+  feedDown: '%s decked a cop -- backup is coming',
+  reinforceOnDown: 2,
   // The user's own two files, staged at `/audio/`. Played on aggro with a
   // cooldown, because two officers promoting on the same tick within earshot of
   // each other is the common case and not the exception.
@@ -3840,6 +3884,33 @@ export function verifyPolice(kitTriangles?: number, snapshotInterval?: number): 
   // blocked by a building it passes over, and clear when it should not be.
   failures.push(...verifyLineOfSight());
 
+  // --- A decked officer is gone, and two more are owed. The owner: "cops can
+  // be attacked back (it should despawn that cop, but make 2 more cops come
+  // so its bad for the user)".
+  {
+    const field = new FactionField();
+    const cop = field.promote(NPC_KIND.POLICE, 0, 0, 0, 1, 0, 7);
+    if (cop === null) failures.push('a police officer could not be promoted for the strike check.');
+    else {
+      const first = strikeNpc(field, cop, POLICE_MAX_HEALTH, 'Bazza', 7, 10);
+      if (!first.landed || !first.down) failures.push('three pips did not put an officer down.');
+      if (cop.health !== -2) failures.push(`a downed officer has health ${cop.health}; -2 is the despawn flag, and POLICE_DOWN_SECONDS must be 0.`);
+      if (field.reinforcementDebt.get(7) !== 2) failures.push(`putting an officer down owed ${field.reinforcementDebt.get(7)} reinforcements, not 2.`);
+      if (!first.feed.includes('decked a cop')) failures.push(`the feed line for a downed officer reads "${first.feed}".`);
+      const second = field.promote(NPC_KIND.POLICE, 2, 0, 0, 1, 0, 7);
+      if (second !== null) {
+        strikeNpc(field, second, POLICE_MAX_HEALTH, 'Bazza', 7, 20);
+        if (field.reinforcementDebt.get(7) !== 4) failures.push('a second officer down did not owe two more.');
+      }
+      for (let i = 0; i < 10; i++) {
+        const more = field.promote(NPC_KIND.POLICE, 4 + i, 0, 0, 1, 0, 7);
+        if (more !== null) strikeNpc(field, more, POLICE_MAX_HEALTH, 'Bazza', 7, 30 + i);
+      }
+      if ((field.reinforcementDebt.get(7) ?? 0) > REINFORCE_DEBT_MAX) failures.push('the reinforcement debt is not capped.');
+      field.clearInvestigation(7);
+      if (field.reinforcementDebt.has(7)) failures.push('closing the investigation did not clear the reinforcement debt.');
+    }
+  }
   // --- The two-star gate, over the real `POLICE.think`.
   failures.push(...verifyArmedAtTwoStars());
 

@@ -626,6 +626,12 @@ export function liveTripCount(dir: RailDirection): number {
 }
 
 /**
+ * Seconds a train stands at its origin, doors open, before it departs. A
+ * caller sweeping trips with `tripIndexAt` starts at `j = -1` to include it.
+ */
+export const ORIGIN_STAND_S = 45;
+
+/**
  * Which departure is `j` steps behind the most recent one at time `t`.
  *
  * Trips are numbered by departure, forever, exactly as `traffic.ts` numbers its
@@ -855,7 +861,32 @@ export function poseTrain(
   bake: RailBake, dir: RailDirection, trip: number, t: number, out: TrainPose,
 ): boolean {
   const age = t - dir.offset - trip * dir.line.period;
-  if (age < 0 || age > dir.duration || dir.vertexCount < 2) return false;
+  if (age < -ORIGIN_STAND_S || age > dir.duration || dir.vertexCount < 2) return false;
+  // **Standing at the origin before it leaves.** A trip used to begin at the
+  // instant of departure, so a terminus -- Bondi Junction, Olympic Park --
+  // never had a train with its doors open and nobody could board there
+  // (`server/underground-check.ts` found it). For `ORIGIN_STAND_S` before
+  // departure the train sits at the first stop, doors open, the same object
+  // the departing trip will be.
+  if (age < 0) {
+    sampleAlong(bake, dir, 0, out);
+    out.speed = 0;
+    out.s = 0;
+    out.age = age;
+    out.atStop = -1;
+    out.doorsOpen = false;
+    for (let k = 0; k < dir.stops.length; k++) {
+      const st = dir.stops[k];
+      if (!st.calls) continue;
+      if (st.s < 40) {
+        out.atStop = k;
+        out.doorsOpen = true;
+      }
+      break;
+    }
+    out.identity = trainIdentity(dir, trip);
+    return true;
+  }
 
   const { s, v } = evalCurve(bake.phases, dir.phaseOff, dir.phaseCount, age);
 
@@ -1024,6 +1055,23 @@ export function railAt(dir: RailDirection, s: number): number {
  */
 export function verifyRail(bake: RailBake): string[] {
   const bad: string[] = [];
+  // --- A train stands at its origin with its doors open before it leaves.
+  {
+    const pose = createTrainPose();
+    let checked = 0;
+    for (const line of bake.lines) {
+      for (const dir of line.dirs) {
+        if (dir.vertexCount < 2 || !dir.stops.length || !dir.stops[0].calls) continue;
+        const t = dir.offset + 3 * line.period - 10;
+        if (!poseTrain(bake, dir, 3, t, pose)) { bad.push(`${line.name} ${dir.index}: no train stands at the origin ten seconds before departure`); break; }
+        if (!pose.doorsOpen || pose.s !== 0) bad.push(`${line.name} ${dir.index}: the standing train has its doors shut or is not at s=0`);
+        if (poseTrain(bake, dir, 3, t - ORIGIN_STAND_S, pose)) bad.push(`${line.name} ${dir.index}: a train stands at the origin before its window`);
+        checked++;
+        break;
+      }
+      if (checked >= 3) break;
+    }
+  }
   // --- The buried spans are marked, and every served bore has a concourse.
   {
     let deep = 0;

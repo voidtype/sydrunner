@@ -5873,7 +5873,7 @@ export class Simulation {
    * during a ride is ignored, and the ends of the shaft are ends
    * (`liftTarget`). The frame goes to everyone in the building.
    */
-  liftPress(id: number, direction: 1 | -1): LiftRideFrame | null {
+  liftPress(id: number, level: number): LiftRideFrame | null {
     const p = this.participants.get(id);
     if (!p || p.gone || p.bot !== null) return null;
     const inside = p.interior;
@@ -5886,7 +5886,7 @@ export class Simulation {
     if (liftMoving(inside, now)) return null;
     const feet = b.position.y - EYE_HEIGHT;
     const from = levelIndex(inside.levels, feet);
-    const to = liftTarget(inside, feet, direction);
+    const to = liftTarget(inside, from, level);
     if (to < 0) return null;
     inside.lift = { from, to, startMs: now, durMs: liftDurationMs(inside.levels, from, to) };
     return { building: inside.seed, ...inside.lift };
