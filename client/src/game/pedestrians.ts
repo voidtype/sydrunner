@@ -379,13 +379,21 @@ export interface PedPose {
   vz: number;
   /** Killed: the renderer draws parts, not a body. See `GIB_SPEED`. */
   gib: boolean;
+  /**
+   * How far above its ground the launch has the body right now, metres: the
+   * hop's share of `y`. Zero once landed and for anyone not launched. Kept
+   * apart from `y` so a renderer can put the body on the ground it actually
+   * slid onto -- the band's own height is the footpath it was hit on, and a
+   * body thrown eight metres up a grass bank is otherwise under the bank.
+   */
+  hop: number;
 }
 
 export function createPedPose(): PedPose {
   return {
     key: 0, osmId: 0, side: 0, slot: 0, x: 0, y: 0, z: 0, dx: 0, dz: 1,
     kit: 0, speed: 0, along: 0, down: false, downT: 0, downLeft: 0,
-    vx: 0, vz: 0, gib: false,
+    vx: 0, vz: 0, gib: false, hop: 0,
   };
 }
 
@@ -1160,6 +1168,7 @@ export function posePedestrian(
   out.vx = isDown && down !== undefined ? down.vx : 0;
   out.vz = isDown && down !== undefined ? down.vz : 0;
   out.gib = isDown && down !== undefined && down.gib;
+  out.hop = 0;
   // The flight. A body a car threw is not where it stood; it is where the
   // launch put it, and the schedule stays pinned underneath so it gets up
   // where it landed only in the sense that it never gets up anywhere else.
@@ -1168,6 +1177,7 @@ export function posePedestrian(
     out.x += _launch[0];
     out.y += _launch[1];
     out.z += _launch[2];
+    out.hop = _launch[1];
   }
   return true;
 }

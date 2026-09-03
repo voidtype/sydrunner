@@ -413,6 +413,26 @@ interface RigSlot {
  *
  * `update` allocates nothing.
  */
+/**
+ * How far from the camera a walker's height is re-read off the real ground,
+ * metres, and how far the band's own height may be from it before it is.
+ *
+ * A band's `y` is the footpath the pipeline baked, and it is right almost
+ * everywhere -- which is why the crowd costs no ground queries. It is wrong
+ * exactly where the ground has since moved under it: the apron and incline
+ * carved at a station's mouth, a deck the streamer decided on late, and any
+ * launched body, which slides metres off the footpath it was hit on. The
+ * owner: *"fix people being passed thru ground"*. So inside `GROUND_RADIUS`
+ * the ground is asked, and a walker whose band is more than
+ * `GROUND_SLACK_M` from it -- or who is flying -- stands on the answer. A
+ * few hundred cheap queries a frame, none beyond the range a sunk figure is
+ * visible at.
+ */
+const GROUND_RADIUS = 140;
+const GROUND_SLACK_M = 0.35;
+/** The footpath slab's own height over the terrain the ground query returns. `index.json`'s `footpath_y_m`. */
+const FOOTPATH_Y = 0.15;
+
 export class PedestrianCrowd {
   /** Add these to the scene. Six sets, in part order. */
   readonly meshes: InstancedMesh[] = [];
@@ -526,6 +546,13 @@ export class PedestrianCrowd {
    * frame delta rather than the tick for `main.ts`'s reason: the simulation is
    * fixed so prediction and rewind agree, and animation is presentation.
    */
+  /**
+   * The ground under a point, for the walkers who need it. Set by `main.ts`
+   * to its own ground query; null is the crowd exactly as it shipped, on the
+   * bands' baked heights. See `GROUND_RADIUS`.
+   */
+  ground: ((x: number, z: number, feetY: number) => number) | null = null;
+
   update(field: PedestrianField, tick: number, dt: number, x: number, z: number): void {
     const at = performance.now();
     this.gather(field, tick, x, z);
@@ -551,6 +578,15 @@ export class PedestrianCrowd {
       this.vX[n] = p.x;
       this.vY[n] = p.y;
       this.vZ[n] = p.z;
+      // On the real ground where it matters. See `GROUND_RADIUS`.
+      const ground = this.ground;
+      if (ground !== null && dx * dx + dz * dz < GROUND_RADIUS * GROUND_RADIUS) {
+        const base = p.y - p.hop;
+        const g = ground(p.x, p.z, base);
+        if (Number.isFinite(g) && (p.vx !== 0 || p.vz !== 0 || Math.abs(g + FOOTPATH_Y - base) > GROUND_SLACK_M)) {
+          this.vY[n] = g + FOOTPATH_Y + p.hop;
+        }
+      }
       this.vDx[n] = p.dx;
       this.vDz[n] = p.dz;
       this.vAlong[n] = p.along;
@@ -823,7 +859,13 @@ export class PedestrianCrowd {
       const y = Math.max(0, up * tt - 0.5 * GRAVITY * tt * tt);
       const px = this.vX[i] + vx * k;
       const pz = this.vZ[i] + vz * k;
-      const py = this.vY[i] + y + 0.12;
+      // Each part lands on the ground under *it*, not under the body it left.
+      let base = this.vY[i];
+      if (this.ground !== null) {
+        const g = this.ground(px, pz, base);
+        if (Number.isFinite(g)) base = g + 0.05;
+      }
+      const py = base + y + 0.12;
       // Tumbling while it flies, still once it lands.
       const angle = (y > 0 ? tt : Math.min(tt, up / (0.5 * GRAVITY))) * GIB_SPIN * (0.5 + a);
       _gibAxis.set(hz, 0.3 + c, -hx).normalize();

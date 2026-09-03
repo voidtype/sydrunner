@@ -13119,6 +13119,9 @@ async function main(): Promise<void> {
       // the near tier reads it: fourteen `CharacterActor`s are animated on the
       // frame delta for the reason every actor below is, and the far tier's gait
       // is derived from the distance walked and has no clock at all.
+      // The ground, for the walkers near enough to be seen sinking into it.
+      // See `PedestrianCrowd.ground`.
+      if (crowd.ground === null) crowd.ground = groundHeightAt;
       crowd.update(
         pedestrians,
         trafficTick(Date.now()) + accumulator / FIXED_DT,
