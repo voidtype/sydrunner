@@ -189,4 +189,38 @@ if (!held) {
   }
   console.log(`${held.mouths.length - roofed} of ${held.mouths.length} mouths on the field the server holds are under open sky`);
 }
-process.exit(pass === rows.length && roofed === 0 ? 0 : 1);
+
+/*
+ * --- And the platform kerbs stand in the room.
+ *
+ * `rail-solids.undergroundSolids` registers the two platform strips as solid
+ * collision boxes. They were on `PlacedStation`'s frame -- the routed stopping
+ * anchor -- while the room the field walks is built from the bake's site, and
+ * the two are as much as 248 m apart: at Wynyard, 59 m, which was a pair of
+ * invisible chest-high walls across the concourse. Both ends evaluate
+ * `stationSolids`, so this is the one call, checked against the one box.
+ */
+const { buildNetwork, planStation, stationSolids, SOLID_BOX_PLATFORM } = await import('../client/src/world/rail-solids.ts');
+const net = buildNetwork(bake);
+let kerbsOff = 0;
+let kerbs = 0;
+for (const st of net.stations) {
+  if (st.vertical !== 'underground') continue;
+  const room = held?.boxFor(st.name) ?? null;
+  if (room === null) continue;
+  const plan = planStation(net, st, () => Number.NaN, true);
+  const boxes: import('../client/src/world/rail-solids.ts').FrameSolid[] = [];
+  stationSolids(plan, boxes);
+  for (const b of boxes) {
+    if (b.kind !== SOLID_BOX_PLATFORM) continue;
+    kerbs++;
+    const off = Math.hypot(b.f.x - room.x, b.f.z - room.z);
+    const half = Math.max(Math.abs(b.t0), Math.abs(b.t1));
+    if (off > 1 || Math.abs(half - (room.halfLength - 6)) > 1) {
+      kerbsOff++;
+      console.log(`FAIL ${st.name.padEnd(22)} a platform kerb is on a frame ${off.toFixed(0)} m from the room (half ${half.toFixed(0)} vs room ${room.halfLength.toFixed(0)})`);
+    }
+  }
+}
+console.log(`${kerbs - kerbsOff} of ${kerbs} platform kerbs stand in the room they are drawn in`);
+process.exit(pass === rows.length && roofed === 0 && kerbsOff === 0 ? 0 : 1);
