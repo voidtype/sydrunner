@@ -1246,6 +1246,38 @@ the crowd renderer's ground re-read (added for *"fix people being passed thru
 ground"*) is staggered to every fourth frame per standing walker, keyed so the
 queries spread, and every frame only while a figure is airborne.
 
+## The second pass: the edge is not caching, and 67 ms of dead air
+
+Timed against the live CDN with `curl --compressed`, one object at a time:
+
+| object | ttfb | note |
+|---|---|---|
+| `/world/root.json` (origin) | 0.058 s | the pivot, same origin, fast |
+| `suburbs.json` | 0.418 s | first request to the CDN: dns 0.058 + tls 0.067 |
+| `far-terrain.bin` | 0.647 s | |
+| `hexes/h+00+00.far.bin` | 0.730 s | |
+| `tiles/-5_9.glb` | 0.759 s | |
+| a re-put tile, three times running | 0.32 / 0.22 / 0.20 s | `cf-cache-status: DYNAMIC` every time |
+
+Two things come out of that. **The edge is not caching the world**, even after
+the re-put: Cloudflare's default cache eligibility is keyed on file extension
+and `.glb` and `.bin` are not in the list, so `Cache-Control: immutable` makes
+the *browser* keep an object (which is the win for a second session) while the
+*edge* still goes to R2 for every first-time request, and that is where the
+0.2–0.75 s per object comes from. Fixing it is a zone Cache Rule
+("Eligible for cache" over `world.3rp.uk`), not a code change, and it is the
+single largest remaining number on this page — **the owner's to make**, because
+it is a change to his Cloudflare account rather than to this repo.
+
+Second, the first request to `world.3rp.uk` pays 67 ms of DNS, connection and
+TLS before a byte is asked for, and it is paid *after* the 800 kB bundle has
+downloaded and parsed, because nothing mentions that origin until the streamer
+runs. `client/index.html` now carries a `preconnect` for it, and a `preload`
+of `/world/root.json` — seven kilobytes, same origin, no version of its own,
+and the pivot every other asset's address is read from. Both start during the
+HTML parse, which takes the bundle's whole download off the front of the
+world's critical path.
+
 ## What was measured and left alone
 
 `bun run server/tick-profile.ts` on this tree: ambient 0.007 ms, one player

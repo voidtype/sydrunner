@@ -9,6 +9,21 @@
          which on a cold cache is a round trip after first paint. -->
     <link rel="preload" href="/fonts/PublicSans.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/Jost.woff2" as="font" type="font/woff2" crossorigin />
+    <!-- The world lives on another origin, and the first thing asked of it is
+         asked after the 800 kB bundle has downloaded and parsed. Measured
+         against the live CDN, the DNS lookup, the connection and the TLS
+         handshake are 67 ms of dead time before that request can even go out;
+         `preconnect` spends them during the parse instead. See PERFORMANCE.md,
+         "Loading, measured from outside". -->
+    <link rel="preconnect" href="https://world.3rp.uk" crossorigin />
+    <!-- And the pivot the whole world hangs off. `root.json` names the version
+         every other asset is addressed by (`world/version.ts`), so nothing can
+         be fetched until it lands -- and today nothing asks for it until the
+         bundle is running. Seven kilobytes, same origin, no version of its own:
+         starting it during the parse takes the bundle's whole download off the
+         front of the world's critical path. `streamer.loadIndex` then finds it
+         in the preload cache. -->
+    <link rel="preload" href="/world/root.json" as="fetch" />
     <title>SYDNEY</title>
     <style>
       /* HARBOUR STEEL -- the interface, from the ground up. UI.md is the
