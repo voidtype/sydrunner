@@ -250,6 +250,31 @@ rides the lift of a twelve-storey one, and builds the deck. `checkInteriors`
 does the same over every stair within 800 m of the spawn, rides a real lift in
 a real `Simulation`, and finds the podium.
 
+## The hallway, and the lift at the end of it
+
+The owner: *"make default inside generation have a hallway go down the
+building, and if lifts in building, past them with it clearly saying
+lift"*. `floorplan.floorPlan` cuts a strip `CORRIDOR_W` (2.6 m) wide down the
+long axis of any footprint at least `CORRIDOR_LONG_M` by `CORRIDOR_SHORT_M`
+(12 x 10.6 m) and subdivides the two wings beside it into rooms *along* the
+hall -- a wing splits whenever it is over `2 * MIN_ROOM_M` long, whatever
+its depth, where an open plan needs that both ways -- so every room shares
+a wall with the hall and `interior.ts` turns that contact into its door.
+The hall is a room (`Room.corridor`) and counts against the floor's cap.
+
+`placeCore` puts the core at the hall's end before it looks anywhere else:
+a lift a cab deep with its doors facing down the hall, a stair set back a
+landing from the end wall, walked in from the end a quarter metre at a
+time until its corners clear the shell and every room beside it still has
+some wall long enough for a door. `wallsFor` moves a doorway out of the
+core's way (`CORE_DOOR_CLEAR_M`) rather than cutting one into the cab, and
+the core's cut reaches the outer wall behind it so no stub of hall wall is
+left standing there. `liftSignsOf` hands the view one board per level over
+the mouth and `interiorview` writes LIFT (or STAIRS) on it. `verifyFloorPlan`
+asserts the hall and its wings on a 30 x 14 block and none on a terrace;
+`verifyInterior` asserts the lift stands in the hall's far half, opens down
+it, and has a sign on every level.
+
 ## What is not built
 
 - **Rooms on the upper floors are drawn and walled but empty**, and a level's

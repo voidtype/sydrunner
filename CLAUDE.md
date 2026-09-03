@@ -46,7 +46,10 @@ match that voice, and read the header of any file before changing it.
   `server/ride-acceptance.ts`, `server/underground-check.ts` are the pattern). Test rendering by its pure
   parts. If only eyes can judge something, say so in one sentence and let the
   owner look. Do not start vite, drive the browser pane, or build screenshot
-  sinks.
+  sinks. An **offline** render of pure data is fine and encouraged:
+  `scripts/render-car-sheet.mjs` rasterises every car glb into one PNG with
+  no browser, and reading that PNG is how a wrong nose or a missing body
+  panel gets caught before a deploy.
 - **`integration-check` runs against the live tree.** It takes ~25 minutes and
   spawns real servers along the way, each reading the working tree *at spawn
   time* — so a merge or an edit landed mid-run gives a parent on the old code

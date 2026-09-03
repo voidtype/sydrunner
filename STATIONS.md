@@ -1893,6 +1893,25 @@ walked **1 of 28** before the following and **28 of 28** after.
   collision tile lands; `main.ts` rebuilds on the same tick as the vessels and
   drops the rail chunks over a mouth that moved.
 
+### The hole in the street (2026-09)
+
+The walk above put a body *through* the footpath: the incline was drawn and
+stood on, and the terrain sheet ran straight across it, so from the street
+the way in was a portal frame on a pavement and from under it the sheet,
+single-sided, was gone. `riding.accessCutAt` is the rule now, on both ends:
+inside the passage's own plan, from the mouth to where its lid is
+`ACCESS_LID_COVER_M` under the street (`accessCutLength`), the ground is the
+incline floor; `ACCESS_APRON_M` round it the ground is a flat apron at the
+mouth's height; beyond, nothing. `RailCut.setAccess` files the plans
+(`StationBoxField.plans`) and `cutAt` answers the apron and the incline
+before the corridor and without the road rule; `rail-geo` dresses the hole
+with the apron slab, a skirt down its outside edge and outer faces on the
+passage walls, so the four-metre carve lattice never shows a void. Seeded
+where the boxes are built -- `main.ts` at boot and in `refreshStationBoxes`
+(which also asks the streamer to re-carve the ground at a mouth that moved),
+`server/world.ts` at load -- and `verifyStationAccess` asserts the carve's
+three zones on a synthetic plan.
+
 ### What the deep sweep says after it, and what is still open
 
 `SYDNEY_CHECK_ONLY=stations SYDNEY_STATIONS_DEEP=1` on 2026-09-03, after the

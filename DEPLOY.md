@@ -771,6 +771,30 @@ and `upload-one.sh` is the wrangler `--remote` per-object uploader, which
 the station round's paths, so they run unchanged and take explicit args for the
 next round.
 
+### B2. Lanes v3, and the tool that has to run after any retile
+
+Lanes v3 (2026-09) bakes the traffic chains into the sidecar: the chunks of
+one chain share a rid, a headway, a running phase, joint flags and a crowd
+point, so a car drives through the 800 m cuts instead of parking at them
+(`game/traffic.ts`, "A ROUTE IS A LINK IN A CHAIN"). `lanes.py` writes it for
+a fresh bake; **for anything less than a whole bake, run
+`python3 scripts/world-round/chain-lanes.py --world client/public/world
+--snapshot <dir>` afterwards** -- it re-pairs every route end in the world
+from the files, so tiles the pipeline re-emitted and tiles it did not agree
+about every joint between them. It restamps `built` and `lanes.version`
+into `index.json` and `root.json`, which is what makes every client refetch
+(tiles are immutable under `?v=<built>`), so the pivots and their sidecars
+go out with the tiles exactly as §B step 5 says. `decodeLanes` reads v2 as
+well, so the code can ship first and the world after; a v2 world is a world
+with no chains, not a broken one. `SYDNEY_CHECK_ONLY=traffic` is the section
+that convicts a mismatch, and it is a minute.
+
+Cars: `scripts/prep-car-models.mjs` writes the atlases and paint masks and
+`scripts/render-car-sheet.mjs` draws every shipped file from both ends into
+`data/vehicles/car-sheet.png`. That sheet is the acceptance for a car asset
+-- it is what found three files turned twice -- and it is an offline
+rasteriser, not a browser.
+
 ### C. Who does what
 
 Planning and gating happen in the lead session. Mechanical, well-specified

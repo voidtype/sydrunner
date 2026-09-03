@@ -289,7 +289,14 @@ FLOOR_ROUNDS = 3
 # `WALK_UNDER_M` is: the two numbers have to be comparable, and a clearance
 # measured to the top of the slab is a clearance that gets smaller when someone
 # makes the girder deeper.
-MIN_ROAD_CLEARANCE_M = 5.0
+# **7.0 since the 2026-09 round**, up from 5.0. The owner, having driven
+# under a few: *"in general bridges and stuff are too low give them like 2
+# more meters off the ground"*. 5.0 was Austroads' minimum and read as a
+# ceiling in a game whose camera sits over the roof; two metres more is the
+# difference between ducking and driving. Where the geometry cannot give it
+# -- a stub pinned at both ends -- `_pin_ceiling` still wins, exactly as
+# before, and the shortfall is reported rather than faked.
+MIN_ROAD_CLEARANCE_M = 7.0
 
 # The grade a deck may climb **away from a touchdown** to reach a clearance.
 #
@@ -393,6 +400,14 @@ PARAPET_THICK_M = 0.40
 # road over a pipe. Drawing a barrier down both sides of a 30 m culvert crossing
 # in a suburban street puts a wall across every driveway on it.
 PARAPET_MIN_CLEARANCE_M = 0.8
+
+# How far along the deck the parapet takes to reach its full height once the
+# clearance allows one, metres. A barrier that begins as a 1.05 m wall at one
+# station is a step the eye reads as a mistake at the foot of every ramp --
+# the owner's "transitions to ramps should not have edges like this, should
+# be smooth". Grown over eight metres from the deck's own top, it reads as
+# the barrier a real approach has: low at the gore, full on the span.
+PARAPET_RAMP_M = 8.0
 
 # Piers: how far apart, how big, and the clearance under which none is drawn.
 #
@@ -1725,6 +1740,32 @@ def _emit_run(slots, run: DeckRun, lo: int, hi: int, origin) -> None:
         p = pts[i] + left[i] * (side * hw)
         return _w(p[0], p[1], y, origin)
 
+    # The parapet's height per station: zero where the deck is a piece of road
+    # over a pipe, full on the span, and grown between the two over
+    # `PARAPET_RAMP_M` from whichever end of a barrier run is nearer. See
+    # that constant.
+    n_st = len(dy)
+    allowed = np.array([clear[k] >= PARAPET_MIN_CLEARANCE_M for k in range(n_st)], dtype=bool)
+    step = np.hypot(*np.diff(pts, axis=0).T) if n_st > 1 else np.zeros(0)
+    chain = np.concatenate(([0.0], np.cumsum(step)))
+    para = np.zeros(n_st)
+    k = 0
+    while k < n_st:
+        if not allowed[k]:
+            k += 1
+            continue
+        k2 = k
+        while k2 + 1 < n_st and allowed[k2 + 1]:
+            k2 += 1
+        c0 = chain[k]
+        c1 = chain[k2]
+        for m in range(k, k2 + 1):
+            grow = min((chain[m] - c0) / PARAPET_RAMP_M, (c1 - chain[m]) / PARAPET_RAMP_M, 1.0)
+            # A short barrier run grows to what its length allows and no
+            # further; a run under two ramps' worth peaks in the middle.
+            para[m] = PARAPET_HEIGHT_M * max(0.0, grow)
+        k = k2 + 1
+
     for i in range(lo, hi):
         j = i + 1
         # Running surface, up.
@@ -1750,12 +1791,12 @@ def _emit_run(slots, run: DeckRun, lo: int, hi: int, origin) -> None:
                 edge_pt(j, side, dy[j]), edge_pt(i, side, dy[i]),
                 (out[0], 0.0, -out[1]), origin,
             )
-        if min(clear[i], clear[j]) < PARAPET_MIN_CLEARANCE_M:
+        if para[i] <= 0.01 and para[j] <= 0.01:
             continue
-        # Parapets: a solid barrier standing on the deck's own edge. Three faces
-        # -- outer, inner and cap -- and no end caps, because consecutive
-        # segments abut and the run's two ends are either a touchdown or the
-        # next tile's geometry.
+        # Parapets: a solid barrier standing on the deck's own edge, at the
+        # height `para` grew it to. Three faces -- outer, inner and cap -- and
+        # no end caps, because consecutive segments abut and a barrier run's
+        # two ends have grown down to nothing.
         for side in (1.0, -1.0):
             out = left[i] * side
             outer = side * hw
@@ -1764,16 +1805,16 @@ def _emit_run(slots, run: DeckRun, lo: int, hi: int, origin) -> None:
                 _quad(
                     struct,
                     edge_pt(i, off / hw, dy[i]), edge_pt(j, off / hw, dy[j]),
-                    edge_pt(j, off / hw, dy[j] + PARAPET_HEIGHT_M),
-                    edge_pt(i, off / hw, dy[i] + PARAPET_HEIGHT_M),
+                    edge_pt(j, off / hw, dy[j] + para[j]),
+                    edge_pt(i, off / hw, dy[i] + para[i]),
                     (nrm[0], 0.0, -nrm[1]), origin,
                 )
             _quad(
                 struct,
-                edge_pt(i, inner / hw, dy[i] + PARAPET_HEIGHT_M),
-                edge_pt(j, inner / hw, dy[j] + PARAPET_HEIGHT_M),
-                edge_pt(j, outer / hw, dy[j] + PARAPET_HEIGHT_M),
-                edge_pt(i, outer / hw, dy[i] + PARAPET_HEIGHT_M),
+                edge_pt(i, inner / hw, dy[i] + para[i]),
+                edge_pt(j, inner / hw, dy[j] + para[j]),
+                edge_pt(j, outer / hw, dy[j] + para[j]),
+                edge_pt(i, outer / hw, dy[i] + para[i]),
                 (0.0, 1.0, 0.0), origin,
             )
 
