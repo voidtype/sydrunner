@@ -1195,3 +1195,60 @@ tool disappears. They are `npm run` targets in `client/` so they cannot:
   `--latency 60 --kbps 25000`).
 - `npm run perf-harness` — the frame profiler run under Bun over several scenes
   (`src/perf-harness.ts`; `--coverage` lists the parts).
+
+---
+
+# Loading, measured from outside (2026-09-04)
+
+The budgets above are about the tick. This round was about the first minute,
+and every number here came from `curl` against the live site and the CDN, or
+from timing the shared self-checks under bun, because the browser is not a
+place an agent measures (CLAUDE.md).
+
+## What the CDN was doing
+
+| object | on the wire before | after |
+|---|---|---|
+| `tiles/-5_9.glb` | 565 kB, identity, no `cache-control` | 174 kB, `content-encoding: br`, `immutable` |
+| `far-water.bin` (the map's harbour) | 9.7 MB, identity | 1.4 MB |
+| `hexes/*.far.bin` (the skyline, 14 at boot) | 1.0 MB each at the CBD | 0.8 MB |
+| any tile, second session | fetched again | from the browser cache |
+| `cf-cache-status` | `DYNAMIC` on everything | `HIT` on anything fetched twice |
+
+R2 serves an object as it was put. The python uploader put the pipeline's raw
+bytes with no cache header, and Cloudflare compresses JSON on the way out but
+not `model/gltf-binary` or `application/octet-stream` — so every tile cost
+three times its bytes and no browser kept one. `scripts/world-round/r2-upload.ts`
+compresses on the way up (brotli 6, ~30 % of raw across the world) and stores
+`Content-Encoding: br` and `Cache-Control: public, max-age=31536000, immutable`
+as object metadata; `fetch` decodes transparently and the `?v=<built>`
+addressing (`world/version.ts`) makes the year-long lifetime safe across a
+retile. The pivots stay identity and `no-cache`. A probe object proved all
+three before the world was re-put: the header survives, the decoded bytes are
+the pipeline's, and the edge caches the second fetch. The full re-put is
+195,570 objects at ~7 a second through the REST API — hours, in the
+background, nearest the CBD first so the benefit lands where players spawn.
+
+## The half second before the first fetch
+
+The client's self-checks ran *before* the streamer existed. Timed under bun on
+an M-series Mac, the shared ones alone are ~470 ms (`verifyInterior` 146,
+`verifyTraffic` 83, `verifyHeat` 70, `verifyCharacters` 45 …), and the
+renderer's own come on top in the browser — so the first byte of the world
+was asked for roughly half a second after the page could have asked. They now
+run as one function called the line after `loadIndex` is issued: the fetch
+and the arithmetic overlap, and a failing check still stops the boot before a
+frame is drawn (`main.ts`, `runSelfChecks`).
+
+Two smaller ones in the same pass: the two interface fonts are `preload`ed in
+`index.html`, so first text does not wait a round trip after first paint; and
+the crowd renderer's ground re-read (added for *"fix people being passed thru
+ground"*) is staggered to every fourth frame per standing walker, keyed so the
+queries spread, and every frame only while a figure is airborne.
+
+## What was measured and left alone
+
+`bun run server/tick-profile.ts` on this tree: ambient 0.007 ms, one player
+0.017 ms, 32 players 0.197 ms — all inside the budgets above by an order of
+magnitude. The tick is not where the time is.
+

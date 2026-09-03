@@ -808,6 +808,15 @@ eight threads in about half an hour with zero failures. Verify with curl
 (Python's urllib is 403'd by the CDN) -- `curl -sI` the key and compare the
 ETag with the local MD5, over the whole list with `xargs -P 24`.
 
+**Superseded by `scripts/world-round/r2-upload.ts` (2026-09-04).** Same
+journal, same token refresh, same arguments (`<world> <keys> <results>
+[threads] [quality]`, run with `bun`), but it brotli-compresses every object
+on the way up and stores `Content-Encoding: br` plus an immutable
+`Cache-Control` as R2 metadata — the pivots excepted. Every publish from now
+on goes through it; a raw put would silently undo the compression for the
+keys it touched. PERFORMANCE.md "Loading, measured from outside" has the
+numbers and the probe that proved the headers survive.
+
 ### C. Who does what
 
 Planning and gating happen in the lead session. Mechanical, well-specified

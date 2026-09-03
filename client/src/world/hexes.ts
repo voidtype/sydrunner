@@ -269,7 +269,8 @@ export function hexContract(): HexContract | null {
  * would move these without a client change. `sydney/hexes.py::corners_of` is
  * the other half and produces the same six points.
  */
-function corners(entry: HexEntry, radius: number): number[] {
+/** A hexagon's six corners, world metres, flat pairs. Shared with the big map's turf layer. */
+export function corners(entry: HexEntry, radius: number): number[] {
   const out: number[] = [];
   for (let i = 0; i < 6; i++) {
     const a = (Math.PI / 3) * i;

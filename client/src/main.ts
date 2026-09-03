@@ -50,6 +50,7 @@ import { fetchWorldAsset, verifyCdn } from './world/cdn.ts';
 // single pass over `index.json` at boot now makes that same pass once per hex
 // as the player approaches it -- see `world/hexes.ts`.
 import { hexContract, hexesArmed, hexesNear, onHexTiles } from './world/hexes.ts';
+import { nearestName, verifyTerritory } from './game/territory.ts';
 import { createFacadeGlobals } from './world/facade.ts';
 import { loadFarLayer, setSlabDaylight } from './world/far.ts';
 import { loadLandmarks, verifyLandmarks } from './world/landmarks.ts';
@@ -922,6 +923,20 @@ async function main(): Promise<void> {
   // reported, once, so that "the game takes a while to start" has somewhere to
   // be looked up rather than being guessed at.
   const checkMs: Array<[string, number]> = [];
+  /**
+   * The boot's self-checks, as one function so they can run **while the world
+   * index is in flight** rather than before it is asked for.
+   *
+   * They cost about half a second of CPU on a fast machine (`verifyInterior`
+   * alone builds a dozen buildings), and they used to run here, before the
+   * streamer existed -- so the first byte of the world was requested half a
+   * second after the page could have asked for it. Nothing in them needs the
+   * network and nothing after them needs their result except the boot's own
+   * decision to continue, so the call moved to the line after `loadIndex` is
+   * issued: the fetch and the arithmetic overlap, and a failing check still
+   * stops the boot before anything is drawn. Returns whether to go on.
+   */
+  const runSelfChecks = (): boolean => {
   const checkStart = performance.now();
   const timed = (name: string, run: () => string[]): string[] => {
     const at = performance.now();
@@ -1038,6 +1053,8 @@ async function main(): Promise<void> {
   const teamFailures = timed('teams', verifyTeams);
   const teamFieldFailures = timed('team auras', verifyTeamField);
   const teamWireFailures = timed('teams wire', verifyTeamsWire);
+  // The turf rule, which the server applies and the map draws. See `game/territory.ts`.
+  const territoryFailures = timed('territory', verifyTerritory);
   const talentPanelFailures = timed('talents panel', verifyTalentsPanel);
   const buildSheetFailures = timed('build sheet', verifyBuildSheet);
   // And the two tabs beside it, on the same criterion a fourth and fifth time.
@@ -1656,6 +1673,7 @@ async function main(): Promise<void> {
     teamFailures.length ||
     teamFieldFailures.length ||
     teamWireFailures.length ||
+    territoryFailures.length ||
     talentPanelFailures.length ||
     buildSheetFailures.length ||
     changelogFailures.length ||
@@ -1746,6 +1764,7 @@ async function main(): Promise<void> {
           ...teamFailures,
           ...teamFieldFailures,
           ...teamWireFailures,
+          ...territoryFailures,
           ...talentPanelFailures,
           ...buildSheetFailures,
           ...cashFailures,
@@ -1756,8 +1775,10 @@ async function main(): Promise<void> {
           .map((f) => '  - ' + f)
           .join('\n'),
     );
-    return;
+    return false;
   }
+  return true;
+  };
 
   if (!navigator.gpu) {
     hud.fatal(
@@ -2121,7 +2142,12 @@ async function main(): Promise<void> {
     // a search -- it is the dropped pin, projected -- which is what lets it be
     // known before the index it would otherwise be looked up in. On an
     // unsegmented world this argument is ignored. See `world/hexes.ts`.
-    index = await streamer.loadIndex(SPAWN_TARGET);
+    const indexPromise = streamer.loadIndex(SPAWN_TARGET);
+    // A rejection is awaited below; this only keeps it from being reported as
+    // unhandled on the one path that returns before the await.
+    indexPromise.catch(() => undefined);
+    if (!runSelfChecks()) return;
+    index = await indexPromise;
   } catch (err) {
     hud.fatal(String(err instanceof Error ? err.message : err));
     return;
@@ -7419,6 +7445,8 @@ async function main(): Promise<void> {
   // the city zoom legible.
   const mapAtlas = new MapAtlas(index, '/world', streamer.assetVersion);
   mapAtlas.readLandmarks();
+  // The suburb names now rather than on the first `M`: the turf feed needs them.
+  void mapAtlas.ensureSuburbs();
   const bigmap = new BigMap(
     document.getElementById('bigmap') as HTMLElement,
     document.getElementById('bigmap-canvas') as HTMLCanvasElement,
@@ -7431,6 +7459,10 @@ async function main(): Promise<void> {
   // the tile regions as well: at 3 km and 9 km a footprint is under a pixel and
   // the region is the only thing that can be drawn at all.
   bigmap.setHazards(invisibleWalls, (prism) => invisibleWalls.prismHazard(prism));
+  // The turf, and the edge of the world it is drawn inside. The radius is the
+  // index's own; a world without one is measured off its hexagons instead.
+  bigmap.setWorldRadius((index as { radius_m?: number }).radius_m ?? 0);
+  bigmap.setTerritory(() => net?.territory ?? null);
 
   const keys = new Set<string>();
   let locked = false;
@@ -9551,6 +9583,21 @@ async function main(): Promise<void> {
       /** Somebody's side or build moved. Workstream V; the panel redraws itself. */
       onTalents() {
         talents.invalidate();
+      },
+      /**
+       * Turf changed hands. The map repaints, and the feed says who took what
+       * -- named for the suburb nearest the hexagon's centre, which is the
+       * one line this mechanic is allowed to speak (DESIGN.md rule 6).
+       */
+      onTerritory(flips) {
+        bigmap.territoryChanged();
+        const list = hexContract()?.list ?? [];
+        for (const f of flips) {
+          if (f.owner === TEAM.NONE) continue;
+          const hex = list.find((h) => h.q === f.q && h.r === f.r);
+          const name = hex === undefined ? null : nearestName(mapAtlas.suburbs, hex.c[0], hex.c[1]);
+          pushKill(`${TEAM_NAME[f.owner]} took ${name ?? 'a hexagon'}`);
+        }
       },
     };
   }

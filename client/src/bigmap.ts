@@ -108,6 +108,9 @@ import type { HazardSource, MarkerKind, MarkerSink } from './minimap.ts';
 // `world/questmarkers.ts`.
 import { GIVER_GOLD_CSS } from './game/givermap.ts';
 import { questAreas, type AreaPoint } from './game/questareas.ts';
+import { corners as hexCorners, hexContract, hexesInBox } from './world/hexes.ts';
+import { TEAM, TEAM_COLOUR, TEAM_NAME } from './game/teams.ts';
+import type { Territory } from './game/territory.ts';
 import {
   HAZARD_FILL,
   HAZARD_INK,
@@ -177,6 +180,12 @@ interface Zoom {
   buildings: boolean;
   /** What the chrome calls the width of the view. */
   span: string;
+  /**
+   * Fetch and draw the street-name bundles of the hexagons in view. Off at
+   * the whole-city rung, where a street is under a pixel and the bundles
+   * would be all 86 of them -- see the note above `ZOOMS`.
+   */
+  names: boolean;
 }
 
 /**
@@ -209,13 +218,26 @@ interface Zoom {
  * is one pixel wide. If the whole-world view is ever wanted it needs its own
  * representation -- suburb blobs and motorway spines off a baked overview --
  * not another rung on this ladder.
+ *
+ * **And then it was wanted**, for the turf: the owner asked for the sides'
+ * holdings "visible as the default map view, with a circle drawn on the
+ * edge". So there is a fifth rung, `sydney`, and it is exactly the other
+ * representation the paragraph above asked for -- no streets, no name
+ * bundles (`names: false`), just the harbour, the 86 hexagons washed in
+ * whichever side holds them, the suburb names the greedy cull keeps, and the
+ * disc's edge. It is anchored on the world's origin rather than the player,
+ * because it is a picture of the city and not of where you are.
  */
 const ZOOMS: Zoom[] = [
-  { name: 'neighbourhood', halfM: 500, roadFloor: 0, labelFloor: 0, buildings: true, span: '1 km' },
-  { name: 'district', halfM: 1500, roadFloor: 0, labelFloor: 400, buildings: false, span: '3 km' },
-  { name: 'city', halfM: 4500, roadFloor: 1000, labelFloor: Infinity, buildings: false, span: '9 km' },
-  { name: 'region', halfM: 13500, roadFloor: 4000, labelFloor: Infinity, buildings: false, span: '27 km' },
+  { name: 'neighbourhood', halfM: 500, roadFloor: 0, labelFloor: 0, buildings: true, span: '1 km', names: true },
+  { name: 'district', halfM: 1500, roadFloor: 0, labelFloor: 400, buildings: false, span: '3 km', names: true },
+  { name: 'city', halfM: 4500, roadFloor: 1000, labelFloor: Infinity, buildings: false, span: '9 km', names: true },
+  { name: 'region', halfM: 13500, roadFloor: 4000, labelFloor: Infinity, buildings: false, span: '27 km', names: true },
+  { name: 'sydney', halfM: 62000, roadFloor: Infinity, labelFloor: Infinity, buildings: false, span: '124 km', names: false },
 ];
+
+/** The rung at and above which the turf is drawn in full and the view is the city's, not the player's. */
+const TURF_RUNG_M = 13500;
 
 /**
  * Which rung the map opens on.
@@ -227,7 +249,13 @@ const ZOOMS: Zoom[] = [
  * at which the answer is usually "that way, past Redfern", and it is one wheel
  * click from either neighbour.
  */
-const DEFAULT_ZOOM = 1;
+const DEFAULT_ZOOM = 4;
+// Was 1, the district, and the paragraph above is still the argument for that
+// as a *navigation* default. The owner moved it: the map opens on the whole
+// city with the sides' turf on it, "the default map view", and the district
+// is three wheel clicks in. The argument for the district was that a player
+// presses M to find something else; the argument for this is that the first
+// thing they now see is the war, which is what a session is for this week.
 
 /**
  * How far off centre the player may drift before the view re-anchors, as a
@@ -388,7 +416,14 @@ const QUEST_GLYPH_PX = 11;
  * -- which is genuinely useful, it is a map of where the bikes are -- while
  * leaving the powerups and the combatants unambiguously the larger marks.
  */
-const BIKE_DOT_R = [2.6, 2.2, 1.7, 1.3];
+const BIKE_DOT_R = [2.6, 2.2, 1.7, 1.3, 0.8];
+
+/** The turf's fills: the tint under the street rungs, the wash at the city's, and the unheld cell's edge. */
+const TURF_TINT_ALPHA = 0.10;
+const TURF_FILL_ALPHA = 0.30;
+const TURF_EDGE = 'rgba(241, 233, 214, 0.18)';
+/** The edge of the world. Ferry cream, dashed, so it reads as a boundary and not a road. */
+const BOUNDARY_INK = 'rgba(241, 233, 214, 0.55)';
 // The fourth number is the `region` zoom, and it was missing for as long as that
 // zoom has existed: `BIKE_DOT_R[3]` was `undefined`, the lookup fell back to the
 // last entry, and 27 km of city drew its bikes at the 9 km size. `verifyBigMap`
@@ -559,6 +594,10 @@ export class BigMap implements MarkerSink {
 
   private open = false;
   private zoomIndex = DEFAULT_ZOOM;
+  /** The turf, read on every rebuild; null until the client exists. See `setTerritory`. */
+  private territory: () => Territory | null = () => null;
+  /** The disc's radius, world metres, for the edge. 0 until `setWorldRadius`. */
+  private worldRadius = 0;
   /** CSS pixels across the square drawing surface, measured not assumed. */
   private size = 0;
   private dpr = 1;
@@ -671,6 +710,35 @@ export class BigMap implements MarkerSink {
    * never fetches a byte of it. See `MapAtlas.start` for why calling it every
    * time is correct rather than sloppy.
    */
+  /** Whose turf to draw. A getter, because the client that holds it is made after this map. */
+  setTerritory(get: () => Territory | null): void {
+    this.territory = get;
+    this.layerDirty = true;
+  }
+
+  /**
+   * The edge of the world, as a radius about the origin. The index's own
+   * `radius_m` where it has one; otherwise derived from the hexagons -- the
+   * farthest centre plus a circumradius -- which is what "the edge" means on
+   * a world that never wrote its radius down.
+   */
+  setWorldRadius(radiusM: number): void {
+    if (radiusM > 0) {
+      this.worldRadius = radiusM;
+    } else {
+      const contract = hexContract();
+      let far = 0;
+      for (const h of contract?.list ?? []) far = Math.max(far, Math.hypot(h.c[0], h.c[1]) + contract!.circumradius_m);
+      this.worldRadius = far;
+    }
+    this.layerDirty = true;
+  }
+
+  /** Turf changed hands: repaint the city layer on the next frame it is open. */
+  territoryChanged(): void {
+    this.layerDirty = true;
+  }
+
   toggle(): void {
     this.setOpen(!this.open);
   }
@@ -779,12 +847,16 @@ export class BigMap implements MarkerSink {
       this.measure();
       return;
     }
+    // The whole-city rung is anchored on the world's origin, not the player:
+    // it is a picture of Sydney with you on it, and the disc only fits when it
+    // is centred. Every other rung is a picture of where you are.
+    const city = !ZOOMS[this.zoomIndex].names;
     if (this.needsAnchor) {
-      this.centreX = x;
-      this.centreZ = z;
+      this.centreX = city ? 0 : x;
+      this.centreZ = city ? 0 : z;
       this.needsAnchor = false;
       this.layerDirty = true;
-    } else {
+    } else if (!city) {
       // The re-anchor test, in world metres against the current half-extent.
       const half = ZOOMS[this.zoomIndex].halfM;
       const slack = half * RECENTRE_FRACTION;
@@ -1004,19 +1076,25 @@ export class BigMap implements MarkerSink {
     // the atlas bumps its revision when the rest arrives, which is the same
     // progressive contract every other layer here has. See
     // `MapAtlas.ensureHexNames`.
-    void this.atlas.ensureHexNames(
-      view.cx - zoom.halfM,
-      view.cz - zoom.halfM,
-      view.cx + zoom.halfM,
-      view.cz + zoom.halfM,
-    );
+    if (zoom.names) {
+      void this.atlas.ensureHexNames(
+        view.cx - zoom.halfM,
+        view.cz - zoom.halfM,
+        view.cx + zoom.halfM,
+        view.cz + zoom.halfM,
+      );
+    }
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, this.size, this.size);
 
     this.drawWater(ctx, view);
+    // The turf under everything but the water: a wash of the holder's colour,
+    // faint at the street rungs and full at the city's. See `drawTerritory`.
+    this.drawTerritory(ctx, view, zoom);
     if (zoom.buildings) this.drawBuildings(ctx, view);
     else this.lastPrisms = 0;
-    this.drawRoads(ctx, view, zoom);
+    if (zoom.names) this.drawRoads(ctx, view, zoom);
+    this.drawBoundary(ctx, view);
 
     // Labels last and in priority order, because placement is greedy and the
     // order is the priority: the suburbs are what the map is *for* at every
@@ -1382,6 +1460,20 @@ export class BigMap implements MarkerSink {
     BigMap.halo(ctx, 'SYDNEY', pad, pad);
     spaced.letterSpacing = '0px';
     BigMap.halo(ctx, `${zoom.name} · ${zoom.span} across`, pad, pad + 16);
+    // The score, where the turf is the picture: how many hexagons each side
+    // holds this week. Drawn in the chrome's ink, not the sides' -- the map
+    // below is already the colour, and the line is a count, not a cheer.
+    const turf = this.territory();
+    const contract = hexContract();
+    if (zoom.halfM >= TURF_RUNG_M && turf !== null && contract !== null) {
+      const tally = turf.tally(contract.count);
+      BigMap.halo(
+        ctx,
+        `${TEAM_NAME[TEAM.MARITA]} ${tally.marita} · ${TEAM_NAME[TEAM.DEFAULT]} ${tally.dflt} · ${tally.none} unclaimed`,
+        pad,
+        pad + 32,
+      );
+    }
 
     // North, at the top right. A map that is north-up should say so once rather
     // than leave it to be inferred -- and the arrow is what makes the claim,
@@ -1438,6 +1530,70 @@ export class BigMap implements MarkerSink {
    * on screen to hold it -- at the sixty-kilometre zoom an area is eight pixels
    * across and a word beside it is noise.
    */
+  /**
+   * The turf: every hexagon in view, filled in the colour of the side that
+   * holds it. At the street rungs one hexagon covers the whole panel, so the
+   * fill is a tint you notice rather than a colour you read -- it says whose
+   * ground you are standing on. At the region and city rungs it is the map:
+   * full fills, edges on every cell so the unheld ones read as cells too.
+   */
+  private drawTerritory(ctx: CanvasRenderingContext2D, view: MapView, zoom: Zoom): void {
+    const turf = this.territory();
+    const contract = hexContract();
+    if (turf === null || contract === null) return;
+    const full = zoom.halfM >= TURF_RUNG_M;
+    const radius = contract.circumradius_m;
+    const half = zoom.halfM + radius;
+    for (const hex of hexesInBox(view.cx - half, view.cz - half, view.cx + half, view.cz + half)) {
+      const owner = turf.ownerOf(hex.q, hex.r);
+      const pts = hexCorners(hex, radius);
+      ctx.beginPath();
+      for (let i = 0; i < pts.length; i += 2) {
+        const x = projectX(view, pts[i]);
+        const y = projectY(view, pts[i + 1]);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      if (owner !== TEAM.NONE) {
+        ctx.globalAlpha = full ? TURF_FILL_ALPHA : TURF_TINT_ALPHA;
+        ctx.fillStyle = TEAM_COLOUR[owner].css;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+      if (full) {
+        ctx.strokeStyle = owner === TEAM.NONE ? TURF_EDGE : TEAM_COLOUR[owner].css;
+        ctx.lineWidth = owner === TEAM.NONE ? 1 : 1.5;
+        ctx.stroke();
+      }
+    }
+  }
+
+  /**
+   * The edge of the world: one dashed circle about the origin at the radius
+   * `setWorldRadius` was given. Drawn at every rung, which costs nothing
+   * where it is off screen, and is the "circle drawn on the edge" the brief
+   * asked for -- the disc is the build's real boundary, and a player running
+   * for it deserves to see it coming.
+   */
+  private drawBoundary(ctx: CanvasRenderingContext2D, view: MapView): void {
+    if (!(this.worldRadius > 0)) return;
+    const cx = projectX(view, 0);
+    const cy = projectY(view, 0);
+    const r = this.worldRadius * view.scale;
+    // Off screen entirely: the nearest point of the ring is outside the panel.
+    const d = Math.hypot(cx - this.size / 2, cy - this.size / 2);
+    if (d - r > this.size || r - d > this.size) return;
+    ctx.save();
+    ctx.setLineDash([6, 5]);
+    ctx.strokeStyle = BOUNDARY_INK;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   private drawQuestAreas(ctx: CanvasRenderingContext2D, view: MapView): void {
     const points: AreaPoint[] = [];
     for (let i = 0; i < this.dotCount; i++) {

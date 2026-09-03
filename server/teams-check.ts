@@ -88,6 +88,7 @@ function check(ok: boolean, label: string, detail = ''): void {
 function emptyWorld(): ServerWorld {
   return {
     index: { stage: 'test', radius_m: 0, tile_size: 500, terrain: { grid: 16, datum_ahd: 0, sea_level_y: 0 }, tiles: [] },
+    hexes: [],
     collision: new CollisionWorld(),
     terrain: new TerrainField(16, 500, ''),
     water: WaterLevels.fromIndex([], 500),

@@ -293,6 +293,8 @@ import {
 } from '../client/src/world/placeables.ts';
 import { CITY_SPACE, spaceForBuilding } from '../client/src/net/spaces.ts';
 import { InteriorStore } from './interiors.ts';
+import type { TerritoryStore } from './territory.ts';
+import { hexAt } from '../client/src/game/territory.ts';
 import { TerrainField } from '../client/src/world/terrain.ts';
 import { WaterLevels } from '../client/src/world/wading.ts';
 import { PowerupField } from '../client/src/game/powerups.ts';
@@ -1328,6 +1330,8 @@ export class Simulation {
    * does not survive a restart. See `server/interiors.ts`.
    */
   private readonly interiorStore: InteriorStore | null;
+  /** The host's turf ledger, shared across rooms. Null offline and in checks. See `server/territory.ts`. */
+  private readonly territory: TerritoryStore | null;
 
   /**
    * Who is driving what. See `client/src/game/driving-contract.ts`.
@@ -1451,6 +1455,7 @@ export class Simulation {
       driving?: DrivingLookup;
       accounts?: AccountStore;
       interiors?: InteriorStore;
+      territory?: TerritoryStore;
     } = {},
   ) {
     this.world = world;
@@ -1460,6 +1465,7 @@ export class Simulation {
     // and are the only two things in this constructor that outlive the process.
     this.accounts = options.accounts ?? null;
     this.interiorStore = options.interiors ?? null;
+    this.territory = options.territory ?? null;
     // The real thing by default, now that the driving workstream has landed:
     // the fare loop asks `this.cars` who is driving what, and `NO_DRIVING`
     // survives only as the answer a caller gets when it explicitly asks for
@@ -2263,6 +2269,17 @@ export class Simulation {
         // already inside -- a player knocked over by their own thrown football
         // has not levelled up.
         this.creditLadder(attacker);
+        // The turf: a KO of somebody not on your side is a point for your
+        // side in the hexagon it happened in. The victim's hexagon, because
+        // the fight was where they fell. See `game/territory.ts`.
+        if (this.territory !== null && attacker.team !== TEAM.NONE) {
+          const victim = this.participants.get(victimId);
+          if (victim && victim.team !== attacker.team) {
+            const at = victim.combat.body.position;
+            const hex = hexAt(this.world.hexes, at.x, at.z);
+            if (hex !== null) this.territory.record(hex.q, hex.r, attacker.team);
+          }
+        }
         // WORKSTREAM AK: and the quest engine, at the same funnel and for the
         // identical reason the comment above gives about the ladder -- a
         // second counter anywhere else is the one that stops counting when
@@ -7243,6 +7260,7 @@ export function verifySim(): string[] {
   // branch that carries a player over the harbour.
   const world: ServerWorld = {
     index: { stage: 'test', radius_m: 0, tile_size: 500, terrain: { grid: 16, datum_ahd: 0, sea_level_y: 0 }, tiles: [] },
+    hexes: [],
     collision: new CollisionWorld(),
     terrain: new TerrainField(16, 500, ''),
     // A dry city, on the same terms as the empty one around it: `WaterLevels`

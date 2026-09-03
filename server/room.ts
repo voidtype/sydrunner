@@ -113,6 +113,8 @@ import { encodeLiftRide,
 import { rateFacts, resolveSnapshotHz } from '../client/src/net/snapshotrate.ts';
 // The talents broadcast. Workstream V; see `MSG.TALENTS` and `sendTalents`.
 import { encodeTalents } from '../client/src/net/teams.ts';
+import { encodeTerritory } from '../client/src/net/protocol.ts';
+import type { TerritoryStore } from './territory.ts';
 // The shared wall-clock tick. The heat channel's deadlines are denominated in
 // it, exactly as `sim.stepFactions`' are -- see `sendHeat`.
 import { trafficTick } from '../client/src/game/traffic.ts';
@@ -761,6 +763,9 @@ export class Room {
    * see `sendTalents`.
    */
   private talentsSent = -1;
+  /** The turf ledger, the host's, and the version of it this room last sent. */
+  private readonly territory: TerritoryStore | null;
+  private territorySent = -1;
 
   // --- Measurement. Per room, because a host with one busy room and seven quiet
   // ones has to be able to say so.
@@ -871,6 +876,7 @@ export class Room {
     this.cap = cap;
     this.snapshotPhase = id % HOST_SNAPSHOT_INTERVAL;
     this.ground = groundFor(shared);
+    this.territory = money.territory ?? null;
     // Its own powerups, everybody else's city. See `world.roomWorld`.
     //
     // The wallet store is the **host's** and is deliberately shared across
@@ -882,6 +888,7 @@ export class Room {
       wallets: money.wallets,
       accounts: money.accounts,
       interiors: money.interiors,
+      territory: money.territory,
       driving: money.fakeDriving
         ? fakeDriving({
             poseOf: (playerId) => {
@@ -998,6 +1005,7 @@ export class Room {
     // at all, and that is the point: the feature costs four bytes a join until
     // somebody uses it.
     ws.send(encodeCars(this.sim.carRecords(), true));
+    if (this.territory !== null) ws.send(encodeTerritory(this.territory.entries()));
     // The scoreboard, which is room-global and is what makes an out-of-interest
     // knockout nameable in the kill feed. Sent before anything that could refer
     // to an id, which is the rule `server/index.ts` has always had here.
@@ -1378,6 +1386,7 @@ export class Room {
     this.sendInvestigations();
     this.sendHeat();
     this.sendTalents();
+    this.sendTerritory();
     this.sendBikes();
     this.sendCars();
     // WORKSTREAM Y: **after** the cars, deliberately. A car exploding is a
@@ -1560,6 +1569,23 @@ export class Room {
    * arithmetic that actually matters is adjudicated in this process anyway, so
    * nothing about correctness depends on who was told.
    */
+  /**
+   * The turf table to everybody, when a hexagon changed hands. `sendTalents`'
+   * shape: a version on the source, the last one sent here, one frame for all.
+   */
+  private sendTerritory(): void {
+    const store = this.territory;
+    if (store === null || store.version === this.territorySent) return;
+    this.territorySent = store.version;
+    const frame = encodeTerritory(store.entries());
+    for (const ws of this.conns) {
+      if (!ws.data.participant) continue;
+      ws.send(frame);
+      this.bytesSent += frame.byteLength;
+      this.logBytes += frame.byteLength;
+    }
+  }
+
   private sendTalents(): void {
     const sim = this.sim;
     if (sim.talentsVersion === this.talentsSent) return;
@@ -1983,6 +2009,8 @@ export interface RoomMoney {
    * that does not survive a restart. See `server/interiors.ts`.
    */
   interiors?: InteriorStore;
+  /** The host's turf ledger. See `server/territory.ts`. */
+  territory?: TerritoryStore;
 }
 
 /**

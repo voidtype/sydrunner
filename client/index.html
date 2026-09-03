@@ -3,6 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- The two faces every line of the interface is set in, fetched before the
+         stylesheet below discovers them: a font the parser only learns about
+         from a @font-face rule waits for the first styled glyph to be laid out,
+         which on a cold cache is a round trip after first paint. -->
+    <link rel="preload" href="/fonts/PublicSans.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/Jost.woff2" as="font" type="font/woff2" crossorigin />
     <title>SYDNEY</title>
     <style>
       /* HARBOUR STEEL -- the interface, from the ground up. UI.md is the

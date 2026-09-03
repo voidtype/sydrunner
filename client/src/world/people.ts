@@ -430,6 +430,12 @@ interface RigSlot {
  */
 const GROUND_RADIUS = 140;
 const GROUND_SLACK_M = 0.35;
+
+/** Frames between re-reads of a standing walker's ground. A power of two; the stagger masks by it. */
+const GROUND_EVERY = 4;
+
+/** Held ground samples before the map is dropped and rebuilt. */
+const GROUND_HELD_MAX = 8192;
 /** The footpath slab's own height over the terrain the ground query returns. `index.json`'s `footpath_y_m`. */
 const FOOTPATH_Y = 0.15;
 
@@ -552,8 +558,21 @@ export class PedestrianCrowd {
    * bands' baked heights. See `GROUND_RADIUS`.
    */
   ground: ((x: number, z: number, feetY: number) => number) | null = null;
+  /**
+   * The last ground each walker was given, by key, and the frame counter the
+   * re-reads are staggered on. A standing walker's ground does not move, so it
+   * is asked again only every `GROUND_EVERY` frames, offset by its key so the
+   * crowd's queries spread evenly rather than landing on one frame in four; a
+   * launched one is asked every frame, because its ground is the whole point.
+   * Cleared when it grows past a city's worth of keys, which is a leak guard,
+   * not a policy.
+   */
+  private readonly groundHeld = new Map<number, number>();
+  private frame = 0;
 
   update(field: PedestrianField, tick: number, dt: number, x: number, z: number): void {
+    this.frame++;
+    if (this.groundHeld.size > GROUND_HELD_MAX) this.groundHeld.clear();
     const at = performance.now();
     this.gather(field, tick, x, z);
     this.assign();
@@ -582,8 +601,13 @@ export class PedestrianCrowd {
       const ground = this.ground;
       if (ground !== null && dx * dx + dz * dz < GROUND_RADIUS * GROUND_RADIUS) {
         const base = p.y - p.hop;
-        const g = ground(p.x, p.z, base);
-        if (Number.isFinite(g) && (p.vx !== 0 || p.vz !== 0 || Math.abs(g + FOOTPATH_Y - base) > GROUND_SLACK_M)) {
+        const launched = p.vx !== 0 || p.vz !== 0;
+        let g = this.groundHeld.get(p.key);
+        if (launched || g === undefined || ((this.frame + (p.key | 0)) & (GROUND_EVERY - 1)) === 0) {
+          g = ground(p.x, p.z, base);
+          this.groundHeld.set(p.key, g);
+        }
+        if (Number.isFinite(g) && (launched || Math.abs(g + FOOTPATH_Y - base) > GROUND_SLACK_M)) {
           this.vY[n] = g + FOOTPATH_Y + p.hop;
         }
       }

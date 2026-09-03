@@ -179,6 +179,8 @@ import { verifyRangeAlloc } from '../client/src/world/rangealloc.ts';
 import { verifyFloorPlan } from '../client/src/world/floorplan.ts';
 import { verifyPlaceables } from '../client/src/world/placeables.ts';
 import { InteriorStore, defaultInteriorPath, verifyInteriorStore } from './interiors.ts';
+import { TerritoryStore, defaultTerritoryPath, verifyTerritoryStore } from './territory.ts';
+import { verifyTerritory } from '../client/src/game/territory.ts';
 import { verifyDoorway } from '../client/src/world/doorway.ts';
 import { verifyAreaLine } from '../client/src/game/arealine.ts';
 import { verifyBoats } from '../client/src/game/boats.ts';
@@ -496,6 +498,9 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // the two, because it is the only end with a disk.
     ['verifyPlaceables', verifyPlaceables()],
     ['verifyInteriorStore', verifyInteriorStore()],
+    // The turf: the rule on both ends, the ledger on this one.
+    ['verifyTerritory', verifyTerritory()],
+    ['verifyTerritoryStore', verifyTerritoryStore()],
     ['verifySpaces', verifySpaces()],
     ['verifyDeviceLost', verifyDeviceLost()],
     // --- WORKSTREAM V. `verifyTeams` is the contract's own and is here for a
@@ -1002,6 +1007,14 @@ console.log(
 );
 
 /**
+ * And who holds which hexagon this week -- the fourth thing that outlives the
+ * process, on `interiors`' terms. See `server/territory.ts`.
+ */
+const territory = new TerritoryStore(defaultTerritoryPath());
+await territory.load();
+console.log(`[sydney] territory: ${territory.size} hexagon(s) fought over in week ${territory.week}, in ${territory.path}`);
+
+/**
  * Who is driving what, for SydRide. See `client/src/game/driving-contract.ts`.
  *
  * `NO_DRIVING` unless `SYDNEY_FAKE_DRIVING=1`, because the driving workstream's
@@ -1035,6 +1048,7 @@ const host = new RoomHost(world, ROOM_COUNT, ROOM_CAP, BOT_COUNT, ROOM_BASE, {
   wallets,
   accounts,
   interiors,
+  territory,
   fakeDriving: FAKE_DRIVING,
 });
 if (FAKE_DRIVING) {

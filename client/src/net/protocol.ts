@@ -400,6 +400,11 @@ export const MSG = {
   /** Server -> client: the cab is riding. See `LiftRideFrame`. */
   LIFT_RIDE: 0x98,
   /**
+   * Who holds every hexagon of the city. Server -> client, on welcome and
+   * whenever one changes hands. See `game/territory.ts`.
+   */
+  TERRITORY: 0x99,
+  /**
    * "Put a couch here", or "take that one away". See `net/placeables.ts`... no:
    * `world/placeables.ts`, which is the shared definition of what a thing is.
    *
@@ -1024,7 +1029,7 @@ export const MSG = {
  * the walls this server does. Two ends on different versions of a shared
  * computation is the failure the version exists to refuse.
  */
-export const PROTOCOL_VERSION = 29;
+export const PROTOCOL_VERSION = 30;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;
@@ -3890,6 +3895,70 @@ export function decodeLiftRide(buffer: ArrayBuffer): LiftRideFrame | null {
 }
 
 /**
+ * `MSG.TERRITORY` (0x99, server -> client): the turf table.
+ *
+ *     u8   type = MSG.TERRITORY
+ *     u8   count
+ *     ... per entry: i8 q, i8 r, u8 owner (TEAM), u16 marita, u16 dflt
+ *
+ * The whole table every time, because the frame is the state: a hexagon
+ * absent from it is held by nobody, and a receiver that merged would keep a
+ * side's turf past Monday. At most 86 entries, 604 bytes, sent only when a
+ * hexagon changes hands. See `game/territory.ts` for the rule.
+ */
+export interface TerritoryEntry {
+  q: number;
+  r: number;
+  /** `TEAM`: 0 nobody, 1 Marita, 2 DeFAULT. */
+  owner: number;
+  marita: number;
+  dflt: number;
+}
+
+export const TERRITORY_HEADER_BYTES = 2;
+export const TERRITORY_ENTRY_BYTES = 7;
+
+export function encodeTerritory(entries: readonly TerritoryEntry[]): ArrayBuffer {
+  const n = Math.min(entries.length, 255);
+  const buffer = new ArrayBuffer(TERRITORY_HEADER_BYTES + n * TERRITORY_ENTRY_BYTES);
+  const v = new DataView(buffer);
+  v.setUint8(0, MSG.TERRITORY);
+  v.setUint8(1, n);
+  let p = TERRITORY_HEADER_BYTES;
+  for (let i = 0; i < n; i++) {
+    const e = entries[i];
+    v.setInt8(p, e.q);
+    v.setInt8(p + 1, e.r);
+    v.setUint8(p + 2, e.owner & 3);
+    v.setUint16(p + 3, Math.min(65535, Math.max(0, e.marita)), true);
+    v.setUint16(p + 5, Math.min(65535, Math.max(0, e.dflt)), true);
+    p += TERRITORY_ENTRY_BYTES;
+  }
+  return buffer;
+}
+
+export function decodeTerritory(buffer: ArrayBuffer): TerritoryEntry[] | null {
+  if (buffer.byteLength < TERRITORY_HEADER_BYTES) return null;
+  const v = new DataView(buffer);
+  if (v.getUint8(0) !== MSG.TERRITORY) return null;
+  const count = v.getUint8(1);
+  if (buffer.byteLength < TERRITORY_HEADER_BYTES + count * TERRITORY_ENTRY_BYTES) return null;
+  const out: TerritoryEntry[] = [];
+  let p = TERRITORY_HEADER_BYTES;
+  for (let i = 0; i < count; i++) {
+    out.push({
+      q: v.getInt8(p),
+      r: v.getInt8(p + 1),
+      owner: v.getUint8(p + 2) & 3,
+      marita: v.getUint16(p + 3, true),
+      dflt: v.getUint16(p + 5, true),
+    });
+    p += TERRITORY_ENTRY_BYTES;
+  }
+  return out;
+}
+
+/**
  * `MSG.LIFT`: a type byte and a direction, +1 for up and -1 for down.
  *
  *     u8   type = MSG.LIFT
@@ -5847,6 +5916,37 @@ export function verifyNet(): string[] {
     if (decodeLiftRide(encodeLiftRide(ride).slice(0, LIFT_RIDE_BYTES - 1)) !== null) failures.push('A truncated LIFT_RIDE decoded.');
     if (decodeLiftRide(encodeSpace(sent)) !== null) failures.push('A SPACE frame decoded as a LIFT_RIDE.');
     if (decodeSpace(encodeSun(0, 0)) !== null) failures.push('A SUN frame decoded as a SPACE.');
+  }
+
+  // --- TERRITORY: the turf table, signed coordinates and full-width scores intact.
+  {
+    const table: TerritoryEntry[] = [
+      { q: -6, r: 3, owner: 1, marita: 65535, dflt: 0 },
+      { q: 0, r: 0, owner: 2, marita: 7, dflt: 9 },
+      { q: 5, r: -6, owner: 0, marita: 1, dflt: 1 },
+    ];
+    const got = decodeTerritory(encodeTerritory(table));
+    if (got === null) failures.push('A TERRITORY frame did not decode.');
+    else if (got.length !== table.length) failures.push(`${got.length} of ${table.length} hexagons survived the frame.`);
+    else {
+      for (let i = 0; i < table.length; i++) {
+        const a = table[i];
+        const b = got[i];
+        if (a.q !== b.q || a.r !== b.r || a.owner !== b.owner || a.marita !== b.marita || a.dflt !== b.dflt) {
+          failures.push(`hexagon ${i} came back as ${JSON.stringify(b)}.`);
+        }
+      }
+    }
+    const empty = decodeTerritory(encodeTerritory([]));
+    if (empty === null || empty.length !== 0) failures.push('an empty TERRITORY frame did not decode as nobody holding anything.');
+    if (decodeTerritory(encodeTerritory(table).slice(0, TERRITORY_HEADER_BYTES + TERRITORY_ENTRY_BYTES * 2)) !== null) {
+      failures.push('a truncated TERRITORY decoded rather than being refused.');
+    }
+    if (decodeTerritory(encodeTerritory(table).slice(0, 1)) !== null) failures.push('a headerless TERRITORY decoded.');
+    if (decodeTerritory(encodeLiftRide({ building: 1, from: 0, to: 1, startMs: 0, durMs: 1000 })) !== null) {
+      failures.push('A LIFT_RIDE frame decoded as a TERRITORY.');
+    }
+    if (encodeTerritory(table).byteLength !== TERRITORY_HEADER_BYTES + 3 * TERRITORY_ENTRY_BYTES) failures.push('a TERRITORY frame is the wrong size.');
   }
 
   // --- Furniture, and the room it is in. v25.

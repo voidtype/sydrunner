@@ -147,7 +147,9 @@ import { decodeLiftRide, type LiftRideFrame,
   type SnapshotAboard,
   type SnapshotNpc,
   type SnapshotPlayer,
+  decodeTerritory,
 } from './protocol.ts';
+import { Territory, type TerritoryFlip } from '../game/territory.ts';
 import { InterpDelay } from './interpdelay.ts';
 // Interiors, protocol v23. `spaces.ts` imports nothing and is the shared
 // definition both ends run; see INTERIORS.md.
@@ -486,6 +488,8 @@ export interface NetHandlers {
    * shut for all but a minute of the session.
    */
   onTalents?(): void;
+  /** Hexagons changed hands; `territory` is already updated. See `game/territory.ts`. */
+  onTerritory?(flips: TerritoryFlip[]): void;
 }
 
 interface PendingInput {
@@ -1490,6 +1494,9 @@ export class NetClient {
   /** Set when `placed` changed; `takePlaced` clears it. */
   private placedDirty = false;
 
+  /** Who holds every hexagon, as the server last said. See `game/territory.ts`. */
+  readonly territory = new Territory();
+
   /**
    * Has the room's contents changed since this was last asked?
    *
@@ -1939,6 +1946,12 @@ export class NetClient {
         this.talents.clear();
         for (const r of records) this.talents.set(r.playerId, r);
         this.handlers.onTalents?.();
+        return;
+      }
+      case MSG.TERRITORY: {
+        const table = decodeTerritory(frame);
+        if (!table) return;
+        this.handlers.onTerritory?.(this.territory.apply(table));
         return;
       }
       /*

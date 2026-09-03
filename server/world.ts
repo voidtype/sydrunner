@@ -1780,6 +1780,8 @@ export interface WorldIndex {
  */
 export interface ServerWorld {
   index: WorldIndex;
+  /** The streaming hexagons, which are also the turf. Empty on an unsegmented world. See `game/territory.ts`. */
+  hexes: readonly HexEntry[];
   collision: CollisionWorld;
   terrain: TerrainField;
   /**
@@ -2280,6 +2282,7 @@ export async function loadWorld(
 
   const world: ServerWorld = {
     index,
+    hexes: rootIndex?.hexes?.list ?? [],
     collision,
     terrain,
     // One table for the process, off the index that has already been read. No

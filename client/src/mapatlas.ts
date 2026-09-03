@@ -653,7 +653,7 @@ export class MapAtlas {
     if (this.started) return;
     this.started = true;
     this.startedAt = performance.now();
-    void this.loadSuburbs();
+    void this.ensureSuburbs();
     void this.loadWater();
     void this.loadNames();
   }
@@ -1050,6 +1050,18 @@ export class MapAtlas {
    * a NaN coordinate would win every nearest test and every label placement from
    * then on, because every comparison against NaN is false.
    */
+  /**
+   * The suburb names alone, for whoever needs them before the map is opened:
+   * the turf feed says "Marita took Parramatta" and has to know the word.
+   * Once; `start` goes through here too.
+   */
+  ensureSuburbs(): Promise<void> {
+    if (this.suburbsLoad === null) this.suburbsLoad = this.loadSuburbs();
+    return this.suburbsLoad;
+  }
+
+  private suburbsLoad: Promise<void> | null = null;
+
   private async loadSuburbs(): Promise<void> {
     try {
       this.fetches++;
