@@ -795,6 +795,19 @@ Cars: `scripts/prep-car-models.mjs` writes the atlases and paint masks and
 -- it is what found three files turned twice -- and it is an offline
 rasteriser, not a browser.
 
+**The upload path that worked on 2026-09-03.** `upload-changed.sh` reported
+13,000 of 15,000 lane sidecars as FAIL twice with no status to read; the
+cause was the OAuth access token expiring about fifteen minutes after
+`wrangler whoami` refreshed it, and the script never refreshing. Use
+`scripts/world-round/r2-upload.py <world> <keylist> <results> [threads]`
+under the pipeline's Python (`cd pipeline && uv run python ...`, the system
+python3 has no `tomllib`): it logs every status, refreshes the token through
+`wrangler whoami` on a 401/403, honours Retry-After on a 429, resumes from
+its results file, and never prints the bearer. 12,021 objects went up at
+eight threads in about half an hour with zero failures. Verify with curl
+(Python's urllib is 403'd by the CDN) -- `curl -sI` the key and compare the
+ETag with the local MD5, over the whole list with `xargs -P 24`.
+
 ### C. Who does what
 
 Planning and gating happen in the lead session. Mechanical, well-specified
