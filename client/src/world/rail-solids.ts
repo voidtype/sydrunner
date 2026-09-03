@@ -1554,10 +1554,29 @@ export function undergroundSolids(
   // was a kerb onto the upper level's strips and a step off the lower's.
   const top = concourseY(station);
   const floor = top - 1.45;
-  const L = BOX_HALF_LENGTH;
+  // **On the room's frame, which is the site's, not the anchor's.**
+  //
+  // `f: station` put these two 1.45 m kerbs on `PlacedStation`'s own `x, z` --
+  // the routed stopping anchor -- while `riding.StationBoxField` builds the
+  // room from the bake's `siteX, siteZ` and `rail-geo` draws it there. This
+  // type's own comment says anchor and node run "as much as 248 m apart"; at
+  // Wynyard the room and the anchor are 59 m apart. So the platforms a player
+  // could see were at one end of the room and the platforms they could *walk
+  // into* were somewhere else entirely: a pair of invisible walls across the
+  // concourse, chest high, with nothing drawn on them. The owner: *"i can see
+  // the train but i run into invis wall"*.
+  //
+  // `L` follows for the same reason: the box is `boxHalfLength` and this was
+  // a constant 88.
+  const frame: TrackFrame = Number.isFinite(station.siteX) && Number.isFinite(station.siteZ)
+    ? { x: station.siteX, z: station.siteZ, ux: station.siteDx, uz: station.siteDz }
+    : station;
+  const L = Number.isFinite(station.boxHalfLength) && station.boxHalfLength > 0
+    ? station.boxHalfLength
+    : BOX_HALF_LENGTH;
   for (const side of [-1, 1]) {
     out.push({
-      f: station,
+      f: frame,
       t0: -L + 6, t1: L - 6,
       o0: PLATFORM_INNER * side, o1: (PLATFORM_INNER + PLATFORM_WIDTH) * side,
       y0: floor, y1: top,
