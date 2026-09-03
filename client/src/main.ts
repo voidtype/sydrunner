@@ -50,7 +50,7 @@ import { fetchWorldAsset, verifyCdn } from './world/cdn.ts';
 // single pass over `index.json` at boot now makes that same pass once per hex
 // as the player approaches it -- see `world/hexes.ts`.
 import { hexContract, hexesArmed, hexesNear, onHexTiles } from './world/hexes.ts';
-import { nearestName, verifyTerritory } from './game/territory.ts';
+import { nearestName, verifyTerritory, type TerritoryFlip } from './game/territory.ts';
 import { createFacadeGlobals } from './world/facade.ts';
 import { loadFarLayer, setSlabDaylight } from './world/far.ts';
 import { loadLandmarks, verifyLandmarks } from './world/landmarks.ts';
@@ -900,7 +900,46 @@ async function main(): Promise<void> {
   // `catch` on purpose, so an exception that reaches `window` has already
   // broken an invariant -- and until this existed, the only report of one was
   // the owner reading a sentence with no trace under it. See `crash.ts`.
-  installCrashLog((message) => hud.fatal(message));
+  /**
+   * Whether the city is on screen. Set where `hud.ready` hands it over.
+   *
+   * It decides what an uncaught error costs. Before the game is up, one is a
+   * boot failure and the panel is the only thing the player was going to get
+   * anyway. After it, taking a working city away because one message handler
+   * threw is worse than the bug it is reporting -- the first version of this
+   * did exactly that, and the owner lost a session he was already playing to a
+   * feed line that could not be written.
+   */
+  let bootDone = false;
+  installCrashLog((message) => {
+    if (bootDone) hud.notice(message.split('\n')[0]);
+    else hud.fatal(message);
+  });
+
+  /**
+   * What to do when turf changes hands, once there is a map to say it to.
+   *
+   * `netHandlers()` is built at the join (line ~6970) and the server's first
+   * `TERRITORY` frame rides in with the welcome -- which is *before* `mapAtlas`
+   * and `bigmap` are constructed a few hundred lines further down. A handler
+   * that closed over them directly therefore ran inside their temporal dead
+   * zone and threw `ReferenceError: Cannot access 'bigmap' before
+   * initialization` on the first frame of every session. No guard fixes that:
+   * even `typeof` throws on a binding in the dead zone. So the handler holds a
+   * *variable that already exists* and the real work is hung on it once the map
+   * does.
+   *
+   * Dropping the frames that arrive before then is right rather than merely
+   * convenient. There is no map to repaint yet, and the welcome's table is the
+   * whole board rather than news -- announcing it would put a "took Newtown"
+   * line in the feed for every hexagon anybody holds, at the moment of joining.
+   *
+   * Declared **here**, at the top of the boot, for the reason the bug had in
+   * the first place: anything below the join is below the first frame that can
+   * arrive.
+   */
+  let announceTerritory: ((flips: readonly TerritoryFlip[]) => void) | null = null;
+
   // The day/night clock, top centre. Constructed here beside the HUD rather than
   // inside it because it is fed the sky's own `SkyClock` rather than the
   // `HudState` the overlay takes, and because it draws whether or not the debug
@@ -3393,6 +3432,7 @@ async function main(): Promise<void> {
         );
       }
       hud.ready(index, revealFirstVisit);
+      bootDone = true;
     };
     requestAnimationFrame(tick);
   }
@@ -7494,6 +7534,18 @@ async function main(): Promise<void> {
   // index's own; a world without one is measured off its hexagons instead.
   bigmap.setWorldRadius((index as { radius_m?: number }).radius_m ?? 0);
   bigmap.setTerritory(() => net?.territory ?? null);
+  // And now the map exists, so the handler installed at the join has somewhere
+  // to put a change of hands. See `announceTerritory`.
+  announceTerritory = (flips) => {
+    bigmap.territoryChanged();
+    const list = hexContract()?.list ?? [];
+    for (const f of flips) {
+      if (f.owner === TEAM.NONE) continue;
+      const hex = list.find((h) => h.q === f.q && h.r === f.r);
+      const name = hex === undefined ? null : nearestName(mapAtlas.suburbs, hex.c[0], hex.c[1]);
+      pushKill(`${TEAM_NAME[f.owner]} took ${name ?? 'a hexagon'}`);
+    }
+  };
 
   const keys = new Set<string>();
   let locked = false;
@@ -9621,14 +9673,7 @@ async function main(): Promise<void> {
        * one line this mechanic is allowed to speak (DESIGN.md rule 6).
        */
       onTerritory(flips) {
-        bigmap.territoryChanged();
-        const list = hexContract()?.list ?? [];
-        for (const f of flips) {
-          if (f.owner === TEAM.NONE) continue;
-          const hex = list.find((h) => h.q === f.q && h.r === f.r);
-          const name = hex === undefined ? null : nearestName(mapAtlas.suburbs, hex.c[0], hex.c[1]);
-          pushKill(`${TEAM_NAME[f.owner]} took ${name ?? 'a hexagon'}`);
-        }
+        announceTerritory?.(flips);
       },
     };
   }
