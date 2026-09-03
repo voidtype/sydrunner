@@ -2259,12 +2259,18 @@ export function trenchPlanes(plan: AccessPlan, cutLen: number): CutPlane[] {
   const nx = -dz;
   const nz = dx;
   const slope = (plan.mouthY - plan.floorY) / Math.max(plan.inclineM, 1e-6);
-  // A little past the lip each way and a little wider than the passage, so the
-  // paving's own edge does not show as a sliver along the trench.
+  // A little past the lip each way, and barely wider than the passage: the
+  // first cut was 0.3 m wider and open to the sky, and it took the face off
+  // the building beside Wynyard's mouth -- the picker only checks the incline's
+  // centreline for buildings, so a facade can stand within a metre of the
+  // passage wall. The lid fixes the same thing from above: the paving is
+  // 0.02-0.15 m over the street, so 0.6 m of headroom takes all of it and
+  // spares everything that stands on the footpath beside the trench.
   const d0 = -0.3;
   const d1 = Math.max(cutLen, 0) + 0.3;
-  const w = ACCESS_HALF_W + 0.3;
+  const w = ACCESS_HALF_W + 0.1;
   const floor = plan.mouthY - slope * d1 - 0.5;
+  const lid = plan.mouthY + TRENCH_LID_M;
   const face = (ox: number, oy: number, oz: number, cx: number, cy: number, cz: number): CutPlane => ({
     nx: ox, ny: oy, nz: oz, constant: -(ox * cx + oy * cy + oz * cz),
   });
@@ -2277,10 +2283,14 @@ export function trenchPlanes(plan: AccessPlan, cutLen: number): CutPlane[] {
     // the two sides, outward across it
     face(-nx, 0, -nz, mx - nx * w, 0, mz - nz * w),
     face(nx, 0, nz, mx + nx * w, 0, mz + nz * w),
-    // and a floor under the ramp, pointing down
+    // a floor under the ramp, pointing down, and a lid just over the paving
     face(0, -1, 0, 0, floor, 0),
+    face(0, 1, 0, 0, lid, 0),
   ];
 }
+
+/** How far over the street the paving cut reaches. Enough for a kerb; not a facade. */
+export const TRENCH_LID_M = 0.6;
 
 /** Whether a point is inside every plane's clipped side -- what the group would cut. */
 export function insideCut(planes: readonly CutPlane[], x: number, y: number, z: number): boolean {
@@ -4390,7 +4400,7 @@ export function verifyStationAccess(): string[] {
     };
     const cutLen = 6.5;
     const planes = trenchPlanes(plan, cutLen);
-    if (planes.length !== 5) failures.push(`${planes.length} planes bound the trench; five do.`);
+    if (planes.length !== 6) failures.push(`${planes.length} planes bound the trench; six do.`);
     for (const p of planes) {
       const len = Math.hypot(p.nx, p.ny, p.nz);
       if (Math.abs(len - 1) > 1e-9) failures.push('a trench plane normal is not unit length.');
@@ -4405,8 +4415,11 @@ export function verifyStationAccess(): string[] {
     if (insideCut(planes, 100, 10.1, 198)) failures.push('the street in front of the mouth was cut.');
     // The shaft itself, well under the ramp floor, is below the box.
     if (insideCut(planes, 100, -20, 203)) failures.push('the cut reaches down into the shaft; the lining would go with the paving.');
-    // The sky over it is open: nothing above is kept out of the box on purpose.
-    if (!insideCut(planes, 100, 30, 203)) failures.push('the box has a lid; the trench should be open to the sky.');
+    // The kerb over the trench goes; a facade a metre up beside it stays. This
+    // is the face that went missing off the building beside Wynyard's mouth.
+    if (!insideCut(planes, 100, 10 + 0.15, 203)) failures.push('the kerb over the trench was kept.');
+    if (insideCut(planes, 100, 10 + 1.0, 203)) failures.push('a metre above the street over the trench was cut; that is a building\'s face.');
+    if (insideCut(planes, 100 + ACCESS_HALF_W + 0.5, 10.3, 203)) failures.push('half a metre beside the passage was cut; that is where a facade stands.');
     // A zero-length trench cuts (almost) nothing.
     const none = trenchPlanes(plan, 0);
     if (insideCut(none, 100, 10.1, 203)) failures.push('a mouth with no open trench still cut the paving three metres in.');
