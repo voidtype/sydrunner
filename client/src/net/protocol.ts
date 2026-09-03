@@ -1024,7 +1024,7 @@ export const MSG = {
  * the walls this server does. Two ends on different versions of a shared
  * computation is the failure the version exists to refuse.
  */
-export const PROTOCOL_VERSION = 28;
+export const PROTOCOL_VERSION = 29;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;
@@ -4061,11 +4061,13 @@ export interface PlacedItem {
   turn: number;
   x: number;
   z: number;
+  /** The storey. See `placeables.ts` "Levels". */
+  level: number;
 }
 
 /** `MSG.PLACED`'s header, and one entry. */
 export const PLACED_HEADER_BYTES = 6;
-export const PLACED_ENTRY_BYTES = 10;
+export const PLACED_ENTRY_BYTES = 11;
 
 /**
  * Everything in one room.
@@ -4073,7 +4075,11 @@ export const PLACED_ENTRY_BYTES = 10;
  *     u8   type = MSG.PLACED
  *     u32  space     which room this is about
  *     u8   count
- *     ... per entry: u8 kind, u8 turn, f32 x, f32 z
+ *     ... per entry: u8 kind, u8 turn, f32 x, f32 z, u8 level
+ *
+ * v29 added the level byte: a placement carries its storey, so a browser
+ * drawing a room knows which floor a bed is on. `FURNISH` carries none; the
+ * server takes the storey from the body's feet, as `placeables.ts` says.
  *
  * **The space is in it**, which looks redundant -- a client is only ever in one
  * room -- and is the one field that makes the frame safe to act on. A player
@@ -4095,6 +4101,7 @@ export function encodePlaced(space: number, items: readonly PlacedItem[]): Array
     v.setUint8(p + 1, it.turn & 3);
     v.setFloat32(p + 2, it.x, true);
     v.setFloat32(p + 6, it.z, true);
+    v.setUint8(p + 10, it.level & 0xff);
     p += PLACED_ENTRY_BYTES;
   }
   return buffer;
@@ -4115,6 +4122,7 @@ export function decodePlaced(buffer: ArrayBuffer): { space: number; items: Place
       turn: v.getUint8(p + 1) & 3,
       x: v.getFloat32(p + 2, true),
       z: v.getFloat32(p + 6, true),
+      level: v.getUint8(p + 10),
     });
     p += PLACED_ENTRY_BYTES;
   }
@@ -5877,8 +5885,8 @@ export function verifyNet(): string[] {
     if (gone === null || gone.op !== FURNISH_OP.REMOVE) failures.push('a removal did not decode as one.');
 
     const items: PlacedItem[] = [
-      { kind: 0, turn: 0, x: -2236.375, z: 4543.25 },
-      { kind: 0, turn: 2, x: -2230.5, z: 4547.75 },
+      { kind: 0, turn: 0, x: -2236.375, z: 4543.25, level: 0 },
+      { kind: 19, turn: 2, x: -2230.5, z: 4547.75, level: 3 },
     ];
     const room = decodePlaced(encodePlaced(0xdeadbeef, items));
     if (room === null) failures.push('A PLACED frame did not decode.');
@@ -5889,7 +5897,8 @@ export function verifyNet(): string[] {
         for (let i = 0; i < items.length; i++) {
           if (
             room.items[i].kind !== items[i].kind || room.items[i].turn !== items[i].turn ||
-            room.items[i].x !== items[i].x || room.items[i].z !== items[i].z
+            room.items[i].x !== items[i].x || room.items[i].z !== items[i].z ||
+            room.items[i].level !== items[i].level
           ) {
             failures.push(`item ${i} came back as ${JSON.stringify(room.items[i])}.`);
           }

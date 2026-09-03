@@ -94,6 +94,10 @@ import {
   pushOutOfBox,
   type PlacedBox,
   type Placement,
+  isCut,
+  isSolid,
+  CUT_MIN_SPAN_M,
+  CUT_REACH_M,
 } from './placeables.ts';
 
 /** Wall thickness, metres. Also how far the walkable shell is inset from the footprint. */
@@ -165,6 +169,8 @@ export interface InteriorWall {
   az: number;
   bx: number;
   bz: number;
+  /** Laid by `coreWalls`: the shaft's own, which no cut may open. */
+  core?: boolean;
 }
 
 /** A building's one door, derived from its footprint. See the header. */
@@ -309,13 +315,29 @@ export interface Core {
 
 /** One walkable level: its floor, and the walls a body on it is stepped against. */
 export interface Level {
-  /** Floor, world metres. */
+  /** Floor height, world metres. */
   y: number;
   rooms: readonly Room[];
-  /** Everything a body on this level collides with: partitions and the core's own walls. */
+  /**
+   * The partitions as they stand: `wallsAll` with every cut applied. What is
+   * drawn and what a body is stepped against. Reassigned by `setPlacements`.
+   */
   walls: readonly InteriorWall[];
-  /** Drawing only; see `Interior.headers`. */
+  /** The lintels over every opening, the generator's and the cuts'. */
   headers: readonly InteriorWall[];
+  /** The partitions as the generator laid them. Never mutated: a cut is undone by leaving. */
+  wallsAll: readonly InteriorWall[];
+  headersAll: readonly InteriorWall[];
+  /** What is placed on this storey and drawn: everything but the cuts. */
+  items: PlacedThing[];
+  /** The subset of `items` a body walks round. */
+  placed: PlacedBox[];
+}
+
+/** One placed thing as the drawer and the collision see it. */
+export interface PlacedThing {
+  kind: number;
+  box: PlacedBox;
 }
 
 /**
@@ -383,7 +405,7 @@ export interface Interior {
   /**
    * What people have put in the room, as boxes, for the mesh to draw.
    *
-   * The same list `InteriorResolver.setPlaced` holds, kept here as well so that
+   * The ground floor's collision boxes, `levels[0].placed`, kept here as well so that
    * the drawing and the collision cannot describe different rooms. `setPlacements`
    * writes both in one call and is the only thing that writes either.
    */
@@ -701,28 +723,10 @@ export function levelIndex(levels: readonly Level[], feetY: number): number {
 const NO_BOXES: readonly PlacedBox[] = [];
 
 export class InteriorResolver {
-  /**
-   * What people have put in the room, as boxes.
-   *
-   * Mutable, where everything else in this class is fixed at construction, and
-   * that asymmetry is the feature: the *rooms* are derived and identical for
-   * everybody forever, and the couches are not -- they arrive on the wire, they
-   * change while a player is standing in the room, and both ends have to start
-   * stepping bodies around them on the same tick. Replaced wholesale rather
-   * than patched, because a placement list is at most 64 entries and the frame
-   * that carries it is the whole list. Ground floor only, as the furniture is.
-   */
-  private placed: readonly PlacedBox[] = [];
-
   constructor(
     private readonly planes: readonly ShellPlane[],
     private readonly levels: readonly Level[],
   ) {}
-
-  /** Adopt this room's furniture. See `placed`. */
-  setPlaced(boxes: readonly PlacedBox[]): void {
-    this.placed = boxes;
-  }
 
   /**
    * How much room a body of zero radius has at this point, metres.
@@ -752,11 +756,9 @@ export class InteriorResolver {
       const s = Math.sqrt(ex * ex + ez * ez) - WALL_THICK_M / 2;
       if (s < least) least = s;
     }
-    if (k === 0) {
-      for (const b of this.placed) {
-        const s = boxClearance(b, x, z);
-        if (s < least) least = s;
-      }
+    for (const b of this.levels[k].placed) {
+      const s = boxClearance(b, x, z);
+      if (s < least) least = s;
     }
     return least;
   }
@@ -780,7 +782,7 @@ export class InteriorResolver {
   ): { x: number; z: number; hit: boolean } {
     const k = levelIndex(this.levels, feetY);
     const walls = this.levels[k].walls;
-    const placed = k === 0 ? this.placed : NO_BOXES;
+    const placed = this.levels[k]?.placed ?? NO_BOXES;
     let x = toX;
     let z = toZ;
     let hit = false;
@@ -1642,7 +1644,7 @@ function coreWalls(core: Core, levels: readonly Level[], k: number, out: Interio
     core.z + core.lz * r + az * w,
   ];
   const seg = (a: [number, number], b: [number, number]): void => {
-    out.push({ ax: a[0], az: a[1], bx: b[0], bz: b[1] });
+    out.push({ ax: a[0], az: a[1], bx: b[0], bz: b[1], core: true });
   };
   seg(at(-core.hr, -core.hw), at(core.hr, -core.hw));
   seg(at(-core.hr, core.hw), at(core.hr, core.hw));
@@ -1799,7 +1801,10 @@ export function buildInterior(
     }
   }
   const count = core === null ? 1 : wanted;
-  const levels: Array<{ y: number; rooms: readonly Room[]; walls: InteriorWall[]; headers: InteriorWall[] }> = [];
+  const levels: Array<{
+    y: number; rooms: readonly Room[]; walls: InteriorWall[]; headers: InteriorWall[];
+    wallsAll: readonly InteriorWall[]; headersAll: readonly InteriorWall[]; items: PlacedThing[]; placed: PlacedBox[];
+  }> = [];
   for (let k = 0; k < count; k++) {
     const isDeck = deck !== undefined && k === count - 1;
     levels.push({
@@ -1807,6 +1812,10 @@ export function buildInterior(
       rooms: k === 0 ? ground : isDeck ? [] : roomsOn(k),
       walls: [],
       headers: [],
+      wallsAll: [],
+      headersAll: [],
+      items: [],
+      placed: [],
     });
   }
   for (let k = 0; k < count; k++) {
@@ -1814,6 +1823,8 @@ export function buildInterior(
     levels[k].walls = made.walls;
     levels[k].headers = made.headers;
     if (core !== null) coreWalls(core, levels, k, levels[k].walls);
+    levels[k].wallsAll = levels[k].walls;
+    levels[k].headersAll = levels[k].headers;
   }
 
   const it: Interior = {
@@ -1977,52 +1988,245 @@ export function placementFits(
 ): boolean {
   const kind = PLACEABLES[p.kind];
   if (kind === undefined) return false;
-  const box = boxOf(p, it.plan.box.ux, it.plan.box.uz);
+  const level = it.levels[p.level];
+  if (level === undefined) return false;
+  const ux = it.plan.box.ux;
+  const uz = it.plan.box.uz;
+  const box = boxOf(p, ux, uz);
 
-  // Inside the room, corners and all.
+  // Inside the shell, on every storey: the planes are the building's.
   const corners = cornersOf(box);
   for (let i = 0; i < corners.length; i += 2) {
     for (const pl of it.planes) {
       if (pl.nx * corners[i] + pl.nz * corners[i + 1] - pl.d < 0.02) return false;
     }
   }
-  // Clear of the partitions, by half a wall so it stands against one rather
-  // than in one.
-  // Not on the stairs, or in the lift, or in the apron round them that
-  // every level's partitions are cut back to.
+  // Not in the shaft, which runs through every storey.
   if (it.core !== null && inCore(it.core, p.x, p.z, Math.max(kind.hx, kind.hz) + CORE_CUT_M)) return false;
-  for (const w of it.walls) {
-    if (!clearOfSegment(box, w.ax, w.az, w.bx, w.bz, WALL_THICK_M / 2)) return false;
+
+  if (kind.wall === 'cut') {
+    // A cut has to take out a real run of partition -- one the generator laid,
+    // never the shaft's -- and may not lie over another cut. It may touch one:
+    // two cuts side by side are one wide opening.
+    let span = 0;
+    for (const w of level.wallsAll) {
+      if (w.core === true) continue;
+      const t = cutSpan(box, w);
+      if (t !== null) span = Math.max(span, (t[1] - t[0]) * segmentLength(w));
+    }
+    if (span < CUT_MIN_SPAN_M) return false;
+    for (const other of existing) {
+      if (other.level !== p.level || !isCut(other.kind)) continue;
+      if (boxesOverlap(box, boxOf(other, ux, uz), -PANEL_JOINT_M)) return false;
+    }
+    if (p.level === 0) {
+      for (const d of doors) {
+        if (boxClearance(box, d.x, d.z) < DOOR_CLEAR_M) return false;
+      }
+    }
+    return true;
   }
-  // Clear of every opening, which is the rule that keeps a building walkable.
-  for (const h of it.headers) {
+
+  // Clear of the partitions as they stand (cuts applied), a wall's half
+  // thickness away -- except a panel, which may butt against them: a wall
+  // nobody can join to anything is a fence post.
+  const wallWant = kind.wall === 'panel' ? -WALL_THICK_M : WALL_THICK_M / 2;
+  for (const w of level.walls) {
+    if (!clearOfSegment(box, w.ax, w.az, w.bx, w.bz, wallWant)) return false;
+  }
+  // Never across an opening, the generator's or a cut's: that is the one piece
+  // of griefing a room has no answer to, because unlike a couch on a floor it
+  // cannot be walked around.
+  for (const h of level.headers) {
     if (!clearOfSegment(box, h.ax, h.az, h.bx, h.bz, OPENING_CLEAR_M)) return false;
   }
-  // Every door anybody in the room came in by, not just the building's own:
-  // the door is per entrant (see the header), and a couch across the one you
-  // used is the one you cannot find.
-  for (const d of doors) {
-    if (boxClearance(box, d.x, d.z) < DOOR_CLEAR_M) return false;
+  if (p.level === 0) {
+    for (const d of doors) {
+      if (boxClearance(box, d.x, d.z) < DOOR_CLEAR_M) return false;
+    }
   }
-  // And clear of everything already in the room.
   for (const other of existing) {
-    if (boxesOverlap(box, boxOf(other, it.plan.box.ux, it.plan.box.uz))) return false;
+    if (other.level !== p.level) continue;
+    const ok = PLACEABLES[other.kind];
+    if (ok === undefined || ok.wall === 'cut') continue;
+    // A rug and a table share the floor; two rugs do not, nor two tables.
+    if ((ok.walk === true) !== (kind.walk === true)) continue;
+    // Panels join end to end: two centimetres of overlap is a joint, not a clash.
+    const slack = kind.wall === 'panel' && ok.wall === 'panel' ? -PANEL_JOINT_M : 0;
+    if (boxesOverlap(box, boxOf(other, ux, uz), slack)) return false;
   }
   return true;
 }
 
+/** How far two panels, or two cuts, may overlap and still be one run. */
+const PANEL_JOINT_M = 0.02;
+
+/** A piece of wall shorter than this after a cut is not drawn: a sliver, not a jamb. */
+const CUT_STUB_M = 0.05;
+
+function segmentLength(w: InteriorWall): number {
+  return Math.sqrt((w.bx - w.ax) * (w.bx - w.ax) + (w.bz - w.az) * (w.bz - w.az));
+}
+
 /**
- * Hand this room its furniture, so bodies start walking around it.
+ * The part of a wall a cut takes: the wall's parameter span inside the cut's
+ * box, or null where they miss. Liang-Barsky against the four faces, in the
+ * cut's own frame, so a cut at any quarter turn clips exactly.
+ */
+function cutSpan(c: PlacedBox, w: InteriorWall): [number, number] | null {
+  const u0 = (w.ax - c.x) * c.ax + (w.az - c.z) * c.az;
+  const v0 = -(w.ax - c.x) * c.az + (w.az - c.z) * c.ax;
+  const u1 = (w.bx - c.x) * c.ax + (w.bz - c.z) * c.az;
+  const v1 = -(w.bx - c.x) * c.az + (w.bz - c.z) * c.ax;
+  let t0 = 0;
+  let t1 = 1;
+  for (const [p0, p1, h] of [[u0, u1, c.hx], [v0, v1, c.hz]] as const) {
+    const d = p1 - p0;
+    for (const sign of [1, -1]) {
+      // sign * p(t) <= h, with p(t) = p0 + d t.
+      const q = h - sign * p0;
+      const r = sign * d;
+      if (Math.abs(r) < 1e-9) {
+        if (q < 0) return null;
+        continue;
+      }
+      const t = q / r;
+      if (r > 0) t1 = Math.min(t1, t);
+      else t0 = Math.max(t0, t);
+    }
+  }
+  return t1 - t0 > 1e-6 ? [t0, t1] : null;
+}
+
+/**
+ * The storey's partitions with its cuts taken out of them.
  *
- * One call rather than a setter per list, because the resolver and the mesh
- * must never disagree about what is in the room: a body stepped around a couch
- * nobody can see is worse than either of the two halves being wrong.
+ * Every generated wall is clipped against every cut on the storey; the pieces
+ * either side stay walls and the span between them becomes a lintel, which is
+ * exactly the shape the generator gives a doorway -- so a cut is drawn, headed
+ * and stepped by the code that already handles one. The shaft's walls are
+ * skipped whole: a cut cannot open the lift.
+ */
+function applyCuts(level: Level, cuts: readonly PlacedBox[]): { walls: InteriorWall[]; headers: InteriorWall[] } {
+  const walls: InteriorWall[] = [];
+  const headers: InteriorWall[] = level.headersAll.slice();
+  for (const w of level.wallsAll) {
+    if (w.core === true) {
+      walls.push(w);
+      continue;
+    }
+    let pieces: InteriorWall[] = [w];
+    for (const c of cuts) {
+      const next: InteriorWall[] = [];
+      for (const piece of pieces) {
+        const span = cutSpan(c, piece);
+        if (span === null) {
+          next.push(piece);
+          continue;
+        }
+        const len = segmentLength(piece);
+        let [t0, t1] = span;
+        // A sliver left at either end is dropped, and the lintel runs to the end instead.
+        if (t0 * len <= CUT_STUB_M) t0 = 0;
+        if ((1 - t1) * len <= CUT_STUB_M) t1 = 1;
+        const at = (t: number): [number, number] => [
+          piece.ax + (piece.bx - piece.ax) * t,
+          piece.az + (piece.bz - piece.az) * t,
+        ];
+        const [x0, z0] = at(t0);
+        const [x1, z1] = at(t1);
+        if (t0 > 0) next.push({ ax: piece.ax, az: piece.az, bx: x0, bz: z0 });
+        if (t1 < 1) next.push({ ax: x1, az: z1, bx: piece.bx, bz: piece.bz });
+        if ((t1 - t0) * len > 1e-3) headers.push({ ax: x0, az: z0, bx: x1, bz: z1 });
+      }
+      pieces = next;
+    }
+    for (const piece of pieces) walls.push(piece);
+  }
+  return { walls, headers };
+}
+
+/**
+ * The cut a right-click on a wall makes: centred on the nearest generated
+ * partition on the storey within `CUT_REACH_M`, turned to run along it, and
+ * slid along the wall so the whole opening lies within it where the wall is
+ * long enough. Null where there is no wall to open. Shared with the browser so
+ * a preview would be the server's own answer.
+ */
+export function cutAt(it: Interior, level: number, x: number, z: number): Placement | null {
+  const lv = it.levels[level];
+  if (lv === undefined) return null;
+  const half = PLACEABLES[PLACEABLE.WALL_CUT].hx;
+  let best: InteriorWall | null = null;
+  let bestD = CUT_REACH_M;
+  let cx = 0;
+  let cz = 0;
+  for (const w of lv.walls) {
+    if (w.core === true) continue;
+    const dx = w.bx - w.ax;
+    const dz = w.bz - w.az;
+    const len2 = dx * dx + dz * dz;
+    if (len2 < 1e-9) continue;
+    const len = Math.sqrt(len2);
+    let along = Math.max(0, Math.min(len, ((x - w.ax) * dx + (z - w.az) * dz) / len));
+    const px = w.ax + (dx / len) * along;
+    const pz = w.az + (dz / len) * along;
+    const d = Math.sqrt((x - px) * (x - px) + (z - pz) * (z - pz));
+    if (d >= bestD) continue;
+    if (len >= 2 * half) along = Math.max(half, Math.min(len - half, along));
+    bestD = d;
+    best = w;
+    cx = w.ax + (dx / len) * along;
+    cz = w.az + (dz / len) * along;
+  }
+  if (best === null) return null;
+  const dx = best.bx - best.ax;
+  const dz = best.bz - best.az;
+  const withU = Math.abs(dx * it.plan.box.ux + dz * it.plan.box.uz);
+  const withV = Math.abs(-dx * it.plan.box.uz + dz * it.plan.box.ux);
+  return { kind: PLACEABLE.WALL_CUT, x: cx, z: cz, turn: withU >= withV ? 0 : 1, level };
+}
+
+/**
+ * Take the room's contents, as the server holds them, and make them real:
+ * every storey's drawn things, its collision boxes and -- where a cut is
+ * among them -- its partitions re-clipped. Called on every `PLACED` frame,
+ * and after every accepted `furnish` on the server; each is the whole list, so
+ * this starts from nothing every time.
  */
 export function setPlacements(it: Interior, list: readonly Placement[]): void {
-  const boxes: PlacedBox[] = [];
-  for (const p of list) boxes.push(boxOf(p, it.plan.box.ux, it.plan.box.uz));
-  it.resolver.setPlaced(boxes);
-  it.placedBoxes = boxes;
+  const ux = it.plan.box.ux;
+  const uz = it.plan.box.uz;
+  const cutsOn: PlacedBox[][] = it.levels.map(() => []);
+  for (const level of it.levels) {
+    level.items = [];
+    level.placed = [];
+  }
+  for (const p of list) {
+    const level = it.levels[p.level];
+    if (level === undefined) continue;
+    const box = boxOf(p, ux, uz);
+    if (isCut(p.kind)) {
+      cutsOn[p.level].push(box);
+      continue;
+    }
+    level.items.push({ kind: p.kind, box });
+    if (isSolid(p.kind)) level.placed.push(box);
+  }
+  for (let k = 0; k < it.levels.length; k++) {
+    const level = it.levels[k];
+    if (cutsOn[k].length === 0) {
+      level.walls = level.wallsAll;
+      level.headers = level.headersAll;
+    } else {
+      const made = applyCuts(level, cutsOn[k]);
+      level.walls = made.walls;
+      level.headers = made.headers;
+    }
+  }
+  it.walls = it.levels[0].walls;
+  it.headers = it.levels[0].headers;
+  it.placedBoxes = it.levels[0].placed;
 }
 
 // --- Saying what it is ---------------------------------------------------------
@@ -2116,7 +2320,30 @@ export function couchInto(
     b: Math.min(1, 0.36 * tone + 0.16),
   };
   const dark = { r: cloth.r * 0.62, g: cloth.g * 0.62, b: cloth.b * 0.62 };
-  const shade = (c: { r: number; g: number; b: number }, k: number): number[] => [
+  const slab = slabWriter(pos, nor, col, b);
+  slab(0, 0, b.hx, b.hz, floorY, floorY + 0.16, dark);
+  slab(-b.hx * 0.45, 0.06, b.hx * 0.42, b.hz * 0.74, floorY + 0.16, floorY + seat, cloth);
+  slab(b.hx * 0.45, 0.06, b.hx * 0.42, b.hz * 0.74, floorY + 0.16, floorY + seat, cloth);
+  slab(0, -b.hz + 0.11, b.hx, 0.11, floorY + 0.16, floorY + back, cloth);
+  slab(-b.hx + 0.09, 0.09, 0.09, b.hz * 0.9, floorY + 0.16, floorY + arm, dark);
+  slab(b.hx - 0.09, 0.09, 0.09, b.hz * 0.9, floorY + 0.16, floorY + arm, dark);
+}
+
+type RGB = { r: number; g: number; b: number };
+
+/**
+ * The one primitive every placed thing is made of: an upright box in the
+ * placement's own frame. `cu`/`cv` its centre along and across the thing,
+ * `hu`/`hv` its half-extents, `y0`/`y1` absolute heights. Four sides shaded
+ * round the compass and a top, which is the surface anybody actually looks at.
+ */
+function slabWriter(
+  pos: number[],
+  nor: number[],
+  col: number[],
+  b: PlacedBox,
+): (cu: number, cv: number, hu: number, hv: number, y0: number, y1: number, rgb: RGB) => void {
+  const shade = (c: RGB, k: number): number[] => [
     Math.min(1, c.r * k), Math.min(1, c.g * k), Math.min(1, c.b * k),
   ];
   const quad = (
@@ -2128,15 +2355,11 @@ export function couchInto(
     for (let i = 0; i < 6; i++) nor.push(nx, ny, nz);
     for (let i = 0; i < 6; i++) col.push(rgb[0], rgb[1], rgb[2]);
   };
-  /** An upright box in the placement's own frame. `cu`/`cv` its centre, `hu`/`hv` its half-extents. */
-  const slab = (
-    cu: number, cv: number, hu: number, hv: number, y0: number, y1: number,
-    rgb: { r: number; g: number; b: number },
-  ): void => {
-    const px = (u: number, v: number): [number, number] => [
-      b.x + u * b.ax - v * b.az,
-      b.z + u * b.az + v * b.ax,
-    ];
+  const px = (u: number, v: number): [number, number] => [
+    b.x + u * b.ax - v * b.az,
+    b.z + u * b.az + v * b.ax,
+  ];
+  return (cu, cv, hu, hv, y0, y1, rgb) => {
     const c0 = px(cu - hu, cv - hv);
     const c1 = px(cu + hu, cv - hv);
     const c2 = px(cu + hu, cv + hv);
@@ -2153,18 +2376,253 @@ export function couchInto(
     side(c1, c2, 0.86);
     side(c2, c3, 0.74);
     side(c3, c0, 0.86);
-    // The top, which is the surface anybody actually looks at.
     quad(
       c0[0], y1, c0[1], c1[0], y1, c1[1], c2[0], y1, c2[1], c3[0], y1, c3[1],
       0, 1, 0, shade(rgb, 1.12),
     );
   };
-  slab(0, 0, b.hx, b.hz, floorY, floorY + 0.16, dark);
-  slab(-b.hx * 0.45, 0.06, b.hx * 0.42, b.hz * 0.74, floorY + 0.16, floorY + seat, cloth);
-  slab(b.hx * 0.45, 0.06, b.hx * 0.42, b.hz * 0.74, floorY + 0.16, floorY + seat, cloth);
-  slab(0, -b.hz + 0.11, b.hx, 0.11, floorY + 0.16, floorY + back, cloth);
-  slab(-b.hx + 0.09, 0.09, 0.09, b.hz * 0.9, floorY + 0.16, floorY + arm, dark);
-  slab(b.hx - 0.09, 0.09, 0.09, b.hz * 0.9, floorY + 0.16, floorY + arm, dark);
+}
+
+/** The decor's materials. Named for what they are, so a row reads as a thing. */
+const DECOR = {
+  wood: { r: 0.55, g: 0.38, b: 0.22 },
+  darkWood: { r: 0.30, g: 0.20, b: 0.13 },
+  linen: { r: 0.86, g: 0.84, b: 0.78 },
+  pillow: { r: 0.93, g: 0.93, b: 0.91 },
+  white: { r: 0.90, g: 0.90, b: 0.90 },
+  steel: { r: 0.60, g: 0.62, b: 0.65 },
+  screen: { r: 0.07, g: 0.07, b: 0.09 },
+  leaf: { r: 0.20, g: 0.45, b: 0.20 },
+  leafLight: { r: 0.32, g: 0.58, b: 0.26 },
+  pot: { r: 0.50, g: 0.30, b: 0.20 },
+  soil: { r: 0.20, g: 0.14, b: 0.10 },
+  shade: { r: 0.92, g: 0.86, b: 0.70 },
+  benchTop: { r: 0.33, g: 0.33, b: 0.35 },
+  benchFront: { r: 0.82, g: 0.82, b: 0.80 },
+  water: { r: 0.55, g: 0.70, b: 0.80 },
+} as const;
+
+const BOOK_COLOURS: readonly RGB[] = [
+  { r: 0.6, g: 0.2, b: 0.2 }, { r: 0.2, g: 0.3, b: 0.55 }, { r: 0.25, g: 0.45, b: 0.3 },
+  { r: 0.7, g: 0.6, b: 0.3 }, { r: 0.3, g: 0.25, b: 0.4 }, { r: 0.85, g: 0.85, b: 0.8 },
+];
+
+const RUG_COLOURS: readonly RGB[] = [
+  { r: 0.55, g: 0.20, b: 0.20 }, { r: 0.20, g: 0.30, b: 0.50 }, { r: 0.45, g: 0.40, b: 0.30 },
+  { r: 0.30, g: 0.40, b: 0.35 },
+];
+
+/** The plaster a panel is made of where the room's own is not to hand. */
+const PLASTER_DEFAULT: RGB = { r: 0.71, g: 0.69, b: 0.65 };
+
+/**
+ * Draw one placed thing of any kind. The couch keeps its own builder; every
+ * other row is a handful of slabs here, in the thing's own frame, at real
+ * sizes. `tint` paints the whole thing one colour, which is the ghost; the
+ * `plaster` is the room's, so a panel matches the walls it joins.
+ *
+ * A cut draws nothing here -- its effect is the wall that is missing -- and
+ * only its ghost has a shape: two posts and a lintel, so the player sees the
+ * doorway they are about to make.
+ */
+export function partsInto(
+  pos: number[],
+  nor: number[],
+  col: number[],
+  b: PlacedBox,
+  floorY: number,
+  kind: number,
+  tint: RGB | null = null,
+  plaster: RGB = PLASTER_DEFAULT,
+): void {
+  if (kind === PLACEABLE.COUCH) {
+    couchInto(pos, nor, col, b, floorY, tint);
+    return;
+  }
+  const slabAt = slabWriter(pos, nor, col, b);
+  const y = floorY;
+  const hash = hash2(Math.round(b.x * 4), Math.round(b.z * 4));
+  const tone = 0.85 + hash * 0.3;
+  const mul = (c: RGB, k: number): RGB => ({ r: Math.min(1, c.r * k), g: Math.min(1, c.g * k), b: Math.min(1, c.b * k) });
+  const slab = (cu: number, cv: number, hu: number, hv: number, y0: number, y1: number, rgb: RGB): void => {
+    slabAt(cu, cv, hu, hv, y + y0, y + y1, tint ?? rgb);
+  };
+  const wood = mul(DECOR.wood, tone);
+  const dark = mul(DECOR.darkWood, tone);
+  const cloth = {
+    r: Math.min(1, 0.34 * tone + 0.14),
+    g: Math.min(1, 0.30 * tone + 0.12),
+    b: Math.min(1, 0.36 * tone + 0.16),
+  };
+  const legs = (hu: number, hv: number, r: number, top: number, rgb: RGB): void => {
+    for (const su of [-1, 1]) for (const sv of [-1, 1]) slab(su * hu, sv * hv, r, r, 0, top, rgb);
+  };
+  const hx = b.hx;
+  const hz = b.hz;
+  switch (kind) {
+    case PLACEABLE.BED:
+    case PLACEABLE.DOUBLE_BED: {
+      const twin = kind === PLACEABLE.DOUBLE_BED;
+      slab(0, 0, hx, hz, 0.1, 0.35, dark);
+      slab(0.02, 0, hx - 0.04, hz - 0.04, 0.35, 0.5, DECOR.linen);
+      slab(0.22, 0, hx - 0.26, hz - 0.06, 0.5, 0.56, mul(cloth, 1.1));
+      if (twin) {
+        slab(-hx + 0.3, -hz * 0.45, 0.2, 0.3, 0.5, 0.62, DECOR.pillow);
+        slab(-hx + 0.3, hz * 0.45, 0.2, 0.3, 0.5, 0.62, DECOR.pillow);
+      } else {
+        slab(-hx + 0.3, 0, 0.2, hz * 0.7, 0.5, 0.62, DECOR.pillow);
+      }
+      slab(-hx + 0.03, 0, 0.03, hz, 0.1, twin ? 1.0 : 0.95, dark);
+      return;
+    }
+    case PLACEABLE.TABLE:
+    case PLACEABLE.DINING_TABLE: {
+      slab(0, 0, hx, hz, 0.71, 0.75, wood);
+      legs(hx - 0.08, hz - 0.08, 0.03, 0.71, dark);
+      return;
+    }
+    case PLACEABLE.CHAIR: {
+      slab(0, 0, 0.22, 0.22, 0.42, 0.46, wood);
+      legs(0.18, 0.18, 0.02, 0.42, dark);
+      slab(-0.2, 0, 0.03, 0.22, 0.46, 0.9, wood);
+      return;
+    }
+    case PLACEABLE.WARDROBE: {
+      slab(0, 0, hx - 0.02, hz - 0.02, 0, 0.05, dark);
+      slab(0, 0, hx, hz, 0.05, 2.0, wood);
+      slab(0, -hz - 0.006, 0.012, 0.006, 0.1, 1.9, dark);
+      slab(-0.06, -hz - 0.02, 0.012, 0.02, 0.9, 1.05, DECOR.steel);
+      slab(0.06, -hz - 0.02, 0.012, 0.02, 0.9, 1.05, DECOR.steel);
+      return;
+    }
+    case PLACEABLE.BOOKSHELF: {
+      slab(-hx + 0.02, 0, 0.02, hz, 0, 1.9, wood);
+      slab(hx - 0.02, 0, 0.02, hz, 0, 1.9, wood);
+      slab(0, hz - 0.015, hx, 0.015, 0, 1.9, mul(wood, 0.8));
+      const shelves = [0.05, 0.5, 0.95, 1.4, 1.85];
+      for (let i = 0; i < shelves.length; i++) {
+        slab(0, 0, hx - 0.04, hz - 0.02, shelves[i], shelves[i] + 0.03, wood);
+        if (i === shelves.length - 1) continue;
+        const books = 3 + ((hash * 977 + i * 31) & 1);
+        for (let j = 0; j < books; j++) {
+          const pick = Math.floor(hash2(Math.round(b.x * 4) + i * 7, Math.round(b.z * 4) + j * 13) * BOOK_COLOURS.length);
+          const cu = -hx + 0.14 + j * 0.22 + (i & 1) * 0.06;
+          slab(cu, 0.02, 0.085, hz - 0.06, shelves[i] + 0.03, shelves[i] + 0.3 + (j & 1) * 0.06, BOOK_COLOURS[pick % BOOK_COLOURS.length]);
+        }
+      }
+      return;
+    }
+    case PLACEABLE.DESK: {
+      slab(0, 0, hx, hz, 0.70, 0.74, wood);
+      slab(hx - 0.24, 0, 0.22, hz - 0.05, 0.05, 0.70, mul(wood, 0.9));
+      slab(-hx + 0.04, -hz + 0.05, 0.025, 0.025, 0, 0.70, dark);
+      slab(-hx + 0.04, hz - 0.05, 0.025, 0.025, 0, 0.70, dark);
+      slab(-0.1, hz * 0.55, 0.08, 0.06, 0.74, 0.84, DECOR.steel);
+      slab(-0.1, hz * 0.65, 0.28, 0.015, 0.84, 1.16, DECOR.screen);
+      return;
+    }
+    case PLACEABLE.FRIDGE: {
+      slab(0, 0, hx - 0.02, hz - 0.02, 0, 0.05, dark);
+      slab(0, 0, hx, hz, 0.05, 1.75, DECOR.white);
+      slab(0, -hz - 0.004, hx, 0.004, 1.2, 1.215, DECOR.steel);
+      slab(hx - 0.08, -hz - 0.02, 0.015, 0.015, 0.4, 1.1, DECOR.steel);
+      slab(hx - 0.08, -hz - 0.02, 0.015, 0.015, 1.3, 1.6, DECOR.steel);
+      return;
+    }
+    case PLACEABLE.TV_UNIT: {
+      slab(0, 0, hx - 0.02, hz - 0.02, 0, 0.05, dark);
+      slab(0, 0, hx, hz, 0.05, 0.5, dark);
+      slab(0, 0, 0.15, 0.08, 0.5, 0.58, DECOR.steel);
+      slab(0, 0.02, hx - 0.18, 0.02, 0.58, 1.1, DECOR.screen);
+      return;
+    }
+    case PLACEABLE.COFFEE_TABLE: {
+      slab(0, 0, hx, hz, 0.38, 0.42, wood);
+      slab(0, 0, hx - 0.05, hz - 0.05, 0.12, 0.15, mul(wood, 0.85));
+      legs(hx - 0.05, hz - 0.05, 0.025, 0.38, dark);
+      return;
+    }
+    case PLACEABLE.ARMCHAIR: {
+      slab(0, 0, hx, hz, 0.05, 0.2, mul(cloth, 0.62));
+      slab(0, 0.06, 0.32, 0.36, 0.2, 0.45, cloth);
+      slab(0, -hz + 0.07, hx, 0.07, 0.2, 0.85, cloth);
+      slab(-hx + 0.07, 0.06, 0.07, hz - 0.05, 0.2, 0.62, mul(cloth, 0.62));
+      slab(hx - 0.07, 0.06, 0.07, hz - 0.05, 0.2, 0.62, mul(cloth, 0.62));
+      return;
+    }
+    case PLACEABLE.RUG: {
+      const base = RUG_COLOURS[Math.floor(hash * RUG_COLOURS.length) % RUG_COLOURS.length];
+      slab(0, 0, hx, hz, 0, 0.02, base);
+      slab(0, 0, hx - 0.2, hz - 0.2, 0.02, 0.025, mul(base, 1.25));
+      return;
+    }
+    case PLACEABLE.PLANT: {
+      slab(0, 0, 0.2, 0.2, 0, 0.4, DECOR.pot);
+      slab(0, 0, 0.17, 0.17, 0.4, 0.42, DECOR.soil);
+      slab(0, 0, 0.03, 0.03, 0.42, 0.9, dark);
+      slab(0, 0, 0.22, 0.22, 0.85, 1.1, DECOR.leaf);
+      slab(0, 0, 0.17, 0.17, 1.1, 1.3, DECOR.leafLight);
+      slab(0.1, -0.08, 0.14, 0.14, 0.7, 0.9, DECOR.leaf);
+      return;
+    }
+    case PLACEABLE.LAMP: {
+      slab(0, 0, 0.16, 0.16, 0, 0.03, DECOR.steel);
+      slab(0, 0, 0.015, 0.015, 0.03, 1.3, DECOR.steel);
+      slab(0, 0, 0.18, 0.18, 1.3, 1.6, DECOR.shade);
+      return;
+    }
+    case PLACEABLE.BATH: {
+      slab(0, 0, hx, hz, 0, 0.5, DECOR.white);
+      slab(0, -hz + 0.06, hx, 0.06, 0.5, 0.55, DECOR.white);
+      slab(0, hz - 0.06, hx, 0.06, 0.5, 0.55, DECOR.white);
+      slab(-hx + 0.06, 0, 0.06, hz, 0.5, 0.55, DECOR.white);
+      slab(hx - 0.06, 0, 0.06, hz, 0.5, 0.55, DECOR.white);
+      slab(0, 0, hx - 0.12, hz - 0.12, 0.5, 0.51, DECOR.water);
+      slab(hx - 0.1, 0, 0.03, 0.03, 0.55, 0.75, DECOR.steel);
+      return;
+    }
+    case PLACEABLE.TOILET: {
+      slab(0, 0.05, 0.12, 0.12, 0, 0.05, DECOR.white);
+      slab(0, 0.08, 0.18, 0.22, 0.05, 0.4, DECOR.white);
+      slab(0, 0.08, 0.2, 0.24, 0.4, 0.44, mul(DECOR.white, 0.92));
+      slab(0, -hz + 0.08, 0.2, 0.08, 0.4, 0.8, DECOR.white);
+      return;
+    }
+    case PLACEABLE.KITCHEN_BENCH: {
+      slab(0, 0, hx - 0.02, hz - 0.02, 0, 0.05, dark);
+      slab(0, 0, hx, hz, 0.05, 0.86, DECOR.benchFront);
+      slab(0, 0, hx + 0.02, hz + 0.02, 0.86, 0.9, DECOR.benchTop);
+      slab(0, -hz - 0.01, hx - 0.1, 0.01, 0.78, 0.8, DECOR.steel);
+      slab(hx * 0.42, 0, 0.3, 0.2, 0.9, 0.905, DECOR.steel);
+      slab(hx * 0.42, 0.22, 0.02, 0.02, 0.9, 1.15, DECOR.steel);
+      slab(-hx * 0.42, 0, 0.3, 0.25, 0.9, 0.905, DECOR.screen);
+      for (const [du, dv] of [[-0.12, -0.11], [0.12, -0.11], [-0.12, 0.12], [0.12, 0.12]]) {
+        slab(-hx * 0.42 + du, dv, 0.06, 0.06, 0.905, 0.915, DECOR.steel);
+      }
+      return;
+    }
+    case PLACEABLE.WALL_PANEL: {
+      const top = PLACEABLES[kind].height;
+      slab(0, 0, hx, hz + 0.005, 0, 0.14, mul(plaster, 0.62));
+      slab(0, 0, hx, hz, 0.14, top - 0.1, mul(plaster, 0.95));
+      slab(0, 0, hx, hz, top - 0.1, top, mul(plaster, 0.78));
+      return;
+    }
+    case PLACEABLE.WALL_CUT: {
+      // Only ever a ghost: the doorway about to be made.
+      const head = PLACEABLES[kind].height;
+      slab(-hx + 0.03, 0, 0.03, hz, 0, head, tint ?? DECOR.steel);
+      slab(hx - 0.03, 0, 0.03, hz, 0, head, tint ?? DECOR.steel);
+      slab(0, 0, hx, hz, head - 0.06, head, tint ?? DECOR.steel);
+      return;
+    }
+    default: {
+      // A row the table has and this switch does not: draw its box, so the
+      // omission is visible rather than an invisible collider.
+      slab(0, 0, hx, hz, 0, PLACEABLES[kind]?.height ?? 0.5, cloth);
+      return;
+    }
+  }
 }
 
 /**
@@ -2177,10 +2635,11 @@ export function ghostMesh(it: Interior, p: Placement, ok: boolean): InteriorMesh
   const pos: number[] = [];
   const nor: number[] = [];
   const col: number[] = [];
-  couchInto(
+  partsInto(
     pos, nor, col,
     boxOf(p, it.plan.box.ux, it.plan.box.uz),
-    it.base + 0.01,
+    (it.levels[p.level] ?? it.levels[0]).y + 0.01,
+    p.kind,
     ok ? { r: 0.35, g: 0.85, b: 0.45 } : { r: 0.9, g: 0.3, b: 0.28 },
   );
   return {
@@ -2682,8 +3141,8 @@ export function interiorMesh(it: Interior, door: InteriorDoor = it.door): Interi
       );
     }
 
-    // --- The furniture, on the ground floor, which is where it is allowed.
-    if (k === 0) for (const b of it.placedBoxes) couchInto(pos, nor, col, b, floorY);
+    // --- The furniture on this storey, and the panels, in the room's plaster.
+    for (const t of level.items) partsInto(pos, nor, col, t.box, floorY, t.kind, null, tint);
 
     // --- The lintels: the wall over each doorway, with its underside.
     for (const h of level.headers) {
@@ -3573,7 +4032,7 @@ export function verifyInterior(): string[] {
       let outside = 0;
       for (let i = 0; i < 24; i++) {
         const t = i / 24;
-        const p: Placement = { kind: PLACEABLE.COUCH, x: -2 + t * 22, z: -2 + t * 28, turn: i & 3 };
+        const p: Placement = { kind: PLACEABLE.COUCH, x: -2 + t * 22, z: -2 + t * 28, turn: i & 3, level: 0 };
         if (!placementFits(it, [], p)) continue;
         const box = boxOf(p, it.plan.box.ux, it.plan.box.uz);
         const corners = cornersOf(box);
@@ -3593,6 +4052,7 @@ export function verifyInterior(): string[] {
           x: it.door.x - it.door.nx * 0.8,
           z: it.door.z - it.door.nz * 0.8,
           turn: 0,
+          level: 0,
         })
       ) {
         failures.push('a couch was allowed in front of the way out.');
@@ -3605,8 +4065,8 @@ export function verifyInterior(): string[] {
       for (const h of it.headers) {
         const mx = (h.ax + h.bx) / 2;
         const mz = (h.az + h.bz) / 2;
-        if (placementFits(it, [], { kind: PLACEABLE.COUCH, x: mx, z: mz, turn: 0 })) blocked++;
-        if (placementFits(it, [], { kind: PLACEABLE.COUCH, x: mx, z: mz, turn: 1 })) blocked++;
+        if (placementFits(it, [], { kind: PLACEABLE.COUCH, x: mx, z: mz, turn: 0, level: 0 })) blocked++;
+        if (placementFits(it, [], { kind: PLACEABLE.COUCH, x: mx, z: mz, turn: 1, level: 0 })) blocked++;
       }
       if (blocked > 0) failures.push(`${blocked} couches were allowed to stand in a doorway.`);
 
@@ -3628,6 +4088,7 @@ export function verifyInterior(): string[] {
             x: at.x + (dx / len) * ring * 0.9,
             z: at.z + (dz / len) * ring * 0.9,
             turn: 0,
+            level: 0,
           };
           if (placementFits(it, [], want)) first = want;
         }
@@ -3662,6 +4123,190 @@ export function verifyInterior(): string[] {
       if (furnished <= bare) failures.push('adding a couch drew no more triangles; furniture is invisible.');
       setPlacements(it, []);
       if (it.resolver.clearance(first.x, first.z) < 0) failures.push('a removed couch is still in the collision.');
+    }
+  }
+
+  // --- The catalogue beyond the couch.
+  //
+  // A rug is walked over and things sit on it; a panel stands, joins the wall
+  // it meets and another panel end to end; a cut opens a partition into a
+  // doorway a body walks through and a couch may not block; and a storey keeps
+  // its own things. Driven, not measured, for the same reason as the couch.
+  {
+    const pts = poly(0, 0, 16, 0, 16, 22, 0, 22);
+    const it = southDoor(pts, 0, 3, 77);
+    if (it === null) failures.push('the 16 x 22 m building would not generate for the catalogue.');
+    else {
+      const ux = it.plan.box.ux;
+      const uz = it.plan.box.uz;
+      const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]];
+      /** The first spot outward from the arrival where a thing of `kind` fits with the room as it is. */
+      const spotFor = (kind: number, existing: readonly Placement[], level = 0, room: Interior = it): Placement | null => {
+        const start = arrivalAt(room);
+        for (let ring = 1; ring < 14; ring++) {
+          for (const [dx, dz] of DIRS) {
+            const len = Math.sqrt(dx * dx + dz * dz);
+            const p: Placement = {
+              kind, x: start.x + (dx / len) * ring * 0.8, z: start.z + (dz / len) * ring * 0.8, turn: 0, level,
+            };
+            if (placementFits(room, existing, p)) return p;
+          }
+        }
+        return null;
+      };
+
+      // **Rugs are walked over**, and a table sits on one.
+      const rug = spotFor(PLACEABLE.RUG, []);
+      if (rug === null) failures.push('no rug fits anywhere in an empty room.');
+      else {
+        const table: Placement = { ...rug, kind: PLACEABLE.COFFEE_TABLE };
+        if (!placementFits(it, [rug], table)) failures.push('a coffee table was refused on a rug.');
+        if (placementFits(it, [rug], { ...rug })) failures.push('two rugs were allowed on the same spot.');
+        if (placementFits(it, [table], { ...rug, kind: PLACEABLE.BED })) failures.push('a bed was allowed through a coffee table.');
+        setPlacements(it, [rug, table]);
+        if (it.levels[0].items.length !== 2) failures.push(`${it.levels[0].items.length} things drawn of the two placed.`);
+        if (it.levels[0].placed.length !== 1) failures.push(`${it.levels[0].placed.length} things in the collision; the rug should not be.`);
+        setPlacements(it, [rug]);
+        if (it.resolver.clearance(rug.x, rug.z) < 0.35) failures.push('a rug is in the collision.');
+        const withRug = interiorMesh(it).triangles;
+        setPlacements(it, []);
+        if (interiorMesh(it).triangles >= withRug) failures.push('a rug drew nothing.');
+      }
+
+      // **Panels join** the wall they meet and each other; **a cut opens** the
+      // wall into a doorway. Both against the longest partitions the generator
+      // laid, whichever of them has the room for it.
+      const walls = it.levels[0].wallsAll.filter((w) => w.core !== true && segmentLength(w) >= 3);
+      walls.sort((a, b) => segmentLength(b) - segmentLength(a));
+      let joined = false;
+      let jointTests = 0;
+      let cutMade = false;
+      for (const w of walls) {
+        if (jointTests > 0 && cutMade) break;
+        const len = segmentLength(w);
+        const ex = (w.bx - w.ax) / len;
+        const ez = (w.bz - w.az) / len;
+        const mx = (w.ax + w.bx) / 2;
+        const mz = (w.az + w.bz) / 2;
+        const alongU = Math.abs(ex * ux + ez * uz) >= Math.abs(-ex * uz + ez * ux);
+        const panelHalf = PLACEABLES[PLACEABLE.WALL_PANEL].hx;
+        for (const side of [1, -1]) {
+          if (jointTests > 0) break;
+          const nx = -ez * side;
+          const nz = ex * side;
+          // Stood off the wall by its own half length, so its end touches it,
+          // and turned to run along the wall's normal.
+          const panel: Placement = {
+            kind: PLACEABLE.WALL_PANEL, x: mx + nx * panelHalf, z: mz + nz * panelHalf, turn: alongU ? 1 : 0, level: 0,
+          };
+          if (!placementFits(it, [], panel)) continue;
+          joined = true;
+          // A couch whose end sits where the panel's does -- on the wall's
+          // line -- is refused; only a panel may touch a wall.
+          const couchHalf = PLACEABLES[PLACEABLE.COUCH].hx;
+          if (placementFits(it, [], { ...panel, kind: PLACEABLE.COUCH, x: mx + nx * couchHalf, z: mz + nz * couchHalf })) {
+            failures.push('a couch was allowed touching a wall; only a panel may.');
+          }
+          // A second panel meeting the first: straight on, back through the
+          // wall, or as an L off its far end. Whichever of them the room has
+          // space for on its own must still fit with the first there, or the
+          // joint is refused as an overlap.
+          const farX = panel.x + nx * panelHalf;
+          const farZ = panel.z + nz * panelHalf;
+          // An L's end sits on the first panel's face, a half thickness off its line.
+          const ell = panelHalf + PLACEABLES[PLACEABLE.WALL_PANEL].hz;
+          const meets: Placement[] = [
+            { ...panel, x: panel.x + nx * panelHalf * 2, z: panel.z + nz * panelHalf * 2 },
+            { ...panel, x: panel.x - nx * panelHalf * 2, z: panel.z - nz * panelHalf * 2 },
+            { ...panel, turn: alongU ? 0 : 1, x: farX + ex * ell, z: farZ + ez * ell },
+            { ...panel, turn: alongU ? 0 : 1, x: farX - ex * ell, z: farZ - ez * ell },
+          ];
+          for (const second of meets) {
+            if (!placementFits(it, [], second)) continue;
+            jointTests++;
+            if (!placementFits(it, [panel], second)) failures.push('a second panel meeting the first end to end was refused.');
+          }
+          if (placementFits(it, [panel], { ...panel, x: panel.x + nx * 0.5, z: panel.z + nz * 0.5 })) {
+            failures.push('a panel was allowed half inside another.');
+          }
+          setPlacements(it, [panel]);
+          if (it.levels[0].placed.length !== 1) failures.push('a panel is not in the collision.');
+          // The resolver settles a destination, it does not sweep: a body is
+          // stopped by a thin panel because a tick's step is shorter than a
+          // body's radius, so the step that would cross it ends inside it.
+          const into = it.resolver.resolve(
+            panel.x + ex * 1, panel.z + ez * 1, panel.x, panel.z, 0.3, it.base,
+          );
+          if (!into.hit) failures.push('a body stepped into a panel and was not stopped.');
+          if (it.resolver.clearance(into.x, into.z) < 0.3 - 1e-6) failures.push('a body stopped by a panel is standing inside it.');
+          setPlacements(it, []);
+        }
+        const cut: Placement = { kind: PLACEABLE.WALL_CUT, x: mx, z: mz, turn: alongU ? 0 : 1, level: 0 };
+        if (cutMade || !placementFits(it, [], cut)) continue;
+        cutMade = true;
+        const lv = it.levels[0];
+        const wallsBefore = lv.wallsAll.length;
+        const headersBefore = lv.headersAll.length;
+        setPlacements(it, [cut]);
+        if (lv.walls.length < wallsBefore + 1) {
+          failures.push(`a cut through a wall's middle left ${lv.walls.length} walls of ${wallsBefore}; it should have split one.`);
+        }
+        if (lv.headers.length < headersBefore + 1) failures.push('a cut added no lintel.');
+        if (it.walls !== lv.walls) failures.push('the ground floor alias did not follow the cut.');
+        const nx = -ez;
+        const nz = ex;
+        const through = it.resolver.resolve(mx + nx * 0.8, mz + nz * 0.8, mx - nx * 0.8, mz - nz * 0.8, 0.3, it.base);
+        if (through.hit) failures.push('a body could not walk through a cut.');
+        // A right-click inside the opening finds no wall there -- at most a
+        // different one nearby, never the one already open.
+        const inside = cutAt(it, 0, mx + nx * 0.3, mz + nz * 0.3);
+        if (inside !== null && inside.turn === cut.turn && Math.abs(inside.x - mx) + Math.abs(inside.z - mz) < 0.3) {
+          failures.push('a right-click inside an opening found the opened wall to open again.');
+        }
+        if (placementFits(it, [cut], { kind: PLACEABLE.COUCH, x: mx, z: mz, turn: alongU ? 1 : 0, level: 0 })) {
+          failures.push('a couch was allowed across a cut opening.');
+        }
+        if (placementFits(it, [cut], { ...cut, x: mx + ex * 0.5, z: mz + ez * 0.5 })) failures.push('a cut was allowed over another.');
+        if (!placementFits(it, [], { ...cut, level: 0, kind: PLACEABLE.WALL_CUT })) failures.push('the same cut stopped fitting an empty room.');
+        setPlacements(it, []);
+        if (lv.walls.length !== wallsBefore) failures.push('removing the cut did not restore the wall.');
+        if (lv.walls !== lv.wallsAll) failures.push('an uncut storey does not share the generator\'s list.');
+        // And the right-click that makes one.
+        const made = cutAt(it, 0, mx + nx * 0.3, mz + nz * 0.3);
+        if (made === null) failures.push('a right-click beside a wall found nothing to open.');
+        else {
+          if (Math.abs(made.x - mx) + Math.abs(made.z - mz) > 0.05) failures.push('the cut a right-click makes is not on the wall.');
+          if (made.turn !== cut.turn) failures.push('the cut a right-click makes runs across the wall, not along it.');
+          if (!placementFits(it, [], made)) failures.push('the cut a right-click makes does not fit.');
+        }
+      }
+      if (!joined) failures.push('no wall in the room would take a panel against it.');
+      if (jointTests === 0) failures.push('no wall in the room left space to join two panels, so the joint went untested.');
+      if (!cutMade) failures.push('no wall in the room would take a cut.');
+      if (placementFits(it, [], { kind: PLACEABLE.WALL_CUT, x: arrivalAt(it).x, z: arrivalAt(it).z, turn: 0, level: 0 })) {
+        failures.push('a cut was allowed in open floor, where there is no wall to open.');
+      }
+
+      // **A storey keeps its own things.**
+      const tall = southDoor(pts, 0, 9, 78);
+      if (tall === null || tall.levels.length < 2) failures.push('a 9 m building has no storey above the ground to furnish.');
+      else {
+        const bed = spotFor(PLACEABLE.BED, [], 1, tall);
+        if (bed === null) failures.push('no bed fits anywhere on the first floor.');
+        else {
+          const groundBefore = tall.resolver.clearance(bed.x, bed.z, tall.levels[0].y);
+          setPlacements(tall, [bed]);
+          if (tall.levels[1].items.length !== 1 || tall.levels[0].items.length !== 0) {
+            failures.push('a first-floor bed was drawn on the wrong storey.');
+          }
+          if (tall.resolver.clearance(bed.x, bed.z, tall.levels[1].y) > 0) failures.push('a first-floor bed is not in its own floor\'s collision.');
+          if (tall.resolver.clearance(bed.x, bed.z, tall.levels[0].y) !== groundBefore) failures.push('a first-floor bed is in the ground floor\'s collision.');
+          if (placementFits(tall, [], { ...bed, level: tall.levels.length + 3 })) failures.push('a bed on a storey the building does not have was accepted.');
+          const drawn = interiorMesh(tall).triangles;
+          setPlacements(tall, []);
+          if (interiorMesh(tall).triangles >= drawn) failures.push('a first-floor bed drew nothing.');
+        }
+      }
     }
   }
 
@@ -3779,7 +4424,7 @@ export function verifyInterior(): string[] {
         const z = core.z + core.lz * (e * (core.hr + 0.7)) + az * lane;
         if (it.resolver.clearance(x, z, it.levels[k].y) < 0.35) failures.push(`level ${k}'s landing is not clear for a body.`);
       }
-      if (placementFits(it, [], { kind: PLACEABLE.COUCH, x: core.x, z: core.z, turn: 0 })) {
+      if (placementFits(it, [], { kind: PLACEABLE.COUCH, x: core.x, z: core.z, turn: 0, level: 0 })) {
         failures.push('a couch can be put on the stairs.');
       }
       const mesh = interiorMesh(it);

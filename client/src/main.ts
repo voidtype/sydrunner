@@ -122,8 +122,11 @@ import { CITY_SPACE, spaceForBuilding, verifySpaces } from './net/spaces.ts';
 import {
   MAX_PER_SPACE,
   PLACEABLE,
+  PLACEABLES,
+  PLACEABLE_ORDER,
   boxClearance,
   boxOf,
+  isSolid,
   verifyPlaceables,
   type Placement,
 } from './world/placeables.ts';
@@ -6447,6 +6450,13 @@ async function main(): Promise<void> {
   let building = false;
   /** Quarter turns from the building's own axis. `R` advances it. See `placeables.ts`. */
   let buildTurn = 0;
+  /** Which row of the catalogue the ghost is: an index into `PLACEABLE_ORDER`. `[` and `]` walk it. */
+  let buildSlot = 0;
+  /** The customiser's one line: what is being placed and every key it answers to. */
+  const buildLine = (): string => {
+    const kind = PLACEABLES[PLACEABLE_ORDER[buildSlot]] ?? PLACEABLES[0];
+    return `placing ${kind.name} (${buildSlot + 1}/${PLACEABLE_ORDER.length}) — [ ] changes what, wheel or R turns it, click puts it down, right-click takes one away or opens a wall`;
+  };
   /** Where the ghost is standing, and whether the server would allow it there. */
   let ghostAt: Placement | null = null;
   let ghostOk = false;
@@ -7964,7 +7974,8 @@ async function main(): Promise<void> {
   const ghostSpot = (it: Interior): { x: number; z: number } => {
     camera.getWorldDirection(doorGaze);
     const eye = player.position;
-    const drop = eye.y - it.base;
+    // The floor under the player, whichever storey that is.
+    const drop = eye.y - it.levels[levelIndex(it.levels, eye.y - EYE_HEIGHT)].y;
     let x: number;
     let z: number;
     const down = -doorGaze.y;
@@ -8007,18 +8018,19 @@ async function main(): Promise<void> {
       return;
     }
     const at = ghostSpot(it);
-    const want: Placement = { kind: PLACEABLE.COUCH, x: at.x, z: at.z, turn: buildTurn };
+    const kind = PLACEABLE_ORDER[buildSlot] ?? PLACEABLE.COUCH;
+    const level = levelIndex(it.levels, player.position.y - EYE_HEIGHT);
+    const want: Placement = { kind, x: at.x, z: at.z, turn: buildTurn, level };
     ghostAt = want;
     ghostOk =
       placedHere.length < MAX_PER_SPACE &&
-      // From the ground floor, which is the only floor furniture is on.
-      levelIndex(it.levels, player.position.y - EYE_HEIGHT) === 0 &&
       placementFits(it, placedHere, want, interiorDoor === null ? [it.door] : [it.door, interiorDoor]) &&
-      // And not on top of the person placing it, which is the one rule the
-      // server applies that `placementFits` does not know about -- it is a
-      // question about who is in the room rather than about the room.
-      boxClearance(boxOf(want, it.plan.box.ux, it.plan.box.uz), player.position.x, player.position.z) >=
-        PLAYER_RADIUS + 0.05;
+      // Not on top of yourself -- the one rule the server applies that
+      // `placementFits` does not know about, mirrored so the ghost agrees. A
+      // rug or a cut cannot trap anybody, so neither is refused for it.
+      (!isSolid(kind) ||
+        boxClearance(boxOf(want, it.plan.box.ux, it.plan.box.uz), player.position.x, player.position.z) >=
+          PLAYER_RADIUS + 0.05);
   };
 
   /**
@@ -8031,7 +8043,7 @@ async function main(): Promise<void> {
     const it = interior;
     if (net === null || it === null) return;
     if (net.placedSpace !== net.space) return;
-    placedHere = net.placed.map((i) => ({ kind: i.kind, x: i.x, z: i.z, turn: i.turn }));
+    placedHere = net.placed.map((i) => ({ kind: i.kind, x: i.x, z: i.z, turn: i.turn, level: i.level }));
     setPlacements(it, placedHere);
     interiorView.rebuild(it, interiorDoor ?? it.door);
   };
@@ -8737,16 +8749,20 @@ async function main(): Promise<void> {
       } else {
         building = !building;
         interiorView.setGhost(null, null, false);
-        hud.notice(
-          building
-            ? 'placing a couch — wheel or R turns it, click to put it down, right-click to take one away'
-            : 'done',
-        );
+        hud.notice(building ? buildLine() : 'done');
       }
       return;
     }
     if (e.code === 'KeyR' && !held && building && interior !== null) {
       buildTurn = (buildTurn + 1) & 3;
+      return;
+    }
+    // `[` and `]` walk the catalogue, wrapping at either end. Bracket keys
+    // because the digits are the talents' and the wheel is the turn's.
+    if ((e.code === 'BracketRight' || e.code === 'BracketLeft') && !held && building && interior !== null) {
+      const n = PLACEABLE_ORDER.length;
+      buildSlot = (buildSlot + (e.code === 'BracketRight' ? 1 : n - 1)) % n;
+      hud.notice(buildLine());
       return;
     }
     // And Escape closes it, which is where a player's hand goes first.

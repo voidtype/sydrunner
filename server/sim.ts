@@ -271,6 +271,7 @@ import {
   CORE,
   arrivalAt,
   buildInterior,
+  cutAt,
   inCore,
   interiorGround,
   levelIndex,
@@ -279,12 +280,16 @@ import {
   type Interior,
   type InteriorDoor, liftMoving, liftTarget, liftDurationMs, slabFor } from '../client/src/world/interior.ts';
 import {
+  CUT_REMOVE_REACH_M,
   MAX_PER_SPACE,
   REMOVE_REACH_M,
   boxClearance,
   boxOf,
+  isCut,
+  isSolid,
   knownKind,
   sanitisePlacement,
+  type Placement,
 } from '../client/src/world/placeables.ts';
 import { CITY_SPACE, spaceForBuilding } from '../client/src/net/spaces.ts';
 import { InteriorStore } from './interiors.ts';
@@ -6081,59 +6086,75 @@ export class Simulation {
     const inside = p.interior;
     const store = this.interiorStore;
     if (inside === null || store === null || p.space === CITY_SPACE) return null;
-
+    const ux = inside.plan.box.ux;
+    const uz = inside.plan.box.uz;
+    // The storey is the body's, never the request's: `placeables.ts` "Levels".
+    const level = levelIndex(inside.levels, p.combat.body.position.y - EYE_HEIGHT);
     const held = store.for(p.space);
+
+    const commit = (next: Placement[]): readonly PlacedItem[] | null => {
+      if (!store.set(p.space, next)) return null;
+      setPlacements(inside, next);
+      return next;
+    };
+    const doorsHere = (): InteriorDoor[] => {
+      const doors: InteriorDoor[] = [inside.door];
+      for (const other of this.ordered) {
+        if (other.space === p.space && other.door !== null) doors.push(other.door);
+      }
+      return doors;
+    };
+
     if (req.op === FURNISH_OP.REMOVE) {
-      // The nearest thing to the point, and nothing if there is not one close.
-      // A point rather than an index, because an index is into a list whose
-      // order changes the moment anything is removed from the middle of it --
-      // see `protocol.FurnishRequest`.
+      // The nearest placed thing on this storey within reach -- a cut only when
+      // the click is on it, or every click near an opening would close it --
+      // and failing that, the wall under the click, which the delete opens.
       let best = -1;
-      let bestD = REMOVE_REACH_M;
+      let bestD = Infinity;
       for (let i = 0; i < held.length; i++) {
-        const d = boxClearance(boxOf(held[i], inside.plan.box.ux, inside.plan.box.uz), req.x, req.z);
-        if (d < bestD) {
+        if (held[i].level !== level) continue;
+        const reach = isCut(held[i].kind) ? CUT_REMOVE_REACH_M : REMOVE_REACH_M;
+        const d = boxClearance(boxOf(held[i], ux, uz), req.x, req.z);
+        if (d < reach && d < bestD) {
           bestD = d;
           best = i;
         }
       }
-      if (best < 0) return null;
+      if (best >= 0) {
+        const next = held.slice();
+        next.splice(best, 1);
+        return commit(next);
+      }
+      const cut = cutAt(inside, level, req.x, req.z);
+      if (cut === null) return null;
+      if (held.length >= MAX_PER_SPACE) return null;
+      if (!placementFits(inside, held, cut, doorsHere())) return null;
       const next = held.slice();
-      next.splice(best, 1);
-      if (!store.set(p.space, next)) return null;
-      setPlacements(inside, next);
-      return next;
+      next.push(cut);
+      return commit(next);
     }
 
     if (req.op !== FURNISH_OP.PLACE) return null;
     if (!knownKind(req.kind)) return null;
     if (held.length >= MAX_PER_SPACE) return null;
-    // From the ground floor only, which is the only floor furniture is on.
-    if (levelIndex(inside.levels, p.combat.body.position.y - EYE_HEIGHT) !== 0) return null;
-    const want = sanitisePlacement({ kind: req.kind, x: req.x, z: req.z, turn: req.turn });
+    const want = sanitisePlacement({ kind: req.kind, x: req.x, z: req.z, turn: req.turn, level });
     if (want === null) return null;
     // **Not on top of a person**, which `placementFits` cannot know about: it is
-    // a question about the room and this is a question about who is in it. A
-    // couch dropped on somebody would push them somewhere on the next tick,
-    // which at a wall is through it.
-    const box = boxOf(want, inside.plan.box.ux, inside.plan.box.uz);
-    for (const other of this.ordered) {
-      if (other.space !== p.space) continue;
-      const b = other.combat.body.position;
-      if (boxClearance(box, b.x, b.z) < PLAYER_RADIUS + 0.05) return null;
+    // pure and the bodies are here. Only what a body walks round can trap one;
+    // a rug under somebody's feet, or a doorway cut round them, is fine.
+    if (isSolid(want.kind)) {
+      const box = boxOf(want, ux, uz);
+      for (const other of this.ordered) {
+        if (other.space !== p.space) continue;
+        const b = other.combat.body.position;
+        if (levelIndex(inside.levels, b.y - EYE_HEIGHT) !== level) continue;
+        if (boxClearance(box, b.x, b.z) < PLAYER_RADIUS + 0.05) return null;
+      }
     }
-    // Clear of every door anybody in the room came in by, and the building's
-    // own for whoever comes in next with no saved one.
-    const doors: InteriorDoor[] = [inside.door];
-    for (const other of this.ordered) {
-      if (other.space === p.space && other.door !== null) doors.push(other.door);
-    }
-    if (!placementFits(inside, held, want, doors)) return null;
+    if (!placementFits(inside, held, want, doorsHere())) return null;
     const next = held.slice();
     next.push(want);
-    if (!store.set(p.space, next)) return null;
-    setPlacements(inside, next);
-    return next;
+    return commit(next);
   }
 
   /**

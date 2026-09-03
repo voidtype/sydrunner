@@ -40,13 +40,63 @@
  * down from expensive insides"*. Exactly so, and it is what licenses a couch
  * made of seven boxes rather than one: nothing in here is ever drawn, stepped
  * or streamed by anybody standing in the street.
+ *
+ * ## The table grew, and two of its rows are walls
+ *
+ * The second brief: *"add heaps more decor for inside, and beds and stuff, and
+ * make it so i can delete and place wall panels in the same way"*. The decor is
+ * more rows -- the shape the first brief bought -- and each row is a footprint
+ * plus a case in `interior.ts`' parts builder. Two rows are not furniture:
+ *
+ * - **`WALL_PANEL`** is a three-metre run of plaster, full height, placed like
+ *   a couch: it stands in the collision as a thin box and draws as a wall. It
+ *   may *touch* the walls the generator laid (a couch may not), because a panel
+ *   nobody can join to anything is a fence post.
+ * - **`WALL_CUT`** is the delete. It is a placement whose only effect is
+ *   negative: any generated partition it crosses is clipped to a doorway of the
+ *   same head height as the rest, and a right-click on a wall with nothing
+ *   placed within reach makes one. Storing the *hole* rather than the wall
+ *   list is what keeps a building derived: the walls are still recomputed from
+ *   the footprint, and a room's file holds only what a player did.
+ *
+ * `walk` marks the rows a body walks over (a rug): drawn, never stepped, and
+ * other things may sit on them.
+ *
+ * ## Levels
+ *
+ * A placement carries the storey it is on. The building's own `levelIndex`
+ * from the placer's feet decides it, both ends, so the server never trusts a
+ * byte for it -- `FURNISH` does not even carry one; `PLACED` does, because a
+ * browser drawing the room has to know which floor a bed is on.
  */
 
-/** The kinds. One so far; see the header for why it is a table anyway. */
-export const PLACEABLE = { COUCH: 0 } as const;
+/** The kinds. The order is the wire's, so a row is only ever appended. */
+export const PLACEABLE = {
+  COUCH: 0,
+  BED: 1,
+  DOUBLE_BED: 2,
+  TABLE: 3,
+  CHAIR: 4,
+  WARDROBE: 5,
+  BOOKSHELF: 6,
+  DESK: 7,
+  FRIDGE: 8,
+  TV_UNIT: 9,
+  COFFEE_TABLE: 10,
+  ARMCHAIR: 11,
+  RUG: 12,
+  PLANT: 13,
+  LAMP: 14,
+  BATH: 15,
+  TOILET: 16,
+  KITCHEN_BENCH: 17,
+  DINING_TABLE: 18,
+  WALL_PANEL: 19,
+  WALL_CUT: 20,
+} as const;
 
 /** How many kinds exist. The wire and every validator bound against this. */
-export const PLACEABLE_KINDS = 1;
+export const PLACEABLE_KINDS = 21;
 
 /** What one kind is, physically. */
 export interface PlaceableKind {
@@ -56,18 +106,77 @@ export interface PlaceableKind {
   hz: number;
   /** How tall it stands. */
   height: number;
+  /** A body walks over it rather than round it, and other things may sit on it. */
+  walk?: boolean;
+  /** A wall row: a `panel` stands, a `cut` removes. See the header. */
+  wall?: 'panel' | 'cut';
 }
+
+/** The partition thickness the generator uses; a panel is the same wall. */
+const PANEL_HALF_THICK_M = 0.08;
 
 /**
  * The catalogue.
  *
- * A two-seater at 1.9 x 0.9 m, which is a real couch. The numbers matter twice
- * over: they are the collision box as well as the mesh, and a couch you can
- * stand inside is worse than no couch at all.
+ * Real sizes: a two-seater at 1.9 x 0.9 m, a single bed at 2.0 x 1.0, a
+ * queen at 2.1 x 1.7. The numbers matter twice over: they are the collision
+ * box as well as the mesh, and a couch you can stand inside is worse than no
+ * couch at all. The wall panel is a full storey tall; the cut is a doorway's
+ * head height, wide enough to walk two abreast.
  */
 export const PLACEABLES: readonly PlaceableKind[] = [
   { name: 'couch', hx: 0.95, hz: 0.45, height: 0.82 },
+  { name: 'bed', hx: 1.0, hz: 0.5, height: 0.95 },
+  { name: 'double bed', hx: 1.05, hz: 0.85, height: 1.0 },
+  { name: 'table', hx: 0.7, hz: 0.45, height: 0.75 },
+  { name: 'chair', hx: 0.24, hz: 0.24, height: 0.9 },
+  { name: 'wardrobe', hx: 0.8, hz: 0.3, height: 2.0 },
+  { name: 'bookshelf', hx: 0.6, hz: 0.18, height: 1.9 },
+  { name: 'desk', hx: 0.7, hz: 0.35, height: 1.16 },
+  { name: 'fridge', hx: 0.38, hz: 0.35, height: 1.75 },
+  { name: 'tv unit', hx: 0.8, hz: 0.22, height: 1.1 },
+  { name: 'coffee table', hx: 0.55, hz: 0.3, height: 0.42 },
+  { name: 'armchair', hx: 0.45, hz: 0.45, height: 0.85 },
+  { name: 'rug', hx: 1.2, hz: 0.8, height: 0.025, walk: true },
+  { name: 'pot plant', hx: 0.22, hz: 0.22, height: 1.3 },
+  { name: 'floor lamp', hx: 0.18, hz: 0.18, height: 1.6 },
+  { name: 'bath', hx: 0.85, hz: 0.4, height: 0.75 },
+  { name: 'toilet', hx: 0.2, hz: 0.35, height: 0.8 },
+  { name: 'kitchen bench', hx: 1.2, hz: 0.32, height: 1.15 },
+  { name: 'dining table', hx: 0.9, hz: 0.5, height: 0.75 },
+  { name: 'wall panel', hx: 1.5, hz: PANEL_HALF_THICK_M, height: 2.7, wall: 'panel' },
+  { name: 'doorway', hx: 1.2, hz: 0.3, height: 2.1, wall: 'cut' },
 ];
+
+/** The cycle the customiser's `[` and `]` walk: every row, the delete last. */
+export const PLACEABLE_ORDER: readonly number[] = [
+  PLACEABLE.COUCH, PLACEABLE.ARMCHAIR, PLACEABLE.COFFEE_TABLE, PLACEABLE.RUG, PLACEABLE.TV_UNIT,
+  PLACEABLE.BED, PLACEABLE.DOUBLE_BED, PLACEABLE.WARDROBE, PLACEABLE.BOOKSHELF, PLACEABLE.DESK,
+  PLACEABLE.CHAIR, PLACEABLE.TABLE, PLACEABLE.DINING_TABLE, PLACEABLE.KITCHEN_BENCH, PLACEABLE.FRIDGE,
+  PLACEABLE.BATH, PLACEABLE.TOILET, PLACEABLE.PLANT, PLACEABLE.LAMP,
+  PLACEABLE.WALL_PANEL, PLACEABLE.WALL_CUT,
+];
+
+/** Whether a kind is the delete. */
+export function isCut(kind: number): boolean {
+  return PLACEABLES[kind]?.wall === 'cut';
+}
+
+/** Whether a kind stands as a wall. */
+export function isPanel(kind: number): boolean {
+  return PLACEABLES[kind]?.wall === 'panel';
+}
+
+/** Whether a kind is walked over rather than round. */
+export function isWalk(kind: number): boolean {
+  return PLACEABLES[kind]?.walk === true;
+}
+
+/** Whether a kind takes part in the collision at all. */
+export function isSolid(kind: number): boolean {
+  const k = PLACEABLES[kind];
+  return k !== undefined && k.walk !== true && k.wall !== 'cut';
+}
 
 /**
  * One thing, placed. The unit of storage and of the wire.
@@ -81,18 +190,24 @@ export interface Placement {
   z: number;
   /** 0..3. See the header. */
   turn: number;
+  /** The storey it is on: `levelIndex` of the placer's feet. Ground is 0. */
+  level: number;
 }
 
 /**
  * How many things one building may hold.
  *
  * A cap rather than a policy, and it is doing two jobs: it bounds the disk and
- * the wire (64 x 10 bytes is a 640-byte frame), and while *anyone* can furnish
+ * the wire (96 x 11 bytes is a kilobyte frame), and while *anyone* can furnish
  * *any* building -- the owner's call for now, with a $20,000 claim to come --
  * it is the only thing standing between a pub and somebody who wants to fill it
- * with two thousand couches.
+ * with two thousand couches. Raised from 64 when the catalogue grew: a house
+ * with a bed, a wardrobe and a lamp in each of four rooms is already thirty.
  */
-export const MAX_PER_SPACE = 64;
+export const MAX_PER_SPACE = 96;
+
+/** The most storeys a placement may name; the wire's byte and `levelIndex`'s bound. */
+export const MAX_LEVEL = 255;
 
 /**
  * How far a body must stay from a placed thing, metres.
@@ -127,11 +242,14 @@ export function sanitisePlacement(raw: unknown): Placement | null {
   const x = Number(v.x);
   const z = Number(v.z);
   const turn = Number(v.turn);
+  // Absent on rows written before levels existed, which were all ground floor.
+  const level = v.level === undefined ? 0 : Number(v.level);
   if (!knownKind(kind)) return null;
+  if (!Number.isInteger(level) || level < 0 || level > MAX_LEVEL) return null;
   if (!Number.isFinite(x) || !Number.isFinite(z)) return null;
   if (Math.abs(x) > 1e6 || Math.abs(z) > 1e6) return null;
   if (!Number.isInteger(turn) || turn < 0 || turn > 3) return null;
-  return { kind, x, z, turn };
+  return { kind, x, z, turn, level };
 }
 
 /**
@@ -290,10 +408,30 @@ export const SAME_SPOT_M = 0.35;
  */
 export const REMOVE_REACH_M = 1.55;
 
+/**
+ * How near a right-click has to land to a cut to take the cut away rather than
+ * open more wall: inside its own box, near enough. A cut is thin and long, so
+ * the couch's reach would make every click near an opening close it.
+ */
+export const CUT_REMOVE_REACH_M = 0.45;
+
+/**
+ * How far from a partition a right-click with nothing placed in reach still
+ * opens it. Wider than the wall by a body: you aim at the wall from where you
+ * stand, and the grid the aim snaps to is a quarter metre.
+ */
+export const CUT_REACH_M = 0.9;
+
+/**
+ * The least run of wall a cut has to take out to count as an opening. A cut
+ * that only nicks a corner would store a hole nobody can walk through.
+ */
+export const CUT_MIN_SPAN_M = 0.6;
+
 /** Self-check. On both boot lists: it is arithmetic and imports nothing. */
 export function verifyPlaceables(): string[] {
   const failures: string[] = [];
-  const couch = (x: number, z: number, turn: number): Placement => ({ kind: PLACEABLE.COUCH, x, z, turn });
+  const couch = (x: number, z: number, turn: number): Placement => ({ kind: PLACEABLE.COUCH, x, z, turn, level: 0 });
 
   // --- The catalogue is a table and the wire's bound matches it.
   {
@@ -306,9 +444,22 @@ export function verifyPlaceables(): string[] {
     }
     for (const k of PLACEABLES) {
       if (!(k.hx > 0 && k.hz > 0 && k.height > 0)) failures.push(`"${k.name}" has no size.`);
-      if (Math.max(k.hx, k.hz) < BODY_RADIUS_M) {
-        failures.push(`"${k.name}" is smaller than the body that has to walk round it.`);
-      }
+      // A chair or a lamp is narrower than a body, and `pushOutOfBox` settles
+      // any box in one pass; the floor here is against a row nobody could see.
+      if (Math.max(k.hx, k.hz) < 0.15) failures.push(`"${k.name}" is too small to see.`);
+      if (k.wall === 'panel' && k.hz > 0.1) failures.push(`"${k.name}" is a wall thicker than a wall.`);
+    }
+    if (PLACEABLE_ORDER.length !== PLACEABLE_KINDS) failures.push('the customiser cycle skips a kind or repeats one.');
+    if (new Set(PLACEABLE_ORDER).size !== PLACEABLE_ORDER.length) failures.push('the customiser cycle repeats a kind.');
+    if (PLACEABLE_ORDER[PLACEABLE_ORDER.length - 1] !== PLACEABLE.WALL_CUT) failures.push('the delete is not last in the cycle.');
+    if (!isCut(PLACEABLE.WALL_CUT) || isSolid(PLACEABLE.WALL_CUT)) failures.push('the cut is not a cut.');
+    if (!isPanel(PLACEABLE.WALL_PANEL) || !isSolid(PLACEABLE.WALL_PANEL)) failures.push('the panel does not stand.');
+    if (!isWalk(PLACEABLE.RUG) || isSolid(PLACEABLE.RUG)) failures.push('a rug is walked round.');
+    if (!isSolid(PLACEABLE.COUCH) || isWalk(PLACEABLE.COUCH)) failures.push('a couch is walked over.');
+    let solid = 0;
+    for (let k = 0; k < PLACEABLE_KINDS; k++) if (isSolid(k)) solid++;
+    if (solid !== PLACEABLE_KINDS - 2) failures.push(`${solid} solid kinds; only the rug and the cut should be walked through.`);
+    {
     }
   }
 
@@ -316,12 +467,19 @@ export function verifyPlaceables(): string[] {
   {
     if (sanitisePlacement(null) !== null) failures.push('null decoded as a placement.');
     if (sanitisePlacement({ kind: 0, x: NaN, z: 0, turn: 0 }) !== null) failures.push('a NaN placement was accepted.');
-    if (sanitisePlacement({ kind: 9, x: 0, z: 0, turn: 0 }) !== null) failures.push('an unknown kind was accepted.');
+    if (sanitisePlacement({ kind: 200, x: 0, z: 0, turn: 0 }) !== null) failures.push('an unknown kind was accepted.');
     if (sanitisePlacement({ kind: 0, x: 0, z: 0, turn: 4 }) !== null) failures.push('a fifth quarter turn was accepted.');
     if (sanitisePlacement({ kind: 0, x: 0, z: 0, turn: -1 }) !== null) failures.push('a negative turn was accepted.');
     if (sanitisePlacement({ kind: 0, x: 1e9, z: 0, turn: 0 }) !== null) failures.push('a couch past the end of the world was accepted.');
     const ok = sanitisePlacement({ kind: 0, x: -2236.5, z: 4543.25, turn: 3 });
     if (ok === null || ok.turn !== 3 || ok.x !== -2236.5) failures.push('a good placement was refused.');
+    if (ok !== null && ok.level !== 0) failures.push('a row written before levels existed did not land on the ground floor.');
+    const up = sanitisePlacement({ kind: PLACEABLE.BED, x: 0, z: 0, turn: 1, level: 3 });
+    if (up === null || up.level !== 3) failures.push('a bed on the third floor was refused or moved.');
+    if (sanitisePlacement({ kind: 0, x: 0, z: 0, turn: 0, level: -1 }) !== null) failures.push('a basement was accepted.');
+    if (sanitisePlacement({ kind: 0, x: 0, z: 0, turn: 0, level: 1.5 }) !== null) failures.push('a mezzanine was accepted.');
+    if (sanitisePlacement({ kind: 0, x: 0, z: 0, turn: 0, level: MAX_LEVEL + 1 }) !== null) failures.push('a level past the wire was accepted.');
+    if (sanitisePlacement({ kind: PLACEABLE_KINDS, x: 0, z: 0, turn: 0 }) !== null) failures.push('the kind after the last was accepted.');
   }
 
   // --- Quarter turns come back round, and they are exact.

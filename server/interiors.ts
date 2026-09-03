@@ -205,7 +205,7 @@ const EMPTY: readonly Placement[] = [];
 export function verifyInteriorStore(): string[] {
   const failures: string[] = [];
   const store = new InteriorStore('/dev/null/never-written', false);
-  const couch = (x: number): Placement => ({ kind: 0, x, z: 0, turn: 0 });
+  const couch = (x: number): Placement => ({ kind: 0, x, z: 0, turn: 0, level: 0 });
 
   // --- A room holds what it was given, and the city holds nothing.
   {

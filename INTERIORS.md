@@ -100,7 +100,7 @@ Every one of those but `interiorview.ts` is three-free and runs on **both** boot
 lists (`client/src/main.ts` and `server/index.ts`), because a check that only
 runs in the browser is a check the deploy gate cannot see.
 
-## The wire — protocol v26
+## The wire — protocol v26, and v29's level byte
 
 Three messages. Two are a matched pair under the halves convention:
 
@@ -127,6 +127,10 @@ Three messages. Two are a matched pair under the halves convention:
   applies a same-space frame as a placement, not as a new room. v26 also moved
   the number for a generator change: every storey is now laid out, and a v25
   client would step a body against different walls.
+- **v29** put a storey byte on every `PLACED` entry (11 bytes, was 10), so a
+  browser drawing a room knows which floor a bed is on. `FURNISH` did not
+  grow: the server takes the storey from the placer's feet, the one fact it
+  already has and the sender cannot lie about.
 
 **The space is deliberately not in the snapshot.** Four bytes per player per
 snapshot — 25 kbit/s at a full working set — to send a number already known to
@@ -314,25 +318,60 @@ The rooms are derived and cost nothing to store. **Furniture is the exception**
 and is the first thing about an interior that cannot be recomputed from a
 footprint, so it is the first thing that is written down and sent:
 
-- `client/src/world/placeables.ts` — the catalogue (one row: a couch), oriented
+- `client/src/world/placeables.ts` — the catalogue (twenty-one rows), oriented
   boxes, quarter turns in the building's own frame, and the arithmetic both ends
   run. Named `placeables` because `world/furniture.ts` is the *street's*.
 - `server/interiors.ts` — space id to placements, on disk, `server/wallets.ts`'
-  shape down to the debounce. 64 things a building, 10,000 buildings a box.
+  shape down to the debounce. 96 things a building, 10,000 buildings a box.
 - Protocol v25: `FURNISH` (0x17) up, `PLACED` (0x97) down — the whole list every
-  time, because a room is not a tick.
+  time, because a room is not a tick. v29 added the storey byte to `PLACED`.
 
-`X` opens the customiser indoors; the wheel or `R` turns the couch; left click
-places, right click removes the nearest. Both mouse buttons belong to the mode
-while it is open, which is why it is a mode: in a game whose only verb is
-hitting people, a click that sometimes puts a couch down instead is the worst
-ambiguity available.
+`X` opens the customiser indoors; `[` and `]` walk the catalogue; the wheel or
+`R` turns the thing; left click places, right click removes the nearest — or,
+with nothing placed in reach, **opens the wall under the click**. Both mouse
+buttons belong to the mode while it is open, which is why it is a mode: in a
+game whose only verb is hitting people, a click that sometimes puts a couch down
+instead is the worst ambiguity available.
+
+### The catalogue
+
+Nineteen rows of decor — couch, armchair, coffee table, rug, tv unit, bed,
+double bed, wardrobe, bookshelf, desk, chair, table, dining table, kitchen
+bench, fridge, bath, toilet, pot plant, floor lamp — each a footprint in the
+table and a handful of slabs in `interior.ts`' `partsInto`, at real sizes. The
+rug is the one `walk` row: drawn, never stepped, and a table may sit on it.
+Two rows are walls:
+
+- **Wall panel**: a three-metre run of plaster, a storey tall, that stands in
+  the collision as a thin box and draws in the room's own plaster. It may butt
+  against a generated wall and against another panel end to end (a couch may
+  touch neither), because a panel nobody can join to anything is a fence post.
+- **Doorway** (`WALL_CUT`): the delete. A placement whose only effect is
+  negative: the generated partition it crosses is clipped to an opening with
+  the same lintel the generator draws over a doorway, and a body walks through.
+  It is stored as a *hole* rather than as an edited wall list, which is what
+  keeps a building derived — the walls are still recomputed from the footprint
+  and a room's file holds only what a player did. Removing the cut brings the
+  wall back. The shaft's walls are never cut, and the shell is not a wall.
+
+### Storeys
+
+A placement carries its storey. The server takes it from the placer's feet
+(`levelIndex`), never from the request; the browser's ghost uses the same
+function, so the two agree without a byte to lie in. Every level keeps its own
+drawn things, its own collision boxes and its own clipped walls; the ground
+floor's remain aliased on the `Interior` for the code that predates storeys.
+
+### The rules
 
 `Simulation.furnish` decides everything and the browser runs the same
 `placementFits` only so the ghost is red on the frames the server would refuse.
-Nothing outside the walls, inside a partition, on top of a person, or **across a
-doorway** — that last is the one piece of griefing a room has no answer to,
-because unlike a couch on a floor it cannot be walked around.
+Nothing outside the walls, inside the shaft, on top of a person (only what a
+body walks round can trap one), or **across an opening** — the generator's or a
+cut's — because that last is the one piece of griefing a room has no answer
+to: unlike a couch on a floor it cannot be walked around. A cut has to take out
+at least 0.6 m of real partition, so a click that only nicks a corner stores
+nothing.
 
 **Anyone can furnish anything**, by the owner's decision, with a $20,000 claim
 to come. When it lands it is one test on one line in `Simulation.furnish` and a
