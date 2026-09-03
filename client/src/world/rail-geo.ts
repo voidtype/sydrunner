@@ -4288,9 +4288,34 @@ function writeUndergroundStation(
   for (const dy of [0, H]) {
     inclineShell(at(d0, -HW, yAt(d0) + dy), at(d0, HW, yAt(d0) + dy), at(d1, HW, yAt(d1) + dy), at(d1, -HW, yAt(d1) + dy));
   }
+  // The side walls -- and **the way out of them**. The tunnel leaves the
+  // incline sideways at the foot, so the wall it leaves through is drawn in two
+  // pieces with its doorway between them; the other is solid for the full run.
+  const tunSide = plan.tunDirX * nx + plan.tunDirZ * nz >= 0 ? 1 : -1;
+  const foot = plan.inclineM;
+  const wallSeg = (sgn: number, da: number, db: number): void => {
+    if (!(db - da > 1e-3)) return;
+    inclineShell(at(da, HW * sgn, yAt(da)), at(db, HW * sgn, yAt(db)), at(db, HW * sgn, yAt(db) + H), at(da, HW * sgn, yAt(da) + H));
+  };
   for (const sgn of [-1, 1]) {
-    inclineShell(at(d0, HW * sgn, yAt(d0)), at(d1, HW * sgn, yAt(d1)), at(d1, HW * sgn, yAt(d1) + H), at(d0, HW * sgn, yAt(d0) + H));
+    if (sgn !== tunSide) {
+      wallSeg(sgn, d0, d1);
+      continue;
+    }
+    wallSeg(sgn, d0, Math.max(d0, foot - HW));
+    wallSeg(sgn, Math.min(d1, foot + HW), d1);
   }
+  // **And the far end is closed.** It was not, and nothing about the incline
+  // said so: the loops above draw a floor, a ceiling and two walls, and both
+  // ends were left open. The near end is the mouth and is meant to be; the far
+  // end opened on nothing at all, so a player who walked past the foot stepped
+  // out of the shaft, out of the access box, lost the floor the box was giving
+  // them and was put back on the street. The owner: *"when i get to the bottom
+  // there is a clipped hole, if i go thru it i jump to the surface"*.
+  inclineShell(
+    at(d1, -HW, yAt(d1)), at(d1, HW, yAt(d1)),
+    at(d1, HW, yAt(d1) + H), at(d1, -HW, yAt(d1) + H),
+  );
   // Its lid from above, on concrete, so the street over it is not a hole.
   concrete.quad(...at(d0, -HW, yAt(d0) + H), ...at(d1, -HW, yAt(d1) + H), ...at(d1, HW, yAt(d1) + H), ...at(d0, HW, yAt(d0) + H));
   // The tunnel from the foot into the room, flat at the floor.
