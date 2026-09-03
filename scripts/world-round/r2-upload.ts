@@ -39,11 +39,27 @@
  * line), `Retry-After` is honoured on a 429, and the results file is a journal
  * -- a key marked OK is skipped on the next run, so the same list can be
  * resumed after a kill.
+ *
+ * ---------------------------------------------------------------------------
+ * THE REFRESH IS ASYNCHRONOUS AND CHECKED, which it was not, and the failure
+ * that taught us is worth writing down: the grant expires after a few hours,
+ * the first run hit that at 27,000 of 195,000 objects, and every worker then
+ * spent eight retries per key failing 401 while the *refresh itself* --
+ * `spawnSync`, on Bun's one thread, with its exit status never read -- froze
+ * the whole process for a minute at a time. Throughput fell from 4/s to 1.3/s
+ * to nothing, and it ground on like that for two hours without saying a word.
+ *
+ * So: `Bun.spawn` rather than `spawnSync`, so a refresh does not stop the other
+ * eleven workers; the token is read before and after and the refresh is only
+ * believed if it **changed**; and a grant that cannot be refreshed stops the
+ * run with a message that names the one command a human has to type. The same
+ * argument gives the circuit breaker below -- `MAX_CONSECUTIVE_FAILS` in a row
+ * means something is wrong with the world and not with a key, and grinding
+ * through 160,000 doomed objects is not resilience.
  */
 import { brotliCompressSync, constants } from 'node:zlib';
 import { readFileSync, appendFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
 
 const CFG = `${process.env.HOME}/Library/Preferences/.wrangler/config/default.toml`;
 const ACCOUNT = 'b7f27f4a44cf2aea00155a84949b3879';
@@ -66,12 +82,35 @@ function readToken(): string {
 
 let tokenEpoch = 0;
 let refreshing: Promise<void> | null = null;
+
+/** Set when the grant is gone for good. Every worker stops; see the header. */
+let dead = '';
+
+/** Consecutive failures across all workers before the run gives up. */
+const MAX_CONSECUTIVE_FAILS = 40;
+let consecutiveFails = 0;
+
 async function refresh(seen: number): Promise<void> {
   if (tokenEpoch !== seen) return;
   if (refreshing === null) {
     refreshing = (async () => {
+      const before = readToken();
       const env = { ...process.env, PATH: `${process.env.HOME}/.nvm/versions/node/v22.12.0/bin:${process.env.PATH}` };
-      spawnSync('npx', ['--yes', 'wrangler@latest', 'whoami'], { env, stdio: 'ignore', timeout: 120_000 });
+      try {
+        const proc = Bun.spawn(['npx', '--yes', 'wrangler@latest', 'whoami'], { env, stdout: 'ignore', stderr: 'ignore' });
+        await Promise.race([proc.exited, Bun.sleep(180_000).then(() => proc.kill())]);
+      } catch {
+        // Fall through to the token comparison, which is the only thing that
+        // actually answers whether the grant came back.
+      }
+      // Believe the refresh only if the bearer moved. `whoami` exits 0 on a
+      // grant it could not renew, so its status is not the answer.
+      if (readToken() === before) {
+        dead =
+          'the R2 grant has expired and `wrangler whoami` did not renew it. ' +
+          'Run `npx wrangler login` in a terminal, then start this again -- ' +
+          'the results journal means it picks up where it stopped.';
+      }
       tokenEpoch++;
       refreshing = null;
     })();
@@ -96,6 +135,7 @@ async function put(key: string): Promise<[string, string | number, number]> {
   if (!pivot) headers['Content-Encoding'] = 'br';
   const url = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/r2/buckets/${BUCKET}/objects/${encodeURIComponent(key)}`;
   for (let attempt = 0; attempt < 8; attempt++) {
+    if (dead) return ['FAIL', 'grant', raw.length];
     const epoch = tokenEpoch;
     let r: Response;
     try {
@@ -147,8 +187,13 @@ async function worker(): Promise<void> {
     const i = next++;
     if (i >= todo.length) return;
     const key = todo[i];
+    if (dead) return;
     const [status, code, raw] = await put(key);
     counts[status as 'OK' | 'FAIL']++;
+    if (status === 'OK') consecutiveFails = 0;
+    else if (++consecutiveFails >= MAX_CONSECUTIVE_FAILS && !dead) {
+      dead = `${MAX_CONSECUTIVE_FAILS} keys in a row failed (last ${code}); stopping rather than grinding through the rest.`;
+    }
     if (status !== 'OK') codes.set(String(code), (codes.get(String(code)) ?? 0) + 1);
     if (status === 'OK') {
       sentBytes += code as number;
@@ -168,4 +213,5 @@ async function worker(): Promise<void> {
 }
 await Promise.all(Array.from({ length: THREADS }, () => worker()));
 console.log(`done: ok ${counts.OK} fail ${counts.FAIL} raw ${(rawBytes / 1e6).toFixed(0)} MB sent ${(sentBytes / 1e6).toFixed(0)} MB in ${((Date.now() - t0) / 60000).toFixed(1)} min`);
-process.exit(counts.FAIL === 0 ? 0 : 1);
+if (dead) console.error(`STOPPED: ${dead}`);
+process.exit(counts.FAIL === 0 && !dead ? 0 : 1);
