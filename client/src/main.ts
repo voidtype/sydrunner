@@ -795,6 +795,7 @@ import { EventAssets, EventScene, eventWarmupParts, inTrackworkQueue, verifyEven
 import { verifyWallet } from './game/wallet-contract.ts';
 import { Hud, verifyHud } from './hud.ts';
 import { crashText, installCrashLog, verifyCrash } from './crash.ts';
+import { installSceneRouting, verifySceneRouting } from './world/sceneroute.ts';
 import { Minimap } from './minimap.ts';
 import { MapAtlas } from './mapatlas.ts';
 import { BigMap, verifyBigMap } from './bigmap.ts';
@@ -1520,6 +1521,9 @@ async function main(): Promise<void> {
   // and therefore invisible, a lamp hash that clumps every luminaire in the city
   // onto one street -- all of them draw something plausible and none of them
   // throws. See `world/nightlights.ts`.
+  // Before the night lights, because the night lights are what it broke: this
+  // is the check whose absence let a recursive `scene.remove` ship.
+  const sceneRouteFailures = timed('scene routing', verifySceneRouting);
   const nightFailures = timed('night-lights', () => verifyNightLights());
   // The train lighting's own two, on the same criterion and for the same reason
   // the file above gives: a lit carriage that draws something plausible and
@@ -1683,6 +1687,7 @@ async function main(): Promise<void> {
     lifecycleFailures.length ||
     groundFirstFailures.length ||
     canopyFailures.length ||
+    sceneRouteFailures.length ||
     nightFailures.length ||
     trainLightFailures.length ||
     raveFailures.length ||
@@ -1775,6 +1780,7 @@ async function main(): Promise<void> {
           ...lifecycleFailures,
           ...groundFirstFailures,
           ...canopyFailures,
+          ...sceneRouteFailures,
           ...nightFailures,
           ...trainLightFailures,
           ...raveFailures,
@@ -2026,20 +2032,12 @@ async function main(): Promise<void> {
   const world = new ClippingGroup();
   world.name = 'world';
   world.enabled = false;
-  const sceneAddRaw = scene.add.bind(scene);
-  sceneAddRaw(world);
-  scene.add = ((...objects: Object3D[]) => {
-    for (const o of objects) {
-      const raw = (o as { isCamera?: boolean }).isCamera === true || (o as { isLight?: boolean }).isLight === true || o.userData.unclipped === true;
-      if (raw) sceneAddRaw(o);
-      else world.add(o);
-    }
-    return scene;
-  }) as typeof scene.add;
-  scene.remove = ((...objects: Object3D[]) => {
-    for (const o of objects) o.removeFromParent();
-    return scene;
-  }) as typeof scene.remove;
+  // The routing, and the check that it terminates. It lived inline here until
+  // the removal half was found to recurse forever on anything sitting on the
+  // scene root -- a light, a camera, anything `unclipped` -- because
+  // `removeFromParent` is `parent.remove(this)` and the parent was this. See
+  // `world/sceneroute.ts`: the story, and the test that would have caught it.
+  installSceneRouting(scene, world);
   // The field of view is `game/feedback.ts`'s to move, not this file's: spec
   // 8.3's Flat White raises it to 80 for the duration and eases it back, so the
   // base lives beside the boosted value and the ease that connects them rather
