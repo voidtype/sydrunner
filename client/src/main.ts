@@ -794,7 +794,7 @@ import { EVENT_NAME, stepEvents, sweepEvents, verifyEvents } from './game/events
 import { EventAssets, EventScene, eventWarmupParts, inTrackworkQueue, verifyEventKit } from './world/events.ts';
 import { verifyWallet } from './game/wallet-contract.ts';
 import { Hud, verifyHud } from './hud.ts';
-import { installCrashLog, verifyCrash } from './crash.ts';
+import { crashText, installCrashLog, verifyCrash } from './crash.ts';
 import { Minimap } from './minimap.ts';
 import { MapAtlas } from './mapatlas.ts';
 import { BigMap, verifyBigMap } from './bigmap.ts';
@@ -944,9 +944,29 @@ async function main(): Promise<void> {
    */
   const runSelfChecks = (): boolean => {
   const checkStart = performance.now();
+  /**
+   * Run one self-check, and **name it if it throws**.
+   *
+   * A check that returns failures is reported by name already. A check that
+   * *throws* was, until this, indistinguishable from the world index failing to
+   * load: both landed in the one `catch` below, which showed `err.message` and
+   * nothing else -- so the owner got "Maximum call stack size exceeded" on a
+   * blank screen with no way to tell which of a hundred checks produced it, and
+   * no stack, because the message is all that was kept. Naming the check costs
+   * a `try` per check on a path that runs once.
+   */
   const timed = (name: string, run: () => string[]): string[] => {
     const at = performance.now();
-    const failures = run();
+    let failures: string[];
+    try {
+      failures = run();
+    } catch (err) {
+      console.error(`[boot] self-check "${name}" threw`, err);
+      throw new Error(
+        `the self-check "${name}" threw: ${String(err instanceof Error ? err.message : err)}`,
+        { cause: err },
+      );
+    }
     checkMs.push([name, performance.now() - at]);
     return failures;
   };
@@ -2158,7 +2178,11 @@ async function main(): Promise<void> {
     if (!runSelfChecks()) return;
     index = await indexPromise;
   } catch (err) {
-    hud.fatal(String(err instanceof Error ? err.message : err));
+    // The stack, not just the sentence. A boot that dies with `err.message`
+    // alone is a bug report nobody can act on -- see `crash.ts`, which exists
+    // because of exactly that.
+    console.error('[boot] the world index or the self-checks failed', err);
+    hud.fatal(crashText(err));
     return;
   }
 
