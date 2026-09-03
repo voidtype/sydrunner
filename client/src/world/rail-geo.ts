@@ -107,7 +107,7 @@
  * player's position. `poseTrain` stays pure because nothing here can reach it.
  */
 
-import { stationAccessPlan, ACCESS_OVERLAP_M, ACCESS_APRON_M, accessCutLength, roomCeilY, concourseY, type AccessPlan, type AccessWorld,
+import { stationAccessPlan, ACCESS_OVERLAP_M, ACCESS_APRON_M, accessCutLength, roomCeilY, concourseY, windOutward, type AccessPlan, type AccessWorld, type Vec3,
   ACCESS_HALF_W,
   ACCESS_HEIGHT_M,
 } from '../game/riding.ts';
@@ -4209,12 +4209,20 @@ function writeUndergroundStation(
   // The room, seen from inside: floor up, ceiling down, four walls in. On the
   // lining material, which is the file's one `BackSide` material -- a box the
   // player is inside is exactly the case it exists for.
-  lining.quad(...corner(-L, -W, floor), ...corner(L, -W, floor), ...corner(L, W, floor), ...corner(-L, W, floor));
-  lining.quad(...corner(-L, -W, roof), ...corner(L, -W, roof), ...corner(L, W, roof), ...corner(-L, W, roof));
-  lining.quad(...corner(-L, -W, floor), ...corner(L, -W, floor), ...corner(L, -W, roof), ...corner(-L, -W, roof));
-  lining.quad(...corner(-L, W, floor), ...corner(L, W, floor), ...corner(L, W, roof), ...corner(-L, W, roof));
-  lining.quad(...corner(-L, -W, floor), ...corner(-L, W, floor), ...corner(-L, W, roof), ...corner(-L, -W, roof));
-  lining.quad(...corner(L, -W, floor), ...corner(L, W, floor), ...corner(L, W, roof), ...corner(L, -W, roof));
+  // Every face wound to point **away from the room**, because `lining` is
+  // `BackSide` and a face whose normal points inward is simply not there when
+  // you are standing in it. See `riding.windOutward`.
+  const roomInside: Vec3 = [station.x, (floor + roof) / 2, station.z];
+  const shell = (a: Vec3, b: Vec3, c: Vec3, d: Vec3): void => {
+    const [p, q, r, t] = windOutward(roomInside, a, b, c, d);
+    lining.quad(...p, ...q, ...r, ...t);
+  };
+  shell(corner(-L, -W, floor), corner(L, -W, floor), corner(L, W, floor), corner(-L, W, floor));
+  shell(corner(-L, -W, roof), corner(L, -W, roof), corner(L, W, roof), corner(-L, W, roof));
+  shell(corner(-L, -W, floor), corner(L, -W, floor), corner(L, -W, roof), corner(-L, -W, roof));
+  shell(corner(-L, W, floor), corner(L, W, floor), corner(L, W, roof), corner(-L, W, roof));
+  shell(corner(-L, -W, floor), corner(-L, W, floor), corner(-L, W, roof), corner(-L, -W, roof));
+  shell(corner(L, -W, floor), corner(L, W, floor), corner(L, W, roof), corner(L, -W, roof));
 
   // **The lid, seen from outside, and the room had none.** Everything above is
   // on `lining`, which is the file's one `BackSide` material -- correct for a
@@ -4267,11 +4275,21 @@ function writeUndergroundStation(
   const d1 = plan.inclineM + ACCESS_OVERLAP_M / 2;
   // The incline: floor, ceiling and two side walls, all leaning together, on
   // the lining -- the one BackSide material, for the player under it.
+  // The same rule as the room, and the place it was got wrong: floor and
+  // ceiling came out of one loop and both walls out of another, so each pair
+  // shared a winding when a pair needs opposite ones. Half the shaft was
+  // invisible from inside it.
+  const dMid = plan.inclineM / 2;
+  const inclineInside: Vec3 = [at(dMid, 0, 0)[0], yAt(dMid) + H / 2, at(dMid, 0, 0)[2]];
+  const inclineShell = (a: Vec3, b: Vec3, c: Vec3, d: Vec3): void => {
+    const [p, q, r, t] = windOutward(inclineInside, a, b, c, d);
+    lining.quad(...p, ...q, ...r, ...t);
+  };
   for (const dy of [0, H]) {
-    lining.quad(...at(d0, -HW, yAt(d0) + dy), ...at(d0, HW, yAt(d0) + dy), ...at(d1, HW, yAt(d1) + dy), ...at(d1, -HW, yAt(d1) + dy));
+    inclineShell(at(d0, -HW, yAt(d0) + dy), at(d0, HW, yAt(d0) + dy), at(d1, HW, yAt(d1) + dy), at(d1, -HW, yAt(d1) + dy));
   }
   for (const sgn of [-1, 1]) {
-    lining.quad(...at(d0, HW * sgn, yAt(d0)), ...at(d1, HW * sgn, yAt(d1)), ...at(d1, HW * sgn, yAt(d1) + H), ...at(d0, HW * sgn, yAt(d0) + H));
+    inclineShell(at(d0, HW * sgn, yAt(d0)), at(d1, HW * sgn, yAt(d1)), at(d1, HW * sgn, yAt(d1) + H), at(d0, HW * sgn, yAt(d0) + H));
   }
   // Its lid from above, on concrete, so the street over it is not a hole.
   concrete.quad(...at(d0, -HW, yAt(d0) + H), ...at(d1, -HW, yAt(d1) + H), ...at(d1, HW, yAt(d1) + H), ...at(d0, HW, yAt(d0) + H));
@@ -4283,11 +4301,17 @@ function writeUndergroundStation(
   ];
   const t0 = -HW;
   const t1 = plan.tunnelM;
+  const tMid = (t0 + t1) / 2;
+  const tunnelInside: Vec3 = [tat(tMid, 0, 0)[0], plan.floorY + H / 2, tat(tMid, 0, 0)[2]];
+  const tunnelShell = (a: Vec3, b: Vec3, c: Vec3, d: Vec3): void => {
+    const [p, q, r, t] = windOutward(tunnelInside, a, b, c, d);
+    lining.quad(...p, ...q, ...r, ...t);
+  };
   for (const dy of [0, H]) {
-    lining.quad(...tat(t0, -HW, plan.floorY + dy), ...tat(t0, HW, plan.floorY + dy), ...tat(t1, HW, plan.floorY + dy), ...tat(t1, -HW, plan.floorY + dy));
+    tunnelShell(tat(t0, -HW, plan.floorY + dy), tat(t0, HW, plan.floorY + dy), tat(t1, HW, plan.floorY + dy), tat(t1, -HW, plan.floorY + dy));
   }
   for (const sgn of [-1, 1]) {
-    lining.quad(...tat(t0, HW * sgn, plan.floorY), ...tat(t1, HW * sgn, plan.floorY), ...tat(t1, HW * sgn, plan.floorY + H), ...tat(t0, HW * sgn, plan.floorY + H));
+    tunnelShell(tat(t0, HW * sgn, plan.floorY), tat(t1, HW * sgn, plan.floorY), tat(t1, HW * sgn, plan.floorY + H), tat(t0, HW * sgn, plan.floorY + H));
   }
   concrete.quad(...tat(t0, -HW, plan.floorY + H), ...tat(t1, -HW, plan.floorY + H), ...tat(t1, HW, plan.floorY + H), ...tat(t0, HW, plan.floorY + H));
   // The entrance on the street: a portal frame over the mouth, open toward

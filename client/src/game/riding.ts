@@ -2151,6 +2151,50 @@ export const ACCESS_LID_COVER_M = 0.35;
  * incline where the ground never gets over it. Sampled every half metre off
  * the same `groundAt` both ends' plans were made with.
  */
+/** A point, for the winding helper below. */
+export type Vec3 = readonly [number, number, number];
+
+/**
+ * Order a quad's four corners so its face **points away from `inside`**.
+ *
+ * Every enclosure this project draws -- a station room, the incline down to it,
+ * the tunnel between them -- is drawn with a `BackSide` material, which is the
+ * right choice: it is a box you stand *in*, and rendering only its back faces
+ * means the shell never occludes the street above it. The catch is that
+ * `BackSide` makes the winding load-bearing. A face is seen from inside only
+ * when its own normal points outward, and `Solid.quad` takes its normal from
+ * the order the corners arrive in.
+ *
+ * `rail-geo` wound each pair of opposite surfaces identically -- floor and
+ * ceiling in one loop over `[0, H]`, both side walls in one loop over
+ * `[-1, 1]` -- which reads as symmetry and is the opposite of it: the two
+ * faces of a pair need *opposite* windings to both point outward. So one of
+ * every pair was inside-out and invisible from within, and a player walking
+ * down Wynyard's shaft looked through the missing floor at the underside of
+ * the terrain and out through the missing wall at the skyline. The owner:
+ * *"i do underground into clipville if i go thru where a hole should be"*.
+ *
+ * Rather than fix the four call sites by hand and leave the next one to get it
+ * wrong, the winding is no longer something a caller states. It is derived
+ * from where the inside is, which is the thing the caller actually knows.
+ *
+ * Three-free and pure, so `verifyStationAccess` can drive a whole box through
+ * it on both ends.
+ */
+export function windOutward(inside: Vec3, a: Vec3, b: Vec3, c: Vec3, d: Vec3): [Vec3, Vec3, Vec3, Vec3] {
+  const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+  const vx = d[0] - a[0], vy = d[1] - a[1], vz = d[2] - a[2];
+  const nx = uy * vz - uz * vy;
+  const ny = uz * vx - ux * vz;
+  const nz = ux * vy - uy * vx;
+  // From the face's centre toward the inside; a normal that agrees with it is
+  // pointing the wrong way. The diagonal's midpoint is the centre of any
+  // planar quad this is used on.
+  const cx = (a[0] + c[0]) / 2, cy = (a[1] + c[1]) / 2, cz = (a[2] + c[2]) / 2;
+  const dot = nx * (inside[0] - cx) + ny * (inside[1] - cy) + nz * (inside[2] - cz);
+  return dot > 0 ? [a, d, c, b] : [a, b, c, d];
+}
+
 export function accessCutLength(plan: AccessPlan, groundAt: ((x: number, z: number) => number) | undefined): number {
   const slope = (plan.mouthY - plan.floorY) / Math.max(plan.inclineM, 1e-6);
   if (groundAt === undefined) return Math.min(plan.inclineM, (ACCESS_HEIGHT_M + ACCESS_LID_COVER_M) / Math.max(slope, 1e-6));
@@ -4209,6 +4253,38 @@ export function verifyStationAccess(): string[] {
   if (flat.floorAt(10, 0, 7) !== 7 || flat.floorAt(-10, 0, 7) !== 7) {
     failures.push('an unsloped box no longer answers one height across its length.');
   }
+  // --- Every face of a shell points outward, so a `BackSide` lining is whole
+  //     from inside. See `windOutward`: this is the bug that put the owner
+  //     under the world at Wynyard, driven over a box rather than a shaft
+  //     because a box has all six directions in it.
+  {
+    const lo = [-2, -3, -4] as const;
+    const hi = [5, 6, 7] as const;
+    const inside: Vec3 = [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2];
+    const corner = (i: number, j: number, k: number): Vec3 => [i ? hi[0] : lo[0], j ? hi[1] : lo[1], k ? hi[2] : lo[2]];
+    // The six faces, each given in a deliberately arbitrary order.
+    const faces: Array<[string, Vec3, Vec3, Vec3, Vec3]> = [
+      ['floor', corner(0, 0, 0), corner(1, 0, 0), corner(1, 0, 1), corner(0, 0, 1)],
+      ['ceiling', corner(0, 1, 0), corner(1, 1, 0), corner(1, 1, 1), corner(0, 1, 1)],
+      ['west', corner(0, 0, 0), corner(0, 1, 0), corner(0, 1, 1), corner(0, 0, 1)],
+      ['east', corner(1, 0, 0), corner(1, 1, 0), corner(1, 1, 1), corner(1, 0, 1)],
+      ['north', corner(0, 0, 0), corner(1, 0, 0), corner(1, 1, 0), corner(0, 1, 0)],
+      ['south', corner(0, 0, 1), corner(1, 0, 1), corner(1, 1, 1), corner(0, 1, 1)],
+    ];
+    for (const [name, a, b, c, d] of faces) {
+      const [p, q, r, t] = windOutward(inside, a, b, c, d);
+      const ux = q[0] - p[0], uy = q[1] - p[1], uz = q[2] - p[2];
+      const vx = t[0] - p[0], vy = t[1] - p[1], vz = t[2] - p[2];
+      const n: Vec3 = [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx];
+      const cx = (p[0] + r[0]) / 2, cy = (p[1] + r[1]) / 2, cz = (p[2] + r[2]) / 2;
+      const dot = n[0] * (inside[0] - cx) + n[1] * (inside[1] - cy) + n[2] * (inside[2] - cz);
+      if (dot >= 0) failures.push(`the ${name} of a shell faces inward; a BackSide lining would have a hole there.`);
+      // And it is a re-ordering, not a new quad: the same four corners come back.
+      const same = [p, q, r, t].every((v) => [a, b, c, d].some((w) => w[0] === v[0] && w[1] === v[1] && w[2] === v[2]));
+      if (!same) failures.push(`the ${name} came back with corners that were not the ones given.`);
+    }
+  }
+
   // --- The field's plans are addressable by name, which is what lets the
   //     drawing read the same numbers the collision stands bodies on rather
   //     than working out its own. See `rail-geo.setAccessPlans`.
