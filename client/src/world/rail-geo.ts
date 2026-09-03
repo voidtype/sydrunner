@@ -107,7 +107,7 @@
  * player's position. `poseTrain` stays pure because nothing here can reach it.
  */
 
-import { stationAccessPlan, ACCESS_OVERLAP_M, ACCESS_APRON_M, accessCutLength, roomCeilY, concourseY, type AccessWorld,
+import { stationAccessPlan, ACCESS_OVERLAP_M, ACCESS_APRON_M, accessCutLength, roomCeilY, concourseY, type AccessPlan, type AccessWorld,
   ACCESS_HALF_W,
   ACCESS_HEIGHT_M,
 } from '../game/riding.ts';
@@ -120,6 +120,29 @@ import { stationAccessPlan, ACCESS_OVERLAP_M, ACCESS_APRON_M, accessCutLength, r
 let accessWorld: AccessWorld = {};
 export function setAccessWorld(world: AccessWorld): void {
   accessWorld = world;
+}
+
+/**
+ * The access plans as the **field** holds them, which is the only copy allowed
+ * to decide where a station's way in is drawn.
+ *
+ * This file used to work its own plan out, calling `stationAccessPlan` a second
+ * time against `accessWorld` above. That reads as harmless -- same function,
+ * same station -- and it is not, because the two calls happen at different
+ * moments. `stationAccessPlan` walks the mouth out of whatever building it
+ * lands in, and it can only do that when the prisms are loaded; a rail chunk
+ * built before the client had any drew the shaft where the bake put it, while
+ * `StationBoxField` stood bodies on the mouth it had since moved to. The player
+ * then walks down a floor that is real to the collision and invisible to the
+ * renderer, with the underside of the world for scenery.
+ *
+ * So the plan comes from the field or the geometry is not drawn at all. Null
+ * until `main.ts` (or the server) hands one over, and re-handed on every
+ * rebuild -- the same call that invalidates the chunks over a mouth that moved.
+ */
+let accessPlans: { planFor(name: string): AccessPlan | null } | null = null;
+export function setAccessPlans(field: { planFor(name: string): AccessPlan | null } | null): void {
+  accessPlans = field;
 }
 import {
   BackSide,
@@ -4224,7 +4247,12 @@ function writeUndergroundStation(
   // disagree. The first design put the mouth 68 m along and 40 m across the
   // site at the site's own height, which the owner found impassable and
   // undrawn where the street there was a few metres higher.
-  const plan = stationAccessPlan(station as unknown as RailStation, accessWorld);
+  // **The field's plan, not one of our own.** See `setAccessPlans`: computing
+  // it again here is how the drawn shaft and the walked-on floor came apart.
+  // The fallback is for a caller that has not handed a field over (the offline
+  // renderers, and the first chunk of a boot); a chunk built on it is
+  // invalidated the moment the field moves the mouth.
+  const plan = accessPlans?.planFor(station.name) ?? stationAccessPlan(station as unknown as RailStation, accessWorld);
   if (plan === null) return;
   const HW = ACCESS_HALF_W;
   const H = ACCESS_HEIGHT_M;

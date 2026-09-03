@@ -649,6 +649,7 @@ import {
   verifyRailChunkSteps,
   verifyRailGeometry,
   type RailNetwork,
+  setAccessPlans,
   setAccessWorld,
 } from './world/rail-geo.ts';
 // The arithmetic half of the railway, which the server evaluates too. See
@@ -2813,6 +2814,9 @@ async function main(): Promise<void> {
       // *"moving anywhere on foot underground tps me to surface"*, and it is a
       // ground answer rather than a teleport. See `game/riding.StationBoxField`.
       stationBoxes = buildStationBoxes(railBake);
+      // The drawing reads this field's plans rather than working out its own;
+      // see `rail-geo.setAccessPlans` for the bug that came of two copies.
+      setAccessPlans(stationBoxes);
       // The hole in the street each way in goes down through, on the same
       // plans. See `riding.accessCutAt`. No ground sampler yet at this point
       // of the boot, so the carve length is the geometric estimate;
@@ -4921,6 +4925,7 @@ async function main(): Promise<void> {
     setAccessWorld(world);
     const before = stationBoxes;
     stationBoxes = buildStationBoxes(railBake, world);
+    setAccessPlans(stationBoxes);
     if (railCut !== null) railCut.setAccess(stationBoxes.plans, rawGroundAt);
     // A mouth that moved is an incline the chunk drew somewhere else: drop
     // the chunks over it so `rail-geo` draws the plan the field now stands

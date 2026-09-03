@@ -1660,6 +1660,30 @@ export class StationBoxField {
   readonly mouths: Array<{ name: string; x: number; z: number; y: number }> = [];
   /** The plans behind those mouths, for the terrain carve. See `accessCutAt`. */
   readonly plans: AccessPlan[] = [];
+
+  /**
+   * The plans by station name -- **the one copy the drawing must read**.
+   *
+   * `world/rail-geo.writeUndergroundStation` used to call `stationAccessPlan`
+   * again for itself, off its own `accessWorld`, and its header claimed that
+   * "the field and `rail-geo` read the same plan, so the floor a body stands on
+   * and the shaft it sees are one set of numbers". They were two computations
+   * of the same thing against two different worlds, which is not the same thing
+   * at all: a chunk built before the client had prisms drew the shaft at the
+   * bake's mouth while the field stood bodies on the moved one, and a player who
+   * walked in got a floor with no walls round it and the underside of the city
+   * to look at. The owner: *"i do underground into clipville if i go thru where
+   * a hole should be"*.
+   *
+   * `mouths` and `plans` are pushed together and stay index-aligned; this is
+   * the same pair keyed for the drawing.
+   */
+  planFor(name: string): AccessPlan | null {
+    for (let i = 0; i < this.mouths.length; i++) {
+      if (this.mouths[i].name === name) return this.plans[i] ?? null;
+    }
+    return null;
+  }
   private readonly cells = new Map<number, StationBox[]>();
   readonly boxes: StationBox[] = [];
   /** Grid pitch. A box is at most ~400 m long, so a query touches a few cells. */
@@ -4185,6 +4209,25 @@ export function verifyStationAccess(): string[] {
   if (flat.floorAt(10, 0, 7) !== 7 || flat.floorAt(-10, 0, 7) !== 7) {
     failures.push('an unsloped box no longer answers one height across its length.');
   }
+  // --- The field's plans are addressable by name, which is what lets the
+  //     drawing read the same numbers the collision stands bodies on rather
+  //     than working out its own. See `rail-geo.setAccessPlans`.
+  {
+    const st = like({ entranceX: 40, entranceZ: 20, entranceY: 20, name: 'Testville' });
+    const field = buildStationBoxes({ stations: [st] } as unknown as RailBake);
+    if (field.mouths.length !== field.plans.length) {
+      failures.push(`${field.mouths.length} mouths against ${field.plans.length} plans; the two are meant to be pushed together.`);
+    }
+    for (let i = 0; i < field.mouths.length; i++) {
+      const got = field.planFor(field.mouths[i].name);
+      if (got !== field.plans[i]) failures.push(`planFor("${field.mouths[i].name}") did not return that mouth's own plan.`);
+      if (got !== null && (Math.abs(got.mouthX - field.mouths[i].x) > 1e-9 || Math.abs(got.mouthZ - field.mouths[i].z) > 1e-9)) {
+        failures.push('a mouth and the plan behind it are in different places.');
+      }
+    }
+    if (field.planFor('a station that does not exist') !== null) failures.push('planFor invented a plan for an unknown station.');
+  }
+
   // --- **The mouth walks out of the building it lands in** -- and it can only
   //     do that if it is asked when the buildings are actually there.
   //
