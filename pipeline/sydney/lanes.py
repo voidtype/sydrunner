@@ -285,7 +285,7 @@ LANES_MAGIC = 0x454E414C  # 'LANE' little-endian
 # is not optional: v1 carried no bay at all and the client *derived* one from
 # the ways block, which is precisely the drift this version exists to end, so a
 # v1 file read by a v2 client would silently go back to deriving.
-LANES_VERSION = 2
+LANES_VERSION = 3
 
 # The class byte in the sidecar, in this order. **Append only** -- an index in a
 # file already on disk must keep meaning what it meant, exactly as
@@ -506,6 +506,20 @@ class Route:
     # the timetable that gives a bay a route-time. See `bays.py`.
     bay0: bays.Bay | None = None
     bay1: bays.Bay | None = None
+    # The chain this route is a chunk of (`_emit_chain`'s counter) and where
+    # in it. A joint is an end the car drives through: no bay, and the client
+    # synthesises none. The chain's crowd point is the head's own centre,
+    # copied onto every link so the client scales the whole chain alike. See
+    # `_chain` and the client's "A ROUTE IS A LINK IN A CHAIN".
+    chain: int = -1
+    chunk: int = 0
+    joint0: bool = False
+    joint1: bool = False
+    chain_e: float = 0.0
+    chain_n: float = 0.0
+    # The longest stationary run on this route, and on its chain. See `_chain`.
+    longest_dwell: float = 0.0
+    chain_dwell: float = 0.0
 
     @property
     def duration(self) -> float:
@@ -1023,7 +1037,8 @@ def _emit_chain(
         return []
 
     out: list[Route] = []
-    for lo, hi in _chunks(p):
+    chain = stats["chains"] = stats.get("chains", 0) + 1
+    for chunk, (lo, hi) in enumerate(_chunks(p)):
         sub = p[lo : hi + 1]
         length = float(np.hypot(*np.diff(sub, axis=0).T).sum())
         if length < MIN_ROUTE_M:
@@ -1041,6 +1056,8 @@ def _emit_chain(
                 headway=0.0,
                 phase=0.0,
                 stops=[s - lo for s in stops if lo <= s <= hi],
+                chain=chain,
+                chunk=chunk,
             )
         )
     return out
@@ -1149,6 +1166,7 @@ def _schedule(routes: list[Route], signals: set) -> list[Route]:
         r.rid = rid
         pts, y, t, longest = _timetable(r, r.stops)
         r.pts, r.y, r.t = pts, y, t
+        r.longest_dwell = float(longest)
         r.headway = _headway(r.highway, longest)
         # The phase is what decorrelates two routes that meet at a junction.
         # Hashed off the route id so it is the same in every process and stable
@@ -1156,7 +1174,66 @@ def _schedule(routes: list[Route], signals: set) -> list[Route]:
         r.phase = float(_unit(_hash(rid, 0x1D0C)) * r.headway)
         r.tile = geo.tile_for_enu(float(r.pts[0, 0]), float(r.pts[0, 1])).key
         kept.append(r)
+    _chain(kept)
     return kept
+
+
+def _chain(kept: list[Route]) -> None:
+    """Join the chunks of one chain back into one car.
+
+    `_chunks` cuts a chain of edges longer than `MAX_ROUTE_M` into routes that
+    share a vertex, and until v3 each cut was a route end -- a bay, a residency
+    and a car that winked out while the next route's car winked in three metres
+    on. The client cannot mend that at runtime (a link's timetable would depend
+    on which tiles it happened to hold), so it is mended here, where the whole
+    chain is in hand: consecutive kept chunks of one chain share the head's
+    rid, the chain's longest headway, a phase that is the head's plus the
+    durations before, joint flags on the shared ends, and the head's centre as
+    the crowd's one sample point. A chunk `KEEP_SHARE` dropped breaks the
+    chain there, which is right: the car that would have carried on is not in
+    the file.
+    """
+    by_chain: dict[int, list[Route]] = {}
+    for r in kept:
+        if r.chain >= 0:
+            by_chain.setdefault(r.chain, []).append(r)
+    for members in by_chain.values():
+        members.sort(key=lambda r: r.chunk)
+        runs: list[list[Route]] = []
+        for r in members:
+            if runs and runs[-1][-1].chunk == r.chunk - 1:
+                runs[-1].append(r)
+            else:
+                runs.append([r])
+        for run in runs:
+            if len(run) < 2:
+                continue
+            head = run[0]
+            headway = max(r.headway for r in run)
+            dwell = max(r.longest_dwell for r in run)
+            centre_e = float(head.pts[:, 0].mean())
+            centre_n = float(head.pts[:, 1].mean())
+            phase = head.phase
+            for i, r in enumerate(run):
+                r.rid = head.rid
+                r.headway = headway
+                # Stored as f32 and rounded *up*: a phase a hair short of the
+                # car in front's arrival poses the same car on both links for
+                # that hair. See `scripts/world-round/chain-lanes.py`'s `up32`.
+                p32 = np.float32(phase)
+                while float(p32) < phase:
+                    p32 = np.nextafter(p32, np.float32(np.inf))
+                r.phase = float(p32)
+                r.joint0 = i > 0
+                r.joint1 = i < len(run) - 1
+                r.chain_e = centre_e
+                r.chain_n = centre_n
+                r.chain_dwell = dwell
+                phase = r.phase + float(np.float32(r.duration))
+    for r in kept:
+        if r.chain_e == 0.0 and r.chain_n == 0.0:
+            r.chain_e = float(r.pts[:, 0].mean())
+            r.chain_n = float(r.pts[:, 1].mean())
 
 
 def _timetable(route: Route, stops: list[int]):

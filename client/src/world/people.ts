@@ -92,6 +92,7 @@ import { FIGURE_HEIGHT, HIP_HEIGHT, strideLength } from '../player/animation.ts'
 import {
   PedestrianField,
   createPedPose,
+  GIB_SECONDS,
   forEachPedestrianNear,
   type PedBand,
   type PedPose,
@@ -348,6 +349,36 @@ const FALL_OUT = 0.38;
 /** How high off the footpath a body lies. Half a torso. */
 const LIE_LIFT = 0.13;
 
+// --- Gibs. See `pedestrians.GIB_SPEED`.
+//
+// A killed walker is drawn as the same six parts leaving in six directions:
+// each takes the launch the record carries, plus its own hashed spread, flies
+// a hop under gravity and slides to rest, tumbling as it goes, and lies there
+// for `GIB_SECONDS` before the ground swallows it. The skin parts go the
+// colour of the inside of a person. Nothing here is a new mesh: the parts are
+// the impostor's own, so a gibbed figure costs exactly what a standing one
+// does, and the figure never reaches the rig tier because a rig has no
+// "in pieces" clip and would stand up.
+/** How fast a part leaves, over and above the launch, m/s. */
+const GIB_SPREAD = 5.5;
+/** The parts' own hop, m/s, and how long they tumble and slide. */
+const GIB_UP_MIN = 2.5;
+const GIB_UP_SPAN = 4.5;
+const GIB_SLIDE_S = 1.6;
+const GIB_SPIN = 9;
+/** What the skin becomes. */
+const GORE: Rgb = [0.52, 0.07, 0.06];
+const GRAVITY = 9.8;
+
+/** A unit in [0, 1) from a key and a small index, without a transcendental. */
+function gibUnit(key: number, index: number): number {
+  let h = (Math.imul(key | 0, 0x9e3779b1) ^ Math.imul(index + 1, 0x85ebca6b)) >>> 0;
+  h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d) >>> 0;
+  h = Math.imul(h ^ (h >>> 12), 0x297a2d39) >>> 0;
+  return ((h ^ (h >>> 15)) >>> 0) / 4294967296;
+}
+const _gibAxis = /*#__PURE__*/ new Vector3();
+
 // --- The crowd -----------------------------------------------------------------
 
 const _matrix = /*#__PURE__*/ new Matrix4();
@@ -415,6 +446,12 @@ export class PedestrianCrowd {
   private readonly vDown = new Uint8Array(VISIBLE_CAPACITY);
   /** Which rig slot took this walker, or -1. */
   private readonly vRig = new Int32Array(VISIBLE_CAPACITY);
+  /** Killed: drawn as parts. See the gib constants. */
+  private readonly vGib = new Uint8Array(VISIBLE_CAPACITY);
+  /** Seconds down, and the launch, for the parts' own flight. */
+  private readonly vDownT = new Float64Array(VISIBLE_CAPACITY);
+  private readonly vVx = new Float64Array(VISIBLE_CAPACITY);
+  private readonly vVz = new Float64Array(VISIBLE_CAPACITY);
   private visible = 0;
 
   private readonly counts = [0, 0, 0, 0, 0, 0];
@@ -526,6 +563,13 @@ export class PedestrianCrowd {
       // reason to spend a transcendental on an ease.
       this.vFall[n] = p.down ? ease(Math.min(p.downT / FALL_IN, 1)) * ease(Math.min(p.downLeft / FALL_OUT, 1)) : 0;
       this.vRig[n] = -1;
+      this.vGib[n] = p.gib ? 1 : 0;
+      this.vDownT[n] = p.downT;
+      this.vVx[n] = p.vx;
+      this.vVz[n] = p.vz;
+      // A gibbed figure past its time is not drawn at all: the parts are gone
+      // and the walker is dead for `DEAD_SECONDS` more.
+      if (p.gib && p.downT > GIB_SECONDS) return;
       n++;
     });
     this.visible = n;
@@ -551,7 +595,7 @@ export class PedestrianCrowd {
       if (slot.key < 0) continue;
       let held = -1;
       for (let i = 0; i < this.visible; i++) {
-        if (this.vKey[i] === slot.key && this.vDist2[i] <= keep && this.vRig[i] < 0) {
+        if (this.vKey[i] === slot.key && this.vDist2[i] <= keep && this.vRig[i] < 0 && this.vGib[i] === 0) {
           held = i;
           break;
         }
@@ -575,6 +619,7 @@ export class PedestrianCrowd {
       let bestD = take;
       for (let i = 0; i < this.visible; i++) {
         if (this.vRig[i] >= 0) continue;
+        if (this.vGib[i] !== 0) continue;
         if (this.vDist2[i] < bestD) {
           bestD = this.vDist2[i];
           best = i;
@@ -673,6 +718,12 @@ export class PedestrianCrowd {
         _quaternion.set(0, 1, 0, 0);
       }
 
+      if (this.vGib[i] !== 0) {
+        this.writeGibs(i, n);
+        n++;
+        continue;
+      }
+
       const fall = this.vFall[i];
       if (fall > 0) {
         // Face down on the footpath. A rotation about the figure's own right
@@ -742,6 +793,48 @@ export class PedestrianCrowd {
   private strideOf(i: number): number {
     const speed = this.vSpeed[i];
     return (this.vAlong[i] * Math.PI * 2) / strideLength(speed > 0.1 ? speed : 1.3);
+  }
+
+  /**
+   * The six parts of a killed figure, each on its own flight. See the gib
+   * constants. `i` is the visible index, `n` the instance the six sets share.
+   */
+  private writeGibs(i: number, n: number): void {
+    const key = this.vKey[i];
+    const t = Math.min(this.vDownT[i], GIB_SLIDE_S);
+    const tt = this.vDownT[i];
+    const kit = COLOURWAYS[this.vKit[i]] ?? COLOURWAYS[0];
+    // The launch the record carries, at the figure's feet: `vX/vZ` already
+    // include the body's own flight, so the parts start from where the body
+    // would be and spread from there.
+    for (let p = 0; p < 6; p++) {
+      const a = gibUnit(key, p * 4);
+      const b = gibUnit(key, p * 4 + 1);
+      const c = gibUnit(key, p * 4 + 2);
+      const d = gibUnit(key, p * 4 + 3);
+      // Spread on a hashed heading, plus a share of the launch.
+      const hx = a * 2 - 1;
+      const hz = b * 2 - 1;
+      const vx = this.vVx[i] * (0.4 + 0.6 * c) + hx * GIB_SPREAD;
+      const vz = this.vVz[i] * (0.4 + 0.6 * c) + hz * GIB_SPREAD;
+      const up = GIB_UP_MIN + GIB_UP_SPAN * d;
+      // Distance under constant deceleration to rest over the slide.
+      const k = t - (t * t) / (2 * GIB_SLIDE_S);
+      const y = Math.max(0, up * tt - 0.5 * GRAVITY * tt * tt);
+      const px = this.vX[i] + vx * k;
+      const pz = this.vZ[i] + vz * k;
+      const py = this.vY[i] + y + 0.12;
+      // Tumbling while it flies, still once it lands.
+      const angle = (y > 0 ? tt : Math.min(tt, up / (0.5 * GRAVITY))) * GIB_SPIN * (0.5 + a);
+      _gibAxis.set(hz, 0.3 + c, -hx).normalize();
+      _quaternion.setFromAxisAngle(_gibAxis, angle);
+      // Each part is built about the figure's own origin; a hip-origin part
+      // (the shorts and shins) is offset so its box sits on its own centre.
+      _position.set(px, py, pz);
+      _matrix.compose(_position, _quaternion, _scale);
+      const tint: Rgb = p === 0 ? kit.singlet : p === 1 || p === 3 || p === 5 ? GORE : kit.shorts;
+      this.write(p, n, _matrix, tint);
+    }
   }
 
   private write(part: number, n: number, matrix: Matrix4, tint: Rgb): void {

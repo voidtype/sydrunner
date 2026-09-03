@@ -311,8 +311,10 @@ class BayLedger:
                 self.stats["too_short"] += 2
                 self.stats["ends"] += 2
                 continue
-            r.bay0 = self._claim(r, duration, near=True)
-            r.bay1 = self._claim(r, duration, near=False)
+            # A joint in a chain is driven through and claims no gutter; see
+            # `lanes._chain`.
+            r.bay0 = None if getattr(r, "joint0", False) else self._claim(r, duration, near=True)
+            r.bay1 = None if getattr(r, "joint1", False) else self._claim(r, duration, near=False)
 
     def _claim(self, route, duration: float, near: bool) -> Bay | None:
         """Walk this end's kerb outward until a bay comes free.

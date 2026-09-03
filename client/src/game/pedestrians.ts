@@ -254,6 +254,34 @@ export const PEDESTRIAN_KIT_COUNT = 7;
 export const DOWN_MIN = 1.5;
 export const DOWN_SPAN = 1.0;
 
+// --- Being launched, and being killed ---------------------------------------------
+//
+// The owner: *"add simple physics for cars and ppl"* and *"add actual death
+// mechanics for npc like hitting them at max car speed ... make em gib"*. A
+// knockdown used to be a body dropping where it stood, at any speed. Now a
+// car's hit carries its velocity into the record, the body flies with it --
+// a ballistic hop and a slide that stops inside `LAUNCH_SECONDS` -- and past
+// `GIB_SPEED` the walker is not knocked down but killed: the record lasts
+// `DEAD_SECONDS`, and `world/people.ts` draws the six parts of the figure
+// leaving in six directions rather than one body. All of it is arithmetic on
+// the record the two ends already share, so the flight is the same on every
+// screen and the police pass counts a corpse exactly as it counted a body.
+
+/** The whole of a launched body's flight and slide, seconds. */
+export const LAUNCH_SECONDS = 1.1;
+/** The body's launch speed as a fraction of the car's: a 60 km/h hit throws you at 9 m/s. */
+export const LAUNCH_SCALE = 0.55;
+/** The vertical share of the launch, and its cap, m/s. */
+export const LAUNCH_UP = 0.35;
+export const LAUNCH_UP_MAX = 5;
+/** Hit at this or faster, m/s, and the walker is killed rather than knocked down. 20 m/s is 72 km/h. */
+export const GIB_SPEED = 20;
+/** How long a killed walker is gone, seconds. Fifteen minutes: the street forgets before the player does. */
+export const DEAD_SECONDS = 900;
+/** How long the parts of a gibbed figure stay on the ground, seconds. */
+export const GIB_SECONDS = 8;
+const GRAVITY = 9.8;
+
 // --- Decoded shapes ------------------------------------------------------------
 
 /**
@@ -346,14 +374,43 @@ export interface PedPose {
   downT: number;
   /** Seconds until they get up, or 0. */
   downLeft: number;
+  /** The launch this body is flying or flew on, m/s. Zero for a plain knockdown. */
+  vx: number;
+  vz: number;
+  /** Killed: the renderer draws parts, not a body. See `GIB_SPEED`. */
+  gib: boolean;
 }
 
 export function createPedPose(): PedPose {
   return {
     key: 0, osmId: 0, side: 0, slot: 0, x: 0, y: 0, z: 0, dx: 0, dz: 1,
     kit: 0, speed: 0, along: 0, down: false, downT: 0, downLeft: 0,
+    vx: 0, vz: 0, gib: false,
   };
 }
+
+/**
+ * Where a launched body is, `t` seconds after the hit, relative to where it
+ * stood: a hop under gravity and a slide that decelerates to rest at
+ * `LAUNCH_SECONDS`. Pure arithmetic, no root, so both ends and every renderer
+ * agree to the bit. Writes into `out` as [dx, dy, dz].
+ */
+export function launchOffset(vx: number, vz: number, t: number, out: Float64Array): void {
+  const T = LAUNCH_SECONDS;
+  const tt = t < 0 ? 0 : t > T ? T : t;
+  // Distance under constant deceleration from v to 0 over T: v t - v t^2 / 2T.
+  const k = tt - (tt * tt) / (2 * T);
+  out[0] = vx * k;
+  out[2] = vz * k;
+  const speed2 = vx * vx + vz * vz;
+  // The vertical share, capped; `Math.sqrt` is exact and allowed.
+  let up = LAUNCH_UP * Math.sqrt(speed2);
+  if (up > LAUNCH_UP_MAX) up = LAUNCH_UP_MAX;
+  const y = up * tt - 0.5 * GRAVITY * tt * tt;
+  out[1] = y > 0 ? y : 0;
+}
+
+const _launch = new Float64Array(3);
 
 /**
  * One pedestrian who has been knocked over, and the whole of how they get back up.
@@ -377,10 +434,15 @@ export interface PedDown {
   frozen: number;
   /** Wall-clock schedule seconds at which they stand up. */
   upAt: number;
-  /** How long this knock puts them down for. `downSeconds(key, tick)`. */
+  /** How long this knock puts them down for. `downSeconds(key, tick)`, or `DEAD_SECONDS`. */
   seconds: number;
   /** Total seconds this walker has ever spent on the ground. */
   offset: number;
+  /** The launch, m/s in the plan. Zero for a bat, a ball or a slow car. See `LAUNCH_SECONDS`. */
+  vx: number;
+  vz: number;
+  /** Killed rather than knocked down. See `GIB_SPEED`. */
+  gib: boolean;
   /** The tick of the most recent hit. A hash input, and the police pass's cause. */
   tick: number;
   /** Where they were standing. Read only by `forgetDistant`; see there. */
@@ -814,11 +876,11 @@ export class PedestrianField {
    * stops a bat swung through a pile of bodies re-launching all of them every
    * tick it overlaps them.
    */
-  knockDown(key: number, tick: number, now: number, x = 0, z = 0): PedDown | null {
+  knockDown(key: number, tick: number, now: number, x = 0, z = 0, vx = 0, vz = 0, gib = false): PedDown | null {
     const existing = this.downs.get(key);
     if (existing !== undefined && now < existing.upAt) return null;
     const offsetBefore = existing === undefined ? 0 : existing.offset;
-    const seconds = downSeconds(key, tick);
+    const seconds = gib ? DEAD_SECONDS : downSeconds(key, tick);
     const record: PedDown = {
       frozen: now - offsetBefore,
       upAt: now + seconds,
@@ -827,6 +889,9 @@ export class PedestrianField {
       tick,
       x,
       z,
+      vx,
+      vz,
+      gib,
     };
     this.downs.set(key, record);
     return record;
@@ -1092,6 +1157,18 @@ export function posePedestrian(
   out.down = isDown;
   out.downT = downT;
   out.downLeft = downLeft;
+  out.vx = isDown && down !== undefined ? down.vx : 0;
+  out.vz = isDown && down !== undefined ? down.vz : 0;
+  out.gib = isDown && down !== undefined && down.gib;
+  // The flight. A body a car threw is not where it stood; it is where the
+  // launch put it, and the schedule stays pinned underneath so it gets up
+  // where it landed only in the sense that it never gets up anywhere else.
+  if (isDown && down !== undefined && (down.vx !== 0 || down.vz !== 0)) {
+    launchOffset(down.vx, down.vz, downT, _launch);
+    out.x += _launch[0];
+    out.y += _launch[1];
+    out.z += _launch[2];
+  }
   return true;
 }
 
@@ -1177,6 +1254,10 @@ export interface PedestrianHit {
   cause: 'bat' | 'footy' | 'car';
   /** The combatant id responsible, or 0 when nothing owns it. */
   attacker: number;
+  /** The launch the record carries, and whether it killed. See `LAUNCH_SECONDS`, `GIB_SPEED`. */
+  vx: number;
+  vz: number;
+  gib: boolean;
 }
 
 type PedestrianHitListener = (hit: PedestrianHit) => void;
@@ -1398,6 +1479,8 @@ export function runDownPedestrian(
     halfLength: number;
     halfWidth: number;
     height: number;
+    /** Metres per second, as `CarPose.speed` carries it. Absent for a blast box: a shove with no launch. */
+    speed?: number;
   },
   driver: number,
   tick: number,
@@ -1447,7 +1530,11 @@ export function runDownPedestrian(
   });
 
   if (bestKey < 0) return null;
-  return land(field, bestKey, bestOsm, bestSide, bestSlot, bestX, bestY, bestZ, tick, 'car', driver, scratch, pose);
+  // The launch is the car's own velocity, scaled; the kill is its speed.
+  const speed = car.speed ?? 0;
+  const vx = car.dx * speed * LAUNCH_SCALE;
+  const vz = car.dz * speed * LAUNCH_SCALE;
+  return land(field, bestKey, bestOsm, bestSide, bestSlot, bestX, bestY, bestZ, tick, 'car', driver, scratch, pose, vx, vz, speed >= GIB_SPEED);
 }
 
 /** Put somebody on the ground, tell the listeners, and hand back their pose. */
@@ -1465,9 +1552,12 @@ function land(
   attacker: number,
   scratch: PedBand[],
   pose: PedPose,
+  vx = 0,
+  vz = 0,
+  gib = false,
 ): PedPose | null {
   const now = trafficSeconds(tick);
-  const record = field.knockDown(key, tick, now, x, z);
+  const record = field.knockDown(key, tick, now, x, z, vx, vz, gib);
   if (record === null) return null;
   // Re-pose so the caller is handed the walker as they now are -- down, pinned,
   // and with the clock the renderer reads off them.
@@ -1478,9 +1568,12 @@ function land(
   announce({
     key, osmId, side, slot, x, y, z,
     tick,
-    seconds: downSeconds(key, tick),
+    seconds: record.seconds,
     cause,
     attacker,
+    vx,
+    vz,
+    gib,
   });
   return pose;
 }
@@ -1861,6 +1954,69 @@ export function verifyPedestrians(
             }
           }
         }
+      }
+    }
+  }
+
+  // --- BEING LAUNCHED, AND BEING KILLED. See `LAUNCH_SECONDS` and `GIB_SPEED`.
+  //
+  // A car's hit throws the body along the car's own heading -- a hop and a
+  // slide that is over inside `LAUNCH_SECONDS` -- and a hit past `GIB_SPEED`
+  // keeps the walker down for `DEAD_SECONDS`. The flight is what the police
+  // pass and every screen agree on, so it is checked as arithmetic here.
+  {
+    const field = new PedestrianField();
+    field.adopt('synthetic', tile);
+    const scratch: PedBand[] = [];
+    const probe = createPedPose();
+    let key = -1;
+    let x0 = 0;
+    let z0 = 0;
+    let y0 = 0;
+    const hitTick = 1200;
+    forEachPedestrianNear(field, 250, 250, 900, hitTick, scratch, probe, (p) => {
+      key = p.key;
+      x0 = p.x;
+      y0 = p.y;
+      z0 = p.z;
+      return true;
+    });
+    if (key < 0) failures.push('No walker to launch on the synthetic band.');
+    else {
+      const now = trafficSeconds(hitTick);
+      const record = field.knockDown(key, hitTick, now, x0, z0, 8, 0, false);
+      if (record === null) failures.push('A standing walker could not be launched.');
+      else {
+        const bandOf = field.near(x0, z0, 2, scratch).find((b) => pedKey(b.osmId, b.side, 0) <= key && key < pedKey(b.osmId, b.side, 0) + MAX_SLOTS);
+        const slot = bandOf === undefined ? -1 : key - pedKey(bandOf.osmId, bandOf.side, 0);
+        if (bandOf === undefined || slot < 0) failures.push('The launched walker\'s band could not be found again.');
+        else {
+          const mid = createPedPose();
+          posePedestrian(bandOf, slot, now + 0.3, record, mid);
+          const flown = Math.sqrt((mid.x - x0) ** 2 + (mid.z - z0) ** 2);
+          if (!(flown > 1.5 && flown < 3)) failures.push(`0.3 s into an 8 m/s launch the body is ${flown.toFixed(2)} m from where it stood; it should be about 2.`);
+          if (!(mid.y > y0 + 0.2)) failures.push(`0.3 s into a launch the body is ${(mid.y - y0).toFixed(2)} m up; a hop should have it off the ground.`);
+          if (Math.abs(mid.vx - 8) > 1e-9 || mid.vz !== 0 || mid.gib) failures.push('The pose does not carry the launch it is flying.');
+          const rest = createPedPose();
+          posePedestrian(bandOf, slot, now + LAUNCH_SECONDS + 0.5, record, rest);
+          const slid = Math.sqrt((rest.x - x0) ** 2 + (rest.z - z0) ** 2);
+          const expect = 8 * LAUNCH_SECONDS / 2;
+          if (Math.abs(slid - expect) > 0.05) failures.push(`After the launch the body lies ${slid.toFixed(2)} m from where it stood; a ${LAUNCH_SECONDS} s slide from 8 m/s is ${expect.toFixed(2)}.`);
+          if (Math.abs(rest.y - y0) > 1e-6) failures.push('The body did not come back to the ground after its hop.');
+          if (!rest.down) failures.push('The launched body is not down.');
+          const later = createPedPose();
+          posePedestrian(bandOf, slot, now + LAUNCH_SECONDS + 1.0, record, later);
+          if (Math.abs(later.x - rest.x) > 1e-6 || Math.abs(later.z - rest.z) > 1e-6) failures.push('A landed body kept moving.');
+        }
+      }
+      // And a kill. A fresh field, so the re-hit guard is not what answers.
+      const morgue = new PedestrianField();
+      morgue.adopt('synthetic', tile);
+      const dead = morgue.knockDown(key, hitTick, now, x0, z0, 12, 3, true);
+      if (dead === null) failures.push('A standing walker could not be killed.');
+      else {
+        if (dead.seconds !== DEAD_SECONDS || !dead.gib) failures.push(`A kill lasts ${dead.seconds} s and gib ${dead.gib}; it should be ${DEAD_SECONDS} s and true.`);
+        if (morgue.knockDown(key, hitTick + 60, now + 1, x0, z0) !== null) failures.push('A killed walker was knocked down again.');
       }
     }
   }

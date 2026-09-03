@@ -2962,6 +2962,8 @@ export const EVENT = {
   PICKUP: 3,
   JOIN: 4,
   LEAVE: 5,
+  /** A car put a pedestrian down, or killed one. See `PedHitEvent`. */
+  PED_HIT: 7,
   /**
    * A bat sent a football back. See `game/swat.ts`.
    *
@@ -3088,7 +3090,31 @@ export interface SwatEvent {
   vz: number;
 }
 
-export type NetEvent = HitEvent | PickupEventFrame | JoinEvent | SwatEvent;
+/**
+ * A car put a pedestrian on the ground, or killed one. Server -> everyone.
+ *
+ * Twenty-four bytes: the walker's identity (`pedestrians.pedKey`'s three
+ * numbers), the tick, where they stood, the launch and whether it killed --
+ * everything `PedestrianField.knockDown` takes, so a client that never ran
+ * the hit lands the same record the server did and draws the same flight.
+ * Until this event only the server knew a driven car had hit anybody; the
+ * driver watched the crowd stand still.
+ */
+export interface PedHitEvent {
+  kind: 7;
+  osmId: number;
+  side: number;
+  slot: number;
+  tick: number;
+  x: number;
+  z: number;
+  /** The launch, m/s, to a centimetre a second. */
+  vx: number;
+  vz: number;
+  gib: boolean;
+}
+
+export type NetEvent = HitEvent | PickupEventFrame | JoinEvent | SwatEvent | PedHitEvent;
 
 /**
  * A batch of events, `u8 type`, `u8 count`, then each event's own bytes.
@@ -3104,6 +3130,7 @@ const EVENT_BYTES: Record<number, number> = {
   [EVENT.JOIN]: 5,
   [EVENT.LEAVE]: 5,
   [EVENT.SWAT]: 20,
+  [EVENT.PED_HIT]: 24,
 };
 
 /**
@@ -3152,6 +3179,16 @@ export function encodeEvents(events: readonly NetEvent[]): ArrayBuffer {
       v.setInt8(p + 17, quantiseVelocity(e.vx));
       v.setInt8(p + 18, quantiseVelocity(e.vy));
       v.setInt8(p + 19, quantiseVelocity(e.vz));
+    } else if (e.kind === EVENT.PED_HIT) {
+      v.setUint32(p + 1, e.osmId >>> 0, true);
+      v.setUint8(p + 5, e.side & 0xff);
+      v.setUint8(p + 6, e.slot & 0xff);
+      v.setUint32(p + 7, e.tick >>> 0, true);
+      v.setInt32(p + 11, quantisePos(e.x), true);
+      v.setInt32(p + 15, quantisePos(e.z), true);
+      v.setInt16(p + 19, Math.max(-32768, Math.min(32767, Math.round(e.vx * 100))), true);
+      v.setInt16(p + 21, Math.max(-32768, Math.min(32767, Math.round(e.vz * 100))), true);
+      v.setUint8(p + 23, e.gib ? 1 : 0);
     } else {
       v.setUint16(p + 1, e.id & 0xffff, true);
       v.setUint8(p + 3, e.colourway);
@@ -3205,6 +3242,19 @@ export function decodeEvents(buffer: ArrayBuffer): NetEvent[] | null {
         vx: dequantiseVelocity(v.getInt8(p + 17)),
         vy: dequantiseVelocity(v.getInt8(p + 18)),
         vz: dequantiseVelocity(v.getInt8(p + 19)),
+      });
+    } else if (kind === EVENT.PED_HIT) {
+      out.push({
+        kind: EVENT.PED_HIT,
+        osmId: v.getUint32(p + 1, true),
+        side: v.getUint8(p + 5),
+        slot: v.getUint8(p + 6),
+        tick: v.getUint32(p + 7, true),
+        x: dequantisePos(v.getInt32(p + 11, true)),
+        z: dequantisePos(v.getInt32(p + 15, true)),
+        vx: v.getInt16(p + 19, true) / 100,
+        vz: v.getInt16(p + 21, true) / 100,
+        gib: v.getUint8(p + 23) !== 0,
       });
     } else {
       out.push({
@@ -5484,6 +5534,9 @@ export function verifyNet(): string[] {
         x: -812.345, y: 15.5, z: 1420.99,
         vx: -21.5, vy: 8, vz: -35.5,
       },
+      // A pedestrian killed by a car going west and north, on a way whose id
+      // is over 2^31 -- the u32 half of the range an OSM id can reach.
+      { kind: EVENT.PED_HIT, osmId: 3_900_000_001, side: 1, slot: 37, tick: 123456789, x: -2450.5, z: 1300.25, vx: -11.25, vz: -3.5, gib: true },
     ];
     const got = decodeEvents(encodeEvents(events));
     if (!got || got.length !== events.length) {
@@ -5496,6 +5549,14 @@ export function verifyNet(): string[] {
       const pick = got[1] as PickupEventFrame;
       if (pick.tileX !== -3 || pick.tileZ !== 5 || pick.index !== 17 || pick.powerup !== 1) {
         failures.push('A PICKUP event did not round-trip. Negative tile indices are the usual cause.');
+      }
+      const ped = got[4] as PedHitEvent;
+      if (
+        ped.kind !== EVENT.PED_HIT || ped.osmId !== 3_900_000_001 || ped.side !== 1 || ped.slot !== 37 ||
+        ped.tick !== 123456789 || Math.abs(ped.x + 2450.5) > 0.002 || Math.abs(ped.z - 1300.25) > 0.002 ||
+        Math.abs(ped.vx + 11.25) > 0.006 || Math.abs(ped.vz + 3.5) > 0.006 || !ped.gib
+      ) {
+        failures.push('A PED_HIT event did not round-trip.');
       }
       const join = got[2] as JoinEvent;
       if (join.id !== 9 || join.bot !== 1) failures.push('A JOIN event did not round-trip.');

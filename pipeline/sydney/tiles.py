@@ -1525,10 +1525,10 @@ def write_lanes(path: Path, tile: lanes.TileLanes, origin: tuple[float, float]) 
           per point:
             f32  x, f32 y, f32 z
 
-        per route (16-byte header, 24-byte park block, then 16 bytes a point):
+        per route (16-byte header, 24-byte park block, 12-byte chain block, then 16 bytes a point):
           u32  rid            stable route id; the hash seed for its cars
           u8   klass
-          u8   flags          bit 0: a near bay is assigned
+          u8   flags          bit 0: a near bay is assigned; bit 2/3: this end is a chain joint
                               bit 1: a far bay is assigned
           u16  point count
           f32  headway        seconds between departures
@@ -1537,6 +1537,9 @@ def write_lanes(path: Path, tile: lanes.TileLanes, origin: tuple[float, float]) 
           f32  offX0, offZ0   near bay centre minus the lane point at parkT0
           f32  parkT1         route-time the car comes to rest at in the far bay
           f32  offX1, offZ1   far bay centre minus the lane point at parkT1
+          f32  chainX, chainZ tile-local point the client samples the crowd at,
+                              the chain's head centre -- see `lanes._chain`
+          f32  chainDwell     the chain's longest stationary run, seconds
           per point:
             f32  x, f32 y, f32 z
             f32  t            cumulative seconds from the route's start
@@ -1615,10 +1618,17 @@ def write_lanes(path: Path, tile: lanes.TileLanes, origin: tuple[float, float]) 
         for (e, n), y in zip(w.pts, w.y):
             out += struct.pack("<fff", float(e - oe), float(y), float(-(n - on)))
     for r in tile.routes:
-        bay0 = getattr(r, "bay0", None)
-        bay1 = getattr(r, "bay1", None)
+        # A joint never parks: the bay the arbitration may have given it is
+        # dropped here rather than left for the client to ignore.
+        bay0 = None if getattr(r, "joint0", False) else getattr(r, "bay0", None)
+        bay1 = None if getattr(r, "joint1", False) else getattr(r, "bay1", None)
         duration = float(r.t[-1]) if len(r.t) else 0.0
-        flags = (1 if bay0 is not None else 0) | (2 if bay1 is not None else 0)
+        flags = (
+            (1 if bay0 is not None else 0)
+            | (2 if bay1 is not None else 0)
+            | (4 if getattr(r, "joint0", False) else 0)
+            | (8 if getattr(r, "joint1", False) else 0)
+        )
         out += struct.pack(
             "<IBBHff",
             int(r.rid) & 0xFFFFFFFF,
@@ -1645,6 +1655,13 @@ def write_lanes(path: Path, tile: lanes.TileLanes, origin: tuple[float, float]) 
             float(bay1.off_e) if bay1 is not None else 0.0,
             float(-bay1.off_n) if bay1 is not None else 0.0,
         )
+        # The chain block. See `lanes._chain`.
+        ce = getattr(r, "chain_e", 0.0)
+        cn = getattr(r, "chain_n", 0.0)
+        if ce == 0.0 and cn == 0.0:
+            ce = float(np.asarray(r.pts)[:, 0].mean())
+            cn = float(np.asarray(r.pts)[:, 1].mean())
+        out += struct.pack("<fff", float(ce - oe), float(-(cn - on)), float(getattr(r, "chain_dwell", 0.0)))
         for (e, n), y, t in zip(r.pts, r.y, r.t):
             out += struct.pack("<ffff", float(e - oe), float(y), float(-(n - on)), float(t))
 

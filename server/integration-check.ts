@@ -3384,18 +3384,23 @@ async function checkTraffic(): Promise<void> {
       let bayless = 0;
       let inLane = 0;
       let synth = 0;
+      let joints = 0;
       for (const route of routes) {
-        for (const [has, isSynth, shift] of [
-          [route.bay0, route.laneBay0, route.kerbShift0],
-          [route.bay1, route.laneBay1, route.kerbShift1],
+        for (const [has, isSynth, shift, joint] of [
+          [route.bay0, route.laneBay0, route.kerbShift0, route.joint0],
+          [route.bay1, route.laneBay1, route.kerbShift1, route.joint1],
         ] as const) {
+          // A joint in a chain owns no bay by design: the car drives through.
+          // See `traffic.ts`'s "A ROUTE IS A LINK IN A CHAIN".
+          if (joint) { joints++; continue; }
           if (!has) bayless++;
           else if (isSynth) synth++;
           else if (shift === 0) inLane++;
         }
       }
-      const ends = routes.length * 2;
+      const ends = routes.length * 2 - joints;
       const kerb = ends - bayless - inLane - synth;
+      say(`  chains: ${joints.toLocaleString()} route ends are joints a car drives through`);
       say(
         `  kerbs: ${kerb.toLocaleString()} of ${ends.toLocaleString()} route ends own a kerb bay, ` +
           `${inLane.toLocaleString()} own the lane spot they drive through ` +
@@ -4871,7 +4876,9 @@ async function checkTraffic(): Promise<void> {
           // The matching route in instance one's field, by rid. Both decoded the
           // same tile, so the rid is the same 32-bit name -- that is what
           // `LaneRoute.rid` is for.
-          const mine = inRing.find((c) => c.rid === r.rid);
+          // By rid *and* first vertex: since lanes v3 the links of a chain
+          // share their head's rid, and the twin of a link is the link.
+          const mine = inRing.find((c) => c.rid === r.rid && c.x[0] === r.x[0] && c.z[0] === r.z[0]);
           if (mine === undefined) continue;
           const slot = Math.floor((now - r.phase) / r.headway);
           if (!one.poseCar(mine, slot, now, a)) continue;

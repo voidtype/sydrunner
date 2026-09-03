@@ -101,6 +101,7 @@ import {
   verifyPedestrians,
   type PedBand,
   type PedPose,
+  pedKey,
 } from './game/pedestrians.ts';
 import {
   PipelineWatch,
@@ -9421,6 +9422,14 @@ async function main(): Promise<void> {
       onBounce(x, _y, z, bounces) {
         const range = Math.hypot(x - player.position.x, z - player.position.z);
         if (range < BOUNCE_AUDIBLE) audio.footyBounce(range, bounces);
+      },
+      onPedHit(osmId, side, slot, tick, x, z, vx, vz, gib) {
+        // The server's record, landed here as it was made there -- the same
+        // key, tick and launch -- so this walker flies the same arc on every
+        // screen. `knockDown` refuses a walker already down, which is what
+        // keeps a local strike and its echo from the server one knockdown.
+        pedestrians.knockDown(pedKey(osmId, side, slot), tick, trafficSeconds(tick), x, z, vx, vz, gib);
+        audio.oof(Math.hypot(x - player.position.x, z - player.position.z), pedKey(osmId, side, slot) | 0);
       },
       onPickup(combatant, kind, tileKey, index) {
         // Spec 8.3 is server-authoritative online, so the local field is a

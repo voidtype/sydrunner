@@ -4523,7 +4523,7 @@ def _decode_lanes(key: str):
     magic, version, n_ways, n_routes = struct.unpack_from("<IIII", buf, 0)
     if magic != tiles.LANES_MAGIC:
         return f"magic {magic:#x}"
-    if version != tiles.LANES_VERSION:
+    if version not in (2, tiles.LANES_VERSION):
         return f"version {version}"
     o = 16
     ways, routes = [], []
@@ -4543,10 +4543,15 @@ def _decode_lanes(key: str):
         # decode as a plausible route somewhere else entirely.
         pt0, ox0, oz0, pt1, ox1, oz1 = struct.unpack_from("<ffffff", buf, o)
         o += 24
+        chain = (0.0, 0.0)
+        if version >= 3:
+            chain = struct.unpack_from("<fff", buf, o)
+            o += 12
         rec = np.frombuffer(buf, dtype="<f4", count=n * 4, offset=o).reshape(n, 4)
         o += n * 16
         routes.append({"rid": rid, "klass": klass, "headway": headway, "phase": phase,
                        "bay0": bool(flags & 1), "bay1": bool(flags & 2),
+                       "joint0": bool(flags & 4), "joint1": bool(flags & 8), "chain": chain,
                        "park": (pt0, ox0, oz0, pt1, ox1, oz1),
                        "p": rec[:, :3].astype(np.float64), "t": rec[:, 3].astype(np.float64)})
     if o != len(buf):

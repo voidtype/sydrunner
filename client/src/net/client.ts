@@ -381,6 +381,12 @@ export interface NetHandlers {
   ): void;
   /** A ball bounced. `bounces` is which one, so the caller can vary the thud. */
   onBounce(x: number, y: number, z: number, bounces: number): void;
+  /**
+   * A car put a pedestrian down, or killed one. Everything
+   * `PedestrianField.knockDown` takes, so the receiver lands the server's
+   * record exactly. See `protocol.PedHitEvent`.
+   */
+  onPedHit?(osmId: number, side: number, slot: number, tick: number, x: number, z: number, vx: number, vz: number, gib: boolean): void;
   onPickup(combatant: number, kind: PowerupKind, tileKey: string, index: number): void;
   onJoin(id: number, colourway: number, bot: boolean): void;
   /**
@@ -2138,6 +2144,8 @@ export class NetClient {
         );
       } else if (e.kind === EVENT.SWAT) {
         this.handlers.onSwat(e.swinger, e.ball, e.x, e.y, e.z, e.vx, e.vy, e.vz);
+      } else if (e.kind === EVENT.PED_HIT) {
+        this.handlers.onPedHit?.(e.osmId, e.side, e.slot, e.tick, e.x, e.z, e.vx, e.vz, e.gib);
       } else if (e.kind === EVENT.PICKUP) {
         this.handlers.onPickup(e.combatant, e.powerup as PowerupKind, `${e.tileX}_${e.tileZ}`, e.index);
       } else if (e.kind === EVENT.JOIN) {
@@ -3996,6 +4004,7 @@ function silentHandlers(): NetHandlers {
   return {
     onHit: () => {},
     onSwat: () => {},
+    onPedHit: () => {},
     onBounce: () => {},
     onPickup: () => {},
     onJoin: () => {},

@@ -95,45 +95,46 @@
  * than a flight over the bonnet.
  *
  * ---------------------------------------------------------------------------
- * A ROUTE IS A LINK IN A CHAIN. THIS IS WHAT v4 CHANGED.
+ * A ROUTE IS A LINK IN A CHAIN. THIS IS WHAT LANES v3 CHANGED.
  *
  * The owner's third report on the same subject: *"there are many places along
  * roads where cars stop, despawn after a while, and shortly after may in some
  * cases also have other cars spawning later on."* Every word true again, and
  * this time the cause was in `lanes.py`'s `_chunks`, not in the park stages: a
  * chain of edges longer than `MAX_ROUTE_M` (800 m) is cut into routes that
- * share a vertex, and each cut is a route end. So every 800 m along a long
+ * share a vertex, and each cut was a route end. So every 800 m along a long
  * street a car pulled into a bay, sat out the residency and went, while the
  * next route's car appeared in a bay a few metres on and pulled out -- a
  * relay race with a parked car for a baton, on a street where nobody would
  * ever park.
  *
- * The sidecar cannot say which ends are cuts, but the geometry can: a cut is
- * the one place two routes of the same class share a vertex *exactly*, because
- * `_chunks` writes the same point into both. So `TrafficField.adopt` files
- * every resident route by its two ends and joins any pair that meet -- in
- * either adoption order, across any tile boundary -- and then runs the chain's
- * clock down from its head:
+ * **The fix is in the bake, and it was first written here and taken out
+ * again.** A runtime that joined resident routes by their shared vertex
+ * worked in one process and was wrong across the wire: a link's timetable
+ * was the head's plus every duration before it, and a client whose resident
+ * tiles began mid-chain saw a different head, so the cars nearest the player
+ * stood somewhere else on the server. So `lanes.py` (and, for the world that
+ * already shipped, `scripts/world-round/chain-lanes.py`) does it once, with
+ * the whole chain in hand, and writes the answer into every link:
  *
- *   - every link's cars hash from the **head's** rid (`chainRid`), so the car
- *     that crosses a joint is the same identity, model and paint on both sides;
- *   - every link takes the head's headway, and a phase that is the moment the
- *     car before it reaches the joint, so slot `k` of the link is slot `k` of
- *     the head an exact `duration` later;
- *   - the ends inside a chain lose their bays and the two ends of the whole
- *     chain keep theirs, so the car drives through and parks only where the
- *     chain really stops.
+ *   - the links share the head's **rid**, so the car that crosses a joint is
+ *     the same identity, model and paint on both sides -- `carHash(rid, slot)`
+ *     is the same number;
+ *   - the links share one headway (the chain's longest) and each link's phase
+ *     is the head's plus the durations before it, so slot `k` of a link is
+ *     slot `k` of the head an exact `duration` later;
+ *   - the ends inside the chain are flagged **joints** (bits 2 and 3 of the
+ *     flags byte): no bay, and `buildParkPhases` synthesises none, so the car
+ *     drives through and parks only where the chain really stops;
+ *   - every link carries the chain's one **crowd sample point**, so
+ *     `scaleHeadway` scales the whole chain alike -- a chain that crossed a
+ *     density boundary would otherwise change headway at the joint.
  *
  * The timetable already keeps the free speed at both ends of every route
  * ("a route does not stop dead at either end", `lanes._timetable`), which is
  * what makes a joint invisible: same point, same speed, same car, one frame
- * apart. A tile leaving takes its links out and hands the halves their own
- * numbers back, exactly as the sidecar wrote them (`OwnStages`).
- *
- * The plan bounds are not touched by any of this. `unindex` recomputes a
- * route's cells from them, so they are frozen at decode; a link can only
- * *remove* a bay, and a bay a route no longer parks in leaves its bounds a
- * little generous, which is the harmless direction.
+ * apart. Nothing about it is decided at runtime, so a client and the server
+ * agree about every car on the chain whichever tiles each of them holds.
  *
  * ---------------------------------------------------------------------------
  * AND THE PARKED STAGE IS A RESIDENCY, NOT A LAY-BY. THIS IS WHAT v3 CHANGED.
@@ -347,7 +348,7 @@ export const LANES_MAGIC = 0x454e414c;
  * is also why the bump is not optional: a v1 file has no park block, so a v2
  * decoder pointed at one would fall straight back to deriving.
  */
-export const LANES_VERSION = 2;
+export const LANES_VERSION = 3;
 
 /**
  * The class byte in `.lanes.bin`, in the pipeline's own order.
@@ -732,23 +733,28 @@ export interface LaneRoute {
   mark: number;
 
   // --- The chain. See the header's "A ROUTE IS A LINK IN A CHAIN".
-  /** The rid every car on this chain is hashed from: the head's. `rid` for an unchained route. */
-  chainRid: number;
-  /** The route whose last vertex is this one's first, once both are resident. */
-  prev: LaneRoute | null;
-  /** The route whose first vertex is this one's last. */
-  next: LaneRoute | null;
-  /** The tile this route arrived in. `TrafficField.adopt` sets it. */
-  tileKey: string;
   /**
    * Whether each end is a joint in a chain: the car drives through it and
    * `buildParkPhases` must not synthesise a lane bay there the way it does for
-   * a kerbless end. Set by `propagate`, cleared by `restoreOwn`.
+   * a kerbless end. Bits 2 and 3 of the sidecar's flags byte, v3.
    */
   joint0: boolean;
   joint1: boolean;
-  /** The sidecar's own numbers, so a link undone puts them back exactly. */
-  own: OwnStages;
+  /**
+   * Where the crowd is sampled for this route's headway: the chain's one
+   * point, world metres, so every link of a chain scales by the same
+   * multiplier and a car does not meet a different timetable at a joint. A
+   * route on no chain carries its own plan centre here.
+   */
+  chainX: number;
+  chainZ: number;
+  /**
+   * The longest stationary run anywhere on the chain, seconds -- the floor
+   * `scaleHeadway` squeezes against. Every link carries the chain's, or a
+   * link with a shorter red light would squeeze to a shorter headway than the
+   * one before it and the two would meet at the joint as two cars.
+   */
+  chainDwell: number;
 
   // --- The park stages. The two *bays* come out of the sidecar's park block --
   // `bays.py` arbitrated them against the static fleet and against every other
@@ -856,20 +862,6 @@ export interface LaneRoute {
 export interface TileLanes {
   ways: LaneWay[];
   routes: LaneRoute[];
-}
-
-/** What `decodeLanes` read for a route's stages, before any chain touched them. */
-export interface OwnStages {
-  phase: number;
-  headway: number;
-  bay0: boolean;
-  bay1: boolean;
-  parkT0: number;
-  parkT1: number;
-  kerbOffX0: number;
-  kerbOffZ0: number;
-  kerbOffX1: number;
-  kerbOffZ1: number;
 }
 
 /** Where one car is, and what it looks like. Reused; never allocated per frame. */
@@ -1041,7 +1033,11 @@ export function decodeLanes(
   if (buffer.byteLength < 16) return null;
   const v = new DataView(buffer);
   if (v.getUint32(0, true) !== LANES_MAGIC) return null;
-  if (v.getUint32(4, true) !== LANES_VERSION) return null;
+  // v2 is read as well as v3, for the one deploy where the code lands before
+  // the world does: a v2 route has no joints and samples the crowd at its own
+  // centre, which is exactly what v2 meant.
+  const version = v.getUint32(4, true);
+  if (version !== LANES_VERSION && version !== 2) return null;
   const wayCount = v.getUint32(8, true);
   const routeCount = v.getUint32(12, true);
 
@@ -1089,6 +1085,18 @@ export function decodeLanes(
     const bayOffX1 = v.getFloat32(o + 32, true);
     const bayOffZ1 = v.getFloat32(o + 36, true);
     o += 40;
+    // The chain block, v3: the crowd's sample point for this route's chain.
+    // See `LaneRoute.chainX`. Local like every point in the file.
+    let chainX = Number.NaN;
+    let chainZ = Number.NaN;
+    let chainDwell = 0;
+    if (version >= 3) {
+      if (o + 12 > buffer.byteLength) return null;
+      chainX = v.getFloat32(o, true) + originX;
+      chainZ = v.getFloat32(o + 4, true) + originZ;
+      chainDwell = v.getFloat32(o + 8, true);
+      o += 12;
+    }
     if (n < 2 || o + n * 16 > buffer.byteLength) return null;
     const x = new Float32Array(n);
     const y = new Float32Array(n);
@@ -1116,7 +1124,11 @@ export function decodeLanes(
     // rather than clamped: a car in the wrong place is a bug you can see, and a
     // hang is not.
     if (!(headway > 0) || !(t[n - 1] > 0)) continue;
-    const scaled = scaleHeadway(headway, klass, x, z, t, n, minX, maxX, minZ, maxZ, crowd);
+    if (!Number.isFinite(chainX)) {
+      chainX = (minX + maxX) * 0.5;
+      chainZ = (minZ + maxZ) * 0.5;
+    }
+    const scaled = scaleHeadway(headway, klass, x, z, t, n, chainX, chainZ, chainDwell, crowd);
     const route: LaneRoute = {
       rid, klass, headway: scaled, phase, duration: t[n - 1], count: n, x, y, z, t, minX, maxX, minZ, maxZ,
       // WORKSTREAM AB: no query has looked at this route yet. Stamps start at 1.
@@ -1132,8 +1144,8 @@ export function decodeLanes(
       bay0: (bayFlags & 1) !== 0, bay1: (bayFlags & 2) !== 0,
       laneBay0: false, laneBay1: false,
       dwellCap0: 0, dwellCap1: 0, dwellCap: 0,
-      chainRid: rid, prev: null, next: null, tileKey: '', joint0: false, joint1: false,
-      own: { phase, headway: scaled, bay0: (bayFlags & 1) !== 0, bay1: (bayFlags & 2) !== 0, parkT0: bayT0, parkT1: bayT1, kerbOffX0: bayOffX0, kerbOffZ0: bayOffZ0, kerbOffX1: bayOffX1, kerbOffZ1: bayOffZ1 },
+      joint0: (bayFlags & 4) !== 0, joint1: (bayFlags & 8) !== 0,
+      chainX, chainZ, chainDwell,
     };
     route.parkT0 = bayT0;
     route.parkT1 = bayT1;
@@ -1198,20 +1210,21 @@ function scaleHeadway(
   z: Float32Array,
   t: Float32Array,
   n: number,
-  minX: number,
-  maxX: number,
-  minZ: number,
-  maxZ: number,
+  /** Where the crowd is read: the chain's point, or the route's own centre. See `LaneRoute.chainX`. */
+  atX: number,
+  atZ: number,
+  /** The chain's longest stationary run, seconds; zero for a route on no chain. See `LaneRoute.chainDwell`. */
+  chainDwell: number,
   crowd: (x: number, z: number, klass: number) => number,
 ): number {
-  const mul = crowd((minX + maxX) * 0.5, (minZ + maxZ) * 0.5, klass);
+  const mul = crowd(atX, atZ, klass);
   if (!(mul > 0)) return headway;
   const want = headway / mul;
   if (want >= headway) return want;
 
   // Squeezing. Find the longest stretch of route-time the car spends stationary
   // and refuse to go under it.
-  let longest = 0;
+  let longest = chainDwell > 0 ? chainDwell : 0;
   let runStart = 0;
   for (let i = 1; i < n; i++) {
     const dx = x[i] - x[runStart];
@@ -1662,38 +1675,39 @@ export function verifyBayBounds(routes: readonly LaneRoute[], label: string): st
         'See `coverBays`.',
     );
   }
-  // --- The chain. Two synthetic tiles, the second's route starting on the
-  // first's last vertex: one car, one identity, no stop at the joint, and the
-  // sidecar's own numbers back when a tile leaves. Both adoption orders.
-  for (const order of [0, 1]) {
+  // --- The chain, as the bake writes it: two tiles, the second's route
+  // starting on the first's last vertex, the same rid, one headway, the
+  // second's phase the first's arrival, joints flagged on the shared end. One
+  // car, one identity, no stop at the joint, and no lane bay synthesised there.
+  {
     const field = new TrafficField();
-    const a = syntheticTile(2.2, 0, 0, UNIFORM_CROWD, SYNTHETIC_HEADWAY, 3, 0, 0x1a);
-    const b = syntheticTile(2.2, 0, -200, UNIFORM_CROWD, SYNTHETIC_HEADWAY, 3, 37, 0x2b);
-    if (order === 0) { field.adopt('a', a); field.adopt('b', b); } else { field.adopt('b', b); field.adopt('a', a); }
+    const a = syntheticTile(2.2, 0, 0, UNIFORM_CROWD, SYNTHETIC_HEADWAY, 1 | 8, 0, 0x1a, -12.5, [-2.2, -100]);
+    const durationA = a.routes[0].duration;
+    // The same world point as A's, in B's own frame: B's origin is 200 m
+    // north, so its local z is 200 more.
+    const b = syntheticTile(2.2, 0, -200, UNIFORM_CROWD, SYNTHETIC_HEADWAY, 2 | 4, durationA, 0x1a, -12.5, [-2.2, 100]);
+    field.adopt('a', a);
+    field.adopt('b', b);
     const A = a.routes[0];
     const B = b.routes[0];
-    const label = order === 0 ? 'head first' : 'tail first';
-    if (A.next !== B || B.prev !== A) { failures.push(`Two routes sharing a vertex did not chain (${label}).`); continue; }
-    if (B.chainRid !== A.rid) failures.push(`The second link's cars are hashed from rid ${B.chainRid}, not the head's ${A.rid} (${label}).`);
-    if (Math.abs(B.phase - (A.phase + A.duration)) > 1e-6) failures.push(`The second link's phase is ${B.phase}, not the head's arrival at ${A.phase + A.duration} (${label}).`);
-    if (A.bay1 || B.bay0) failures.push(`A joint kept a bay: A.bay1 ${A.bay1}, B.bay0 ${B.bay0} (${label}).`);
-    if (!A.bay0 || !B.bay1) failures.push(`The chain's two ends lost their bays (${label}).`);
-    if (A.headway !== B.headway) failures.push(`The links disagree about the headway (${label}).`);
-    // The car at the joint, a frame either side of it.
+    if (!A.joint1 || !B.joint0 || A.joint0 || B.joint1) failures.push(`The joint flags did not decode: A ${A.joint0}/${A.joint1}, B ${B.joint0}/${B.joint1}.`);
+    if (A.bay1 || B.bay0) failures.push(`A joint got a bay: A.bay1 ${A.bay1}, B.bay0 ${B.bay0}; a joint is driven through.`);
+    if (!A.bay0 || !B.bay1) failures.push('The chain\'s two real ends lost their bays.');
+    if (A.headway !== B.headway) failures.push('Two links with one chain point scaled to different headways.');
+    if (Math.abs(A.chainX - B.chainX) > 1e-6 || Math.abs(A.chainZ - B.chainZ) > 1e-6) failures.push('The chain point did not decode alike on both links.');
     const pa = createCarPose();
     const pb = createCarPose();
     const joint = A.phase + A.duration;
     const okA = poseCar(A, 0, joint - 1 / 60, pa);
     const okB = poseCar(B, 0, joint + 1 / 60, pb);
-    if (!okA || !okB) failures.push(`The car is missing a frame from the joint: before ${okA}, after ${okB} (${label}).`);
+    if (!okA || !okB) failures.push(`The car is missing a frame from the joint: before ${okA}, after ${okB}.`);
     else {
-      if (pa.identity !== pb.identity) failures.push(`The car changed identity at the joint: ${pa.identity} then ${pb.identity} (${label}).`);
+      if (pa.identity !== pb.identity) failures.push(`The car changed identity at the joint: ${pa.identity} then ${pb.identity}.`);
       const gap = Math.sqrt((pa.x - pb.x) ** 2 + (pa.z - pb.z) ** 2);
-      if (gap > 1.0) failures.push(`The car jumped ${gap.toFixed(2)} m at the joint (${label}).`);
-      if (pa.speed < 5 || pb.speed < 5) failures.push(`The car slowed to ${pa.speed.toFixed(1)} / ${pb.speed.toFixed(1)} m/s at the joint; a joint is not a stop (${label}).`);
-      if (pa.stage !== CAR_STAGE_DRIVING || pb.stage !== CAR_STAGE_DRIVING) failures.push(`The car is in stage ${pa.stage} then ${pb.stage} at the joint; both should be driving (${label}).`);
+      if (gap > 1.0) failures.push(`The car jumped ${gap.toFixed(2)} m at the joint.`);
+      if (pa.speed < 5 || pb.speed < 5) failures.push(`The car slowed to ${pa.speed.toFixed(1)} / ${pb.speed.toFixed(1)} m/s at the joint; a joint is not a stop.`);
+      if (pa.stage !== CAR_STAGE_DRIVING || pb.stage !== CAR_STAGE_DRIVING) failures.push(`The car is in stage ${pa.stage} then ${pb.stage} at the joint; both should be driving.`);
     }
-    // Never two cars at the joint.
     let doubled = 0;
     const scratch: LaneRoute[] = [];
     const seen = new Set<number>();
@@ -1706,12 +1720,12 @@ export function verifyBayBounds(routes: readonly LaneRoute[], label: string): st
       });
       if (here > 1 && seen.size > 1) doubled++;
     }
-    if (doubled > 0) failures.push(`Two different cars stood within 4 m of the joint on ${doubled} sampled ticks (${label}).`);
-    // Undone when the head leaves.
-    field.drop('a');
-    if (B.prev !== null || B.chainRid !== B.rid || B.phase !== 37 || !B.bay0) {
-      failures.push(`Dropping the head did not give the second link its own stages back (prev ${B.prev !== null}, rid ${B.chainRid}, phase ${B.phase}, bay0 ${B.bay0}) (${label}).`);
-    }
+    if (doubled > 0) failures.push(`Two different cars stood within 4 m of the joint on ${doubled} sampled ticks.`);
+    // And a v2 tile still decodes: no joints, the crowd read at its own centre.
+    const old = syntheticTile(2.2, 0, 0, UNIFORM_CROWD, SYNTHETIC_HEADWAY, 3, 0, 0x33, -12.5, null, 2);
+    const O = old.routes[0];
+    if (O.joint0 || O.joint1) failures.push('A v2 route decoded with joints.');
+    if (Math.abs(O.chainX - (O.minX + O.maxX) * 0.5) > 1e-3 || Math.abs(O.chainZ - (O.minZ + O.maxZ) * 0.5) > 1e-3) failures.push('A v2 route does not sample the crowd at its own centre.');
   }
 
   return failures;
@@ -2049,62 +2063,6 @@ export function compareRoutes(a: LaneRoute, b: LaneRoute): number {
  * handles and the checks, and sorting 23,734 routes on demand is cheaper in
  * code than a second incremental structure nobody queries.
  */
-/** A route end, to the centimetre, as a map key. Adoption-time only. */
-function ptKey(x: number, z: number): string {
-  return `${Math.round(x * 100)},${Math.round(z * 100)}`;
-}
-
-/** The sidecar's stages back onto the route, so a chain undone leaves no trace. */
-function restoreOwn(r: LaneRoute): void {
-  const o = r.own;
-  r.phase = o.phase;
-  r.headway = o.headway;
-  r.bay0 = o.bay0;
-  r.bay1 = o.bay1;
-  r.parkT0 = o.parkT0;
-  r.parkT1 = o.parkT1;
-  r.kerbOffX0 = o.kerbOffX0;
-  r.kerbOffZ0 = o.kerbOffZ0;
-  r.kerbOffX1 = o.kerbOffX1;
-  r.kerbOffZ1 = o.kerbOffZ1;
-  r.laneBay0 = false;
-  r.laneBay1 = false;
-  r.joint0 = false;
-  r.joint1 = false;
-}
-
-/** The first link of the chain `r` is on. */
-function headOf(r: LaneRoute): LaneRoute {
-  let h = r;
-  while (h.prev !== null) h = h.prev;
-  return h;
-}
-
-/** Is `who` already somewhere on the chain that `r` is on? Guards a loop of viaduct. */
-function inChain(who: LaneRoute, r: LaneRoute): boolean {
-  for (let q: LaneRoute | null = headOf(r); q !== null; q = q.next) if (q === who) return true;
-  return false;
-}
-
-/**
- * Does `b` carry on from `a`? Same class of street, and heading the same way
- * at the joint -- the lanes of the two directions of one street end on
- * different points, so equality of the point already refuses a U-turn, and
- * the heading test is for the crossing where two chains happen to touch.
- */
-function continues(a: LaneRoute, b: LaneRoute): boolean {
-  if (a.klass !== b.klass) return false;
-  const n = a.count - 1;
-  const ax = a.x[n] - a.x[n - 1];
-  const az = a.z[n] - a.z[n - 1];
-  const bx = b.x[1] - b.x[0];
-  const bz = b.z[1] - b.z[0];
-  const la = Math.sqrt(ax * ax + az * az);
-  const lb = Math.sqrt(bx * bx + bz * bz);
-  if (!(la > 1e-6) || !(lb > 1e-6)) return true;
-  return (ax * bx + az * bz) / (la * lb) > 0.2;
-}
-
 export class TrafficField {
   /**
    * Which cars a player has left standing in the road, and how far behind the
@@ -2135,19 +2093,13 @@ export class TrafficField {
   private flat: LaneRoute[] = [];
   private readonly grid = new Map<number, LaneRoute[]>();
   private flatDirty = true;
-  /** Resident routes by where they start and where they end, for `link`. */
-  private readonly starts = new Map<string, LaneRoute>();
-  private readonly ends = new Map<string, LaneRoute>();
 
   adopt(tileKey: string, tile: TileLanes): void {
     // Re-adopting a key replaces it, which is what the old `Map.set` plus a
     // full rebuild did. Unindexed first, or the previous tile's routes stay in
     // the grid with nothing left holding a reference to take them out.
     const previous = this.tiles.get(tileKey);
-    if (previous !== undefined) {
-      for (const r of previous.routes) this.unlink(r);
-      this.unindex(previous.routes);
-    }
+    if (previous !== undefined) this.unindex(previous.routes);
     // The bays too, and in the same order: out with the old tile's, in with the
     // new one's. `LaneObstacles.drop` is keyed by the tile rather than by the
     // routes, so a re-adopt cannot leave a bay behind pointing at a route
@@ -2155,11 +2107,6 @@ export class TrafficField {
     if (previous !== undefined) this.obstacles.drop(tileKey);
     this.tiles.set(tileKey, tile);
     this.index(tile.routes);
-    // The chains, before the bays: a joint a car drives through is not a bay
-    // and must not be registered as one. `link` re-registers the neighbour's
-    // tile when it changes a route that is already resident.
-    for (const r of tile.routes) r.tileKey = tileKey;
-    for (const r of tile.routes) this.link(r);
     this.obstacles.adoptRoutes(tileKey, tile.routes);
     this.flatDirty = true;
   }
@@ -2168,97 +2115,9 @@ export class TrafficField {
     const previous = this.tiles.get(tileKey);
     if (previous === undefined) return;
     this.tiles.delete(tileKey);
-    for (const r of previous.routes) this.unlink(r);
     this.unindex(previous.routes);
     this.obstacles.drop(tileKey);
     this.flatDirty = true;
-  }
-
-  // --- The chain. See the header's "A ROUTE IS A LINK IN A CHAIN".
-
-  /**
-   * File a route's two ends and join it to whatever is already resident on
-   * either side of it. Order-independent: the pair links whichever of the two
-   * tiles lands second, and a chain of three is the same chain built from any
-   * end, because `propagate` always starts from the head.
-   */
-  private link(r: LaneRoute): void {
-    const n = r.count - 1;
-    const sKey = ptKey(r.x[0], r.z[0]);
-    const eKey = ptKey(r.x[n], r.z[n]);
-    if (!this.starts.has(sKey)) this.starts.set(sKey, r);
-    if (!this.ends.has(eKey)) this.ends.set(eKey, r);
-    const before = this.ends.get(sKey);
-    if (before !== undefined && before !== r && before.next === null && r.prev === null && continues(before, r) && !inChain(r, before)) {
-      before.next = r;
-      r.prev = before;
-    }
-    const after = this.starts.get(eKey);
-    if (after !== undefined && after !== r && after.prev === null && r.next === null && continues(r, after) && !inChain(after, r)) {
-      r.next = after;
-      after.prev = r;
-    }
-    if (r.prev !== null || r.next !== null) this.propagate(headOf(r));
-  }
-
-  /** Take a route out of its chain and its end files; the halves left behind are re-run from their heads. */
-  private unlink(r: LaneRoute): void {
-    const n = r.count - 1;
-    const sKey = ptKey(r.x[0], r.z[0]);
-    const eKey = ptKey(r.x[n], r.z[n]);
-    if (this.starts.get(sKey) === r) this.starts.delete(sKey);
-    if (this.ends.get(eKey) === r) this.ends.delete(eKey);
-    const prev = r.prev;
-    const next = r.next;
-    r.prev = null;
-    r.next = null;
-    if (prev !== null) {
-      prev.next = null;
-      this.propagate(headOf(prev));
-    }
-    if (next !== null) {
-      next.prev = null;
-      this.propagate(next);
-    }
-    restoreOwn(r);
-    r.chainRid = r.rid;
-    buildParkPhases(r);
-  }
-
-  /**
-   * Run the chain's clock down from its head: every link takes the head's rid
-   * for its cars, the head's headway, and a phase that is the moment the car
-   * before it reaches the joint. The ends inside the chain lose their bays --
-   * the car drives through -- and the two ends of the whole chain keep theirs.
-   * Every tile touched re-files its bays, because a joint is not a bay.
-   */
-  private propagate(head: LaneRoute): void {
-    let phase = head.own.phase;
-    const headway = head.own.headway;
-    const touched = new Set<string>();
-    for (let r: LaneRoute | null = head; r !== null; r = r.next) {
-      restoreOwn(r);
-      r.chainRid = head.rid;
-      r.phase = phase;
-      r.headway = headway;
-      if (r.prev !== null) {
-        r.bay0 = false;
-        r.joint0 = true;
-      }
-      if (r.next !== null) {
-        r.bay1 = false;
-        r.joint1 = true;
-      }
-      buildParkPhases(r);
-      phase += r.duration;
-      if (r.tileKey !== '') touched.add(r.tileKey);
-    }
-    for (const key of touched) {
-      const tile = this.tiles.get(key);
-      if (tile === undefined) continue;
-      this.obstacles.drop(key);
-      this.obstacles.adoptRoutes(key, tile.routes);
-    }
   }
 
   /** Is this tile's lane sidecar already held? The residency's accounting asks. */
@@ -2443,7 +2302,7 @@ function unit(h: number): number {
  * two that agree today.
  */
 export function identityOf(route: LaneRoute, slot: number): number {
-  return carHash(route.chainRid, slot);
+  return carHash(route.rid, slot);
 }
 
 /**
@@ -2597,7 +2456,7 @@ export function poseCar(route: LaneRoute, slot: number, now: number, out: CarPos
   // Identity first, because the dwells are drawn out of it and the live test
   // needs them. A pure function of (route, slot), so every process that
   // evaluates this car agrees about what it is without a byte on the wire.
-  const h = carHash(route.chainRid, slot);
+  const h = carHash(route.rid, slot);
   const dwellIn = parkDwell(route, 0);
   const dwellOut = parkDwell(route, 1);
   if (age < -dwellIn || age >= route.duration + dwellOut) return false;
@@ -4549,7 +4408,8 @@ export function verifyTraffic(
           'every car in the city would be in the wrong place.',
       );
     }
-    if (contract.version !== undefined && contract.version !== LANES_VERSION) {
+    // v2 is still read -- see `decodeLanes` -- so a v2 world is not a failure.
+    if (contract.version !== undefined && contract.version !== LANES_VERSION && contract.version !== 2) {
       failures.push(`The lane sidecars are v${contract.version} and this build reads v${LANES_VERSION}.`);
     }
   }
@@ -6594,6 +6454,13 @@ export function syntheticTile(
    * driver to fake a heightfield, the street is allowed to be at ground level.
    */
   laneY = -12.5,
+  /**
+   * The chain's crowd point, tile-local, or null for the route's own centre.
+   * Two tiles handed the same point are one chain to `scaleHeadway`.
+   */
+  chainCentre: readonly [number, number] | null = null,
+  /** Which sidecar version to write. v2 for the one check that reads the old bytes. */
+  version = LANES_VERSION,
 ): TileLanes {
   // Five vertices, the middle one doubled for a red light. World axes: north is
   // -Z, so the lane runs from z = 0 to z = -200, and the left of that is -X.
@@ -6611,10 +6478,11 @@ export function syntheticTile(
   // The way: the same street's centreline, at x = 0, over the same 200 m.
   const wayPts: Array<[number, number, number]> = [[0, laneY, 0], [0, laneY, -200]];
 
-  const bytes = new ArrayBuffer(16 + (16 + wayPts.length * 12) + 40 + pts.length * 16);
+  const chainBytes = version >= 3 ? 12 : 0;
+  const bytes = new ArrayBuffer(16 + (16 + wayPts.length * 12) + 40 + chainBytes + pts.length * 16);
   const v = new DataView(bytes);
   v.setUint32(0, LANES_MAGIC, true);
-  v.setUint32(4, LANES_VERSION, true);
+  v.setUint32(4, version, true);
   v.setUint32(8, 1, true);
   v.setUint32(12, 1, true);
   let o = 16;
@@ -6659,6 +6527,14 @@ export function syntheticTile(
   v.setFloat32(o + 16, -bayShift, true);
   v.setFloat32(o + 20, 0, true);
   o += 24;
+  if (version >= 3) {
+    // The chain block: the crowd's point, or this route's own centre, and the
+    // chain's longest dwell -- this route's own red light, `SYNTHETIC_DWELL`.
+    v.setFloat32(o, chainCentre !== null ? chainCentre[0] : -offset, true);
+    v.setFloat32(o + 4, chainCentre !== null ? chainCentre[1] : -100, true);
+    v.setFloat32(o + 8, SYNTHETIC_DWELL, true);
+    o += 12;
+  }
   for (const [x, y, z, at] of pts) {
     v.setFloat32(o, x, true);
     v.setFloat32(o + 4, y, true);

@@ -4661,6 +4661,13 @@ export class Simulation {
         );
         if (hit !== null) {
           offended = true;
+          // Everyone sees it, the driver included: the record the server just
+          // made, on the wire, so every client lands the same walker on the
+          // same flight. See `protocol.PedHitEvent`.
+          this.events.push({
+            kind: EVENT.PED_HIT, osmId: hit.osmId, side: hit.side, slot: hit.slot, tick,
+            x: hit.x, z: hit.z, vx: hit.vx, vz: hit.vz, gib: hit.gib,
+          });
           // Half a hp, and cosmetic on purpose -- see `driving.PEDESTRIAN_DAMAGE`,
           // which is a *ratio* against the crash cap and moved down with it.
           // Through the same `damage` call the walls use, so the same cooldown
