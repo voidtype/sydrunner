@@ -23,7 +23,14 @@
          starting it during the parse takes the bundle's whole download off the
          front of the world's critical path. `streamer.loadIndex` then finds it
          in the preload cache. -->
-    <link rel="preload" href="/world/root.json" as="fetch" />
+    <!-- `crossorigin` is not optional on an `as="fetch"` preload and its absence
+         is not a warning you can leave: `fetch()` defaults to a credentials
+         mode of "same-origin", a preload without the attribute asks for
+         "include", and Chrome refuses to match them -- "A preload for
+         '/world/root.json' is found, but is not used because the request
+         credentials mode does not match", which is the preload being paid for
+         and then thrown away. -->
+    <link rel="preload" href="/world/root.json" as="fetch" crossorigin />
     <title>SYDNEY</title>
     <style>
       /* HARBOUR STEEL -- the interface, from the ground up. UI.md is the

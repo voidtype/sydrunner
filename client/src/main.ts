@@ -794,6 +794,7 @@ import { EVENT_NAME, stepEvents, sweepEvents, verifyEvents } from './game/events
 import { EventAssets, EventScene, eventWarmupParts, inTrackworkQueue, verifyEventKit } from './world/events.ts';
 import { verifyWallet } from './game/wallet-contract.ts';
 import { Hud, verifyHud } from './hud.ts';
+import { installCrashLog, verifyCrash } from './crash.ts';
 import { Minimap } from './minimap.ts';
 import { MapAtlas } from './mapatlas.ts';
 import { BigMap, verifyBigMap } from './bigmap.ts';
@@ -894,6 +895,11 @@ const RAIL_BAKE_DEADLINE_MS = 12000;
 
 async function main(): Promise<void> {
   const hud = new Hud();
+  // Before anything else can throw. Nothing in this client throws past a
+  // `catch` on purpose, so an exception that reaches `window` has already
+  // broken an invariant -- and until this existed, the only report of one was
+  // the owner reading a sentence with no trace under it. See `crash.ts`.
+  installCrashLog((message) => hud.fatal(message));
   // The day/night clock, top centre. Constructed here beside the HUD rather than
   // inside it because it is fed the sky's own `SkyClock` rather than the
   // `HudState` the overlay takes, and because it draws whether or not the debug
@@ -1419,6 +1425,7 @@ async function main(): Promise<void> {
   // is handed in so the check cannot drift from the bar's actual length. See
   // `hud.verifyHud`.
   const hudFailures = timed('hud', () => verifyHud(BALL_CHARGES));
+  const crashFailures = timed('crash log', verifyCrash);
   // And the invisible-wall overlay, which earns a check on the same criterion
   // the HUD's does: every way it breaks draws something plausible. The cell
   // arithmetic is floored off a tile's minimum corner and the whole build is
@@ -1650,6 +1657,7 @@ async function main(): Promise<void> {
     bigNightFailures.length ||
     guardFailures.length ||
     hudFailures.length ||
+    crashFailures.length ||
     wallFailures.length ||
     ghostFailures.length ||
     lifecycleFailures.length ||
@@ -1741,6 +1749,7 @@ async function main(): Promise<void> {
           ...bigNightFailures,
           ...guardFailures,
           ...hudFailures,
+          ...crashFailures,
           ...wallFailures,
           ...ghostFailures,
           ...lifecycleFailures,

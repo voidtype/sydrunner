@@ -186,6 +186,7 @@ import { verifyAreaLine } from '../client/src/game/arealine.ts';
 import { verifyBoats } from '../client/src/game/boats.ts';
 import { verifyInterior } from '../client/src/world/interior.ts';
 import { verifySpaces } from '../client/src/net/spaces.ts';
+import { verifyCrash } from '../client/src/crash.ts';
 import { verifyDeviceLost } from '../client/src/devicelost.ts';
 // --- Workstream E. Three self-checks, all three of them shared modules being
 // run in the second runtime -- which is the premise this whole block exists to
@@ -502,6 +503,11 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     ['verifyTerritory', verifyTerritory()],
     ['verifyTerritoryStore', verifyTerritoryStore()],
     ['verifySpaces', verifySpaces()],
+    // The crash reporter's formatting. Browser-only in effect -- there is no
+    // `window` here -- but `crashText` is pure and the rule is that a check
+    // runs on both boot lists, so a bad trim is caught by whichever end boots
+    // first. See `client/src/crash.ts`.
+    ['verifyCrash', verifyCrash()],
     ['verifyDeviceLost', verifyDeviceLost()],
     // --- WORKSTREAM V. `verifyTeams` is the contract's own and is here for a
     // reason the rest of this list does not have: it is a **spelling** check.
