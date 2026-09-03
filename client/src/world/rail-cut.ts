@@ -168,6 +168,7 @@
  */
 
 import { SPAN_DEEP, SPAN_BRIDGE, SPAN_CUTTING, SPAN_TUNNEL, type RailBake } from '../game/rail.ts';
+import { ACCESS_APRON_M, ACCESS_HALF_W, accessCutAt, accessCutLength, type AccessPlan } from '../game/riding.ts';
 
 /**
  * Half the width of the hole cut in the terrain, from the track centreline.
@@ -792,6 +793,11 @@ export class RailCut {
    * mid-air over it.
    */
   cutAt(x: number, z: number, groundY: number): number {
+    // The way in, first and without the road rule: a mouth is placed clear of
+    // buildings and its apron is a designed hole, not a corridor a street may
+    // be carried over. See `riding.accessCutAt`.
+    const access = this.accessCutAt(x, z);
+    if (Number.isFinite(access)) return access;
     const railY = this.railCutAt(x, z, groundY);
     if (!Number.isFinite(railY)) return Number.NaN;
     // **And the road, last.** See the header: a road is not a reason to cut and
@@ -838,6 +844,51 @@ export class RailCut {
    * Wynyard the owner looked down into.
    */
   private readonly bores: Array<{ x: number; z: number; ux: number; uz: number; hl: number; hw: number }> = [];
+
+  /**
+   * The ways into the bores, and the hole in the street each goes down
+   * through. See `riding.accessCutAt`, which is the rule; this holds the plans
+   * and their carve lengths, filed by cell like the strips. Set from outside
+   * on `setStations`' terms: `buildStationBoxes` is the one place the plans
+   * are made, on both ends, and this only reads them.
+   */
+  private access: Array<{ plan: AccessPlan; length: number }> = [];
+  private readonly accessCells = new Map<number, number[]>();
+
+  setAccess(plans: readonly AccessPlan[], groundAt?: (x: number, z: number) => number): void {
+    this.access = plans.map((plan) => ({ plan, length: accessCutLength(plan, groundAt) }));
+    this.accessCells.clear();
+    for (let i = 0; i < this.access.length; i++) {
+      const { plan, length } = this.access[i];
+      const reach = length + ACCESS_HALF_W + 2 * ACCESS_APRON_M;
+      const cx = plan.mouthX + plan.dirX * (length / 2);
+      const cz = plan.mouthZ + plan.dirZ * (length / 2);
+      const x0 = Math.floor((cx - reach) / CELL_M);
+      const x1 = Math.floor((cx + reach) / CELL_M);
+      const z0 = Math.floor((cz - reach) / CELL_M);
+      const z1 = Math.floor((cz + reach) / CELL_M);
+      for (let gx = x0; gx <= x1; gx++) {
+        for (let gz = z0; gz <= z1; gz++) {
+          const k = cellKey(gx, gz);
+          const list = this.accessCells.get(k);
+          if (list) list.push(i);
+          else this.accessCells.set(k, [i]);
+        }
+      }
+    }
+  }
+
+  /** The ground a way in leaves at this point, or `NaN`. See `riding.accessCutAt`. */
+  accessCutAt(x: number, z: number): number {
+    const list = this.accessCells.get(cellKey(Math.floor(x / CELL_M), Math.floor(z / CELL_M)));
+    if (list === undefined) return Number.NaN;
+    for (const i of list) {
+      const { plan, length } = this.access[i];
+      const y = accessCutAt(plan, length, x, z);
+      if (Number.isFinite(y)) return y;
+    }
+    return Number.NaN;
+  }
 
   private overBore(x: number, z: number): boolean {
     for (const b of this.bores) {
@@ -964,6 +1015,15 @@ export class RailCut {
    * and must not pay for one.
    */
   near(x: number, z: number, pad: number): boolean {
+    // A way in is its own reason to look. See `setAccess`.
+    if (this.accessCells.size > 0) {
+      const ra = ACCESS_HALF_W + 2 * ACCESS_APRON_M + pad;
+      for (let gx = Math.floor((x - ra) / CELL_M); gx <= Math.floor((x + ra) / CELL_M); gx++) {
+        for (let gz = Math.floor((z - ra) / CELL_M); gz <= Math.floor((z + ra) / CELL_M); gz++) {
+          if (this.accessCells.has(cellKey(gx, gz))) return true;
+        }
+      }
+    }
     // The widest the corridor can be anywhere, so the broad phase never rejects
     // a quad a station's flare would have reached into.
     const r = STATION_HALF_WIDTH + pad;

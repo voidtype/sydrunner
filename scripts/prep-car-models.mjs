@@ -48,7 +48,8 @@
  */
 
 import { NodeIO, getBounds } from '@gltf-transform/core';
-import { weld, unweld, flatten, prune, dedup, quantize, transformMesh, join } from '@gltf-transform/functions';
+import { weld, unweld, flatten, prune, dedup, quantize, transformMesh, join, normals } from '@gltf-transform/functions';
+import sharp from 'sharp';
 // The decimator. meshoptimizer is a dependency of three in the client tree
 // rather than of this script, so it is reached by path; see the decimation
 // stage in `processFile` for why it is here at all now.
@@ -90,6 +91,15 @@ const MAX_TRIS = 8000;
  */
 const DECIMATE_TO = 12000;
 const DECIMATE_ERROR = 0.02;
+/**
+ * Islands under this fraction of the car's extent are dropped before the
+ * collapse, unless a row says otherwise. 1.0 -- the whole car -- is what the
+ * first round shipped with and what a one-shell body (the Ranger, the Camry)
+ * wants: every bolt and badge goes and the shell stays. A body authored as
+ * separate panels sets `pruneError: 0.02` in its CATALOG row, which is a
+ * 10 cm bolt on a 5 m car and never a door. See the decimation stage.
+ */
+const PRUNE_ERROR = 1.0;
 const MAX_TOTAL_BYTES = 16 * 1024 * 1024; // was 6; eleven textured real cars at ~0.5-1 MB each
 const MIN_PER_CLASS = 3;
 const MAX_PER_CLASS = 8; // was 6; the real cars come first and the generics fill behind them
@@ -116,12 +126,25 @@ const CATALOG = [
   // list: Ranger 8, HiLux 8, ...); `carlod` repeats a model in its body's
   // pool that many times, and the generics below get 1 each.
   { file: 'ford_ranger_2023.glb', body: 3, priority: 0, decimate: true, weight: 8 },
-  { file: 'toyota_hilux_2021.glb', body: 3, priority: 0, decimate: true, weight: 8 },
-  { file: 'mitsubishi_l200_dh.glb', body: 3, priority: 0, decimate: true, weight: 4 },
+  // `pruneError`: bodies authored as separate panels lose them to the
+  // island prune at the default; 2% keeps a door and drops a bolt. See the
+  // decimation stage. The Ranger is one shell and takes the default.
+  // `maxTris`: 345 meshes of panels that the 2% prune keeps and the collapse
+  // then cannot fold below 38k. The most common ute in the country gets the
+  // budget rather than the bin; 24 instances of it is under a million.
+  { file: 'toyota_hilux_2021.glb', body: 3, priority: 0, decimate: true, weight: 8, pruneError: 0.02, positionsOnly: true },
+  // `paint`: the author's names are upside down -- "Interieur" is 45% of the
+  // surface and is the body; the real cabin is "Siege". Pinned off the sheet.
+  { file: 'mitsubishi_l200_dh.glb', body: 3, priority: 0, decimate: true, weight: 4, paint: ['Interieur', 'Body_gris'], pruneError: 0.02 },
   { file: 'mazda_cx5_tnnv.glb', body: 2, priority: 0, decimate: true, weight: 5 },
-  { file: 'nissan_xtrail_2023.glb', body: 2, priority: 0, decimate: true, weight: 4 },
+  // The body panels are the 37% material named `xtinner23`; `Car_Paint` is the
+  // radar cover. Pinned off the sheet.
+  { file: 'nissan_xtrail_2023.glb', body: 2, priority: 0, decimate: true, weight: 4, paint: ['xtinner23', 'Car_Paint'], pruneError: 0.02, maxTris: 40000 },
   { file: 'hyundai_tucson_2015.glb', body: 2, priority: 0, decimate: true, weight: 3 },
-  { file: 'toyota_prado_2013.glb', body: 2, priority: 0, decimate: true, weight: 5 },
+  // `positionsOnly`: every face its own island by UV, so nothing welds and
+  // nothing collapses -- 89k triangles after the gentle prune. The maps go
+  // (a light bar, a tyre) and the panels stay. See the decimation stage.
+  { file: 'toyota_prado_2013.glb', body: 2, priority: 0, decimate: true, weight: 5, pruneError: 0.02, positionsOnly: true },
   { file: 'toyota_corolla_2020.glb', body: 1, priority: 0, decimate: true, weight: 5 },
   { file: 'tesla_model_3.glb', body: 0, priority: 0, decimate: true, weight: 4 },
   { file: 'toyota_camry_2020.glb', body: 0, priority: 0, decimate: true, weight: 6 },
@@ -144,7 +167,8 @@ const CATALOG = [
   // --- hatch (1) ---
   { file: 'hatch_generic_a.glb', body: 1, priority: 1 },
   { file: 'hatch_kenney.glb', body: 1, priority: 2 },
-  { file: 'hatch_filler.glb', body: 1, priority: 3 },
+  // 72% of it is a material named `Black`, which is the body; `Main` is the trim.
+  { file: 'hatch_filler.glb', body: 1, priority: 3, paint: ['Black', 'Main'] },
   { file: 'hatch_micro.glb', body: 1, priority: 4 },
   { file: 'vw_golf_mk.glb', body: 1, priority: 5 },
   // All three far over MAX_TRIS (11989, 33706, 19720); mazda_rx7 is also the
@@ -174,7 +198,10 @@ const CATALOG = [
   // --- ute (3) --- only 4 candidates exist; all are kept if they pass.
   { file: 'ute_generic.glb', body: 3, priority: 1 },
   { file: 'ute_tray_kenney.glb', body: 3, priority: 2 },
-  { file: 'mitsubishi_l200.glb', body: 3, priority: 3 },
+  // `nose: -1`: detection puts its tray at +X (the FrontColor material is a
+  // value-duplicate `dedup` folds away); the sheet showed the tray, so the
+  // nose is pinned by hand. See `NOSE_OVERRIDE` below.
+  { file: 'mitsubishi_l200.glb', body: 3, priority: 3, nose: -1, paint: ['M_0136_Charcoal', 'Color_M08'] },
   { file: 'toyota_hilux_97.glb', body: 3, priority: 4 },
 
   // --- van (4) --- only 3 candidates exist; all are kept if they pass.
@@ -558,6 +585,436 @@ function eachWorldVertex(scene, fn) {
   }
 }
 
+
+// --- What the game paints, and what it leaves alone -------------------------------
+//
+// `world/carlod.ts` collapses every model to one geometry and one material, and
+// until this round every surface of a `multiply` model took the entity's paint:
+// a white headlight came out the colour of the car and a red tail light the
+// colour of the car. `_PAINT` is one float per vertex, 1 where the game's paint
+// lands (the body panels, as value under the entity's hue) and 0 where the
+// authored colour stays (glass, lights, tyres, chrome, plates). Decided per
+// material here, where the names still exist -- `carlod` sees "Index_0_2" and
+// nothing else.
+const PAINT_RE = /paint|body|carros|varnish|karoser|lack\b|\bmain\b|exterior|vehicle|metal_white|bodywork|carbody|shell|lackierung/i;
+const NEVER_PAINT_RE = /glass|tyre|tire|rubber|chrome|lights?\b|xlight|lamp|plate|plaque|interior|interieur|\bint\b|_int\b|mirror|miroir|wheel|rim\b|disc|disk|exhaust|grill|plastic|plastique|black|noir|dark|leather|seat|siege|logo|badge|decal|screen|window|fenetre|vitre|verre|phare|feux|pneu|jante|mecanique|protector|kidney|detail|pipe|luntai|lunzi|inner|steel|metal_dark|varnish_dark|dash|panel|console|carpet|floor|engine|moteur|spring|bolt|caliper|brake|tail|trunk|hood|bonnet|roof_int|velvet/i;
+
+/** Mean value (max channel) of a material's base colour, texel-weighted when it has a map. */
+async function materialValue(mat) {
+  const f = mat.getBaseColorFactor();
+  const tex = mat.getBaseColorTexture();
+  if (!tex || !tex.getImage()) return Math.max(f[0], f[1], f[2]);
+  try {
+    const { data, info } = await sharp(Buffer.from(tex.getImage())).resize(32, 32, { fit: 'fill' }).raw().toBuffer({ resolveWithObject: true });
+    const vals = [];
+    for (let i = 0; i < info.width * info.height; i++) {
+      const o = i * info.channels;
+      vals.push(Math.max(data[o] * f[0], data[o + 1] * f[1], data[o + 2] * f[2]) / 255);
+    }
+    vals.sort((a, b) => a - b);
+    return vals[Math.floor(vals.length * 0.95)] ?? 0;
+  } catch {
+    return Math.max(f[0], f[1], f[2]);
+  }
+}
+
+/** Triangle area summed per material, in world metres, over the whole scene. */
+function areaByMaterial(doc) {
+  const out = new Map();
+  const scene = doc.getRoot().listScenes()[0];
+  for (const node of scene.listChildren()) {
+    const mesh = node.getMesh();
+    if (!mesh) continue;
+    const m = node.getWorldMatrix();
+    for (const prim of mesh.listPrimitives()) {
+      const mat = prim.getMaterial();
+      const pos = prim.getAttribute('POSITION');
+      const idx = prim.getIndices();
+      if (!mat || !pos) continue;
+      const n = pos.getCount();
+      const w = new Float64Array(n * 3);
+      const v = [0, 0, 0];
+      for (let i = 0; i < n; i++) {
+        pos.getElement(i, v);
+        w[i * 3] = m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12];
+        w[i * 3 + 1] = m[1] * v[0] + m[5] * v[1] + m[9] * v[2] + m[13];
+        w[i * 3 + 2] = m[2] * v[0] + m[6] * v[1] + m[10] * v[2] + m[14];
+      }
+      const cnt = idx ? idx.getCount() : n;
+      let area = 0;
+      for (let t = 0; t < cnt; t += 3) {
+        const a = idx ? idx.getScalar(t) : t, b = idx ? idx.getScalar(t + 1) : t + 1, c = idx ? idx.getScalar(t + 2) : t + 2;
+        const e1x = w[b * 3] - w[a * 3], e1y = w[b * 3 + 1] - w[a * 3 + 1], e1z = w[b * 3 + 2] - w[a * 3 + 2];
+        const e2x = w[c * 3] - w[a * 3], e2y = w[c * 3 + 1] - w[a * 3 + 1], e2z = w[c * 3 + 2] - w[a * 3 + 2];
+        const nx = e1y * e2z - e1z * e2y, ny = e1z * e2x - e1x * e2z, nz = e1x * e2y - e1y * e2x;
+        area += Math.sqrt(nx * nx + ny * ny + nz * nz) * 0.5;
+      }
+      out.set(mat, (out.get(mat) ?? 0) + area);
+    }
+  }
+  return out;
+}
+
+/**
+ * Which materials take the paint. Named ones first; a corpus with no names
+ * (Object_5 / Index_0_1) falls back to area: every non-excluded surface at
+ * least a fifth the size of the largest one, bright enough to be a panel.
+ * Blended materials are glass and never painted.
+ */
+async function paintedMaterials(doc, pinned = null) {
+  const areas = areaByMaterial(doc);
+  const mats = [...areas.keys()];
+  const info = new Map();
+  for (const mat of mats) {
+    const name = mat.getName() || '';
+    const blend = mat.getAlphaMode() === 'BLEND' && mat.getBaseColorFactor()[3] < 0.95;
+    info.set(mat, { name, blend, area: areas.get(mat), value: await materialValue(mat) });
+  }
+  if (pinned !== null) return { painted: new Set(mats.filter((m) => pinned.includes(info.get(m).name))), info };
+  const explicit = mats.filter((m) => { const i = info.get(m); return PAINT_RE.test(i.name) && !NEVER_PAINT_RE.test(i.name) && !i.blend; });
+  if (explicit.length > 0) return { painted: new Set(explicit), info };
+  const eligible = mats.filter((m) => { const i = info.get(m); return !NEVER_PAINT_RE.test(i.name) && !i.blend && i.value >= 0.15; });
+  let largest = 0;
+  for (const m of eligible) largest = Math.max(largest, info.get(m).area);
+  return { painted: new Set(eligible.filter((m) => info.get(m).area >= largest * 0.2)), info };
+}
+
+/**
+ * The value the body reads at, so the paint lands at full strength: the 95th
+ * percentile of the painted surfaces' value, area-weighted by material. Baked
+ * into the file (texels and base colours) rather than computed at load, so
+ * `carlod` no longer reads a texture back to find it.
+ */
+function paintGain(painted, info) {
+  let best = 0;
+  let total = 0;
+  const mapped = [...painted].filter((m) => m.getBaseColorTexture());
+  for (const m of mapped) total += info.get(m).area;
+  for (const m of mapped) {
+    const i = info.get(m);
+    if (i.area < total * 0.1) continue;
+    best = Math.max(best, i.value);
+  }
+  if (best <= 0) for (const m of mapped) best = Math.max(best, info.get(m).value);
+  return best > 1e-3 ? Math.min(6, 1 / best) : 1;
+}
+
+/**
+ * The Kenney kit's colours, from geometry, because its palette is gone.
+ *
+ * Every `*_kenney.glb` maps its faces to cells of a `colormap.png` that is not
+ * in `data/` (see `readRepaired`), so the ten arrive white. The cells are still
+ * there in the UVs -- a hundred-odd distinct points -- and faces that share a
+ * cell shared a colour, so the roles can be read back off where those clusters
+ * sit on the car: the tall vertical faces above the beltline are glass, the
+ * small clusters at the very ends are lights, the wheel nodes are tyres and
+ * hubs, and everything else is the body the paint lands on. Written as
+ * `COLOR_0` and `_PAINT`, so `carlod` needs no special case for the kit.
+ */
+function inferKenneyRoles(doc) {
+  const scene = doc.getRoot().listScenes()[0];
+  if (process.env.PREP_DEBUG) {
+    let prims = 0, indexed = 0, withUv = 0;
+    for (const node of scene.listChildren()) for (const p of node.getMesh()?.listPrimitives() ?? []) { prims++; if (p.getIndices()) indexed++; if (p.getAttribute('TEXCOORD_0')) withUv++; }
+    console.log(`  kenney roles: ${scene.listChildren().length} nodes, ${prims} primitives, ${indexed} indexed, ${withUv} with uv`);
+  }
+  const b = getBounds(scene);
+  const maxY = b.max[1];
+  const halfLen = (b.max[0] - b.min[0]) / 2;
+  const cx = (b.max[0] + b.min[0]) / 2;
+  // First pass: cluster stats.
+  const stats = new Map();
+  const tri = [];
+  for (const node of scene.listChildren()) {
+    const mesh = node.getMesh();
+    if (!mesh) continue;
+    const wheel = /wheel/i.test(node.getName() + ' ' + (mesh.getName() || ''));
+    const m = node.getWorldMatrix();
+    for (const prim of mesh.listPrimitives()) {
+      const pos = prim.getAttribute('POSITION');
+      const uv = prim.getAttribute('TEXCOORD_0');
+      const idx = prim.getIndices();
+      if (!pos) continue;
+      const n = pos.getCount();
+      const w = new Float64Array(n * 3);
+      const v = [0, 0, 0];
+      for (let i = 0; i < n; i++) {
+        pos.getElement(i, v);
+        w[i * 3] = m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12];
+        w[i * 3 + 1] = m[1] * v[0] + m[5] * v[1] + m[9] * v[2] + m[13];
+        w[i * 3 + 2] = m[2] * v[0] + m[6] * v[1] + m[10] * v[2] + m[14];
+      }
+      const t = [0, 0];
+      // Indexed or not: the Kenney files arrive here unindexed.
+      const cnt = idx ? idx.getCount() : n;
+      for (let k = 0; k < cnt; k += 3) {
+        const a = idx ? idx.getScalar(k) : k, bb = idx ? idx.getScalar(k + 1) : k + 1, c = idx ? idx.getScalar(k + 2) : k + 2;
+        let key = 'w';
+        // The exact UV, not a quantised one: the kit's palette rows are 0.007
+        // apart and a 1/64 grid folded a door onto the window beside it.
+        if (!wheel && uv) { uv.getElement(a, t); key = `${t[0].toFixed(4)},${t[1].toFixed(4)}`; }
+        const e1x = w[bb * 3] - w[a * 3], e1y = w[bb * 3 + 1] - w[a * 3 + 1], e1z = w[bb * 3 + 2] - w[a * 3 + 2];
+        const e2x = w[c * 3] - w[a * 3], e2y = w[c * 3 + 1] - w[a * 3 + 1], e2z = w[c * 3 + 2] - w[a * 3 + 2];
+        const nx = e1y * e2z - e1z * e2y, ny = e1z * e2x - e1x * e2z, nz = e1x * e2y - e1y * e2x;
+        const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1e-9;
+        const area = len * 0.5;
+        const cyv = (w[a * 3 + 1] + w[bb * 3 + 1] + w[c * 3 + 1]) / 3;
+        const cxv = (w[a * 3] + w[bb * 3] + w[c * 3]) / 3;
+        const s = stats.get(key) ?? { area: 0, y: 0, ay: 0, x: 0 };
+        s.area += area; s.y += cyv * area; s.ay += Math.abs(ny / len) * area; s.x += cxv * area;
+        stats.set(key, s);
+        tri.push({ prim, k, key, wheel, nz: Math.abs(nz / len) });
+      }
+    }
+  }
+  let total = 0;
+  for (const s of stats.values()) total += s.area;
+  const roles = new Map();
+  for (const [key, s] of stats) {
+    const yf = s.y / s.area / Math.max(maxY, 1e-3);
+    const ay = s.ay / s.area;
+    const x = s.x / s.area - cx;
+    const share = s.area / total;
+    let colour, paint;
+    if (process.env.PREP_DEBUG) console.log(`  cluster ${key.padEnd(8)} share ${(100 * share).toFixed(1).padStart(5)} yf ${yf.toFixed(2)} |ny| ${ay.toFixed(2)} x ${x.toFixed(2)}`);
+    if (key === 'w') { colour = [0.06, 0.06, 0.065]; paint = 0; }
+    else if (yf > 0.55 && ay < 0.6 && share < 0.12) { colour = [0.09, 0.10, 0.12]; paint = 0; }
+    else if (Math.abs(x) > halfLen * 0.82 && yf > 0.2 && yf < 0.72 && share < 0.06) { colour = x > 0 ? [1.0, 0.95, 0.72] : [0.85, 0.06, 0.04]; paint = 0; }
+    else if (yf < 0.22 && share < 0.25) { colour = [0.16, 0.16, 0.17]; paint = 0; }
+    else { colour = [1, 1, 1]; paint = 1; }
+    roles.set(key, { colour, paint });
+  }
+  // Second pass: write per-vertex colour and mask. Unwelded first so a vertex
+  // belongs to one triangle and therefore one cluster.
+  return { roles, tri, hub: [0.62, 0.62, 0.64] };
+}
+
+/**
+ * Apply the roles after `unweld()`: every vertex is now private to its
+ * triangle, so the triangle's cluster decides its colour.
+ */
+function writeKenneyColours(doc, inferred) {
+  const scene = doc.getRoot().listScenes()[0];
+  const b = getBounds(scene);
+  const maxY = b.max[1];
+  for (const node of scene.listChildren()) {
+    const mesh = node.getMesh();
+    if (!mesh) continue;
+    const wheel = /wheel/i.test(node.getName() + ' ' + (mesh.getName() || ''));
+    const m = node.getWorldMatrix();
+    for (const prim of mesh.listPrimitives()) {
+      const pos = prim.getAttribute('POSITION');
+      const uv = prim.getAttribute('TEXCOORD_0');
+      const idx = prim.getIndices();
+      if (!pos) continue;
+      const n = pos.getCount();
+      const col = new Float32Array(n * 3).fill(1);
+      const mask = new Float32Array(n).fill(1);
+      const t = [0, 0];
+      const v = [0, 0, 0];
+      const cnt = idx ? idx.getCount() : n;
+      for (let k = 0; k < cnt; k += 3) {
+        const a = idx ? idx.getScalar(k) : k, bb = idx ? idx.getScalar(k + 1) : k + 1, c = idx ? idx.getScalar(k + 2) : k + 2;
+        let colour, paint;
+        if (wheel) {
+          // The wheel face (normal along the car's z) is the hub, the rest is tread.
+          const w = [a, bb, c].map((i) => { pos.getElement(i, v); return [m[0] * v[0] + m[4] * v[1] + m[8] * v[2], m[1] * v[0] + m[5] * v[1] + m[9] * v[2], m[2] * v[0] + m[6] * v[1] + m[10] * v[2]]; });
+          const e1 = [w[1][0] - w[0][0], w[1][1] - w[0][1], w[1][2] - w[0][2]], e2 = [w[2][0] - w[0][0], w[2][1] - w[0][1], w[2][2] - w[0][2]];
+          const nz = e1[0] * e2[1] - e1[1] * e2[0];
+          const nl = Math.hypot(e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], nz) || 1e-9;
+          colour = Math.abs(nz / nl) > 0.8 ? inferred.hub : [0.06, 0.06, 0.065];
+          paint = 0;
+        } else {
+          let key = 'w';
+          if (uv) { uv.getElement(a, t); key = `${t[0].toFixed(4)},${t[1].toFixed(4)}`; }
+          const r = inferred.roles.get(key) ?? { colour: [1, 1, 1], paint: 1 };
+          colour = r.colour; paint = r.paint;
+        }
+        for (const i of [a, bb, c]) { col[i * 3] = colour[0]; col[i * 3 + 1] = colour[1]; col[i * 3 + 2] = colour[2]; mask[i] = paint; }
+      }
+      const buf = pos.getBuffer();
+      prim.setAttribute('COLOR_0', doc.createAccessor().setType('VEC3').setArray(col).setBuffer(buf));
+      prim.setAttribute('_PAINT', doc.createAccessor().setType('SCALAR').setArray(mask).setBuffer(buf));
+    }
+  }
+  void maxY;
+}
+
+/** Give every primitive the same attribute set, so `join` and `carlod` see one shape. */
+function completeAttributes(doc) {
+  for (const mesh of doc.getRoot().listMeshes()) {
+    for (const prim of mesh.listPrimitives()) {
+      const pos = prim.getAttribute('POSITION');
+      if (!pos) continue;
+      const n = pos.getCount();
+      const buf = pos.getBuffer();
+      if (!prim.getAttribute('TEXCOORD_0')) prim.setAttribute('TEXCOORD_0', doc.createAccessor().setType('VEC2').setArray(new Float32Array(n * 2)).setBuffer(buf));
+      if (!prim.getAttribute('COLOR_0')) prim.setAttribute('COLOR_0', doc.createAccessor().setType('VEC3').setArray(new Float32Array(n * 3).fill(1)).setBuffer(buf));
+      if (!prim.getAttribute('_PAINT')) prim.setAttribute('_PAINT', doc.createAccessor().setType('SCALAR').setArray(new Float32Array(n).fill(1)).setBuffer(buf));
+    }
+  }
+}
+
+// --- One texture per car ---------------------------------------------------------
+//
+// A Sketchfab car is a dozen materials over a dozen 2-4K maps, and the game
+// draws it as one `InstancedMesh` with one material. Until this round the
+// maps were read back at load and reduced to one texel per vertex, which is
+// the whole of why the "textured" cars looked flat. Now the maps are packed
+// into one 512 px atlas per file here, the UVs are rewritten onto it, and the
+// base colour factors (and the paint gain) are multiplied into the texels --
+// so `carlod` gets one map, one material and no read-back.
+const ATLAS_PX = 512;
+const SOLID_STRIP_PX = 64;
+const SOLID_CELL_PX = 8;
+const CELL_PAD_PX = 2;
+
+async function bakeAtlas(doc, painted, info, gain) {
+  const root = doc.getRoot();
+  const textured = [];
+  const solid = [];
+  for (const mat of info.keys()) {
+    const tex = mat.getBaseColorTexture();
+    if (tex && tex.getImage()) textured.push(mat);
+    else solid.push(mat);
+  }
+  if (textured.length === 0) return false;
+  if (solid.length > (ATLAS_PX / SOLID_CELL_PX) * (SOLID_STRIP_PX / SOLID_CELL_PX)) throw new Error(`${solid.length} solid materials do not fit the atlas strip`);
+  const perRow = Math.ceil(Math.sqrt(textured.length));
+  const cell = Math.floor((ATLAS_PX - SOLID_STRIP_PX) / perRow);
+  const layers = [];
+  /** Where each material's cell is: [x, y, w, h] in atlas pixels. */
+  const cells = new Map();
+  const factorOf = (mat) => {
+    const f = mat.getBaseColorFactor();
+    const a = mat.getAlphaMode() === 'BLEND' ? f[3] : 1;
+    // A painted surface with no map is *white*: the game supplies the colour,
+    // and a Ranger authored in navy would otherwise take its paint at a
+    // fifteenth of the brightness of the Camry beside it. A painted map keeps
+    // its texels (the panel gaps, the badge) exposed by the gain.
+    if (painted.has(mat)) return mat.getBaseColorTexture() ? [f[0] * gain, f[1] * gain, f[2] * gain] : [1, 1, 1];
+    // Glass darkens by its own alpha: what a tinted window looks like from
+    // outside, drawn opaque.
+    return [f[0] * a, f[1] * a, f[2] * a];
+  };
+  for (let i = 0; i < textured.length; i++) {
+    const mat = textured[i];
+    const x = (i % perRow) * cell;
+    const y = Math.floor(i / perRow) * cell;
+    const inner = cell - 2 * CELL_PAD_PX;
+    const f = factorOf(mat);
+    const { data, info: meta } = await sharp(Buffer.from(mat.getBaseColorTexture().getImage()))
+      .resize(inner, inner, { fit: 'fill' })
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    for (let p = 0; p < meta.width * meta.height; p++) {
+      const o = p * 3;
+      data[o] = Math.min(255, data[o] * f[0]);
+      data[o + 1] = Math.min(255, data[o + 1] * f[1]);
+      data[o + 2] = Math.min(255, data[o + 2] * f[2]);
+    }
+    const padded = await sharp(data, { raw: { width: inner, height: inner, channels: 3 } })
+      .extend({ top: CELL_PAD_PX, bottom: CELL_PAD_PX, left: CELL_PAD_PX, right: CELL_PAD_PX, extendWith: 'copy' })
+      .raw()
+      .toBuffer();
+    layers.push({ input: padded, raw: { width: cell, height: cell, channels: 3 }, left: x, top: y });
+    cells.set(mat, [x + CELL_PAD_PX, y + CELL_PAD_PX, inner, inner]);
+  }
+  for (let i = 0; i < solid.length; i++) {
+    const mat = solid[i];
+    const perRowS = ATLAS_PX / SOLID_CELL_PX;
+    const x = (i % perRowS) * SOLID_CELL_PX;
+    const y = ATLAS_PX - SOLID_STRIP_PX + Math.floor(i / perRowS) * SOLID_CELL_PX;
+    const f = factorOf(mat);
+    const px = Buffer.alloc(SOLID_CELL_PX * SOLID_CELL_PX * 3);
+    for (let p = 0; p < SOLID_CELL_PX * SOLID_CELL_PX; p++) {
+      px[p * 3] = Math.min(255, Math.round(f[0] * 255));
+      px[p * 3 + 1] = Math.min(255, Math.round(f[1] * 255));
+      px[p * 3 + 2] = Math.min(255, Math.round(f[2] * 255));
+    }
+    layers.push({ input: px, raw: { width: SOLID_CELL_PX, height: SOLID_CELL_PX, channels: 3 }, left: x, top: y });
+    cells.set(mat, [x + 2, y + 2, SOLID_CELL_PX - 4, SOLID_CELL_PX - 4]);
+  }
+  const atlasJpeg = await sharp({ create: { width: ATLAS_PX, height: ATLAS_PX, channels: 3, background: { r: 128, g: 128, b: 128 } } })
+    .composite(layers)
+    .jpeg({ quality: 88, chromaSubsampling: '4:4:4' })
+    .toBuffer();
+  const texture = doc.createTexture('car_atlas').setImage(atlasJpeg).setMimeType('image/jpeg');
+  const material = doc.createMaterial('car_atlas')
+    .setBaseColorTexture(texture)
+    .setBaseColorFactor([1, 1, 1, 1])
+    .setMetallicFactor(0)
+    .setRoughnessFactor(0.6)
+    .setAlphaMode('OPAQUE')
+    .setDoubleSided(false);
+
+  // The UVs, per triangle, onto the cell. Unwelded first so a vertex is one
+  // triangle's; a triangle spanning more than one repeat of a tiling map is
+  // clamped to the repeat it starts in. Any authored vertex colour goes with
+  // the old materials: a baked occlusion under the atlas is a car in the dark.
+  for (const mesh of root.listMeshes()) for (const prim of mesh.listPrimitives()) if (prim.getAttribute('COLOR_0')) prim.setAttribute('COLOR_0', null);
+  await doc.transform(unweld());
+  for (const mesh of root.listMeshes()) {
+    for (const prim of mesh.listPrimitives()) {
+      const mat = prim.getMaterial();
+      const pos = prim.getAttribute('POSITION');
+      if (!mat || !pos) continue;
+      const n = pos.getCount();
+      const idx = prim.getIndices();
+      const box = cells.get(mat);
+      const out = new Float32Array(n * 2);
+      const mask = new Float32Array(n).fill(painted.has(mat) ? 1 : 0);
+      const uv = prim.getAttribute('TEXCOORD_0');
+      const t = [0, 0];
+      if (!box) throw new Error(`material ${mat.getName()} has no atlas cell`);
+      const [bx, by, bw, bh] = box;
+      const isTex = textured.includes(mat);
+      const cnt = idx ? idx.getCount() : n;
+      for (let k = 0; k < cnt; k += 3) {
+        const ids = [idx ? idx.getScalar(k) : k, idx ? idx.getScalar(k + 1) : k + 1, idx ? idx.getScalar(k + 2) : k + 2];
+        if (!isTex || !uv) {
+          for (const i of ids) { out[i * 2] = (bx + bw / 2) / ATLAS_PX; out[i * 2 + 1] = (by + bh / 2) / ATLAS_PX; }
+          continue;
+        }
+        let minU = Infinity, minV = Infinity;
+        for (const i of ids) { uv.getElement(i, t); minU = Math.min(minU, t[0]); minV = Math.min(minV, t[1]); }
+        const offU = Math.floor(minU), offV = Math.floor(minV);
+        for (const i of ids) {
+          uv.getElement(i, t);
+          const u = Math.min(1, Math.max(0, t[0] - offU));
+          const vv = Math.min(1, Math.max(0, t[1] - offV));
+          out[i * 2] = (bx + u * bw) / ATLAS_PX;
+          out[i * 2 + 1] = (by + vv * bh) / ATLAS_PX;
+        }
+      }
+      const buf = pos.getBuffer();
+      prim.setAttribute('TEXCOORD_0', doc.createAccessor().setType('VEC2').setArray(out).setBuffer(buf));
+      prim.setAttribute('_PAINT', doc.createAccessor().setType('SCALAR').setArray(mask).setBuffer(buf));
+      for (const sem of prim.listSemantics()) if (/^TEXCOORD_[1-9]/.test(sem)) prim.setAttribute(sem, null);
+      prim.setMaterial(material);
+    }
+  }
+  completeAttributes(doc);
+  await doc.transform(prune({ keepAttributes: true }), join({ keepNamed: false }), weld({ overwrite: true }));
+  return true;
+}
+
+/** `_PAINT` per material for a model that keeps its materials (no atlas). Painted ones go white; see `factorOf`. */
+function writePaintMask(doc, painted) {
+  for (const mat of painted) if (!mat.getBaseColorTexture()) mat.setBaseColorFactor([1, 1, 1, 1]);
+  for (const mesh of doc.getRoot().listMeshes()) {
+    for (const prim of mesh.listPrimitives()) {
+      const pos = prim.getAttribute('POSITION');
+      const mat = prim.getMaterial();
+      if (!pos) continue;
+      const n = pos.getCount();
+      const on = mat && painted.has(mat) ? 1 : 0;
+      prim.setAttribute('_PAINT', doc.createAccessor().setType('SCALAR').setArray(new Float32Array(n).fill(on)).setBuffer(pos.getBuffer()));
+    }
+  }
+}
+
 /**
  * The nose, from the glass: the windscreen is the largest pane facing along
  * the car, and the rear glass is smaller on a sedan, a hatch, an SUV and a
@@ -733,11 +1190,16 @@ async function processFile(entry, srcMeta) {
   // whatever transforms are currently on the nodes correctly either way, so
   // detection does not need the cleanup pass to have already run.
   const direction = detectDirection(doc);
+  if (entry.nose !== undefined) {
+    // Pinned by hand, off the rendered sheet (`scripts/render-car-sheet.mjs`).
+    direction.sign = entry.nose;
+    direction.confidence = `pinned by CATALOG (detection said ${direction.sign === entry.nose ? 'the same' : 'the opposite'})`;
+  }
   result.axis = direction.axis;
   result.sign = direction.sign;
   result.directionConfidence = direction.confidence;
 
-  await doc.transform(prune(), dedup());
+  await doc.transform(prune({ keepAttributes: true }), dedup());
   deinstanceMeshes(doc);
   bakeToIdentity(doc);
 
@@ -778,7 +1240,21 @@ async function processFile(entry, srcMeta) {
   // 3,000 -- then reduced toward `DECIMATE_TO`, in passes, because one pass
   // at a 0.7% ratio under an error bound rarely lands.
   if (entry.decimate) {
-    await doc.transform(prune(), join({ keepNamed: false }), weld({ overwrite: true }));
+    if (entry.positionsOnly) {
+      // **Positions only.** A body whose every face carries its own patch of
+      // UV never welds -- each face is an island, the collapse cannot cross
+      // it, and the file stalls at ten times the budget. So the maps are
+      // given up before the weld: strip everything but POSITION, weld by
+      // position alone, collapse, and recompute normals after. The atlas
+      // stage then samples each map at its centre, which is the right price
+      // for a Prado whose only map is a light bar.
+      for (const mesh of doc.getRoot().listMeshes()) {
+        for (const prim of mesh.listPrimitives()) {
+          for (const sem of prim.listSemantics()) if (sem !== 'POSITION') prim.setAttribute(sem, null);
+        }
+      }
+    }
+    await doc.transform(prune({ keepAttributes: true }), join({ keepNamed: false }), weld({ overwrite: true }));
     await MeshoptSimplifier.ready;
     let have = countTris(doc);
     result.trisBefore = have;
@@ -791,29 +1267,61 @@ async function processFile(entry, srcMeta) {
     // collapse that has to keep each island keeps 90,000 triangles of a
     // Ranger whatever the ratio. `Prune` lets an island go, which is the
     // whole of what a car ten metres away wants.
-    for (let pass = 0; pass < 3 && have > DECIMATE_TO; pass++) {
+    // **Prune and collapse are two calls, and the order is the fix.** One
+    // `simplify(..., 1.0, ['Prune'])` -- an unbounded error with the prune
+    // flag -- let meshoptimizer drop every island whose radius was under the
+    // *whole car*, which on a body authored as separate panels (the
+    // David_Holiday L200: doors, bonnet and tray sides each their own shell)
+    // deleted the body and kept the chassis. So each pass prunes first, at
+    // the pass's own small error -- 2% of the extent is a bolt or a badge
+    // letter, 10% is a mirror or a handle, never a door -- and only then
+    // collapses, unbounded and without the flag. The prune needs a target
+    // under the current count or meshoptimizer returns before it looks; the
+    // 5% it is allowed to collapse at that error is invisible.
+    const base = entry.pruneError ?? PRUNE_ERROR;
+    const PRUNE_LADDER = [base, Math.min(1.0, base * 2.5), Math.min(1.0, base * 5)];
+    for (let pass = 0; pass < PRUNE_LADDER.length && have > DECIMATE_TO; pass++) {
       const ratio = Math.max(0.002, (DECIMATE_TO * 0.9) / have);
       for (const mesh of doc.getRoot().listMeshes()) {
         for (const prim of mesh.listPrimitives()) {
           const idx = prim.getIndices();
           const pos = prim.getAttribute('POSITION');
           if (!idx || !pos) continue;
-          const indices = new Uint32Array(idx.getArray());
+          let indices = new Uint32Array(idx.getArray());
           const positions = new Float32Array(pos.getArray());
-          const target = Math.max(3, Math.round((indices.length / 3) * ratio) * 3);
-          const [out] = MeshoptSimplifier.simplify(indices, positions, 3, target, 1.0, ['Prune']);
+          // A primitive the last pass emptied -- every island of it was a bolt.
+          if (indices.length < 3) continue;
+          let out;
+          if (PRUNE_LADDER[pass] >= 1.0) {
+            // The first round's one call: prune and collapse together, with the
+            // error unbounded. Right for a one-shell body, and the two-step
+            // below is not the same thing -- run separately, the collapse
+            // without the flag folded the Ranger into a black crumple.
+            const target = Math.max(3, Math.round((indices.length / 3) * ratio) * 3);
+            [out] = MeshoptSimplifier.simplify(indices, positions, 3, target, 1.0, ['Prune']);
+          } else {
+            const pruneTarget = Math.max(3, Math.floor((indices.length / 3) * 0.95) * 3);
+            [indices] = MeshoptSimplifier.simplify(indices, positions, 3, pruneTarget, PRUNE_LADDER[pass], ['Prune']);
+            if (indices.length < 3) {
+              // The prune took the whole primitive: nothing but bolts in it.
+              prim.setIndices(doc.createAccessor().setType('SCALAR').setArray(new Uint32Array(0)).setBuffer(idx.getBuffer()));
+              continue;
+            }
+            const target = Math.max(3, Math.round((indices.length / 3) * ratio) * 3);
+            [out] = MeshoptSimplifier.simplify(indices, positions, 3, target, 1.0, []);
+          }
           const next = doc.createAccessor().setType('SCALAR').setArray(out).setBuffer(idx.getBuffer());
           prim.setIndices(next);
         }
       }
       // Drop the vertices nothing indexes any more: unweld writes a vertex per
       // index, weld merges them back, and the old accessors are pruned.
-      await doc.transform(unweld(), weld({ overwrite: true }), prune());
-      const now = countTris(doc);
-      if (now >= have * 0.98) break;
-      have = now;
+      await doc.transform(unweld(), weld({ overwrite: true }), prune({ keepAttributes: true }));
+      have = countTris(doc);
     }
-    await doc.transform(prune(), dedup());
+    if (process.env.PREP_DEBUG) { const bd = getBounds(doc.getRoot().listScenes()[0]); console.log(`  after decimation: ${countTris(doc)} tris, extent ${(bd.max[0]-bd.min[0]).toFixed(2)} x ${(bd.max[1]-bd.min[1]).toFixed(2)} x ${(bd.max[2]-bd.min[2]).toFixed(2)}`); }
+    if (entry.positionsOnly) await doc.transform(normals({ overwrite: true }));
+    await doc.transform(prune({ keepAttributes: true }), dedup());
     // Decimation moves the lowest vertices: the wheels' contact patch is the
     // first detail to go, and the car floats a few centimetres. Grounded and
     // re-centred again, on the decimated mesh, so the gate below measures
@@ -821,7 +1329,39 @@ async function processFile(entry, srcMeta) {
     reground(doc, targetLength);
   }
 
-  await doc.transform(quantize({ pattern: /^(POSITION|NORMAL)$/ }));
+  // --- What the paint lands on, and one map per car. See `PAINT_RE` and
+  // `bakeAtlas`. The Kenney kit has no map and no names, so its roles come
+  // off the geometry instead.
+  await doc.transform(normals({ overwrite: false }));
+  if (missingTextures.length > 0) {
+    const inferred = inferKenneyRoles(doc);
+    if (process.env.PREP_DEBUG) {
+      for (const [key, r] of inferred.roles) console.log(`  role ${key.padEnd(8)} ${r.paint ? 'body ' : 'fixed'} ${r.colour.map((c) => c.toFixed(2)).join('/')}`);
+    }
+    await doc.transform(unweld());
+    writeKenneyColours(doc, inferred);
+    completeAttributes(doc);
+    await doc.transform(weld({ overwrite: true }));
+    result.atlas = false;
+    result.roles = 'kenney';
+  } else {
+    const { painted, info } = await paintedMaterials(doc, entry.paint ?? null);
+    const gain = paintGain(painted, info);
+    result.painted = [...painted].map((m) => m.getName() || '?');
+    let totalArea = 0;
+    for (const i of info.values()) totalArea += i.area;
+    result.materials = [...info.entries()].sort((a, b) => b[1].area - a[1].area).slice(0, 8).map(([, i]) => `${i.name || '?'}:${Math.round((100 * i.area) / totalArea)}%`);
+    result.gain = Math.round(gain * 100) / 100;
+    if (await bakeAtlas(doc, painted, info, gain)) {
+      result.atlas = true;
+    } else {
+      writePaintMask(doc, painted);
+      completeAttributes(doc);
+      result.atlas = false;
+    }
+  }
+
+  await doc.transform(quantize({ pattern: /^(POSITION|NORMAL|TEXCOORD_0|COLOR_0)$/, quantizeTexcoord: 14, quantizeColor: 8 }));
 
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const io = new NodeIO();
@@ -842,7 +1382,7 @@ async function processFile(entry, srcMeta) {
   const axisOk = lengthAxisExtent > widthAxisExtent;
   const yOk = Math.abs(minY) <= Y_TOLERANCE;
   const lengthOk = Math.abs(lengthAxisExtent - targetLength) <= targetLength * LENGTH_TOLERANCE;
-  const trisOk = tris <= (entry.decimate ? DECIMATE_TO : MAX_TRIS);
+  const trisOk = tris <= (entry.maxTris ?? (entry.decimate ? DECIMATE_TO : MAX_TRIS));
 
   result.tris = tris;
   result.lengthM = Math.round(lengthAxisExtent * 1000) / 1000;
@@ -855,7 +1395,7 @@ async function processFile(entry, srcMeta) {
     if (!axisOk) reasons.push(`forward axis wrong (length ${lengthAxisExtent.toFixed(2)} <= width ${widthAxisExtent.toFixed(2)})`);
     if (!yOk) reasons.push(`min y = ${minY.toFixed(3)} (want ~0, tol ${Y_TOLERANCE})`);
     if (!lengthOk) reasons.push(`length ${lengthAxisExtent.toFixed(3)}m vs target ${targetLength}m (tol ${LENGTH_TOLERANCE * 100}%)`);
-    if (!trisOk) reasons.push(`${tris} tris > ${entry.decimate ? DECIMATE_TO : MAX_TRIS} limit`);
+    if (!trisOk) reasons.push(`${tris} tris > ${entry.maxTris ?? (entry.decimate ? DECIMATE_TO : MAX_TRIS)} limit`);
     fs.unlinkSync(outPath);
     return { ...result, status: 'rejected', reason: reasons.join('; ') };
   }
@@ -1011,7 +1551,7 @@ function printReport(results) {
         r.minY,
         `${r.axis}${r.sign > 0 ? '+' : '-'}`,
         r.directionConfidence,
-        `${r.steeringZ === null || r.steeringZ === undefined ? '-' : r.steeringZ.toFixed(2)} / ${r.mirrored ? 'yes' : 'no'} / ${r.trisBefore ?? '-'}`,
+        `${r.steeringZ === null || r.steeringZ === undefined ? '-' : r.steeringZ.toFixed(2)} / ${r.mirrored ? 'yes' : 'no'} / ${r.trisBefore ?? '-'}` + (r.atlas ? ' / atlas' : '') + (r.painted ? ` / paint: ${r.painted.join(',')} x${r.gain} of ${(r.materials ?? []).join(' ')}` : r.roles ? ` / ${r.roles} roles` : ''),
       ].join(' | '),
     );
   }
@@ -1057,12 +1597,19 @@ async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
   // Clean slate: remove any .glb left over from a previous run so a file
   // that stops shipping (curation or a tightened limit) doesn't linger.
-  for (const f of fs.readdirSync(OUT_DIR)) {
-    if (f.endsWith('.glb')) fs.unlinkSync(path.join(OUT_DIR, f));
+  if (!process.env.PREP_ONLY) {
+    for (const f of fs.readdirSync(OUT_DIR)) {
+      if (f.endsWith('.glb')) fs.unlinkSync(path.join(OUT_DIR, f));
+    }
   }
 
   const results = [];
+  // `PREP_ONLY=<substring>` processes the matching rows and writes their
+  // .glb files only -- no manifest, no credits, no clean slate -- for looking
+  // at one car; `PREP_DEBUG=1` prints the Kenney role table with it.
+  const only = process.env.PREP_ONLY ?? '';
   for (const entry of CATALOG) {
+    if (only && !entry.file.includes(only)) continue;
     if (!srcMeta[entry.file]) {
       results.push({ file: entry.file, body: entry.body, status: 'rejected', reason: 'not present in source manifest.json' });
       continue;
@@ -1079,6 +1626,10 @@ async function main() {
     }
   }
 
+  if (process.env.PREP_ONLY) {
+    printReport(results);
+    return;
+  }
   curate(results);
 
   // Total-budget guard: drop the largest lowest-priority shipped model(s)
@@ -1107,6 +1658,7 @@ async function main() {
       lengthM: r.lengthM,
       tint: tintFor(r.body),
       weight: r.weight,
+      atlas: r.atlas === true,
       license: r.license,
       attribution: r.attribution,
       source_url: r.source_url,

@@ -1658,6 +1658,8 @@ export const ACCESS_ALONG_M = 68;
 export class StationBoxField {
   /** Every station entrance on the street, for the prompt that points at one. */
   readonly mouths: Array<{ name: string; x: number; z: number; y: number }> = [];
+  /** The plans behind those mouths, for the terrain carve. See `accessCutAt`. */
+  readonly plans: AccessPlan[] = [];
   private readonly cells = new Map<number, StationBox[]>();
   readonly boxes: StationBox[] = [];
   /** Grid pitch. A box is at most ~400 m long, so a query touches a few cells. */
@@ -2091,9 +2093,67 @@ export function buildStationBoxes(bake: RailBake, world: AccessWorld = {}): Stat
         ceilY: plan.floorY + ACCESS_HEIGHT_M,
       });
       field.mouths.push({ name: st.name, x: plan.mouthX, z: plan.mouthZ, y: plan.mouthY });
+      field.plans.push(plan);
     }
   }
   return field;
+}
+
+// --- The hole in the street the way in goes down through -------------------------------
+//
+// The owner, at Wynyard: *"entrance to station is like passing thru floor and
+// if i go down its like clipped out"*. The incline was drawn and stood on, but
+// the terrain sheet ran straight across it -- a body walked *through* the
+// footpath into the passage, and from under it the sheet, single-sided, was
+// simply gone. So the ground is carved where the way in is, on the identical
+// rule both ends already use for a cutting (`world/rail-cut.cutAt`): finite
+// here means the terrain is not there and this is the ground instead.
+//
+// Three zones, one rectangle. Inside the passage's own plan, from the mouth to
+// where its lid is safely under the street (`accessCutLength`), the ground is
+// the incline floor. Around it, `ACCESS_APRON_M` each way, the ground is a flat
+// concrete apron at the mouth's height, so the carve's four-metre lattice can
+// take a sub-quad beside the passage and leave a slab rather than a void; the
+// apron's own skirt hides the rest. Beyond that, nothing.
+
+/** How far the apron reaches past the passage walls, and past its ends, metres. */
+export const ACCESS_APRON_M = 2.6;
+/** How far under the street the passage lid has to be before the ground may stand over it. */
+export const ACCESS_LID_COVER_M = 0.35;
+
+/**
+ * How far down the incline the carve runs, metres from the mouth: the first
+ * point where the lid is `ACCESS_LID_COVER_M` under the ground, or the whole
+ * incline where the ground never gets over it. Sampled every half metre off
+ * the same `groundAt` both ends' plans were made with.
+ */
+export function accessCutLength(plan: AccessPlan, groundAt: ((x: number, z: number) => number) | undefined): number {
+  const slope = (plan.mouthY - plan.floorY) / Math.max(plan.inclineM, 1e-6);
+  if (groundAt === undefined) return Math.min(plan.inclineM, (ACCESS_HEIGHT_M + ACCESS_LID_COVER_M) / Math.max(slope, 1e-6));
+  for (let d = 0; d <= plan.inclineM; d += 0.5) {
+    const lid = plan.mouthY - slope * d + ACCESS_HEIGHT_M;
+    const g = groundAt(plan.mouthX + plan.dirX * d, plan.mouthZ + plan.dirZ * d);
+    if (Number.isFinite(g) && g - lid >= ACCESS_LID_COVER_M) return d;
+  }
+  return plan.inclineM;
+}
+
+/**
+ * The ground the carve leaves at a point, or `NaN` where this plan leaves the
+ * terrain alone. `cutLength` is `accessCutLength` for the plan, computed once
+ * by whoever holds the plans.
+ */
+export function accessCutAt(plan: AccessPlan, cutLength: number, x: number, z: number): number {
+  const dx = x - plan.mouthX;
+  const dz = z - plan.mouthZ;
+  const d = dx * plan.dirX + dz * plan.dirZ;
+  const w = -dx * plan.dirZ + dz * plan.dirX;
+  if (d < -ACCESS_APRON_M || d > cutLength + ACCESS_APRON_M) return Number.NaN;
+  if (w < -ACCESS_HALF_W - ACCESS_APRON_M || w > ACCESS_HALF_W + ACCESS_APRON_M) return Number.NaN;
+  if (d >= 0 && d <= cutLength && w >= -ACCESS_HALF_W && w <= ACCESS_HALF_W) {
+    return plan.mouthY - ((plan.mouthY - plan.floorY) / Math.max(plan.inclineM, 1e-6)) * d;
+  }
+  return plan.mouthY;
 }
 
 // --- Who is aboard what --------------------------------------------------------------
@@ -3993,6 +4053,29 @@ function riderArc(consist: Consist, a: AboardSlot, head: number): number {
  */
 export function verifyStationAccess(): string[] {
   const failures: string[] = [];
+  // --- The carve. A plan running along +z from a mouth at the origin, 10 m
+  // deep over 13.3 m, flat ground at 0: the lid (4.2 m over the floor) is
+  // under the street past d = (4.2 + cover) / 0.75.
+  {
+    const plan: AccessPlan = {
+      mouthX: 0, mouthZ: 0, mouthY: 0, dirX: 0, dirZ: 1, inclineM: 13.3,
+      footX: 0, footZ: 13.3, floorY: -10, tunDirX: 1, tunDirZ: 0, tunnelM: 20,
+    };
+    const len = accessCutLength(plan, () => 0);
+    const expect = (ACCESS_HEIGHT_M + ACCESS_LID_COVER_M) / (10 / 13.3);
+    if (Math.abs(len - expect) > 0.6) failures.push(`the carve runs ${len.toFixed(1)} m down the incline; the lid is under the street at ${expect.toFixed(1)} m`);
+    if (accessCutLength(plan, () => -100) !== plan.inclineM) failures.push('ground that never covers the lid should carve the whole incline');
+    if (accessCutLength(plan, () => 100) !== 0) failures.push('ground already over the lid at the mouth carves nothing past it');
+    const atMouth = accessCutAt(plan, len, 0, 0.1);
+    if (!(Math.abs(atMouth) < 0.1)) failures.push(`the ground at the mouth is the mouth's height, not ${atMouth}`);
+    const mid = accessCutAt(plan, len, 0, 4);
+    if (!(Math.abs(mid - (-4 * 10 / 13.3)) < 0.05)) failures.push(`4 m down the incline the ground is the floor, not ${mid}`);
+    const apron = accessCutAt(plan, len, ACCESS_HALF_W + 1, 2);
+    if (apron !== 0) failures.push(`beside the passage the ground is the apron at the mouth's height, not ${apron}`);
+    if (Number.isFinite(accessCutAt(plan, len, ACCESS_HALF_W + ACCESS_APRON_M + 0.5, 2))) failures.push('past the apron the terrain is left alone');
+    if (Number.isFinite(accessCutAt(plan, len, 0, len + ACCESS_APRON_M + 0.5))) failures.push('past the carve\'s end the terrain is left alone');
+    if (Number.isFinite(accessCutAt(plan, len, 0, -ACCESS_APRON_M - 0.5))) failures.push('in front of the apron the terrain is left alone');
+  }
   const field = new StationBoxField();
   const street = 40;
   const floor = 20;

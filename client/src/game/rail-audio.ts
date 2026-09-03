@@ -165,6 +165,7 @@ import {
   type RailBake,
   type RailDirection,
   type TrainPose,
+  railUnderground,
 } from './rail.ts';
 import {
   consistOf,
@@ -621,6 +622,15 @@ export function railAnnounceMix(
   z: number,
   aboard: AboardRef | null,
   out: RailAnnounceMix,
+  /**
+   * Whether the listener is below the street -- in a station box or its
+   * incline. A train in a bore is heard from the platform and never from the
+   * footpath over it, and a listener on the footpath hears the surface
+   * railway and never the one under their feet. `railUnderground` is the
+   * other half of the test; together they are the cheap occlusion the owner
+   * asked for -- *"tunnel trains should only be hearable like in eyesight"*.
+   */
+  listenerUnderground = false,
 ): void {
   out.arrive.active = false;
   out.depart.active = false;
@@ -660,6 +670,8 @@ export function railAnnounceMix(
         }
         const age = _pose.age;
         const s = _pose.s;
+        // The occlusion. The rider's own train is always heard.
+        if (!mine && railUnderground(bake, dir, s) !== listenerUnderground) continue;
         if (mine) {
           // **Underway is the absence of a dwell**, which is the same fact the
           // doors are driven from rather than a second opinion about it:

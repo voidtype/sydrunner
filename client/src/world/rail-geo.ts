@@ -107,7 +107,7 @@
  * player's position. `poseTrain` stays pure because nothing here can reach it.
  */
 
-import { stationAccessPlan, ACCESS_OVERLAP_M, roomCeilY, concourseY, type AccessWorld,
+import { stationAccessPlan, ACCESS_OVERLAP_M, ACCESS_APRON_M, accessCutLength, roomCeilY, concourseY, type AccessWorld,
   ACCESS_HALF_W,
   ACCESS_HEIGHT_M,
 } from '../game/riding.ts';
@@ -4281,6 +4281,56 @@ function writeUndergroundStation(
   const tpost = at(-2.5, w + 1.2, y);
   concrete.box(tpost[0] - 0.18, y, tpost[2] - 0.18, tpost[0] + 0.18, y + 6.2, tpost[2] + 0.18);
   signs.box(tpost[0] - 0.9, y + 4.6, tpost[2] - 0.9, tpost[0] + 0.9, y + 6.2, tpost[2] + 0.9);
+
+  // --- The hole in the street, dressed. `riding.accessCutAt` carves the
+  // terrain over the first `cutLen` metres of the incline and `ACCESS_APRON_M`
+  // around it, on both ends; this is the concrete that stands in the hole so
+  // it reads as an entrance and not as a pit. The apron is a flat slab at the
+  // mouth's height round the passage, with a skirt down its outside edge so
+  // the four-metre carve lattice never shows a void under a lip of grass; the
+  // passage's own walls get an outer face where they stand above the apron,
+  // because the lining is drawn from inside only. The lid on top is already
+  // concrete. What the owner saw -- *"passing thru floor"* -- was the terrain
+  // running across all of this; now the terrain stops at the apron's edge.
+  const cutLen = accessCutLength(plan, accessWorld.groundAt);
+  const A = ACCESS_APRON_M;
+  const SKIRT = 1.6;
+  const d0a = -A;
+  const d1a = cutLen + A;
+  const wOut = HW + A;
+  // The apron: two side strips, a front strip and a back strip, all at the
+  // mouth's height, leaving the passage's own plan open between them.
+  const slab = (da: number, db: number, wa: number, wb: number): void => {
+    concrete.quad(...at(da, wa, y), ...at(db, wa, y), ...at(db, wb, y), ...at(da, wb, y));
+  };
+  slab(d0a, d1a, -wOut, -HW);
+  slab(d0a, d1a, HW, wOut);
+  slab(d0a, 0, -HW, HW);
+  slab(cutLen, d1a, -HW, HW);
+  // The skirt, facing out, round the apron's four edges.
+  const skirt = (a: [number, number, number], b: [number, number, number]): void => {
+    concrete.quad(a[0], y - SKIRT, a[2], b[0], y - SKIRT, b[2], b[0], y, b[2], a[0], y, a[2]);
+  };
+  skirt(at(d0a, -wOut, y), at(d0a, wOut, y));
+  skirt(at(d1a, wOut, y), at(d1a, -wOut, y));
+  skirt(at(d0a, wOut, y), at(d1a, wOut, y));
+  skirt(at(d1a, -wOut, y), at(d0a, -wOut, y));
+  // The passage walls' outer faces, from the apron up to the lid, where the
+  // lid is above the apron. Wound to face away from the passage.
+  for (const sgn of [-1, 1]) {
+    for (let d = 0; d < cutLen; d += 2) {
+      const dn = Math.min(cutLen, d + 2);
+      const top0 = yAt(d) + H;
+      const top1 = yAt(dn) + H;
+      if (top0 <= y && top1 <= y) break;
+      const p0 = at(d, HW * sgn, y);
+      const p1 = at(dn, HW * sgn, y);
+      const q0 = at(d, HW * sgn, Math.max(y, top0));
+      const q1 = at(dn, HW * sgn, Math.max(y, top1));
+      if (sgn > 0) concrete.quad(p0[0], p0[1], p0[2], p1[0], p1[1], p1[2], q1[0], q1[1], q1[2], q0[0], q0[1], q0[2]);
+      else concrete.quad(p1[0], p1[1], p1[2], p0[0], p0[1], p0[2], q0[0], q0[1], q0[2], q1[0], q1[1], q1[2]);
+    }
+  }
 }
 
 /** The station name on a blade, with two posts, at the platform's own end. */

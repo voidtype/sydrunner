@@ -405,6 +405,30 @@ export function heightAlong(bake: RailBake, dir: RailDirection, s: number): numb
   return p[lo * 3 + 1] + (p[(lo + 1) * 3 + 1] - p[lo * 3 + 1]) * u;
 }
 
+/**
+ * Is the track at arc length `s` in a bore -- tunnelled, or buried past
+ * `DEEP_M`? The one question `game/rail-audio.ts` asks of the geometry: a
+ * train thirty metres under York Street is not a sound on York Street, and
+ * the owner heard one ("i can hear the train like outside upstairs"). Both
+ * vertices of the span have to say so, which is the conservative reading at
+ * a portal: a train half out of the hill is audible.
+ */
+export function railUnderground(bake: RailBake, dir: RailDirection, s: number): boolean {
+  const c = bake.cum;
+  let lo = dir.vertexOff;
+  let hi = dir.vertexOff + dir.vertexCount - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (c[mid] <= s) lo = mid;
+    else hi = mid - 1;
+  }
+  if (lo >= dir.vertexOff + dir.vertexCount - 1) lo = dir.vertexOff + dir.vertexCount - 2;
+  if (lo < dir.vertexOff) lo = dir.vertexOff;
+  const buried = SPAN_TUNNEL | SPAN_DEEP;
+  const f = bake.vertexFlags;
+  return (f[lo] & buried) !== 0 && (f[lo + 1] & buried) !== 0;
+}
+
 /** `RailStation.concourseY` for every station with a calling stop. Idempotent. */
 export function deriveConcourse(bake: RailBake): void {
   for (const st of bake.stations) {
@@ -1079,6 +1103,30 @@ export function verifyRail(bake: RailBake): string[] {
     for (let i = 0; i < bake.vertexFlags.length; i++) {
       if (bake.vertexClearance[i] < -DEEP_M) deep++;
       if (bake.vertexFlags[i] & SPAN_DEEP) marked++;
+    }
+    // `railUnderground` reads the same flags: a buried span says so through
+    // it and a surface span does not. Checked on the first four of each the
+    // bake has, at the span's own middle arc length.
+    {
+      const buried = SPAN_TUNNEL | SPAN_DEEP;
+      let buriedSeen = 0;
+      let surfaceSeen = 0;
+      for (const line of bake.lines) {
+        for (const dir of line.dirs) {
+          for (let v = dir.vertexOff; v < dir.vertexOff + dir.vertexCount - 1; v++) {
+            const a = (bake.vertexFlags[v] & buried) !== 0;
+            const b = (bake.vertexFlags[v + 1] & buried) !== 0;
+            const s = (bake.cum[v] + bake.cum[v + 1]) / 2;
+            if (a && b && buriedSeen < 4) {
+              buriedSeen++;
+              if (!railUnderground(bake, dir, s)) bad.push(`${line.id} dir ${dir.index} span ${v} is buried and railUnderground says not`);
+            } else if (!a && !b && surfaceSeen < 4) {
+              surfaceSeen++;
+              if (railUnderground(bake, dir, s)) bad.push(`${line.id} dir ${dir.index} span ${v} is at the surface and railUnderground says buried`);
+            }
+          }
+        }
+      }
     }
     if (deep > 0 && marked < deep) bad.push(`${deep} vertices are buried past ${DEEP_M} m and ${marked} carry SPAN_DEEP; decode marks them`);
     for (const st of bake.stations) {

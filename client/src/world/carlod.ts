@@ -177,10 +177,14 @@
  * today is exactly one file: the police car, whose livery is not a paint choice.
  */
 
+import { Fn, instancedBufferAttribute, max, mix, texture, uv, vec4, vertexColor } from 'three/tsl';
 import {
   BufferAttribute,
   BufferGeometry,
   Color,
+  DoubleSide,
+  DynamicDrawUsage,
+  InstancedBufferAttribute,
   InstancedMesh,
   Matrix3,
   Matrix4,
@@ -299,40 +303,17 @@ const PER_MODEL_CAPACITY = 24;
 /**
  * Files authored nose-toward `-X`, corrected by half a turn at merge time.
  *
- * **Established by rendering every file in the set from a camera parked off its
- * +X end**: a correctly authored model shows its grille and headlights there,
- * and these five showed a tailgate, a tray or a spare wheel. That test is worth
- * naming because the cheap proxies all fail -- a cabin-offset heuristic calls
- * every ute backwards and misses `nissan_terrano`, and a bounding box says
- * nothing at all.
- *
- * Note for whoever curates the manifest next: the four files flagged there as
- * low-confidence were `city_bus`, `hatch_micro`, `suv_generic_b` and
- * `vw_golf_mk`. Two of those four are fine (`hatch_micro` faces the right way,
- * and `suv_generic_b` is not a car at all -- see `PROPORTION_LIMIT`), and four
- * files nobody suspected are backwards. The flags were not a superset.
- *
- * Baked into the geometry rather than applied per instance: it is a property of
- * the file, it never changes, and a per-frame rotation would be a transcendental
- * per claimed car for a constant.
+ * **Empty since the 2026-09 round, and kept as a table so the next stale
+ * entry has somewhere to be argued about.** `scripts/prep-car-models.mjs`
+ * turns every file nose-to-`+X` before it ships (name cues, then the glass,
+ * then a `nose` pinned by hand in its CATALOG), and `scripts/render-car-sheet.mjs`
+ * draws every shipped file from off its `+X` end so a person can see the
+ * grille. The five entries that used to live here were written against files
+ * the prep had *not yet* turned; once it did, three of them -- the bus, the
+ * garbage truck and `sedan_generic_a` -- were turned a second time here and
+ * drove backwards for a day. One fact, one place: the prep owns the nose.
  */
-const YAW_CORRECTION: Readonly<Record<string, number>> = {
-  // Rear doors and the destination sign are at -X. Unmapped today; corrected so
-  // that mapping a bus later does not start by rediscovering this.
-  city_bus: Math.PI,
-  // The hopper is at +X. Likewise unmapped.
-  garbage_truck_kenney: Math.PI,
-  // Tray and tail lights at +X, grille and badge at -X.
-  mitsubishi_l200: Math.PI,
-  // Spare wheel on the tailgate at +X.
-  nissan_terrano: Math.PI,
-  // Number plate and tail lights at +X; round headlights and a grille at -X.
-  sedan_generic_a: Math.PI,
-  // Open flatbed at +X, cab at -X.
-  van_generic_a: Math.PI,
-  // Hatchback tailgate at +X.
-  vw_golf_mk: Math.PI,
-};
+const YAW_CORRECTION: Readonly<Record<string, number>> = {};
 
 /**
  * How far out of proportion a model may be before this file refuses to draw it.
@@ -412,6 +393,8 @@ function mappedBody(entry: CarModelEntry): BodyKey | null {
 
 /** What the merge produced, or why it did not. */
 interface MergedModel {
+  /** The one map the prep packed for this file, or null for a flat-coloured model. */
+  map: Texture | null;
   geometry: BufferGeometry;
   box: CarModelBox;
   /**
@@ -432,11 +415,12 @@ const _matrix = /*#__PURE__*/ new Matrix4();
 const _position = /*#__PURE__*/ new Vector3();
 const _quaternion = /*#__PURE__*/ new Quaternion();
 const _scale = /*#__PURE__*/ new Vector3();
-const _colour = /*#__PURE__*/ new Color();
 const _zero = /*#__PURE__*/ new Matrix4().makeScale(0, 0, 0);
 
 /** One primitive's contribution, held while the two passes of the merge run. */
 interface Piece {
+  uvs: Float32Array;
+  paint: Float32Array;
   positions: Float32Array;
   normals: Float32Array;
   /** Linear RGB per vertex, before the value collapse. */
@@ -445,55 +429,6 @@ interface Piece {
   triangles: number;
 }
 
-/**
- * sRGB to linear, for texels read off a canvas.
- *
- * Material colours arrive from `GLTFLoader` already in the working (linear)
- * space -- glTF's `baseColorFactor` is defined linear -- so only sampled texels
- * need this. Written out rather than reached for through `ColorManagement` so
- * that the one place a colour space is converted in this file is visible.
- */
-function srgbToLinear(c: number): number {
-  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-}
-
-/**
- * Every texel of a texture, once.
- *
- * Cached across models because two files in the set share `citybits_texture`,
- * and because a 1024 x 1024 read-back is the single most expensive thing this
- * module does at load.
- */
-const texelCache = new Map<string, ImageData | null>();
-
-function readTexels(texture: Texture): ImageData | null {
-  const image = texture.image as
-    | (CanvasImageSource & { width?: number; height?: number })
-    | undefined;
-  if (!image) return null;
-  const key = texture.uuid;
-  const hit = texelCache.get(key);
-  if (hit !== undefined) return hit;
-  let data: ImageData | null = null;
-  try {
-    const width = image.width ?? 0;
-    const height = image.height ?? 0;
-    if (width > 0 && height > 0) {
-      const canvas = new OffscreenCanvas(width, height);
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      if (ctx) {
-        ctx.drawImage(image, 0, 0);
-        data = ctx.getImageData(0, 0, width, height);
-      }
-    }
-  } catch (err) {
-    // A texture that will not read back costs its model the texture's colours,
-    // not the model. The material factor below still applies.
-    console.warn('[carlod] could not read a model texture back:', err);
-  }
-  texelCache.set(key, data);
-  return data;
-}
 
 /**
  * Collapse a glTF scene into one geometry with a baked vertex colour.
@@ -517,6 +452,7 @@ function mergeModel(root: Object3D, tint: 'multiply' | 'none', yaw: number): Mer
   const materials: Array<{ triangles: number; values: number[] }> = [];
   const materialIndex = new Map<unknown, number>();
   const pieces: Piece[] = [];
+  let map: Texture | null = null;
 
   for (const mesh of meshes) {
     const geometry = mesh.geometry;
@@ -543,12 +479,23 @@ function mergeModel(root: Object3D, tint: 'multiply' | 'none', yaw: number): Mer
     _normalMatrix.getNormalMatrix(_matrix);
 
     const base = (material as { color?: Color }).color ?? new Color(1, 1, 1);
-    const map = (material as { map?: Texture | null }).map ?? null;
-    const texels = map ? readTexels(map) : null;
+    // The atlas, if the prep packed one. One per file by construction
+    // (`bakeAtlas` joins every primitive onto it), so the first is the only.
+    const ownMap = (material as { map?: Texture | null }).map ?? null;
+    if (ownMap !== null && map === null) map = ownMap;
+    // With an atlas the texels are sampled in the shader; without one the
+    // model has no map. The per-vertex texture read-back that used to live
+    // here is what made a Ranger look flat.
+    // What the prep decided the paint lands on, per vertex; a file without the
+    // attribute predates it and is painted all over, which is what it was.
+    const paintAttr = geometry.getAttribute('_paint') ?? geometry.getAttribute('_PAINT');
+    const colourAttr = geometry.getAttribute('color');
 
     const positions = new Float32Array(count * 3);
     const normals = new Float32Array(count * 3);
     const colours = new Float32Array(count * 3);
+    const uvs = new Float32Array(count * 2);
+    const paint = new Float32Array(count);
 
     for (let i = 0; i < count; i++) {
       // `fromBufferAttribute` denormalises, which every file in this set needs:
@@ -570,24 +517,23 @@ function mergeModel(root: Object3D, tint: 'multiply' | 'none', yaw: number): Mer
       let r = base.r;
       let g = base.g;
       let b = base.b;
-      if (texels && uv) {
-        // glTF puts the UV origin at the image's top-left and `GLTFLoader`
-        // carries that through as `flipY = false`, so `v` indexes rows from the
-        // top with no flip. Nearest, wrapped: these are palette atlases and flat
-        // per-island maps, where a filtered read would only blend two patches
-        // that were never meant to meet.
-        const px = wrapTexel(uv.getX(i), texels.width);
-        const py = wrapTexel(uv.getY(i), texels.height);
-        const o = (py * texels.width + px) * 4;
-        r *= srgbToLinear(texels.data[o] / 255);
-        g *= srgbToLinear(texels.data[o + 1] / 255);
-        b *= srgbToLinear(texels.data[o + 2] / 255);
+      if (colourAttr) {
+        r *= colourAttr.getX(i);
+        g *= colourAttr.getY(i);
+        b *= colourAttr.getZ(i);
       }
+      if (uv) {
+        uvs[i * 2] = uv.getX(i);
+        uvs[i * 2 + 1] = uv.getY(i);
+      }
+      paint[i] = paintAttr ? paintAttr.getX(i) : 1;
       colours[i * 3] = r;
       colours[i * 3 + 1] = g;
       colours[i * 3 + 2] = b;
       // V, the maximum channel. See section 6 on why this is not luminance.
-      materials[slot].values.push(Math.max(r, g, b));
+      // Only the painted vertices vote: a headlight the prep left alone must
+      // not set the exposure for the panels, and is not normalised itself.
+      if (paint[i] > 0.5 && ownMap === null) materials[slot].values.push(Math.max(r, g, b));
     }
 
     const source = index ? index.array : null;
@@ -597,7 +543,7 @@ function mergeModel(root: Object3D, tint: 'multiply' | 'none', yaw: number): Mer
     } else {
       for (let i = 0; i < merged.length; i++) merged[i] = i;
     }
-    pieces.push({ positions, normals, colours, index: merged, triangles });
+    pieces.push({ positions, normals, colours, uvs, paint, index: merged, triangles });
   }
 
   // --- The exposure. See section 6.
@@ -630,17 +576,25 @@ function mergeModel(root: Object3D, tint: 'multiply' | 'none', yaw: number): Mer
   }
   const positions = new Float32Array(vertexTotal * 3);
   const normals = new Float32Array(vertexTotal * 3);
-  const colours = new Float32Array(vertexTotal * 3);
+  // Four wide: rgb and the paint mask in w, read as one `vertexColor()`.
+  const colours = new Float32Array(vertexTotal * 4);
+  const uvs = new Float32Array(vertexTotal * 2);
   const indices = new Uint32Array(indexTotal);
   let vOffset = 0;
   let iOffset = 0;
   for (const p of pieces) {
     positions.set(p.positions, vOffset * 3);
     normals.set(p.normals, vOffset * 3);
+    uvs.set(p.uvs, vOffset * 2);
     const n = p.positions.length / 3;
     for (let i = 0; i < n; i++) {
-      const o = (vOffset + i) * 3;
-      if (tint === 'multiply') {
+      const o = (vOffset + i) * 4;
+      // A `none` model is drawn as authored everywhere: its mask is off.
+      const painted = tint === 'multiply' && p.paint[i] > 0.5;
+      colours[o + 3] = painted ? 1 : 0;
+      if (painted && map === null) {
+        // Flat colours: the value, exposed so the body reaches 1. With an atlas
+        // the prep baked the gain into the texels and the vertex stays white.
         const value = Math.min(1, Math.max(p.colours[i * 3], p.colours[i * 3 + 1], p.colours[i * 3 + 2]) * gain);
         colours[o] = value;
         colours[o + 1] = value;
@@ -659,7 +613,8 @@ function mergeModel(root: Object3D, tint: 'multiply' | 'none', yaw: number): Mer
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new BufferAttribute(positions, 3));
   geometry.setAttribute('normal', new BufferAttribute(normals, 3));
-  geometry.setAttribute('color', new BufferAttribute(colours, 3));
+  geometry.setAttribute('color', new BufferAttribute(colours, 4));
+  geometry.setAttribute('uv', new BufferAttribute(uvs, 2));
   geometry.setIndex(new BufferAttribute(indices, 1));
   geometry.computeBoundingSphere();
   geometry.computeBoundingBox();
@@ -700,6 +655,7 @@ function mergeModel(root: Object3D, tint: 'multiply' | 'none', yaw: number): Mer
 
   return {
     geometry,
+    map,
     seat,
     box: {
       length: bounds.max.x - bounds.min.x,
@@ -710,19 +666,32 @@ function mergeModel(root: Object3D, tint: 'multiply' | 'none', yaw: number): Mer
   };
 }
 
-/** Nearest texel on a wrapped axis. */
-function wrapTexel(t: number, size: number): number {
-  const i = Math.floor(t * size);
-  return ((i % size) + size) % size;
-}
 
 // --- One model, ready to draw ---------------------------------------------------
+
+/** One instance's paint and crumple tone into the slot's buffer. See `ModelSlot.paint`. */
+function writePaint(slot: ModelSlot, index: number, r: number, g: number, b: number, tone: number): void {
+  const a = slot.paint.array as Float32Array;
+  a[index * 4] = r;
+  a[index * 4 + 1] = g;
+  a[index * 4 + 2] = b;
+  a[index * 4 + 3] = tone;
+}
 
 /** A loaded model file and the instances currently wearing it. */
 interface ModelSlot {
   file: string;
   mesh: InstancedMesh;
   box: CarModelBox;
+  /**
+   * The paint per instance -- rgb, and the crumple tone in w -- read by the
+   * material through `instancedBufferAttribute`. Not `instanceColor`, and the
+   * difference is the whole of section 6's second half: `instanceColor` is
+   * multiplied into every fragment by the node material, and a headlight, a
+   * tyre and a number plate must not take the paint. The shader below reads
+   * this where the prep's `_PAINT` mask says so and leaves the rest alone.
+   */
+  paint: InstancedBufferAttribute;
   /** Whether an instance takes the entity's paint. `tint: "multiply"`. */
   painted: boolean;
   /** Claims occupying instances `0 .. claims.length - 1`. Kept packed. */
@@ -805,7 +774,8 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
   /** Every instanced set, for the scene and the boot warm-up. */
   readonly meshes: InstancedMesh[] = [];
   /** The one material every model wears. See section 5. */
-  readonly material: MeshStandardNodeMaterial;
+  /** Every material the fleet made, for disposal. Two graphs, N instances. */
+  private readonly materials: MeshStandardNodeMaterial[] = [];
 
   /** Cars drawn as models right now. On the debug overlay. */
   claimedCount = 0;
@@ -947,26 +917,57 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
 
   constructor(pose: CarPose) {
     this.pose = pose;
-    this.material = new MeshStandardNodeMaterial();
-    this.material.name = 'car_model';
-    // No `colorNode`, exactly as `CarAssets` has none: `NodeMaterial` already
-    // multiplies the material colour by the geometry `color` attribute and then
-    // by `instanceColor`, so the model's baked value and the entity's paint both
-    // arrive through built-in multiplies and no shader graph at all.
-    this.material.vertexColors = true;
-    this.material.color = new Color(1, 1, 1);
+  }
+
+  /**
+   * One material per model, because the map and the paint buffer are the
+   * model's own. Two shader graphs in the whole fleet -- with a map and
+   * without -- so the pipeline count does not grow with the manifest.
+   *
+   * The colour rule, in one line of TSL: `base` is the atlas texel (or 1) times
+   * the vertex colour; where the prep's mask is on, the entity's paint takes
+   * the *value* of that base as its hue's brightness -- section 6's rule, in
+   * the shader rather than baked -- and where it is off the authored colour
+   * stands. The crumple tone rides in the paint's fourth component and darkens
+   * both, so a wreck's headlights are as sooty as its panels.
+   */
+  private materialFor(map: Texture | null, paint: InstancedBufferAttribute, file: string): MeshStandardNodeMaterial {
+    const material = new MeshStandardNodeMaterial();
+    material.name = map === null ? 'car_model' : 'car_model_mapped';
+    material.color = new Color(1, 1, 1);
+    material.vertexColors = false;
+    // The vertex colour is a vec4: rgb, and the prep's `_PAINT` mask in w.
+    const atlas = map;
+    material.colorNode = Fn(() => {
+      const vc = vertexColor();
+      // `TextureNode` is typed without swizzles in @types/three; it is a vec4.
+      const texel = atlas === null ? null : (texture(atlas, uv()) as unknown as ReturnType<typeof vec4>);
+      const base = texel === null ? vc.rgb : texel.rgb.mul(vc.rgb);
+      const pc = instancedBufferAttribute(paint, 'vec4') as unknown as ReturnType<typeof vec4>;
+      const value = max(base.r, max(base.g, base.b));
+      const painted = pc.rgb.mul(value);
+      return mix(base.mul(pc.w), painted.mul(pc.w), vc.w);
+    })();
     // The same roughness and metalness as `car_paint`, and the same numbers
     // rather than a fresh judgement: `cars.PAINT` was lifted to compensate for
     // exactly this metalness moving energy out of the diffuse term, so a model
     // car drawn with different constants would be a different white from the box
     // car parked behind it. See `world/cars.ts` on the palette.
-    this.material.roughness = 0.35;
-    this.material.metalness = 0.4;
+    material.roughness = 0.35;
+    material.metalness = 0.4;
     // **Not** flat-shaded, which is the one place this diverges from the box
     // fleet. A box car is a polyhedron and smooth-shading one makes it read as a
     // melted version of itself; these carry authored normals, and a Kenney body
     // is faceted where the artist faceted it and rounded where they did not.
-    this.material.flatShading = false;
+    material.flatShading = false;
+    // **Two-sided.** A Sketchfab car is authored double-sided and half its
+    // panels are wound inside-out -- the David_Holiday L200 and the 2021 HiLux
+    // draw as a chassis with no body under a single-sided material, which is
+    // the owner's "one of the cars is a weird mesh". Two dozen instances a
+    // model is nothing to draw twice.
+    material.side = DoubleSide;
+    void file;
+    return material;
   }
 
   /**
@@ -976,7 +977,11 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
    * of a pool *is* the model choice for every car in Sydney. See section 1.
    */
   addModel(entry: CarModelEntry, merged: MergedModel, body: BodyKey): void {
-    const mesh = new InstancedMesh(merged.geometry, this.material, PER_MODEL_CAPACITY);
+    const paint = new InstancedBufferAttribute(new Float32Array(PER_MODEL_CAPACITY * 4).fill(1), 4);
+    paint.setUsage(DynamicDrawUsage);
+    const material = this.materialFor(merged.map, paint, entry.file);
+    this.materials.push(material);
+    const mesh = new InstancedMesh(merged.geometry, material, PER_MODEL_CAPACITY);
     mesh.name = `carmodel_${keyOf(entry.file)}`;
     mesh.count = 0;
     // Culled by the claim radius rather than by the frustum, on exactly
@@ -1014,16 +1019,10 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
     // Never owned by a tile, so an eviction must never free this geometry -- the
     // same flag the moving fleet carries for the same reason.
     mesh.userData.traffic = true;
-    // **The paint buffer, allocated here and not by the first `setColorAt` in a
-    // claim, and this line is load-bearing.** `InstancedMesh` allocates
-    // `instanceColor` lazily and `NodeMaterial.setupDiffuseColor` multiplies by
-    // it *only when the attribute exists at the moment the node graph is built*,
-    // with nothing in the cache key to force a rebuild when it appears later.
-    // The boot scene pass compiles these before a single car has been claimed,
-    // so without this every model would draw in its base value and no paint at
-    // all -- the exact bug `world/cars.ts` documents shipping once in the moving
-    // fleet.
-    mesh.setColorAt(0, _colour.setRGB(1, 1, 1));
+    // No `setColorAt` here or anywhere: the paint is `slot.paint`, allocated
+    // above at full capacity before the node graph is built, which is the
+    // same order-of-construction rule `world/cars.ts` documents for
+    // `instanceColor` and the reason the buffer is made before the material.
     this.meshes.push(mesh);
 
     const pool = this.pools.get(body) ?? [];
@@ -1031,6 +1030,7 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
       file: entry.file,
       mesh,
       box: merged.box,
+      paint,
       painted: entry.tint === 'multiply',
       claims: [],
       dirty: false,
@@ -1134,8 +1134,7 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
     // car somebody is looking at actually crashed.
     if (pose.damage !== claim.damage) {
       claim.damage = pose.damage;
-      const tone = crumpleTone(pose.damage);
-      claim.slot.mesh.setColorAt(claim.index, _colour.setRGB(claim.pr * tone, claim.pg * tone, claim.pb * tone));
+      writePaint(claim.slot, claim.index, claim.pr, claim.pg, claim.pb, crumpleTone(pose.damage));
     }
     claim.slot.dirty = true;
     return true;
@@ -1247,7 +1246,7 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
       for (const slot of pool) {
         if (slot === null || !slot.dirty) continue;
         slot.mesh.instanceMatrix.needsUpdate = true;
-        if (slot.mesh.instanceColor) slot.mesh.instanceColor.needsUpdate = true;
+        slot.paint.needsUpdate = true;
         slot.dirty = false;
       }
     }
@@ -1444,7 +1443,7 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
     claim.pr = paint[0];
     claim.pg = paint[1];
     claim.pb = paint[2];
-    slot.mesh.setColorAt(claim.index, _colour.setRGB(paint[0], paint[1], paint[2]));
+    writePaint(slot, claim.index, paint[0], paint[1], paint[2], crumpleTone(claim.damage));
     slot.dirty = true;
   }
 
@@ -1470,8 +1469,7 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
       // The crash tone travels with the claim. Without it, a wreck whose
       // neighbour in the instance buffer was released would be repainted in its
       // showroom colour and stay that way until it crashed again.
-      const tone = crumpleTone(last.damage);
-      slot.mesh.setColorAt(vacated, _colour.setRGB(last.pr * tone, last.pg * tone, last.pb * tone));
+      writePaint(slot, vacated, last.pr, last.pg, last.pb, crumpleTone(last.damage));
     }
     slot.mesh.count = slot.claims.length;
     slot.dirty = true;
@@ -1646,7 +1644,7 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
       mesh.geometry.dispose();
       mesh.dispose();
     }
-    this.material.dispose();
+    for (const m of this.materials) m.dispose();
   }
 }
 
@@ -1797,9 +1795,6 @@ export async function loadCarModels(
     }
   }
 
-  // Texture read-backs are per session and per texture, and nothing needs them
-  // once every model is merged.
-  texelCache.clear();
   return fleet;
 }
 

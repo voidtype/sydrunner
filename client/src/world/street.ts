@@ -373,7 +373,16 @@ function finishConcrete(material: MeshStandardNodeMaterial): MeshStandardNodeMat
     const groove = smoothstep(float(JOINT_HALF_WIDTH), float(JOINT_HALF_WIDTH * 3.0), toJoint);
     // The groove is a shadowed recess, not a drawn line, so it darkens rather
     // than tinting.
-    const jointShade = mix(float(0.62), float(1.0), groove);
+    //
+    // **Only on the ground.** This slot is also every bridge fascia, parapet
+    // and pier `decks.py` emits, whose UVs are world metres on one axis and
+    // height on the other -- so on a wall running diagonally in the world the
+    // 1.2 m grid drew two families of lines crossing at odd angles, which is
+    // the owner's "default concrete ... has criss cross on it". A wall gets
+    // the pour, the speckle and the mottle, and no joints and no gum: the
+    // formwork on a real fascia is the *absence* of a pattern at this scale.
+    const onGround = smoothstep(float(0.55), float(0.85), normalWorld.y);
+    const jointShade = mix(float(1.0), mix(float(0.62), float(1.0), groove), onGround);
 
     // Per-slab pour variation: adjacent slabs were poured on different days and
     // it shows for decades.
@@ -425,7 +434,7 @@ function finishConcrete(material: MeshStandardNodeMaterial): MeshStandardNodeMat
     return base
       .mul(float(1.0).add(pour).add(speckle).add(blotch))
       .mul(jointShade)
-      .mul(float(1.0).sub(gum.mul(float(GUM.peak))));
+      .mul(float(1.0).sub(gum.mul(float(GUM.peak)).mul(onGround)));
   })();
   material.roughnessNode = float(0.90);
   material.metalnessNode = float(0.0);

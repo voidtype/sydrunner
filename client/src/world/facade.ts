@@ -718,6 +718,16 @@ const DOOR = {
   step: 0.06,
   threshold: [0.34, 0.30, 0.23] as const,
   /**
+   * How far below the pad the steps reach, metres, and each riser. 2.4 m is
+   * fourteen risers -- the deepest a front flight gets before it is a
+   * staircase with a landing, and past it the skirt is masonry again. See
+   * the steps in the door node.
+   */
+  stepsDown: 2.4,
+  riser: 0.17,
+  /** How far past the architrave the flight spreads, each side. */
+  stepsSide: 0.25,
+  /**
    * The fanlight over a terrace or federation door: a 340 mm light on a 70 mm
    * transom bar. Sydney terraces have these almost universally and they are the
    * reason a terrace's opening reads as taller than its door.
@@ -3396,11 +3406,13 @@ export function createFacadeMaterial(
 
           // The opening: architrave to architrave, and the ground to the head.
           // The bottom is v = 0 rather than the top of the threshold, because
-          // the step is part of the assembly and stands on the pad.
+          // the step is part of the assembly and stands on the pad -- and
+          // below v = 0, down the skirt, the flight of steps that reaches it.
+          // See `steps` below; `DOOR.stepsDown` is how far they go.
           const cover = smoothstep(
             float(0.0),
             pw,
-            min(doorHalf.sub(doorAcross), min(co.y, doorTop.sub(co.y))),
+            min(doorHalf.sub(doorAcross), min(co.y.add(float(DOOR.stepsDown)), doorTop.sub(co.y))),
           ).mul(hasDoor);
 
           // The leaf: 820 mm wide on a house, which is the standard leaf and
@@ -3509,6 +3521,29 @@ export function createFacadeMaterial(
             .oneMinus()
             .mul(float(DOOR.step).div(wStep));
           colour.assign(mix(colour, vec3(...DOOR.threshold), stepBand));
+
+          // --- The steps, below the pad. The owner's "doors appear in air":
+          // a pad is one height for the whole building and on a sloping
+          // block the downhill wall stands on its skirt, so the door sat a
+          // metre up a blank masonry base. What a Sydney house has there is a
+          // flight of sandstone steps from the footpath to the threshold, and
+          // that is what is drawn: treads at `DOOR.riser` down the skirt
+          // inside the door's own width, each riser a shaded line, the whole
+          // thing the threshold's stone. Where the ground is at the pad the
+          // terrain buries the flight and nothing shows, which is the right
+          // answer for the four fifths of doors that were never in the air.
+          const below = step(co.y, float(0.0)).mul(step(float(-DOOR.stepsDown), co.y));
+          const inFlight = below.mul(step(doorAcross, doorHalf.add(float(DOOR.stepsSide))));
+          const riserT = fract(co.y.negate().div(float(DOOR.riser)));
+          const wRiser = max(float(0.02), pw.div(float(DOOR.riser)));
+          const riserLine = smoothstep(float(0.0), wRiser, riserT).mul(smoothstep(float(1.0), float(1.0).sub(wRiser), riserT)).oneMinus();
+          const treadShade = mix(float(1.0), float(0.55), riserLine);
+          // A tread is sunlit from above; the riser under it is not. Nine
+          // tenths of the height of each step is the riser face, drawn a
+          // little darker so the flight reads as steps and not stripes.
+          const riserFace = smoothstep(float(0.08), float(0.2), riserT).mul(0.18);
+          const stone = vec3(...DOOR.threshold).mul(1.12).mul(treadShade).mul(float(1.0).sub(riserFace));
+          colour.assign(mix(colour, stone, inFlight));
 
           return vec4(colour, cover);
         })();

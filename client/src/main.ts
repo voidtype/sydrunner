@@ -2713,6 +2713,12 @@ async function main(): Promise<void> {
       // *"moving anywhere on foot underground tps me to surface"*, and it is a
       // ground answer rather than a teleport. See `game/riding.StationBoxField`.
       stationBoxes = buildStationBoxes(railBake);
+      // The hole in the street each way in goes down through, on the same
+      // plans. See `riding.accessCutAt`. No ground sampler yet at this point
+      // of the boot, so the carve length is the geometric estimate;
+      // `refreshStationBoxes` re-seeds it with the real ground once a tile
+      // has landed.
+      if (railCut !== null) railCut.setAccess(stationBoxes.plans);
       console.debug(
         `[rail] ${railNetwork.segments.length} unique segments from ` +
           `${railNetwork.directedSegments} directed (${(
@@ -4814,14 +4820,20 @@ async function main(): Promise<void> {
     setAccessWorld(world);
     const before = stationBoxes;
     stationBoxes = buildStationBoxes(railBake, world);
+    if (railCut !== null) railCut.setAccess(stationBoxes.plans, rawGroundAt);
     // A mouth that moved is an incline the chunk drew somewhere else: drop
     // the chunks over it so `rail-geo` draws the plan the field now stands
-    // bodies on. Rare -- a tile landing with a tower over the old mouth.
-    if (before !== null && railChunks !== null) {
+    // bodies on, and re-carve the ground at both the old mouth and the new.
+    // Rare -- a tile landing with a tower over the old mouth. The first
+    // refresh after boot carves every mouth's hole, because the boot's boxes
+    // were built before any tile had landed and the plans have all moved.
+    if (before !== null) {
       for (const m of stationBoxes.mouths) {
         const was = before.mouths.find((q) => q.name === m.name);
         if (was !== undefined && Math.abs(was.x - m.x) < 0.01 && Math.abs(was.z - m.z) < 0.01 && Math.abs(was.y - m.y) < 0.01) continue;
-        railChunks.invalidate([m.x - 300, m.z - 300, m.x + 300, m.z + 300]);
+        if (railChunks !== null) railChunks.invalidate([m.x - 300, m.z - 300, m.x + 300, m.z + 300]);
+        streamer.recutNear([m.x - 80, m.z - 80, m.x + 80, m.z + 80]);
+        if (was !== undefined) streamer.recutNear([was.x - 80, was.z - 80, was.x + 80, was.z + 80]);
       }
     }
   };
@@ -12873,6 +12885,9 @@ async function main(): Promise<void> {
           player.position.z,
           isAboard(playerCombat.aboard) ? playerCombat.aboard : null,
           railAnnounce,
+          // Below the street or not: a bore's trains are heard from its
+          // platform and never from the footpath over it. See `railUnderground`.
+          underground(),
         );
         audio.railAnnounce(railAnnounce);
       } else {

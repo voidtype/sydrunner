@@ -2247,6 +2247,17 @@ export class TileStreamer implements LampSource {
   }
 
   /**
+   * Re-carve the resident ground inside a plan box. `main.ts` calls it when a
+   * station's way in moves -- a tile landing with a tower over the old mouth
+   * -- so the hole in the street (`RailCut.setAccess`) follows the incline
+   * the field now stands bodies on. Bounded like `setSeam`, for its reason.
+   */
+  recutNear(box: readonly [number, number, number, number]): void {
+    const recut = this.recutGround(box);
+    if (recut > 0) console.debug(`[terrain] re-cut ${recut} resident tiles for a station entrance`);
+  }
+
+  /**
    * The rim the ground must be triangulated to. Phase 2a of `STATIONS.md`.
    *
    * Null unless `?vessels=1`, and null is the world that shipped. Where it is

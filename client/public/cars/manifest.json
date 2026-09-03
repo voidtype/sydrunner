@@ -6,6 +6,7 @@
     "lengthM": 12,
     "tint": "none",
     "weight": 1,
+    "atlas": false,
     "license": "CC-BY 3.0",
     "attribution": "\"Montreal Bus\" by Nick Ladd, licensed CC-BY 3.0, via Poly Pizza (https://poly.pizza/m/fFCCghvRImG)",
     "source_url": "https://poly.pizza/m/fFCCghvRImG"
@@ -17,6 +18,7 @@
     "lengthM": 5.2,
     "tint": "multiply",
     "weight": 8,
+    "atlas": true,
     "license": "CC-BY 4.0",
     "attribution": "\"Ford Ranger Next-Gen 2023 Sport\" by Asadawut.Kaewma, licensed CC-BY 4.0, via Sketchfab (https://sketchfab.com/3d-models/ford-ranger-next-gen-2023-sport-e93ac097ee9a46a4a9decca9aceed03c)",
     "source_url": "https://sketchfab.com/3d-models/ford-ranger-next-gen-2023-sport-e93ac097ee9a46a4a9decca9aceed03c"
@@ -28,6 +30,7 @@
     "lengthM": 9,
     "tint": "none",
     "weight": 1,
+    "atlas": false,
     "license": "CC0 1.0",
     "attribution": "none required (CC0). Courtesy credit: Kenney - www.kenney.nl",
     "source_url": "https://kenney.nl/assets/car-kit"
@@ -39,6 +42,7 @@
     "lengthM": 4.2,
     "tint": "multiply",
     "weight": 1,
+    "atlas": false,
     "license": "CC-BY 3.0",
     "attribution": "\"Car\" by Quaternius, licensed CC-BY 3.0, via Poly Pizza (https://poly.pizza/m/HQ0hvRM2XR)",
     "source_url": "https://poly.pizza/m/HQ0hvRM2XR"
@@ -50,6 +54,7 @@
     "lengthM": 4.2,
     "tint": "multiply",
     "weight": 1,
+    "atlas": true,
     "license": "CC0 1.0",
     "attribution": "none required (CC0). Courtesy credit: Kay Lousberg via Poly Pizza",
     "source_url": "https://poly.pizza/m/BG0KAhmGDt"
@@ -61,6 +66,7 @@
     "lengthM": 4.2,
     "tint": "multiply",
     "weight": 1,
+    "atlas": false,
     "license": "CC0 1.0",
     "attribution": "none required (CC0). Courtesy credit: Kenney - www.kenney.nl",
     "source_url": "https://kenney.nl/assets/car-kit"
@@ -72,6 +78,7 @@
     "lengthM": 4.2,
     "tint": "multiply",
     "weight": 1,
+    "atlas": false,
     "license": "CC-BY 3.0",
     "attribution": "\"Mini Car !\" by Romain Revert, licensed CC-BY 3.0, via Poly Pizza (https://poly.pizza/m/eNH2gURnsVB)",
     "source_url": "https://poly.pizza/m/eNH2gURnsVB"
@@ -83,6 +90,7 @@
     "lengthM": 4.7,
     "tint": "multiply",
     "weight": 3,
+    "atlas": false,
     "license": "CC-BY",
     "attribution": "\"2015 Hyundai Tucson\" by razor24, licensed CC-BY, via Sketchfab (https://sketchfab.com/3d-models/2015-hyundai-tucson-7674a3bd168a451daf73fc0a33d39589)",
     "source_url": "https://sketchfab.com/3d-models/2015-hyundai-tucson-7674a3bd168a451daf73fc0a33d39589"
@@ -94,6 +102,7 @@
     "lengthM": 4.7,
     "tint": "multiply",
     "weight": 5,
+    "atlas": true,
     "license": "CC-BY 4.0",
     "attribution": "\"Mazda CX-5\" by tnnv, licensed CC-BY 4.0, via Sketchfab (https://sketchfab.com/3d-models/mazda-cx-5-0ca0354c7b2a41bbb84c835ff046e8e5)",
     "source_url": "https://sketchfab.com/3d-models/mazda-cx-5-0ca0354c7b2a41bbb84c835ff046e8e5"
@@ -101,10 +110,11 @@
   {
     "file": "mitsubishi_l200_dh.glb",
     "body": 3,
-    "tris": 4625,
+    "tris": 11538,
     "lengthM": 5.2,
     "tint": "multiply",
     "weight": 4,
+    "atlas": true,
     "license": "CC-BY 4.0",
     "attribution": "\"Mitsubishi L200\" by David_Holiday, licensed CC-BY 4.0, via Sketchfab (https://sketchfab.com/3d-models/mitsubishi-l200-372e50454f3246239a5a1551f839f862)",
     "source_url": "https://sketchfab.com/3d-models/mitsubishi-l200-372e50454f3246239a5a1551f839f862"
@@ -116,6 +126,7 @@
     "lengthM": 5.2,
     "tint": "multiply",
     "weight": 1,
+    "atlas": false,
     "license": "CC-BY 3.0",
     "attribution": "\"Mitsubishi L200\" by Muhammad Reyhan, licensed CC-BY 3.0, via Poly Pizza (https://poly.pizza/m/4qjS9tFhsJg)",
     "source_url": "https://poly.pizza/m/4qjS9tFhsJg"
@@ -123,10 +134,11 @@
   {
     "file": "nissan_xtrail_2023.glb",
     "body": 2,
-    "tris": 8280,
+    "tris": 20387,
     "lengthM": 4.7,
     "tint": "multiply",
     "weight": 4,
+    "atlas": true,
     "license": "CC-BY 4.0",
     "attribution": "\"2023 Nissan X-Trail 4x4-i\" by Ddiaz Design, licensed CC-BY 4.0, via Sketchfab (https://sketchfab.com/3d-models/2023-nissan-x-trail-4x4-i-f9f2cbdacac74ee7acfe1c731195ccaa)",
     "source_url": "https://sketchfab.com/3d-models/2023-nissan-x-trail-4x4-i-f9f2cbdacac74ee7acfe1c731195ccaa"
@@ -138,6 +150,7 @@
     "lengthM": 4.7,
     "tint": "none",
     "weight": 1,
+    "atlas": false,
     "license": "CC0 1.0",
     "attribution": "none required (CC0). Courtesy credit: Kenney - www.kenney.nl",
     "source_url": "https://kenney.nl/assets/car-kit"
@@ -149,6 +162,7 @@
     "lengthM": 4.6,
     "tint": "multiply",
     "weight": 1,
+    "atlas": false,
     "license": "CC0 1.0",
     "attribution": "none required (CC0). Courtesy credit: Quaternius via Poly Pizza",
     "source_url": "https://poly.pizza/m/unqqkULtRU"
@@ -160,6 +174,7 @@
     "lengthM": 4.6,
     "tint": "multiply",
     "weight": 1,
+    "atlas": true,
     "license": "CC-BY 3.0",
     "attribution": "\"Car\" by Poly by Google, licensed CC-BY 3.0, via Poly Pizza (https://poly.pizza/m/eRu2kPYOCa7)",
     "source_url": "https://poly.pizza/m/eRu2kPYOCa7"
@@ -171,6 +186,7 @@
     "lengthM": 4.6,
     "tint": "multiply",
     "weight": 1,
+    "atlas": false,
     "license": "CC0 1.0",
     "attribution": "none required (CC0). Courtesy credit: Quaternius via Poly Pizza",
     "source_url": "https://poly.pizza/m/Cz6yDaUcM9"
@@ -182,6 +198,7 @@
     "lengthM": 4.6,
     "tint": "multiply",
     "weight": 1,
+    "atlas": false,
     "license": "CC-BY 3.0",
     "attribution": "\"Red Car\" by J-Toastie, licensed CC-BY 3.0, via Poly Pizza (https://poly.pizza/m/dVLJ5CjB0h)",
     "source_url": "https://poly.pizza/m/dVLJ5CjB0h"
@@ -193,6 +210,7 @@
     "lengthM": 4.6,
     "tint": "multiply",
     "weight": 1,
+    "atlas": false,
     "license": "CC0 1.0",
     "attribution": "none required (CC0). Courtesy credit: Kenney - www.kenney.nl",
     "source_url": "https://kenney.nl/assets/car-kit"
@@ -204,6 +222,7 @@
     "lengthM": 4.6,
     "tint": "multiply",
     "weight": 1,
+    "atlas": false,
     "license": "CC0 1.0",
     "attribution": "none required (CC0). Courtesy credit: Kenney - www.kenney.nl",
     "source_url": "https://kenney.nl/assets/car-kit"
@@ -215,6 +234,7 @@
     "lengthM": 4.7,
     "tint": "multiply",
     "weight": 1,
+    "atlas": false,
     "license": "CC0 1.0",
     "attribution": "none required (CC0). Courtesy credit: Quaternius via Poly Pizza",
     "source_url": "https://poly.pizza/m/xsMtZhBkxL"
@@ -226,6 +246,7 @@
     "lengthM": 4.7,
     "tint": "multiply",
     "weight": 1,
+    "atlas": true,
     "license": "CC0 1.0",
     "attribution": "none required (CC0). Courtesy credit: Quaternius via Poly Pizza",
     "source_url": "https://poly.pizza/m/tzOLXetacM"
@@ -237,6 +258,7 @@
     "lengthM": 4.7,
     "tint": "multiply",
     "weight": 1,
+    "atlas": false,
     "license": "CC0 1.0",
     "attribution": "none required (CC0). Courtesy credit: Kenney - www.kenney.nl",
     "source_url": "https://kenney.nl/assets/car-kit"
@@ -248,6 +270,7 @@
     "lengthM": 4.7,
     "tint": "multiply",
     "weight": 1,
+    "atlas": false,
     "license": "CC0 1.0",
     "attribution": "none required (CC0). Courtesy credit: Kenney - www.kenney.nl",
     "source_url": "https://kenney.nl/assets/car-kit"
@@ -259,6 +282,7 @@
     "lengthM": 4.6,
     "tint": "none",
     "weight": 1,
+    "atlas": true,
     "license": "CC0 1.0",
     "attribution": "none required (CC0). Courtesy credit: Kay Lousberg via Poly Pizza",
     "source_url": "https://poly.pizza/m/u5PhZQ35XG"
@@ -270,6 +294,7 @@
     "lengthM": 4.6,
     "tint": "none",
     "weight": 1,
+    "atlas": false,
     "license": "CC0 1.0",
     "attribution": "none required (CC0). Courtesy credit: Kenney - www.kenney.nl",
     "source_url": "https://kenney.nl/assets/car-kit"
@@ -281,6 +306,7 @@
     "lengthM": 4.6,
     "tint": "multiply",
     "weight": 4,
+    "atlas": true,
     "license": "CC-BY",
     "attribution": "\"VEHICLE - TESLA MODEL 3\" by Thcyrax, licensed CC-BY, via Sketchfab (https://sketchfab.com/3d-models/vehicle-tesla-model-3-43512c27667f412297bced6b9857a735)",
     "source_url": "https://sketchfab.com/3d-models/vehicle-tesla-model-3-43512c27667f412297bced6b9857a735"
@@ -292,6 +318,7 @@
     "lengthM": 4.6,
     "tint": "multiply",
     "weight": 6,
+    "atlas": true,
     "license": "CC-BY",
     "attribution": "\"Toyota Camry 2020\" by ItsDiyor, licensed CC-BY, via Sketchfab (https://sketchfab.com/3d-models/toyota-camry-2020-236a5a6e2fa6420fbdf641f4800cd544)",
     "source_url": "https://sketchfab.com/3d-models/toyota-camry-2020-236a5a6e2fa6420fbdf641f4800cd544"
@@ -299,10 +326,11 @@
   {
     "file": "toyota_corolla_2020.glb",
     "body": 1,
-    "tris": 8093,
+    "tris": 8101,
     "lengthM": 4.2,
     "tint": "multiply",
     "weight": 5,
+    "atlas": true,
     "license": "CC-BY 4.0",
     "attribution": "\"Toyota Corolla 2020\" by ItsDiyor, licensed CC-BY 4.0, via Sketchfab (https://sketchfab.com/3d-models/toyota-corolla-2020-6d7d34ee42734d1ab28a6b1f1c5fc4fc)",
     "source_url": "https://sketchfab.com/3d-models/toyota-corolla-2020-6d7d34ee42734d1ab28a6b1f1c5fc4fc"
@@ -314,6 +342,7 @@
     "lengthM": 5.4,
     "tint": "multiply",
     "weight": 8,
+    "atlas": true,
     "license": "CC-BY 4.0",
     "attribution": "\"Toyota Hiace Passenger Van L2H3 GLX 2020\" by Aeroux (modelled by slowpoly), licensed CC-BY 4.0, via Sketchfab (https://sketchfab.com/3d-models/toyota-hiace-passenger-van-l2h3-glx-2020-cddcf39773b84b62ac5f247d18eadda2)",
     "source_url": "https://sketchfab.com/3d-models/toyota-hiace-passenger-van-l2h3-glx-2020-cddcf39773b84b62ac5f247d18eadda2"
@@ -321,10 +350,11 @@
   {
     "file": "toyota_hilux_2021.glb",
     "body": 3,
-    "tris": 7208,
+    "tris": 10248,
     "lengthM": 5.2,
     "tint": "multiply",
     "weight": 8,
+    "atlas": true,
     "license": "CC-BY 4.0",
     "attribution": "\"Toyota Hilux Revo Prerunner 2021\" by Asadawut.Kaewma, licensed CC-BY 4.0, via Sketchfab (https://sketchfab.com/3d-models/toyota-hilux-revo-prerunner-2021-04ae6d8e07e84f55a9e1d7e3261be171)",
     "source_url": "https://sketchfab.com/3d-models/toyota-hilux-revo-prerunner-2021-04ae6d8e07e84f55a9e1d7e3261be171"
@@ -336,6 +366,7 @@
     "lengthM": 5.2,
     "tint": "multiply",
     "weight": 1,
+    "atlas": false,
     "license": "CC-BY 3.0",
     "attribution": "\"Toyota Hilux 97\" by Muhammad Reyhan, licensed CC-BY 3.0, via Poly Pizza (https://poly.pizza/m/8-0nFArehjd)",
     "source_url": "https://poly.pizza/m/8-0nFArehjd"
@@ -343,10 +374,11 @@
   {
     "file": "toyota_prado_2013.glb",
     "body": 2,
-    "tris": 6088,
+    "tris": 10283,
     "lengthM": 4.7,
     "tint": "multiply",
     "weight": 5,
+    "atlas": true,
     "license": "CC-BY 4.0",
     "attribution": "\"2013 Toyota Land Cruiser Prado\" by Romanov_13, licensed CC-BY 4.0, via Sketchfab (https://sketchfab.com/3d-models/2013-toyota-land-cruiser-prado-8d2aa08e92da4c698ef922a71bae8729)",
     "source_url": "https://sketchfab.com/3d-models/2013-toyota-land-cruiser-prado-8d2aa08e92da4c698ef922a71bae8729"
@@ -358,6 +390,7 @@
     "lengthM": 5.2,
     "tint": "multiply",
     "weight": 1,
+    "atlas": true,
     "license": "CC0 1.0",
     "attribution": "none required (CC0). Courtesy credit: Quaternius via Poly Pizza",
     "source_url": "https://poly.pizza/m/qn4grQgHm8"
@@ -369,6 +402,7 @@
     "lengthM": 5.2,
     "tint": "multiply",
     "weight": 1,
+    "atlas": false,
     "license": "CC0 1.0",
     "attribution": "none required (CC0). Courtesy credit: Kenney - www.kenney.nl",
     "source_url": "https://kenney.nl/assets/car-kit"
@@ -380,6 +414,7 @@
     "lengthM": 5.4,
     "tint": "multiply",
     "weight": 1,
+    "atlas": false,
     "license": "CC0 1.0",
     "attribution": "none required (CC0). Courtesy credit: Kenney - www.kenney.nl",
     "source_url": "https://kenney.nl/assets/car-kit"
@@ -391,6 +426,7 @@
     "lengthM": 5.4,
     "tint": "multiply",
     "weight": 1,
+    "atlas": false,
     "license": "CC-BY 3.0",
     "attribution": "\"Low Poly Multicab\" by Jordan Diamante (djiordhan), licensed CC-BY 3.0, via Poly Pizza (https://poly.pizza/m/8V0uzZMZTsr)",
     "source_url": "https://poly.pizza/m/8V0uzZMZTsr"
@@ -402,6 +438,7 @@
     "lengthM": 5.4,
     "tint": "multiply",
     "weight": 1,
+    "atlas": false,
     "license": "CC-BY 3.0",
     "attribution": "\"Generic Van\" by PuKkBuMXDD, licensed CC-BY 3.0, via Poly Pizza (https://poly.pizza/m/BbRojf2v3H)",
     "source_url": "https://poly.pizza/m/BbRojf2v3H"
@@ -413,6 +450,7 @@
     "lengthM": 4.2,
     "tint": "multiply",
     "weight": 1,
+    "atlas": false,
     "license": "CC-BY 3.0",
     "attribution": "\"MK Golf - Low Poly\" by Yogoshimo 2.0, licensed CC-BY 3.0, via Poly Pizza (https://poly.pizza/m/2u4e9d0aePt)",
     "source_url": "https://poly.pizza/m/2u4e9d0aePt"

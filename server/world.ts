@@ -2314,6 +2314,8 @@ export async function loadWorld(
   world.platforms = world.rail ? buildPlatforms(world.rail) : null;
   world.railCut = world.rail ? new RailCut(world.rail) : null;
   world.stationBoxes = world.rail ? buildStationBoxes(world.rail, accessWorldOf(world)) : null;
+  // The hole in the street each way in goes down through. See `riding.accessCutAt`.
+  if (world.railCut && world.stationBoxes) world.railCut.setAccess(world.stationBoxes.plans, (x, z) => world.terrain.height(x, z));
   world.stationBoxesTiles = world.collision.tileCount;
   // **And the roads, which is where the carve stops.** `main.ts` writes the
   // identical line one statement after it builds its own `RailCut`, over a deck
@@ -2725,6 +2727,7 @@ export function boxesOf(world: ServerWorld): StationBoxField | null {
   const tiles = world.collision.tileCount;
   if (world.stationBoxes === null || world.stationBoxes === undefined || world.stationBoxesTiles !== tiles) {
     world.stationBoxes = buildStationBoxes(world.rail, accessWorldOf(world));
+    if (world.railCut) world.railCut.setAccess(world.stationBoxes.plans, (x, z) => world.terrain.height(x, z));
     world.stationBoxesTiles = tiles;
   }
   return world.stationBoxes;
