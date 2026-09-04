@@ -197,7 +197,14 @@ import {
 import { SPAN_TUNNEL } from '../game/rail.ts';
 import { uploadAttribute } from './instupload.ts';
 import { drawnAsTunnel } from './rail-cut.ts';
+import { LAMP_RECORD_STRIDE } from './nightlights.ts';
 import { CHUNK_M, TUNNEL_RADIUS, TUNNEL_RISE, chunkKey } from './rail-solids.ts';
+import {
+  STATION_LAMP_FLOATS,
+  STATION_LAMP_RECORD_STRIDE,
+  type LampRoom,
+  stationLampPositions,
+} from './stationlamps.ts';
 import { geometryLayout, warmupGeometry, type WarmupPart } from './warmup.ts';
 
 /** Linear RGB, `world/nightlights.ts`' own. */
@@ -383,7 +390,13 @@ const gapKey = (cx: number, cz: number): number => cx * 0x100000 + cz;
  * 24 m in tunnels, so a lamp every 12 m crosses one constantly -- and it is why
  * the run is walked by arc length rather than per segment with a leftover.
  */
-export function buildTunnelLamps(bake: TunnelLampSource): TunnelLampField {
+/**
+ * `rooms` are the station chambers (`stationlamps.lampRooms`): their lamps hang
+ * from the ceiling on `side = 0`, positioned by `stationLampPositions` so the
+ * painted batten and the real light `main.ts` composes from the same function
+ * are the same lamp. Stored `TUNNEL_RISE` low because `refill` adds it back.
+ */
+export function buildTunnelLamps(bake: TunnelLampSource, rooms: readonly LampRoom[] = []): TunnelLampField {
   const p = bake.vertices;
   const flags = bake.vertexFlags;
   const cum = bake.cum;
@@ -490,6 +503,14 @@ export function buildTunnelLamps(bake: TunnelLampSource): TunnelLampField {
     }
   }
 
+  for (const room of rooms) {
+    const p = stationLampPositions(room);
+    for (let i = 0; i < p.length; i += STATION_LAMP_FLOATS) {
+      at.push(p[i], p[i + 1] - TUNNEL_RISE, p[i + 2], p[i + 3], p[i + 4]);
+      side.push(0);
+    }
+  }
+
   const cells = new Map<string, number[]>();
   for (let i = 0; i < side.length; i++) {
     const key = chunkKey(Math.floor(at[i * 5] / CHUNK_M), Math.floor(at[i * 5 + 2] / CHUNK_M));
@@ -578,6 +599,46 @@ function writeTemplate(wall: number): { offset: Float32Array; colour: Float32Arr
 const TEMPLATE_LEFT = /*#__PURE__*/ writeTemplate(-1);
 const TEMPLATE_RIGHT = /*#__PURE__*/ writeTemplate(1);
 
+/**
+ * The station lamp: the same batten and head, hung from a ceiling. The mount is
+ * the record itself (a room lamp is stored at its own height), `i` is straight
+ * down and `t` is across the room, so the batten lies flat under the ceiling
+ * and the head hangs beneath it facing along the platform -- which is where a
+ * body on the platform looks from.
+ */
+function writeCeilingTemplate(): { offset: Float32Array; colour: Float32Array } {
+  const offset = new Float32Array(VERTS_PER_LAMP * 3);
+  const colour = new Float32Array(VERTS_PER_LAMP * 3);
+  let v = 0;
+  const put = (along: number, tan: number, into: number, level: number): void => {
+    offset[v * 3] = along;
+    offset[v * 3 + 1] = tan;
+    offset[v * 3 + 2] = -into;
+    colour[v * 3] = TUNNEL_LAMP_COLOUR[0] * level;
+    colour[v * 3 + 1] = TUNNEL_LAMP_COLOUR[1] * level;
+    colour[v * 3 + 2] = TUNNEL_LAMP_COLOUR[2] * level;
+    v++;
+  };
+  put(-BATTEN_HALF_LENGTH, -BATTEN_HALF_HEIGHT, 0, 0);
+  put(0, -BATTEN_HALF_HEIGHT, 0, BATTEN_LEVEL);
+  put(0, BATTEN_HALF_HEIGHT, 0, BATTEN_LEVEL);
+  put(-BATTEN_HALF_LENGTH, BATTEN_HALF_HEIGHT, 0, 0);
+  put(0, -BATTEN_HALF_HEIGHT, 0, BATTEN_LEVEL);
+  put(BATTEN_HALF_LENGTH, -BATTEN_HALF_HEIGHT, 0, 0);
+  put(BATTEN_HALF_LENGTH, BATTEN_HALF_HEIGHT, 0, 0);
+  put(0, BATTEN_HALF_HEIGHT, 0, BATTEN_LEVEL);
+  // The wall lamp's head straddles its standoff, 6 cm of it behind the lining
+  // where nobody is. A ceiling has a slab behind it and a platform in front,
+  // so this head hangs wholly below the batten.
+  put(0, -HEAD_HALF_ACROSS, HEAD_STANDOFF, HEAD_LEVEL);
+  put(0, HEAD_HALF_ACROSS, HEAD_STANDOFF, HEAD_LEVEL);
+  put(0, HEAD_HALF_ACROSS, HEAD_STANDOFF + 2 * HEAD_HALF_DEEP, HEAD_LEVEL);
+  put(0, -HEAD_HALF_ACROSS, HEAD_STANDOFF + 2 * HEAD_HALF_DEEP, HEAD_LEVEL);
+  return { offset, colour };
+}
+
+const TEMPLATE_DOWN = /*#__PURE__*/ writeCeilingTemplate();
+
 // --- The renderer ------------------------------------------------------------------
 
 /**
@@ -657,7 +718,7 @@ export class TunnelLights {
   private lastCell = '';
 
   constructor(
-    private readonly field: TunnelLampField,
+    private field: TunnelLampField,
     assets: TunnelLightAssets,
     private readonly capacity: number = TUNNEL_LAMP_CAPACITY,
   ) {
@@ -728,6 +789,16 @@ export class TunnelLights {
     this.refill(x, z);
   }
 
+  /**
+   * A new table, and a refill on the next `update`. `main.ts` calls this when
+   * the station field is rebuilt with the terrain known: a room's ceiling is
+   * read off the ground, so its lamps can move a little once the tiles are in.
+   */
+  setField(field: TunnelLampField): void {
+    this.field = field;
+    this.lastCell = '';
+  }
+
   dispose(): void {
     this.group.remove(this.mesh);
     this.geometry.dispose();
@@ -769,7 +840,7 @@ export class TunnelLights {
           // on the wall and not near it.
           const px = -uz;
           const pz = ux;
-          const template = side[i] < 0 ? TEMPLATE_LEFT.offset : TEMPLATE_RIGHT.offset;
+          const template = side[i] === 0 ? TEMPLATE_DOWN.offset : side[i] < 0 ? TEMPLATE_LEFT.offset : TEMPLATE_RIGHT.offset;
           let w = n * VERTS_PER_LAMP * 3;
           for (let v = 0; v < VERTS_PER_LAMP * 3; v += 3) {
             const along = template[v];
@@ -998,6 +1069,57 @@ export function verifyTunnelLights(): string[] {
       out.push('the warm-up part wears a different material instance from the mesh it stands in for');
     }
     far.dispose();
+    lights.dispose();
+  }
+
+  // --- The station rooms. `stationlamps` promises `nightlights` a record
+  //     stride it cannot import; this file imports both.
+  if (STATION_LAMP_RECORD_STRIDE !== LAMP_RECORD_STRIDE) {
+    out.push(`stationlamps writes ${STATION_LAMP_RECORD_STRIDE}-float records and nightlights reads ${LAMP_RECORD_STRIDE}`);
+  }
+  {
+    const source = straightBake(20, 5, 14);
+    const bare = buildTunnelLamps(source);
+    const room: LampRoom = {
+      name: 'Wynyard', x: 5000, z: -5000, ux: 0.6, uz: 0.8,
+      halfLength: 80, halfWidth: 16, floorY: -20, ceilY: -14,
+    };
+    const lit = buildTunnelLamps(source, [room]);
+    const expected = stationLampPositions(room).length / STATION_LAMP_FLOATS;
+    if (lit.count !== bare.count + expected) {
+      out.push(`a room added ${lit.count - bare.count} lamps to the table; stationLampPositions gives ${expected}`);
+    }
+    let down = 0;
+    for (let i = 0; i < lit.count; i++) if (lit.side[i] === 0) down++;
+    if (down !== expected) out.push(`${down} lamps hang from a ceiling; the room's ${expected} should and no tunnel lamp should`);
+    for (let i = bare.count; i < lit.count; i++) {
+      const y = lit.at[i * 5 + 1] + TUNNEL_RISE;
+      if (!(y < room.ceilY && y > room.floorY)) {
+        out.push(`room lamp ${i - bare.count} refills to ${y.toFixed(2)}; the room runs ${room.floorY} to ${room.ceilY}`);
+        break;
+      }
+    }
+    // The ceiling template hangs down: nothing above the mount, the head under the batten.
+    const t = TEMPLATE_DOWN.offset;
+    let highest = -Infinity;
+    let battenLow = Infinity;
+    let headHigh = -Infinity;
+    for (let v = 0; v < VERTS_PER_LAMP; v++) {
+      const up = t[v * 3 + 2];
+      highest = Math.max(highest, up);
+      if (v < 8) battenLow = Math.min(battenLow, up);
+      else headHigh = Math.max(headHigh, up);
+    }
+    if (highest > 1e-6) out.push(`the ceiling lamp reaches ${highest.toFixed(2)} m above its mount, into the slab`);
+    if (!(headHigh < battenLow + 1e-6)) out.push('the ceiling lamp\'s head is not under its batten');
+    const lights = new TunnelLights(lit, new TunnelLightAssets(), 64);
+    lights.update(room.x, room.z);
+    if (lights.lampCount !== Math.min(64, expected)) {
+      out.push(`standing in the room draws ${lights.lampCount} lamps; ${Math.min(64, expected)} hang there`);
+    }
+    lights.setField(bare);
+    lights.update(room.x, room.z);
+    if (lights.lampCount !== 0) out.push(`after setField to a table with no rooms, the room still draws ${lights.lampCount} lamps`);
     lights.dispose();
   }
 

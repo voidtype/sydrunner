@@ -395,6 +395,13 @@ const SLEEPER_CONCRETE: Rgb = [0.115, 0.115, 0.112];
 const CONCRETE: Rgb = [0.195, 0.186, 0.168];
 /** Tunnel lining: sprayed concrete, seen only by lamp and headlight. */
 const LINING: Rgb = [0.085, 0.084, 0.082];
+/**
+ * Station room finish: glazed tile gone the grey of eighty years of brake dust.
+ * Six times the lining's albedo, and that ratio is the whole point -- see
+ * `world/stationlamps.ts`: a real light in a room lined in LINING returns
+ * nothing, and the owner's *"dark af"* was the lining as much as the lamps.
+ */
+const CONCOURSE: Rgb = [0.55, 0.52, 0.47];
 /** Canopy: painted steel and a fibre-cement soffit. */
 const CANOPY: Rgb = [0.145, 0.152, 0.156];
 /** Mast and gantry steel: hot-dip galvanised, gone matt grey. */
@@ -615,6 +622,8 @@ export class RailAssets {
    * buried in the ground, which is to say nothing at all.
    */
   readonly lining: MeshStandardNodeMaterial;
+  /** The station rooms: tile, BackSide like the lining, for the same outward winding. */
+  readonly concourse: MeshStandardNodeMaterial;
   /** The overhead conductors. Unlit, for the reason `power.ts` sets out at length. */
   readonly wire: MeshBasicNodeMaterial;
   /** Station names, all 267 of them, on one atlas. See `buildSignAtlas`. */
@@ -650,6 +659,9 @@ export class RailAssets {
     const lining = standard('rail_lining', LINING, 0.95, 0.0, false);
     lining.side = BackSide;
     this.lining = lining;
+    const concourse = standard('rail_concourse', CONCOURSE, 0.7, 0.0, false);
+    concourse.side = BackSide;
+    this.concourse = concourse;
 
     const wire = new MeshBasicNodeMaterial();
     wire.name = 'rail_wire';
@@ -751,7 +763,7 @@ export class RailAssets {
   materials(): Material[] {
     return [
       this.ballast, this.rail, this.concrete, this.canopy, this.sleeper,
-      this.mast, this.lining, this.wire, this.sign, this.corridor,
+      this.mast, this.lining, this.concourse, this.wire, this.sign, this.corridor,
       this.cess, this.tactile, this.brick, this.furniture, this.fence,
     ];
   }
@@ -838,6 +850,7 @@ export function railWarmupParts(assets: RailAssets): WarmupPart[] {
     // The tunnel lining neither casts nor receives: it is the inside of a tube
     // and the only light in there is the train's.
     solid(assets.lining, false, false),
+    solid(assets.concourse, false, false),
     solid(assets.canopy, true, true),
     solid(assets.tactile, false, true),
     solid(assets.brick, true, true),
@@ -1040,7 +1053,7 @@ const STATION_STEP_NAMES = [
 ];
 const FINISH_STEP_NAMES = [
   'ballast', 'cess', 'rails', 'concrete', 'lining', 'canopy', 'tactile', 'brick',
-  'furniture', 'fence', 'signs', 'wire', 'install',
+  'furniture', 'fence', 'signs', 'wire', 'concourse', 'install',
 ];
 
 /** What a cursor is pointing at, in words. See `RailWorld.worstStep`. */
@@ -1062,8 +1075,8 @@ function chunkStepName(phase: number, index: number): string {
  * a single vertex. The first step is the plan's own solids and their prisms.
  */
 const STATION_STEPS = 7;
-/** ...and within the finish: eleven materials, the wire, and the tail. */
-const FINISH_STEPS = 13;
+/** ...and within the finish: twelve materials, the wire, and the tail. */
+const FINISH_STEPS = 14;
 
 /**
  * The three states a chunk key can be in, and the fourth that is none of them.
@@ -1127,6 +1140,7 @@ interface ChunkBuild {
   rails: Solid;
   concrete: Solid;
   lining: Solid;
+  concourse: Solid;
   canopy: Solid;
   signs: Solid;
   cess: Solid;
@@ -1650,6 +1664,7 @@ export class RailWorld {
       rails: new Solid(),
       concrete: new Solid(),
       lining: new Solid(),
+      concourse: new Solid(),
       canopy: new Solid(),
       signs: new Solid(),
       cess: new Solid(),
@@ -1728,7 +1743,7 @@ export class RailWorld {
    */
   private runStep(state: ChunkBuild): void {
     const {
-      chunk, ballast, rails, concrete, lining, canopy, signs, cess, fence, tactile, brick,
+      chunk, ballast, rails, concrete, lining, concourse, canopy, signs, cess, fence, tactile, brick,
       furniture, plans, prisms, sleepers, floorAt, vesselled,
     } = state;
     const index = state.at.index;
@@ -1858,7 +1873,7 @@ export class RailWorld {
             for (const b of state.boxes) prisms.push(framePrism(b));
             return;
           case 1:
-            if (underground) writeUndergroundStation(concrete, lining, signs, state.boxes, station);
+            if (underground) writeUndergroundStation(concrete, lining, concourse, signs, state.boxes, station);
             else writePlatforms(concrete, canopy, tactile, plan);
             return;
           case 2:
@@ -2013,6 +2028,9 @@ export class RailWorld {
           // nothing -- see `railWarmupParts` for the arithmetic behind that.
           case 9: add(fence.build(`rail_fence_${key}`, true), this.assets.fence, 'fence', false, true); return;
           case 10: add(signs.build(`rail_sign_${key}`, true), this.assets.sign, 'signs', false, false); return;
+          // Step 12, after the wire: the numbers are a contract with
+          // `FINISH_STEP_NAMES`, which the performance report reads by index.
+          case 12: add(concourse.build(`rail_concourse_${key}`), this.assets.concourse, 'concourse', false, false); return;
           case 11:
             add(state.wire, this.assets.wire, 'wire', false, false);
             // Handed over: `addMesh` has pushed it into `geometries`, so
@@ -4217,6 +4235,8 @@ export function writeVesselWalls(
 function writeUndergroundStation(
   concrete: Solid,
   lining: Solid,
+  /** The room's own finish. The passage and the link stay on `lining`: they are tubes. */
+  concourse: Solid,
   signs: Solid,
   /** This station's solids, from `rail-solids.undergroundSolids`. */
   _boxes: readonly FrameSolid[],
@@ -4275,7 +4295,9 @@ function writeUndergroundStation(
   const roomInside: Vec3 = [originX, (floor + roof) / 2, originZ];
   const shell = (a: Vec3, b: Vec3, c: Vec3, d: Vec3): void => {
     const [p, q, r, t] = windOutward(roomInside, a, b, c, d);
-    lining.quad(...p, ...q, ...r, ...t);
+    // On `concourse`, not `lining`: the room is the one underground surface a
+    // real light reaches (`world/stationlamps.ts`), and light on LINING is dark.
+    concourse.quad(...p, ...q, ...r, ...t);
   };
   shell(corner(-L, -W, floor), corner(L, -W, floor), corner(L, W, floor), corner(-L, W, floor));
   shell(corner(-L, -W, roof), corner(L, -W, roof), corner(L, W, roof), corner(-L, W, roof));
@@ -4679,10 +4701,10 @@ export function verifyRailChunkSteps(): string[] {
   if (PHASE_NAMES.length !== PHASE_COUNT) {
     bad.push(`PHASE_NAMES has ${PHASE_NAMES.length} entries for ${PHASE_COUNT} phases`);
   }
-  // Eleven materials, the wire and the tail. Named here because the finish
+  // Twelve materials, the wire and the tail. Named here because the finish
   // phase's `switch` is a list of literals and a miscount would silently drop
   // the last material off the end of the walk.
-  if (FINISH_STEPS !== 13) bad.push(`FINISH_STEPS is ${FINISH_STEPS}; it is 11 materials + the wire + the tail`);
+  if (FINISH_STEPS !== 14) bad.push(`FINISH_STEPS is ${FINISH_STEPS}; it is 12 materials + the wire + the tail`);
   // The two name tables are read by index off a live cursor, so a short one is
   // an `undefined` in a performance report rather than a crash -- which is the
   // kind of thing that survives for a year.

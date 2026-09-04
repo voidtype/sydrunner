@@ -28,7 +28,7 @@ import { BOARD_HINT_M, DoorMarker, verifyDoorMarker } from './world/doormarker.t
 //     `game/sunbutton.ts` for where the button is and why it is there.
 import { sunScreaming, sunScreamMix, verifySunButton } from './game/sunbutton.ts';
 import { SunFeature, verifySunButtonRenderer } from './world/sunbutton.ts';
-import { EXPOSURE } from './sky/calibration.ts';
+import { EXPOSURE, NIGHT_FULL_ALTITUDE } from './sky/calibration.ts';
 import { SydneySky } from './sky/sky.ts';
 import { CYCLE_MS, verifyCycle } from './sky/cycle.ts';
 /*
@@ -666,6 +666,7 @@ import {
   tunnelLightWarmupParts,
   verifyTunnelLights,
 } from './world/tunnellights.ts';
+import { buildStationLampRecords, lampRooms, verifyStationLamps } from './world/stationlamps.ts';
 import { TrainFleet, verifyTrainLights } from './world/trains.ts';
 import {
   aboardFrame,
@@ -1570,6 +1571,7 @@ async function main(): Promise<void> {
   // The walls of an underground room, its shaft and its tunnel, and the one
   // doorway between them. See `rail-solids.verifyStationWalls`.
   const stationWallFailures = timed('station walls', verifyStationWalls);
+  const stationLampFailures = timed('station lamps', verifyStationLamps);
   const nightFailures = timed('night-lights', () => verifyNightLights());
   // The train lighting's own two, on the same criterion and for the same reason
   // the file above gives: a lit carriage that draws something plausible and
@@ -1735,6 +1737,7 @@ async function main(): Promise<void> {
     canopyFailures.length ||
     sceneRouteFailures.length ||
     stationWallFailures.length ||
+    stationLampFailures.length ||
     nightFailures.length ||
     trainLightFailures.length ||
     raveFailures.length ||
@@ -1829,6 +1832,7 @@ async function main(): Promise<void> {
           ...canopyFailures,
           ...sceneRouteFailures,
           ...stationWallFailures,
+          ...stationLampFailures,
           ...nightFailures,
           ...trainLightFailures,
           ...raveFailures,
@@ -2514,6 +2518,11 @@ async function main(): Promise<void> {
    */
   let stationBoxes: StationBoxField | null = null;
   /**
+   * The station lamps as the night rig's records, rebuilt with the field. See
+   * `world/stationlamps.ts`; composed into `lampSource` below.
+   */
+  let stationLampRecords: Float32Array<ArrayBuffer> = new Float32Array(0);
+  /**
    * The volume nothing may stand in: the railway's loading gauge and every
    * carriageway's headroom, in one object.
    *
@@ -2826,6 +2835,7 @@ async function main(): Promise<void> {
       // see `rail-geo.setAccessPlans` for the bug that came of two copies.
       setAccessPlans(stationBoxes);
       setStationPlans(stationBoxes);
+      stationLampRecords = buildStationLampRecords(lampRooms(stationBoxes.boxes));
       // The hole in the street each way in goes down through, on the same
       // plans. See `riding.accessCutAt`. No ground sampler yet at this point
       // of the boot, so the carve length is the geometric estimate;
@@ -4935,6 +4945,10 @@ async function main(): Promise<void> {
     const before = stationBoxes;
     stationBoxes = buildStationBoxes(railBake, world);
     setAccessPlans(stationBoxes);
+    stationLampRecords = buildStationLampRecords(lampRooms(stationBoxes.boxes));
+    // The painted lamps hang off the same rooms, and a room's ceiling is read
+    // off the terrain, so the table follows the field. See `TunnelLights.setField`.
+    tunnelLights?.setField(buildTunnelLamps(railBake, lampRooms(stationBoxes.boxes)));
     // And the walls: `rail-solids.undergroundSolids` reads the same field for
     // where the room and its doorway are. See `setStationPlans`.
     setStationPlans(stationBoxes);
@@ -5085,7 +5099,10 @@ async function main(): Promise<void> {
    * railway itself is -- a city with no railway has no tunnels to light.
    */
   if (railBake !== null) {
-    tunnelLights = new TunnelLights(buildTunnelLamps(railBake), tunnelLightAssets);
+    tunnelLights = new TunnelLights(
+      buildTunnelLamps(railBake, stationBoxes !== null ? lampRooms(stationBoxes.boxes) : []),
+      tunnelLightAssets,
+    );
     scene.add(tunnelLights.group);
   }
   // The arithmetic half of the same railway, for the ground query. Built from
@@ -5846,7 +5863,11 @@ async function main(): Promise<void> {
    */
   const giverLamps = new GiverLampField(streamer.streetLamps);
   /** The `LampSource` the night rig reads: the resident tiles, plus these. */
-  const lampSource = lampsOver(streamer, () => giverLamps.lampRecords());
+  const lampSource = lampsOver(
+    lampsOver(streamer, () => giverLamps.lampRecords()),
+    // ...and the station rooms', so the two real lights come underground.
+    () => stationLampRecords,
+  );
   /**
    * The corner tracker, declared before the arrow because the arrow reads it.
    *
@@ -13194,7 +13215,10 @@ async function main(): Promise<void> {
       nightLights.update(
         frameDt,
         camera,
-        alt,
+        // Under a station the sun has set, whatever the clock says: the rig's
+        // two lamp lights are off by day, and the room's lamps are the only
+        // light it has. The sky above keeps the real altitude.
+        underground() ? NIGHT_FULL_ALTITUDE : alt,
         Math.hypot(player.velocity.x, player.velocity.z),
         // WORKSTREAM AP: the streamer's lamps **and** the hero giver's, through
         // `world/giverlamp.lampsOver`. Sydney Park has no lights in it -- measured,
