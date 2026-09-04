@@ -38,7 +38,7 @@ import { ClippingGroup, Plane, Vector3,
   Mesh,
   MeshBasicNodeMaterial,
   PlaneGeometry,
-  type Scene,
+  Scene,
 } from 'three/webgpu';
 import { liftCabDoorMesh, liftLandingMesh, CAB_DOOR_SLIDE, liftCabMesh, CORE, ghostMesh, interiorMesh, liftSignsOf, type Interior, type InteriorDoor } from './interior.ts';
 import type { Placement } from './placeables.ts';
@@ -101,7 +101,38 @@ export class InteriorView {
   private signs: Mesh[] = [];
   private readonly signTextures = new Map<string, CanvasTexture>();
 
-  constructor(private readonly scene: Scene, private readonly world: ClippingGroup | null = null) {}
+  constructor(private readonly scene: Scene, private readonly world: ClippingGroup | null = null) {
+    this.padWorld();
+  }
+
+  /**
+   * The world's clipping group, with nothing cut: twelve planes every point is
+   * under, `clipIntersection` on, enabled. **Never `enabled = false`.**
+   *
+   * three keys every material's pipeline on the clipping context, and the key
+   * is the plane count -- `ClippingContext.cacheKey` is
+   * `${intersectionPlanes.length}:${unionPlanes.length}`, rebuilt whenever the
+   * group changes. A disabled group contributes no planes, so opening a hole
+   * took every object in the world from `0:0` to `12:0`, and closing it took
+   * them all back: a different WGSL for each, a new pipeline for each, all in
+   * the one frame that made the change. The owner's stall table has the
+   * receipt -- `13003 ms ... cmp 357` sixty metres from Green Square's mouth,
+   * where `main.ts` had just turned the station cut on. The padding already
+   * existed to hold the count still *between* buildings; this holds it still
+   * between a building and the street as well, which is where the freeze was.
+   *
+   * The cost is twelve plane tests per fragment on the world, always, which
+   * the world was already paying inside every building.
+   */
+  private padWorld(): void {
+    const world = this.world;
+    if (world === null) return;
+    const planes: Plane[] = [];
+    while (planes.length < WORLD_HOLE_PLANES) planes.push(new Plane(new Vector3(0, 1, 0), -1e9));
+    world.clippingPlanes = planes;
+    world.clipIntersection = true;
+    world.enabled = true;
+  }
 
   /**
    * The hole in the world where this building is. Everything the streamer
@@ -121,7 +152,7 @@ export class InteriorView {
     const world = this.world;
     if (world === null) return;
     if (it === null) {
-      world.enabled = false;
+      this.padWorld();
       return;
     }
     const planes: Plane[] = [];
@@ -150,7 +181,7 @@ export class InteriorView {
     const world = this.world;
     if (world === null || this.mesh !== null) return;
     if (planes === null || planes.length === 0) {
-      world.enabled = false;
+      this.padWorld();
       return;
     }
     const out: Plane[] = [];
@@ -426,4 +457,47 @@ export class InteriorView {
     mesh.geometry.dispose();
     this.mesh = null;
   }
+}
+
+/**
+ * The one invariant the frame time depends on: the world's clipping plane
+ * count never moves. See `padWorld`.
+ */
+export function verifyInteriorView(): string[] {
+  const failures: string[] = [];
+  const world = new ClippingGroup();
+  const view = new InteriorView(new Scene(), world);
+  const state = (): string => `${world.enabled ? 'on' : 'off'}/${world.clipIntersection ? 'inter' : 'union'}/${world.clippingPlanes.length}`;
+  const want = `on/inter/${WORLD_HOLE_PLANES}`;
+  if (state() !== want) failures.push(`a fresh view leaves the world at ${state()}; ${want} holds the pipeline key still.`);
+
+  const cut = [
+    { nx: 1, ny: 0, nz: 0, constant: 5 },
+    { nx: -1, ny: 0, nz: 0, constant: 5 },
+    { nx: 0, ny: 0, nz: 1, constant: 5 },
+    { nx: 0, ny: 0, nz: -1, constant: 5 },
+    { nx: 0, ny: 1, nz: 0, constant: 5 },
+    { nx: 0, ny: -1, nz: 0, constant: 5 },
+  ];
+  view.setWorldCut(cut);
+  if (state() !== want) failures.push(`a station cut leaves the world at ${state()}.`);
+  if (world.clippingPlanes[0].normal.x !== 1 || world.clippingPlanes[0].constant !== 5) {
+    failures.push('the station cut did not land on the group.');
+  }
+  view.setWorldCut(null);
+  if (state() !== want) failures.push(`closing the station cut leaves the world at ${state()}; this is the 13-second frame.`);
+  view.setWorldCut([]);
+  if (state() !== want) failures.push(`an empty cut leaves the world at ${state()}.`);
+  view.setWorldHole(null);
+  if (state() !== want) failures.push(`closing a hole with none open leaves the world at ${state()}.`);
+
+  // A padding plane never decides under intersection: every point is on its
+  // clipped side, so it can only agree with the others.
+  for (const pl of world.clippingPlanes) {
+    if (!(pl.distanceToPoint(new Vector3(0, 1e6, 0)) < 0)) {
+      failures.push('a padding plane has a point on its kept side; it would clip on its own.');
+      break;
+    }
+  }
+  return failures;
 }

@@ -203,6 +203,7 @@ import {
   STATION_LAMP_FLOATS,
   STATION_LAMP_RECORD_STRIDE,
   type LampRoom,
+  insideLampRoom,
   stationLampPositions,
 } from './stationlamps.ts';
 import { geometryLayout, warmupGeometry, type WarmupPart } from './warmup.ts';
@@ -457,6 +458,9 @@ export function buildTunnelLamps(bake: TunnelLampSource, rooms: readonly LampRoo
           const y = ay + (by - ay) * u;
           const z = az + dz * u;
           const wall = (k & 1) === 0 ? -1 : 1;
+          // Not in a station chamber: the tube is not drawn there, so a batten
+          // on its wall would hang in the air over the platform.
+          if (insideLampRoom(rooms, x, z)) continue;
           // The handover rejection. Nine cells because a lamp near a cell corner
           // is within `MIN_GAP` of the eight around it, and a test that only
           // looked in its own cell would let a pair through whenever the seam
@@ -1086,6 +1090,20 @@ export function verifyTunnelLights(): string[] {
     };
     const lit = buildTunnelLamps(source, [room]);
     const expected = stationLampPositions(room).length / STATION_LAMP_FLOATS;
+    // ...and a room laid over the straight bake takes the tube's lamps out of it.
+    {
+      // `straightBake` runs along +x at 24 m a vertex, tunnel from vertex 5 to 14: x 120-336.
+      const over: LampRoom = { ...room, x: 228, z: 0, ux: 1, uz: 0, halfLength: 30, halfWidth: 16 };
+      const cut = buildTunnelLamps(source, [over]);
+      let wallInside = 0;
+      for (let i = 0; i < cut.count; i++) {
+        if (cut.side[i] !== 0 && insideLampRoom([over], cut.at[i * 5], cut.at[i * 5 + 2])) wallInside++;
+      }
+      if (wallInside > 0) out.push(`${wallInside} tunnel wall lamps still hang inside a room laid over the bore`);
+      let wallBefore = 0;
+      for (let i = 0; i < bare.count; i++) if (insideLampRoom([over], bare.at[i * 5], bare.at[i * 5 + 2])) wallBefore++;
+      if (wallBefore === 0) out.push('the room check proves nothing: the straight bake put no wall lamps where the room is');
+    }
     if (lit.count !== bare.count + expected) {
       out.push(`a room added ${lit.count - bare.count} lamps to the table; stationLampPositions gives ${expected}`);
     }

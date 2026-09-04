@@ -98,6 +98,26 @@ export function isLampRoom(name: string): boolean {
   return !name.endsWith(' access') && !name.endsWith(' tunnel');
 }
 
+/**
+ * Whether a point is inside one of the rooms, in the room's own frame -- the
+ * test `StationBoxField.roomAt` makes, restated here so `tunnellights` can ask
+ * it of a plain room list. The tunnel lamps use it to stay out of the chamber:
+ * `rail-geo.writeTunnel` already skips the tube's pieces inside a room, and a
+ * batten on a wall that is not drawn is the owner's *"tunnel lights floating"*.
+ */
+export function insideLampRoom(rooms: readonly LampRoom[], x: number, z: number): boolean {
+  for (const r of rooms) {
+    const dx = x - r.x;
+    const dz = z - r.z;
+    const along = dx * r.ux + dz * r.uz;
+    if (along < -r.halfLength || along > r.halfLength) continue;
+    const across = dx * -r.uz + dz * r.ux;
+    if (across < -r.halfWidth || across > r.halfWidth) continue;
+    return true;
+  }
+  return false;
+}
+
 /** The rooms among a field's boxes, in the field's order. */
 export function lampRooms<T extends LampRoom>(boxes: readonly T[]): T[] {
   return boxes.filter((b) => isLampRoom(b.name));
@@ -228,6 +248,15 @@ export function verifyStationLamps(): string[] {
     }
     const one = stationLampPositions({ ...room, halfLength: STATION_LAMP_END_M + 1 });
     if (one.length !== 2 * STATION_LAMP_FLOATS) failures.push(`a room just long enough for one lamp a row got ${one.length / STATION_LAMP_FLOATS}.`);
+  }
+
+  // --- Inside is inside in the room's own frame, not the world's.
+  {
+    const mid = { x: room.x + room.ux * 70, z: room.z + room.uz * 70 };
+    if (!insideLampRoom([room], mid.x, mid.z)) failures.push('a point 70 m along the room is not inside it.');
+    if (insideLampRoom([room], room.x + room.ux * 90, room.z + room.uz * 90)) failures.push('a point 90 m along an 80 m half-length room is inside it.');
+    if (insideLampRoom([room], room.x - room.uz * 17, room.z + room.ux * 17)) failures.push('a point 17 m across a 16 m half-width room is inside it.');
+    if (insideLampRoom([], room.x, room.z)) failures.push('no rooms contain a point.');
   }
 
   // --- The passage and the link are not rooms; the records are the positions, white.

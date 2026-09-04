@@ -146,7 +146,7 @@ import { liftFloors, LIFT_DOORS_MS, liftFloorY, liftMoving, liftTarget, liftDura
   type Interior,
   type InteriorDoor,
 } from './world/interior.ts';
-import { INTERIOR_LAYER, InteriorView } from './world/interiorview.ts';
+import { INTERIOR_LAYER, InteriorView, verifyInteriorView } from './world/interiorview.ts';
 import { lostMessage, lostPlan, verifyDeviceLost } from './devicelost.ts';
 import { verifyIndexDom } from './domcheck.ts';
 import { LiftPanel } from './liftpanel.ts';
@@ -667,6 +667,7 @@ import {
   verifyTunnelLights,
 } from './world/tunnellights.ts';
 import { buildStationLampRecords, lampRooms, verifyStationLamps } from './world/stationlamps.ts';
+import { Pids, verifyPids } from './world/pids.ts';
 import { TrainFleet, verifyTrainLights } from './world/trains.ts';
 import {
   aboardFrame,
@@ -1568,10 +1569,12 @@ async function main(): Promise<void> {
   // Before the night lights, because the night lights are what it broke: this
   // is the check whose absence let a recursive `scene.remove` ship.
   const sceneRouteFailures = timed('scene routing', verifySceneRouting);
+  const interiorViewFailures = timed('interior view', verifyInteriorView);
   // The walls of an underground room, its shaft and its tunnel, and the one
   // doorway between them. See `rail-solids.verifyStationWalls`.
   const stationWallFailures = timed('station walls', verifyStationWalls);
   const stationLampFailures = timed('station lamps', verifyStationLamps);
+  const pidsFailures = timed('pids', verifyPids);
   const nightFailures = timed('night-lights', () => verifyNightLights());
   // The train lighting's own two, on the same criterion and for the same reason
   // the file above gives: a lit carriage that draws something plausible and
@@ -1736,8 +1739,10 @@ async function main(): Promise<void> {
     groundFirstFailures.length ||
     canopyFailures.length ||
     sceneRouteFailures.length ||
+    interiorViewFailures.length ||
     stationWallFailures.length ||
     stationLampFailures.length ||
+    pidsFailures.length ||
     nightFailures.length ||
     trainLightFailures.length ||
     raveFailures.length ||
@@ -1831,8 +1836,10 @@ async function main(): Promise<void> {
           ...groundFirstFailures,
           ...canopyFailures,
           ...sceneRouteFailures,
+          ...interiorViewFailures,
           ...stationWallFailures,
           ...stationLampFailures,
+          ...pidsFailures,
           ...nightFailures,
           ...trainLightFailures,
           ...raveFailures,
@@ -2083,7 +2090,8 @@ async function main(): Promise<void> {
    */
   const world = new ClippingGroup();
   world.name = 'world';
-  world.enabled = false;
+  // Not `enabled = false`: `InteriorView` pads it with twelve planes at once and
+  // holds that count for the life of the session. See `InteriorView.padWorld`.
   // The routing, and the check that it terminates. It lived inline here until
   // the removal half was found to recurse forever on anything sitting on the
   // scene root -- a light, a camera, anything `unclipped` -- because
@@ -2506,6 +2514,8 @@ async function main(): Promise<void> {
   const tunnelLightAssets = new TunnelLightAssets();
   /** The lamps in the scene, once there is a bake to place them from. */
   let tunnelLights: TunnelLights | null = null;
+  /** The platform indicator, one for the city, hung over the nearest station. See `world/pids.ts`. */
+  let pids: Pids | null = null;
   /** Station platforms as rectangles, for `groundHeightAt`. Null with no bake. */
   let platforms: PlatformField | null = null;
   /**
@@ -5104,6 +5114,8 @@ async function main(): Promise<void> {
       tunnelLightAssets,
     );
     scene.add(tunnelLights.group);
+    pids = new Pids(railBake, () => sky.time.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' }));
+    scene.add(pids.mesh);
   }
   // The arithmetic half of the same railway, for the ground query. Built from
   // the identical network, the identical carve and the identical two ground
@@ -13102,6 +13114,7 @@ async function main(): Promise<void> {
       // pure function of arc length and the player's position, so two riders in
       // the same carriage see the same lights go past at the same instant.
       tunnelLights?.update(player.position.x, player.position.z);
+      pids?.update(player.position.x, player.position.z, railSeconds(Date.now()), Date.now() / 1000);
       // And the trains, on the traffic's own contract one line up from it: no
       // frame delta, no state, and the wall clock read through `railSeconds` so a
       // backgrounded tab costs nothing and comes back with every train in the
