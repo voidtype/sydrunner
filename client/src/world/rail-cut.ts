@@ -198,7 +198,15 @@ export const CUT_HALF_WIDTH = 5.4;
  * 9.4 m clears the platform, the fence line behind it and the stairs, which is
  * what a station cutting on the Bankstown line actually measures.
  */
-export const STATION_HALF_WIDTH = 9.4;
+// Defined in `game/riding.ts` and re-exported here, for one reason: `riding`
+// needs the number for `PLATFORM_OUTER_M`, and importing it *from* this file
+// made `riding <-> rail-cut` a cycle that evaluated `riding.ts` half-built
+// whenever a module reached `rail-cut` first -- `rail-solids` does, and so
+// did the server's boot list the day `verifyStationWalls` joined it. The
+// essay above is still the argument for 9.4; the declaration just lives with
+// the other half of the ownership.
+import { STATION_HALF_WIDTH } from '../game/riding.ts';
+export { STATION_HALF_WIDTH };
 
 /** Half-length of the widened box at a platform site: the platform and a little. */
 const STATION_HALF_LENGTH = 88;

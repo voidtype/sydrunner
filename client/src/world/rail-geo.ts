@@ -4359,8 +4359,11 @@ function writeUndergroundStation(
   for (const dy of [0, H]) {
     tunnelShell(tat(t0, -HW, plan.floorY + dy), tat(t0, HW, plan.floorY + dy), tat(t1, HW, plan.floorY + dy), tat(t1, -HW, plan.floorY + dy));
   }
+  // The side walls start where the tunnel clears the incline, not at `t0`:
+  // the floor and the lid run back to `t0` to cover the corner, but a wall
+  // drawn from there stands across the ramp, three metres before the foot.
   for (const sgn of [-1, 1]) {
-    tunnelShell(tat(t0, HW * sgn, plan.floorY), tat(t1, HW * sgn, plan.floorY), tat(t1, HW * sgn, plan.floorY + H), tat(t0, HW * sgn, plan.floorY + H));
+    tunnelShell(tat(HW, HW * sgn, plan.floorY), tat(t1, HW * sgn, plan.floorY), tat(t1, HW * sgn, plan.floorY + H), tat(HW, HW * sgn, plan.floorY + H));
   }
   concrete.quad(...tat(t0, -HW, plan.floorY + H), ...tat(t1, -HW, plan.floorY + H), ...tat(t1, HW, plan.floorY + H), ...tat(t0, HW, plan.floorY + H));
   // The entrance on the street: a portal frame over the mouth, open toward

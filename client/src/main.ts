@@ -654,7 +654,9 @@ import {
 } from './world/rail-geo.ts';
 // The arithmetic half of the railway, which the server evaluates too. See
 // `world/rail-solids.ts` for why the definition lives outside the renderer.
-import { RailSolidField } from './world/rail-solids.ts';
+import { RailSolidField,
+  setStationPlans, verifyStationWalls,
+} from './world/rail-solids.ts';
 // WORKSTREAM AI: the lights on the tunnel wall, which are the only optic flow a
 // bore has. See `world/tunnellights.ts` section 1 for why the pitch is 12 m.
 import {
@@ -1565,6 +1567,9 @@ async function main(): Promise<void> {
   // Before the night lights, because the night lights are what it broke: this
   // is the check whose absence let a recursive `scene.remove` ship.
   const sceneRouteFailures = timed('scene routing', verifySceneRouting);
+  // The walls of an underground room, its shaft and its tunnel, and the one
+  // doorway between them. See `rail-solids.verifyStationWalls`.
+  const stationWallFailures = timed('station walls', verifyStationWalls);
   const nightFailures = timed('night-lights', () => verifyNightLights());
   // The train lighting's own two, on the same criterion and for the same reason
   // the file above gives: a lit carriage that draws something plausible and
@@ -1729,6 +1734,7 @@ async function main(): Promise<void> {
     groundFirstFailures.length ||
     canopyFailures.length ||
     sceneRouteFailures.length ||
+    stationWallFailures.length ||
     nightFailures.length ||
     trainLightFailures.length ||
     raveFailures.length ||
@@ -1822,6 +1828,7 @@ async function main(): Promise<void> {
           ...groundFirstFailures,
           ...canopyFailures,
           ...sceneRouteFailures,
+          ...stationWallFailures,
           ...nightFailures,
           ...trainLightFailures,
           ...raveFailures,
@@ -2818,6 +2825,7 @@ async function main(): Promise<void> {
       // The drawing reads this field's plans rather than working out its own;
       // see `rail-geo.setAccessPlans` for the bug that came of two copies.
       setAccessPlans(stationBoxes);
+      setStationPlans(stationBoxes);
       // The hole in the street each way in goes down through, on the same
       // plans. See `riding.accessCutAt`. No ground sampler yet at this point
       // of the boot, so the carve length is the geometric estimate;
@@ -4927,6 +4935,9 @@ async function main(): Promise<void> {
     const before = stationBoxes;
     stationBoxes = buildStationBoxes(railBake, world);
     setAccessPlans(stationBoxes);
+    // And the walls: `rail-solids.undergroundSolids` reads the same field for
+    // where the room and its doorway are. See `setStationPlans`.
+    setStationPlans(stationBoxes);
     if (railCut !== null) railCut.setAccess(stationBoxes.plans, rawGroundAt);
     // A mouth that moved is an incline the chunk drew somewhere else: drop
     // the chunks over it so `rail-geo` draws the plan the field now stands

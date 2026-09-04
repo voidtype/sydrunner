@@ -81,6 +81,7 @@
  * headless process cannot have.
  */
 
+import { pointInPolygon } from '../player/collision.ts';
 import {
   SPAN_BRIDGE,
   SPAN_TUNNEL,
@@ -93,10 +94,11 @@ import {
   drawnAsTunnel,
   type RailCut,
 } from './rail-cut.ts';
-import { pointInPolygon } from '../player/collision.ts';
 import { DECK_THICKNESS_M } from './road-deck.ts';
 import { RAIL_HALF_M } from './envelope.ts';
-import { concourseY, PLATFORM_OUTER_M, samePlatform } from '../game/riding.ts';
+import { concourseY, PLATFORM_OUTER_M, samePlatform,
+  ACCESS_HALF_W, ACCESS_HEIGHT_M, ACCESS_OVERLAP_M, type AccessPlan,
+} from '../game/riding.ts';
 import {
   frameAt,
   platformSlots,
@@ -1314,6 +1316,71 @@ export const SOLID_FOOTBRIDGE_STAIR = 7;
 export const SOLID_HOUSE = 8;
 export const SOLID_BOX_PLATFORM = 9;
 export const SOLID_SHAFT_HEAD = 10;
+/** A wall of an underground room, its shaft or its tunnel: pushes, never stood on. */
+export const SOLID_BOX_WALL = 11;
+
+/**
+ * Where the station rooms and their ways in actually are, by name -- the
+ * `StationBoxField` both ends build -- so the walls below can be put round the
+ * room a body is stood in and a doorway left where its tunnel comes through.
+ *
+ * Module state, like `rail-geo.setAccessPlans`, and set from the same places:
+ * `main.ts` on every field rebuild, `server/world.ts` after the load and in
+ * `boxesOf`. Null draws no walls at all rather than walls in the wrong place;
+ * the two check scripts that call `stationSolids` bare get the old behaviour.
+ */
+export interface StationPlanSource {
+  planFor(name: string): AccessPlan | null;
+  boxFor(name: string): { ceilY: number } | null;
+}
+let stationPlans: StationPlanSource | null = null;
+export function setStationPlans(source: StationPlanSource | null): void {
+  stationPlans = source;
+}
+
+/**
+ * The opening in a room's side wall for its way in: which side, and the span
+ * along the room it is open over. Exported so the audit in
+ * `server/underground-check.ts` and `verifyStationWalls` probe the wall the
+ * builder actually leaves, rather than a re-statement of the rule that drifts.
+ *
+ * Usually the doorway alone: the tunnel's half-width and a little, centred
+ * where the foot sits along the room. But where the incline runs *along* that
+ * wall -- Town Hall's foot is 16.2 m across in a room 16 m wide, Barangaroo's
+ * 16.0 -- the passage straddles the wall band for the incline's whole length
+ * and the opening is the run of the incline plus the doorway; decided by
+ * whether the passage overlaps the band by more than a tolerance, so an
+ * incline a few metres outside the wall (Wynyard, 3.6 m) keeps a whole wall.
+ */
+export function roomSideGap(
+  frame: TrackFrame, halfWidth: number, plan: AccessPlan,
+): { side: number; gap0: number; gap1: number } {
+  const fx = plan.footX - frame.x;
+  const fz = plan.footZ - frame.z;
+  const doorAt = fx * frame.ux + fz * frame.uz;
+  const across = -fx * frame.uz + fz * frame.ux;
+  const side = across >= 0 ? 1 : -1;
+  const half = ACCESS_HALF_W + DOORWAY_PAD_M;
+  let gap0 = doorAt - half;
+  let gap1 = doorAt + half;
+  const a = Math.abs(across);
+  const overlap = Math.min(a + ACCESS_HALF_W, halfWidth + WALL_M) - Math.max(a - ACCESS_HALF_W, halfWidth);
+  if (overlap > 0.2) {
+    const mx = plan.mouthX - frame.x;
+    const mz = plan.mouthZ - frame.z;
+    const mouthAt = mx * frame.ux + mz * frame.uz;
+    gap0 = Math.min(gap0, Math.min(doorAt, mouthAt) - half);
+    gap1 = Math.max(gap1, Math.max(doorAt, mouthAt) + half);
+  }
+  return { side, gap0, gap1 };
+}
+
+/** How thick a room's wall solid is, outside the walkable extent. */
+const WALL_M = 0.5;
+/** A doorway's half-width, past the tunnel's own half-width. */
+const DOORWAY_PAD_M = 0.3;
+/** The incline's walls are flat prisms, so they step down the ramp this often. */
+const INCLINE_WALL_STEP_M = 2;
 
 /** A prism as `CollisionWorld.addPrisms` takes one. */
 export interface SolidPrism {
@@ -1588,6 +1655,250 @@ export function undergroundSolids(
   // `stationAccessPlan`, and the passage is bounded by `StationBoxField`'s
   // access box. A slab at street + 3.4 m over a mouth nobody uses was a roof
   // in the middle of a footpath.
+
+  // --- **The walls.** Until this, an underground room had a floor and a
+  // drawing and nothing between them: `StationBoxField` answers heights, the
+  // lining is a `BackSide` mesh, and the only solids here were the two kerbs.
+  // So the wall a player saw stopped nothing. Measured at Wynyard, the floor
+  // answers at 15.9 m across and is `-Infinity` at 16.1 -- one step through
+  // the wall and the ground under the body is the terrain eleven metres up.
+  // The owner: *"if i touch the internal wall i tp to the surface"*.
+  //
+  // Four walls round the room, outside its walkable extent, with a doorway
+  // where the tunnel comes through; two down the tunnel; two down the incline
+  // in flat steps. All on the same frames the drawing uses, from the same
+  // field, and registered by both ends: the chunk builder on the client and
+  // `RailLateralField` on the server adopt every prism `stationSolids` emits.
+  const W = Number.isFinite(station.boxHalfWidth) && station.boxHalfWidth > 0 ? station.boxHalfWidth : BOX_HALF_WIDTH;
+  const plan = stationPlans?.planFor(station.name) ?? null;
+  const ceil = stationPlans?.boxFor(station.name)?.ceilY ?? top + BOX_HEIGHT;
+  const wallTop = Math.min(ceil, top + BOX_HEIGHT);
+  const wall = (f: TrackFrame, t0: number, t1: number, o0: number, o1: number, y0: number, y1: number): void => {
+    if (!(t1 - t0 > 1e-3) || !(y1 > y0)) return;
+    out.push({ f, t0, t1, o0: Math.min(o0, o1), o1: Math.max(o0, o1), y0, y1, kind: SOLID_BOX_WALL });
+  };
+  // The two ends.
+  wall(frame, L, L + WALL_M, -(W + WALL_M), W + WALL_M, top, wallTop);
+  wall(frame, -L - WALL_M, -L, -(W + WALL_M), W + WALL_M, top, wallTop);
+  // The two sides, one of them with the doorway -- and, where the incline
+  // runs along that wall, with the incline's whole run left open.
+  //
+  // At Town Hall the foot sits at 16.2 m across with the room 16 m wide; at
+  // Barangaroo, 16.0. The incline descends *along the room's edge*, its
+  // passage straddling the wall band for twenty metres, and a wall drawn there
+  // stood across the ramp: the walker's feet were inside its band, `pick`
+  // handed back its top, and the rise was 7.19 m. So the gap on that side is
+  // the doorway, or the incline's span plus the doorway, whichever the plan
+  // needs -- decided by whether the passage actually overlaps the band, so
+  // Wynyard's incline, 3.6 m outside its wall, keeps a whole wall.
+  let doorSide = 0;
+  let sideGap0 = 0;
+  let sideGap1 = 0;
+  if (plan !== null) {
+    const gap = roomSideGap(frame, W, plan);
+    doorSide = gap.side;
+    sideGap0 = gap.gap0;
+    sideGap1 = gap.gap1;
+  }
+  for (const side of [-1, 1]) {
+    const o0 = side * W;
+    const o1 = side * (W + WALL_M);
+    if (side !== doorSide) {
+      wall(frame, -L, L, o0, o1, top, wallTop);
+      continue;
+    }
+    wall(frame, -L, Math.max(-L, sideGap0), o0, o1, top, wallTop);
+    wall(frame, Math.min(L, sideGap1), L, o0, o1, top, wallTop);
+  }
+  if (plan === null) return;
+  // The tunnel's walls, **from where the tunnel clears the incline** to the
+  // room. The lining starts them a half-width *behind* the foot so the corner
+  // has a floor and a ceiling, and the first solids copied that -- which put
+  // a 0.5 m wall across the ramp 3.45 m before the foot, because the tunnel's
+  // across-axis is the incline's own axis. A body on the ramp there has its
+  // feet about 2.6 m up the wall's 4.2 m band, so `pick` handed it the top: a
+  // 1.87 m step at Wynyard, and every one of the 28 failed the walk.
+  const tf: TrackFrame = { x: plan.footX, z: plan.footZ, ux: plan.tunDirX, uz: plan.tunDirZ };
+  for (const side of [-1, 1]) {
+    wall(tf, ACCESS_HALF_W, plan.tunnelM, side * ACCESS_HALF_W, side * (ACCESS_HALF_W + WALL_M), plan.floorY, plan.floorY + ACCESS_HEIGHT_M);
+  }
+  // The incline, stepped: a prism is flat-topped and the ramp is not.
+  const inf: TrackFrame = { x: plan.mouthX, z: plan.mouthZ, ux: plan.dirX, uz: plan.dirZ };
+  const slope = (plan.mouthY - plan.floorY) / Math.max(plan.inclineM, 1e-6);
+  const yAt = (d: number): number => plan.mouthY - slope * Math.min(Math.max(d, 0), plan.inclineM);
+  const d0 = -ACCESS_OVERLAP_M / 2;
+  const d1 = plan.inclineM + ACCESS_OVERLAP_M / 2;
+  // The tunnel leaves the incline sideways at the foot, so the incline's wall
+  // on that side stops short of the foot by the tunnel's half-width -- the
+  // same doorway `rail-geo` cuts in the drawing. Without it, at a station
+  // whose incline runs parallel to the room a few metres outside its wall
+  // (Cherrybrook: 3.6 m), the incline's last wall step stood across the room's
+  // own doorway and the audit that found it read as a shut door.
+  const tunSide = plan.tunDirX * -plan.dirZ + plan.tunDirZ * plan.dirX >= 0 ? 1 : -1;
+  const gap0 = plan.inclineM - ACCESS_HALF_W - DOORWAY_PAD_M;
+  const gap1 = plan.inclineM + ACCESS_HALF_W + DOORWAY_PAD_M;
+  for (let d = d0; d < d1; d += INCLINE_WALL_STEP_M) {
+    const dn = Math.min(d1, d + INCLINE_WALL_STEP_M);
+    const lo = yAt(dn) - 0.3;
+    const hi = yAt(d) + ACCESS_HEIGHT_M;
+    for (const side of [-1, 1]) {
+      const o0 = side * ACCESS_HALF_W;
+      const o1 = side * (ACCESS_HALF_W + WALL_M);
+      if (side !== tunSide || dn <= gap0 || d >= gap1) {
+        wall(inf, d, dn, o0, o1, lo, hi);
+        continue;
+      }
+      // This step overlaps the doorway: keep whatever of it lies outside.
+      wall(inf, d, Math.min(dn, gap0), o0, o1, lo, hi);
+      wall(inf, Math.max(d, gap1), dn, o0, o1, lo, hi);
+    }
+  }
+}
+
+/**
+ * The walls stand where the drawing stands, and the doorway is open.
+ *
+ * Pure, over a synthetic station and a synthetic way in, through the same
+ * `framePrism` + point-in-polygon the collision runs -- so a test point is
+ * placed with `framePoint` and never by hand arithmetic, which is how the
+ * winding bug and the frame bug both got past a reader.
+ */
+export function verifyStationWalls(): string[] {
+  const failures: string[] = [];
+  const st = {
+    name: 'Testville', vertical: 'underground', trackY: -20,
+    siteX: 0, siteZ: 0, siteDx: 1, siteDz: 0, boxHalfLength: 50, boxHalfWidth: 10,
+    x: 40, z: 30, ux: 1, uz: 0,
+  } as unknown as PlacedStation;
+  const floor = concourseY(st);
+  const plan: AccessPlan = {
+    // Cherrybrook's shape, which is every real plan's: the incline runs along
+    // the room's axis four metres outside its +side wall (at 10), from a mouth
+    // at -30 to a foot at -12, and the tunnel turns in from the foot through
+    // that wall. The incline's near wall therefore passes right beside the
+    // doorway, which is the case the first fixture -- a tunnel carrying
+    // straight on from the incline -- never exercised.
+    mouthX: -30, mouthZ: 14, mouthY: floor + 13.5, dirX: 1, dirZ: 0, inclineM: 18,
+    footX: -12, footZ: 14, floorY: floor, tunDirX: 0, tunDirZ: -1, tunnelM: 8,
+  };
+  const wallsOf = (source: StationPlanSource | null): FrameSolid[] => {
+    const was = stationPlans;
+    setStationPlans(source);
+    const out: FrameSolid[] = [];
+    undergroundSolids(st, out);
+    setStationPlans(was);
+    return out.filter((b) => b.kind === SOLID_BOX_WALL);
+  };
+  const inWall = (walls: readonly FrameSolid[], p: readonly [number, number, number]): boolean => {
+    for (const b of walls) {
+      const pr = framePrism(b);
+      if (p[1] < pr.base || p[1] > pr.base + pr.height) continue;
+      if (pointInPolygon(pr.points, p[0], p[2])) return true;
+    }
+    return false;
+  };
+  const room: TrackFrame = { x: 0, z: 0, ux: 1, uz: 0 };
+  const y = floor + 1;
+
+  const walls = wallsOf({ planFor: () => plan, boxFor: () => ({ ceilY: floor + 9 }) });
+  if (walls.length < 8) failures.push(`${walls.length} wall solids for a room with a way in; eight is the least it takes.`);
+  // Inside the room: nothing pushes.
+  if (inWall(walls, framePoint(room, 0, 0, y))) failures.push('the middle of the room is inside a wall.');
+  if (inWall(walls, framePoint(room, 49.5, 9.5, y))) failures.push('the room\'s own corner, inside the extent, is inside a wall.');
+  // Just outside each face: a wall.
+  if (!inWall(walls, framePoint(room, 20, 10.25, y))) failures.push('the +side wall is missing where there is no doorway.');
+  if (!inWall(walls, framePoint(room, 0, -10.25, y))) failures.push('the far side wall is missing.');
+  if (!inWall(walls, framePoint(room, 50.25, 0, y))) failures.push('the end wall is missing.');
+  if (!inWall(walls, framePoint(room, -50.25, 0, y))) failures.push('the other end wall is missing.');
+  // The doorway: where the tunnel crosses the +side wall, open -- at the
+  // foot's own `along`, derived exactly as the builder derives it.
+  const doorAt = (plan.footX - room.x) * room.ux + (plan.footZ - room.z) * room.uz;
+  if (inWall(walls, framePoint(room, doorAt, 10.25, y))) failures.push('the doorway is walled up; the tunnel cannot enter the room.');
+  if (inWall(walls, framePoint(room, doorAt + ACCESS_HALF_W - 0.2, 10.25, y))) failures.push('the doorway is narrower than the tunnel.');
+  if (!inWall(walls, framePoint(room, doorAt + ACCESS_HALF_W + DOORWAY_PAD_M + 0.6, 10.25, y))) failures.push('the wall beside the doorway is missing.');
+  // The tunnel's own walls, and its open middle.
+  const tf: TrackFrame = { x: plan.footX, z: plan.footZ, ux: plan.tunDirX, uz: plan.tunDirZ };
+  // Probed past the incline's half-width, where the tunnel's own walls begin;
+  // closer to the foot the tunnel is still inside the incline's passage.
+  if (!inWall(walls, framePoint(tf, ACCESS_HALF_W + 2, ACCESS_HALF_W + 0.25, floor + 1))) failures.push('the tunnel has no wall on one side.');
+  if (!inWall(walls, framePoint(tf, ACCESS_HALF_W + 2, -ACCESS_HALF_W - 0.25, floor + 1))) failures.push('the tunnel has no wall on the other side.');
+  if (inWall(walls, framePoint(tf, 3, 0, floor + 1))) failures.push('the middle of the tunnel is inside a wall.');
+  if (inWall(walls, framePoint(tf, 1, ACCESS_HALF_W + 0.25, floor + 1))) failures.push('a tunnel wall stands inside the incline\'s passage, across the ramp.');
+  // The incline's walls follow the ramp down, and the ramp itself is open --
+  // **every half metre of it**, at the height a body's feet would be, which is
+  // how a wall standing across the ramp just before the foot is caught.
+  const inf: TrackFrame = { x: plan.mouthX, z: plan.mouthZ, ux: plan.dirX, uz: plan.dirZ };
+  const slope = (plan.mouthY - plan.floorY) / plan.inclineM;
+  for (const d of [1, 9, 17]) {
+    const ramp = plan.mouthY - slope * d + 1;
+    if (!inWall(walls, framePoint(inf, d, ACCESS_HALF_W + 0.25, ramp))) failures.push(`the incline has no wall ${d} m down.`);
+  }
+  for (let d = 0; d <= plan.inclineM; d += 0.5) {
+    const feet = plan.mouthY - slope * d;
+    for (const dy of [0.05, 1.0]) {
+      if (inWall(walls, framePoint(inf, d, 0, feet + dy))) {
+        failures.push(`the incline is walled across ${d} m down, ${dy} m over the ramp.`);
+        break;
+      }
+    }
+  }
+  // And the tunnel's centreline, foot to room, at floor height.
+  for (let t = 0; t <= plan.tunnelM; t += 0.5) {
+    if (inWall(walls, framePoint(tf, t, 0, plan.floorY + 0.05)) || inWall(walls, framePoint(tf, t, 0, plan.floorY + 1))) {
+      failures.push(`the tunnel is walled across ${t} m from the foot.`);
+      break;
+    }
+  }
+  // The incline's wall on the tunnel's side stops short of the foot, so the
+  // tunnel can leave; the other side runs to the end.
+  {
+    const rampAtFoot = plan.floorY + 1;
+    const tunSide = plan.tunDirX * -plan.dirZ + plan.tunDirZ * plan.dirX >= 0 ? 1 : -1;
+    if (inWall(walls, framePoint(inf, plan.inclineM, tunSide * (ACCESS_HALF_W + 0.25), rampAtFoot))) {
+      failures.push('the incline\'s wall on the tunnel side is not cut at the foot; the tunnel is walled off.');
+    }
+    if (!inWall(walls, framePoint(inf, plan.inclineM - ACCESS_HALF_W - DOORWAY_PAD_M - 1, tunSide * (ACCESS_HALF_W + 0.25), plan.mouthY - slope * (plan.inclineM - ACCESS_HALF_W - 1.3) + 1))) {
+      failures.push('the incline\'s wall on the tunnel side stops too early.');
+    }
+    if (!inWall(walls, framePoint(inf, plan.inclineM, -tunSide * (ACCESS_HALF_W + 0.25), rampAtFoot))) {
+      failures.push('the incline\'s far wall does not reach the foot.');
+    }
+  }
+  // Nothing stands above the street beside the mouth's pad: the walls at the
+  // lip reach the passage's own height and no higher.
+  if (inWall(walls, framePoint(inf, 1, ACCESS_HALF_W + 0.25, plan.mouthY + ACCESS_HEIGHT_M + 1))) {
+    failures.push('an incline wall reaches higher than the passage it lines.');
+  }
+  // --- Town Hall's shape: the incline runs *along* the room's wall, its
+  //     passage straddling the band. The wall on that side has to stand aside
+  //     for the incline's whole run, not just the doorway, or it stands across
+  //     the ramp; the wall beyond the run, and the far wall, stay.
+  {
+    const along: AccessPlan = {
+      mouthX: -30, mouthZ: 9.8, mouthY: floor + 13.5, dirX: 1, dirZ: 0, inclineM: 18,
+      footX: -12, footZ: 9.8, floorY: floor, tunDirX: 0, tunDirZ: -1, tunnelM: 8,
+    };
+    const w2 = wallsOf({ planFor: () => along, boxFor: () => ({ ceilY: floor + 9 }) });
+    const inf2: TrackFrame = { x: along.mouthX, z: along.mouthZ, ux: along.dirX, uz: along.dirZ };
+    const slope2 = (along.mouthY - along.floorY) / along.inclineM;
+    for (let d = 0; d <= along.inclineM; d += 0.5) {
+      const feet = along.mouthY - slope2 * d;
+      if (inWall(w2, framePoint(inf2, d, 0, feet + 0.05)) || inWall(w2, framePoint(inf2, d, 0, feet + 1))) {
+        failures.push(`with the incline along the wall, the ramp is walled across ${d} m down.`);
+        break;
+      }
+    }
+    // Beyond the incline's run the wall is back; the far wall never left.
+    if (!inWall(w2, framePoint(room, 20, 10.25, y))) failures.push('with the incline along the wall, the wall beyond its run is missing.');
+    if (!inWall(w2, framePoint(room, 0, -10.25, y))) failures.push('with the incline along the wall, the far wall is missing.');
+    if (inWall(w2, framePoint(room, -20, 10.25, y))) failures.push('with the incline along the wall, the wall still stands over the incline\'s run.');
+  }
+
+  // No way in known: four continuous walls, no doorway, nothing down a tunnel.
+  const bare = wallsOf(null);
+  if (bare.length !== 4) failures.push(`${bare.length} walls for a room with no known way in; four, unbroken.`);
+  if (!inWall(bare, framePoint(room, 0, 10.25, y))) failures.push('with no way in known, the +side wall still has a hole.');
+  return failures;
 }
 
 /**

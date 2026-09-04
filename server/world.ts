@@ -136,7 +136,9 @@ import { RailCut } from '../client/src/world/rail-cut.ts';
 // because they are drawn per chunk in a browser, and every one of them is
 // ground a player stands on. `RailSolidField` is the definition those prisms are
 // now *also* derived from, so the two ends compute one number.
-import { RailSolidField, buildNetwork } from '../client/src/world/rail-solids.ts';
+import { RailSolidField, buildNetwork,
+  setStationPlans,
+} from '../client/src/world/rail-solids.ts';
 // The lateral half of the same solids, which is this file's own module rather
 // than a shared one: it is a *residency*, and only a process with participants
 // in it has one. See `server/rail-lateral.ts`.
@@ -2603,6 +2605,10 @@ export async function loadWorld(
     world.stationBoxes = buildStationBoxes(world.rail, accessWorldOf(world));
     if (world.railCut) world.railCut.setAccess(world.stationBoxes.plans, (x, z) => world.terrain.height(x, z));
     world.stationBoxesTiles = world.collision.tileCount;
+    // And the walls read the same field. `RailSolidField` caches a station's
+    // solids on first query, so this has to be set before anybody asks --
+    // which is here, the last thing the load does. See `setStationPlans`.
+    setStationPlans(world.stationBoxes);
   }
 
   return world;
@@ -2759,6 +2765,7 @@ export function boxesOf(world: ServerWorld): StationBoxField | null {
     world.stationBoxes = buildStationBoxes(world.rail, accessWorldOf(world));
     if (world.railCut) world.railCut.setAccess(world.stationBoxes.plans, (x, z) => world.terrain.height(x, z));
     world.stationBoxesTiles = tiles;
+    setStationPlans(world.stationBoxes);
   }
   return world.stationBoxes;
 }

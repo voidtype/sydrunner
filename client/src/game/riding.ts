@@ -181,7 +181,6 @@ import { type RailStation, CONCOURSE_OVER_RAIL_M,
 // terms section 2 sets out. It is imported rather than restated because the
 // deck's outer edge and the rim of the terrain carve have to be *the same
 // number*: see `PLATFORM_OUTER_M`, where their difference was the bug.
-import { STATION_HALF_WIDTH } from '../world/rail-cut.ts';
 import { pointInPolygon, type Prism } from '../player/collision.ts';
 // WORKSTREAM AG: how much of the corridor this platform's track may have. See
 // `PlatformSite.outer` -- both ends of the wire read this one answer.
@@ -1101,6 +1100,21 @@ export const PLATFORM_WIDTH_M = 5.5;
  * the passenger platform and none of them changes. This is the surface, which is
  * a different question and now has its own name.
  */
+/**
+ * How far either side of the track centre a station cutting is carved, metres.
+ *
+ * `world/rail-cut.ts` is where this is *used* and where its essay is -- the
+ * platform's outer face is 7.12 m out, and at the thirty or so sites that sit
+ * in real cuttings a 5.4 m hole would bury half of every platform in the
+ * trench wall; 9.4 clears the platform, the fence line and the stairs, which
+ * is what a Bankstown-line cutting measures. It is *declared* here because
+ * `PLATFORM_OUTER_M` below needs it and `rail-cut` imports this file: a
+ * constant that flowed the other way was an import cycle, and a cycle in ES
+ * modules is not an error, it is a module evaluated with half its bindings in
+ * the temporal dead zone, whenever something happens to reach the other end
+ * first.
+ */
+export const STATION_HALF_WIDTH = 9.4;
 export const PLATFORM_OUTER_M = STATION_HALF_WIDTH;
 
 /**

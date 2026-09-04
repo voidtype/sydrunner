@@ -187,6 +187,7 @@ import { verifyBoats } from '../client/src/game/boats.ts';
 import { verifyInterior } from '../client/src/world/interior.ts';
 import { verifySpaces } from '../client/src/net/spaces.ts';
 import { verifyCrash } from '../client/src/crash.ts';
+import { verifyStationWalls } from '../client/src/world/rail-solids.ts';
 import { verifyDeviceLost } from '../client/src/devicelost.ts';
 // --- Workstream E. Three self-checks, all three of them shared modules being
 // run in the second runtime -- which is the premise this whole block exists to
@@ -508,6 +509,9 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // runs on both boot lists, so a bad trim is caught by whichever end boots
     // first. See `client/src/crash.ts`.
     ['verifyCrash', verifyCrash()],
+    // The walls of an underground room and its way in. Both ends adopt every
+    // prism `stationSolids` emits, so the doorway has to be right here too.
+    ['verifyStationWalls', verifyStationWalls()],
     ['verifyDeviceLost', verifyDeviceLost()],
     // --- WORKSTREAM V. `verifyTeams` is the contract's own and is here for a
     // reason the rest of this list does not have: it is a **spelling** check.

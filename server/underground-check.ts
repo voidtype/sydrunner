@@ -200,8 +200,10 @@ if (!held) {
  * invisible chest-high walls across the concourse. Both ends evaluate
  * `stationSolids`, so this is the one call, checked against the one box.
  */
-const { buildNetwork, planStation, stationSolids, SOLID_BOX_PLATFORM } = await import('../client/src/world/rail-solids.ts');
+const { buildNetwork, planStation, stationSolids, SOLID_BOX_PLATFORM, SOLID_BOX_WALL, setStationPlans, framePrism, roomSideGap } = await import('../client/src/world/rail-solids.ts');
 const net = buildNetwork(bake);
+// The walls read the field this server holds, exactly as `loadWorld` sets it.
+setStationPlans(held ?? null);
 let kerbsOff = 0;
 let kerbs = 0;
 for (const st of net.stations) {
@@ -223,4 +225,46 @@ for (const st of net.stations) {
   }
 }
 console.log(`${kerbs - kerbsOff} of ${kerbs} platform kerbs stand in the room they are drawn in`);
-process.exit(pass === rows.length && roofed === 0 && kerbsOff === 0 ? 0 : 1);
+
+/*
+ * --- And the walls: a step through the drawn wall meets a solid, and the
+ *     doorway the tunnel comes through does not. On the real field, every
+ *     station, through the same prisms both ends register.
+ */
+let wallsBad = 0;
+let wallsChecked = 0;
+for (const st of net.stations) {
+  if (st.vertical !== 'underground') continue;
+  const room = held?.boxFor(st.name) ?? null;
+  const plan = held?.planFor(st.name) ?? null;
+  if (room === null || plan === null) continue;
+  const boxes: import('../client/src/world/rail-solids.ts').FrameSolid[] = [];
+  stationSolids(planStation(net, st, () => Number.NaN, true), boxes);
+  const walls = boxes.filter((b) => b.kind === SOLID_BOX_WALL).map((b) => framePrism(b));
+  const hit = (x: number, y: number, z: number): boolean =>
+    walls.some((pr) => y >= pr.base && y <= pr.base + pr.height && pointInPolygon(pr.points, x, z));
+  const px = -room.uz, pz = room.ux;
+  const y = room.floorY + 1;
+  // The far side wall, a quarter metre past the drawn face, at three points.
+  const { side: doorSide, gap0, gap1 } = roomSideGap(room, room.halfWidth, plan);
+  let ok = true;
+  for (const t of [-room.halfLength * 0.6, 0, room.halfLength * 0.6]) {
+    const o = -doorSide * (room.halfWidth + 0.25);
+    if (!hit(room.x + room.ux * t + px * o, y, room.z + room.uz * t + pz * o)) ok = false;
+  }
+  // The opening, open at its middle; the wall just past either end of it,
+  // closed -- the same gap the builder leaves, from the same function.
+  const oDoor = doorSide * (room.halfWidth + 0.25);
+  const mid = (gap0 + gap1) / 2;
+  if (hit(room.x + room.ux * mid + px * oDoor, y, room.z + room.uz * mid + pz * oDoor)) ok = false;
+  const beside = gap1 + 0.5 <= room.halfLength ? gap1 + 0.5 : gap0 - 0.5;
+  if (beside > -room.halfLength && beside < room.halfLength &&
+      !hit(room.x + room.ux * beside + px * oDoor, y, room.z + room.uz * beside + pz * oDoor)) ok = false;
+  wallsChecked++;
+  if (!ok) {
+    wallsBad++;
+    console.log(`FAIL ${st.name.padEnd(22)} the room's walls do not stand where they are drawn, or the doorway is shut`);
+  }
+}
+console.log(`${wallsChecked - wallsBad} of ${wallsChecked} rooms have walls a body meets and a doorway it does not`);
+process.exit(pass === rows.length && roofed === 0 && kerbsOff === 0 && wallsBad === 0 ? 0 : 1);
