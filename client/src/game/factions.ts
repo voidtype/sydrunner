@@ -695,7 +695,26 @@ export const NPC_STATE = {
   DOWN: 5,
   /** Walking back to the beat. Despawns on arrival. */
   RETURN: 6,
+  /**
+   * A police round that did not land. Police only: every other kind's `FIRE`
+   * is a swipe or a peck and has no miss to tell.
+   *
+   * The owner: *"when police shoot you the tracers go past in the air instead
+   * of irl."* The client draws a tracer off the state byte and knew nothing
+   * about the roll, so it aimed every round at the player and every round
+   * stopped there -- a miss was a round ending in the air beside your head.
+   * One more state value carries the bit the roll already decided, and
+   * `roundEnd` turns it into a round that whips past and hits the road or a
+   * wall behind you. Test with `firedRound` wherever "a shot just left this
+   * officer" is the question; test `FIRE` alone only where a hit is.
+   */
+  FIRE_MISS: 7,
 } as const;
+
+/** Did a round just leave this actor, landing or not? See `NPC_STATE.FIRE_MISS`. */
+export function firedRound(state: number): boolean {
+  return state === NPC_STATE.FIRE || state === NPC_STATE.FIRE_MISS;
+}
 
 /** One promoted actor, as the authority simulates it and the wire carries it. */
 export interface NpcActor {
@@ -1517,6 +1536,92 @@ export function policeShotLands(
 ): boolean {
   const roll = carHash(officerId, carHash(targetId, (tick ^ Math.imul(shotIndex, 0x9e3779b1)) | 0)) / 4294967296;
   return roll < hitChance(range) * POLICE_LAND_SCALE * missScale;
+}
+
+/** How far a missed round carries past the suspect before the tracer gives up, metres. */
+export const ROUND_CARRY_M = 45;
+/** The step a carried round is walked in, metres. Coarse, because the tracer is a metre-wide box. */
+export const ROUND_STEP_M = 1;
+/** The chest: the eye less the head. A landed round stops here. */
+export const ROUND_CHEST_BELOW_EYE_M = 0.55;
+/** How far to the side a missed round passes, metres, least and most. Past a shoulder, never through it. */
+export const ROUND_MISS_LATERAL_MIN_M = 0.6;
+export const ROUND_MISS_LATERAL_MAX_M = 1.5;
+
+/**
+ * Where a round ends, for the tracer.
+ *
+ * A **hit** ends at the chest, which is where `SHOT_DAMAGE` says it went. A
+ * **miss** passes the suspect to one side -- a little off in height too -- and
+ * keeps going, a metre at a time, until it meets the ground or a prism
+ * (`CollisionWorld.blocked`, the same test the officer's line of sight uses,
+ * so a round cannot stop behind a wall the officer could not see through) or
+ * runs out of `ROUND_CARRY_M`. The tracer then reads as a round that hit the
+ * road behind you, which is what the owner asked for.
+ *
+ * Presentation, run on the client only, but pure and hashed so the same shot
+ * draws the same way on every screen that sees it. No `Math.sin`; `sqrt` is
+ * what this file already allows itself.
+ */
+export function roundEnd(
+  mx: number, my: number, mz: number,
+  ex: number, ey: number, ez: number,
+  miss: boolean,
+  seed: number,
+  collision: { blocked(ax: number, ay: number, az: number, bx: number, by: number, bz: number): boolean } | null,
+  groundHeight: (x: number, z: number, feetY: number) => number,
+  out: { x: number; y: number; z: number },
+): void {
+  const cx = ex;
+  const cy = ey - ROUND_CHEST_BELOW_EYE_M;
+  const cz = ez;
+  if (!miss) {
+    out.x = cx; out.y = cy; out.z = cz;
+    return;
+  }
+  const h = carHash(seed, 0x51ed) / 4294967296;
+  const h2 = carHash(seed, 0x2b7e) / 4294967296;
+  const dx = cx - mx;
+  const dz = cz - mz;
+  const len = Math.sqrt(dx * dx + dz * dz) || 1;
+  const px = -dz / len;
+  const pz = dx / len;
+  const side = h < 0.5 ? -1 : 1;
+  const lateral = ROUND_MISS_LATERAL_MIN_M + ((h * 2) % 1) * (ROUND_MISS_LATERAL_MAX_M - ROUND_MISS_LATERAL_MIN_M);
+  const ax = cx + px * side * lateral;
+  // Low more often than high: a round that climbs never lands, and the road is the point.
+  const ay = cy - 0.5 + h2 * 0.7;
+  const az = cz + pz * side * lateral;
+  const vx = ax - mx;
+  const vy = ay - my;
+  const vz = az - mz;
+  const vlen = Math.sqrt(vx * vx + vy * vy + vz * vz) || 1;
+  const ux = (vx / vlen) * ROUND_STEP_M;
+  const uy = (vy / vlen) * ROUND_STEP_M;
+  const uz = (vz / vlen) * ROUND_STEP_M;
+  let x = ax;
+  let y = ay;
+  let z = az;
+  for (let s = 0; s < ROUND_CARRY_M; s += ROUND_STEP_M) {
+    const nx = x + ux;
+    const ny = y + uy;
+    const nz = z + uz;
+    const g = groundHeight(nx, nz, ny);
+    if (Number.isFinite(g) && ny <= g) {
+      out.x = nx; out.y = g; out.z = nz;
+      return;
+    }
+    if (collision !== null && collision.blocked(x, y, z, nx, ny, nz)) {
+      out.x = x; out.y = y; out.z = z;
+      return;
+    }
+    x = nx; y = ny; z = nz;
+  }
+  // Out of carry and still in the air: put it on the ground under where it
+  // got to. A tracer that ends on the road forty metres behind you reads as a
+  // round that hit the road; one that ends in mid-air reads as the old bug.
+  const g = groundHeight(x, z, y);
+  out.x = x; out.y = Number.isFinite(g) && g < y ? g : y; out.z = z;
 }
 
 /** How long a batted officer stays down, seconds. They are hardy; they get up. */
@@ -3237,7 +3342,7 @@ function hostileNear(ctx: FactionCtx, officer: NpcActor): NpcActor | null {
   for (const a of ctx.field.actors) {
     if (!policeHostile.has(a.kind)) continue;
     if (a.state === NPC_STATE.DOWN || a.state === NPC_STATE.RETURN) continue;
-    if (a.target < 0 && a.state !== NPC_STATE.CHASE && a.state !== NPC_STATE.FIRE) continue;
+    if (a.target < 0 && a.state !== NPC_STATE.CHASE && !firedRound(a.state)) continue;
     const dx = a.x - officer.x;
     const dz = a.z - officer.z;
     const d2 = dx * dx + dz * dz;
@@ -3404,7 +3509,7 @@ export const POLICE = registerNpcKind({
       actor.dx = dx * s;
       actor.dz = dz * s;
     }
-    if (actor.state !== NPC_STATE.AIM && actor.state !== NPC_STATE.FIRE) {
+    if (actor.state !== NPC_STATE.AIM && !firedRound(actor.state)) {
       actor.state = NPC_STATE.AIM;
       actor.stateTicks = 0;
       ctx.field.bark(actor, ctx);
@@ -3414,7 +3519,7 @@ export const POLICE = registerNpcKind({
     // back down to aim, which is what lets a client fire a muzzle flash, a
     // tracer and a crack off the state byte alone -- no event, no extra message,
     // and nothing to lose. See `FIRE_STATE_TICKS`.
-    if (actor.state === NPC_STATE.FIRE) {
+    if (firedRound(actor.state)) {
       if (actor.stateTicks >= FIRE_STATE_TICKS) {
         actor.state = NPC_STATE.AIM;
         actor.stateTicks = 0;
@@ -3449,8 +3554,7 @@ export const POLICE = registerNpcKind({
     // ticks.
     if (actor.stateTicks < AIM_TICKS || actor.fireCooldown > 0) return;
 
-    // --- The shot.
-    actor.state = NPC_STATE.FIRE;
+    // --- The shot. The state is set below, once the roll says which one it is.
     actor.stateTicks = 0;
     actor.fireCooldown = FIRE_INTERVAL_TICKS;
     actor.shotsFired++;
@@ -3470,6 +3574,7 @@ export const POLICE = registerNpcKind({
     // `heat.ts` composes the same talent into the Polair marksman's damage on
     // the same terms, one file over.
     const hit = policeShotLands(actor.id, suspect.id, ctx.tick, actor.shotsFired, d, fxPoliceHitScale(suspect.id));
+    actor.state = hit ? NPC_STATE.FIRE : NPC_STATE.FIRE_MISS;
     ctx.field.shots++;
     ctx.emit({
       kind: 'shot',
@@ -3914,6 +4019,44 @@ export function verifyPolice(kitTriangles?: number, snapshotInterval?: number): 
   // --- The two-star gate, over the real `POLICE.think`.
   failures.push(...verifyArmedAtTwoStars());
 
+  // --- Where a round ends: a hit at the chest, a miss past you and into the road.
+  {
+    const flat = (): number => 0;
+    const end = { x: 0, y: 0, z: 0 };
+    // Officer at the origin, suspect 15 m along +x, eye at 1.68 on flat ground.
+    roundEnd(0.3, 1.35, 0, 15, 1.68, 0, false, 7, null, flat, end);
+    if (end.x !== 15 || end.z !== 0 || Math.abs(end.y - (1.68 - ROUND_CHEST_BELOW_EYE_M)) > 1e-9) {
+      failures.push(`a landed round ended at (${end.x}, ${end.y.toFixed(2)}, ${end.z}); the chest is (15, ${(1.68 - ROUND_CHEST_BELOW_EYE_M).toFixed(2)}, 0).`);
+    }
+    roundEnd(0.3, 1.35, 0, 15, 1.68, 0, true, 7, null, flat, end);
+    if (!(end.x > 15)) failures.push(`a missed round ended ${end.x.toFixed(1)} m along; it should carry past the suspect at 15.`);
+    if (Math.abs(end.y) > 1e-6) failures.push(`a missed round over flat ground ended ${end.y.toFixed(2)} m up; it should hit the road.`);
+    if (end.x > 15 + ROUND_CARRY_M + 1) failures.push('a missed round carried further than ROUND_CARRY_M.');
+    {
+      const probe = { x: 0, y: 0, z: 0 };
+      let left = 0;
+      for (let seed = 1; seed <= 40; seed++) {
+        // With everything blocked the round stops at its aim point past the suspect.
+        roundEnd(0.3, 1.35, 0, 15, 1.68, 0, true, seed, { blocked: () => true }, flat, probe);
+        const off = Math.abs(probe.z);
+        if (off < ROUND_MISS_LATERAL_MIN_M - 1e-6 || off > ROUND_MISS_LATERAL_MAX_M + 1e-6) {
+          failures.push(`missed round ${seed} passes ${off.toFixed(2)} m off the line; the band is ${ROUND_MISS_LATERAL_MIN_M}-${ROUND_MISS_LATERAL_MAX_M}.`);
+          break;
+        }
+        if (probe.z < 0) left++;
+      }
+      if (left === 0 || left === 40) failures.push('every missed round passes on the same side.');
+    }
+    const a = { x: 0, y: 0, z: 0 };
+    const b = { x: 0, y: 0, z: 0 };
+    roundEnd(0.3, 1.35, 0, 15, 1.68, 0, true, 99, null, flat, a);
+    roundEnd(0.3, 1.35, 0, 15, 1.68, 0, true, 99, null, flat, b);
+    if (a.x !== b.x || a.y !== b.y || a.z !== b.z) failures.push('roundEnd is not deterministic.');
+    const wall = { blocked: (ax: number, _ay: number, _az: number, bx: number) => ax < 20 && bx >= 20 };
+    roundEnd(0.3, 1.35, 0, 15, 1.68, 0, true, 3, wall, () => -100, end);
+    if (!(end.x < 20 && end.x >= 15)) failures.push(`a missed round went through a wall at 20 m and ended at ${end.x.toFixed(1)}.`);
+  }
+
   return failures;
 }
 
@@ -4062,7 +4205,7 @@ function verifyArmedAtTwoStars(): string[] {
     // window on the way through, fails exactly here and nowhere else.
     stars = POLICE_ARMED_STARS;
     run(1);
-    if (field.shots !== 1 || shotEvents !== 1 || officer.state !== NPC_STATE.FIRE) {
+    if (field.shots !== 1 || shotEvents !== 1 || !firedRound(officer.state)) {
       failures.push(
         `Crossing into ${POLICE_ARMED_STARS} stars produced ${field.shots} round(s) and ${shotEvents} shot ` +
           `event(s) on the tick the star landed, in state ${officer.state}. The rung has to start the moment the ` +
@@ -4085,7 +4228,7 @@ function verifyArmedAtTwoStars(): string[] {
           'once at the start of a pursuit rather than every tick.',
       );
     }
-    if (officer.state === NPC_STATE.FIRE) {
+    if (firedRound(officer.state)) {
       failures.push(
         'An officer whose suspect shed back to one star is stuck in NPC_STATE.FIRE. The gate is above the ' +
           'fire-state hold, so the weapon never comes back down and every client draws a permanent muzzle flash.',

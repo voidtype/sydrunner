@@ -591,6 +591,8 @@ import {
   verifyPolice,
   type FactionCtx,
   type NpcActor,
+  firedRound,
+  roundEnd
 } from './game/factions.ts';
 import { PoliceAssets, PoliceSquad, Tracers, policeWarmupParts, verifyPoliceKit } from './world/police.ts';
 // --- The heat ladder (workstream D). Pure logic in `game/heat.ts`, which the
@@ -4405,6 +4407,8 @@ async function main(): Promise<void> {
    * read every frame at 60 Hz rather than sampled at 20.
    */
   const firing = new Set<number>();
+  /** Scratch for `roundEnd`, so a volley allocates nothing. */
+  const shotEnd = { x: 0, y: 0, z: 0 };
   /**
    * What state every live bird was in last frame, so a call is heard once.
    *
@@ -13597,14 +13601,25 @@ async function main(): Promise<void> {
       // would give a shirtless bloke in a beanie a service pistol.
       for (const actor of policeField().actors) {
         const wasFiring = firing.has(actor.id);
-        if (actor.state === NPC_STATE.FIRE) {
+        if (firedRound(actor.state)) {
           if (!wasFiring) {
             firing.add(actor.id);
             const range = Math.hypot(actor.x - player.position.x, actor.z - player.position.z);
             if (actor.kind === NPC_KIND.POLICE) {
               policeStats.shots++;
               audio.gunshot(range);
-              tracers.fire(actor, player.position, range);
+              // A hit stops at the chest; a miss whips past and hits the road
+              // or a wall behind you. See `factions.roundEnd` and `NPC_STATE.FIRE_MISS`.
+              roundEnd(
+                actor.x + actor.dx * 0.3, actor.y + 1.35, actor.z + actor.dz * 0.3,
+                player.position.x, player.position.y, player.position.z,
+                actor.state === NPC_STATE.FIRE_MISS,
+                (actor.id * 131 + ((trafficTick(Date.now()) / 6) | 0)) | 0,
+                collision,
+                groundHeightAt,
+                shotEnd,
+              );
+              tracers.fire(actor, shotEnd, Math.hypot(shotEnd.x - actor.x, shotEnd.y - actor.y - 1.35, shotEnd.z - actor.z));
             } else if (isStreetKind(actor.kind) && range < 6) {
               // Close only. A swipe is a sound you hear because it happened to
               // you, and one audible from 40 m would be a city of invisible

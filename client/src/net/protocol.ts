@@ -1029,7 +1029,7 @@ export const MSG = {
  * the walls this server does. Two ends on different versions of a shared
  * computation is the failure the version exists to refuse.
  */
-export const PROTOCOL_VERSION = 30;
+export const PROTOCOL_VERSION = 31;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;

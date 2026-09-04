@@ -3077,7 +3077,7 @@ async function checkBikes(): Promise<void> {
   // the bump is one line the lead changes here and in `protocol.ts` together.
   // See `PROTOCOL_VERSION`'s v15 note. If this line is still reading 14 after
   // the batch has landed, that is the bug this check exists to catch.
-  check(PROTOCOL_VERSION === 30, `the protocol is at version ${PROTOCOL_VERSION}`);
+  check(PROTOCOL_VERSION === 31, `the protocol is at version ${PROTOCOL_VERSION}`);
   check(
     WELCOME_BYTES === 36,
     `  and a WELCOME is ${WELCOME_BYTES} bytes: 27 through v10, plus v11's f64 clock, plus v15's ` +
@@ -7907,7 +7907,7 @@ async function checkStreetlife(): Promise<void> {
       for (let i = 0; i < 240; i++) {
         const ctx = makeCtx(field, clear, [victim], 3_100_000 + i);
         field.step(ctx);
-        if (officer.state === fac.NPC_STATE.FIRE) fired++;
+        if (fac.firedRound(officer.state)) fired++;
       }
       check(fired === 0, 'and never entered the fire state doing it -- a baton, not a service pistol');
     }
