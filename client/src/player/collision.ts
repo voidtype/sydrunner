@@ -161,6 +161,14 @@ export interface Prism {
 export const BODY_HEIGHT_M = 1.8;
 
 /**
+ * How far below a building's lowest corner a head has to be before the body
+ * counts as under the building rather than in it. See `solidFor`, clause 2.
+ * Two metres: deeper than any kerb, step or cutting a body reaches on foot at
+ * the terrain, shallower than the shallowest station tunnel lid.
+ */
+export const UNDER_BUILDING_M = 2;
+
+/**
  * The coarse cell a *tile* is filed under, metres. See `tileCells`.
  *
  * A tile is 500 m on this build, so one cell holds four of them and a re-carve
@@ -893,7 +901,19 @@ export class CollisionWorld implements MoveResolver {
     fromZ: number,
   ): boolean {
     if (feetY >= prism.top - 0.05) return false;
-    if (!prism.structural) return true;
+    // 2, with the one exception it always needed. A building is solid to the
+    // terrain, and `base` is its low corner, so nothing standing on the ground
+    // anywhere in its footprint can get its head under `base`: the ground
+    // there is at or above it. A body whose head is `UNDER_BUILDING_M` below
+    // that corner is therefore not on any ground the building stands on -- it
+    // is in a station tunnel, a cutting, a shaft -- and is under the building,
+    // not inside it. Wynyard's tunnel runs 31 m under Wynyard Place at -28.8 m
+    // with the tower's low corner at -16.8, and until this the tower stopped
+    // the body twelve metres below its foundations. The rail envelope carves
+    // buildings over track corridors and station boxes, but a carve is
+    // plan-only and would open the tower at street level too, which is the
+    // wrong trade for a passage nobody can see from the street.
+    if (!prism.structural) return headY > prism.base - UNDER_BUILDING_M;
     if (headY <= prism.base) return false;
     if (feetY < prism.base && pointInPolygon(prism.points, fromX, fromZ)) return false;
     return true;
@@ -1305,6 +1325,28 @@ export function verifyCollision(): string[] {
     if (walk(world, 4, -20, 4, -19, 6.2).hit) {
       say('A body standing on the deck top was pushed off it -- the roofline test regressed.');
     }
+  }
+
+  // --- A building is solid to the terrain, and no further. TERRACE has its low
+  //     corner at 3: a body at the terrain beside it is stopped, a body whose
+  //     head is just under the corner is still stopped (that is a step, not a
+  //     tunnel), and a body seven metres down -- a station tunnel under the
+  //     footprint -- walks straight under it. See `solidFor`, clause 2.
+  {
+    const into = (feet: number) => walk(world, 17, 0, 24, 0, feet);
+    if (!into(0).hit) say('A body at the terrain walked into a building; a building is solid to the terrain.');
+    if (!into(1.5).hit) say('A body with its head above a building\'s low corner walked into it.');
+    if (!into(3 - BODY_HEIGHT_M - 0.42 - 0.5).hit) {
+      say('A body half a metre under a building\'s low corner walked into it; that is a step, not a tunnel.');
+    }
+    const under = into(-6);
+    if (under.hit || Math.abs(under.x - 24) > 1e-6) {
+      say(`A body seven metres under a building's low corner was stopped by it (ended at x=${under.x.toFixed(2)}); the tunnels under the city are walled off.`);
+    }
+    // And the roofline is untouched: standing on it is still standing on it.
+    if (world.roofHeight(27, 0, 12) !== 12) say(`roofHeight over the building answered ${world.roofHeight(27, 0, 12)}, not its top at 12.`);
+  }
+  {
     // Against a tolerance because `base` and `height` are f32 in the payload and
     // 5 + 1.2 comes back as 6.200000047683716. The wire format is the authority
     // on that, not the literal in this file.

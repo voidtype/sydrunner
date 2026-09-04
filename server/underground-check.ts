@@ -267,4 +267,76 @@ for (const st of net.stations) {
   }
 }
 console.log(`${wallsChecked - wallsBad} of ${wallsChecked} rooms have walls a body meets and a doorway it does not`);
-process.exit(pass === rows.length && roofed === 0 && kerbsOff === 0 && wallsBad === 0 ? 0 : 1);
+
+/*
+ * --- And the move itself. Everything above asks for heights and for solids in
+ *     a band; none of it runs `resolve`, which is what actually moves a body
+ *     on both ends, against the prisms `RailLateralField` adopts from the solid
+ *     field's cache *and* the tile prisms already resident. That is the gap a
+ *     building over Wynyard's tunnel walked through: its low corner twelve
+ *     metres above the tunnel, `solidFor` calling it solid to the terrain, and
+ *     no audit here driving a body into it. So: adopt each station exactly as
+ *     the lateral field does and walk the way in with `resolve`.
+ */
+const solidField: any = world.railSolids;
+let moveBad = 0;
+let moveChecked = 0;
+if (solidField && held) {
+  for (const st of net.stations) {
+    if (st.vertical !== 'underground') continue;
+    const room = held.boxFor(st.name);
+    const plan = held.planFor(st.name);
+    if (room === null || plan === null) continue;
+    // Adopt every site of this station through the cache, as adopt() does.
+    const key = `ug-audit-${st.name}`;
+    let adopted = 0;
+    net.stations.forEach((s: any, i: number) => {
+      if (s.name !== st.name) return;
+      adopted += world.collision.addPrisms(`${key}-${i}`, solidField.solidsOf('station', i).prisms);
+    });
+    const col = world.collision;
+    const px = -room.uz, pz = room.ux;
+    let feet = plan.floorY;
+    let x = plan.footX, z = plan.footZ;
+    let blocked = '';
+    const step = (tx: number, tz: number, label: string): void => {
+      if (blocked) return;
+      feet = g.groundHeight(x, z, feet);
+      const r = col.resolve(x, z, tx, tz, 0.34, feet, feet + 1.7);
+      const wanted = Math.hypot(tx - x, tz - z);
+      const moved = Math.hypot(r.x - x, r.z - z);
+      if (r.hit && moved < wanted * 0.5) blocked = `${label} at (${x.toFixed(0)} E, ${(-z).toFixed(0)} N), feet ${feet.toFixed(1)}`;
+      x = r.x; z = r.z;
+    };
+    // The tunnel, foot to three metres past its end -- then **on along the
+    // tunnel's line** toward the platform, from wherever the body is, and only
+    // then along the platform. Not a line drawn across the room through the
+    // foot: at the shallow stations the foot is inside the room and the walled
+    // ramp lands on the concourse, so a body started there and marched across
+    // walks out through the ramp's own far wall -- a real, drawn wall no player
+    // meets, because a player leaves the ramp through its doorway.
+    for (let t = 0.5; t <= plan.tunnelM + 3; t += 0.5) step(plan.footX + plan.tunDirX * t, plan.footZ + plan.tunDirZ * t, `the tunnel ${t} m from the foot`);
+    // Then toward the centreline -- **not** on along the tunnel's line. Where
+    // the foot is already inside the room the eight-metre tunnel crosses the
+    // centreline and ends on the far side, and a march that kept its heading
+    // walked into the far wall, which is a real wall. A player turns toward
+    // the platform.
+    const acrossOf = (): number => -(x - room.x) * room.uz + (z - room.z) * room.ux;
+    for (let n = 0; n < 80 && Math.abs(acrossOf()) > 4; n++) {
+      const toward = acrossOf() > 0 ? -1 : 1;
+      step(x + px * toward * 0.5, z + pz * toward * 0.5, `the room ${acrossOf().toFixed(0)} m across`);
+    }
+    const side = acrossOf() >= 0 ? 1 : -1;
+    const along = (x - room.x) * room.ux + (z - room.z) * room.uz;
+    const tEnd = Math.min(along + 30, room.halfLength - 7);
+    for (let t = along + 1; t <= tEnd; t += 1) step(room.x + room.ux * t + px * side * 4, room.z + room.uz * t + pz * side * 4, `the platform ${(t - along).toFixed(0)} m along`);
+    net.stations.forEach((s: any, i: number) => { if (s.name === st.name) world.collision.removeTile(`${key}-${i}`); });
+    moveChecked++;
+    if (blocked) {
+      moveBad++;
+      console.log(`FAIL ${st.name.padEnd(22)} resolve stopped the body in ${blocked}`);
+    }
+  }
+}
+console.log(`${moveChecked - moveBad} of ${moveChecked} stations let a body walk foot to tunnel to room to platform through resolve`);
+process.exit(pass === rows.length && roofed === 0 && kerbsOff === 0 && wallsBad === 0 && moveBad === 0 ? 0 : 1);
