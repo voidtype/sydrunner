@@ -1711,6 +1711,34 @@ export class StationBoxField {
     return null;
   }
 
+  /**
+   * The station **room** a point is inside in plan, or null -- the box named
+   * for the station itself, never its \` access\` or \` tunnel\`. For the drawing:
+   * the running lines' tunnel tubes are drawn straight through a bore station,
+   * so a player who had walked into the room was standing inside a track bore
+   * with the chamber invisible round them. The owner: *"it's just the current
+   * rail tube visible, i have to pass between rail tube walls and cant see
+   * anything. Ideally the station should open to a chamber"*. `rail-geo` asks
+   * this for every tube span and leaves out the ones inside a room.
+   */
+  roomAt(x: number, z: number): StationBox | null {
+    const list = this.cells.get(
+      StationBoxField.key(Math.floor(x / StationBoxField.CELL), Math.floor(z / StationBoxField.CELL)),
+    );
+    if (list === undefined) return null;
+    for (const box of list) {
+      if (box.name.endsWith(' access') || box.name.endsWith(' tunnel')) continue;
+      const dx = x - box.x;
+      const dz = z - box.z;
+      const along = dx * box.ux + dz * box.uz;
+      if (along < -box.halfLength || along > box.halfLength) continue;
+      const across = dx * -box.uz + dz * box.ux;
+      if (across < -box.halfWidth || across > box.halfWidth) continue;
+      return box;
+    }
+    return null;
+  }
+
   planFor(name: string): AccessPlan | null {
     for (let i = 0; i < this.mouths.length; i++) {
       if (this.mouths[i].name === name) return this.plans[i] ?? null;
@@ -4437,6 +4465,27 @@ export function verifyStationAccess(): string[] {
     // A zero-length trench cuts (almost) nothing.
     const none = trenchPlanes(plan, 0);
     if (insideCut(none, 100, 10.1, 203)) failures.push('a mouth with no open trench still cut the paving three metres in.');
+  }
+
+  // --- `roomAt` names the room and only the room: not its way in, not the
+  //     street beside it. What the tube writer relies on to open a station.
+  {
+    const st = like({ entranceX: 130, entranceZ: 30, entranceY: 22, name: 'Roomville' });
+    const field = buildStationBoxes({ stations: [st] } as unknown as RailBake);
+    const room = field.boxFor('Roomville');
+    const plan = field.planFor('Roomville');
+    if (room === null || plan === null) failures.push('the roomAt fixture built no room or no plan.');
+    else {
+      if (field.roomAt(room.x, room.z) !== room) failures.push('the centre of a room is not in it.');
+      const px = -room.uz, pz = room.ux;
+      if (field.roomAt(room.x + px * (room.halfWidth + 1), room.z + pz * (room.halfWidth + 1)) !== null) {
+        failures.push('a point a metre outside the room\'s wall is in the room.');
+      }
+      // The mouth is out on the street, and the tunnel's start is outside the room.
+      if (field.roomAt(plan.mouthX, plan.mouthZ) !== null) failures.push('the street mouth counts as inside the room.');
+      const mid = field.roomAt(plan.footX + plan.tunDirX * 1, plan.footZ + plan.tunDirZ * 1);
+      if (mid !== null && mid.name !== 'Roomville') failures.push('a point in the way in resolved to a box that is not the room.');
+    }
   }
 
   // --- The field's plans are addressable by name, which is what lets the

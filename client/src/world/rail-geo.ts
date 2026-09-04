@@ -143,6 +143,8 @@ export function setAccessWorld(world: AccessWorld): void {
 interface AccessSource {
   planFor(name: string): AccessPlan | null;
   boxFor(name: string): { x: number; z: number; ux: number; uz: number; halfLength: number; halfWidth: number; floorY: number; ceilY: number } | null;
+  /** The station room a point is inside in plan, or null. See `riding.StationBoxField.roomAt`. */
+  roomAt(x: number, z: number): { name: string } | null;
 }
 let accessPlans: AccessSource | null = null;
 export function setAccessPlans(field: AccessSource | null): void {
@@ -330,6 +332,7 @@ import {
 import { frameAt, offsetAt, railYAt, type PlatformSpine } from './platform-spine.ts';
 
 export { buildNetwork, type PlacedStation, type RailNetwork } from './rail-solids.ts';
+import { roomSideGap } from './rail-solids.ts';
 
 // --- Where the bake comes from ------------------------------------------------
 
@@ -1758,7 +1761,7 @@ export class RailWorld {
         // without knowing is built again. See `retryProvisional`.
         if (!Number.isFinite(depth) && !tunnel && !bridge) state.provisional = true;
         if (tunnel) {
-          writeTunnel(lining, s);
+          writeTunnel(lining, s, (x, z) => accessPlans?.roomAt(x, z) !== null);
         } else {
           writeBallast(ballast, s, bridge, floorAt);
           if ((s.flags & SPAN_ELECTRIFIED) !== 0) state.wireSpans++;
@@ -3109,24 +3112,53 @@ function entranceOpens(plans: readonly StationPlan[], x: number, z: number): boo
  * train is the tube and the portal transition, and that is the whole experience.
  * Nobody walks these.
  */
-function writeTunnel(s: Solid, seg: Segment): void {
+/** How finely a tube is cut when a station room is somewhere along it. */
+const TUNNEL_PIECE_M = 4;
+
+/**
+ * The running line's bore, as a tube -- **except inside a station room.**
+ *
+ * The tube used to run straight through every bore station, so a player who
+ * had come down the incline and through the tunnel was standing inside a
+ * track bore with the chamber invisible round them, and had to walk between
+ * tube walls to find a platform. The owner: *"it's just the current rail tube
+ * visible … Ideally the station should open to a chamber where i can walk to
+ * the right platform, rather than thru tube walls"*. So a segment with a room
+ * anywhere along it is cut into short pieces and the pieces inside the room
+ * are simply not drawn: the room's own lining is the chamber, and the bore
+ * begins again at its wall.
+ *
+ * Client-only, and safe to be: a tunnel segment registers no solids
+ * (`buildSegmentSolids`), so what is drawn here moves nobody.
+ */
+function writeTunnel(s: Solid, seg: Segment, insideRoom?: (x: number, z: number) => boolean): void {
   const px = -seg.uz;
   const pz = seg.ux;
   const ay = seg.ay + TUNNEL_RISE;
   const by = seg.by + TUNNEL_RISE;
-  for (let i = 0; i < TUNNEL_SIDES; i++) {
-    const t0 = (i / TUNNEL_SIDES) * Math.PI * 2;
-    const t1 = ((i + 1) / TUNNEL_SIDES) * Math.PI * 2;
-    const o0 = Math.cos(t0) * TUNNEL_RADIUS;
-    const y0 = Math.sin(t0) * TUNNEL_RADIUS;
-    const o1 = Math.cos(t1) * TUNNEL_RADIUS;
-    const y1 = Math.sin(t1) * TUNNEL_RADIUS;
-    s.quad(
-      seg.ax + px * o0, ay + y0, seg.az + pz * o0,
-      seg.bx + px * o0, by + y0, seg.bz + pz * o0,
-      seg.bx + px * o1, by + y1, seg.bz + pz * o1,
-      seg.ax + px * o1, ay + y1, seg.az + pz * o1,
-    );
+  const len = Math.hypot(seg.bx - seg.ax, seg.bz - seg.az);
+  const rooms = insideRoom !== undefined && (insideRoom(seg.ax, seg.az) || insideRoom(seg.bx, seg.bz) || insideRoom((seg.ax + seg.bx) / 2, (seg.az + seg.bz) / 2));
+  const pieces = rooms ? Math.max(1, Math.ceil(len / TUNNEL_PIECE_M)) : 1;
+  for (let k = 0; k < pieces; k++) {
+    const f0 = k / pieces;
+    const f1 = (k + 1) / pieces;
+    const x0 = seg.ax + (seg.bx - seg.ax) * f0, z0 = seg.az + (seg.bz - seg.az) * f0, ya = ay + (by - ay) * f0;
+    const x1 = seg.ax + (seg.bx - seg.ax) * f1, z1 = seg.az + (seg.bz - seg.az) * f1, yb = ay + (by - ay) * f1;
+    if (rooms && insideRoom!((x0 + x1) / 2, (z0 + z1) / 2)) continue;
+    for (let i = 0; i < TUNNEL_SIDES; i++) {
+      const t0 = (i / TUNNEL_SIDES) * Math.PI * 2;
+      const t1 = ((i + 1) / TUNNEL_SIDES) * Math.PI * 2;
+      const o0 = Math.cos(t0) * TUNNEL_RADIUS;
+      const y0 = Math.sin(t0) * TUNNEL_RADIUS;
+      const o1 = Math.cos(t1) * TUNNEL_RADIUS;
+      const y1 = Math.sin(t1) * TUNNEL_RADIUS;
+      s.quad(
+        x0 + px * o0, ya + y0, z0 + pz * o0,
+        x1 + px * o0, yb + y0, z1 + pz * o0,
+        x1 + px * o1, yb + y1, z1 + pz * o1,
+        x0 + px * o1, ya + y1, z0 + pz * o1,
+      );
+    }
   }
 }
 
@@ -4236,15 +4268,41 @@ function writeUndergroundStation(
   // Every face wound to point **away from the room**, because `lining` is
   // `BackSide` and a face whose normal points inward is simply not there when
   // you are standing in it. See `riding.windOutward`.
-  const roomInside: Vec3 = [station.x, (floor + roof) / 2, station.z];
+  // The point every face is wound away from is the **box's** centre. It was
+  // `station.x, station.z` -- the routed anchor, 59 m from Wynyard's room --
+  // which can lie outside the room entirely, and a face wound away from a
+  // point outside the room is wound into it: invisible from within.
+  const roomInside: Vec3 = [originX, (floor + roof) / 2, originZ];
   const shell = (a: Vec3, b: Vec3, c: Vec3, d: Vec3): void => {
     const [p, q, r, t] = windOutward(roomInside, a, b, c, d);
     lining.quad(...p, ...q, ...r, ...t);
   };
   shell(corner(-L, -W, floor), corner(L, -W, floor), corner(L, W, floor), corner(-L, W, floor));
   shell(corner(-L, -W, roof), corner(L, -W, roof), corner(L, W, roof), corner(-L, W, roof));
-  shell(corner(-L, -W, floor), corner(L, -W, floor), corner(L, -W, roof), corner(-L, -W, roof));
-  shell(corner(-L, W, floor), corner(L, W, floor), corner(L, W, roof), corner(-L, W, roof));
+  // The two side walls -- one of them with the doorway the tunnel comes
+  // through, the same opening `undergroundSolids` leaves in the collision,
+  // from the same `roomSideGap`. Until this the drawn wall was whole: from the
+  // tunnel it was invisible (a BackSide face seen from behind) and from the
+  // room it was solid, so a player walked in through a wall that then closed
+  // behind them. A header over the opening keeps it a doorway and not a slot.
+  const gapPlan = accessPlans?.planFor(station.name) ?? null;
+  const gap = gapPlan === null ? null : roomSideGap({ x: originX, z: originZ, ux, uz }, W, gapPlan);
+  const sideWall = (o: number, t0: number, t1: number, y0: number, y1: number): void => {
+    if (!(t1 - t0 > 1e-3) || !(y1 > y0)) return;
+    shell(corner(t0, o, y0), corner(t1, o, y0), corner(t1, o, y1), corner(t0, o, y1));
+  };
+  for (const side of [-1, 1]) {
+    const o = side * W;
+    if (gap === null || side !== gap.side) {
+      sideWall(o, -L, L, floor, roof);
+      continue;
+    }
+    const g0 = Math.max(-L, gap.gap0);
+    const g1 = Math.min(L, gap.gap1);
+    sideWall(o, -L, g0, floor, roof);
+    sideWall(o, g1, L, floor, roof);
+    sideWall(o, g0, g1, floor + ACCESS_HEIGHT_M, roof);
+  }
   shell(corner(-L, -W, floor), corner(-L, W, floor), corner(-L, W, roof), corner(-L, -W, roof));
   shell(corner(L, -W, floor), corner(L, W, floor), corner(L, W, roof), corner(L, -W, roof));
 
