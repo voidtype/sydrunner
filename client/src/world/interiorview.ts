@@ -60,6 +60,40 @@ import type { Placement } from './placeables.ts';
 /** How many planes the world's hole always has. See `InteriorView.setWorldHole`. */
 export const WORLD_HOLE_PLANES = 12;
 
+/**
+ * three's own clipping test, written out: under `clipIntersection` a fragment
+ * is cut when it is on the **negative** side of *every* plane in the group.
+ * `ClippingNode.setupDefault` ANDs `positionView.dot(plane.xyz) > plane.w`
+ * across the intersection planes, and `ClippingContext.projectPlanes` packs
+ * `xyz` **negated** with `w = constant` -- so that comparison is exactly
+ * `Plane.distanceToPoint(p) < 0`, and the AND is unanimity.
+ *
+ * Unanimity is the whole trap, and it cost a deploy. A plane every point is
+ * under (`fillerPlane`) always votes to cut, so inside a real cut it can only
+ * ever agree with the planes beside it -- which is what makes it safe filler
+ * for holding the plane count still. Twelve of them with no real plane to
+ * disagree is a unanimous vote to cut *the world*: black sky, no ground, the
+ * city gone, and the handful of unclipped things -- your own body, a
+ * nameplate, the road under your feet -- left floating in the dark. That is
+ * why `padWorld` fills with the opposite plane, and why the checks below are
+ * written against this function rather than against the plane count.
+ */
+export function worldCutsPoint(planes: ReadonlyArray<Plane>, p: Vector3): boolean {
+  if (planes.length === 0) return false;
+  for (const pl of planes) if (pl.distanceToPoint(p) >= 0) return false;
+  return true;
+}
+
+/** A plane every point is under: it votes to cut, so it never decides alone. */
+function fillerPlane(): Plane {
+  return new Plane(new Vector3(0, 1, 0), -1e9);
+}
+
+/** A plane every point is over: it votes to keep, and under an AND that decides. */
+function openPlane(): Plane {
+  return new Plane(new Vector3(0, 1, 0), 1e9);
+}
+
 export const INTERIOR_LAYER = 2;
 
 /**
@@ -107,7 +141,9 @@ export class InteriorView {
 
   /**
    * The world's clipping group, with nothing cut: twelve planes every point is
-   * under, `clipIntersection` on, enabled. **Never `enabled = false`.**
+   * **over**, `clipIntersection` on, enabled. **Never `enabled = false`,** and
+   * never `fillerPlane` twelve times -- see `worldCutsPoint` for why that
+   * second one cut the entire city and shipped.
    *
    * three keys every material's pipeline on the clipping context, and the key
    * is the plane count -- `ClippingContext.cacheKey` is
@@ -128,7 +164,7 @@ export class InteriorView {
     const world = this.world;
     if (world === null) return;
     const planes: Plane[] = [];
-    while (planes.length < WORLD_HOLE_PLANES) planes.push(new Plane(new Vector3(0, 1, 0), -1e9));
+    while (planes.length < WORLD_HOLE_PLANES) planes.push(openPlane());
     world.clippingPlanes = planes;
     world.clipIntersection = true;
     world.enabled = true;
@@ -155,11 +191,17 @@ export class InteriorView {
       this.padWorld();
       return;
     }
-    const planes: Plane[] = [];
     const shell = it.planes.slice(0, WORLD_HOLE_PLANES);
+    // A shell with no planes would leave twelve fillers voting as one to cut
+    // the world; there is nothing to cut here anyway.
+    if (shell.length === 0) {
+      this.padWorld();
+      return;
+    }
+    const planes: Plane[] = [];
     for (const pl of shell) planes.push(new Plane(new Vector3(-pl.nx, 0, -pl.nz), pl.d));
-    // The padding: a plane every point is under, so it never decides.
-    while (planes.length < WORLD_HOLE_PLANES) planes.push(new Plane(new Vector3(0, 1, 0), -1e9));
+    // The padding: a plane every point is under, so it only ever agrees.
+    while (planes.length < WORLD_HOLE_PLANES) planes.push(fillerPlane());
     world.clippingPlanes = planes;
     world.clipIntersection = true;
     world.enabled = true;
@@ -186,7 +228,7 @@ export class InteriorView {
     }
     const out: Plane[] = [];
     for (const p of planes.slice(0, WORLD_HOLE_PLANES)) out.push(new Plane(new Vector3(p.nx, p.ny, p.nz), p.constant));
-    while (out.length < WORLD_HOLE_PLANES) out.push(new Plane(new Vector3(0, 1, 0), -1e9));
+    while (out.length < WORLD_HOLE_PLANES) out.push(fillerPlane());
     world.clippingPlanes = out;
     world.clipIntersection = true;
     world.enabled = true;
@@ -469,35 +511,65 @@ export function verifyInteriorView(): string[] {
   const view = new InteriorView(new Scene(), world);
   const state = (): string => `${world.enabled ? 'on' : 'off'}/${world.clipIntersection ? 'inter' : 'union'}/${world.clippingPlanes.length}`;
   const want = `on/inter/${WORLD_HOLE_PLANES}`;
-  if (state() !== want) failures.push(`a fresh view leaves the world at ${state()}; ${want} holds the pipeline key still.`);
+  const cuts = (x: number, y: number, z: number): boolean => worldCutsPoint(world.clippingPlanes, new Vector3(x, y, z));
 
-  const cut = [
-    { nx: 1, ny: 0, nz: 0, constant: 5 },
-    { nx: -1, ny: 0, nz: 0, constant: 5 },
-    { nx: 0, ny: 0, nz: 1, constant: 5 },
-    { nx: 0, ny: 0, nz: -1, constant: 5 },
-    { nx: 0, ny: 1, nz: 0, constant: 5 },
-    { nx: 0, ny: -1, nz: 0, constant: 5 },
+  // Nothing is open, so nothing may be cut. Standing on a street, up a tower,
+  // down a shaft, out at Penrith: the city has to draw at every one of them.
+  // Twelve filler planes here read as a unanimous vote to cut the world, and
+  // that is what the owner saw -- "everything is kinda just floating", a black
+  // sky at 07:48 and no ground under Kent Street.
+  const anywhere: Array<[number, number, number]> = [
+    [0, 0, 0], [0, 1.68, 0], [-2249.8, 12, 4494.2], [0, 260, 0], [0, -30, 0], [30000, 4, -30000],
   ];
-  view.setWorldCut(cut);
-  if (state() !== want) failures.push(`a station cut leaves the world at ${state()}.`);
-  if (world.clippingPlanes[0].normal.x !== 1 || world.clippingPlanes[0].constant !== 5) {
-    failures.push('the station cut did not land on the group.');
-  }
-  view.setWorldCut(null);
-  if (state() !== want) failures.push(`closing the station cut leaves the world at ${state()}; this is the 13-second frame.`);
-  view.setWorldCut([]);
-  if (state() !== want) failures.push(`an empty cut leaves the world at ${state()}.`);
-  view.setWorldHole(null);
-  if (state() !== want) failures.push(`closing a hole with none open leaves the world at ${state()}.`);
-
-  // A padding plane never decides under intersection: every point is on its
-  // clipped side, so it can only agree with the others.
-  for (const pl of world.clippingPlanes) {
-    if (!(pl.distanceToPoint(new Vector3(0, 1e6, 0)) < 0)) {
-      failures.push('a padding plane has a point on its kept side; it would clip on its own.');
+  for (const [x, y, z] of anywhere) {
+    if (cuts(x, y, z)) {
+      failures.push(`with nothing open the world is cut at (${x}, ${y}, ${z}); this is the black sky and the missing ground.`);
       break;
     }
   }
+  if (state() !== want) failures.push(`a fresh view leaves the world at ${state()}; ${want} holds the pipeline key still.`);
+
+  // A real cut, in `riding.trenchPlanes`' convention: normals point out of the
+  // box, so every point inside is on the negative side of all six.
+  const cut = [
+    { nx: 1, ny: 0, nz: 0, constant: -5 },
+    { nx: -1, ny: 0, nz: 0, constant: -5 },
+    { nx: 0, ny: 0, nz: 1, constant: -5 },
+    { nx: 0, ny: 0, nz: -1, constant: -5 },
+    { nx: 0, ny: 1, nz: 0, constant: -5 },
+    { nx: 0, ny: -1, nz: 0, constant: -5 },
+  ];
+  view.setWorldCut(cut);
+  if (state() !== want) failures.push(`a station cut leaves the world at ${state()}.`);
+  if (!cuts(0, 0, 0)) failures.push('the station cut does not cut its own middle; the paving would close over the mouth.');
+  if (cuts(20, 0, 0) || cuts(0, 0, 20) || cuts(0, 20, 0)) {
+    failures.push('the station cut reaches past its own box; it would take the street with it.');
+  }
+  if (cuts(5.5, 0, 0)) failures.push('the station cut is wider than its planes.');
+
+  view.setWorldCut(null);
+  if (state() !== want) failures.push(`closing the station cut leaves the world at ${state()}; this is the 13-second frame.`);
+  if (cuts(0, 0, 0)) failures.push('closing the station cut left the world cut.');
+  view.setWorldCut([]);
+  if (state() !== want) failures.push(`an empty cut leaves the world at ${state()}.`);
+  if (cuts(0, 0, 0)) failures.push('an empty cut cuts everything.');
+  view.setWorldHole(null);
+  if (state() !== want) failures.push(`closing a hole with none open leaves the world at ${state()}.`);
+  if (cuts(0, 0, 0)) failures.push('closing a hole with none open cuts everything.');
+
+  // A building shell: `setWorldHole` turns the outward normals it is handed
+  // inward, so the cut is the inside of the footprint, and it must survive
+  // being padded out to twelve.
+  const shell = { planes: [
+    { nx: -1, nz: 0, d: -5 }, { nx: 1, nz: 0, d: -5 },
+    { nx: 0, nz: -1, d: -5 }, { nx: 0, nz: 1, d: -5 },
+  ] } as unknown as Interior;
+  view.setWorldHole(shell);
+  if (state() !== want) failures.push(`a building hole leaves the world at ${state()}.`);
+  if (!cuts(0, 3, 0)) failures.push('a building hole does not cut inside the footprint; the terrain stays in the room.');
+  if (cuts(40, 3, 0)) failures.push('a building hole cuts outside the footprint; the view through a window would go.');
+  view.setWorldHole({ planes: [] } as unknown as Interior);
+  if (cuts(0, 0, 0)) failures.push('a shell with no planes cut the world.');
+
   return failures;
 }
