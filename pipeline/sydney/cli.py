@@ -1112,6 +1112,17 @@ def _report_landmarks(marks: list, terrain) -> None:
                 f"      base {a['base_y'] - sea:.1f} m AHD, spire {a['height_m']:.0f} m above it"
                 f" ({a['spire_y'] - sea:.1f} m AHD), {int(a['cables'])} cables"
             )
+        elif lm.name == "luna_park":
+            # The pad spread is here because it is the number that decides
+            # whether the entrance still looks like a pair: it is how much
+            # ground the DEM puts between the two towers, and the model buries
+            # it. Watch it after any terrain change.
+            print(
+                f"      entrance pad {a['base_y'] - sea:.1f} m AHD, towers"
+                f" {a['tower_height_m']:.0f} m, face {a['face_width_m']:.0f} m wide at"
+                f" {a['face_centre_y'] - sea:.1f} m AHD, wheel {a['wheel_height_m']:.0f} m,"
+                f" pad spread under the entrance {a['pad_spread_m']:.1f} m"
+            )
 
 
 def _report_decks(net: decks.DeckNetwork) -> None:
@@ -3987,7 +3998,7 @@ def _mesh_grade_report(keys, args, field=None) -> None:
 
 # --- landmark-audit ------------------------------------------------------------
 #
-# The three hero landmarks are the one part of this world that is *authored*
+# The four hero landmarks are the one part of this world that is *authored*
 # rather than derived, and that changes what an audit of them is for. Everything
 # else the pipeline emits can be checked against its source -- a footprint is
 # right if it matches OSM, a road grade is right if it matches the DEM. A
@@ -4009,6 +4020,11 @@ LANDMARK_TRUTH: dict[str, dict[str, float]] = {
     "harbour_bridge": {"deck_ahd": 49.0, "arch_apex_ahd": 134.0, "pylon_ahd": 89.0},
     "opera_house": {"shell_max_ahd": 67.0},
     "sydney_tower": {"spire_height": 309.0},
+    # Luna Park's figures are heights **above its own entrance pad** rather than
+    # AHD, for the reason `landmarks.py` sets out at length: the park is flat and
+    # the DEM under it is a cliff, so an AHD figure here would be quoting the
+    # model against a hillside that is not there.
+    "luna_park": {"tower_height": 26.0},
 }
 
 # How far the shipped geometry may sit from the OSM feature it is registered to.
@@ -4031,7 +4047,7 @@ def _landmark_nodes(path: Path) -> dict:
     left every landmark sitting on Town Hall.
 
     Through `meshpack.read_glb` like every other GLB this pipeline reads back.
-    `write_landmarks` does *not* pack -- three hero models are 300 kB and the
+    `write_landmarks` does *not* pack -- four hero models are 400 kB and the
     file is fetched once and never evicted, so there is nothing here worth the
     quantisation error -- and this audit went on passing through the pack round
     for exactly that reason. Sharing the reader anyway is what stops that being
@@ -4257,7 +4273,7 @@ def cmd_landmark_audit(args: argparse.Namespace) -> int:
 
     # --- 1. Presence.
     print("\npresence")
-    for name in ("harbour_bridge", "opera_house", "sydney_tower"):
+    for name in ("harbour_bridge", "opera_house", "sydney_tower", "luna_park"):
         ok = name in nodes and name in items
         print(f"  {name:16} {'present' if ok else 'MISSING'}")
         if not ok:
@@ -4278,12 +4294,21 @@ def cmd_landmark_audit(args: argparse.Namespace) -> int:
         "harbour_bridge": (None, "arch crown"),
         "opera_house": ({"landmark_granite"}, "podium deck"),
         "sydney_tower": (None, "spire tip"),
+        # The two entrance towers' finials, found by their gold: it is the only
+        # gold in the park, so the band picks up exactly two objects 13 m apart
+        # whose midpoint is the anchor. A probe on "the highest thing" would land
+        # on the Ferris Wheel, which is nine metres taller than the towers, and
+        # one on the highest cream thing would land on Coney Island's roof.
+        "luna_park": ({"landmark_gold"}, "tower finials"),
     }
     for name, (mats, what) in probes.items():
         if name not in nodes:
             continue
         parts = nodes[name]["parts"]
-        if name == "opera_house":
+        if name == "luna_park":
+            top = items[name]["audit"]["tower_top_y"]
+            x, z, n = _plan_anchor(parts, top - 3.0, top + 0.5, mats)
+        elif name == "opera_house":
             # The podium deck, by area rather than by vertex: this outline's
             # vertices are four times denser at the harbour end than at the
             # forecourt, and a mean of them lands 25 m out to sea.
@@ -4319,6 +4344,7 @@ def cmd_landmark_audit(args: argparse.Namespace) -> int:
             ("harbour_bridge", "bridge_deck"),
             ("opera_house", "opera"),
             ("sydney_tower", "tower"),
+            ("luna_park", "luna_gate_roof"),
         )
         for name, key in pairs:
             if name not in measured:
@@ -4362,6 +4388,11 @@ def cmd_landmark_audit(args: argparse.Namespace) -> int:
         base = items["sydney_tower"]["audit"]["base_y"]
         check("sydney tower spire", _max_y(parts) - base,
               LANDMARK_TRUTH["sydney_tower"]["spire_height"], unit="m AGL")
+    if "luna_park" in nodes:
+        parts = nodes["luna_park"]["parts"]
+        base = items["luna_park"]["audit"]["base_y"]
+        check("luna park entrance towers", _max_y(parts, {"landmark_gold"}) - base,
+              LANDMARK_TRUTH["luna_park"]["tower_height"], unit="m AGL")
 
     # --- 4. The deck, and whether a player can walk it.
     print("\nwalkable deck (collision prisms, projected onto the bridge axis)")

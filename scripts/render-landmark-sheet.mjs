@@ -54,6 +54,7 @@ const TONES = {
   landmark_glass: [0.08, 0.085, 0.095],
   landmark_gold: [0.700, 0.478, 0.150],
   landmark_asphalt: [0.052, 0.055, 0.058],
+  landmark_paint_white: [0.86, 0.84, 0.78],
   landmark_paint_red: [0.62, 0.08, 0.06],
   landmark_paint_yellow: [0.85, 0.62, 0.08],
   landmark_paint_blue: [0.08, 0.18, 0.55],

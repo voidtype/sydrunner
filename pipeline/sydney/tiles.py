@@ -397,7 +397,7 @@ def write_glb(
 
 
 def write_landmarks(path: Path, marks: list) -> dict:
-    """`world/landmarks.glb`: the three hero landmarks, one node each.
+    """`world/landmarks.glb`: the four hero landmarks, one node each.
 
     A single file for the whole world, loaded once beside `far.bin` and never
     evicted, and it belongs to no tile for a reason that is not the far layer's.
@@ -418,7 +418,7 @@ def write_landmarks(path: Path, marks: list) -> dict:
 
     Materials are `landmarks.LANDMARK_MATERIALS`, named in the file, and **not**
     `mesh.MATERIALS` -- see that module's header for why the landmark set has its
-    own namespace rather than five appended slots.
+    own namespace rather than ten appended slots.
     """
     from . import landmarks as lm
 
