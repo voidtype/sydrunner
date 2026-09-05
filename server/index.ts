@@ -189,6 +189,7 @@ import { verifySpaces } from '../client/src/net/spaces.ts';
 import { verifyCrash } from '../client/src/crash.ts';
 import { verifyStationWalls } from '../client/src/world/rail-solids.ts';
 import { verifyStationLamps } from '../client/src/world/stationlamps.ts';
+import { verifyTill } from '../client/src/game/till.ts';
 import { verifyDeviceLost } from '../client/src/devicelost.ts';
 // --- Workstream E. Three self-checks, all three of them shared modules being
 // run in the second runtime -- which is the premise this whole block exists to
@@ -514,6 +515,7 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // prism `stationSolids` emits, so the doorway has to be right here too.
     ['verifyStationWalls', verifyStationWalls()],
     ['verifyStationLamps', verifyStationLamps()],
+    ['verifyTill', verifyTill()],
     ['verifyDeviceLost', verifyDeviceLost()],
     // --- WORKSTREAM V. `verifyTeams` is the contract's own and is here for a
     // reason the rest of this list does not have: it is a **spelling** check.
@@ -2090,6 +2092,14 @@ const server = Bun.serve<Conn>({
             // success already has one: the `WALLET` frame the credit produces
             // carries "+$100 centrelink" and arrives on the next tick. Two
             // messages for one event would be the pill saying it twice.
+            if (refusal !== '' && p.walletNote === '') p.walletNote = refusal;
+            if (refusal !== '') p.walletVersion++;
+            return;
+          }
+          if (req.op === PHONE_OP.TOPUP) {
+            // `CLAIM`'s arrangement above, for `CLAIM`'s reasons: a refusal is
+            // a sentence and a success is the `WALLET` frame's own note.
+            const refusal = room.sim.topUp(p.id, req.packIndex);
             if (refusal !== '' && p.walletNote === '') p.walletNote = refusal;
             if (refusal !== '') p.walletVersion++;
             return;

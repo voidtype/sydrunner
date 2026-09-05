@@ -147,6 +147,7 @@ import { liftFloors, LIFT_DOORS_MS, liftFloorY, liftMoving, liftTarget, liftDura
   type InteriorDoor,
 } from './world/interior.ts';
 import { INTERIOR_LAYER, InteriorView, verifyInteriorView } from './world/interiorview.ts';
+import { verifyTill } from './game/till.ts';
 import { lostMessage, lostPlan, verifyDeviceLost } from './devicelost.ts';
 import { verifyIndexDom } from './domcheck.ts';
 import { LiftPanel } from './liftpanel.ts';
@@ -1175,6 +1176,7 @@ async function main(): Promise<void> {
   // `phone.ts`.
   const cashFailures = timed('cash', verifyCash);
   const phoneFailures = timed('phone', verifyPhone);
+  const tillFailures = timed('till', verifyTill);
   // And the water, in two halves that fail in two different silent ways. A
   // sidecar decoded a word out of step is triangles at plausible coordinates and
   // impossible depths; a wading rule whose tile keying disagrees with the
@@ -1769,7 +1771,8 @@ async function main(): Promise<void> {
     changelogFailures.length ||
     bugFailures.length ||
     cashFailures.length ||
-    phoneFailures.length
+    phoneFailures.length ||
+    tillFailures.length
   ) {
     hud.fatal(
       'Self-checks failed:\n' +
@@ -1865,6 +1868,7 @@ async function main(): Promise<void> {
           ...buildSheetFailures,
           ...cashFailures,
           ...phoneFailures,
+          ...tillFailures,
           ...changelogFailures,
           ...bugFailures,
         ]

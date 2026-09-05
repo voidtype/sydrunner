@@ -357,6 +357,7 @@ import {
   type CentrelinkOffice,
   type WalletRecord,
 } from '../client/src/game/cash.ts';
+import { TILL_COOLDOWN_MS, packAt, receiptFor } from '../client/src/game/till.ts';
 // --- Workstream I: what a knocked-over NPC is worth, and how fast. One import,
 // one field on the participant, and one call from `hitNpc`. The table, the rate
 // bank and the note's design are all in the three-free module so
@@ -715,6 +716,12 @@ export interface Participant {
   walletNote: string;
   /** The rideshare shift and whatever fare is running on it. See `server/fares.ts`. */
   fare: FareJob;
+  /**
+   * When this player last bought a pack at the till, or 0. Session-only and
+   * deliberately not on the wallet record: it guards a button against being
+   * held down, which is a fact about this connection and not about the money.
+   */
+  lastTillMs: number;
 
   // --- Accounts. See `client/src/net/accounts.ts`.
   /**
@@ -1400,6 +1407,21 @@ export class Simulation {
      */
     debit: (playerId: number, amount: number, why: string): number =>
       this.moveWallet(playerId, -Math.abs(Math.trunc(amount)), why),
+    /**
+     * Pay a player money they did **not** earn: the till, and nothing else yet.
+     *
+     * The whole difference from `credit` is that this does not signal an
+     * `earn` step, and it is worth its own door rather than a boolean at every
+     * call site because the rule it enforces is a design rule, not a
+     * plumbing one. `game/till.ts` says money never buys damage, speed or
+     * reach; a quest that asks you to earn $500 is exactly that kind of
+     * progress, and five real dollars must not complete it. Everything else
+     * about the credit -- the cap, the note, the save-progress prompt, the
+     * dirty flag -- is identical, because those are all true of money however
+     * it arrived.
+     */
+    grant: (playerId: number, amount: number, why: string): number =>
+      this.moveWallet(playerId, Math.abs(Math.trunc(amount)), why, false),
     /** What this player has, or 0 for a bot and for an id that has left. */
     balanceOf: (playerId: number): number =>
       this.participants.get(playerId)?.wallet?.balance ?? 0,
@@ -1880,6 +1902,7 @@ export class Simulation {
       walletVersion: 1,
       walletNote: '',
       fare: createFare(),
+      lastTillMs: 0,
       account: bot === null ? account : null,
       accountId: bot === null && account !== null ? account.id : null,
       // The ladder, off the record if there is one. A guest and a bot are both
@@ -2771,7 +2794,7 @@ export class Simulation {
    * a departed id and a host with no store all fall out of the same null test,
    * and all three return 0 -- which is the honest answer to "how much moved".
    */
-  private moveWallet(playerId: number, delta: number, why: string): number {
+  private moveWallet(playerId: number, delta: number, why: string, earned = true): number {
     const p = this.participants.get(playerId);
     if (!p || p.wallet === null) return 0;
     const moved = moveBalance(p.wallet, delta);
@@ -2782,7 +2805,7 @@ export class Simulation {
     // only: a step that asks a player to earn $60 is not un-earned by them
     // spending it, and a debit that counted would make the step unreachable
     // for anybody who buys anything.
-    if (moved > 0) this.quests?.signal(playerId, 'earn', why, moved);
+    if (moved > 0 && earned) this.quests?.signal(playerId, 'earn', why, moved);
     this.wallets?.markDirty();
     p.walletVersion++;
     p.walletNote = `${moved > 0 ? '+' : '-'}${formatMoney(Math.abs(moved))} ${why}`.slice(0, 40);
@@ -3740,6 +3763,43 @@ export class Simulation {
       if (dx * dx + dz * dz > CENTRELINK_NEARBY_M * CENTRELINK_NEARBY_M) continue;
       this.wallet.credit(other.id, cut, 'centrelink');
     }
+    return '';
+  }
+
+  /**
+   * `PHONE_OP.TOPUP`: sell this player a pack of game money for pretend
+   * Australian dollars.
+   *
+   * **The catalogue is the server's.** The client sends an index and nothing
+   * else -- no amount, no price -- so the only thing a hostile client can do
+   * here is buy a pack that exists, which is what the button does anyway. An
+   * index off the end is refused rather than clamped, because clamping would
+   * sell somebody the dearest pack for asking a question.
+   *
+   * **No money moves.** This is the dummy till `game/till.ts`'s header
+   * describes: the receipt says `(test)` and the only thing that happens is a
+   * credit. When there is a real processor, the shape that survives is this
+   * one, and the single change is that the *authority* for "this order is
+   * paid" moves from the client's tap to a webhook -- at which point this
+   * method takes an order id instead of an index and everything below the
+   * first two lines is unchanged.
+   *
+   * Returns a sentence for the player on refusal and `''` on success, on
+   * `claim`'s rule exactly: the success already has a sentence, and it is the
+   * `WALLET` frame's own note arriving on the next tick.
+   */
+  topUp(playerId: number, packIndex: number): string {
+    const p = this.participants.get(playerId);
+    if (!p || p.wallet === null) return 'no wallet on this host';
+    const pack = packAt(packIndex);
+    if (pack === null) return 'that pack is not for sale';
+    const now = Date.now();
+    // The cooldown is against a held button and a script, not against spending
+    // -- `game/till.TILL_COOLDOWN_MS` argues why a cap here would be theatre.
+    const since = now - p.lastTillMs;
+    if (p.lastTillMs !== 0 && since < TILL_COOLDOWN_MS) return 'one at a time';
+    p.lastTillMs = now;
+    this.wallet.grant(playerId, pack.dollars, receiptFor(pack));
     return '';
   }
 

@@ -413,6 +413,10 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
     position: () => deps.position(),
     online: () => online,
     claim: (officeId) => deps.net()?.claimCentrelink(officeId),
+    // The till. `claim`'s shape: the phone names a row and the server decides.
+    // Offline there is no server to ask, so the phone says so rather than
+    // drawing a shop that cannot sell anything.
+    topUp: (packIndex) => deps.net()?.topUp(packIndex) ?? false,
     gallery,
     shoot: () => {
       void takePhoto();

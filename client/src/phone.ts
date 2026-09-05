@@ -62,6 +62,7 @@ import {
   nearestOffices,
   type CentrelinkOffice,
 } from './game/cash.ts';
+import { AUD_TO_GAME, PACKS, formatAud, packAt } from './game/till.ts';
 import { GALLERY_MAX, type Gallery, verifyPhoneModel } from './game/phone.ts';
 import type { FareFrame, WalletFrame } from './net/cash.ts';
 
@@ -98,6 +99,15 @@ export interface PhoneSource {
   online(): boolean;
   /** Ask the server for a Centrelink payment at this office. */
   claim(officeId: string): void;
+  /**
+   * Buy a pack at the till, by its index in `game/till.PACKS`. Returns false
+   * when there is no server to ask.
+   *
+   * Optional, on `openTalents`' reasons exactly: a `PhoneSource` is also built
+   * by the checks and by `?offline`, and a shop with nobody behind the counter
+   * should say so rather than throw.
+   */
+  topUp?(packIndex: number): boolean;
   /** Clock on or off. */
   setOnline(on: boolean): void;
   /**
@@ -182,7 +192,7 @@ export interface PhoneSource {
 
 // --- The overlay -------------------------------------------------------------------
 
-type AppId = 'wallet' | 'centrelink' | 'sydride' | 'map' | 'camera' | 'gallery' | 'talents' | 'obligations';
+type AppId = 'wallet' | 'centrelink' | 'sydride' | 'map' | 'camera' | 'gallery' | 'talents' | 'obligations' | 'till';
 
 interface AppDef {
   id: AppId;
@@ -245,6 +255,21 @@ const APPS: readonly AppDef[] = [
   // captions are written around that word. Renaming the key would rename the
   // joke; renaming the label is what was asked for.
   { id: 'obligations', glyph: '!', label: 'QuestBuddy' },
+  /**
+   * The till. **A screen, not a shortcut**, on QuestBuddy's rule: six rows and
+   * a note is a 300 px screen with room to spare.
+   *
+   * Ninth, which finally makes the grid three rows of three -- the seventh
+   * tile's note apologised for breaking that and the eighth's claimed to have
+   * fixed it while leaving a row of two. This is the one that actually does.
+   *
+   * A tile rather than a button inside the wallet, which is the other obvious
+   * place for it. The wallet is where you look at money you have; this is
+   * where you get more, and a shop hidden one level inside another app is a
+   * shop nobody finds. It is also the door a payment processor will one day be
+   * behind, and that door should be somewhere a player can point at.
+   */
+  { id: 'till', glyph: '+', label: 'top up' },
 ];
 
 /** How long the viewfinder flashes white after the shutter, milliseconds. */
@@ -582,6 +607,31 @@ export class Phone {
         }
         break;
 
+      case 'till': {
+        this.title.textContent = 'top up';
+        // Said first and said plainly. A shop screen that buried this at the
+        // bottom would be a shop screen that was lying for the length of a
+        // scroll -- see `game/till.ts`'s header on why there is no card form
+        // here and never will be.
+        rows.push(
+          '<div class="phone-note"><b>test till.</b> no money moves and nothing is charged. ' +
+            'it is here so the shop can be walked through before it is real.</div>',
+        );
+        rows.push(
+          `<div class="phone-note">${escape(formatAud(100))} buys ${escape(formatMoney(AUD_TO_GAME))}. bigger packs pay better.</div>`,
+        );
+        for (let i = 0; i < PACKS.length; i++) {
+          const pack = PACKS[i];
+          rows.push(
+            `<button class="phone-act" data-act="buy" data-id="${i}">` +
+              `${escape(pack.name)} · ${escape(formatAud(pack.cents))} → ${escape(formatMoney(pack.dollars))}` +
+              `</button>`,
+          );
+          rows.push(`<div class="phone-note">${escape(pack.blurb)}</div>`);
+        }
+        break;
+      }
+
       case 'obligations':
         this.title.textContent = 'QuestBuddy';
         rows.push(
@@ -690,6 +740,18 @@ export class Phone {
         this.drawn = '';
         this.draw();
         break;
+
+      case 'buy': {
+        // The phone says nothing about the amount. What lands is the `WALLET`
+        // frame's own note -- "+$110,000 slab (test)" -- on the same pill every
+        // other movement of money uses, which is what makes a purchase look
+        // like a fare rather than like a different kind of event.
+        const pack = packAt(id);
+        if (pack === null) return;
+        const sent = this.source.topUp?.(id) ?? false;
+        if (!sent) this.source.notice('the till is shut — you are not connected to a server.');
+        break;
+      }
 
       case 'open':
         this.viewing = id;

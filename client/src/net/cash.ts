@@ -90,6 +90,21 @@ export const PHONE_OP = {
   CLAIM: 0,
   ONLINE: 1,
   OFFLINE: 2,
+  /**
+   * `TOPUP` names a row of `game/till.PACKS` by **index** and asks to be
+   * credited. It is `CLAIM`'s shape exactly, and deliberately so: the client
+   * names a thing in a table both ends compile in, and the server decides
+   * whether it happens. What the client may not do is name an *amount* --
+   * there is no dollar figure on this wire in either direction, because a
+   * message that carried one would be a client telling the server how rich it
+   * is, and no amount of validation downstream makes that a good sentence to
+   * have in the protocol.
+   *
+   * The index rather than the id, on `TEAM_OP`'s argument: a byte against a
+   * string, on a message a player can send by tapping a button. `PACKS` is
+   * append-only for this reason and its header says so.
+   */
+  TOPUP: 3,
 } as const;
 
 /** An office id is `clNNN` today; the cap is generous and bounded. */
@@ -99,6 +114,8 @@ export interface PhoneRequest {
   op: number;
   /** `CLAIM` only. Empty for the others. */
   officeId: string;
+  /** `TOPUP` only: an index into `game/till.PACKS`. 0 for the others. */
+  packIndex: number;
 }
 
 /**
@@ -107,12 +124,14 @@ export interface PhoneRequest {
  *     u8   type = MSG.PHONE
  *     u8   op          PHONE_OP.*
  *     -- CLAIM: u8 office id length, then the id, ASCII
+ *     -- TOPUP: u8 pack index
  *     -- ONLINE / OFFLINE: nothing more
  */
-export function encodePhone(type: number, op: number, officeId = ''): ArrayBuffer {
+export function encodePhone(type: number, op: number, officeId = '', packIndex = 0): ArrayBuffer {
   const id = ENC.encode(officeId).subarray(0, MAX_OFFICE_ID_BYTES);
   const wantsId = op === PHONE_OP.CLAIM;
-  const buffer = new ArrayBuffer(2 + (wantsId ? 1 + id.length : 0));
+  const wantsPack = op === PHONE_OP.TOPUP;
+  const buffer = new ArrayBuffer(2 + (wantsId ? 1 + id.length : 0) + (wantsPack ? 1 : 0));
   const v = new DataView(buffer);
   v.setUint8(0, type);
   v.setUint8(1, op);
@@ -120,6 +139,9 @@ export function encodePhone(type: number, op: number, officeId = ''): ArrayBuffe
     v.setUint8(2, id.length);
     new Uint8Array(buffer, 3).set(id);
   }
+  // Clamped rather than trusted: an index is a byte and a byte is what fits.
+  // The server resolves it against the table anyway and refuses what does not.
+  if (wantsPack) v.setUint8(2, Math.max(0, Math.min(255, Math.trunc(packIndex))));
   return buffer;
 }
 
@@ -135,11 +157,15 @@ export function decodePhone(buffer: ArrayBuffer, type: number): PhoneRequest | n
   const v = new DataView(buffer);
   if (v.getUint8(0) !== type) return null;
   const op = v.getUint8(1);
-  if (op === PHONE_OP.ONLINE || op === PHONE_OP.OFFLINE) return { op, officeId: '' };
+  if (op === PHONE_OP.ONLINE || op === PHONE_OP.OFFLINE) return { op, officeId: '', packIndex: 0 };
+  if (op === PHONE_OP.TOPUP) {
+    if (buffer.byteLength < 3) return null;
+    return { op, officeId: '', packIndex: v.getUint8(2) };
+  }
   if (op !== PHONE_OP.CLAIM) return null;
   if (buffer.byteLength < 3) return null;
   const n = Math.min(v.getUint8(2), MAX_OFFICE_ID_BYTES, buffer.byteLength - 3);
-  return { op, officeId: n > 0 ? DEC.decode(new Uint8Array(buffer, 3, n)) : '' };
+  return { op, officeId: n > 0 ? DEC.decode(new Uint8Array(buffer, 3, n)) : '', packIndex: 0 };
 }
 
 // --- The wallet, coming down ----------------------------------------------------
@@ -404,6 +430,17 @@ export function verifyCashWire(): string[] {
     const claim = decodePhone(encodePhone(PHONE, PHONE_OP.CLAIM, 'cl017'), PHONE);
     if (!claim || claim.op !== PHONE_OP.CLAIM || claim.officeId !== 'cl017') {
       failures.push(`A CLAIM round-tripped to ${JSON.stringify(claim)}.`);
+    }
+    for (const index of [0, 5, 255]) {
+      const top = decodePhone(encodePhone(PHONE, PHONE_OP.TOPUP, '', index), PHONE);
+      if (!top || top.op !== PHONE_OP.TOPUP || top.packIndex !== index) {
+        failures.push(`a top-up for pack ${index} did not survive the wire.`);
+      }
+    }
+    // A `TOPUP` with the index byte missing is a short frame, not a purchase
+    // of pack 0. The server would otherwise credit somebody for a truncation.
+    if (decodePhone(new Uint8Array([PHONE, PHONE_OP.TOPUP]).buffer, PHONE) !== null) {
+      failures.push('a top-up with no pack byte decoded; a short frame must not buy anything.');
     }
     for (const op of [PHONE_OP.ONLINE, PHONE_OP.OFFLINE]) {
       const got = decodePhone(encodePhone(PHONE, op), PHONE);

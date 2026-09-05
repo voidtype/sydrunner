@@ -812,7 +812,7 @@ export const MSG = {
  * reason six branches merged without two of them decoding each other's frames:
  *
  *     0x0d SUN_PRESS   the button in Sydney Park          (client -> server)
- *     0x0e PHONE       claim / clock on / clock off       (client -> server)
+ *     0x0e PHONE       claim / clock on/off / top up       (client -> server)
  *     0x8e SUN         the screaming face's two instants
  *     0x8f WALLET      the balance, the claim timer, the cash on the ground
  *     0x90 FARE        the rideshare job's state
@@ -1029,7 +1029,7 @@ export const MSG = {
  * the walls this server does. Two ends on different versions of a shared
  * computation is the failure the version exists to refuse.
  */
-export const PROTOCOL_VERSION = 31;
+export const PROTOCOL_VERSION = 32;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;

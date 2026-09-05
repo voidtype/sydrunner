@@ -1574,6 +1574,20 @@ export class NetClient {
     return true;
   }
 
+  /**
+   * Buy a pack at the till. The index names a row of `game/till.PACKS`; the
+   * server owns the price and the amount, and this carries neither.
+   *
+   * Returns false offline, which the phone draws as the screen being shut
+   * rather than as a failed purchase -- there is no such thing here as a
+   * purchase that half happened, because the only record of one is the credit.
+   */
+  topUp(packIndex: number): boolean {
+    if (this.status !== 'online') return false;
+    this.transport.send(encodePhone(MSG.PHONE, PHONE_OP.TOPUP, '', packIndex));
+    return true;
+  }
+
   /** Clock on or off the rideshare shift. Idempotent; see `net/cash.PHONE_OP`. */
   setRideshareOnline(online: boolean): boolean {
     if (this.status !== 'online') return false;
