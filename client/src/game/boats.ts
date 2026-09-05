@@ -56,6 +56,20 @@
  * Drummoyne, Manly to Watsons Bay across the Heads, Neutral Bay to
  * Kirribilli. A rider is part of the mesh; an empty jetski at thirty knots is
  * a ghost story.
+ *
+ * ---------------------------------------------------------------------------
+ * AND WHAT SHAPE EACH ONE IS, WHICH IS HERE AND NOT IN THE FILE THAT DRAWS IT.
+ *
+ * `BOAT_SIZE`, `BOAT_WINDOW_ROWS` and `navLamps` are three tables of the same
+ * fact -- how long a Freshwater is, where its window bands are, where its
+ * sidelights hang -- and they are in this three-free file rather than beside the
+ * boxes in `world/boats.ts` because **two** readers need them now. The hulls are
+ * built from them, and so are the navigation lights in `world/nightlights.
+ * BoatLights`, and the owner's *"boats also need lights at nigth"* is only
+ * answered if the green light is on the same starboard bridge wing the cream
+ * superstructure is. Two copies of a hull's beam is how a lamp ends up hanging
+ * two metres off the side of the boat it belongs to, at night, over water, where
+ * nothing else in the frame gives the eye a scale to notice it by.
  */
 import { BOAT_ROUTES, WHARVES, SEA_Y, type BoatRoute } from './boatroutes.ts';
 
@@ -72,6 +86,165 @@ export function kindForRoute(id: string): BoatKind {
 
 /** Metres per second, by kind. Sydney's: 20 knots, 16 knots, 18 knots. */
 export const SPEED: Readonly<Record<BoatKind, number>> = { 0: 10.3, 1: 8.2, 2: 9.3, 3: 0, 4: 15.4 };
+
+/**
+ * How big each hull is, and how high the highest thing on it stands.
+ *
+ * `length` and `beam` are the numbers `world/boats.ts` builds every box of a
+ * hull from -- its `L` and `W` -- and `mastY` is the top of the funnel, the
+ * wheelhouse or the handlebar post, measured off the waterline. The Freshwater's
+ * 70 by 12.6 is the real ship's; the rest are the Emerald class, the RiverCat, a
+ * 4.5 m runabout and a two-seat ski.
+ */
+export const BOAT_SIZE: Readonly<Record<BoatKind, { length: number; beam: number; mastY: number }>> = {
+  0: { length: 70, beam: 12.6, mastY: 10.65 },
+  1: { length: 35, beam: 9, mastY: 5.65 },
+  2: { length: 35, beam: 10, mastY: 5.15 },
+  3: { length: 4.5, beam: 1.8, mastY: 0.9 },
+  4: { length: 2.9, beam: 1.12, mastY: 0.96 },
+};
+
+/** One band of saloon windows: its middle, its height off the waterline, and its extent. */
+export interface WindowRow {
+  x: number;
+  y: number;
+  length: number;
+  height: number;
+  beam: number;
+}
+
+/**
+ * The window bands, which are both the dark strip in the daytime hull and the
+ * warm strip after dark.
+ *
+ * `world/boats.ts` emits one `WINDOW`-coloured box per row and
+ * `world/nightlights.BoatLights` puts a soft additive sheet just proud of the
+ * same box, so a ferry's lit saloon is exactly where its windows are. The
+ * fractions are the hulls' own -- 0.80 of the length, 0.9 of the beam, and the
+ * four centimetres that make the band stand proud of the cream around it.
+ *
+ * The tinnie and the jetski have none, because neither has a saloon: a runabout
+ * is an open boat and a ski is a seat.
+ */
+export const BOAT_WINDOW_ROWS: Readonly<Record<BoatKind, readonly WindowRow[]>> = {
+  0: [
+    { x: 0, y: 2.1, length: 70 * 0.8 + 0.04, height: 0.9, beam: 12.6 * 0.9 + 0.04 },
+    { x: 0, y: 4.8, length: 70 * 0.52 + 0.04, height: 0.85, beam: 12.6 * 0.78 + 0.04 },
+    { x: 70 * 0.3, y: 7.4, length: 5.04, height: 0.8, beam: 12.6 * 0.5 + 0.04 },
+    { x: -70 * 0.3, y: 7.4, length: 5.04, height: 0.8, beam: 12.6 * 0.5 + 0.04 },
+  ],
+  1: [
+    { x: -35 * 0.05, y: 1.8, length: 35 * 0.72 + 0.04, height: 0.8, beam: 9 * 0.88 + 0.04 },
+    { x: 35 * 0.18, y: 4.3, length: 6.04, height: 0.75, beam: 9 * 0.6 + 0.04 },
+  ],
+  2: [
+    { x: -35 * 0.02, y: 1.7, length: 35 * 0.7 + 0.04, height: 0.8, beam: 10 * 0.86 + 0.04 },
+    { x: 35 * 0.2, y: 4.0, length: 5.04, height: 0.7, beam: 10 * 0.5 + 0.04 },
+  ],
+  3: [],
+  4: [],
+};
+
+/* --------------------------------------------------------------------------
+ * Navigation lights.
+ * ------------------------------------------------------------------------ */
+
+/**
+ * The four, in the order every reader below indexes them by.
+ *
+ * Fixed order rather than a search by colour, because the geometry is baked once
+ * per kind and the self-check has to be able to say *which* lamp ended up on the
+ * wrong side of the boat.
+ */
+export const NAV_PORT = 0;
+export const NAV_STARBOARD = 1;
+export const NAV_MAST = 2;
+export const NAV_STERN = 3;
+/** How many lamps a boat carries. `world/nightlights.BOAT_LIGHT_CAPACITY` is a multiple of it. */
+export const NAV_LAMPS_PER_BOAT = 4;
+
+/**
+ * The colours, and they are the international rule rather than a palette
+ * decision: **red to port, green to starboard**, white ahead and white astern.
+ *
+ * That is the whole reason a boat's lights are worth drawing at all. A ferry
+ * crossing in front of you shows green then white; one crossing away shows red;
+ * one coming at you shows both sidelights at once. It is the only thing in this
+ * game that tells you which way something on the water is going when the hull is
+ * a silhouette, and getting it backwards would be a specific and legible lie.
+ *
+ * Bright, and unapologetically: these are point sources over black water at up
+ * to `world/boats.FERRY_DRAW_M`, and the additive blend puts them against a
+ * frame that arrives at a few hundredths of scene-linear. See
+ * `world/nightlights.ts`'s header on why a fixed amount of light is a glow at
+ * night and invisible at noon.
+ */
+export const NAV_RED: readonly [number, number, number] = [1.0, 0.05, 0.02];
+export const NAV_GREEN: readonly [number, number, number] = [0.04, 1.0, 0.18];
+export const NAV_WHITE: readonly [number, number, number] = [1.0, 0.95, 0.86];
+
+/** One lamp in the hull's own axes: +x is the bow, +y up from the waterline, +z starboard. */
+export interface NavLamp {
+  forward: number;
+  up: number;
+  starboard: number;
+  colour: readonly [number, number, number];
+}
+
+/**
+ * Where a hull's four lamps hang, as fractions of its own size.
+ *
+ * Sidelights forward and out at the bridge wings, where the screens that make
+ * them 112.5-degree lights would be; the masthead high and forward of the
+ * middle; the stern light low and right aft. A double-ended Freshwater has two
+ * of everything in life and shows the set for whichever end is leading -- which
+ * this does not model, and does not need to: `ferryPose` turns the hull round at
+ * the terminal, so the bow is always the leading end and the lights are always
+ * on it.
+ */
+export function navLamps(kind: BoatKind): readonly NavLamp[] {
+  const size = BOAT_SIZE[kind] ?? BOAT_SIZE[1];
+  const half = size.length / 2;
+  const deck = size.mastY * 0.8;
+  return [
+    { forward: half * 0.6, up: deck, starboard: -size.beam * 0.44, colour: NAV_RED },
+    { forward: half * 0.6, up: deck, starboard: size.beam * 0.44, colour: NAV_GREEN },
+    { forward: half * 0.14, up: size.mastY + 0.25, starboard: 0, colour: NAV_WHITE },
+    { forward: -half * 0.94, up: size.mastY * 0.5, starboard: 0, colour: NAV_WHITE },
+  ];
+}
+
+/** Where a lamp on a posed boat is, in world metres. */
+export interface NavLampPoint {
+  x: number;
+  y: number;
+  z: number;
+}
+
+/**
+ * One lamp of one posed boat, in world metres.
+ *
+ * The rotation is `world/boats.BoatFleet.update`'s own -- `rotation.y =
+ * atan2(-hz, hx)`, so `cos = hx` and `sin = -hz` -- written out as the two
+ * multiplies it reduces to rather than composed from a matrix, because this is
+ * the arithmetic the self-check needs and a check that used a `Matrix4` would be
+ * checking three's rotation convention rather than this file's.
+ *
+ * `y` is passed rather than taken from the pose because the hull rides the bob
+ * (`bobAt`), and a stern light that stayed at sea level while the boat it is
+ * bolted to rose 12 cm would be the sort of thing only a still frame catches.
+ */
+export function navLampWorld(
+  pose: BoatPose,
+  lamp: NavLamp,
+  y: number,
+  out: NavLampPoint,
+): NavLampPoint {
+  out.x = pose.x + lamp.forward * pose.hx - lamp.starboard * pose.hz;
+  out.y = y + lamp.up;
+  out.z = pose.z + lamp.forward * pose.hz + lamp.starboard * pose.hx;
+  return out;
+}
 /** Seconds alongside at an intermediate wharf, and at a terminal before turning. */
 export const DWELL_S = 45;
 export const TERMINAL_S = 150;
@@ -382,5 +555,126 @@ export function verifyBoats(): string[] {
     }
     if (both > 0 && clashes > both * 0.05) failures.push(`${clashes} of ${both} shared waits put two ferries on one berth.`);
   }
+
+  /* --- The navigation lights, and the one claim in them that is a *rule*
+   * rather than a taste: red is to port and green is to starboard.
+   *
+   * Every failure here draws a perfectly good pair of coloured dots. A boat with
+   * its sidelights swapped reads as going the other way, which is worse than no
+   * lights at all, and nothing on screen contradicts it -- the hull is a
+   * silhouette and the wake is not modelled. So the check is made in world
+   * metres against a boat on a known heading, not against the table.
+   *
+   * The world frame is east and negative-north (`z = -north`), so a boat heading
+   * **north** has `(hx, hz) = (0, -1)` and its starboard side is **east**: the
+   * green lamp's world x must be greater than the hull's. Turn it round and the
+   * green goes west. That is the whole assertion, and it is the one that would
+   * have caught the sign error in `navLampWorld` that this comment exists
+   * because of. */
+  {
+    const point: NavLampPoint = { x: 0, y: 0, z: 0 };
+    for (const kind of [BOAT_KIND.FRESHWATER, BOAT_KIND.HARBOUR, BOAT_KIND.RIVERCAT, BOAT_KIND.TINNIE, BOAT_KIND.JETSKI]) {
+      const lamps = navLamps(kind);
+      if (lamps.length !== NAV_LAMPS_PER_BOAT) {
+        failures.push(`kind ${kind} carries ${lamps.length} navigation lamps; ${NAV_LAMPS_PER_BOAT} are the set.`);
+        continue;
+      }
+      if (lamps[NAV_PORT].colour !== NAV_RED || lamps[NAV_STARBOARD].colour !== NAV_GREEN) {
+        failures.push(`kind ${kind} does not carry red to port and green to starboard.`);
+      }
+      if (lamps[NAV_MAST].colour !== NAV_WHITE || lamps[NAV_STERN].colour !== NAV_WHITE) {
+        failures.push(`kind ${kind}'s masthead or stern light is not white.`);
+      }
+      if (!(lamps[NAV_MAST].up > lamps[NAV_STERN].up)) {
+        failures.push(`kind ${kind}'s masthead is not above its stern light.`);
+      }
+      if (!(lamps[NAV_MAST].forward > lamps[NAV_STERN].forward)) {
+        failures.push(`kind ${kind}'s masthead is not forward of its stern light.`);
+      }
+      const size = BOAT_SIZE[kind];
+      for (const lamp of lamps) {
+        if (Math.abs(lamp.forward) > size.length / 2 + 1e-6) {
+          failures.push(`a lamp on kind ${kind} hangs ${lamp.forward.toFixed(2)} m off a ${size.length} m hull.`);
+          break;
+        }
+        if (Math.abs(lamp.starboard) > size.beam / 2 + 1e-6) {
+          failures.push(`a lamp on kind ${kind} hangs ${lamp.starboard.toFixed(2)} m off a ${size.beam} m beam.`);
+          break;
+        }
+      }
+
+      // --- And in the world, on the two headings that make the rule readable.
+      const boat = createBoatPose();
+      boat.kind = kind;
+      boat.x = 1000;
+      boat.z = -2000;
+      for (const [heading, hx, hz] of [['north', 0, -1], ['south', 0, 1]] as const) {
+        boat.hx = hx;
+        boat.hz = hz;
+        navLampWorld(boat, lamps[NAV_STARBOARD], SEA_Y, point);
+        const greenEast = point.x - boat.x;
+        navLampWorld(boat, lamps[NAV_PORT], SEA_Y, point);
+        const redEast = point.x - boat.x;
+        const want = heading === 'north' ? 1 : -1;
+        if (Math.sign(greenEast) !== want || Math.sign(redEast) !== -want) {
+          failures.push(
+            `Heading ${heading}, kind ${kind} puts green ${greenEast.toFixed(2)} m east of the hull ` +
+              `and red ${redEast.toFixed(2)} m. Heading ${heading} the starboard side is the ` +
+              `${want > 0 ? 'east' : 'west'}ern one, so the green lamp must be ` +
+              `${want > 0 ? 'east' : 'west'} of centre and the red the other way.`,
+          );
+        }
+        // The two sidelights are the beam apart and neither has drifted along
+        // the hull: a rotation that mixed the two multiplies would still put
+        // them either side of the centre and would shorten the gap.
+        navLampWorld(boat, lamps[NAV_STARBOARD], SEA_Y, point);
+        const gx = point.x, gz = point.z;
+        navLampWorld(boat, lamps[NAV_PORT], SEA_Y, point);
+        const gap = Math.sqrt((gx - point.x) ** 2 + (gz - point.z) ** 2);
+        if (Math.abs(gap - Math.abs(lamps[NAV_STARBOARD].starboard - lamps[NAV_PORT].starboard)) > 1e-3) {
+          failures.push(`heading ${heading}, kind ${kind}'s sidelights came out ${gap.toFixed(2)} m apart.`);
+        }
+      }
+      // A heading down the world's own +x, where the two multiplies cannot
+      // cover for each other: the masthead has to be ahead in x and nowhere
+      // else, and the starboard lamp has to be at +z (which is south).
+      boat.hx = 1;
+      boat.hz = 0;
+      navLampWorld(boat, lamps[NAV_MAST], SEA_Y, point);
+      if (Math.abs(point.x - boat.x - lamps[NAV_MAST].forward) > 1e-3 || Math.abs(point.z - boat.z) > 1e-3) {
+        failures.push(`kind ${kind}'s masthead is not straight ahead of a boat heading east.`);
+      }
+      navLampWorld(boat, lamps[NAV_STARBOARD], SEA_Y, point);
+      if (Math.abs(point.z - boat.z - lamps[NAV_STARBOARD].starboard) > 1e-3) {
+        failures.push(`kind ${kind}'s starboard lamp is not abeam of a boat heading east.`);
+      }
+      if (Math.abs(point.y - (SEA_Y + lamps[NAV_STARBOARD].up)) > 1e-6) {
+        failures.push(`kind ${kind}'s starboard lamp did not take the hull's own height.`);
+      }
+    }
+  }
+
+  // --- The window bands the saloon glow is painted on: inside the hull, above
+  // the waterline, and present on the three ferries and neither of the two open
+  // boats. A row wider than the beam is a glow sheet hanging in the air beside
+  // the ship.
+  for (const kind of [BOAT_KIND.FRESHWATER, BOAT_KIND.HARBOUR, BOAT_KIND.RIVERCAT]) {
+    const rows = BOAT_WINDOW_ROWS[kind];
+    if (rows.length === 0) {
+      failures.push(`kind ${kind} is a ferry with no window band; its saloon cannot light up.`);
+      continue;
+    }
+    const size = BOAT_SIZE[kind];
+    for (const row of rows) {
+      if (row.beam > size.beam + 0.2) failures.push(`a window row on kind ${kind} is ${row.beam.toFixed(2)} m wide on a ${size.beam} m beam.`);
+      if (Math.abs(row.x) + row.length / 2 > size.length / 2 + 0.2) failures.push(`a window row on kind ${kind} runs past the ends of the hull.`);
+      if (!(row.y > 0) || !(row.height > 0)) failures.push(`a window row on kind ${kind} is under the waterline or has no height.`);
+      if (row.y + row.height > size.mastY + 0.5) failures.push(`a window row on kind ${kind} is above its masthead.`);
+    }
+  }
+  if (BOAT_WINDOW_ROWS[BOAT_KIND.TINNIE].length !== 0 || BOAT_WINDOW_ROWS[BOAT_KIND.JETSKI].length !== 0) {
+    failures.push('an open boat has a saloon window band.');
+  }
+
   return failures;
 }

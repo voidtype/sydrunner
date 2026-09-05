@@ -53,7 +53,8 @@ import { hexContract, hexesArmed, hexesNear, onHexTiles } from './world/hexes.ts
 import { nearestName, verifyTerritory, type TerritoryFlip } from './game/territory.ts';
 import { createFacadeGlobals } from './world/facade.ts';
 import { loadFarLayer, setSlabDaylight } from './world/far.ts';
-import { loadLandmarks, verifyLandmarks } from './world/landmarks.ts';
+import { landmarkPositions, loadLandmarks, verifyLandmarks } from './world/landmarks.ts';
+import { verifyBridgeLights } from './world/bridgelights.ts';
 import { createFarGround } from './world/ground.ts';
 import { verifyCanopy } from './world/cover.ts';
 import { VegetationAssets, verifyStemVariety, verifyVegetationCost } from './world/vegetation.ts';
@@ -169,6 +170,7 @@ import { uploadReport, verifyInstanceUpload } from './world/instupload.ts';
 import {
   NIGHT_VISIBLE_LEVEL,
   NightLights,
+  buildBridgeLights,
   createTorchMount,
   torchBikeMount,
   torchHandMount,
@@ -1582,6 +1584,12 @@ async function main(): Promise<void> {
   // doorway between them. See `rail-solids.verifyStationWalls`.
   const stationWallFailures = timed('station walls', verifyStationWalls);
   const stationLampFailures = timed('station lamps', verifyStationLamps);
+  // The Harbour Bridge's night lighting, which is derived from the bridge's own
+  // vertices at load and is therefore arithmetic that can be checked with no GLB
+  // anywhere near it. A string that picked the arch's *lower* chord, or that ran
+  // 1.5 km along the deck parapet, renders a perfectly plausible bridge -- see
+  // `world/bridgelights.ts`. On the server's list too.
+  const bridgeLightFailures = timed('bridge lights', verifyBridgeLights);
   const pidsFailures = timed('pids', verifyPids);
   const nightFailures = timed('night-lights', () => verifyNightLights());
   // The train lighting's own two, on the same criterion and for the same reason
@@ -1750,6 +1758,7 @@ async function main(): Promise<void> {
     interiorViewFailures.length ||
     stationWallFailures.length ||
     stationLampFailures.length ||
+    bridgeLightFailures.length ||
     pidsFailures.length ||
     nightFailures.length ||
     trainLightFailures.length ||
@@ -1848,6 +1857,7 @@ async function main(): Promise<void> {
           ...interiorViewFailures,
           ...stationWallFailures,
           ...stationLampFailures,
+          ...bridgeLightFailures,
           ...pidsFailures,
           ...nightFailures,
           ...trainLightFailures,
@@ -2542,6 +2552,16 @@ async function main(): Promise<void> {
    * `world/stationlamps.ts`; composed into `lampSource` below.
    */
   let stationLampRecords: Float32Array<ArrayBuffer> = new Float32Array(0);
+  /**
+   * And the Harbour Bridge's deck lamps, on exactly the same terms.
+   *
+   * Empty until the landmark GLB has landed a thousand lines below -- the lamps
+   * are derived from the arch's own vertices rather than from a baked sidecar,
+   * see `world/bridgelights.ts` -- and composed into `lampSource` with the
+   * station rooms' so the two real `PointLight`s walk onto the bridge when a
+   * player does. There is no eighth light here.
+   */
+  let bridgeLampRecords: Float32Array<ArrayBuffer> = new Float32Array(0);
   /**
    * The volume nothing may stand in: the railway's loading gauge and every
    * carriageway's headroom, in one object.
@@ -3674,9 +3694,36 @@ async function main(): Promise<void> {
       loadLandmarks('/world', index.landmarks, streamer.assetVersion),
       FAR_LAYER_DEADLINE_MS,
       'the landmarks',
-    )) ?? { group: null, triangles: 0, names: [] };
+    )) ?? { group: null, triangles: 0, names: [], parts: [] };
   if (landmarks.group) {
     scene.add(landmarks.group);
+    /*
+     * --- The bridge at night, derived from the bridge.
+     *
+     * The owner: *"bridge also needs to be illuminated at night"*. Everything
+     * about where the lights go is `world/bridgelights.ts` and everything about
+     * what they look like is `world/nightlights.BridgeLights`; this is the whole
+     * of the wiring, and it is here because *here* is the first moment the
+     * vertices exist. Null on any world without a `landmark_steel` primitive
+     * under `harbour_bridge`, which is the same contract the landmarks
+     * themselves have: losing it costs the lights and never the frame.
+     */
+    const bridge = buildBridgeLights(
+      landmarkPositions(landmarks, 'harbour_bridge', 'landmark_steel'),
+      landmarkPositions(landmarks, 'harbour_bridge', 'landmark_granite'),
+      landmarkPositions(landmarks, 'harbour_bridge', 'landmark_asphalt'),
+    );
+    if (bridge) {
+      scene.add(bridge.mesh);
+      nightLights.bridge = bridge;
+      // The deck columns, into the source the night rig already reads. See
+      // `bridgeLampRecords` above and `world/giverlamp.lampsOver`.
+      bridgeLampRecords = bridge.lamps;
+      console.debug(
+        `[bridge-lights] ${bridge.archSprites} arch sprites, ${bridge.deckLamps} deck lamps, ` +
+          `${bridge.pylonFaces} pylon faces -- ${bridge.triangles.toLocaleString()} triangles, one draw`,
+      );
+    }
     // Their shaders, warmed here for the same reason the far city's are: they do
     // not exist until this fetch has landed, and the warm-up pass ran long
     // before it. Six pipelines, and two of them (the shells and the gold) are
@@ -3688,6 +3735,19 @@ async function main(): Promise<void> {
       WARMUP_DEADLINE_MS,
       'the landmark shaders',
     );
+    // And the bridge's night kit, in its own call rather than in the walk above
+    // because it is not in that group. One render object and one pipeline -- the
+    // additive night material -- and it is compiled here rather than left to the
+    // boot scene pass for belt and braces: this mesh is the one thing in the
+    // night that appears mid-boot, and the scene pass is the one thing in the
+    // boot with a deadline it can miss.
+    if (bridge) {
+      await withDeadline(
+        renderer.compileAsync(bridge.mesh, camera, scene),
+        WARMUP_DEADLINE_MS,
+        'the bridge light shader',
+      );
+    }
     console.debug(
       `[landmarks] ${landmarks.names.join(', ')} -- ${landmarks.triangles.toLocaleString()} triangles`,
     );
@@ -4063,6 +4123,13 @@ async function main(): Promise<void> {
   // The harbour's ferries and the bays' tinnies. See `game/boats.ts`.
   const boats = new BoatFleet();
   scene.add(boats);
+  // The owner: *"boats also need lights at nigth"*. Fed from inside the one loop
+  // that already poses every ferry in view, for `TrafficMovers.lights`' reason
+  // exactly -- a second pass that had to agree with that one about where a ferry
+  // is, is how a set of nav lights ends up sailing behind its own ship. By day
+  // `begin()` returns false and the whole thing is one comparison per frame. See
+  // `world/nightlights.BoatLights`.
+  boats.lights = nightLights.boatLights;
   for (const mesh of trafficMovers.meshes) scene.add(mesh);
   // --- Workstream Q: the (dis)appearance latch, and the obstacle roster.
   //
@@ -5898,9 +5965,26 @@ async function main(): Promise<void> {
   const giverLamps = new GiverLampField(streamer.streetLamps);
   /** The `LampSource` the night rig reads: the resident tiles, plus these. */
   const lampSource = lampsOver(
-    lampsOver(streamer, () => giverLamps.lampRecords()),
-    // ...and the station rooms', so the two real lights come underground.
-    () => stationLampRecords,
+    lampsOver(
+      lampsOver(
+        lampsOver(streamer, () => giverLamps.lampRecords()),
+        // ...and the station rooms', so the two real lights come underground.
+        () => stationLampRecords,
+      ),
+      // ...and the Harbour Bridge's deck columns, so they come out over the
+      // water too. The bridge deck is 49 m AHD with nothing under it for 500 m,
+      // so the streamer's own lamps -- which are on power poles on streets --
+      // are never anywhere near a player crossing it. See
+      // `world/bridgelights.ts`.
+      () => bridgeLampRecords,
+    ),
+    // ...and the ferry wharves', which is the fourth and last. A finger wharf is
+    // not a street and carries no surveyed power pole, so a player waiting at
+    // Circular Quay or Manly at 3 am had nothing within `LAMP_SEARCH_RADIUS` for
+    // the two real lights to walk onto. Constant for the life of the process --
+    // `boatroutes.WHARVES` is generated -- so unlike the other three this one is
+    // never rebuilt; the closure is here only so the four compose alike.
+    () => nightLights.boatLights.wharfLamps,
   );
   /**
    * The corner tracker, declared before the arrow because the arrow reads it.
@@ -14887,6 +14971,19 @@ async function main(): Promise<void> {
         lampsLit: nightLights.lampsLit,
         carsLit: nightLights.carLights.drawn,
         bikesLit: nightLights.bikeLights.drawn,
+        boatsLit: nightLights.boatLights.drawn,
+        // The bridge, once its GLB has landed. Null before that and in any world
+        // without a `harbour_bridge` node; the counts are what the boot log
+        // prints, so a build can be compared against the last one by hand.
+        bridge: nightLights.bridge === null
+          ? null
+          : {
+              arch: nightLights.bridge.archSprites,
+              deck: nightLights.bridge.deckLamps,
+              pylonFaces: nightLights.bridge.pylonFaces,
+              triangles: nightLights.bridge.triangles,
+              lampRecords: nightLights.bridge.lamps.length / 4,
+            },
         torch: nightLights.torch.intensity,
         // Which of the three jobs the one spot light is doing, so a report taken
         // on a bike is not mistaken for a torch that has gone the wrong colour.

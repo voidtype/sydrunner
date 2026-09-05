@@ -107,6 +107,26 @@ export interface LandmarkContract {
   anchor_sources: Record<string, string>;
 }
 
+/**
+ * One primitive of one landmark, kept so that something other than the renderer
+ * can read it.
+ *
+ * The `owner` is recovered **before** reparenting -- see `loadLandmarks` -- and
+ * without this list it is thrown away the moment the mesh is added to the group,
+ * because after that every primitive's parent is the group and they all report
+ * the same name. Nothing needed it until `world/bridgelights.ts` did: the
+ * Harbour Bridge's night lighting is derived from the arch's own vertices rather
+ * than from a baked sidecar, and `landmark_steel` under `harbour_bridge` is how
+ * you ask for the arch.
+ */
+export interface LandmarkPart {
+  /** The glTF node's name: `harbour_bridge`, `opera_house`, and so on. */
+  owner: string;
+  /** Which of `LANDMARK_MATERIALS` the primitive wears. */
+  material: string;
+  mesh: Mesh;
+}
+
 export interface LandmarkSet {
   /** The scene node, or null when there is no landmark set to load. */
   group: Group | null;
@@ -114,9 +134,39 @@ export interface LandmarkSet {
   triangles: number;
   /** Landmark node names actually built. */
   names: string[];
+  /** Every primitive, by landmark and material. See `landmarkPositions`. */
+  parts: LandmarkPart[];
 }
 
-const EMPTY: LandmarkSet = { group: null, triangles: 0, names: [] };
+const EMPTY: LandmarkSet = { group: null, triangles: 0, names: [], parts: [] };
+
+/**
+ * One landmark primitive's vertices, in **world** metres, or null when the set
+ * has no such primitive.
+ *
+ * World rather than node-local because `loadLandmarks` bakes each node's
+ * translation into its geometry -- the anchor is on the node above the mesh and
+ * has to survive reparenting -- so by the time anything can call this, the
+ * numbers are already where the bridge is. That matters to the one caller: a
+ * lamp derived in node-local metres would be a lamp 1.8 km north of the bridge.
+ *
+ * Null rather than an empty array when the primitive is absent, so a caller has
+ * to decide what an absent landmark means rather than quietly deriving nothing
+ * from nothing.
+ */
+export function landmarkPositions(
+  set: LandmarkSet,
+  owner: string,
+  material: string,
+): Float32Array | null {
+  for (const part of set.parts) {
+    if (part.owner !== owner || part.material !== material) continue;
+    const attribute = part.mesh.geometry.getAttribute('position');
+    const array = attribute?.array;
+    return array instanceof Float32Array ? array : null;
+  }
+  return null;
+}
 
 /* --------------------------------------------------------------------------
  * The materials.
@@ -400,6 +450,7 @@ export async function loadLandmarks(
     const group = new Group();
     group.name = 'landmarks';
     const names: string[] = [];
+    const parts: LandmarkPart[] = [];
     let triangles = 0;
 
     // Collected before reparenting: mutating the children array that `traverse`
@@ -433,6 +484,9 @@ export async function loadLandmarks(
       mesh.matrixWorld.identity();
 
       const name = resolveMaterialName(mesh);
+      // Recorded here, in the one place that still knows which landmark this
+      // primitive came off. See `LandmarkPart`.
+      if (owner) parts.push({ owner, material: name, mesh });
       mesh.material = materials.get(name) ?? materials.get('landmark_steel')!;
       // Cast and receive, like a building. The shadow system culls by distance
       // on its own -- `streamer.applyShadowRole` never sees these, because they
@@ -452,7 +506,7 @@ export async function loadLandmarks(
     for (const item of contract.items) {
       if (!names.includes(item.name)) names.push(item.name);
     }
-    return { group, triangles, names };
+    return { group, triangles, names, parts };
   } catch (err) {
     console.warn('landmarks failed to load:', err);
     return EMPTY;
