@@ -1233,6 +1233,120 @@ def bore_nodes(g: RailGraph) -> np.ndarray:
     return inside
 
 
+# --- A portal is a transition, not a step -----------------------------------------
+#
+# THE CHATSWOOD DEFECT, MEASURED. The station's platforms are on a deck -- OSM
+# tags 100% of the track over its 85 m as `bridge`, `layer=1`, and every one of
+# the four platform ways with it -- and the bake shipped them 10.54 m *under* the
+# terrain. Nothing near the station is capped: `tunnel_share` is 0.00 and not one
+# node within the platform carries a bound. What put them there is 291 m away.
+#
+# North of the platform the Metro and the North Shore pair enter tunnel together
+# at +229 m. `bore_nodes` correctly leaves the portal itself at daylight -- and
+# then the *next vertex in*, 62 m further, is a node whose every edge is
+# tunnelled, so it was asked for the full `TUNNEL_COVER_M` of earth. The DEM
+# there reads 30.53 m, twelve metres below the station, so the bound came out at
+# 23.03 m, and `apply_cover`'s cone -- which is grade-legal and therefore reaches
+# `d / 0.033` metres in every direction -- carried it back up the ramp and put
+# the platform deck at 32.26. Ten metres of station buried by one vertex, and
+# which vertex it was is a mapper's decision about where to break a way.
+#
+# THE RULE THAT WAS MISSING. The section header above already says the physics:
+# *"a portal is not capped ... so the first ~230 m inside a portal genuinely has
+# less than full cover, which is true of real railways"*. It was written as an
+# observation about what the cone happened to produce. It is not an observation,
+# it is a **constraint**, and until it is written as one the amount of cover
+# demanded at the first node inside a bore depends on nothing but vertex spacing.
+#
+#     A bore is only ever as deep as a train can have dug on the way in from
+#     daylight. At the portal it owes no cover at all, because it is standing on
+#     the surface; `MAX_GRADIENT` metres of cover later for every metre it has
+#     run; and full cover once it has had the distance to earn it.
+#
+# So the ceiling on a bore node is the *higher* of the two honest answers -- the
+# full-cover bound, and the deepest a train descending from its own portal at the
+# ruling gradient could be -- and never higher than the surface itself, because
+# the player's absolute rule is not negotiable at any distance:
+#
+#     cap = min( surface, max( surface - TUNNEL_COVER_M, portal_ceiling ) )
+#
+# Deep inside a bore the portal term has fallen away and this is the old bound,
+# unchanged, to the metre: `TUNNEL_COVER_M / MAX_GRADIENT` is 227 m, so nothing
+# more than that from daylight moves at all. Inside that window the demand stops
+# being an impossibility. Asking for 7.5 m of cover 62 m past a headwall is
+# asking a railway to descend at 12%, and a solver handed an impossible demand
+# does not refuse it -- it pays for it somewhere else, and at Chatswood
+# somewhere else was the station.
+#
+# **This does not weaken the rule the player stated.** *"A rail tunnel should
+# never result in the train assets being above the surface"* is the `min(surface,
+# ...)` term, and it now binds at every capped node including the ones inside the
+# transition, which the old bound could not do because it was 7.5 m stricter and
+# therefore infeasible. `rail-audit` section 3b measures exactly this expression
+# and keeps its negative control.
+
+
+def portal_ceiling(g: RailGraph, surf: np.ndarray) -> np.ndarray:
+    """How deep a bore can have got at each node, descending from its portals.
+
+    The upper envelope of `surface` over the *tunnel* subgraph, sourced at every
+    portal, relaxed at `MAX_GRADIENT`: `max` over portals `p` of
+    `surface[p] - MAX_GRADIENT * dist(p, n)` through tunnel edges only. Same
+    Dijkstra as `_cone`, same triangle-inequality argument, restricted to the
+    bore because the descent it measures is the bore's own.
+
+    `-inf` at a node no portal reaches -- a bore that runs off the edge of the
+    extract, or one whose whole component is tunnelled -- which leaves the
+    full-cover bound alone, and is the strict direction.
+    """
+    import heapq
+
+    inside = bore_nodes(g)
+    ceil = np.full(g.n_nodes, -np.inf)
+    heap: list[tuple[float, int]] = []
+    for n in range(g.n_nodes):
+        ei = g.adj[n]
+        if inside[n] or not ei:
+            continue
+        if any(g.ways[int(g.way_of[e])].tunnel for e in ei):
+            ceil[n] = float(surf[n])
+            heap.append((-ceil[n], n))
+    if not heap:
+        return ceil
+    heapq.heapify(heap)
+    done = np.zeros(g.n_nodes, dtype=bool)
+    cost = g.length * MAX_GRADIENT
+    while heap:
+        val, n = heapq.heappop(heap)
+        if done[n] or -val < ceil[n] - 1e-12:
+            continue
+        done[n] = True
+        for ei in g.adj[n]:
+            if not g.ways[int(g.way_of[ei])].tunnel:
+                continue
+            u, v = int(g.edges[ei, 0]), int(g.edges[ei, 1])
+            m = v if u == n else u
+            cand = -val - float(cost[ei])
+            if cand > ceil[m] + 1e-12:
+                ceil[m] = cand
+                heapq.heappush(heap, (-cand, m))
+    return ceil
+
+
+def bore_cover_cap(g: RailGraph, surf: np.ndarray) -> np.ndarray:
+    """The cover bound on every node inside a bore; `+inf` everywhere else.
+
+    One expression, called by the constraint and by `rail-audit` section 3b, so
+    the check can never be measuring a different rule from the solver.
+    """
+    inside = bore_nodes(g)
+    surf = np.asarray(surf, dtype=np.float64)
+    bound = np.minimum(surf, np.maximum(surf - TUNNEL_COVER_M, portal_ceiling(g, surf)))
+    cap = np.full(g.n_nodes, np.inf)
+    cap[inside] = bound[inside]
+    return cap
+
+
 def visible_surface(g: RailGraph, ground: np.ndarray, y: np.ndarray) -> np.ndarray:
     """The surface a player actually sees over each node.
 
@@ -1981,8 +2095,13 @@ def cover_caps(
         visible_surface(g, ground, y) if surface is None
         else np.asarray(surface, dtype=np.float64)
     )
-    inside = bore_nodes(g)
-    cap[inside] = np.minimum(cap[inside], surf[inside] - TUNNEL_COVER_M)
+    # `bore_cover_cap` and not `surf - TUNNEL_COVER_M`: see "A portal is a
+    # transition, not a step". Full cover past 227 m from daylight, the surface
+    # itself as the floor of the demand inside that, and the Chatswood platform
+    # no longer paying for a bound the railway 291 m away could never have met.
+    bore = bore_cover_cap(g, surf)
+    inside = np.isfinite(bore)
+    cap[inside] = np.minimum(cap[inside], bore[inside])
 
     reg = register if register is not None else read_level_crossings(0.0, Path("/nonexistent"))
     census = road_crossings(g, y, ground, roads or (), reg, terrain, y_ref)
@@ -5835,26 +5954,56 @@ def audit(radius_m: float, built: dict | None = None, log=print) -> int:
     surface = g.surface if g.surface.size == g.n_nodes else g.ground
     cover = surface - g.y
     bounded = inside & np.isfinite(np.asarray(cover, dtype=np.float64))
-    short_n = int((bounded & (cover < TUNNEL_COVER_M - 1e-3)).sum())
+    # --- Measured against `bore_cover_cap`, which is the solver's own expression
+    # and not a restatement of it. See "A portal is a transition, not a step":
+    # the demand is full cover once a bore has run `TUNNEL_COVER_M / MAX_GRADIENT`
+    # metres from daylight, and inside that window it is the surface itself,
+    # because a headwall is at the surface by definition and no gradient can put
+    # 7.5 m of earth over a train 60 m past one. Splitting the check in two is
+    # deliberate: the first half is the player's absolute rule and holds at every
+    # capped node without exception, the second is the earth-cover figure and is
+    # allowed to be short only where the transition says it must be.
+    capbound = bore_cover_cap(g, surface)
+    over_n = int((bounded & (g.y > surface + 1e-3)).sum())
+    check(
+        over_n == 0,
+        f"not one of the {int(bounded.sum()):,} nodes inside a bore is above the surface a "
+        f"player sees -- the player's absolute rule, and it now binds inside a portal's "
+        f"transition too, where the old 7.5 m bound was infeasible and therefore silent "
+        f"(worst {float(cover[bounded].min()) if bounded.any() else 0.0:.2f} m of cover)",
+    )
+    ramped = bounded & (capbound > surface - TUNNEL_COVER_M + 1e-6)
+    short_n = int((bounded & ~ramped & (cover < TUNNEL_COVER_M - 1e-3)).sum())
     check(
         short_n == 0,
-        f"all {int(bounded.sum()):,} nodes inside a bore sit at least {TUNNEL_COVER_M:.1f} m "
-        f"under the surface a player sees (worst "
-        f"{float(cover[bounded].min()) if bounded.any() else 0.0:.2f} m); before the constraint "
-        f"{cov.get('violating_before', 0)} were short of it and the worst was "
+        f"all {int((bounded & ~ramped).sum()):,} bore nodes more than "
+        f"{TUNNEL_COVER_M / MAX_GRADIENT:.0f} m from daylight carry the full "
+        f"{TUNNEL_COVER_M:.1f} m of cover; the other {int(ramped.sum()):,} are inside a "
+        f"portal transition and carry what a train descending at "
+        f"{100 * MAX_GRADIENT:.1f}% from its own headwall could have dug. Before the "
+        f"constraint {cov.get('violating_before', 0)} were short and the worst was "
         f"{cov.get('worst_violation_m', 0.0):.2f} m *above* its own surface",
     )
     # The negative control the rest of this file insists on: the check has to be
     # able to fail. Lift one bore node to a hand's breadth under the ground and
-    # confirm the same expression catches it.
+    # confirm the same expression catches it -- once against the cover figure,
+    # once against the absolute rule, because there are now two of them.
     if bounded.any():
         probe = np.asarray(cover, dtype=np.float64).copy()
-        victim = int(np.argmax(bounded))
+        victim = int(np.argmax(bounded & ~ramped)) if (bounded & ~ramped).any() else int(np.argmax(bounded))
         probe[victim] = 0.2
         check(
-            int((bounded & (probe < TUNNEL_COVER_M - 1e-3)).sum()) == 1,
+            int((bounded & ~ramped & (probe < TUNNEL_COVER_M - 1e-3)).sum()) == 1,
             "  NEGATIVE CONTROL: a bore node lifted to 0.20 m of cover is caught -- "
             "which is the picture being fixed, a tunnel drawn through the surface",
+        )
+        lifted = np.asarray(g.y, dtype=np.float64).copy()
+        vic2 = int(np.argmax(bounded))
+        lifted[vic2] = float(surface[vic2]) + 1.0
+        check(
+            int((bounded & (lifted > surface + 1e-3)).sum()) == 1,
+            "  NEGATIVE CONTROL: a bore node standing a metre proud of its own surface is "
+            "caught by the absolute rule, inside a portal transition as much as anywhere",
         )
     check(
         float(cov.get("worst_grade_after", worst)) <= MAX_GRADIENT + 1e-6,
