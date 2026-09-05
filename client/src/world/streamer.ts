@@ -114,7 +114,7 @@
 
 import { admits, blendHeading, cancels, priorityTiles, type SlotFacts } from './tilepriority.ts';
 import { retireGroup, type ReclaimObject } from './pipereclaim.ts';
-import { InstancePool, type InstanceClaim } from './instancepool.ts';
+import { InstancePool, type InstanceClaim, type PooledSet } from './instancepool.ts';
 import {
   Box3,
   BufferAttribute,
@@ -1260,11 +1260,12 @@ export class TileStreamer implements LampSource {
    * cars on the traffic's terms and from the same two call sites.
    *
    * Different from the three above in one way that matters: it is handed the
-   * tile's own `InstancedMesh`es, not just data, because the only way to stop a
-   * parked box drawing under a parked model is to reach into the matrix buffer
-   * the tile built. That makes `release` a hard requirement rather than
+   * spans the tile claimed out of the shared car meshes, not just data, because
+   * the only way to stop a parked box drawing under a parked model is to reach
+   * into the matrix buffer. That makes `release` a hard requirement rather than
    * housekeeping -- it is what guarantees the reference is dropped before
-   * `dispose` frees the buffer. See `world/carlod.ts` section 3.
+   * `dispose` hands those instances back to the pool, which is free to give them
+   * to the next tile that arrives. See `world/carlod.ts` section 3.
    *
    * Null is a working configuration: it means every parked car stays a box,
    * which is what this client did before the model fleet existed.
@@ -3557,12 +3558,18 @@ export class TileStreamer implements LampSource {
       // canopy shadow across a footpath is the most valuable shadow in the frame
       // and it costs the depth pass ~85 triangles.
       //
-      // Parked cars take the same flags again, and this is where they earn their
-      // triangles: a car is 1.5 m tall standing on a road that is otherwise a
-      // flat unbroken surface, so the shadow it throws down the gutter is the
-      // only thing giving the kerb line any relief at all. They are not marked
-      // `userData.surface`, so they cast; they receive on the same range as
-      // everything else.
+      // Parked cars used to take the same flags again, and this is where they
+      // earn their triangles: a car is 1.5 m tall standing on a road that is
+      // otherwise a flat unbroken surface, so the shadow it throws down the
+      // gutter is the only thing giving the kerb line any relief at all. They
+      // are spans of five shared meshes now and are not in this group, so they
+      // cast unconditionally and never receive -- `cars.buildTileCars` sets both
+      // once, at the mesh. The casting half is the half that mattered and it is
+      // unchanged; what is given up is the receiving a car within the shadow
+      // volume used to get, which for a box drawn at up to 1.8 km could not be
+      // switched per tile anyway once the tile stopped owning the mesh. The
+      // near-field *models* receive, and they are the cars close enough for it
+      // to read -- see `carlod.addModel`'s appearance fix 2.
       //
       // Power poles too -- they are 10 m tall and 30 cm across, so they are
       // almost free to rasterise into the depth map and the bar of shadow one
@@ -4107,7 +4114,7 @@ export class TileStreamer implements LampSource {
       // whole, so a build that is abandoned half-way never leaves a claim
       // pointing at a mesh that was thrown away.
       let parkedCars: TileCars | null = null;
-      let parkedMeshes: InstancedMesh[] = [];
+      let parkedSets: PooledSet[] = [];
       if (carsBuffer !== null) {
         // The tile key goes in because a parked car's identity is derived from
         // it -- see `cars.staticCarIdentity`. The sidecar carries no id of its
@@ -4115,12 +4122,24 @@ export class TileStreamer implements LampSource {
         // bytes are in *is* the identity.
         const parked = safeDecode(() => decodeCars(carsBuffer, entry.key));
         if (parked !== null) {
-          parkedMeshes = buildTileCars(parked, this.carAssets, groundAt);
-          for (const mesh of parkedMeshes) {
-            mesh.castShadow = true;
-            mesh.receiveShadow = false;
-            group.add(mesh);
-          }
+          // Spans of the five shared car meshes rather than meshes of this
+          // tile's own, on the poles' and the bins' terms exactly: an
+          // `InstancedMesh` is a pipeline in three r0.185, and five per tile
+          // ring after tile ring was the growth in the owner's frame time. So
+          // these are not in `group`, are not shadow-flagged by walking it --
+          // `buildTileCars` decides its casting once, where the mesh is made --
+          // and are released with the rest of the tile's claims. See
+          // `world/instancepool.ts`.
+          parkedSets = buildTileCars(
+            parked,
+            this.carAssets,
+            this.instancePool,
+            group.position.x,
+            group.position.z,
+            groundAt,
+          );
+          for (const set of parkedSets) claims.push(set.claim);
+          this.instancePool.flush();
           cars = parked.count;
           parkedCars = parked;
         }
@@ -4486,7 +4505,7 @@ export class TileStreamer implements LampSource {
         this.parkedCars.adopt(
           entry.key,
           parkedCars,
-          parkedMeshes,
+          parkedSets,
           group.position.x,
           group.position.z,
         );
@@ -4578,6 +4597,18 @@ export class TileStreamer implements LampSource {
         this.root.remove(group);
         releaseGroupGeometry(group);
         group.clear();
+        // **Before the spans go back**, on `dispose`'s own ordering argument and
+        // for the same reason. The commit step hands the parked spans to the
+        // model fleet a few lines above `committed = true`, so a throw in
+        // between -- a bad lamp array, a full atlas -- leaves this file holding
+        // references into ranges that are about to be reallocated. Releasing a
+        // key that was never adopted is a lookup that misses, so this costs
+        // nothing on the common path.
+        this.parkedCars?.release(entry.key);
+        // And its twin, beside it for the reason `dispose` keeps them together:
+        // this one holds no buffer, but a tile adopted and then abandoned is a
+        // tile the field's cap counts forever.
+        this.staticCars?.drop(entry.key);
         // The spans too: they are not in the group and nothing else would.
         for (const claim of claims) this.instancePool.release(claim);
         claims.length = 0;
@@ -5122,10 +5153,20 @@ export class TileStreamer implements LampSource {
    * change that makes it bind shows up as a number rather than as a bug report.
    */
   private dispose(key: string, tile: LoadedTile, cam: Vector3 | null = null): void {
-    // **First**, before anything frees a buffer. The model fleet holds direct
-    // references into this tile's parked-car instance matrices, and a claim
-    // that outlived its mesh would write into a disposed buffer the next time
-    // the car left the near field. See `world/carlod.ts` section 3.
+    // **First**, before any claim goes back to the pool, and the ordering is
+    // load-bearing rather than tidy.
+    //
+    // The model fleet holds direct references into this tile's parked-car
+    // instances -- a `PooledSet` and an index within its claim -- for every car
+    // it has folded flat behind a model or behind a driver. `instancePool
+    // .release` below zeroes those instances and returns the range to the
+    // allocator, which is free to hand the *same* instances to the next tile
+    // that streams in, possibly inside this very frame. A claim that outlived
+    // its span would therefore not fault: it would quietly restore a Newtown
+    // hatchback into a Parramatta bay, at Newtown's height, and stay there.
+    // Releasing here means every reference is dropped while the span still
+    // belongs to this tile, which is the only window in which those writes are
+    // meaningful. See `world/carlod.ts` section 3.
     this.parkedCars?.release(key);
     // WORKSTREAM S. Order does not matter for this one -- it holds no buffer
     // reference -- but it is here beside its twin so the two lifecycles stay
@@ -5203,13 +5244,19 @@ export class TileStreamer implements LampSource {
  * Geometry is per tile and must go; materials are shared world-wide and must
  * not. Disposing a shared material here would blank every other tile.
  *
- * Trees, cars and poles invert that: their *geometry* is the shared thing --
- * six tree meshes, five car bodies and two pole kinds for the whole world --
- * and what is per tile is the instance matrix and colour buffers, which is
- * exactly what `InstancedMesh.dispose` releases. Calling `geometry.dispose()`
- * on one would delete the species out of every other tile at once, and the
- * symptom would be trees, or every silver hatchback in the city, vanishing the
- * first time the player walked far enough to evict a tile.
+ * The instanced kinds invert that: their *geometry* is the shared thing -- six
+ * tree meshes, five car bodies and two pole kinds for the whole world -- and
+ * what is per tile is a range of the instance matrix and colour buffers.
+ * Calling `geometry.dispose()` on one would delete the species out of every
+ * other tile at once, and the symptom would be trees, or every silver
+ * hatchback in the city, vanishing the first time the player walked far enough
+ * to evict a tile.
+ *
+ * Trees, cars, poles and furniture have since gone further than that and left
+ * the tile group altogether: they are spans of one mesh per species now, given
+ * back through `instancePool.release` rather than freed here, and this function
+ * never sees them. The flags below that name them are a **rule** kept for the
+ * next kind that needs it, not a description of traffic through this loop.
  *
  * The *wires* are not in that set and must not be: their geometry is merged per
  * tile from that tile's own spans, so it falls to the default branch and is
@@ -5238,9 +5285,12 @@ function releaseGroupGeometry(group: Group): void {
       // The branch stays because the *rule* it encodes -- shared geometry is
       // released by `InstancedMesh.dispose`, never `geometry.dispose` -- is the
       // one every flag beside it depends on, and deleting the example makes the
-      // next person adding one guess.
+      // next person adding one guess. `userData.cars` was the second such flag
+      // and is **gone rather than kept**, because one worked example is enough
+      // and two of them read as a list of things that still happen: the parked
+      // fleet is spans of five shared meshes now, on the trees' terms exactly,
+      // and no car has entered a tile group since. See `cars.buildTileCars`.
       mesh.userData.vegetation === true ||
-      mesh.userData.cars === true ||
       mesh.userData.poles === true ||
       // Street furniture is in that set too: six geometries -- bin body, bin
       // lid, name post, blade, signal head, lamp -- shared by the whole world,

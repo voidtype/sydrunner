@@ -117,6 +117,10 @@ import { ShadowWarm, ShadowSweep, verifyShadowWarm } from './world/shadowwarm.ts
 import { AsyncPipelines, budgetFor, verifyAsyncPipes } from './world/asyncpipes.ts';
 import { PipelineReclaim, setActiveReclaim, verifyPipeReclaim } from './world/pipereclaim.ts';
 import { verifyRangeAlloc } from './world/rangealloc.ts';
+// The half of the same bookkeeping that is about the *parked cars* sitting in
+// those shared meshes -- and the one species with a second owner reaching into
+// its matrices. See `world/parkedpool-check.ts`.
+import { verifyParkedPool } from './world/parkedpool-check.ts';
 import { verifyFloorPlan } from './world/floorplan.ts';
 import { buildingSeed, doorAt, verifyDoorway, type DoorSite } from './world/doorway.ts';
 import { CITY_SPACE, spaceForBuilding, verifySpaces } from './net/spaces.ts';
@@ -489,7 +493,7 @@ import {
 // --- WORKSTREAM S: the parked fleet, as something a player can steal. The field
 // is fed by the streamer (`setStaticCarSink`) and asked by `resolveTake`; see
 // `game/staticcars.ts` and `game/driving.ts` section 1, which this retires.
-import { StaticCarField, verifyStaticCars } from './game/staticcars.ts';
+import { StaticCarField, verifyParkedBins, verifyStaticCars } from './game/staticcars.ts';
 import {
   DRIVEN_DRAW_RADIUS,
   DrivenCarView,
@@ -5604,6 +5608,16 @@ async function main(): Promise<void> {
      * `world/rangealloc.ts`.
      */
     ...verifyRangeAlloc(),
+    /*
+     * And the parked cars in those meshes, which are the one species the model
+     * fleet reaches into. Both halves: the layout both ends agree on (three-free,
+     * so the server runs it too) and the whole machine over 41 real tiles
+     * through a real pool. See `world/parkedpool-check.ts` for the report this
+     * was written off -- five `InstancedMesh`es a tile, each of them a pipeline,
+     * for the life of the session.
+     */
+    ...verifyParkedBins(),
+    ...verifyParkedPool(),
     /*
      * Interiors. The one property that matters is that it is **total**: there
      * is no curated list of buildings, so every footprint in Greater Sydney

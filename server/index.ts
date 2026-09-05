@@ -84,7 +84,7 @@ import { verifyCarFire } from '../client/src/game/carfire.ts';
 // cars at a kerb are takeable and not just the forty on the timetable. The body
 // and paint counts are omitted here and passed by `main.ts`, which is the end
 // that can load the palette; see `verifyStaticCars`.
-import { verifyStaticCars } from '../client/src/game/staticcars.ts';
+import { verifyParkedBins, verifyStaticCars } from '../client/src/game/staticcars.ts';
 // And the *drawing* of a car somebody took, which is a browser rule checked here
 // on `verifyViewLatch`'s argument two imports down: `world/drivencars.ts` owns no
 // mesh and imports three only as types, so this process can run every line of it.
@@ -549,6 +549,13 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // a plausible-looking wrong position, which renders perfectly and makes `E`
     // do nothing.
     ['verifyStaticCars', verifyStaticCars()],
+    // And the instance layout the browser's parked fleet is drawn in. Three-free
+    // for this list's own reason: the whole of the pooling check
+    // (`world/parkedpool-check.ts`) needs three and can only run in the browser,
+    // so what runs here is the seam its two halves meet at -- `buildTileCars`
+    // lays a tile's instances out in this order and `carlod` addresses them in
+    // it, and a disagreement folds a car flat somewhere nobody is looking.
+    ['verifyParkedBins', verifyParkedBins()],
     // The two traffic checks that were written to run at boot -- their own
     // comments say so -- and had no caller anywhere. `verifyLaneShare` is the
     // one that asserts the lane rule is a pure function of the tick, which is
