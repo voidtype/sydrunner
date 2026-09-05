@@ -1,10 +1,11 @@
 /**
- * The three hero landmarks: the Harbour Bridge, the Opera House, Sydney Tower.
+ * The four hero landmarks: the Harbour Bridge, the Opera House, Sydney Tower,
+ * and Luna Park.
  *
  * Everything else in this client is *streamed*. A tile is fetched when it comes
  * near, evicted when it does not, and stood in for by a `far.bin` slab in
  * between. That is the right lifecycle for 33,651 buildings and it is the wrong
- * one for these three, for a reason that is not about draw calls:
+ * one for these four, for a reason that is not about draw calls:
  *
  *   **They are the skyline.** The bridge is read from Alexandria, the tower from
  *   every ridge in the extent, and the Opera House from the whole of the
@@ -12,25 +13,36 @@
  *   as you walk away from it, which is the one thing about this city nobody
  *   would forgive.
  *
+ *   Luna Park is the exception that proves it. Its face is nine metres across
+ *   and is read from the wharf, not from Alexandria -- but it sits directly
+ *   under the northern approach of the bridge, which is a place a player is
+ *   *already* looking at a landmark from, and a park that faded in as you
+ *   crossed would be worse there than anywhere else in the world.
+ *
  * So `world/landmarks.glb` is a single file loaded once beside `far.bin`, added
- * to the scene, and never touched again. 26 k triangles for all three, which is
- * a seventh of what the far layer spends on the rest of the city.
+ * to the scene, and never touched again. 29 k triangles for all four, which is
+ * a sixth of what the far layer spends on the rest of the city.
  *
  * ---------------------------------------------------------------------------
- * Materials, and why there are six rather than the twenty the tiles use.
+ * Materials, and why there are ten rather than the twenty the tiles use.
  *
  * The pipeline gives the landmark set its own material namespace --
  * `landmarks.LANDMARK_MATERIALS`, not `mesh.MATERIALS` -- and names them in the
  * GLB, so this file looks them up **by name**. That is affordable here precisely
- * because there are six: the tiles map by *index* because their material list is
+ * because there are ten: the tiles map by *index* because their material list is
  * baked into every primitive and into one byte per far slab, and a landmark file
  * has neither constraint.
  *
- * All six are `MeshStandardNodeMaterial` on the one light rig in
- * `sky/calibration.ts`, and all six cast and receive like a building does. Three
+ * All ten are `MeshStandardNodeMaterial` on the one light rig in
+ * `sky/calibration.ts`, and all ten cast and receive like a building does. Five
  * carry a procedural pattern and it is the same argument the facade grammar
  * makes: a flat colour on a 500 m arch, an 89 m pylon or 1.06 million roof tiles
  * is the thing that makes a model read as a model.
+ *
+ * The four **paint** slots are the exception, and deliberately so: they are flat
+ * colour with nothing on them at all. A sideshow paint job is flat -- that is
+ * what makes it read as paint over sheet metal rather than as a material -- and
+ * the one thing that would ruin the Face is a procedural grain crawling over it.
  */
 
 import {
@@ -53,7 +65,7 @@ import { Group, Mesh, MeshStandardNodeMaterial } from 'three/webgpu';
 import { fetchWorldBuffer } from './cdn.ts';
 
 /**
- * The six slots, in the pipeline's order. Order is not load-bearing -- the GLB
+ * The ten slots, in the pipeline's order. Order is not load-bearing -- the GLB
  * names its materials and this file resolves by name -- but it is checked
  * against `index.json` by `verifyLandmarks`, because a mismatch means the file
  * and the manifest came from different builds.
@@ -65,6 +77,10 @@ export const LANDMARK_MATERIALS = [
   'landmark_glass',
   'landmark_gold',
   'landmark_asphalt',
+  'landmark_paint_white',
+  'landmark_paint_red',
+  'landmark_paint_yellow',
+  'landmark_paint_blue',
 ] as const;
 
 /** What `index.json` carries about the landmark set. */
@@ -131,6 +147,24 @@ const TILE_MATT: [number, number, number] = [0.735, 0.712, 0.640];
 
 /** Gold anodised aluminium, the turret's cladding. */
 const GOLD_TONE: [number, number, number] = [0.700, 0.478, 0.150];
+
+/**
+ * Luna Park's paint box: cream, and three primaries off it.
+ *
+ * Linear-space values, and they are quieter than the swatches a paint chart
+ * would give for the same colours -- the rig in `sky/calibration.ts` puts a hard
+ * sun on these surfaces, and a fully saturated red at 0.75 clips to a flat patch
+ * the moment the sun is on it, which is the one thing that would make a painted
+ * cutout read as an emissive decal.
+ *
+ * The cream is deliberately the same family as `TILE_GLOSS` above. The Opera
+ * House and Luna Park are both off-white against Sydney sandstone, and having
+ * them agree costs nothing and stops the harbour having two whites in it.
+ */
+const PAINT_WHITE: [number, number, number] = [0.845, 0.822, 0.760];
+const PAINT_RED: [number, number, number] = [0.560, 0.082, 0.062];
+const PAINT_YELLOW: [number, number, number] = [0.820, 0.575, 0.075];
+const PAINT_BLUE: [number, number, number] = [0.075, 0.170, 0.520];
 
 function createSteelMaterial(): MeshStandardNodeMaterial {
   const material = new MeshStandardNodeMaterial();
@@ -291,6 +325,31 @@ function createDeckMaterial(): MeshStandardNodeMaterial {
   return material;
 }
 
+/**
+ * One tin of paint, flat.
+ *
+ * No `colorNode` function, no pattern, no variation, and that is the decision
+ * rather than the absence of one. Every other material in this file carries a
+ * procedural term because it stands in for a surface with real texture at real
+ * scale -- coursed stone, a million roof tiles, a mullion grid. Luna Park's
+ * halls and its Face are painted sheet and rendered masonry, repainted every few
+ * years, and the thing that makes them read as *paint* is that they are one
+ * value from one side of the harbour to the other. A grain on the Face would
+ * turn a nine-metre flat cutout into a nine-metre textured object, which is
+ * exactly what it is not.
+ *
+ * 0.62 roughness and no metalness: enamel over steel, a broad soft highlight,
+ * nothing mirror-like anywhere in a fairground.
+ */
+function createPaintMaterial(name: string, tone: [number, number, number]): MeshStandardNodeMaterial {
+  const material = new MeshStandardNodeMaterial();
+  material.name = name;
+  material.colorNode = vec3(...tone);
+  material.roughnessNode = float(0.62);
+  material.metalnessNode = float(0.0);
+  return material;
+}
+
 /** One instance of each, shared across every landmark. Built once, at load. */
 export function createLandmarkMaterials(): Map<string, MeshStandardNodeMaterial> {
   return new Map<string, MeshStandardNodeMaterial>([
@@ -300,6 +359,10 @@ export function createLandmarkMaterials(): Map<string, MeshStandardNodeMaterial>
     ['landmark_glass', createGlassMaterial()],
     ['landmark_gold', createGoldMaterial()],
     ['landmark_asphalt', createDeckMaterial()],
+    ['landmark_paint_white', createPaintMaterial('landmark_paint_white', PAINT_WHITE)],
+    ['landmark_paint_red', createPaintMaterial('landmark_paint_red', PAINT_RED)],
+    ['landmark_paint_yellow', createPaintMaterial('landmark_paint_yellow', PAINT_YELLOW)],
+    ['landmark_paint_blue', createPaintMaterial('landmark_paint_blue', PAINT_BLUE)],
   ]);
 }
 
@@ -420,7 +483,7 @@ function resolveMaterialName(mesh: Mesh): string {
  * wrong are the ones that fail silently.
  *
  * Nothing here touches the network -- it is a check on the *contract*, run
- * before the fetch, and the three things it guards all render:
+ * before the fetch, and the three kinds of thing it guards all render:
  *
  *   - a material list that has drifted from the pipeline's, which paints the
  *     Opera House's shells in bridge steel and reads as a taste decision;
@@ -461,15 +524,22 @@ export function verifyLandmarks(
     );
   }
 
-  // The three published dimensions, checked against the manifest rather than
-  // against the geometry -- the geometry is `sydney landmark-audit`'s job and
-  // needs the file. This catches a manifest that was written from a build where
-  // one of them had been lost, which is silent in every frame.
+  // The published dimensions, checked against the manifest rather than against
+  // the geometry -- the geometry is `sydney landmark-audit`'s job and needs the
+  // file. This catches a manifest that was written from a build where one of
+  // them had been lost, which is silent in every frame.
+  //
+  // Luna Park's entry is the tower height rather than a height above the datum,
+  // and that is the same point `landmarks.py` makes at length: the park's ground
+  // in this world is a DEM cliff that is not there in Sydney, so its dimensions
+  // are quoted above its own pad and an AHD assertion here would be asserting
+  // the cliff.
   const expect: Array<[string, string, number, number]> = [
     ['harbour_bridge', 'arch_apex_ahd', 134.0, 0.05],
     ['harbour_bridge', 'deck_ahd', 49.0, 0.05],
     ['opera_house', 'shell_max_ahd', 67.0, 0.05],
     ['sydney_tower', 'height_m', 309.0, 0.05],
+    ['luna_park', 'tower_height_m', 26.0, 0.05],
   ];
   for (const [name, key, target, tol] of expect) {
     const item = contract.items?.find((i) => i.name === name);

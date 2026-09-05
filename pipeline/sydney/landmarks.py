@@ -1,15 +1,17 @@
-"""The three hero landmarks, built parametrically to published dimensions.
+"""The four hero landmarks, built parametrically to published dimensions.
 
 Everything else in this pipeline is a *rule* applied to a dataset: a footprint is
 extruded, a road is ribboned, a tree is scattered. That works because the city is
 made of thousands of things nobody looks at twice. It fails completely on the
-three objects the city is actually recognised by -- the Harbour Bridge extruded
-from its OSM outline is a 49 m slab of asphalt lying on the water, the Opera
-House is a 30 m warehouse blob, and Sydney Tower is not in the world at all
+handful of objects the city is actually recognised by -- the Harbour Bridge
+extruded from its OSM outline is a 49 m slab of asphalt lying on the water, the
+Opera House is a 30 m warehouse blob, Sydney Tower is not in the world at all
 (OSM tags it `man_made=tower` with no `building`, so `read_buildings` never sees
-it).
+it), and Luna Park -- the one of the four a Sydneysider has actually *walked
+into* -- comes out as a dozen cream warehouse boxes on the Milsons Point
+foreshore with no face on any of them.
 
-So these three are hand-authored, and this module is where the authoring lives.
+So these four are hand-authored, and this module is where the authoring lives.
 
 WHY PARAMETRIC AND NOT A DOWNLOADED MESH. Three reasons and they all matter more
 than the modelling time: a third-party mesh arrives with a licence this project
@@ -21,12 +23,20 @@ already reads correctly under `sky/calibration.ts`'s rig.
 
 WHAT "PARAMETRIC" MUST NOT MEAN HERE. The whole complaint that produced this pass
 is that the procedural city swallowed the landmarks, so a landmark that reads as
-a nicer box has failed. The test each of the three has to pass is silhouette at a
+a nicer box has failed. The test each of the four has to pass is silhouette at a
 kilometre: the bridge is a *trussed arch with four pylons*, the Opera House is
 *spherical shells*, the tower is *a gold turret on a white stalk with a cable
-fan*. Every triangle below is spent on one of those three readings and the
+fan*, and Luna Park is *a grinning face between two Art Deco towers with a wheel
+behind it*. Every triangle below is spent on one of those four readings and the
 detail that does not change the silhouette (rivets, mullions, cladding joints) is
 deliberately absent.
+
+LUNA PARK IS THE ONE READ AT TWO HUNDRED METRES, NOT AT A KILOMETRE, and that
+changes where its triangles go. Nothing in the park is tall; what makes it
+recognisable is a nine-metre painted face you stand in front of. So the face and
+its two towers carry roughly a third of the model's triangles and the halls
+behind them are boxes with roofs -- the opposite of the split the bridge wants,
+and correct for the same reason: spend on the thing that carries the reading.
 
 ---------------------------------------------------------------------------
 Frames, because there are three of them and mixing two is the one bug here that
@@ -65,19 +75,24 @@ from dataclasses import dataclass, field
 
 import mapbox_earcut
 import numpy as np
-from shapely.geometry import Polygon
+from shapely.geometry import MultiPolygon, Polygon
 from shapely.ops import unary_union
 
 from . import geo
 
 # --- Materials ---------------------------------------------------------------
 
-# Five surfaces and one road. Small on purpose: every one of them is a *shared*
-# instance on the client, so the whole of the landmark set is six pipelines.
+# Five surfaces, one road, and four tins of paint. Small on purpose: every one of
+# them is a *shared* instance on the client, so the whole of the landmark set is
+# ten pipelines.
 #
 # Not append-only -- nothing indexes these positionally. The GLB names its
 # materials and the client looks them up by name, which is affordable here
-# precisely because there are six of them rather than 33,651 buildings' worth.
+# precisely because there are ten of them rather than 33,651 buildings' worth.
+# The **order still has to match** `client/src/world/landmarks.ts`, because
+# `verifyLandmarks` compares the two lists as strings at boot: that check is not
+# about rendering, it is about proving the world and the client came out of the
+# same revision.
 LANDMARK_MATERIALS = (
     # Painted structural steel. The bridge is "Harbour Grey", a warm mid grey
     # that photographs almost silver in full sun and near-black in the shade
@@ -101,6 +116,34 @@ LANDMARK_MATERIALS = (
     # because it is the one landmark surface a player stands on, and it has to
     # read as road from the deck rather than as painted steel.
     "landmark_asphalt",
+    # --- Luna Park's paint box, and it is a *box* rather than one slot with a
+    # vertex colour for a reason that is about the client: every material here is
+    # one shared `MeshStandardNodeMaterial` instance, and adding a COLOR_0
+    # attribute to carry four values would put a per-vertex stream on every
+    # primitive in the file -- including the bridge's 34,000 vertices, which are
+    # all one grey. Four flat materials cost four draw calls on one node and
+    # nothing anywhere else.
+    #
+    # The four are the amusement-park palette of the 1930s and they are chosen as
+    # a *set*: cream against three saturated primaries, which is what a
+    # sideshow-alley paint job is, and what stops the halls reading as the same
+    # render-painted boxes the suburb around them is made of.
+    #
+    # Cream rather than white. The face, the towers and the halls are painted a
+    # warm off-white; a true white next to the red would blow out under the rig's
+    # sun and read as plastic, the same trap the Opera House's tiles are cream to
+    # avoid.
+    "landmark_paint_white",
+    # The lips, the trim bands, the turret roofs and half the rays. A deep
+    # signwriter's red with a trace of orange in it, not a fire-engine red.
+    "landmark_paint_red",
+    # The other half of the rays, and Coney Island's bay panels. Ochre-leaning,
+    # because a lemon yellow at this saturation reads as a warning sign.
+    "landmark_paint_yellow",
+    # The eyes, and the cornice above Coney Island's front. The one cool colour
+    # in the park, and it is spent almost entirely on two 2 m discs -- which is
+    # the point, because they are what the face is looking at you with.
+    "landmark_paint_blue",
 )
 LANDMARK_MATERIAL_INDEX = {m: i for i, m in enumerate(LANDMARK_MATERIALS)}
 
@@ -193,6 +236,80 @@ TOWER_TURRET_PROFILE: tuple[tuple[float, float], ...] = (
     (265.0, 3.2),
 )
 
+# Luna Park Sydney, Milsons Point, opened 4 October 1935. Heights here are above
+# **the park's own ground**, not AHD, and that is not laziness: the whole park is
+# built on reclaimed flat at three or four metres above the harbour, and the DEM
+# this world is solved from has no idea -- it runs the Milsons Point cliff
+# straight through the site, from -3.5 m AHD at the water's edge to +25 m AHD
+# eighty metres inland. Quoting a park building in AHD would be quoting it
+# against a hillside that is not there. Every number below is therefore a height
+# above the structure's own pad, which is the same convention `mesh.py` gives the
+# 33,651 generic buildings.
+LUNA_TOWER_HEIGHT = 26.0  # the two Art Deco entrance towers, 1930s, to the finial
+LUNA_FACE_WIDTH = 9.0  # the Face itself, hung between them, facing the wharf
+LUNA_WHEEL_HEIGHT = 35.0  # the Ferris Wheel, 24 gondolas
+LUNA_WHEEL_GONDOLAS = 24
+# The Face's surround. The nine metres above is the painted face; the rayed
+# sunburst it is set into is half as wide again, and it is the sunburst that does
+# the work at two hundred metres because it is the part with two colours in it.
+LUNA_SUNBURST_RADIUS = 7.4
+# How high the Face's centre sits above the entrance pad. Low enough that the
+# mouth is the way in rather than a window, and high enough that the sunburst's
+# eastern rays clear the DEM's bank -- which climbs five metres across the width
+# of the entrance and would otherwise bury a quarter of the composition.
+LUNA_FACE_CENTRE = 10.2
+
+# What the generic pipeline currently makes of the park, as **measured off the
+# shipped `buildings` table**, in metres above each footprint's own pad.
+#
+# This is here because of a sequencing fact rather than a modelling one. The
+# world is refreshed landmark-only -- a 5.3 km terrain solve and a new
+# `landmarks.glb`, no 60 km build -- so `suppression_zones` below does not take
+# effect until the *next* full build, and until then the generic boxes for these
+# footprints are still in the streamed tiles, standing inside the hero model. So
+# every hall here is sized to **envelope** its box: eaves at or above the box's
+# top (a hip roof does not contain the box's corners, so it is the eaves that
+# have to clear it, not the ridge) and the footprint buffered outwards. The
+# numbers are not guesses -- `attributes.resolve_height` classifies most of the
+# park as `warehouse` and gives it twelve metres, which is why Crystal Palace has
+# to be a thirteen-metre hall rather than the ten-metre one it really is.
+LUNA_ENVELOPE_M = 0.3  # clearance past the generic box, every side and above
+LUNA_GENERIC_TOPS: dict[str, float] = {
+    "luna_gate_w": 11.5,
+    "luna_gate_e": 11.5,
+    "luna_gate_roof": 12.0,
+    "luna_crystal_palace": 12.0,
+    "luna_coney_island": 12.0,
+    "luna_big_top": 12.0,
+    "luna_big_top_annexe": 16.3,
+    "luna_lounge": 7.3,
+    "luna_administration": 6.3,
+    "luna_helter_skelter": 11.5,
+    "luna_carousel": 11.5,
+}
+
+# The halls, in metres above their own pads: (eaves, ridge). Every eaves figure
+# clears `LUNA_GENERIC_TOPS` by `LUNA_ENVELOPE_M`; the ridge is the shape.
+LUNA_CRYSTAL_EAVES, LUNA_CRYSTAL_RIDGE = 13.0, 17.4
+LUNA_CRYSTAL_TURRET, LUNA_CRYSTAL_SPIRE = 14.6, 21.5
+LUNA_CRYSTAL_BAYS = 13  # the thirteen bays of the two-storey hall
+LUNA_CONEY_EAVES, LUNA_CONEY_RIDGE = 13.0, 16.6
+LUNA_CONEY_BAYS = 12
+LUNA_BIGTOP_EAVES, LUNA_BIGTOP_CROWN = 13.2, 18.4
+LUNA_ANNEXE_EAVES, LUNA_ANNEXE_CROWN = 17.2, 19.8
+LUNA_LOUNGE_EAVES, LUNA_LOUNGE_RIDGE = 8.2, 11.4
+LUNA_ADMIN_TOP, LUNA_ADMIN_PARAPET = 7.2, 8.1
+LUNA_ENTRANCE_TOP = 18.0  # the block the Face is hung on, over a 12 m OSM stub
+
+# How far a landmark's walls run below their own pad, and it is the same argument
+# `mesh.WALL_SKIRT` makes for the city: one flat pad per structure, because a
+# tilted building is worse than a pad that cuts into a slope, and then enough
+# buried wall that the ground never falls away from under it. Unlike `mesh`
+# there is no ceiling on the depth here -- the park sits on a DEM cliff, Crystal
+# Palace's footprint spans seventeen metres of it, and a capped skirt on that
+# footprint is a hole a player can look up through.
+LUNA_SKIRT_MIN = 1.5
+
 
 # --- Suppression ---------------------------------------------------------------
 
@@ -223,39 +340,110 @@ class Anchor:
     source: str  # 'osm' | 'fallback'
 
 
-# What each anchor is, as (OSM name, the tag that selects it). Matched on name
-# and tag rather than on way id: an id is stable in practice and is exactly the
-# thing that is not stable when a mapper splits a way.
-_ANCHOR_QUERIES: tuple[tuple[str, str, str, str], ...] = (
-    ("bridge_deck", "Sydney Harbour Bridge", "man_made", "bridge"),
-    ("bridge_pylons_s", "Sydney Harbour Bridge - South Pylons", "building", "yes"),
-    ("bridge_pylons_n", "Sydney Harbour Bridge - North Pylons", "building", "yes"),
-    ("opera", "Sydney Opera House", "building", "yes"),
-    ("tower", "Sydney Tower", "man_made", "tower"),
+@dataclass(frozen=True)
+class _AnchorQuery:
+    """How one anchor is picked out of forty thousand multipolygons.
+
+    Two selectors, and the second exists because Luna Park's entrance does not
+    have the thing the first one needs.
+
+      * **By name and tag** -- the original, and the right rule wherever the
+        feature has a name. Matched on name and tag rather than on way id: an id
+        is stable in practice and is exactly the thing that is not stable when a
+        mapper splits a way.
+      * **By tag, nearest to the fallback point** (`near_m` set, `name` None) --
+        for a feature OSM leaves unnamed. The two entrance towers are a bare
+        `historic=city_gate` each and the harbour promenade is a bare
+        `man_made=pier`; there is nothing to match on but the tag and where the
+        thing is. Nearest-to-the-fallback rather than first-found, because
+        "first" is whatever order the extract happens to be in and there are two
+        city gates and two piers inside the radius.
+
+    `name` is compared with its runs of whitespace collapsed. OSM has the Luna
+    Park big wheel as `Ferris  Wheel`, with two spaces, and a literal that
+    reproduced the typo would break the day somebody fixed it.
+    """
+
+    key: str
+    name: str | None
+    tag: str
+    value: str
+    near_m: float | None = None
+
+
+def _tidy(name: str) -> str:
+    return " ".join(name.split())
+
+
+_ANCHOR_QUERIES: tuple[_AnchorQuery, ...] = (
+    _AnchorQuery("bridge_deck", "Sydney Harbour Bridge", "man_made", "bridge"),
+    _AnchorQuery("bridge_pylons_s", "Sydney Harbour Bridge - South Pylons", "building", "yes"),
+    _AnchorQuery("bridge_pylons_n", "Sydney Harbour Bridge - North Pylons", "building", "yes"),
+    _AnchorQuery("opera", "Sydney Opera House", "building", "yes"),
+    _AnchorQuery("tower", "Sydney Tower", "man_made", "tower"),
+    # --- Luna Park. The entrance first, because it is the landmark.
+    _AnchorQuery("luna_gate_w", None, "historic", "city_gate", near_m=60.0),
+    _AnchorQuery("luna_gate_e", None, "historic", "city_gate", near_m=60.0),
+    _AnchorQuery("luna_gate_roof", None, "building", "roof", near_m=12.0),
+    _AnchorQuery("luna_crystal_palace", "Crystal Palace", "building", "yes"),
+    _AnchorQuery("luna_coney_island", "Coney Island Funny Land", "building", "yes"),
+    # Two polygons carry `name=Big Top`; they are the hall and its annexe, and
+    # both are wanted, so they are selected by position rather than by name.
+    _AnchorQuery("luna_big_top", "Big Top", "amenity", "events_venue", near_m=40.0),
+    _AnchorQuery("luna_big_top_annexe", "Big Top", "amenity", "events_venue", near_m=40.0),
+    _AnchorQuery("luna_ferris_wheel", "Ferris Wheel", "attraction", "big_wheel"),
+    _AnchorQuery("luna_boardwalk", None, "man_made", "pier", near_m=60.0),
+    _AnchorQuery("luna_carousel", "Carousel", "attraction", "amusement_ride"),
+    _AnchorQuery("luna_helter_skelter", "Helter Skelter", "man_made", "tower"),
+    _AnchorQuery("luna_lounge", "Luna Lounge", "amenity", "bar"),
+    _AnchorQuery("luna_administration", "Administration", "building", "yes"),
 )
 
-# The measured centroids, as of the extract this was written against. Used only
-# when the OSM read finds nothing, so that a landmark can never silently vanish
-# from the skyline because a mapper renamed a way -- it lands in the right place
-# with a coarse outline and the build report says `fallback`.
+# The measured centroids, as of the extract this was written against. Used when
+# the OSM read finds nothing, so that a landmark can never silently vanish from
+# the skyline because a mapper renamed a way -- it lands in the right place with
+# a coarse outline and the build report says `fallback`. For a `near_m` query
+# these are load-bearing rather than a fallback: they are the point the nearest
+# match is measured from.
 _ANCHOR_FALLBACK: dict[str, tuple[float, float]] = {
     "bridge_deck": (95.6, 1834.1),
     "bridge_pylons_s": (-31.2, 1581.4),
     "bridge_pylons_n": (222.0, 2086.5),
     "opera": (516.3, 1305.5),
     "tower": (-29.4, -188.6),
+    "luna_gate_w": (75.9, 2190.4),
+    "luna_gate_e": (89.0, 2191.8),
+    "luna_gate_roof": (82.4, 2191.0),
+    "luna_crystal_palace": (1.5, 2285.8),
+    "luna_coney_island": (1.6, 2424.8),
+    "luna_big_top": (36.2, 2321.0),
+    "luna_big_top_annexe": (25.3, 2357.7),
+    "luna_ferris_wheel": (33.9, 2235.8),
+    "luna_boardwalk": (-11.7, 2321.6),
+    "luna_carousel": (55.0, 2243.3),
+    "luna_helter_skelter": (50.2, 2251.2),
+    "luna_lounge": (54.8, 2214.0),
+    "luna_administration": (64.2, 2281.5),
 }
 
 
 def read_anchors(radius_m: float = 4000.0) -> dict[str, Anchor]:
-    """The five OSM features the three landmarks are registered to.
+    """The OSM features the four landmarks are registered to.
 
     One pass over the `multipolygons` layer, which is the same read
     `osm.read_buildings` does and costs about the same. Deliberately not folded
-    into that call: two of these five are not buildings at all (the bridge deck
-    is `man_made=bridge`, and Sydney Tower carries no `building` tag, which is
-    precisely why it has never been in the world), so a reader filtered to
+    into that call: several of these are not buildings at all (the bridge deck is
+    `man_made=bridge`, Sydney Tower carries no `building` tag -- which is
+    precisely why it has never been in the world -- and Luna Park's wheel and
+    promenade are an `attraction` and a `pier`), so a reader filtered to
     buildings could not return them.
+
+    Each candidate is kept only if it **beats what is already held** for that
+    key: nearer to the query's point for a `near_m` query, larger in plan for a
+    named one. Both rules are there to make the answer independent of the order
+    the extract happens to be in, which the previous first-match-wins rule was
+    not -- and which mattered the moment Luna Park arrived with two city gates,
+    two piers and two polygons called Big Top.
     """
     from .sources import osm
 
@@ -263,10 +451,17 @@ def read_anchors(radius_m: float = 4000.0) -> dict[str, Anchor]:
     geoms, attrs = osm._read_layer(osm.PBF_PATH, "multipolygons", bbox)
 
     found: dict[str, Anchor] = {}
+    score: dict[str, float] = {}
+    # A `near_m` key may not take the polygon a sibling key has already claimed:
+    # the two entrance towers are the same tag 13 m apart, and without this both
+    # would settle on whichever one is nearer to both fallbacks.
+    claimed: dict[str, str] = {}
     for geom, a in zip(geoms, attrs):
-        name = (a.get("name") or "").strip()
-        for key, want_name, tag, value in _ANCHOR_QUERIES:
-            if key in found or name != want_name or a.get(tag) != value:
+        name = _tidy(a.get("name") or "")
+        for q in _ANCHOR_QUERIES:
+            if a.get(q.tag) != q.value:
+                continue
+            if q.name is not None and name != _tidy(q.name):
                 continue
             proj = osm._project(geom)
             polys = list(proj.geoms) if proj.geom_type == "MultiPolygon" else [proj]
@@ -274,18 +469,48 @@ def read_anchors(radius_m: float = 4000.0) -> dict[str, Anchor]:
             if poly.is_empty:
                 continue
             c = poly.centroid
-            found[key] = Anchor(
-                name=key,
+            here = (float(c.x), float(c.y))
+            if q.near_m is not None:
+                pe, pn = _ANCHOR_FALLBACK[q.key]
+                rank = math.hypot(here[0] - pe, here[1] - pn)
+                if rank > q.near_m:
+                    continue
+            else:
+                rank = -float(poly.area)
+            if q.key in score and score[q.key] <= rank:
+                continue
+            found[q.key] = Anchor(
+                name=q.key,
                 ring=np.asarray(poly.exterior.coords, dtype=np.float64),
-                centroid=(float(c.x), float(c.y)),
+                centroid=here,
                 source="osm",
             )
+            score[q.key] = rank
 
-    for key, _, _, _ in _ANCHOR_QUERIES:
-        if key not in found:
-            e, n = _ANCHOR_FALLBACK[key]
-            found[key] = Anchor(
-                name=key,
+    # Sibling keys that landed on the same polygon: the loop above cannot see the
+    # clash because it runs per feature, so it is resolved here, by letting the
+    # key whose own fallback is nearer keep it and re-reading the other from its
+    # fallback outline. In practice this never fires -- the two gates and the two
+    # Big Top polygons each sit nearest their own point -- and it is here so that
+    # a future double claim is a coarse anchor rather than two towers in one
+    # place.
+    for q in _ANCHOR_QUERIES:
+        if q.near_m is None or q.key not in found:
+            continue
+        here = found[q.key].centroid
+        owner = claimed.get(f"{here[0]:.2f},{here[1]:.2f}")
+        if owner is None:
+            claimed[f"{here[0]:.2f},{here[1]:.2f}"] = q.key
+            continue
+        loser = q.key if score[q.key] >= score[owner] else owner
+        found.pop(loser)
+        score.pop(loser)
+
+    for q in _ANCHOR_QUERIES:
+        if q.key not in found:
+            e, n = _ANCHOR_FALLBACK[q.key]
+            found[q.key] = Anchor(
+                name=q.key,
                 ring=np.asarray(
                     [(e - 20, n - 20), (e + 20, n - 20), (e + 20, n + 20), (e - 20, n + 20)],
                     dtype=np.float64,
@@ -296,8 +521,8 @@ def read_anchors(radius_m: float = 4000.0) -> dict[str, Anchor]:
     return found
 
 
-def suppression_zones(anchors: dict[str, Anchor]) -> dict[str, Polygon]:
-    """The plan area each landmark claims, as one shapely polygon per landmark.
+def suppression_zones(anchors: dict[str, Anchor]) -> dict[str, Polygon | MultiPolygon]:
+    """The plan area each landmark claims, as one shapely geometry per landmark.
 
     A generic building whose **centroid** falls inside one of these is dropped
     from the build entirely -- out of the tiles, out of the collision payload and
@@ -313,7 +538,7 @@ def suppression_zones(anchors: dict[str, Anchor]) -> dict[str, Polygon]:
     go is the two 89 m pylon blobs, which are the deck's own structure mapped as
     buildings and would otherwise stand inside the hero pylons.
     """
-    zones: dict[str, Polygon] = {}
+    zones: dict[str, Polygon | MultiPolygon] = {}
 
     bridge_parts = [
         Polygon(anchors[k].ring).buffer(SUPPRESS_MARGIN_M)
@@ -334,6 +559,27 @@ def suppression_zones(anchors: dict[str, Anchor]) -> dict[str, Polygon]:
             _tower_podium_zone(anchors),
         ]
     )
+    # Luna Park's zone is the union of the eleven outlines the hero model is
+    # actually built on, and **not** the park's own `tourism=theme_park`
+    # boundary, which is 25,146 m2 and reaches north-east over Milsons Point
+    # station land and a row of apartment towers that belong in the world. The
+    # rule here is the same one the other three zones follow -- "inside the
+    # landmark", not "near it" -- and the consequence is that half a dozen small
+    # unnamed ride enclosures inside the park survive the build. They should:
+    # they are real sheds this model does not replace.
+    #
+    # It is therefore the one zone here that stays a **MultiPolygon**. The bridge
+    # zone collapses to a hull because its three parts are one continuous
+    # structure with a deck between them; eleven amusement-park sheds are not,
+    # and a hull over them would swallow exactly the station land this paragraph
+    # is about. `suppress` and `landmark-audit` both test with `.contains`, which
+    # does not care.
+    luna = [
+        Polygon(anchors[k].ring).buffer(SUPPRESS_MARGIN_M)
+        for k in LUNA_GENERIC_TOPS
+        if k in anchors
+    ]
+    zones["luna_park"] = unary_union([p for p in luna if p.is_valid and not p.is_empty])
     return zones
 
 
@@ -1674,7 +1920,7 @@ def build_opera(anchors: dict[str, Anchor], terrain) -> Landmark:
 def build_tower(anchors: dict[str, Anchor], terrain) -> Landmark:
     """Sydney Tower: podium, white stalk, gold turret, spire, 56 cables.
 
-    The one landmark of the three that is not in the world at all today, and the
+    The one landmark of the four that is not in the world at all today, and the
     reason is a tagging accident rather than a modelling one: OSM carries it as
     `man_made=tower` with no `building` key, and `osm.read_buildings` filters on
     `building`. So the tallest structure in Sydney has never had a footprint in
@@ -1837,11 +2083,916 @@ def _disc_enu(e0: float, n0: float, radius: float, segments: int) -> np.ndarray:
     )
 
 
+# --- Luna Park -----------------------------------------------------------------
+#
+# The other three landmarks are read from a kilometre away and are modelled to
+# their silhouettes. Luna Park is read from the Milsons Point wharf, from the
+# bridge deck and from the water off Lavender Bay -- two hundred metres, not two
+# thousand -- and what is being recognised is not a shape but a *face*. So the
+# triangles go on the face, and the halls behind it are what they are: painted
+# sheds with roofs on.
+#
+# THE GROUND IS THE PROBLEM HERE AND IT IS WORTH NAMING BEFORE ANY GEOMETRY.
+# The real park is flat, three or four metres above the harbour, on reclaimed
+# land behind a seawall. This world's terrain is solved from a DEM that has the
+# Milsons Point cliff running straight through the site: -3.5 m AHD at the
+# water's edge and +25 m AHD eighty metres inland, a rise of nine and a half
+# metres between the two entrance towers, which stand thirteen metres apart. The
+# model cannot flatten that -- the terrain is baked, and the streets and the
+# station above the park are solved against it, so a landmark that levelled its
+# own ground would leave a cliff of daylight around itself.
+#
+# So the park is built the way the city around it is: one flat pad per structure
+# at its own footprint centroid, walls run down past the lowest ground under that
+# footprint so nothing can float, and where two structures have to *look* like a
+# pair -- the entrance towers -- they share one pad and the uphill one buries its
+# plinth rather than standing nine metres higher. Matched tops, buried plinth.
+
+
+def _luna_grow(ring, by: float) -> np.ndarray:
+    """A footprint pushed outwards, mitred, with its collinear noise removed.
+
+    Mitred rather than rounded because these are all rectangular buildings and a
+    rounded buffer puts sixteen vertices on every corner of a shed; simplified
+    afterwards because OSM traces Crystal Palace with a vertex every two metres
+    and a thirteen-bay wall does not need twenty-six of them.
+    """
+    poly = Polygon(np.asarray(ring, dtype=np.float64)).buffer(
+        by, join_style=2, mitre_limit=2.0
+    )
+    if poly.geom_type == "MultiPolygon":
+        poly = max(poly.geoms, key=lambda p: p.area)
+    poly = poly.simplify(0.35, preserve_topology=True)
+    r = np.asarray(poly.exterior.coords, dtype=np.float64)
+    return r[:-1] if np.allclose(r[0], r[-1]) else r
+
+
+def _luna_local(b: _Builder, ring) -> list[tuple[float, float]]:
+    """An ENU ring in the builder's local (x, z). `w()` with the height dropped."""
+    return [(float(e - b.ae), float(-(n - b.an))) for e, n in np.asarray(ring)]
+
+
+def _luna_out(b: _Builder, direction) -> np.ndarray:
+    """An ENU direction as a world-space vector, for `face`'s outward normal."""
+    return np.array([float(direction[0]), 0.0, -float(direction[1])])
+
+
+def _luna_pad(terrain, ring) -> tuple[float, float]:
+    """`(pad, floor)` for one footprint: where it stands, and how deep it buries.
+
+    The pad is the ground at the footprint's own centroid -- `mesh.WALL_SKIRT`'s
+    convention, whose argument applies here word for word: a real building sits
+    on a levelled pad, and a tilted hall is far worse than a pad that daylight-
+    cuts into a slope. The floor is the lowest ground anywhere under the
+    footprint, less a metre and a half, which is what closes the gap the pad
+    opens on the downhill side. Unlike `mesh` there is no ceiling on that depth:
+    Crystal Palace's footprint spans seventeen metres of the DEM's cliff, and a
+    capped skirt on it is a hole a player can look up through.
+    """
+    poly = Polygon(np.asarray(ring, dtype=np.float64))
+    c = poly.centroid
+    pad = float(terrain.sample(float(c.x), float(c.y)))
+    low = min(float(terrain.sample(float(e), float(n))) for e, n in np.asarray(ring))
+    return pad, min(low, pad) - LUNA_SKIRT_MIN
+
+
+def _luna_rect(ring):
+    """`(corners, along, length, width, centre)` of a footprint's minimum rectangle.
+
+    `corners` is rolled so that `corners[0] -> corners[1]` is always a long edge.
+    Returns None when the rectangle is more than a third bigger than the
+    footprint it encloses, which is this function saying *do not put a hip roof
+    on me*: Crystal Palace, Coney Island and the Big Top are parallelograms whose
+    rectangles fit within a per cent, where the Administration building is a bent
+    L whose rectangle is nearly three times its area -- and a hip roof built on
+    that would float over the yard next door.
+    """
+    poly = Polygon(np.asarray(ring, dtype=np.float64))
+    rect = poly.minimum_rotated_rectangle
+    if rect.geom_type != "Polygon" or rect.area > 1.35 * poly.area:
+        return None
+    p = np.asarray(rect.exterior.coords, dtype=np.float64)[:-1]
+    if len(p) != 4:
+        return None
+    e0, e1 = p[1] - p[0], p[2] - p[1]
+    l0, l1 = float(np.linalg.norm(e0)), float(np.linalg.norm(e1))
+    if l0 < l1:
+        p = np.roll(p, -1, axis=0)
+        e0, l0, l1 = e1, l1, l0
+    return p, e0 / max(l0, 1e-9), l0, l1, p.mean(axis=0)
+
+
+def _luna_roof_face(b: _Builder, material: str, pts) -> None:
+    """One roof plane, wound to face upwards."""
+    v = [np.asarray(q, dtype=np.float64) for q in pts]
+    n = np.cross(v[1] - v[0], v[2] - v[0])
+    if float(np.linalg.norm(n)) < 1e-9:
+        return
+    b.face(material, v, -n if n[1] < 0.0 else n)
+
+
+def _luna_hip(b: _Builder, material: str, ring, y_eaves: float, y_ridge: float) -> None:
+    """A hip roof: two trapezoids over the long walls, a triangle over each end.
+
+    Built on the minimum rotated rectangle rather than on the footprint itself,
+    which is a straight-skeleton problem this file has no business solving for
+    six sheds -- and which would answer the same thing anyway, because every one
+    of them is a parallelogram. A footprint that will not take a rectangle gets a
+    flat lid instead, which is a roof form and not a failure.
+    """
+    fit = _luna_rect(ring)
+    if fit is None:
+        b.cap(material, _luna_local(b, _luna_grow(ring, 0.45)), y_eaves, up=True)
+        return
+    p, u, length, width, centre = fit
+    half = max((length - width) * 0.5, 0.6)
+    r0, r1 = centre - u * half, centre + u * half
+
+    def at(q, y):
+        return b.w(float(q[0]), float(q[1]), y)
+
+    _luna_roof_face(b, material, (at(p[0], y_eaves), at(p[1], y_eaves),
+                                  at(r1, y_ridge), at(r0, y_ridge)))
+    _luna_roof_face(b, material, (at(p[2], y_eaves), at(p[3], y_eaves),
+                                  at(r0, y_ridge), at(r1, y_ridge)))
+    _luna_roof_face(b, material, (at(p[1], y_eaves), at(p[2], y_eaves), at(r1, y_ridge)))
+    _luna_roof_face(b, material, (at(p[3], y_eaves), at(p[0], y_eaves), at(r0, y_ridge)))
+
+
+def _luna_vault(b: _Builder, material: str, ring, y_eaves: float, y_crown: float,
+                steps: int = 8) -> None:
+    """A shallow segmental vault along a footprint's long axis. The Big Top's roof.
+
+    A parabola rather than a circular arc, because the rise wanted here is a
+    seventh of the span and a circular segment that shallow is indistinguishable
+    from one -- and a parabola is two multiplies where an arc is a `sin`.
+
+    The two gables are emitted with the vault's own axis as their outward normal
+    rather than through `_luna_roof_face`, which decides winding by which way is
+    up: a gable is vertical, its `n[1]` is zero, and the tie-break would be
+    floating-point noise -- a gable culled away is a hole into the shed.
+    """
+    fit = _luna_rect(ring)
+    if fit is None:
+        b.cap(material, _luna_local(b, _luna_grow(ring, 0.45)), y_eaves, up=True)
+        return
+    _p, u, length, width, centre = fit
+    across = np.array([-u[1], u[0]])
+    rows = []
+    for end in (-0.5, 0.5):
+        row = []
+        for k in range(steps + 1):
+            t = -1.0 + 2.0 * k / steps
+            q = centre + u * (length * end) + across * (width * 0.5 * t)
+            row.append(b.w(float(q[0]), float(q[1]),
+                           y_eaves + (y_crown - y_eaves) * (1.0 - t * t)))
+        rows.append(row)
+    b.strip(material, rows[0], rows[1])
+    b.face(material, rows[0], _luna_out(b, -u))
+    b.face(material, rows[1], _luna_out(b, u))
+
+
+def _luna_bays(b: _Builder, material: str, p0, p1, centre, count: int,
+               y0: float, y1: float, proud: float = 0.09, fill: float = 0.62) -> None:
+    """`count` panels along one wall, stood `proud` of it. The bay rhythm.
+
+    Panels rather than pilasters, and the reason is triangles: a panel is one
+    quad where a pilaster is a six-sided box, and at the distance this park is
+    read from the eye takes the *rhythm* either way. Thirteen bays on two storeys
+    of Crystal Palace's two long walls is 104 triangles.
+    """
+    a, c = np.asarray(p0, dtype=np.float64), np.asarray(p1, dtype=np.float64)
+    span = c - a
+    length = float(np.linalg.norm(span))
+    if length < 1e-6 or count < 1:
+        return
+    u = span / length
+    out = np.array([u[1], -u[0]])
+    if float(np.dot(out, (a + c) * 0.5 - np.asarray(centre, dtype=np.float64))) < 0.0:
+        out = -out
+    pitch = length / count
+    normal = _luna_out(b, out)
+    for i in range(count):
+        lo = a + u * (pitch * (i + 0.5 - fill * 0.5)) + out * proud
+        hi = a + u * (pitch * (i + 0.5 + fill * 0.5)) + out * proud
+        b.face(
+            material,
+            (b.w(float(lo[0]), float(lo[1]), y0), b.w(float(hi[0]), float(hi[1]), y0),
+             b.w(float(hi[0]), float(hi[1]), y1), b.w(float(lo[0]), float(lo[1]), y1)),
+            normal,
+        )
+
+
+def _luna_hall(
+    b: _Builder,
+    terrain,
+    ring,
+    *,
+    eaves: float,
+    ridge: float,
+    wall: str = "landmark_paint_white",
+    roof: str = "landmark_steel",
+    trim: str | None = "landmark_paint_red",
+    bays: int = 0,
+    bay_material: str = "landmark_glass",
+    vault: bool = False,
+) -> tuple[np.ndarray, float, float, float]:
+    """One painted shed: walls on a pad, two trim bands, a roof, a bay rhythm.
+
+    Returns `(grown ring, pad, lowest ground, eaves y)`, which is everything the
+    caller needs to hang a collision prism and a set of corner pavilions off the
+    same outline it just built.
+    """
+    grown = _luna_grow(ring, LUNA_ENVELOPE_M)
+    pad, floor = _luna_pad(terrain, grown)
+    y_eaves = pad + eaves
+    b.prism(wall, _luna_local(b, grown), floor, y_eaves, cap_top=False)
+    if vault:
+        _luna_vault(b, roof, grown, y_eaves, pad + ridge)
+    else:
+        _luna_hip(b, roof, grown, y_eaves, pad + ridge)
+    if trim is not None:
+        # A string course between the two storeys and a cornice under the eaves.
+        # Bands with a shadow under them rather than painted stripes, because
+        # that is what stops a sixty-metre wall reading as a plane.
+        band = _luna_local(b, _luna_grow(grown, 0.16))
+        b.prism(trim, band, pad + eaves * 0.5 - 0.28, pad + eaves * 0.5 + 0.28, cap_top=False)
+        b.prism(trim, band, y_eaves - 0.75, y_eaves, cap_top=False)
+    if bays:
+        fit = _luna_rect(grown)
+        if fit is not None:
+            p, _u, _l, _w, centre = fit
+            for a0, a1 in ((p[0], p[1]), (p[2], p[3])):
+                _luna_bays(b, bay_material, a0, a1, centre, bays,
+                           pad + 1.2, pad + eaves * 0.5 - 0.5)
+                _luna_bays(b, bay_material, a0, a1, centre, bays,
+                           pad + eaves * 0.5 + 0.5, y_eaves - 1.15)
+    return grown, pad, floor + LUNA_SKIRT_MIN, y_eaves
+
+
+def _luna_prism(ring, base: float, top: float, kind: str) -> Prism:
+    """A structure's collision volume: its own outline, from the ground to its top.
+
+    From the **lowest ground under the footprint** rather than from the pad, and
+    that is a deliberate departure from what `mesh` does for the generic city.
+    A generic prism starts at the pad because a generic footprint spans half a
+    metre of fall; Crystal Palace's spans seventeen, and a prism starting at its
+    pad would leave a player able to walk in under the downhill wall and stand
+    inside the hall looking up at the underside of nothing.
+    """
+    return Prism(np.asarray(ring, dtype=np.float64), base, max(top - base, 0.5), kind)
+
+
+def _luna_face_frame(anchors: dict[str, Anchor]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """`(centre, right, outward)` in ENU for the entrance, from the two gate towers.
+
+    Taken from the towers rather than from the canopy between them because the
+    towers are point-like where the canopy is a 9 m strip -- and because the pair
+    is what has to be square to the Face. The whole entrance is one composition,
+    and a face rotated two degrees off its own towers is the kind of wrongness
+    that has no name and is immediately visible.
+
+    Outward is the gate line turned a quarter turn toward the **south**, which is
+    Milsons Point wharf, which is where the queue is.
+    """
+    w = np.asarray(anchors["luna_gate_w"].centroid, dtype=np.float64)
+    e = np.asarray(anchors["luna_gate_e"].centroid, dtype=np.float64)
+    right = _norm2(e - w)
+    outward = np.array([right[1], -right[0]])
+    if outward[1] > 0.0:
+        outward = -outward
+    return (w + e) * 0.5, right, outward
+
+
+# How far south of the gate line the Face stands. The west tower's outline
+# reaches 2.9 m south of that line, so anything less than about 3.5 saws the coin
+# in half on the tower it is supposed to hang between.
+LUNA_FACE_STANDOFF = 3.6
+
+
+def _luna_face(b: _Builder, anchors: dict[str, Anchor], pad: float) -> float:
+    """The Face: a rayed coin with a grin on it, hung across the entrance block.
+
+    Modelled as a **relief on a coin** rather than as a moulded head, and the
+    argument is the Opera House chevron's: what carries at two hundred metres is
+    the arrangement of flat colours, not the modelling. The real thing is painted
+    sheet metal on a frame anyway.
+
+    The stack, front to back, is nine layers deep and each is a couple of
+    centimetres proud of the one behind it -- sunburst, face disc, eyes, irises,
+    pupils, brows, lips, teeth and their gaps, and the dark of the mouth, which
+    is the doorway and is why it is the darkest thing on the composition.
+
+    Returns the y of the top of the surround, which is what the entrance block
+    behind it has to reach.
+    """
+    centre, right, outward = _luna_face_frame(anchors)
+    origin = centre + outward * LUNA_FACE_STANDOFF
+    y0 = pad + LUNA_FACE_CENTRE
+    r_axis = _luna_out(b, right)
+    o_axis = _luna_out(b, outward)
+    base = b.w(float(origin[0]), float(origin[1]), y0)
+
+    def fp(u: float, v: float, o: float) -> np.ndarray:
+        return base + r_axis * u + np.array([0.0, v, 0.0]) + o_axis * o
+
+    def disc(material: str, cu: float, cv: float, o: float, radius: float,
+             segments: int = 20, squash: float = 1.0) -> None:
+        b.face(
+            material,
+            [fp(cu + radius * math.cos(2 * math.pi * i / segments),
+                cv + radius * squash * math.sin(2 * math.pi * i / segments), o)
+             for i in range(segments)],
+            o_axis,
+        )
+
+    def panel(material: str, u0: float, u1: float, v0: float, v1: float, o: float) -> None:
+        b.face(material, (fp(u0, v0, o), fp(u1, v0, o), fp(u1, v1, o), fp(u0, v1, o)), o_axis)
+
+    # --- The sunburst, as a twelve-point star: 24 arc points on alternating
+    # radii, fanned from the centre and painted a triangle at a time. A plain
+    # two-tone disc reads as a pinwheel; the alternating radius is what makes
+    # them rays, and the rays are what carry the object at range because they are
+    # the part of it with two colours in it.
+    rays, half = 24, 0.28
+    arc_f, arc_b = [], []
+    for i in range(rays):
+        t = 2 * math.pi * i / rays
+        rr = LUNA_SUNBURST_RADIUS if i % 2 == 0 else LUNA_SUNBURST_RADIUS * 0.68
+        arc_f.append(fp(rr * math.cos(t), rr * math.sin(t), half))
+        arc_b.append(fp(rr * math.cos(t), rr * math.sin(t), -half))
+    hub = fp(0.0, 0.0, half)
+    for i in range(rays):
+        b.face(
+            "landmark_paint_yellow" if i % 2 == 0 else "landmark_paint_red",
+            (hub, arc_f[i], arc_f[(i + 1) % rays]),
+            o_axis,
+        )
+    b.face("landmark_paint_white", arc_b, -o_axis)
+    b.strip("landmark_paint_white", arc_b + [arc_b[0]], arc_f + [arc_f[0]])
+
+    # --- The Face itself: the published nine metres across, cream, with a rim so
+    # it stands off the sunburst rather than reading as paint on it.
+    r_face = LUNA_FACE_WIDTH * 0.5
+    o = half + 0.22
+    rim_a = [fp(r_face * math.cos(2 * math.pi * i / 28),
+                r_face * math.sin(2 * math.pi * i / 28), half) for i in range(28)]
+    rim_b = [fp(r_face * math.cos(2 * math.pi * i / 28),
+                r_face * math.sin(2 * math.pi * i / 28), o) for i in range(28)]
+    b.strip("landmark_paint_white", rim_a + [rim_a[0]], rim_b + [rim_b[0]])
+    b.face("landmark_paint_white", rim_b, o_axis)
+
+    # --- Eyes: wide-set and high, which is most of why the thing reads as
+    # cheerful rather than as a moon.
+    for side in (-1.0, 1.0):
+        disc("landmark_paint_white", side * 1.80, 1.45, o + 0.04, 1.15, 16)
+        disc("landmark_paint_blue", side * 1.80, 1.45, o + 0.08, 0.74, 16)
+        disc("landmark_glass", side * 1.80, 1.38, o + 0.12, 0.30, 12)
+        panel("landmark_paint_red", side * 2.85, side * 0.80, 2.80, 3.20, o + 0.04)
+
+    # --- The grin, and getting it to read as one took two looks at the sheet.
+    #
+    # The first pass built the mouth as an ellipse of teeth inside an ellipse of
+    # lip, which came out *neutral at best*: an ellipse's upper edge is highest
+    # in the middle and falls away at the corners, which is the shape of a frown,
+    # and the face read as one shouting rather than one grinning. The second
+    # pass tried to shave the top off that with a big cream lens -- and the
+    # cream is the same paint as the teeth, so the lens and the teeth merged into
+    # one white blob wider than the lips it was supposed to be inside.
+    #
+    # So the mouth is drawn as what it is: **three concentric arcs of one big
+    # circle whose centre is up on the forehead**. Every boundary in it curves
+    # the same way, downward in the middle and up at the corners, because they
+    # are all struck from the same point -- which is the definition of a smile
+    # and needs no cutting. Lips outside, teeth inside them, a dark band along
+    # the bottom for the inside of the mouth, and seven radial gaps in the teeth
+    # that fan with the arc instead of standing vertical.
+    #
+    # Each band is emitted as its own quads with the Face's own outward normal
+    # rather than through `cap` or `face`: an annular sector is not convex, and
+    # `face` fans its polygon from the first vertex, which on a crescent puts
+    # half the triangles outside the shape.
+    smile_c, smile_span = 3.05, 0.66
+
+    def arc_band(material: str, r_in: float, r_out: float, span: float, depth: float,
+                 steps: int = 14) -> None:
+        for i in range(steps):
+            t0 = -span + 2.0 * span * i / steps
+            t1 = -span + 2.0 * span * (i + 1) / steps
+            b.face(
+                material,
+                (fp(r_in * math.sin(t0), smile_c - r_in * math.cos(t0), depth),
+                 fp(r_in * math.sin(t1), smile_c - r_in * math.cos(t1), depth),
+                 fp(r_out * math.sin(t1), smile_c - r_out * math.cos(t1), depth),
+                 fp(r_out * math.sin(t0), smile_c - r_out * math.cos(t0), depth)),
+                o_axis,
+            )
+
+    arc_band("landmark_paint_red", 4.35, 6.20, smile_span, o + 0.04)
+    arc_band("landmark_paint_white", 4.75, 5.72, smile_span * 0.93, o + 0.08, steps=12)
+    arc_band("landmark_glass", 5.72, 6.00, smile_span * 0.93, o + 0.08, steps=12)
+    for i in range(7):
+        t = -smile_span * 0.80 + 2.0 * smile_span * 0.80 * (i + 0.5) / 7.0
+        b.face(
+            "landmark_paint_red",
+            (fp(4.75 * math.sin(t - 0.014), smile_c - 4.75 * math.cos(t - 0.014), o + 0.12),
+             fp(4.75 * math.sin(t + 0.014), smile_c - 4.75 * math.cos(t + 0.014), o + 0.12),
+             fp(5.72 * math.sin(t + 0.014), smile_c - 5.72 * math.cos(t + 0.014), o + 0.12),
+             fp(5.72 * math.sin(t - 0.014), smile_c - 5.72 * math.cos(t - 0.014), o + 0.12)),
+            o_axis,
+        )
+    # A nose, one triangle of it: without one the eyes and the mouth are two
+    # separate objects sitting on a plate.
+    b.face("landmark_paint_red",
+           (fp(0.0, 0.86, o + 0.06), fp(-0.62, -0.02, o + 0.06), fp(0.62, -0.02, o + 0.06)),
+           o_axis)
+    return y0 + LUNA_SUNBURST_RADIUS
+
+
+def _luna_tower(b: _Builder, ring, floor: float, pad: float) -> None:
+    """One entrance tower: a fluted shaft, a banded collar, a stepped crown, a finial.
+
+    The 1935 towers are Chrysler in miniature -- a plain shaft, a collar, then
+    setbacks stepping in to a mast -- and they are modelled as exactly that, on
+    the gate's own OSM outline pushed out far enough to swallow the 11.5 m
+    generic stub standing inside it.
+
+    The finial is the one gold thing in the park, and that is two decisions at
+    once: these towers really do carry a gilded tip, and `landmark-audit` needs a
+    material that exists nowhere else in the node to measure the entrance's
+    placement from. The wheel is taller than the towers and the Big Top's vault
+    is close to them, so a probe on "the highest cream thing" would land
+    somewhere else in the park.
+    """
+    local = _luna_local(b, _luna_grow(ring, LUNA_ENVELOPE_M + 0.25))
+    centre = np.asarray(local, dtype=np.float64).mean(axis=0)
+    top = pad + LUNA_TOWER_HEIGHT
+
+    def scaled(f: float) -> list[tuple[float, float]]:
+        return [(float(centre[0] + (x - centre[0]) * f), float(centre[1] + (z - centre[1]) * f))
+                for x, z in local]
+
+    # The shaft is in two stages, and where the lower one ends is not a
+    # proportion of anything -- it is `LUNA_GENERIC_TOPS` plus clearance, because
+    # below that line the tower has to stay full width to keep the 11.5 m OSM
+    # stub inside it. Above it the tower is free to step in, and it does: the
+    # first sheet had a tower as wide at sixteen metres as at its base standing
+    # beside an entrance block nearly as tall, and the pair read as a gatehouse
+    # rather than as a pair of towers.
+    plinth_top = pad + LUNA_GENERIC_TOPS["luna_gate_w"] + LUNA_ENVELOPE_M
+    shaft_top = pad + LUNA_TOWER_HEIGHT * 0.62
+    b.prism("landmark_paint_white", local, floor, plinth_top, cap_top=False)
+    b.prism("landmark_paint_red", scaled(1.08), plinth_top - 0.55, plinth_top, cap_top=False)
+    shaft = scaled(0.76)
+    b.prism("landmark_paint_white", shaft, plinth_top, shaft_top, cap_top=False)
+    b.prism("landmark_paint_red", scaled(0.84), shaft_top, shaft_top + 1.0, cap_top=False)
+
+    # Two flutes a face, on the upper shaft. Thin boxes rather than a shader
+    # stripe, because the shadow down the side of one is the whole point of Art
+    # Deco fluting.
+    shaft_arr = np.asarray(shaft, dtype=np.float64)
+    for i in range(len(shaft_arr)):
+        a, c = shaft_arr[i], shaft_arr[(i + 1) % len(shaft_arr)]
+        seg = c - a
+        length = float(np.linalg.norm(seg))
+        if length < 1.4:
+            continue
+        u = seg / length
+        out = np.array([-u[1], u[0]])
+        if float(np.dot(out, a + seg * 0.5 - centre)) < 0.0:
+            out = -out
+        for k in range(2):
+            q = a + seg * (0.32 + 0.36 * k) + out * 0.10
+            b.beam("landmark_paint_white",
+                   np.array([q[0], plinth_top + 0.3, q[1]]),
+                   np.array([q[0], shaft_top, q[1]]),
+                   0.30, 0.26, up=(float(u[0]), 0.0, float(u[1])))
+
+    # The crown: four setbacks off the upper shaft, each shorter than the one
+    # below it, which is what makes a ziggurat read as tapering rather than as a
+    # stack of boxes.
+    y = shaft_top + 1.0
+    span = (top - 2.6) - y
+    for f, share in ((0.72, 0.30), (0.58, 0.25), (0.44, 0.21), (0.31, 0.16)):
+        y1 = y + span * share
+        b.prism("landmark_paint_white", scaled(f), y, y1, cap_top=True)
+        y = y1
+    cx, cz = float(centre[0]), float(centre[1])
+    b.frustum("landmark_gold", cx, cz, y, top - 1.0, 0.34, 0.16, segments=8)
+    b.frustum("landmark_gold", cx, cz, top - 1.0, top - 0.45, 0.16, 0.42, segments=10)
+    b.frustum("landmark_gold", cx, cz, top - 0.45, top, 0.42, 0.05, segments=10, cap_bottom=True)
+
+
+def _luna_wheel(b: _Builder, anchor: Anchor, terrain) -> list[Prism]:
+    """The Ferris Wheel: two rims of chords on an axle, two A-frames, 24 gondolas.
+
+    OSM maps the wheel as its 18 x 12 m fenced enclosure, which is the ground it
+    stands on and not the circle it turns in -- a 35 m wheel is 31 m across and
+    does not fit inside its own fence. So the enclosure gives the **plane**, from
+    its long axis, and the published height gives the size.
+
+    Chord beams rather than a tessellated ring: a Ferris wheel read against the
+    sky is a polygon of straight members, and a smooth hoop is a fairground ride
+    nobody ever built. The spokes are every second one for the same reason a
+    photograph of a wheel has fewer spokes in it than the wheel does -- a full
+    set at this scale is a grey disc.
+    """
+    fit = _luna_rect(anchor.ring)
+    e0, n0 = anchor.centroid
+    u = fit[1] if fit is not None else np.array([1.0, 0.0])
+    across = np.array([-u[1], u[0]])
+    pad = float(terrain.sample(e0, n0))
+    clearance = 3.5  # the gondolas' swing under the rim
+    radius = (LUNA_WHEEL_HEIGHT - clearance) * 0.5
+    hub = pad + clearance + radius
+    gauge = 3.2
+    centre = np.array([e0, n0])
+
+    def at(angle: float, r: float, side: float) -> np.ndarray:
+        q = centre + across * (gauge * 0.5 * side)
+        return b.w(float(q[0] + u[0] * r * math.cos(angle)),
+                   float(q[1] + u[1] * r * math.cos(angle)),
+                   hub + r * math.sin(angle))
+
+    segs = LUNA_WHEEL_GONDOLAS
+    for side in (-1.0, 1.0):
+        for i in range(segs):
+            a0, a1 = 2 * math.pi * i / segs, 2 * math.pi * (i + 1) / segs
+            b.beam("landmark_steel", at(a0, radius, side), at(a1, radius, side), 0.45, 0.45)
+            if i % 2 == 0:
+                b.beam("landmark_steel", at(a0, radius, side), at(a0, 0.0, side), 0.22, 0.22)
+    b.beam("landmark_steel", at(0.0, 0.0, -1.0), at(0.0, 0.0, 1.0), 1.1, 1.1)
+
+    # The gondolas, hung just inside the rim so the wheel keeps its published
+    # height at the top of the steel rather than at the top of a bucket.
+    for i in range(segs):
+        p = at(2 * math.pi * (i + 0.5) / segs, radius - 1.4, 0.0)
+        b.beam("landmark_paint_red" if i % 2 else "landmark_paint_blue",
+               p + np.array([0.0, 0.8, 0.0]), p - np.array([0.0, 0.8, 0.0]), 1.5, 1.5)
+
+    prisms: list[Prism] = []
+    for side in (-1.0, 1.0):
+        foot = centre + across * (gauge * 0.5 * side)
+        apex = b.w(float(foot[0]), float(foot[1]), hub)
+        for lean in (-1.0, 1.0):
+            q = foot + u * (radius * 0.55 * lean)
+            ground = float(terrain.sample(float(q[0]), float(q[1])))
+            b.beam("landmark_steel", b.w(float(q[0]), float(q[1]), ground - 1.0), apex, 0.9, 0.9)
+            prisms.append(Prism(_disc_enu(float(q[0]), float(q[1]), 1.4, 8), ground, 4.0, "wheel"))
+    return prisms
+
+
+def _luna_pavilions(b: _Builder, ring, pad: float) -> None:
+    """Crystal Palace's four corner pavilions and their steep pyramid caps.
+
+    The hall's own reading is a long roof; the four turrets are what make it
+    Crystal Palace rather than a shed, and over the Big Top from the north they
+    are the only part of it visible at all.
+    """
+    fit = _luna_rect(ring)
+    if fit is None:
+        return
+    p, u, _length, _width, centre = fit
+    across = np.array([-u[1], u[0]])
+    for corner in p:
+        d = corner - centre
+        seat = centre + u * (float(np.dot(d, u)) * 0.88) + across * (float(np.dot(d, across)) * 0.86)
+        half = 2.9
+        square = [
+            (float(seat[0] + (u[0] * su + across[0] * sv) * half),
+             float(seat[1] + (u[1] * su + across[1] * sv) * half))
+            for su, sv in ((-1, -1), (1, -1), (1, 1), (-1, 1))
+        ]
+        b.prism("landmark_paint_white", _luna_local(b, square), pad + 1.0,
+                pad + LUNA_CRYSTAL_TURRET, cap_top=False)
+        apex = b.w(float(seat[0]), float(seat[1]), pad + LUNA_CRYSTAL_SPIRE)
+        eave = [b.w(e, n, pad + LUNA_CRYSTAL_TURRET) for e, n in square]
+        for i in range(4):
+            _luna_roof_face(b, "landmark_paint_red", (eave[i], eave[(i + 1) % 4], apex))
+
+
+def _luna_pediment(b: _Builder, ring, pad: float, eaves: float) -> None:
+    """Coney Island's decorated front: a signboard gable over its southern wall.
+
+    1935 sideshow architecture is a plain shed with a face on the street, and
+    this is that face -- a raised parapet board with a blue roundel in it, stood
+    proud of the wall so it throws a shadow down onto it.
+    """
+    fit = _luna_rect(ring)
+    if fit is None:
+        return
+    p, u, length, _width, centre = fit
+    edge = p[0:2] if (p[0][1] + p[1][1]) < (p[2][1] + p[3][1]) else p[2:4]
+    mid = (edge[0] + edge[1]) * 0.5
+    out = _norm2(mid - centre)
+    half = min(length * 0.28, 11.0)
+    y0, y1 = pad + eaves - 0.6, pad + eaves + 3.4
+    board = [mid + u * half + out * 0.55, mid - u * half + out * 0.55]
+    b.prism("landmark_paint_red",
+            _luna_local(b, [board[0], board[1], board[1] - out * 0.7, board[0] - out * 0.7]),
+            y0, y1, cap_top=True)
+    seat = mid + out * 1.0
+    cy = (y0 + y1) * 0.5
+    b.face(
+        "landmark_paint_blue",
+        [b.w(float(seat[0] + u[0] * 1.45 * math.cos(2 * math.pi * i / 16)),
+             float(seat[1] + u[1] * 1.45 * math.cos(2 * math.pi * i / 16)),
+             cy + 1.45 * math.sin(2 * math.pi * i / 16)) for i in range(16)],
+        _luna_out(b, out),
+    )
+
+
+def _luna_carousel(b: _Builder, anchor: Anchor, terrain) -> None:
+    """The Carousel: a ring of poles on a plinth under a striped conical tent.
+
+    Sized to the ride rather than to the 11.5 m box `attributes` guessed over it,
+    which means that box is still there until the next full build and the
+    carousel is inside it. That is the right way round -- a nine-metre carousel
+    is correct forever where a twelve-metre one would be wrong forever -- and the
+    suppression zone below takes the box away at the next build.
+    """
+    e0, n0 = anchor.centroid
+    r = math.sqrt(max(Polygon(np.asarray(anchor.ring, dtype=np.float64)).area, 40.0) / math.pi)
+    # The plinth is 16 m across and the bank under it falls four and a half
+    # metres, so it is grounded off the ring rather than off the centre sample --
+    # a `terrain.sample(centre) - 1.5` plinth floats three metres clear on its
+    # western side, which the sheet showed and a centre sample cannot.
+    pad, floor = _luna_pad(terrain, _disc_enu(e0, n0, r, 12))
+    cx, cz = float(b.w(e0, n0, 0.0)[0]), float(b.w(e0, n0, 0.0)[2])
+    b.frustum("landmark_granite", cx, cz, floor, pad + 0.9, r, r, segments=16, cap_top=True)
+    for i in range(12):
+        t = 2 * math.pi * i / 12
+        q = (r * 0.86 * math.cos(t), r * 0.86 * math.sin(t))
+        b.beam("landmark_paint_red" if i % 2 else "landmark_paint_white",
+               b.w(e0 + q[0], n0 + q[1], pad + 0.9), b.w(e0 + q[0], n0 + q[1], pad + 4.6),
+               0.24, 0.24)
+    b.frustum("landmark_paint_red", cx, cz, pad + 4.6, pad + 5.4, r * 1.08, r * 1.02, segments=16)
+    b.frustum("landmark_paint_yellow", cx, cz, pad + 5.4, pad + 8.6, r * 1.02, 0.6, segments=16)
+    b.frustum("landmark_gold", cx, cz, pad + 8.6, pad + 9.4, 0.6, 0.08, segments=8, cap_bottom=True)
+
+
+def _luna_helter_skelter(b: _Builder, anchor: Anchor, terrain) -> None:
+    """The Helter Skelter: a banded drum with a conical cap.
+
+    The one small ride tall enough to swallow its own generic stub, which is why
+    it is here and the Volare, the Hair Raiser and the ride operator's hut are
+    not: a nineteen-square-metre shed inside an 11.5 m box cannot be modelled
+    truthfully and hidden at the same time.
+    """
+    e0, n0 = anchor.centroid
+    pad, floor = _luna_pad(terrain, _disc_enu(e0, n0, 2.6, 8))
+    cx, cz = float(b.w(e0, n0, 0.0)[0]), float(b.w(e0, n0, 0.0)[2])
+    top = pad + 12.4
+    b.frustum("landmark_paint_white", cx, cz, floor, top, 2.5, 2.3, segments=12)
+    for k in range(4):
+        y = pad + 1.6 + 2.7 * k
+        b.frustum("landmark_paint_red", cx, cz, y, y + 0.9, 2.45, 2.38, segments=12)
+    b.frustum("landmark_paint_red", cx, cz, top, top + 3.4, 2.7, 0.12, segments=12,
+              cap_bottom=True)
+
+
+def _luna_boardwalk(b: _Builder, anchor: Anchor, terrain) -> None:
+    """The harbourside promenade: a timber deck on the ground, railed on the water side.
+
+    The deck follows the terrain **per vertex** rather than sitting on one pad,
+    and it is the one thing in the park that has to: it runs 260 m from the wharf
+    round to Coney Island across twenty metres of the DEM's hillside, and a flat
+    deck over that is either a wall or a trench. Where the ground is below the
+    harbour -- which the DEM says it is for the western twenty metres of the
+    promenade -- the deck rides at a fixed height over the water instead, which
+    is what a pier is.
+
+    The rail goes only on edges whose outward normal points away from the
+    promenade's own centre, so it lands on the water side rather than down the
+    middle of the midway. Timber in `landmark_granite`, which is the warm grey
+    the palette has and which weathered hardwood decking is; a paint slot would
+    have been a lie about a surface nobody paints.
+
+    THE DECK IS TRIANGULATED ON A DENSIFIED RING AND THE RAIL ON THE COARSE ONE,
+    and that split is the fix for what the first sheet showed. Ear-clipping a
+    260 m band whose outline has a vertex every ten metres produces ears that
+    are ten metres on a side, and a ten-metre triangle laid across ground that
+    falls one in three is a slab tilted forty degrees out of the hillside -- the
+    promenade came out as a heap of loose sheets. Inserting a vertex every three
+    metres costs 170 triangles and makes every ear small enough to sit on the
+    ground it is over. The rail wants the opposite: one beam per real corner, or
+    the balustrade is four hundred boxes.
+    """
+    poly = Polygon(np.asarray(anchor.ring, dtype=np.float64)).simplify(0.6, preserve_topology=True)
+    if poly.geom_type == "MultiPolygon":
+        poly = max(poly.geoms, key=lambda p: p.area)
+    ring = np.asarray(poly.exterior.coords, dtype=np.float64)[:-1]
+    if len(ring) < 3:
+        return
+    sea = -float(terrain.base_elevation)
+
+    def deck_y(e: float, n: float) -> float:
+        return max(float(terrain.sample(e, n)), sea) + 0.35
+
+    fine: list[np.ndarray] = []
+    for i in range(len(ring)):
+        a, c = ring[i], ring[(i + 1) % len(ring)]
+        steps = max(int(float(np.linalg.norm(c - a)) // 3.0), 1)
+        fine.extend(a + (c - a) * (j / steps) for j in range(steps))
+    dense = np.asarray(fine, dtype=np.float64)
+    # Each ear is emitted with **its own** geometric normal rather than with a
+    # flat (0, 1, 0), and ears with no plan area at all are dropped. Both of
+    # those are `landmark-audit`'s winding pass talking, and what it caught is
+    # worth writing down because it looks like a rounding bug and is not.
+    #
+    # Ear-clipping a 260 m band produces a handful of ears whose three vertices
+    # are nearly collinear *in plan* -- three points strung along one edge of the
+    # promenade. They enclose no ground, so dropping them leaves no hole; but
+    # they run up a 1-in-3 bank, so in three dimensions they are near-vertical
+    # plates of up to sixty square metres. Handed a claimed normal of straight up
+    # their winding is decided by a dot product of almost exactly zero, which
+    # survives in float64 and flips when `write_landmarks` stores the positions
+    # as float32 -- twenty-two triangles that were correct in memory and inside
+    # out in the shipped file, invisible from one side.
+    tris = mapbox_earcut.triangulate_float64(dense, np.array([len(dense)], dtype=np.uint32))
+    for t in np.asarray(tris, dtype=np.int64).reshape(-1, 3):
+        q = [dense[i] for i in t]
+        plan = abs((q[1][0] - q[0][0]) * (q[2][1] - q[0][1])
+                   - (q[1][1] - q[0][1]) * (q[2][0] - q[0][0])) * 0.5
+        if plan < 0.05:
+            continue
+        _luna_roof_face(
+            b, "landmark_granite",
+            [b.w(float(p[0]), float(p[1]), deck_y(float(p[0]), float(p[1]))) for p in q],
+        )
+
+    centre = ring.mean(axis=0)
+    for i in range(len(ring)):
+        a, c = ring[i], ring[(i + 1) % len(ring)]
+        seg = c - a
+        length = float(np.linalg.norm(seg))
+        if length < 2.0:
+            continue
+        out = np.array([seg[1], -seg[0]]) / length
+        if float(np.dot(out, (a + c) * 0.5 - centre)) <= 0.0:
+            continue
+        ya, yc = deck_y(float(a[0]), float(a[1])), deck_y(float(c[0]), float(c[1]))
+        b.beam("landmark_steel",
+               b.w(float(a[0]), float(a[1]), ya + 1.05),
+               b.w(float(c[0]), float(c[1]), yc + 1.05), 0.12, 0.12)
+        posts = max(int(length // 9.0), 1)
+        for k in range(posts):
+            q = a + seg * ((k + 0.5) / posts)
+            y = deck_y(float(q[0]), float(q[1]))
+            b.beam("landmark_steel", b.w(float(q[0]), float(q[1]), y),
+                   b.w(float(q[0]), float(q[1]), y + 1.05), 0.1, 0.1)
+
+
+def build_luna_park(anchors: dict[str, Anchor], terrain) -> Landmark:
+    """Luna Park Sydney, 1935: the Face, its towers, and the park behind them.
+
+    Registered to eleven OSM outlines rather than one, because the park is not
+    one object -- it is a face, a wheel and half a dozen sheds inside a fence,
+    and every one of them is mapped. The node's anchor is the canopy between the
+    two entrance towers: the Face is what the name means, and it is what
+    `landmark-audit` measures the placement from.
+
+    THE ENTRANCE SHARES ONE PAD. Everything else in the park stands on the ground
+    at its own centroid, city-fashion. The two towers cannot: the DEM puts nine
+    and a half metres of hillside between them, so a pad each would give Sydney's
+    most photographed pair of towers a nine-metre height difference. They take
+    the lower pad instead, the uphill one buries its plinth, and the tops come
+    out level -- which is the part a player can see.
+
+    ENVELOPING, AND WHY THE HALLS ARE A STOREY TALLER THAN THEY ARE. This ships
+    into a world refreshed landmark-only, so `suppression_zones` does not bite
+    until the next full build and the generic OSM boxes for Crystal Palace, Coney
+    Island, the Big Top, Luna Lounge, the Administration building, the two gate
+    stubs and the canopy between them are all still in the streamed tiles. Each
+    of those is twelve metres of `warehouse` archetype rather than the seven the
+    two stated levels suggest, so every hall here is sized off
+    `LUNA_GENERIC_TOPS` and swallows its box whole: eaves above the box's top --
+    the *eaves*, because a hip roof does not contain the box's corners -- and the
+    footprint pushed out `LUNA_ENVELOPE_M` on every side. The visible cost is a
+    thirteen-metre Crystal Palace and a seventeen-metre entrance block, both a
+    storey taller than life. After the next full build the boxes go and the sizes
+    stay; correcting them then is one constant each. The Carousel is the one
+    deliberate exception -- see `_luna_carousel`.
+    """
+    ce, cn = anchors["luna_gate_roof"].centroid
+    b = _Builder((ce, cn))
+    prisms: list[Prism] = []
+
+    # --- The entrance: one pad for the pair, taken at the canopy between them.
+    #
+    # The canopy rather than either tower, and it is the *middle* of the three
+    # readings for a reason that took a look at the sheet to find. Taking the
+    # lower tower puts the pad at 10 m AHD, and the ground on the far side of the
+    # entrance is at 19.5 -- so the Face, which hangs across both, had its whole
+    # eastern half underground. Taking the higher one stands the western tower on
+    # seventeen metres of plinth. The canopy's own ground is between the two, the
+    # Face clears the bank at both ends, and the buried side is the uphill side,
+    # which is what a cutting looks like.
+    gate_w, gate_e = anchors["luna_gate_w"], anchors["luna_gate_e"]
+    pad_w, floor_w = _luna_pad(terrain, gate_w.ring)
+    pad_e, floor_e = _luna_pad(terrain, gate_e.ring)
+    pad, roof_floor = _luna_pad(terrain, anchors["luna_gate_roof"].ring)
+    floor = min(floor_w, floor_e, roof_floor)
+    ground = floor + LUNA_SKIRT_MIN  # the lowest real ground under the entrance
+
+    # The block the Face is hung on. Not the canopy's own outline extruded: the
+    # coin has to stand clear of both towers' south faces, so the block is a
+    # rectangle in the entrance's own frame -- wide enough to cover the canopy
+    # stub, and reaching south exactly as far as the Face's mid-plane so that the
+    # coin's front half stands out of it with no gap behind.
+    centre, right, outward = _luna_face_frame(anchors)
+    block = np.asarray(
+        [centre + right * (su * 5.4) + outward * so
+         for su, so in ((-1.0, -4.2), (1.0, -4.2), (1.0, LUNA_FACE_STANDOFF),
+                        (-1.0, LUNA_FACE_STANDOFF))],
+        dtype=np.float64,
+    )
+    entrance_top = pad + LUNA_ENTRANCE_TOP
+    b.prism("landmark_paint_white", _luna_local(b, block), floor, entrance_top, cap_top=True)
+    b.prism("landmark_paint_red", _luna_local(b, _luna_grow(block, 0.22)),
+            entrance_top - 0.9, entrance_top, cap_top=False)
+    # And the same band at the towers' first setback, so that the three parts of
+    # the entrance read as one composition from the side, where the Face is edge
+    # on and cannot do it.
+    b.prism("landmark_paint_red", _luna_local(b, _luna_grow(block, 0.22)),
+            pad + LUNA_GENERIC_TOPS["luna_gate_w"] + LUNA_ENVELOPE_M - 0.55,
+            pad + LUNA_GENERIC_TOPS["luna_gate_w"] + LUNA_ENVELOPE_M, cap_top=False)
+    prisms.append(_luna_prism(block, ground, entrance_top, "gate"))
+
+    for gate in (gate_w, gate_e):
+        _luna_tower(b, gate.ring, floor, pad)
+        prisms.append(_luna_prism(_luna_grow(gate.ring, LUNA_ENVELOPE_M + 0.25), ground,
+                                  pad + LUNA_TOWER_HEIGHT, "gate"))
+    face_top = _luna_face(b, anchors, pad)
+
+    # --- The halls.
+    cp_ring, cp_pad, cp_ground, cp_eaves = _luna_hall(
+        b, terrain, anchors["luna_crystal_palace"].ring,
+        eaves=LUNA_CRYSTAL_EAVES, ridge=LUNA_CRYSTAL_RIDGE, bays=LUNA_CRYSTAL_BAYS,
+    )
+    _luna_pavilions(b, cp_ring, cp_pad)
+    prisms.append(_luna_prism(cp_ring, cp_ground, cp_eaves, "hall"))
+
+    co_ring, co_pad, co_ground, co_eaves = _luna_hall(
+        b, terrain, anchors["luna_coney_island"].ring,
+        eaves=LUNA_CONEY_EAVES, ridge=LUNA_CONEY_RIDGE, bays=LUNA_CONEY_BAYS,
+        bay_material="landmark_paint_yellow", trim="landmark_paint_blue",
+    )
+    _luna_pediment(b, co_ring, co_pad, LUNA_CONEY_EAVES)
+    prisms.append(_luna_prism(co_ring, co_ground, co_eaves, "hall"))
+
+    bt_ring, _bt_pad, bt_ground, bt_eaves = _luna_hall(
+        b, terrain, anchors["luna_big_top"].ring,
+        eaves=LUNA_BIGTOP_EAVES, ridge=LUNA_BIGTOP_CROWN,
+        wall="landmark_steel", roof="landmark_steel", vault=True,
+    )
+    prisms.append(_luna_prism(bt_ring, bt_ground, bt_eaves, "hall"))
+    an_ring, _an_pad, an_ground, an_eaves = _luna_hall(
+        b, terrain, anchors["luna_big_top_annexe"].ring,
+        eaves=LUNA_ANNEXE_EAVES, ridge=LUNA_ANNEXE_CROWN,
+        wall="landmark_steel", roof="landmark_steel", vault=True,
+    )
+    prisms.append(_luna_prism(an_ring, an_ground, an_eaves, "hall"))
+
+    ll_ring, _ll_pad, ll_ground, ll_eaves = _luna_hall(
+        b, terrain, anchors["luna_lounge"].ring,
+        eaves=LUNA_LOUNGE_EAVES, ridge=LUNA_LOUNGE_RIDGE, bays=9,
+    )
+    prisms.append(_luna_prism(ll_ring, ll_ground, ll_eaves, "hall"))
+
+    ad_ring, ad_pad, ad_ground, _ad_eaves = _luna_hall(
+        b, terrain, anchors["luna_administration"].ring,
+        eaves=LUNA_ADMIN_TOP, ridge=LUNA_ADMIN_PARAPET, bays=7,
+    )
+    b.prism("landmark_paint_red", _luna_local(b, _luna_grow(ad_ring, 0.18)),
+            ad_pad + LUNA_ADMIN_TOP, ad_pad + LUNA_ADMIN_PARAPET, cap_top=False)
+    prisms.append(_luna_prism(ad_ring, ad_ground, ad_pad + LUNA_ADMIN_PARAPET, "hall"))
+
+    # --- The rides and the promenade.
+    prisms.extend(_luna_wheel(b, anchors["luna_ferris_wheel"], terrain))
+    _luna_carousel(b, anchors["luna_carousel"], terrain)
+    _luna_helter_skelter(b, anchors["luna_helter_skelter"], terrain)
+    _luna_boardwalk(b, anchors["luna_boardwalk"], terrain)
+
+    audit = {
+        "base_y": pad,
+        "tower_height_m": LUNA_TOWER_HEIGHT,
+        "tower_top_y": pad + LUNA_TOWER_HEIGHT,
+        "face_width_m": LUNA_FACE_WIDTH,
+        "face_centre_y": pad + LUNA_FACE_CENTRE,
+        "face_top_y": face_top,
+        "wheel_height_m": LUNA_WHEEL_HEIGHT,
+        "entrance_top_y": entrance_top,
+        "pad_spread_m": abs(pad_e - pad_w),
+    }
+    return Landmark("luna_park", (ce, cn), b.parts, prisms, audit)
+
+
 # --- The build -----------------------------------------------------------------
 
 
 def build_all(terrain, anchors: dict[str, Anchor] | None = None) -> list[Landmark]:
-    """All three, in one pass, sharing one OSM read.
+    """All four, in one pass, sharing one OSM read.
 
     Both reads are memoised on the caller's behalf rather than repeated: an OSM
     `multipolygons` pass over the inner ring is 40,290 features and five seconds,
@@ -1855,6 +3006,7 @@ def build_all(terrain, anchors: dict[str, Anchor] | None = None) -> list[Landmar
         build_bridge(anchors, terrain),
         build_opera(anchors, terrain),
         build_tower(anchors, terrain),
+        build_luna_park(anchors, terrain),
     ]
 
 
@@ -1913,7 +3065,7 @@ def prisms_by_tile(landmarks: list[Landmark]) -> dict[str, list[Prism]]:
     return out
 
 
-def suppress(buildings: list, zones: dict[str, Polygon]) -> tuple[list, dict[str, list[str]]]:
+def suppress(buildings: list, zones: dict[str, Polygon | MultiPolygon]) -> tuple[list, dict[str, list[str]]]:
     """Drop every generic building standing inside a landmark.
 
     Returns the surviving list and, per zone, the ids removed -- the ids rather
