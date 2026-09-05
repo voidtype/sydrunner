@@ -40,6 +40,45 @@ const PAINT = [0.18, 0.36, 0.78];
 const VIEWS = [{ cam: [1, 0.55, 0.75] }, { cam: [-1, 0.55, 0.75] }];
 
 const io = new NodeIO().registerExtensions(KHRONOS_EXTENSIONS);
+
+/*
+ * --- The manifest against the directory, before a pixel is drawn.
+ *
+ * The sheet reads the *directory*, because what it is for is looking at what
+ * ships. The game reads the *manifest*, and the two are only the same list
+ * while somebody keeps them so. Both ways round are faults and neither shows
+ * up in a picture:
+ *
+ *   - a manifest row whose `.glb` is gone is a hole in a body class's pool --
+ *     `carlod` keeps the slot, so the modulus is right and the cars that hash
+ *     to it silently draw as boxes forever;
+ *   - a `.glb` the manifest does not name is a file nobody drew, downloaded by
+ *     nobody, sitting in the build.
+ *
+ * This is the only place both lists exist outside the browser, so it is where
+ * they are compared. A missing file is fatal; a stray one is a warning,
+ * because dropping a new model in before writing its row is how the manifest
+ * gets written.
+ */
+{
+  const manifest = JSON.parse(fs.readFileSync(path.join(DIR, 'manifest.json'), 'utf8'));
+  const onDisk = new Set(fs.readdirSync(DIR).filter((f) => f.endsWith('.glb')));
+  const named = new Set(manifest.map((e) => e.file));
+  const missing = manifest.filter((e) => !onDisk.has(e.file)).map((e) => e.file);
+  const stray = [...onDisk].filter((f) => !named.has(f));
+  const unlabelled = manifest.filter((e) => typeof e.label !== 'string' || e.label.trim() === '').map((e) => e.file);
+  if (missing.length > 0) {
+    console.error(`manifest.json names ${missing.length} file(s) that are not on disk: ${missing.join(', ')}`);
+    console.error('Every one is a hole in its body class\'s pool: the cars that hash to it draw as boxes.');
+    process.exit(1);
+  }
+  if (unlabelled.length > 0) {
+    console.error(`manifest.json has no label for: ${unlabelled.join(', ')}. Getting into one would say nothing.`);
+    process.exit(1);
+  }
+  if (stray.length > 0) console.warn(`not in manifest.json (never drawn, never fetched): ${stray.join(', ')}`);
+}
+
 const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.glb') && (ONLY === null || ONLY.has(f))).sort();
 const rows = Math.ceil(files.length / COLS);
 const sheetW = COLS * W * 2, sheetH = rows * H;

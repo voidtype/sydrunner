@@ -141,7 +141,12 @@
  * ---------------------------------------------------------------------------
  * 5. THE ASSETS, and the two things this file does to them.
  *
- * `client/public/cars/manifest.json` names 29 normalised `.glb` files. They are
+ * `client/public/cars/manifest.json` names 19 normalised `.glb` files, of which
+ * 15 are loaded. It named 38 until the 2026-09 real-cars round deleted the
+ * nineteen stylised and generic stand-ins from it and from the directory, so
+ * the five passenger classes carry real makes only and the four special bodies
+ * keep the one mesh each that exists for them; `game/carlabels.ts` section 3
+ * argues it and holds the table. They are
  * pre-normalised for length and ground plane -- the X extent is the body class's
  * own length out of `CAR_BODY_SIZE` and the lowest vertex is at y = 0 -- so
  * nothing here scales or lifts them. Two things it does do:
@@ -230,6 +235,7 @@ import {
   type TrafficField,
 } from '../game/traffic.ts';
 import { policeLiveried } from '../game/factions.ts';
+import { CAR_FLEET } from '../game/carlabels.ts';
 import { binCarsByBody } from '../game/staticcars.ts';
 import { BODY_COUNT, CAR_LIVERY_WHITE, CAR_PAINT, crumpleScale, crumpleTone, type TileCars } from './cars.ts';
 import type { PooledSet } from './instancepool.ts';
@@ -320,18 +326,35 @@ export const SWEEP_HZ = 5;
 /**
  * Instances per model file.
  *
- * The claim radius holds roughly 60 parked cars in a suburban street and about
- * 150 in the CBD, spread by `identity % pool.length` over the five to six models
- * of whichever body class -- so a dozen or so per model at the worst measured
- * point, and this is twice that again. It is a hard ceiling rather than a
- * guideline: a car that finds its model full simply is not claimed and draws as
- * the box it already was, which is the correct way for this feature to run out
- * of room.
+ * **This paragraph used to be an estimate and it was wrong.** It said "a dozen
+ * or so per model at the worst measured point", and 24 was twice that again.
+ * The 2026-09 real-cars round measured it instead, over all 13,362 baked
+ * `.cars.bin` sidecars -- 1,398,902 parked cars -- by standing at every car in
+ * the sixty densest tiles, counting what falls inside `CLAIM_RADIUS`, and
+ * taking `identity % pool.length` for each. The answer even *before* the
+ * stand-ins were removed was **35 Corollas** at one point in the inner west,
+ * against a ceiling of 24: this fleet has been quietly overflowing at its
+ * densest points since it shipped, and an overflow is a car drawn as a box
+ * among models.
+ *
+ * With the passenger classes cut to real makes only the worst point is **47**
+ * (`toyota_corolla_2020`, tile `-61_36`, 179 parked cars inside 90 m), because
+ * body 1 is now five parts Corolla to one part Golf. The runners-up are the
+ * Tesla at 36 and the Camry at 34. To those add the schedule fleet and the
+ * driven records, which claim out of the same pools -- counted in tens near the
+ * player, spread over five classes -- so 64 is the measurement plus a third.
+ *
+ * It is a hard ceiling rather than a guideline: a car that finds its model full
+ * simply is not claimed and draws as the box it already was, which is the
+ * correct way for this feature to run out of room.
  *
  * An `InstancedMesh` costs its capacity in buffer bytes and its `count` in draw
- * work, so the headroom is 24 x 80 bytes x 24 meshes = 46 kB and no frame time.
+ * work, so raising it from 24 buys nothing at frame time and costs buffer only:
+ * 64 x 80 bytes x 15 loaded meshes = **77 kB**, up from 29 kB. The mesh count
+ * fell from 24 to 15 in the same round, so the whole fleet is 48 kB dearer than
+ * it was and a Corolla-lined street is no longer half boxes.
  */
-const PER_MODEL_CAPACITY = 24;
+const PER_MODEL_CAPACITY = 64;
 
 /**
  * Files authored nose-toward `-X`, corrected by half a turn at merge time.
@@ -358,12 +381,18 @@ const YAW_CORRECTION: Readonly<Record<string, number>> = {};
  * an SUV hit box of 1.70 x 1.90, and it cannot be rescued by scaling because
  * shrinking it to fit would make it a 2 m long SUV.
  *
- * 1.8x is deliberately generous. The Kenney kit is chunky on purpose and lands
- * between 1.3x and 1.5x, which is the toy-like direction `world/cars.ts` and
- * spec 8.1 already commit to; the only file in the set this rejects is the rover.
+ * 1.8x is deliberately generous. It was set against the Kenney kit, which is
+ * chunky on purpose and lands between 1.3x and 1.5x. The kit and the rover both
+ * left the manifest in the 2026-09 real-cars round, so **this test now rejects
+ * nothing in the set** -- which is the right state for it to be in and not a
+ * reason to delete it: the next `.glb` somebody drops into `client/public/cars/`
+ * is the one it exists for, and a limit only tightened after a wrong object has
+ * shipped is a limit that has already failed.
  *
- * A rejected model **keeps its slot in the pool** (section 1) so the rejection
- * cannot re-model the rest of the city. The cars that hash to it draw as boxes.
+ * A rejected model **keeps its slot in the pool** (section 1) -- `weight` slots,
+ * one per point, so the modulus is the length it would have been -- so the
+ * rejection cannot re-model the rest of the city. The cars that hash to it draw
+ * as boxes.
  */
 const PROPORTION_LIMIT = 1.8;
 
@@ -386,6 +415,13 @@ type BodyKey = number | 'police';
 /** One row of `client/public/cars/manifest.json`. */
 export interface CarModelEntry {
   file: string;
+  /**
+   * What a player is told they are sitting in. `game/carlabels.ts` owns the
+   * table this duplicates and the guard in `loadCarModels` keeps the two
+   * honest; it is repeated in the manifest because the manifest is the record
+   * a person edits when a `.glb` arrives.
+   */
+  label?: string;
   /** `0`..`4` for the five body classes, or a named role. */
   body: number | 'police' | 'taxi' | 'bus' | 'garbage';
   tris: number;
@@ -869,6 +905,21 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
   private sweepNo = 0;
   /** One error, not one per frame. See `begin`. */
   private warnedNoEnd = false;
+  /**
+   * The frame number `end()` last ran on, or -1.
+   *
+   * The whole of the `end()` contract, as a number rather than as an inference
+   * from a dirty flag -- see `begin()` on why the flag was the wrong question
+   * and what it cost.
+   */
+  private endedAt = -1;
+  /**
+   * A cheap hash of the driven identity set, as `drivenSetChanged` last saw it.
+   *
+   * `-1` is "never asked", which is distinguishable from every real hash below
+   * because the mix ends `>>> 0`.
+   */
+  private drivenHash = -1;
   private frameNo = 0;
 
   /**
@@ -1099,9 +1150,20 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
   }
 
   /** Add a hole to a pool: a model the manifest names that this file will not draw. */
-  reserveHole(body: BodyKey, file: string, why: string): void {
+  reserveHole(body: BodyKey, file: string, why: string, weight = 1): void {
     const pool = this.pools.get(body) ?? [];
-    pool.push(null);
+    // **`weight` holes, not one.** A model that failed to load has to take up
+    // exactly the room it would have taken up loaded, or the pool is shorter,
+    // the modulus is different and every car in the class is a different model
+    // -- which is section 1's whole argument, and which a one-slot hole broke
+    // for any entry whose weight is not 1. Every real make in the set has a
+    // weight above 1, so before this the first failed fetch re-modelled a
+    // suburb.
+    const n = Math.max(1, Math.min(16, Math.round(weight)));
+    for (let i = 0; i < n; i++) {
+      this.holeFiles.set(`${String(body)}:${pool.length}`, file);
+      pool.push(null);
+    }
     this.pools.set(body, pool);
     this.skipped.push({ file, why });
   }
@@ -1112,6 +1174,27 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
     for (const [body, pool] of this.pools) out[String(body)] = pool.length;
     return out;
   }
+
+  /**
+   * Every pool as file names, in order, with a hole named for what it was.
+   *
+   * The one thing `game/carlabels.carPool` has to agree with, and the only way
+   * a check can hold the two against each other: the label is
+   * `pool[identity % pool.length]` on this side and on that one, so a pool that
+   * is a different length or a different order is a hero line that names the
+   * wrong car -- silently, and only for the cars whose remainder happens to
+   * differ. See `verifyCarModelLabels`.
+   */
+  poolFiles(): Record<string, string[]> {
+    const out: Record<string, string[]> = {};
+    for (const [body, pool] of this.pools) {
+      out[String(body)] = pool.map((slot, i) => slot?.file ?? this.holeFiles.get(`${String(body)}:${i}`) ?? '');
+    }
+    return out;
+  }
+
+  /** Which file each hole in a pool stands for, so `poolFiles` can name it. */
+  private readonly holeFiles = new Map<string, string>();
 
   // --- The per-frame half, as `TrafficMovers` sees it ---------------------------
 
@@ -1129,7 +1212,18 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
     // contract being broken lives in `main.ts`'s frame loop rather than in this
     // file. So the check lives here, costs one boolean per frame, and says the
     // whole sentence -- a console line nobody reads is worth nothing.
-    if (!this.warnedNoEnd && this.frameNo > 1) {
+    //
+    // **`endedAt`, not the dirty flag alone, and this is the 2026-09 fix.** The
+    // test used to be "is any slot dirty at `begin()`", and that is not the
+    // question: `sweep()` runs *before* `trafficMovers.update()` on purpose --
+    // main.ts states the reason, a claim taken this frame has to be visible to
+    // the box fleet on this frame -- and `consider` dirties a slot every time it
+    // takes one. So the first sweep that claimed a car raised this error in
+    // every session, on a frame whose `end()` was about to run four lines later
+    // and upload everything correctly. The owner's console showed it and there
+    // was nothing wrong. What actually means "nobody called `end()`" is that the
+    // last frame did not end, so that is what is recorded and compared.
+    if (!this.warnedNoEnd && this.frameNo > 1 && this.endedAt !== this.frameNo - 1) {
       for (const pool of this.pools.values()) {
         for (const slot of pool) {
           if (slot === null || !slot.dirty) continue;
@@ -1290,7 +1384,7 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
 
   end(): void {
     // Only what changed. A model nobody claimed or moved this frame does not
-    // need its 24-instance buffer re-uploaded, which is the same rule
+    // need its whole instance buffer re-uploaded, which is the same rule
     // `TrafficMovers.update` applies to its own sets.
     for (const pool of this.pools.values()) {
       for (const slot of pool) {
@@ -1300,6 +1394,69 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
         slot.dirty = false;
       }
     }
+    // The frame ended. See `begin()`: this, and not the dirty flag, is what
+    // `end() was not called` actually means.
+    this.endedAt = this.frameNo - 1;
+  }
+
+  /**
+   * Has the set of cars somebody is driving changed since this was last asked?
+   *
+   * ---------------------------------------------------------------------------
+   * THE JITTER GETTING INTO A CAR, AND WHY IT IS A FRAME-RATE QUESTION.
+   *
+   * The owner: *"theres a little weird jitter geting into vehicles atm"*.
+   * Measured, on the real machinery with a real pool and a real fleet, the
+   * mechanism is exact and has nothing to do with the camera:
+   *
+   *   - A parked car within `CLAIM_RADIUS` holds a **parked** claim. Its box is
+   *     folded flat and the model is drawn from a matrix written once.
+   *   - You press `E`. `predictTakeCar` makes a driven record on that frame.
+   *     `claimed()` refuses the driven pose, because the claim it finds for that
+   *     identity is a *parked* one -- so `TrafficMovers` draws the car you are
+   *     sitting in as a **box**, at your body, while the **model** of the same
+   *     car is still standing in the bay you took it from.
+   *   - Nothing fixes that until the next `sweep`, and the sweep is at
+   *     `SWEEP_HZ` = 5. Measured at 60 Hz the window is up to **11 frames**
+   *     (183 ms); at 144 Hz it is 28. Then the model teleports onto the car.
+   *
+   * So: two coincident car bodies for a fifth of a second, one of them the
+   * wrong shape and the other pulling away from it at up to 8 m/s, followed by
+   * a silhouette pop on the car filling the screen. That is the jitter.
+   *
+   * The fix is not to sweep faster -- the sweep walks every parked car in the
+   * ring and its budget is 0.5 ms -- but to sweep *when the answer has changed*,
+   * which for this artefact is exactly when the driven set does. `main.ts` asks
+   * this once a frame, immediately before the sweep's own 5 Hz gate, and a true
+   * answer forces the sweep on that frame. The window closes to zero.
+   *
+   * **Cost: one walk of the driven records a frame**, which is the field's
+   * `all()` -- up to `MAX_DRIVEN_CARS` = 400 records, one multiply and one add
+   * each. That is under a microsecond and it is the same walk `drivenIdentities`
+   * already does five times a second. It is deliberately *not* a callback from
+   * the take, because the driven set also changes when a **remote** player takes
+   * a car, when `recycleFarthest` retires one, and when a record arrives in
+   * `MSG.CARS` -- four call sites that would each have had to remember, against
+   * one question asked in one place.
+   *
+   * Order-insensitive on purpose: `CarField.all()` compacts on removal, so a
+   * hash that depended on order would fire on every retirement anywhere in the
+   * city. Sum and xor together separate the cases that matter -- one identity
+   * in, one out -- without caring who moved.
+   */
+  drivenSetChanged(): boolean {
+    let sum = 0;
+    let xor = 0;
+    let n = 0;
+    this.drivenIdentities((identity) => {
+      sum = (sum + identity) | 0;
+      xor ^= identity;
+      n++;
+    });
+    const hash = (((Math.imul(sum, 0x9e3779b1) ^ xor) + n) | 0) >>> 0;
+    if (hash === this.drivenHash) return false;
+    this.drivenHash = hash;
+    return true;
   }
 
   // --- The sweep ----------------------------------------------------------------
@@ -1783,6 +1940,38 @@ export async function loadCarModels(
     return null;
   }
 
+  // --- The drift guard. See `game/carlabels.ts` section 2.
+  //
+  // `CAR_FLEET` is a second copy of four of this manifest's fields, held
+  // three-free so the hero line and the boot checks can have them without a
+  // fetch. Two copies of one fact need a moment where they are compared, and
+  // this is the only moment in the game where both exist: the table is a module
+  // and the manifest has just landed. A mismatch is not fatal -- the manifest
+  // is still what gets drawn, so the city is right and only the *name* is stale
+  // -- but it is loud, and it names the row rather than the fact of a
+  // difference, because "the car table is out of date" without a row is a
+  // twenty-minute diff.
+  {
+    const drift: string[] = [];
+    for (let i = 0; i < Math.max(manifest.length, CAR_FLEET.length); i++) {
+      const a = manifest[i];
+      const b = CAR_FLEET[i];
+      if (a === undefined) { drift.push(`manifest is missing ${b.file}`); continue; }
+      if (b === undefined) { drift.push(`CAR_FLEET is missing ${a.file}`); continue; }
+      if (a.file !== b.file) { drift.push(`row ${i}: manifest has ${a.file}, CAR_FLEET has ${b.file}`); continue; }
+      if (a.body !== b.body) drift.push(`${a.file}: body ${String(a.body)} vs ${String(b.body)}`);
+      if ((a.weight ?? 1) !== b.weight) drift.push(`${a.file}: weight ${a.weight ?? 1} vs ${b.weight}`);
+      if (a.label !== undefined && a.label !== b.label) drift.push(`${a.file}: label "${a.label}" vs "${b.label}"`);
+    }
+    if (drift.length > 0) {
+      console.error(
+        '[carlod] `client/public/cars/manifest.json` and `game/carlabels.CAR_FLEET` disagree, so ' +
+          'the hero line names a car the fleet does not draw. Fix the table: ' +
+          drift.join('; '),
+      );
+    }
+  }
+
   // One loader for the whole set, as `loadLandmarks` uses one for the landmark
   // file: bytes first and then `parseAsync`, so a CDN serving these gzipped is
   // not fetched twice.
@@ -1790,7 +1979,7 @@ export async function loadCarModels(
   const skipped: Array<{ file: string; why: string; body: BodyKey }> = [];
 
   // Fetched in parallel and merged in manifest order, because the order is the
-  // contract and a promise race is not an order. 25 files at ~100 kB.
+  // contract and a promise race is not an order. 15 mapped files at ~100 kB.
   const wanted = manifest
     .map((entry) => ({ entry, body: mappedBody(entry) }))
     .filter((row): row is { entry: CarModelEntry; body: BodyKey } => row.body !== null);
@@ -1860,6 +2049,7 @@ export async function loadCarModels(
         body,
         entry.file,
         skipped.find((s) => s.file === entry.file)?.why ?? 'unavailable',
+        entry.weight ?? 1,
       );
     }
   }

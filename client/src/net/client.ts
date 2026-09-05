@@ -2113,6 +2113,26 @@ export class NetClient {
   }
 
   /**
+   * Has the server *agreed* about which car this client is in?
+   *
+   * True when there is no prediction outstanding -- either none was made, or the
+   * input that carried the press has been acknowledged and the block above has
+   * adopted `serverCar`. False for the one round trip in between.
+   *
+   * It exists for the hero line that names the car you have just got into
+   * (`game/carlabels.ts`). Everything else about a take is predicted on the
+   * frame `E` goes down, because a camera and a speed that waited for the server
+   * would be a lurch; a *name* is the opposite case, and it is the same
+   * judgement `predictTakeCar` already writes down about the theft banner --
+   * "a banner that appeared and then vanished when the server disagreed would be
+   * worse than one 50 ms late". A refused take is rare and a hero line is on
+   * screen for four seconds, so the line waits and the car does not.
+   */
+  get carSettled(): boolean {
+    return this.carPredictedAt < 0;
+  }
+
+  /**
    * File every name in a roster, and keep the table from growing forever.
    *
    * A session is capped at sixteen players but not at sixteen *ids*: the server
