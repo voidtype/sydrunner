@@ -1656,6 +1656,19 @@ export interface StationBox {
    * mouth's own height.
    */
   riseMax?: number;
+  /**
+   * The flight, where this box is one. Present, it **replaces** `slope` and
+   * `riseMax`: the lean becomes the stepped profile `stairDropAt` describes,
+   * and the pad at the mouth and the flat at the foot fall out of it rather
+   * than being capped on afterwards.
+   *
+   * This is the whole of the answer to *"the stairs ... its just a ramp"* on
+   * the walking side. The alternative was to draw treads over a floor that
+   * stayed a plane, which is a picture of a staircase you slide down: a body's
+   * shins pass through every nosing, and at 0.17 m a riser the eye sees the
+   * mismatch on the first step. One profile, drawn and walked.
+   */
+  stair?: AccessStair;
 }
 
 /** How far to the side of the track the surface entrance stands. */
@@ -1820,7 +1833,11 @@ export class StationBoxField {
       // the same thickness everywhere on a ramp and a body walking down one is
       // never briefly outside it.
       let rise = box.slope === undefined ? 0 : box.slope * along;
-      if (box.riseMax !== undefined && rise > box.riseMax) rise = box.riseMax;
+      // A flight, where there is one: the box's centre is the midpoint of the
+      // mouth and the foot, so the mouth is `run / 2` along and the distance
+      // down the incline is that minus where the body is. See `AccessStair`.
+      if (box.stair !== undefined) rise = box.stair.drop / 2 - stairDropAt(box.stair, box.stair.run / 2 - along);
+      else if (box.riseMax !== undefined && rise > box.riseMax) rise = box.riseMax;
       const floorY = box.floorY + rise;
       if (feetY < floorY - PLATFORM_STEP_M) continue;
       if (feetY > box.ceilY + rise - BOX_HEADROOM_M) continue;
@@ -2116,6 +2133,294 @@ export function stationAccessPlan(st: RailStation, world: AccessWorld = {}): Acc
   return { mouthX, mouthZ, mouthY, dirX, dirZ, inclineM, footX, footZ, floorY, tunDirX, tunDirZ, tunnelM };
 }
 
+// --- The flight, which is a flight and not a ramp -------------------------------------
+//
+// The owner, standing on a mouth: *"the stairs on a station entrance dont
+// actually look like stairs its just a ramp"*. He was describing exactly what
+// was there. `stationAccessPlan` hands back a mouth, a direction and a length,
+// and everything downstream -- the box a body stands in, the lining the eye
+// sees, the terrain carve -- read that as one straight plane at
+// `ACCESS_MAX_SLOPE`. A 37 degree plane is not a stair. It is a slide with a
+// concrete finish, and a player who walks down one has no idea he is meant to
+// have descended anything.
+//
+// So the plane becomes a profile, and the profile is **one function both ends
+// and the drawing read**, on the same argument as the plan above it: the
+// treads a player sees and the treads his feet climb are the same treads, or
+// they are two opinions and one of them is wrong.
+//
+// ---------------------------------------------------------------------------
+// **Why the landings are as rare as they are, with the arithmetic**, because
+// the brief asked for one every twelve risers and the geometry refuses.
+//
+// The run is not ours. `inclineM` is fixed at both ends -- the mouth is placed
+// against the buildings that stand round it and the foot has to land on the
+// concourse -- so a flight of `n` risers in a run of `R` obeys
+//
+//     R = n * going + landings * landing
+//
+// with `n` fixed by the drop and the riser. At `ACCESS_MAX_SLOPE` the drop is
+// `0.75 R`, so `n = 0.75 R / riser` and the going a landing-free flight gets is
+// `riser / 0.75` = 0.227 m. Insert a landing every `k` risers and the going
+// loses exactly `landing / k` -- independent of how deep the station is, which
+// is the tidy part. A 1.1 m landing every twelve risers costs 0.092 m of it and
+// leaves a 0.135 m tread, which is a ladder, not a stair.
+//
+// The going is therefore floored (`STAIR_GOING_MIN_M`) and the **landings** are
+// what yields: the spacing starts at `STAIR_LANDING_RISERS` and doubles until
+// the going survives, or until there are none. Over this bake that leaves a
+// landing roughly every eight metres of descent -- one at a typical CBD mouth,
+// four at Victoria Cross -- which is fewer than a real station has and is the
+// honest answer to a run this steep. Lengthening the incline would buy more,
+// and it would also move every mouth out from under the buildings
+// `stationAccessPlan` spent a search getting clear of; that trade is not worth
+// making for a landing.
+
+/** The riser a flight aims for, and the band it is allowed to land in. */
+export const STAIR_RISER_M = 0.17;
+export const STAIR_RISER_MIN_M = 0.16;
+export const STAIR_RISER_MAX_M = 0.18;
+/** A tread shorter than this is not a tread. See the arithmetic above. */
+export const STAIR_GOING_MIN_M = 0.2;
+/** What a flight would like: a landing every twelve risers, 1.1 m of it. */
+export const STAIR_LANDING_RISERS = 12;
+export const STAIR_LANDING_M = 1.1;
+
+/**
+ * One flight, solved. Every number here is metres except `risers`, `landings`
+ * and `perFlight`, which are counts.
+ *
+ * `risers * riser === drop` and `risers * going + landings * landing === run`
+ * exactly, both by construction, and `verifyStationAccess` asserts both -- a
+ * flight that does not add up is a flight whose foot is not on the concourse.
+ */
+export interface AccessStair {
+  /** The rise of one step. Never over `PLATFORM_STEP_M`, or a body cannot climb it. */
+  riser: number;
+  /** The depth of one tread. */
+  going: number;
+  risers: number;
+  /** The length of one landing, or 0 where the pitch paid for none. */
+  landing: number;
+  /** Risers between landings, or 0 where there are none. */
+  perFlight: number;
+  landings: number;
+  /** The incline's own run and drop, carried so a reader needs nothing else. */
+  run: number;
+  drop: number;
+  /**
+   * How far below the straight plane the flight ever gets, metres.
+   *
+   * Zero without landings: a tread is the higher of its two ends, so a
+   * landing-free flight sits *on or above* the plane the whole way down. A
+   * landing spends run, the flight either side of it is therefore steeper than
+   * the plane, and the profile falls behind until the landing gives it back --
+   * 0.45 m at a typical CBD mouth, and it is a real number rather than a
+   * rounding one. Whoever draws the passage has to know it: the side walls
+   * start from the plane and a wall that did not reach this far under it would
+   * show a slot of nothing along the foot of the flight.
+   */
+  dip: number;
+}
+
+/** The flight for a plan. Pure, deterministic, and the only place a riser is chosen. */
+export function accessStair(plan: AccessPlan): AccessStair {
+  const drop = plan.mouthY - plan.floorY;
+  const run = Math.max(plan.inclineM, 1e-6);
+  // The riser count first, because it is the one thing the drop decides on its
+  // own; the going is then whatever the run has left over.
+  let risers = Math.max(2, Math.round(drop / STAIR_RISER_M));
+  if (drop / risers > STAIR_RISER_MAX_M) risers = Math.ceil(drop / STAIR_RISER_MAX_M);
+  if (risers > 2 && drop / risers < STAIR_RISER_MIN_M) risers = Math.max(2, Math.floor(drop / STAIR_RISER_MIN_M));
+  const riser = drop / risers;
+  // The landings, spaced as widely as they have to be for the going to survive.
+  let perFlight = STAIR_LANDING_RISERS;
+  let landings = 0;
+  let landing = 0;
+  let going = run / risers;
+  for (let guard = 0; guard < 32; guard++) {
+    const m = Math.max(0, Math.ceil(risers / perFlight) - 1);
+    if (m === 0) break;
+    const g = (run - m * STAIR_LANDING_M) / risers;
+    if (g >= STAIR_GOING_MIN_M) {
+      landings = m;
+      landing = STAIR_LANDING_M;
+      going = g;
+      break;
+    }
+    perFlight *= 2;
+  }
+  if (landings === 0) {
+    perFlight = 0;
+    landing = 0;
+    going = run / risers;
+  }
+  const solved: AccessStair = { riser, going, risers, landing, perFlight, landings, run, drop, dip: 0 };
+  // How far the profile falls behind the plane, measured off the enumeration
+  // rather than derived a second time. A tread is flat and the plane is not, so
+  // the worst is always at a tread's uphill edge.
+  const slope = drop / run;
+  let dip = 0;
+  for (const t of stairTreads(solved)) {
+    const behind = t.drop - slope * t.d0;
+    if (behind > dip) dip = behind;
+  }
+  return { ...solved, dip };
+}
+
+/**
+ * How far a body standing `d` metres down the incline from the mouth has
+ * descended. Zero at and above the mouth, the whole drop at and below the foot.
+ *
+ * **The tread is the higher of its two ends**, which is `rail-solids.stairSolids`'
+ * rule said in a different shape and is what makes the stepped surface sit *on
+ * or above* the plane everywhere rather than crossing it: the terrain carve
+ * (`accessCutAt`) and the drawn lid still describe the plane, and a floor that
+ * dipped under it would be a floor the carve had already filled in.
+ */
+export function stairDropAt(s: AccessStair, d: number): number {
+  if (!(d > 0)) return 0;
+  if (d >= s.run) return s.drop;
+  let risers: number;
+  if (s.landings > 0 && s.perFlight > 0) {
+    // A cell is one flight and the landing at the foot of it. Past the last
+    // landing the remainder is plain treads, which is the first branch.
+    const cell = s.perFlight * s.going + s.landing;
+    const done = s.landings * cell;
+    if (d >= done) risers = s.landings * s.perFlight + Math.floor((d - done) / s.going);
+    else {
+      const c = Math.floor(d / cell);
+      const r = d - c * cell;
+      risers = c * s.perFlight + Math.min(s.perFlight, Math.floor(r / s.going));
+    }
+  } else {
+    risers = Math.floor(d / s.going);
+  }
+  if (risers > s.risers) risers = s.risers;
+  return risers * s.riser;
+}
+
+/** One surface of a flight: a tread, or the landing at the foot of a flight. */
+export interface StairTread {
+  /** Metres from the mouth, along the incline. */
+  d0: number;
+  d1: number;
+  /** How far below the mouth this surface is. */
+  drop: number;
+  landing: boolean;
+}
+
+/**
+ * Every tread and landing of a flight, from the mouth down, and it is the
+ * enumeration `stairDropAt` answers from -- `verifyStationAccess` walks one
+ * against the other rather than trusting that two loops agree.
+ */
+export function stairTreads(s: AccessStair): StairTread[] {
+  const out: StairTread[] = [];
+  let d = 0;
+  for (let k = 0; k < s.risers; k++) {
+    const landing = s.perFlight > 0 && k > 0 && k % s.perFlight === 0 && k / s.perFlight <= s.landings;
+    const len = landing ? s.landing + s.going : s.going;
+    out.push({ d0: d, d1: d + len, drop: k * s.riser, landing });
+    d += len;
+  }
+  return out;
+}
+
+// --- The headhouse: what a station mouth looks like from the footpath ----------------
+//
+// The other half of the same report: *"and from the outside it has no roof"*.
+// There were two piers and a lintel over the mouth, which is the frame of an
+// entrance with the entrance left out, and past them a rectangular hole in the
+// pavement with a ramp in it. From across the street a Sydney station mouth is
+// a small building -- a canopy on two walls, the name on the lintel, and enough
+// of a run over the top of the flight that the cut does not read as roadworks.
+//
+// It is **drawn and nothing else**: no prism, no solid, no collision. That is
+// deliberate and it is what keeps `server/underground-check.ts` walking in
+// through it -- the walk meets prisms and ground, and a headhouse that stood in
+// the collision field would be a building over the mouth, which is the exact
+// condition that check fails a station for. The clear opening is the passage's
+// own width and the soffit is well over a head, so nothing here stands in the
+// doorway even as a picture; `verifyStationAccess` asserts all three.
+
+/**
+ * Clear headroom under the headhouse roof, over the flat pad at the mouth.
+ *
+ * `ACCESS_HEIGHT_M`, and it has to be that number rather than a taste one. The
+ * passage's own lid is `ACCESS_HEIGHT_M` over its floor and the floor at the
+ * mouth is the pavement, so the lid stands 4.2 m proud of the street there and
+ * slopes down into it over the next five and a half metres. A roof lower than
+ * that would have the lid growing through it; at exactly that, the two meet in
+ * one plane at the mouth and the headhouse is the box that caps the top of the
+ * passage, which is what a headhouse is.
+ */
+export const HEADHOUSE_CLEAR_M = ACCESS_HEIGHT_M;
+/**
+ * How far down the incline the roof runs, and how far it laps the footpath.
+ *
+ * Seven metres is not a round number, it is `accessCutLength`'s: over flat
+ * ground the passage lid goes under the street at
+ * `(ACCESS_HEIGHT_M + ACCESS_LID_COVER_M) / ACCESS_MAX_SLOPE` = 6.07 m, and
+ * everything short of that is the open trench the report is about. A roof that
+ * stopped at five would have left a metre of it showing, which is a metre of
+ * "roadworks" at the end of a station entrance.
+ */
+export const HEADHOUSE_RUN_M = 7;
+export const HEADHOUSE_LAP_M = 1.1;
+/** The roof slab, the side walls, and the lintel band across the front. */
+export const HEADHOUSE_SLAB_M = 0.35;
+export const HEADHOUSE_WALL_M = 0.35;
+export const HEADHOUSE_LINTEL_M = 0.55;
+
+/**
+ * The headhouse over one mouth, as numbers. `d` is metres down the incline from
+ * the mouth (negative is out over the footpath) and `o` is metres across it.
+ */
+export interface AccessHeadhouse {
+  /** The roof and the walls, along the incline. */
+  front: number;
+  back: number;
+  /** Inside face of a side wall, its outside face, and the roof's overhang. */
+  clearHalfW: number;
+  wallHalfW: number;
+  roofHalfW: number;
+  /** The underside of the roof, and its top. */
+  soffitY: number;
+  roofY: number;
+  /** The lintel band across the front: its face, its depth and its underside. */
+  lintelD: number;
+  lintelDepth: number;
+  lintelY: number;
+  /** Where the side walls stand from. */
+  baseY: number;
+  /** The one lamp, under the roof at the mouth. */
+  lampD: number;
+  lampY: number;
+}
+
+export function accessHeadhouse(plan: AccessPlan): AccessHeadhouse {
+  const y = plan.mouthY;
+  const soffitY = y + HEADHOUSE_CLEAR_M;
+  const clearHalfW = ACCESS_HALF_W + 0.05;
+  return {
+    front: -HEADHOUSE_LAP_M,
+    back: HEADHOUSE_RUN_M,
+    // Just clear of the passage each side, so the opening is the passage.
+    clearHalfW,
+    wallHalfW: clearHalfW + HEADHOUSE_WALL_M,
+    roofHalfW: clearHalfW + HEADHOUSE_WALL_M + 0.25,
+    soffitY,
+    roofY: soffitY + HEADHOUSE_SLAB_M,
+    lintelD: -HEADHOUSE_LAP_M,
+    lintelDepth: 0.3,
+    lintelY: soffitY - HEADHOUSE_LINTEL_M,
+    baseY: y - 0.2,
+    lampD: 1.2,
+    lampY: soffitY - 0.3,
+  };
+}
+
 export function buildStationBoxes(bake: RailBake, world: AccessWorld = {}): StationBoxField {
   const field = new StationBoxField();
   for (const st of bake.stations) {
@@ -2165,6 +2470,11 @@ export function buildStationBoxes(bake: RailBake, world: AccessWorld = {}): Stat
         ceilY: (plan.mouthY + plan.floorY) / 2 + ACCESS_HEIGHT_M,
         slope: drop / plan.inclineM,
         riseMax: drop / 2,
+        // **And it is a staircase, not a ramp.** `slope` and `riseMax` stay
+        // because they are what the box means when nothing quantises them --
+        // the carve and the drawn lid still describe the plane -- but the floor
+        // a body is handed is the flight. See `StationBox.stair`.
+        stair: accessStair(plan),
       });
       const tMid = plan.tunnelM / 2;
       field.add({
@@ -4555,6 +4865,168 @@ export function verifyStationAccess(): string[] {
     if (stuck === null) failures.push('the same station produced no plan against a world with no buildings in it.');
     else if (Math.abs(stuck.mouthX - st.entranceX) > 1e-9 || Math.abs(stuck.mouthZ - st.entranceZ) > 1e-9) {
       failures.push('a world that cannot see buildings moved the mouth anyway; the search is reading something else.');
+    }
+  }
+
+  // --- **The flight adds up, and it is a flight rather than a ramp.**
+  //
+  // The owner: *"the stairs on a station entrance dont actually look like
+  // stairs its just a ramp"*. A stepped profile that does not add up is worse
+  // than the ramp was -- a flight whose risers do not reach the drop is a foot
+  // that lands somewhere other than the concourse, and one whose treads do not
+  // fill the run is a doorway the flight stops short of. Both are arithmetic
+  // and both are asserted here, over the whole span of shapes the bake holds:
+  // the shallowest incline (`inclineM` clamped to its 12 m floor) and the
+  // deepest (Victoria Cross, 44 m at 1:1.33).
+  {
+    const flight = (drop: number, run: number): AccessStair =>
+      accessStair({
+        mouthX: 0, mouthZ: 0, mouthY: drop, dirX: 0, dirZ: 1, inclineM: run,
+        footX: 0, footZ: run, floorY: 0, tunDirX: 1, tunDirZ: 0, tunnelM: 8,
+      });
+    const cases: Array<[string, number, number]> = [
+      ['a shallow mouth', 7.5, 12],
+      ['a typical CBD mouth', 15, 20],
+      ['Victoria Cross', 33, 44],
+      ['the minimum a plan will build', BOX_MIN_HEIGHT_M + 0.1, 12],
+    ];
+    for (const [what, drop, run] of cases) {
+      const s = flight(drop, run);
+      // The risers reach the drop, within a tread. They reach it exactly by
+      // construction; the tolerance is the brief's and catches a rewrite that
+      // rounds the riser instead of the count.
+      if (Math.abs(s.risers * s.riser - drop) > s.going) {
+        failures.push(`${what}: ${s.risers} risers of ${s.riser.toFixed(3)} m make ${(s.risers * s.riser).toFixed(2)} m of a ${drop} m drop.`);
+      }
+      // The treads and the landings fill the run, or the foot is not at the foot.
+      const laid = s.risers * s.going + s.landings * s.landing;
+      if (Math.abs(laid - run) > 1e-6) failures.push(`${what}: ${laid.toFixed(3)} m of treads and landings in a ${run} m run.`);
+      // No riser a body cannot climb, and none so shallow it is a trip.
+      if (!(s.riser <= PLATFORM_STEP_M)) failures.push(`${what}: a riser of ${s.riser.toFixed(2)} m is over the step height of ${PLATFORM_STEP_M}.`);
+      if (!(s.riser >= STAIR_RISER_MIN_M - 1e-9 && s.riser <= STAIR_RISER_MAX_M + 1e-9)) {
+        failures.push(`${what}: a riser of ${s.riser.toFixed(3)} m is outside ${STAIR_RISER_MIN_M}-${STAIR_RISER_MAX_M}.`);
+      }
+      if (!(s.going >= STAIR_GOING_MIN_M - 1e-9)) failures.push(`${what}: a going of ${s.going.toFixed(3)} m is under the ${STAIR_GOING_MIN_M} m floor; the landings were meant to yield first.`);
+      // The enumeration and the height function are the same flight, walked
+      // against each other rather than assumed equal.
+      const treads = stairTreads(s);
+      if (treads.length !== s.risers) failures.push(`${what}: ${treads.length} surfaces for ${s.risers} risers.`);
+      if (treads.filter((t) => t.landing).length !== s.landings) {
+        failures.push(`${what}: ${treads.filter((t) => t.landing).length} landings drawn for ${s.landings} solved.`);
+      }
+      for (const t of treads) {
+        const mid = (t.d0 + t.d1) / 2;
+        if (Math.abs(stairDropAt(s, mid) - t.drop) > 1e-6) {
+          failures.push(`${what}: the middle of a tread at ${mid.toFixed(2)} m answers ${stairDropAt(s, mid).toFixed(3)} m, the tread is at ${t.drop.toFixed(3)}.`);
+          break;
+        }
+      }
+      if (treads.length > 0 && Math.abs(treads[treads.length - 1].d1 - run) > 1e-6) {
+        failures.push(`${what}: the last tread ends at ${treads[treads.length - 1].d1.toFixed(2)} m of a ${run} m run.`);
+      }
+      // Monotone, never above the mouth, never below the foot, and no single
+      // sample-to-sample jump a body catches on.
+      let last = 0;
+      for (let d = -1; d <= run + 1; d += 0.05) {
+        const y = stairDropAt(s, d);
+        if (y < last - 1e-9) { failures.push(`${what}: the flight climbs back up at ${d.toFixed(2)} m.`); break; }
+        if (y - last > PLATFORM_STEP_M + 1e-9) { failures.push(`${what}: a ${(y - last).toFixed(2)} m drop in 5 cm at ${d.toFixed(2)} m.`); break; }
+        if (y < 0 || y > drop + 1e-9) { failures.push(`${what}: the flight answers ${y.toFixed(2)} m of a ${drop} m drop.`); break; }
+        last = y;
+      }
+      if (stairDropAt(s, 0) !== 0) failures.push(`${what}: the mouth is not at the top of the flight.`);
+      if (Math.abs(stairDropAt(s, run) - drop) > 1e-9) failures.push(`${what}: the foot is not at the bottom of the flight.`);
+      // **How far it may leave the plane, both ways.** The plane is what the
+      // terrain carve and the drawn lid still describe, so the profile has to
+      // stay inside a passage built round it. Below the plane it may fall by
+      // `dip` and no further, which is what the side walls are extended by;
+      // above it, never by more than the plane falls over the longest flat
+      // surface the flight has, or a tread would stand in the lid.
+      const slope = drop / run;
+      const ceiling = slope * (s.going + s.landing) + 1e-9;
+      let below = 0;
+      for (let d = 0; d <= run; d += 0.05) {
+        // Positive is behind the plane, which is to say under it.
+        const off = stairDropAt(s, d) - slope * d;
+        if (-off > ceiling) { failures.push(`${what}: the flight stands ${(-off).toFixed(2)} m over the plane at ${d.toFixed(2)} m.`); break; }
+        if (off > below) below = off;
+      }
+      if (below > s.dip + 1e-9) failures.push(`${what}: the flight falls ${below.toFixed(2)} m under the plane; it declares a ${s.dip.toFixed(2)} m dip.`);
+      if (s.landings === 0 && s.dip > 1e-9) failures.push(`${what}: a flight with no landings declares a ${s.dip.toFixed(2)} m dip.`);
+    }
+    // And a landing exists where the run can pay for one. Twelve risers cannot
+    // be afforded at this pitch (see `accessStair`); the spacing doubles, and a
+    // flight that got none at all would mean the loop never ran.
+    const deep = flight(33, 44);
+    if (deep.landings < 1) failures.push('the deepest flight in the bake got no landing at all.');
+    if (deep.perFlight > 0 && deep.perFlight % STAIR_LANDING_RISERS !== 0) {
+      failures.push(`the landing spacing of ${deep.perFlight} is not a doubling of ${STAIR_LANDING_RISERS}.`);
+    }
+  }
+
+  // --- **A body walks the flight, on the field's own box.** The arithmetic
+  //     above is the profile; this is `floorAt` answering it, which is the
+  //     surface both ends actually stand a body on.
+  {
+    const st = like({ entranceX: 10, entranceZ: 40, entranceY: 19, name: 'Stairville' });
+    const field = buildStationBoxes({ stations: [st] } as unknown as RailBake);
+    const plan = field.planFor('Stairville');
+    const box = field.boxFor('Stairville access');
+    if (plan === null || box === null) failures.push('the flight fixture built no plan or no access box.');
+    else if (box.stair === undefined) failures.push('the access box has no flight on it; the floor is still a plane.');
+    else {
+      let feet = plan.mouthY;
+      let steps = 0;
+      let worst = 0;
+      for (let d = -1; d <= plan.inclineM + 1; d += 0.05) {
+        const y = field.floorAt(plan.mouthX + plan.dirX * d, plan.mouthZ + plan.dirZ * d, feet);
+        if (y === -Infinity) { failures.push(`the flight's floor stopped answering ${d.toFixed(2)} m down.`); break; }
+        const dy = feet - y;
+        if (dy > PLATFORM_STEP_M + 1e-9) { failures.push(`the flight drops ${dy.toFixed(2)} m in 5 cm at ${d.toFixed(2)} m.`); break; }
+        if (dy > 1e-6) { steps++; worst = Math.max(worst, dy); }
+        feet = y;
+      }
+      // It is a staircase and not a ramp: the descent happens in risers, and
+      // there are as many of them as the flight has. A plane would have made
+      // every one of the 5 cm samples a tiny drop and none of them a riser.
+      if (steps !== box.stair.risers) failures.push(`the walk met ${steps} risers; the flight has ${box.stair.risers}.`);
+      if (Math.abs(worst - box.stair.riser) > 1e-6) failures.push(`the tallest riser walked was ${worst.toFixed(3)} m; the flight's is ${box.stair.riser.toFixed(3)}.`);
+      if (Math.abs(feet - plan.floorY) > 1e-6) failures.push(`the flight ended at ${feet.toFixed(2)} m, not the concourse at ${plan.floorY.toFixed(2)}.`);
+      // The pad at the mouth is flat and at the street, which is the step off
+      // the footpath: `riseMax` used to do this and the flight does it now.
+      const pad = field.floorAt(plan.mouthX - plan.dirX * 0.8, plan.mouthZ - plan.dirZ * 0.8, plan.mouthY);
+      if (Math.abs(pad - plan.mouthY) > 1e-6) failures.push(`the pad behind the mouth is at ${pad.toFixed(2)} m, the street is at ${plan.mouthY.toFixed(2)}.`);
+
+      // --- The headhouse, which is the other half of the report: *"and from
+      //     the outside it has no roof"*. Three claims, all of them about not
+      //     being in the way of the doorway the check walks through.
+      const house = accessHeadhouse(plan);
+      if (!(house.soffitY - plan.mouthY >= 2.4)) {
+        failures.push(`the headhouse soffit is ${(house.soffitY - plan.mouthY).toFixed(2)} m over the top landing; 2.4 m is the floor.`);
+      }
+      if (!(house.clearHalfW >= ACCESS_HALF_W)) {
+        failures.push(`the headhouse opening is ${house.clearHalfW.toFixed(2)} m half-wide against a ${ACCESS_HALF_W} m passage; a wall stands in the doorway.`);
+      }
+      if (!(house.roofHalfW > house.wallHalfW && house.wallHalfW > house.clearHalfW)) {
+        failures.push('the headhouse roof, walls and opening are not in that order outward.');
+      }
+      // The doorway plane: the rectangle at the mouth a body walks through,
+      // as wide as the passage and as tall as a head with its hands up. No
+      // part of the headhouse may intersect it.
+      if (!(house.front < 0 && house.lintelD + house.lintelDepth <= 0)) {
+        failures.push('the headhouse lintel reaches past the mouth into the doorway.');
+      }
+      if (!(house.lintelY >= plan.mouthY + ACCESS_HEAD_M)) {
+        failures.push(`the lintel hangs at ${(house.lintelY - plan.mouthY).toFixed(2)} m over the footpath; a head reaches ${ACCESS_HEAD_M}.`);
+      }
+      if (!(house.back > 0 && house.back <= plan.inclineM)) {
+        failures.push(`the headhouse runs ${house.back} m down a ${plan.inclineM.toFixed(0)} m incline.`);
+      }
+      // And the lamp is under the roof rather than in it, and over a head.
+      if (!(house.lampY < house.soffitY && house.lampY > plan.mouthY + ACCESS_HEAD_M)) {
+        failures.push(`the headhouse lamp hangs at ${house.lampY.toFixed(2)}, between a ${(plan.mouthY + ACCESS_HEAD_M).toFixed(2)} head and a ${house.soffitY.toFixed(2)} soffit.`);
+      }
+      if (!(house.lampD > 0 && house.lampD < house.back)) failures.push('the headhouse lamp is not under its own roof.');
     }
   }
 

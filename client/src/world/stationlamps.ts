@@ -61,7 +61,7 @@
  * imports both, asserts the two constants agree.
  */
 
-import { PLATFORM_INNER_M, PLATFORM_WIDTH_M } from '../game/riding.ts';
+import { PLATFORM_INNER_M, PLATFORM_WIDTH_M, accessHeadhouse, type AccessPlan } from '../game/riding.ts';
 
 /** Along the platform, lamp to lamp. A carriage is 20 m; two or three per car. */
 export const STATION_LAMP_PITCH = 8;
@@ -157,10 +157,33 @@ export function stationLampPositions(room: LampRoom): Float32Array<ArrayBuffer> 
 }
 
 /**
- * The same lamps as `LampSource` records for the night rig: x, y, z and a
- * sodium flag of 0, all rooms in one array. Rebuilt whenever the field is.
+ * The one lamp under a headhouse roof, at the mouth: x, y, z.
+ *
+ * A room has two rows of battens and the passage below has none, which was the
+ * right trade while a mouth was a hole in the pavement -- the sky lit it. It is
+ * a building now (`riding.accessHeadhouse`), and a canopy with nothing under it
+ * is darker at night than the footpath it stands on. One record, at the
+ * position the roof's own numbers give, so the light hangs under the roof
+ * rather than inside it.
  */
-export function buildStationLampRecords(rooms: readonly LampRoom[]): Float32Array<ArrayBuffer> {
+export function mouthLampPosition(plan: AccessPlan): [number, number, number] {
+  const house = accessHeadhouse(plan);
+  return [
+    plan.mouthX + plan.dirX * house.lampD,
+    house.lampY,
+    plan.mouthZ + plan.dirZ * house.lampD,
+  ];
+}
+
+/**
+ * The same lamps as `LampSource` records for the night rig: x, y, z and a
+ * sodium flag of 0 -- every room's two rows first, then one lamp under each
+ * station mouth's headhouse. Rebuilt whenever the field is.
+ */
+export function buildStationLampRecords(
+  rooms: readonly LampRoom[],
+  mouths: readonly AccessPlan[] = [],
+): Float32Array<ArrayBuffer> {
   const parts: Float32Array<ArrayBuffer>[] = [];
   let lamps = 0;
   for (const room of rooms) {
@@ -168,7 +191,7 @@ export function buildStationLampRecords(rooms: readonly LampRoom[]): Float32Arra
     parts.push(p);
     lamps += p.length / STATION_LAMP_FLOATS;
   }
-  const out = new Float32Array(lamps * STATION_LAMP_RECORD_STRIDE);
+  const out = new Float32Array((lamps + mouths.length) * STATION_LAMP_RECORD_STRIDE);
   let w = 0;
   for (const p of parts) {
     for (let i = 0; i < p.length; i += STATION_LAMP_FLOATS) {
@@ -177,6 +200,15 @@ export function buildStationLampRecords(rooms: readonly LampRoom[]): Float32Arra
       out[w++] = p[i + 2];
       out[w++] = 0;
     }
+  }
+  for (const plan of mouths) {
+    const [x, y, z] = mouthLampPosition(plan);
+    out[w++] = x;
+    out[w++] = y;
+    out[w++] = z;
+    // White, like the room's battens: a station canopy is a fluorescent, not
+    // the sodium of the street lamp beside it.
+    out[w++] = 0;
   }
   return out;
 }
@@ -286,6 +318,45 @@ export function verifyStationLamps(): string[] {
       }
     }
     if (buildStationLampRecords([]).length !== 0) failures.push('no rooms gave some records.');
+  }
+
+  // --- And the mouth. A headhouse is a roof over the top of the flight, and a
+  //     roof with no lamp under it is darker at night than the street it
+  //     stands on. One record each, after the rooms', at the height
+  //     `riding.accessHeadhouse` puts the fitting -- under the soffit, over a
+  //     head, inside the roof's own run.
+  {
+    const plan: AccessPlan = {
+      mouthX: 40, mouthZ: -12, mouthY: 21, dirX: 0.6, dirZ: 0.8, inclineM: 20,
+      footX: 52, footZ: 4, floorY: 6, tunDirX: -0.8, tunDirZ: 0.6, tunnelM: 8,
+    };
+    const house = accessHeadhouse(plan);
+    const [x, y, z] = mouthLampPosition(plan);
+    if (!(y < house.soffitY && y > plan.mouthY + 2)) {
+      failures.push(`the mouth lamp hangs at ${y}, not between the pad at ${plan.mouthY} and the soffit at ${house.soffitY}.`);
+    }
+    const along = (x - plan.mouthX) * plan.dirX + (z - plan.mouthZ) * plan.dirZ;
+    const across = -(x - plan.mouthX) * plan.dirZ + (z - plan.mouthZ) * plan.dirX;
+    if (!(along > 0 && along < house.back)) failures.push(`the mouth lamp is ${along.toFixed(2)} m along a roof that runs to ${house.back}.`);
+    if (Math.abs(across) > 1e-9) failures.push(`the mouth lamp is ${across.toFixed(2)} m off the passage's centreline.`);
+    // It is appended to the rooms' records rather than replacing them.
+    const rooms = [room];
+    const bare = buildStationLampRecords(rooms);
+    const lit = buildStationLampRecords(rooms, [plan]);
+    if (lit.length !== bare.length + STATION_LAMP_RECORD_STRIDE) {
+      failures.push(`one mouth added ${(lit.length - bare.length) / STATION_LAMP_RECORD_STRIDE} records, not one.`);
+    } else {
+      for (let i = 0; i < bare.length; i++) {
+        if (lit[i] !== bare[i]) { failures.push('a mouth lamp moved one of the room\'s.'); break; }
+      }
+      // A record is a `Float32Array`, so the comparison is to single precision
+      // rather than to the double the position was computed in.
+      const at = bare.length;
+      if (Math.abs(lit[at] - x) > 1e-3 || Math.abs(lit[at + 1] - y) > 1e-3 || Math.abs(lit[at + 2] - z) > 1e-3) {
+        failures.push('the mouth record is not at the mouth lamp.');
+      }
+      if (lit[at + 3] !== 0) failures.push('the mouth lamp is flagged sodium; a station canopy is white.');
+    }
   }
 
   return failures;
