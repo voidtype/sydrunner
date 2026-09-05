@@ -128,6 +128,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 from shapely.geometry import Point, Polygon
+from shapely.ops import unary_union
 from shapely.prepared import prep
 
 from . import bays, geo, streets
@@ -421,6 +422,20 @@ class HeroDeck:
     it meets the ground; this does the same thing by clamping to the terrain,
     which lands the lane on the touchdown at the same place without needing the
     stepped search.
+
+    **Coverage is the deck plus the ramps, not the deck alone.** `height()`
+    always knew the ramp profile, but `covers()` used to test the hero zone,
+    which `decks.hero_bridge_zone` sizes to the published 1,149 m of deck --
+    so every lane vertex on the 300 m of approach ramp past each abutment fell
+    out of coverage and onto the terrain. Measured on the shipped bake
+    (2026-09-05, "the bridge and the road off the bridge dont meet"): the lanes
+    sit on the deck to the centimetre from -550 m to +550 m along the axis and
+    then drop 14.7 m in one 25 m bin at the south abutment, to a flat -37 m
+    that the hero deck only reaches 275 m later at its touchdown. The coverage
+    polygon is therefore the zone extended `BRIDGE_RAMP_MAX` along the axis at
+    both ends, at the deck's own width -- no wider, so the carriageways that
+    diverge off the approaches (the Cahill, the Warringah ramps) stay outside
+    it and keep their own solve.
     """
 
     def __init__(self, anchors: dict, zone: Polygon, terrain) -> None:
@@ -433,8 +448,22 @@ class HeroDeck:
         self._deck_y = -terrain.base_elevation + lm.BRIDGE_DECK_AHD
         self._grade = lm.BRIDGE_RAMP_GRADE
         self._reach = lm.BRIDGE_RAMP_MAX
-        self._zone = prep(zone)
-        self._bounds = zone.bounds
+        # The ramps, added to the zone the caller sized to the deck. See the
+        # docstring: `covers()` has to admit the 300 m past each abutment or
+        # `height()` never gets to draw the ramp it knows how to.
+        half_w = lm.BRIDGE_DECK_WIDTH * 0.5
+        reach = self._half_len + self._reach
+        ramps = Polygon(
+            [
+                centre + along * s + _across * t
+                for s, t in ((-reach, -half_w), (reach, -half_w), (reach, half_w), (-reach, half_w))
+            ]
+        )
+        coverage = unary_union([zone, ramps])
+        if coverage.geom_type != "Polygon":
+            coverage = coverage.convex_hull
+        self._zone = prep(coverage)
+        self._bounds = coverage.bounds
         self._terrain = terrain
         self.covered = 0
 
