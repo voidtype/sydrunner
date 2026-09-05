@@ -2877,8 +2877,9 @@ export class CombatAudio {
       // recorded anyway so this is not retried sixty times a second.
       if (voice.offset < buffer.duration - 0.05) {
         const gate = ctx.createGain();
+        const edge = index === RIDE_CHANNEL ? RIDE_EDGE_S : ANNOUNCE_EDGE_S;
         gate.gain.setValueAtTime(0.0001, t);
-        gate.gain.linearRampToValueAtTime(1, t + ANNOUNCE_EDGE_S);
+        gate.gain.linearRampToValueAtTime(1, t + edge);
         const source = ctx.createBufferSource();
         source.buffer = buffer;
         // The carriage bed goes round; a sentence does not. `loop` is the
@@ -2919,11 +2920,12 @@ export class CombatAudio {
     ch.gate = null;
     if (!source || !gate) return;
     const t = ctx.currentTime;
+    const edge = index === RIDE_CHANNEL ? RIDE_EDGE_S : ANNOUNCE_EDGE_S;
     gate.gain.cancelScheduledValues(t);
     gate.gain.setValueAtTime(gate.gain.value, t);
-    gate.gain.linearRampToValueAtTime(0.0001, t + ANNOUNCE_EDGE_S);
+    gate.gain.linearRampToValueAtTime(0.0001, t + edge);
     try {
-      source.stop(t + ANNOUNCE_EDGE_S * 2);
+      source.stop(t + edge * 2);
     } catch {
       // Already stopped by an earlier release. Nothing to do.
     }
@@ -2934,7 +2936,7 @@ export class CombatAudio {
       } catch {
         // A node already disconnected by a context teardown.
       }
-    }, 400);
+    }, edge * 2 * 1000 + 50);
   }
 
   // --- The screaming sun -------------------------------------------------------
@@ -3781,8 +3783,26 @@ const RIDE_CHANNEL = 2;
  * about 0.96 before the limiter and the limiter has the peaks. Levels live here
  * with the rest of them; `game/rail-audio.ts` says *when* a voice plays and
  * never how loud.
+ *
+ * **+13 dB now.** 2026-09-05, the owner: "turn up the mid-train-journey sound
+ * about 4db". Written the same way, as nine plus four, so both requests can
+ * be read off it. It arrives at about 1.5 before the limiter now; the
+ * compressor after the master is what makes that a level rather than a clip,
+ * and it was already doing that job at 0.96.
  */
-const RIDE_GAIN = ANNOUNCE_GAIN * 10 ** (9 / 20);
+const RIDE_GAIN = ANNOUNCE_GAIN * 10 ** ((9 + 4) / 20);
+/**
+ * How long the carriage bed takes to come up and go down, seconds.
+ *
+ * Five, against `ANNOUNCE_EDGE_S`'s forty milliseconds, and the two are
+ * different because the two sounds are: a sentence has an edge and a bed does
+ * not. The owner's words were "make it crossfade for 5s with the other sounds"
+ * -- boarding a train, the rattle rises under the platform ambience over five
+ * seconds rather than slamming in on the frame the doors close, and stepping
+ * off it, it falls away behind you at the same rate. Only the ride channel
+ * uses this; the PA keeps its edge.
+ */
+const RIDE_EDGE_S = 5;
 
 /**
  * What is left of it through a carriage shell, on the platform side.

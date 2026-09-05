@@ -314,10 +314,14 @@ export class TalentsPanel {
     if (e.code !== 'Escape') return;
     e.preventDefault();
     e.stopImmediatePropagation();
+    // 2026-09-05, the owner: "not clear how to leave the talents page". It was
+    // modal until a side was chosen, and the only sign of that was a small
+    // note. It is not modal any more: Escape and the close button both leave,
+    // side chosen or not, and the panel comes back on the next level line or
+    // phone tile with the choice still waiting. The note stays as a hint.
     if (this.source.team() === TEAM.NONE) {
       const note = document.getElementById('talents-locknote');
-      if (note) note.textContent = 'pick a side first. it lasts the week.';
-      return;
+      if (note) note.textContent = 'no side picked yet — come back from the phone when you have.';
     }
     this.setOpen(false);
   }
@@ -398,9 +402,7 @@ export class TalentsPanel {
     shut.type = 'button';
     shut.id = 'talents-close';
     shut.textContent = 'close (esc)';
-    shut.addEventListener('click', () => {
-      if (this.source.team() !== TEAM.NONE) this.setOpen(false);
-    });
+    shut.addEventListener('click', () => this.setOpen(false));
     bar.append(pts, who, reset, hint, shut);
     inner.appendChild(bar);
 
@@ -492,7 +494,8 @@ export class TalentsPanel {
     const chosen = team !== TEAM.NONE;
 
     setDisplay('talents-choose', chosen ? 'none' : '');
-    setDisplay('talents-close', chosen ? '' : 'none');
+    // Always shown; see `keydown` for why the panel stopped being modal.
+    setDisplay('talents-close', '');
     setText('talents-left', String(Math.max(0, budget - spent)));
     const who = document.getElementById('talents-who');
     if (who) {

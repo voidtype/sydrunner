@@ -269,7 +269,9 @@ const APPS: readonly AppDef[] = [
    * shop nobody finds. It is also the door a payment processor will one day be
    * behind, and that door should be somewhere a player can point at.
    */
-  { id: 'till', glyph: '+', label: 'top up' },
+  // 'buy cash' rather than 'top up': the owner could not find it under the
+  // second. The screen keeps 'top up' as its title.
+  { id: 'till', glyph: '+', label: 'buy cash' },
 ];
 
 /** How long the viewfinder flashes white after the shutter, milliseconds. */
@@ -605,6 +607,9 @@ export class Phone {
           }
           rows.push('<div class="phone-note">this session only</div>');
         }
+        // The till's second door. The wallet is where a player looks when they
+        // want more money, so the way to more money is on it.
+        rows.push('<button class="phone-act" data-act="till">buy cash</button>');
         break;
 
       case 'till': {
@@ -739,6 +744,10 @@ export class Phone {
         this.source.setOnline(!this.source.online());
         this.drawn = '';
         this.draw();
+        break;
+
+      case 'till':
+        this.openApp('till');
         break;
 
       case 'buy': {
