@@ -75,6 +75,76 @@ The one-line version: **OSM is the authority on what the structure is; the DEM
 is the authority on where the ground is.** They answer different questions, and
 neither may answer the other's.
 
+#### 3a. Amendment, 2026-09-05: a portal is a transition, not a step
+
+Rule 1 says a bore is under the ground. It never said *how far in*, and the
+answer the code gave was "at the first vertex", which is a mapper's decision
+about where to break a way and not a fact about a railway. Chatswood is the bill
+for it, measured:
+
+| | before | after |
+|---|---|---|
+| `clearance` (median over the platform) | **−10.54 m** | **−3.58 m** |
+| `clearanceLo` / `clearanceHi` | −13.27 / −5.52 | −5.88 / +1.98 |
+| `siteY` | 32.27 | 39.75 |
+| `trackY` | 32.25 | 39.75 |
+
+Nothing at Chatswood was ever capped — `tunnelShare` is 0.00 over the 85 m
+around it and `bridgeShare` is 1.00, four platform ways all `bridge=yes`,
+`layer=1`. What sank it is 291 m away. The Metro and the North Shore pair enter
+tunnel together 229 m north of the platform; `bore_nodes` leaves the portal at
+daylight, and then the **next vertex in, 62 m further**, has every edge
+tunnelled and was asked for the whole 7.5 m of earth cover. The DEM there reads
+30.53 m — twelve metres below the station — so the bound came out at 23.03 m,
+and `apply_cover`'s cone, which is grade-legal and therefore reaches `d / 0.033`
+metres in every direction, carried it back up the ramp and stood the deck at
+32.26.
+
+7.5 m of cover 62 m past a headwall is a 12% descent. It is not a strict
+requirement, it is an impossible one, and a solver handed an impossible demand
+does not refuse it — it pays for it somewhere else. So the tie-break gains a
+clause, which is a statement about feasibility and not a relaxation:
+
+> **A bore is only ever as deep as a train can have dug on the way in from
+> daylight.** At its portal it owes no cover, because a headwall stands on the
+> surface; `MAX_GRADIENT` metres of cover for every metre it has run after
+> that; and the full `TUNNEL_COVER_M` once it has had the distance to earn it.
+> The bound on a bore node is therefore
+> `min(surface, max(surface − TUNNEL_COVER_M, portal_ceiling))`, where
+> `portal_ceiling` is the upper envelope of the surface over the tunnel
+> subgraph sourced at the portals — `rail.portal_ceiling`, the same Dijkstra
+> as `_cone` and the same triangle-inequality argument.
+
+Three things this deliberately keeps:
+
+- **The player's absolute rule is strengthened, not weakened.** *"A rail tunnel
+  should never result in the train assets being above the surface"* is the
+  `min(surface, …)` term, and it now binds at every capped node **including the
+  ones inside a portal transition**, which the old bound could not do, because a
+  bound 7.5 m stricter than feasible is a bound the solve pays off elsewhere and
+  the check then reports as satisfied. `rail-audit` 3b measures the two halves
+  separately and keeps a negative control on each.
+- **Nothing deep moves.** `TUNNEL_COVER_M / MAX_GRADIENT` is 227 m, so a bore
+  node further than that from daylight has exactly the bound it had before.
+- **One expression, two readers.** `rail.bore_cover_cap` is called by the
+  constraint and by the audit, so a check that has drifted from the solver is
+  not a thing that can happen here.
+
+**What this does not buy, with the arithmetic, because the owner asked for
+more.** The brief wanted Chatswood on a deck at +5 to +8 m. It is not reachable
+and the reason is the ground, not the solver. Measured on the same extract by
+weakening the rules one at a time: with the cover requirement set to **zero**
+Chatswood comes out at **−3.58 m**, identical to what ships — so the cover rule
+now costs the station nothing at all, and the remainder is the absolute rule
+plus the terrain. With **every tunnel tag in Sydney deleted** it reaches
+**−0.24 m**, which is the ceiling the DEM and the 3.3% ruling gradient impose
+between a station node the DEM puts at 42.99 m and ground 291 m north it puts at
+30.53 m. A railway cannot stand 5 m over a knoll 300 m wide whose own flanks
+fall at 4.3%. Chatswood stays `surface` with its conflict recorded, which is
+rule 2 working, and the last three metres are a terrain question — the DEM is a
+*surface* model and the 43 m plateau over the platform is the interchange
+development on top of it — not a height-solve one.
+
 ### 4. Access is generated, never looked up
 
 Every failure of reachability came from treating access as *content* — build it
