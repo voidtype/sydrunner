@@ -313,14 +313,66 @@ export interface StaticCarSource {
   ): void;
 }
 
+// --- Who sits where in a tile's spans -----------------------------------------
+
+/** A tile's cars sorted into one bucket per body, and where each car landed. */
+export interface CarBodyBins {
+  /** `members[b]` is the sidecar rows of body `b`, in sidecar order. */
+  members: number[][];
+  /** `slot[i]` is row `i`'s instance index inside its own body's span. */
+  slot: Uint16Array;
+}
+
+/**
+ * Bin a tile's cars by body, and number each one inside its bin.
+ *
+ * **One function because it is one fact, and it used to be two.**
+ * `world/cars.buildTileCars` bins the sidecar by body and writes the n-th car of
+ * body `b` into instance `n` of that body's span; `world/carlod.adopt` has to
+ * re-derive the identical numbering, because the handle it needs -- "which
+ * instance is this car" -- is not in the sidecar and is not on the span. The two
+ * loops were written a fortnight apart, they agreed, and nothing but a comment
+ * said they had to: a body ordering changed in one of them zero-scales a
+ * *different* car than the one a player is standing next to, which looks like a
+ * car flickering out somewhere behind you and is unfindable.
+ *
+ * It lives here rather than in `world/cars.ts` for the reason `decodeCars` does:
+ * this file is three-free, so `verifyParkedBins` runs on the Bun server as well
+ * as in the browser, and a check the deploy gate cannot see is a check that goes
+ * green on a broken build. It is `+` and array pushes; there is nothing in it a
+ * renderer needs to be present for.
+ *
+ * `bodyCount` is the caller's own table size -- `world/cars.BODY_COUNT` from the
+ * renderer, `STATIC_BODY_COUNT` from anything headless, and `verifyStaticCars`
+ * is what asserts those are the same number. A row naming a body outside it is
+ * left out of every bin and given slot 0, which is what a decoder that clamps
+ * already guarantees cannot happen and what stops this throwing if one ever
+ * stops clamping.
+ */
+export function binCarsByBody(
+  body: Uint8Array,
+  count: number,
+  bodyCount: number = STATIC_BODY_COUNT,
+): CarBodyBins {
+  const members: number[][] = Array.from({ length: bodyCount }, () => []);
+  const slot = new Uint16Array(count);
+  for (let i = 0; i < count; i++) {
+    const b = body[i];
+    if (b >= bodyCount) continue;
+    slot[i] = members[b].length;
+    members[b].push(i);
+  }
+  return { members, slot };
+}
+
 /**
  * How the browser's tile streamer tells a field about a tile's parked cars.
  *
  * `world/streamer.setStaticCarSink`, on `setParkedCarSink`'s terms and from the
  * same two call sites -- adopted when a tile is committed, dropped when it is
  * disposed. Narrower than `ParkedCarSink` on purpose: that one is handed the
- * tile's `InstancedMesh`es because `carlod` has to reach into the matrix buffer,
- * and this one must not be, because it is three-free.
+ * spans a tile took out of the shared car meshes, because `carlod` has to reach
+ * into the matrix buffer, and this one must not be, because it is three-free.
  *
  * A separate sink rather than a second job for `carlod.CarModelFleet`, which
  * already receives the same three arguments, because that object is **optional**:
@@ -802,6 +854,115 @@ export function verifyStaticCars(bodyCount?: number, paintCount?: number): strin
       `The whole static fleet estimates at ${(wholeCity / 1e6).toFixed(1)} MB, over the 50 MB this ` +
         'layer was sized against. Re-measure `BYTES_PER_STATIC_CAR` and re-argue the cap in DEPLOY.md.',
     );
+  }
+
+  return failures;
+}
+
+/**
+ * The three-free half of the parked-car pooling check. Both boot lists.
+ *
+ * `world/parkedpool-check.verifyParkedPool` is the whole of it -- it builds real
+ * tiles through a real `InstancePool` and claims a real car through `carlod` --
+ * and it cannot run here, because every one of those nouns is three. What *can*
+ * run here is the seam the two ends of that machinery meet at, which is
+ * `binCarsByBody`: the builder lays a tile's instances out in this order and
+ * `carlod` addresses them in this order, and a disagreement is a car folded flat
+ * somewhere the player is not looking.
+ *
+ * The properties, and what each one is worth:
+ *
+ *   - **Every car is in exactly one bin.** A row lost here is a car that draws
+ *     and can never be claimed; a row in two bins is two cars sharing an
+ *     instance, so hiding one hides the other.
+ *   - **A bin's slots are `0 .. n-1`, in sidecar order, with no gaps.** This is
+ *     what makes `claim.count === members[b].length` a sufficient capacity
+ *     check rather than a coincidence, and that check is the one thing standing
+ *     between a mismatched sidecar and `carlod` zero-scaling the wrong car.
+ *   - **The bins sum to the tile's count** for every distribution, including the
+ *     ones the streamer meets most: a tile of one body, and a tile with a body
+ *     class entirely absent (which is the common case -- most tiles have no
+ *     vans) and therefore a span that is never claimed at all.
+ *
+ * Cheap and total over a synthetic tile rather than sampled: 500 rows is 500
+ * comparisons and it is run once at boot.
+ */
+export function verifyParkedBins(): string[] {
+  const failures: string[] = [];
+
+  // A distribution with all five bodies, a heavy majority, and one body class
+  // that never appears -- the tile shape the streamer actually sees most.
+  const count = 500;
+  const body = new Uint8Array(count);
+  for (let i = 0; i < count; i++) {
+    // 3 is deliberately never produced: an absent body must yield an empty bin
+    // rather than an off-by-one in every bin after it.
+    body[i] = [0, 0, 0, 1, 2, 4][i % 6];
+  }
+  const bins = binCarsByBody(body, count, STATIC_BODY_COUNT);
+
+  if (bins.members.length !== STATIC_BODY_COUNT) {
+    failures.push(
+      `\`binCarsByBody\` returned ${bins.members.length} bins for ${STATIC_BODY_COUNT} bodies.`,
+    );
+  }
+  if (bins.members[3]?.length !== 0) {
+    failures.push(
+      `The body-3 bin holds ${bins.members[3]?.length} cars in a tile that has none of them. ` +
+        'An absent body must be an empty bin, because `buildTileCars` claims no span for it and ' +
+        '`carlod` must then find no instance rather than somebody else\'s.',
+    );
+  }
+
+  // Every row in exactly one bin, at the slot the bins claim, in sidecar order.
+  const seen = new Uint8Array(count);
+  let binned = 0;
+  for (let b = 0; b < bins.members.length; b++) {
+    const members = bins.members[b];
+    for (let n = 0; n < members.length; n++) {
+      const i = members[n];
+      binned++;
+      if (seen[i] !== 0) failures.push(`Row ${i} is in two bins; two cars would share one instance.`);
+      seen[i] = 1;
+      if (body[i] !== b) failures.push(`Row ${i} is body ${body[i]} and was binned as ${b}.`);
+      if (bins.slot[i] !== n) {
+        failures.push(
+          `Row ${i} is the ${n}-th car of body ${b} and \`slot\` says ${bins.slot[i]}. ` +
+            '`carlod` would fold a different car flat than the one the player is standing at.',
+        );
+      }
+      if (n > 0 && members[n - 1] > i) {
+        failures.push(
+          `Body ${b}'s bin runs ${members[n - 1]} then ${i}, which is not sidecar order. ` +
+            '`buildTileCars` writes its instances in that order and nothing records it afterwards.',
+        );
+      }
+    }
+  }
+  if (binned !== count) {
+    failures.push(
+      `The bins hold ${binned} of ${count} cars. A row in no bin is a car that draws and can ` +
+        'never be claimed.',
+    );
+  }
+
+  // A tile of one body, which is where an off-by-one hides: every slot is its
+  // own row index, so a bin that started at 1 would still look plausible.
+  const single = new Uint8Array(7);
+  const one = binCarsByBody(single, single.length, STATIC_BODY_COUNT);
+  if (one.members[0].length !== 7 || one.slot[0] !== 0 || one.slot[6] !== 6) {
+    failures.push(
+      `A seven-car single-body tile binned to ${one.members[0].length} cars with slots ` +
+        `${one.slot[0]}..${one.slot[6]}; it must be 7 cars at 0..6.`,
+    );
+  }
+
+  // And a body the decoder should never emit. It is dropped rather than thrown
+  // on, because a build that stops clamping must lose one car and not a tile.
+  const rogue = new Uint8Array([0, 200, 1]);
+  const out = binCarsByBody(rogue, rogue.length, STATIC_BODY_COUNT);
+  if (out.members[0].length !== 1 || out.members[1].length !== 1) {
+    failures.push('A row naming a body outside the table disturbed the bins around it.');
   }
 
   return failures;

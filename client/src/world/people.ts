@@ -511,9 +511,9 @@ export class PedestrianCrowd {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       // Never owned by a tile and never freed by an eviction -- the geometry is
-      // shared by every pedestrian in the city. Distinct flag from
-      // `userData.cars` and `userData.traffic` so a change to either cannot
-      // silently free this one's buffers.
+      // shared by every pedestrian in the city. A distinct flag from
+      // `userData.traffic` so a change to that one cannot silently free this
+      // one's buffers.
       mesh.userData.pedestrians = true;
       // **The kit buffer, allocated here rather than by the first `setColorAt`
       // in `write`.** This whole tier is white geometry whose skin, singlet and

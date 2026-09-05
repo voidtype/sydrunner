@@ -128,10 +128,12 @@ import type { CarModelSink } from './carlod.ts';
 // below, because a reader looking for it will look here.
 import {
   STATIC_CAR_CLEARANCE_Y as CARRIAGEWAY_Y,
+  binCarsByBody,
   decodeCars,
   type TileCars,
 } from '../game/staticcars.ts';
 import { uploadInstances } from './instupload.ts';
+import type { InstancePool, PooledSet } from './instancepool.ts';
 
 /** Must match `parking.SEDAN` .. `parking.VAN` in the pipeline. */
 export const BODY_COUNT = 5;
@@ -691,11 +693,41 @@ function hash(...parts: number[]): number {
 }
 
 /**
- * Build one `InstancedMesh` per body type present in a tile.
+ * Claim a span of the city's five car meshes for one tile's parked cars.
  *
- * Positions are tile-local, so these are added to the tile's own group and
- * inherit its world translation -- the same arrangement that keeps float32
- * vertex precision constant across the extent for the buildings and the trees.
+ * ---------------------------------------------------------------------------
+ * WHY THIS IS NOT `new InstancedMesh` ANY MORE, WHICH IS THE WHOLE OF IT.
+ *
+ * three r0.185 puts `object.uuid` into `RenderObject.getMaterialCacheKey()` for
+ * anything instanced, so an `InstancedMesh` is a pipeline: one WGSL compile for
+ * the main pass and one for the shadow pass, per mesh, for the life of the
+ * session. This function used to make up to five of them **per tile**, and the
+ * meter said so -- `car_paint{color,normal,position}[inst] x803` on a session a
+ * few minutes old, beside `ShadowMaterial ... x864`, against a material that has
+ * exactly one graph in it. Nothing about that ever came back: a tile evicted
+ * frees its instance buffers and leaves its pipelines behind, so a player who
+ * kept riding kept compiling, and the frame median walked from 23 ms to 38 ms
+ * over a session with nothing on screen to explain it.
+ *
+ * `world/instancepool.ts` is the fix and was written for exactly this list --
+ * its header names `buildTileCars` among the builders still to convert. Five
+ * meshes for the whole city, spans claimed and given back per tile, and the
+ * conversion is a change of constructor: `PooledSet` wears `setMatrixAt` and
+ * `setColorAt`, so the arithmetic below -- which is where the yaw, the grade
+ * pitch, the kerb clearance and the tonal jitter live -- is untouched.
+ *
+ * **Positions stay tile-local**, and that is deliberate rather than lucky: the
+ * pool folds `originX`/`originZ` into the translation inside `setMatrixAt`, for
+ * the reason its header gives (each builder keeps the metres its sidecar is in,
+ * and the offset cannot be got wrong one file at a time). What changes is that
+ * these are no longer children of the tile group, so they are not hidden,
+ * shadow-flagged or disposed with it -- the streamer holds the claims on the
+ * tile and releases them on eviction, exactly as it already does for the trees,
+ * the poles and the bins.
+ *
+ * The instance layout is `game/staticcars.binCarsByBody`'s and not this
+ * function's own loop, because `world/carlod.ts` has to re-derive it to find the
+ * car a player is standing next to. See that function on why one copy.
  *
  * `groundAt` is the tile's own terrain grid, in the same tile-local metres, and
  * a car sits on it *level* rather than on the road's own pitch. That is wrong by
@@ -707,18 +739,45 @@ function hash(...parts: number[]): number {
 export function buildTileCars(
   data: TileCars,
   assets: CarAssets,
+  pool: InstancePool,
+  originX: number,
+  originZ: number,
   groundAt: (x: number, z: number) => number = () => 0,
-): InstancedMesh[] {
-  const perBody: number[][] = Array.from({ length: BODY_COUNT }, () => []);
-  for (let i = 0; i < data.count; i++) perBody[data.body[i]].push(i);
+): PooledSet[] {
+  const perBody = binCarsByBody(data.body, data.count, BODY_COUNT).members;
 
-  const out: InstancedMesh[] = [];
+  const out: PooledSet[] = [];
   for (let b = 0; b < BODY_COUNT; b++) {
     const members = perBody[b];
     if (members.length === 0) continue;
 
-    const mesh = new InstancedMesh(assets.geometry(b), assets.material, members.length);
-    mesh.name = `cars_${b}`;
+    // One key per body class, so five body types are five meshes citywide.
+    // `world/carlod.ts` reads the body back out of this key, on the terms the
+    // mesh name used to be read -- see its `adopt`.
+    const mesh = pool.set(
+      `cars_${b}`,
+      assets.geometry(b),
+      assets.material,
+      members.length,
+      originX,
+      originZ,
+      (m) => {
+        // A car casts and does not receive, on the trade `world/streamer.ts`
+        // states at length: a 1.5 m body standing on an otherwise unbroken road
+        // surface throws the only shadow that surface has, and the one it would
+        // catch is worth much less. Decided once here rather than per tile,
+        // because the mesh is now the city's rather than the tile's.
+        m.castShadow = true;
+        m.receiveShadow = false;
+        m.frustumCulled = false;
+      },
+    );
+    // A refused claim is a body class this tile does not draw, which is what a
+    // tile that failed to build already looked like. Counted by the pool and put
+    // on the frame line rather than thrown. `carlod` finds no span for those
+    // cars and leaves them as boxes that are not there, which is correct: there
+    // is nothing standing here to model.
+    if (mesh === null) continue;
 
     for (let n = 0; n < members.length; n++) {
       const i = members[n];
@@ -793,16 +852,10 @@ export function buildTileCars(
       _colour.setRGB(paint[0] * tone, paint[1] * tone, paint[2] * tone);
       mesh.setColorAt(n, _colour);
     }
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    // Culled with its tile, like every other primitive the streamer loads.
-    mesh.frustumCulled = false;
-    // Read by `streamer.ts` in two places -- the shadow role and, critically,
-    // disposal, where the geometry is *shared* and must not be released with the
-    // tile. Same flag name pattern as `userData.vegetation`, and it has to be a
-    // separate one so a future change to either cannot silently free the other's
-    // geometry.
-    mesh.userData.cars = true;
+    // No `needsUpdate` here: the pool marks its own species dirty and the caller
+    // uploads every one of them with a single `flush()`, which is what keeps a
+    // tile that touched four species to four `needsUpdate` flags rather than to
+    // one buffer upload per body.
     out.push(mesh);
   }
   return out;
@@ -1246,10 +1299,11 @@ export class TrafficMovers {
       // enough for the difference to be noticed.
       mesh.castShadow = true;
       mesh.receiveShadow = false;
-      // Distinct from `userData.cars`, which is the *parked* flag the streamer's
-      // disposal path reads. These are never owned by a tile and must never be
-      // freed by an eviction -- the geometry is shared with every parked car in
-      // the city.
+      // These are never owned by a tile and must never be freed by an eviction
+      // -- the geometry is shared with every parked car in the city. It used to
+      // be paired with a `userData.cars` on the parked meshes; those are spans
+      // of the shared pool now and never enter a tile group, so this flag is
+      // the only one of the two left.
       mesh.userData.traffic = true;
       // **The paint buffer, allocated here rather than by the first `setColorAt`
       // in the fill loop, and this one line is load-bearing.**

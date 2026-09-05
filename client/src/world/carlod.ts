@@ -79,22 +79,47 @@
  *   - **The parked fleet.** `buildTileCars` writes a tile's matrices once, at
  *     load, and never touches them again -- that is what makes 23,020 cars cost
  *     nothing per frame. There is no per-frame pass to skip, so a claimed parked
- *     car has its matrix in the tile's own `InstancedMesh` overwritten with a
- *     **zero scale** and restored on release. Zero-scale rather than a count
- *     change because a tile's instances are not orderable: they are packed per
- *     body type in sidecar order and moving one would move somebody else's.
+ *     car has its matrix overwritten with a **zero scale** and restored on
+ *     release. Zero-scale rather than a count change because a tile's instances
+ *     are not orderable: they are packed per body type in sidecar order and
+ *     moving one would move somebody else's.
  *
  *     A zero-scaled instance still runs its vertex shader, and that is the price:
  *     110 wasted vertices per claimed car, against at most a couple of dozen
  *     claims. Reordering the tile to keep the drawn ones contiguous would save
  *     it and would mean rewriting a tile's whole matrix buffer on every claim.
  *
+ *     **The matrix is a span of a shared mesh, not a mesh of the tile's own.**
+ *     The parked fleet moved into `world/instancepool.ts` when its per-tile
+ *     `InstancedMesh`es turned out to be compiling a pipeline each -- see
+ *     `cars.buildTileCars` -- so what this file is handed is a `PooledSet` per
+ *     body class and what it addresses is an instance *within a claim*. Three
+ *     consequences worth stating, because each is a bug that was possible for an
+ *     afternoon:
+ *
+ *       * the matrices in the buffer are **world-space**, since a pooled mesh
+ *         sits at the origin and the pool folded the tile offset in on the way
+ *         past. `consider` overwrites the plan position with the sweep's world
+ *         one anyway, so nothing here changed; but the read-then-restore pair
+ *         must go through `getMatrixAt`/`setWorldMatrixAt`, which do not touch
+ *         the origin, or a hidden car reappears one tile east of its bay.
+ *       * a write is not an upload. The pool marks its species dirty and
+ *         `flush()` is what reaches the GPU, so every place that used to set
+ *         `instanceMatrix.needsUpdate` now flushes.
+ *       * the instance index is `binCarsByBody`'s, which is the same function
+ *         the builder laid the span out with rather than a second loop that
+ *         agrees with it.
+ *
  *     **Eviction is the trap here.** A tile can stream out while one of its cars
- *     is claimed, and its `InstancedMesh` is disposed with it. So the claim is
- *     dropped by `release(tileKey)` *without* restoring -- touching a disposed
- *     buffer is the failure this pairing exists to prevent -- and the tile's own
- *     matrices are rebuilt from the sidecar if it ever comes back, which puts the
- *     car back exactly where it was. See `TileStreamer.dispose`.
+ *     is claimed, and the streamer releases its claims back to the pool -- which
+ *     zeroes them, and may hand the same instances to the next tile that arrives
+ *     within the same frame. So the claim is dropped by `release(tileKey)`
+ *     *without* restoring, because a restore after the release would write this
+ *     tile's car into somebody else's suburb, and a restore before it is
+ *     pointless work on a span about to be zeroed. `TileStreamer.dispose` calls
+ *     `release` **first**, before `instancePool.release`, and that ordering is
+ *     the whole of the safety argument: while this file still holds a claim, the
+ *     span still belongs to the tile.
  *
  * ---------------------------------------------------------------------------
  * 4. COST, and where it is spent.
@@ -205,7 +230,9 @@ import {
   type TrafficField,
 } from '../game/traffic.ts';
 import { policeLiveried } from '../game/factions.ts';
+import { binCarsByBody } from '../game/staticcars.ts';
 import { BODY_COUNT, CAR_LIVERY_WHITE, CAR_PAINT, crumpleScale, crumpleTone, type TileCars } from './cars.ts';
+import type { PooledSet } from './instancepool.ts';
 
 // --- The contract with the rest of the client -----------------------------------
 
@@ -261,14 +288,20 @@ export interface CarModelBox {
  */
 export interface ParkedCarSink {
   /**
-   * `meshes` are the tile's own instanced sets as `buildTileCars` returned them,
-   * and `originX`/`originZ` are the tile group's translation -- the sidecar's
-   * coordinates are tile-local and every distance this file measures is not.
+   * `sets` are the spans of the shared car meshes this tile claimed, as
+   * `buildTileCars` returned them, and `originX`/`originZ` are the tile group's
+   * translation -- the sidecar's coordinates are tile-local and every distance
+   * this file measures is not.
+   *
+   * The claims are the *streamer's*, not this file's: they are released back to
+   * the pool when the tile is evicted, and the promise `release` makes is that
+   * every reference into them is dropped before that happens. See section 3 on
+   * eviction, which is where that promise is spent.
    */
   adopt(
     tileKey: string,
     data: TileCars,
-    meshes: readonly InstancedMesh[],
+    sets: readonly PooledSet[],
     originX: number,
     originZ: number,
   ): void;
@@ -731,10 +764,16 @@ interface Claim {
   damage: number;
 }
 
-/** The tile instance a claim has zero-scaled, and what to put back. */
+/**
+ * The tile instance a claim has zero-scaled, and what to put back.
+ *
+ * `set` is the tile's span of the shared mesh for this car's body class and
+ * `index` is the instance *within that span*, which is what makes the pair a
+ * valid handle for exactly as long as the tile holds the claim. See section 3.
+ */
 interface ParkedClaim {
   tile: ParkedTile;
-  mesh: InstancedMesh;
+  set: PooledSet;
   index: number;
   restore: Matrix4;
 }
@@ -748,8 +787,16 @@ interface ParkedTile {
   z: Float32Array;
   body: Uint8Array;
   colour: Uint8Array;
-  /** Which instanced set each car lives in, and where within it. */
-  mesh: Array<InstancedMesh | null>;
+  /**
+   * Which claimed span each car lives in, and where within it.
+   *
+   * Null for a body class this tile claimed no span for -- which is a pool that
+   * refused (`InstancePool.refused`, counted and on the frame line) rather than
+   * anything to do with the sidecar, since a body with cars in it always asks.
+   * Those cars are drawn by nobody, so there is nothing to hide and no model to
+   * put in front of them.
+   */
+  set: Array<PooledSet | null>;
   index: Uint16Array;
   /** Plan bounds, so a sweep can reject a whole tile with four comparisons. */
   minX: number;
@@ -851,8 +898,8 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
    * lookup, so not asking it is the whole of the fix, and `suppress` above is a
    * predicate consulted inside a loop that was already running.
    *
-   * A **parked** car is not a lookup. It is an instance matrix in a tile's
-   * `InstancedMesh`, written once by `buildTileCars` when the tile arrived, and
+   * A **parked** car is not a lookup. It is an instance matrix in the span a
+   * tile claimed, written once by `buildTileCars` when the tile arrived, and
    * it keeps drawing until somebody writes over it. So the box of a car a player
    * has driven away has to be *un-drawn*, which is an action, which needs a
    * handle on the tile and the instance index -- and the only handle a driven
@@ -883,7 +930,7 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
    */
   private readonly hiddenStatics = new Map<number, {
     tile: ParkedTile;
-    mesh: InstancedMesh;
+    set: PooledSet;
     index: number;
     restore: Matrix4;
   }>();
@@ -1192,8 +1239,11 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
     if (this.hiddenStatics.size === 0) return;
     for (const [identity, held] of [...this.hiddenStatics]) {
       if (driving.has(identity)) continue;
-      held.mesh.setMatrixAt(held.index, held.restore);
-      held.mesh.instanceMatrix.needsUpdate = true;
+      // Verbatim, through the write that does *not* add the tile origin: this
+      // matrix came out of the buffer already in world space. See
+      // `InstancePool.getMatrixAt`.
+      held.set.setWorldMatrixAt(held.index, held.restore);
+      held.set.flush();
       this.hiddenStatics.delete(identity);
     }
   }
@@ -1213,18 +1263,18 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
     for (const tile of this.tiles.values()) {
       for (let i = 0; i < tile.count; i++) {
         if (tile.identity[i] !== identity) continue;
-        const mesh = tile.mesh[i];
-        // A body with no instanced set: nothing was ever drawn here, so there is
+        const set = tile.set[i];
+        // A body with no claimed span: nothing was ever drawn here, so there is
         // nothing to hide -- but the car *is* a static one, so it must not go on
         // the `notStatic` list and be scanned for forever.
-        if (mesh === null) return true;
+        if (set === null) return true;
         const existing = this.byIdentity.get(identity);
         if (existing !== undefined && existing.parked !== null) this.revoke(existing, true);
         const restore = new Matrix4();
-        mesh.getMatrixAt(tile.index[i], restore);
-        mesh.setMatrixAt(tile.index[i], _zero);
-        mesh.instanceMatrix.needsUpdate = true;
-        this.hiddenStatics.set(identity, { tile, mesh, index: tile.index[i], restore });
+        set.getMatrixAt(tile.index[i], restore);
+        set.setWorldMatrixAt(tile.index[i], _zero);
+        set.flush();
+        this.hiddenStatics.set(identity, { tile, set, index: tile.index[i], restore });
         return true;
       }
     }
@@ -1379,12 +1429,12 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
 
     let parked: ParkedClaim | null = null;
     if (tile !== null) {
-      const mesh = tile.mesh[tileIndex];
-      if (mesh === null) return;
+      const set = tile.set[tileIndex];
+      if (set === null) return;
       const index = tile.index[tileIndex];
       const restore = new Matrix4();
-      mesh.getMatrixAt(index, restore);
-      parked = { tile, mesh, index, restore };
+      set.getMatrixAt(index, restore);
+      parked = { tile, set, index, restore };
     }
 
     const claim: Claim = {
@@ -1410,13 +1460,16 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
     slot.mesh.count = slot.claims.length;
 
     if (parked !== null) {
-      // The tile's matrix is *tile-local* -- its cars hang off the tile group and
-      // inherit its translation -- and this fleet hangs off the scene, so the
-      // plan position is replaced by the world one the sweep already computed
-      // and the height, heading and size jitter are kept exactly as
+      // The plan position is replaced by the world one the sweep already
+      // computed, and the height, heading and size jitter are kept exactly as
       // `buildTileCars` sampled them. That is what puts the model on the same
       // patch of camber, at the same angle, at the same 4 % of scale variation
       // as the box it is standing in for.
+      //
+      // The overwrite is why nothing here had to change when the parked fleet
+      // moved into the pool: the buffer's matrices are world-space now rather
+      // than tile-local, and the two coordinates that differ are the two this
+      // replaces outright. The other three quantities were never offset.
       //
       // Written once and never again: a parked car does not move.
       parked.restore.decompose(_position, _quaternion, _scale);
@@ -1424,8 +1477,8 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
       _position.z = tile!.z[tileIndex];
       claim.matrix.compose(_position, _quaternion, _scale);
       // And the box it replaces, folded flat. See section 3.
-      parked.mesh.setMatrixAt(parked.index, _zero);
-      parked.mesh.instanceMatrix.needsUpdate = true;
+      parked.set.setWorldMatrixAt(parked.index, _zero);
+      parked.set.flush();
       tile!.claims.add(claim);
     } else if (pose !== null) {
       poseMatrix(pose, claim.matrix);
@@ -1451,7 +1504,8 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
    * Give a claim's instance back.
    *
    * `restore` is false only when the tile that owned the box is being disposed,
-   * in which case writing to its buffer is a use-after-free. See section 3.
+   * in which case its span is about to go back to the pool and a write would
+   * land in whichever tile is given those instances next. See section 3.
    */
   private revoke(claim: Claim, restore: boolean): void {
     const slot = claim.slot;
@@ -1476,8 +1530,8 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
     this.byIdentity.delete(claim.identity);
 
     if (claim.parked !== null && restore) {
-      claim.parked.mesh.setMatrixAt(claim.parked.index, claim.parked.restore);
-      claim.parked.mesh.instanceMatrix.needsUpdate = true;
+      claim.parked.set.setWorldMatrixAt(claim.parked.index, claim.parked.restore);
+      claim.parked.set.flush();
     }
     if (claim.parked !== null) claim.parked.tile.claims.delete(claim);
   }
@@ -1487,7 +1541,7 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
   adopt(
     tileKey: string,
     data: TileCars,
-    meshes: readonly InstancedMesh[],
+    sets: readonly PooledSet[],
     originX: number,
     originZ: number,
   ): void {
@@ -1495,14 +1549,17 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
     // identity is the only thing this file can key a model off. Nothing to do.
     if (data.identity.length !== data.count) return;
 
-    // Which instanced set holds which body, by the name `buildTileCars` gives
-    // them. Re-derived rather than handed over so that `buildTileCars` keeps the
-    // signature every other caller has -- and checked below, because a silent
+    // Which span holds which body, by the pool key `buildTileCars` claims under.
+    // Read out of the key on exactly the terms it used to be read out of the
+    // mesh name, and for the same reason: `buildTileCars` keeps the signature
+    // every other builder in the streamer has, and the alternative -- a parallel
+    // array of body numbers threaded through the streamer -- is one more thing
+    // to keep in step with the claim order. Checked below, because a silent
     // mismatch here would zero-scale the wrong car.
-    const byBody = new Map<number, InstancedMesh>();
-    for (const mesh of meshes) {
-      const match = /^cars_(\d+)$/.exec(mesh.name);
-      if (match) byBody.set(Number(match[1]), mesh);
+    const byBody = new Map<number, PooledSet>();
+    for (const set of sets) {
+      const match = /^cars_(\d+)$/.exec(set.claim.key);
+      if (match) byBody.set(Number(match[1]), set);
     }
 
     const tile: ParkedTile = {
@@ -1512,7 +1569,7 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
       z: new Float32Array(data.count),
       body: data.body,
       colour: data.colour,
-      mesh: new Array<InstancedMesh | null>(data.count).fill(null),
+      set: new Array<PooledSet | null>(data.count).fill(null),
       index: new Uint16Array(data.count),
       minX: Infinity,
       maxX: -Infinity,
@@ -1521,10 +1578,12 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
       claims: new Set(),
     };
 
-    // The per-body running index is exactly `buildTileCars`' own: it bins the
-    // sidecar by body in index order and instance `n` of a body's set is the
-    // n-th car of that body. One loop, the same order, no shared state.
-    const seen = new Int32Array(BODY_COUNT);
+    // The per-body running index is not re-derived any more: it is
+    // `binCarsByBody`, the same call `buildTileCars` laid the spans out with, so
+    // "instance `n` of a body's span is the n-th car of that body in sidecar
+    // order" is one fact in one function rather than two loops that agree. See
+    // that function on what a disagreement looked like.
+    const bins = binCarsByBody(data.body, data.count, BODY_COUNT);
     for (let i = 0; i < data.count; i++) {
       const worldX = data.x[i] + originX;
       const worldZ = data.z[i] + originZ;
@@ -1534,19 +1593,22 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
       if (worldX > tile.maxX) tile.maxX = worldX;
       if (worldZ < tile.minZ) tile.minZ = worldZ;
       if (worldZ > tile.maxZ) tile.maxZ = worldZ;
-      const body = data.body[i];
-      const mesh = byBody.get(body) ?? null;
-      tile.index[i] = seen[body]++;
-      tile.mesh[i] = mesh;
+      tile.index[i] = bins.slot[i];
+      tile.set[i] = byBody.get(data.body[i]) ?? null;
     }
-    // The check the re-derivation earns its keep with: every set's capacity must
-    // be exactly the number of cars binned into it. A tile that disagrees is one
-    // this file refuses to touch rather than one it corrupts.
-    for (const [body, mesh] of byBody) {
-      if (mesh.count !== seen[body]) {
+    // The check that keeps the *claim* honest, and it is worth more now than it
+    // was: a span's length is the pool's answer rather than a constructor
+    // argument this file can see, so a claim short of its bin -- a truncation, a
+    // key collided with another builder's, a body binned twice -- would have
+    // this file zero-scaling instances belonging to some other tile's cars. A
+    // tile that disagrees is one this file refuses to touch rather than one it
+    // corrupts.
+    for (const [body, set] of byBody) {
+      const binned = bins.members[body]?.length ?? 0;
+      if (set.claim.count !== binned) {
         console.warn(
-          `[carlod] tile ${tileKey} has ${mesh.count} instances of body ${body} where the ` +
-            `sidecar has ${seen[body]}; its parked cars will not be modelled.`,
+          `[carlod] tile ${tileKey} claimed ${set.claim.count} instances of body ${body} where the ` +
+            `sidecar has ${binned}; its parked cars will not be modelled.`,
         );
         return;
       }
@@ -1570,14 +1632,19 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
     if (this.obstacles !== null) {
       const y = new Float32Array(data.count);
       for (let i = 0; i < data.count; i++) {
-        const mesh = tile.mesh[i];
-        if (mesh === null) {
-          // No instanced set for this body: nothing was drawn, so there is
+        const set = tile.set[i];
+        if (set === null) {
+          // No claimed span for this body: nothing was drawn, so there is
           // nothing standing there to drive round either.
           y[i] = NaN;
           continue;
         }
-        mesh.getMatrixAt(tile.index[i], _matrix);
+        // Element 13 is the *height*, which is the one component of the
+        // translation the pool does not touch -- it folds the tile origin into
+        // 12 and 14 only. So this reads the same number it read when these
+        // matrices were tile-local, and the vertical gate in
+        // `traffic.resolveLaneShare` is still being given the real one.
+        set.getMatrixAt(tile.index[i], _matrix);
         y[i] = _matrix.elements[13];
       }
       this.obstacles.adoptStatics(
@@ -1598,12 +1665,14 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
   release(tileKey: string): void {
     const tile = this.tiles.get(tileKey);
     if (tile === undefined) return;
-    // Without restoring: the meshes are about to be disposed with the tile.
+    // Without restoring: the tile's spans go back to the pool the moment this
+    // returns, and the pool may hand the same instances to the next tile that
+    // streams in. See section 3 on why the streamer calls this *first*.
     for (const claim of [...tile.claims]) this.revoke(claim, false);
     // WORKSTREAM S: and any folded box in this tile is forgotten rather than
-    // restored, for exactly the reason the claims above are -- writing to a
-    // buffer that is about to be freed is a use-after-free. The car is still
-    // suppressed and still driven; if the tile comes back, `syncSuppressedStatics`
+    // restored, for exactly the reason the claims above are -- writing into a
+    // span that is about to be given away puts this car in another suburb. The
+    // car is still suppressed and still driven; if the tile comes back, `syncSuppressedStatics`
     // folds the fresh instance flat again on the next sweep, which is what
     // clearing `notStatic` in `adopt` is for.
     for (const [identity, held] of [...this.hiddenStatics]) {

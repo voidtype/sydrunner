@@ -53,8 +53,14 @@ import { NO_SPACE, RangeAllocator } from './rangealloc.ts';
  * asked for 4,113 and then 4,483. Growth is correct now -- see `resize` -- but
  * each one still costs this species a recompile, so the opening size is set
  * above what a tile ring of the densest thing in the world actually holds.
- * 8,192 matrices is 512 KB per species, and the eighteen kinds this pool holds
- * come to about 11 MB, which `PERFORMANCE.md`'s budget has room for.
+ * 8,192 matrices is 512 KB per species, and the eighteen kinds this pool held
+ * came to about 11 MB, which `PERFORMANCE.md`'s budget has room for.
+ *
+ * **The parked cars are five more, and one of them will grow.** The inner ring
+ * carries 23,020 of them, so the commonest body class passes 8,192 on any ride
+ * through a suburb and doubles once, to 1 MB. Twenty-three kinds at their
+ * settled sizes is about 14 MB -- still inside the budget, and against the cost
+ * it replaced (two WGSL compiles per tile per body, forever) it is not close.
  */
 const INITIAL_CAPACITY = 8192;
 
@@ -109,6 +115,31 @@ export class PooledSet {
 
   setColorAt(index: number, colour: Color): void {
     this.pool.setColorAt(this.claim, index, colour);
+  }
+
+  /**
+   * The three calls a *consumer* of somebody else's claim needs, as opposed to
+   * the builder that wrote it.
+   *
+   * `world/carlod.ts` is the only one and it is the reason these exist: a parked
+   * car that becomes a model has to have its box folded flat and put back
+   * afterwards, which is a read, a write and an upload against one instance of a
+   * span this file's owner built. It held an `InstancedMesh` and called the
+   * three three-native methods before the parked fleet moved into the pool; it
+   * holds the `PooledSet` and calls these now, and the conversion is a change of
+   * noun rather than of shape. See `InstancePool.getMatrixAt` on why the write
+   * is `setWorldMatrixAt` and not `setMatrixAt`.
+   */
+  getMatrixAt(index: number, out: Matrix4): boolean {
+    return this.pool.getMatrixAt(this.claim, index, out);
+  }
+
+  setWorldMatrixAt(index: number, matrix: Matrix4): void {
+    this.pool.setWorldMatrixAt(this.claim, index, matrix);
+  }
+
+  flush(): void {
+    this.pool.flush();
   }
 }
 
@@ -247,6 +278,45 @@ export class InstancePool {
     slot.dirty = true;
   }
 
+  /**
+   * Read one instance's matrix back, exactly as the buffer holds it.
+   *
+   * **World-space, and deliberately not the tile-local matrix its builder
+   * wrote.** `setMatrixAt` folds the claim's origin in on the way past, so the
+   * world matrix is the only one that exists after a write -- there is nothing
+   * stored anywhere that could give the other one back. That suits the one
+   * consumer this is for: `world/carlod.ts` reads a parked car's matrix to keep
+   * the height, the heading, the grade pitch and the size jitter `buildTileCars`
+   * sampled, and to put the identical bits back when the model gives the car up.
+   *
+   * Paired with `setWorldMatrixAt`, which is the only write in this file that
+   * does **not** add the origin, and the pairing is the whole point: a read
+   * through here and a later write through `setMatrixAt` would add the tile
+   * offset a second time, and a car would walk one tile east every time a player
+   * walked past it.
+   */
+  getMatrixAt(claim: InstanceClaim, index: number, out: Matrix4): boolean {
+    const slot = this.slots.get(claim.key);
+    if (slot === undefined || index < 0 || index >= claim.count) return false;
+    out.fromArray(slot.mesh.instanceMatrix.array as Float32Array, (claim.start + index) * 16);
+    return true;
+  }
+
+  /**
+   * Write one instance's matrix verbatim, origin already in it.
+   *
+   * The other half of `getMatrixAt`'s round trip, and the only write here that
+   * treats its argument as world-space. A builder must not call it: a builder's
+   * arithmetic is tile-local by construction and `setMatrixAt` is what makes
+   * that safe.
+   */
+  setWorldMatrixAt(claim: InstanceClaim, index: number, matrix: Matrix4): void {
+    const slot = this.slots.get(claim.key);
+    if (slot === undefined || index < 0 || index >= claim.count) return;
+    matrix.toArray(slot.mesh.instanceMatrix.array as Float32Array, (claim.start + index) * 16);
+    slot.dirty = true;
+  }
+
   /** Write one instance's tint. */
   setColorAt(claim: InstanceClaim, index: number, colour: Color): void {
     const slot = this.slots.get(claim.key);
@@ -269,16 +339,26 @@ export class InstancePool {
 
   /** One clause for the frame line. */
   state(): string {
-    let live = 0;
     let cap = 0;
-    for (const slot of this.slots.values()) {
-      live += slot.alloc.used;
-      cap += slot.alloc.capacity;
-    }
+    for (const slot of this.slots.values()) cap += slot.alloc.capacity;
     return (
-      `pool ${this.slots.size} meshes, ${live}/${cap} instances, ${this.grows} grows` +
+      `pool ${this.slots.size} meshes, ${this.instances}/${cap} instances, ${this.grows} grows` +
       (this.refused > 0 ? `, ${this.refused} REFUSED` : '')
     );
+  }
+
+  /**
+   * Instances claimed right now, across every species.
+   *
+   * The number a check can hold a builder to: a tile's claims released on
+   * eviction must take exactly the instances that tile brought and no others,
+   * and `state()`'s live figure is that same sum rendered for a human. See
+   * `world/parkedpool-check.ts`.
+   */
+  get instances(): number {
+    let live = 0;
+    for (const slot of this.slots.values()) live += slot.alloc.used;
+    return live;
   }
 
   /** How many pooled meshes exist. One per species; never per tile. */
