@@ -189,6 +189,7 @@ import { verifySpaces } from '../client/src/net/spaces.ts';
 import { verifyCrash } from '../client/src/crash.ts';
 import { verifyStationWalls } from '../client/src/world/rail-solids.ts';
 import { verifyStationLamps } from '../client/src/world/stationlamps.ts';
+import { verifyBridgeLights } from '../client/src/world/bridgelights.ts';
 import { verifyTill } from '../client/src/game/till.ts';
 import { verifyDeviceLost } from '../client/src/devicelost.ts';
 // --- Workstream E. Three self-checks, all three of them shared modules being
@@ -515,6 +516,12 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // prism `stationSolids` emits, so the doorway has to be right here too.
     ['verifyStationWalls', verifyStationWalls()],
     ['verifyStationLamps', verifyStationLamps()],
+    // The Harbour Bridge's night lighting. Nothing here ever draws it -- there
+    // is no GLB on this end and no renderer -- but *where* the string of lights
+    // up the arch goes is arithmetic over the model's own vertices, and by this
+    // list's own rule a pure check runs on both ends so the deploy gate can see
+    // it. `world/bridgelights.ts` builds itself a synthetic bridge to run on.
+    ['verifyBridgeLights', verifyBridgeLights()],
     ['verifyTill', verifyTill()],
     ['verifyDeviceLost', verifyDeviceLost()],
     // --- WORKSTREAM V. `verifyTeams` is the contract's own and is here for a

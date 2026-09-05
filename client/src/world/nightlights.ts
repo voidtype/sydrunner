@@ -122,6 +122,7 @@ import {
   InstancedMesh,
   LinearSRGBColorSpace,
   Matrix4,
+  Mesh,
   MeshBasicNodeMaterial,
   MeshStandardNodeMaterial,
   Object3D,
@@ -161,6 +162,40 @@ import {
 // One headlight out on a dented car. The threshold is the rules', not this
 // file's -- see `game/driving.damageGrade`.
 import { CAR_DENTED_HEALTH, createDamageGrade, damageFraction, damageGrade } from '../game/driving.ts';
+// The harbour: where every boat is, how big each hull is, and where its four
+// navigation lamps hang. Three-free and shared with `world/boats.ts`, which
+// builds the hulls from the same two tables -- see `BoatLights`.
+import {
+  BOAT_KIND,
+  BOAT_SIZE,
+  BOAT_WINDOW_ROWS,
+  NAV_LAMPS_PER_BOAT,
+  NAV_PORT,
+  NAV_STARBOARD,
+  createBoatPose,
+  ferries,
+  ferryCount,
+  navLampWorld,
+  navLamps,
+  type BoatKind,
+  type BoatPose,
+} from '../game/boats.ts';
+// The wharves, and the datum every hull and route in the harbour is written
+// against. Generated; see `game/boatroutes.ts`.
+import { SEA_Y, WHARVES } from '../game/boatroutes.ts';
+// And the bridge: where its lights go, worked out from the loaded GLB. Also
+// three-free, and on both boot lists -- see `verifyBridgeLights`.
+import {
+  ARCH_PITCH_M,
+  BRIDGE_LAMP_RECORD_STRIDE,
+  DECK_LAMP_FLOATS,
+  LAMP_COLUMN_M,
+  bridgeLampRecords,
+  fakeBridge,
+  planBridgeLights,
+  verifyBridgeLights,
+  type BridgeLightPlan,
+} from './bridgelights.ts';
 
 type Rgb = readonly [number, number, number];
 
@@ -1249,9 +1284,23 @@ class Emissive {
   build(name: string): BufferGeometry {
     const g = new BufferGeometry();
     g.name = name;
+    const vertices = this.position.length / 3;
     g.setAttribute('position', new BufferAttribute(new Float32Array(this.position), 3));
     g.setAttribute('color', new BufferAttribute(new Float32Array(this.colour), 3));
-    g.setIndex(new BufferAttribute(new Uint16Array(this.index), 1));
+    // **16-bit indices while they fit, and 32 when they do not.** Every kit in
+    // this file up to the bridge is a lamp or a car and is a few hundred
+    // vertices; `BridgeLights` is a hundred road pools and two hundred blobs in
+    // *one* geometry, which is fourteen thousand, and a model with more of
+    // either would silently wrap past 65535 and index the wrong vertices --
+    // producing not an error but a spray of triangles across the harbour. The
+    // test is on the count rather than on the caller, so nothing has to
+    // remember to ask.
+    g.setIndex(
+      new BufferAttribute(
+        vertices > 0xffff ? new Uint32Array(this.index) : new Uint16Array(this.index),
+        1,
+      ),
+    );
     g.computeBoundingSphere();
     return g;
   }
@@ -4444,6 +4493,714 @@ export class TrainLights {
  */
 export const trainLights = /*#__PURE__*/ new TrainLights();
 
+// --- The bridge ---------------------------------------------------------------
+
+/**
+ * The Harbour Bridge after dark: a string up each arch, a column every thirty
+ * metres down the roadway, and four floodlit pylons.
+ *
+ * The owner: *"bridge also needs to be illuminated at night"*. `world/
+ * bridgelights.ts` is the whole of the thinking about *where* -- it reads the
+ * loaded GLB and hands back a plan -- and this section is what turns that plan
+ * into pixels. It is the fifth population in this file and the only one that
+ * never moves, which is what makes it the cheapest: **one geometry, one
+ * material, one static `Mesh`, one draw**, built once when the landmarks land
+ * and then touched only by the `visible` flag at dusk. There is no per-frame
+ * work of any kind. The traffic costs a matrix compose per car and the trains
+ * cost one per carriage; this costs nothing at all, forever.
+ *
+ * Three shapes, and each one is a shape this file already argued for somewhere
+ * else:
+ *
+ *   - **The arch string** is `blob` -- three crossed quads at a point, the same
+ *     billboard-with-no-per-frame-cost the street lamp's luminaire and the car's
+ *     headlamp lens are. Warm white, 8 m apart, 112 of them over the two chords.
+ *   - **The deck lamps** are the street lamp verbatim: a `disc` pool with the
+ *     radial ramp carried in vertex colour, a three-plane shaft that is dark at
+ *     the road and lit at the head, and a lens blob on top. The pool is oriented
+ *     to the *bridge's* axis rather than the world's -- see `orientedDisc` --
+ *     because the Bradfield Highway runs 26.6 degrees off north and a road
+ *     optic's footprint is long along the road.
+ *   - **The pylon wash** is the car's beam sheet stood on its end: three stacked
+ *     quads up each face with the brightness ramp in the corners, so the stone
+ *     is bright at the base where the floods are and gone by the parapet line.
+ *
+ * All of it in **world metres**, because the mesh sits at the origin and the
+ * plan is already in world metres -- `world/landmarks.loadLandmarks` bakes each
+ * node's translation into its geometry, so the vertices this was derived from
+ * were world coordinates by the time it saw them. The bridge is at (95, -1834),
+ * which is nowhere near far enough from the origin for float32 to care.
+ *
+ * `frustumCulled` is false for `loadLandmarks`' own reason: the bounding box is
+ * 1.5 km long, a per-object frustum test on it costs more than it saves and gets
+ * the answer wrong at the edges of a box that size.
+ */
+
+/** The arch string: sodium-free warm white, the colour the arch is lit in. */
+const BRIDGE_CHORD_COLOUR: Rgb = [1.0, 0.9, 0.72];
+const BRIDGE_CHORD_HALF = 0.4;
+const BRIDGE_CHORD_LEVEL = 2.6;
+
+/** The roadway's own light: white, because the Bradfield Highway is. */
+const BRIDGE_DECK_COLOUR: Rgb = [1.0, 0.94, 0.85];
+const BRIDGE_HEAD_HALF = 0.3;
+const BRIDGE_HEAD_LEVEL = 3.2;
+/** Across the road and along it, metres. Long along, for `POOL_ALONG`'s reason. */
+const BRIDGE_POOL_ACROSS = 8;
+const BRIDGE_POOL_ALONG = 17;
+const BRIDGE_POOL_LEVEL = 0.68;
+const BRIDGE_POOL_SEGMENTS = 8;
+const BRIDGE_POOL_LIFT = 0.25;
+const BRIDGE_POOL_RIM_LIFT = 0.7;
+/**
+ * How far inboard of its column the pool lies.
+ *
+ * The street lamp's `LAMP_OUTREACH` from the other end: a road optic on a kerb
+ * column throws its light *over the carriageway*, not down its own post, and a
+ * pool centred on the kerb would light the parapet and the harbour.
+ */
+const BRIDGE_POOL_INBOARD = 3.4;
+const BRIDGE_SHAFT_HALF_HEAD = 0.24;
+const BRIDGE_SHAFT_HALF_FOOT = 1.8;
+const BRIDGE_SHAFT_LEVEL = 0.11;
+const BRIDGE_SHAFT_PLANES = 3;
+
+/** The pylon wash: warmer than the road, because a flood on trachyte is. */
+const BRIDGE_FLOOD_COLOUR: Rgb = [1.0, 0.84, 0.58];
+const BRIDGE_FLOOD_LEVEL = 0.4;
+/** How far off the stone the wash quad stands, so it cannot z-fight the granite. */
+const BRIDGE_FLOOD_PROUD = 0.45;
+/**
+ * Brightness up the face, as a fraction of the tower's height.
+ *
+ * Bright just above the fittings, falling away by two thirds and gone at the
+ * top: a flood at the base of an 89 m tower does not reach the top of it, and a
+ * wash that did would make the pylon read as an emissive block rather than as
+ * stone with light on it.
+ */
+const BRIDGE_FLOOD_STOPS: ReadonlyArray<readonly [number, number]> = [
+  [0.0, 0.55],
+  [0.12, 1.0],
+  [0.5, 0.42],
+  [1.0, 0.0],
+];
+const BRIDGE_FLOOD_FITTING_HALF = 0.45;
+const BRIDGE_FLOOD_FITTING_LEVEL = 1.5;
+/** The fittings sit a little above the roadway, on the pylon's own plinth. */
+const BRIDGE_FLOOD_FITTING_LIFT = 1.2;
+
+/**
+ * A flat ellipse lying in the XZ plane, **rotated to a given plan axis**.
+ *
+ * `disc` above is this with the axis pinned to Z, and it stays that way: every
+ * one of its callers is a lamp in a tile whose long axis is the pole's own local
+ * Z, and giving it two more parameters would be two more multiplies on the most
+ * numerous shape in the file for four hundred lamps that do not need them. This
+ * one is the bridge's, which is 26.6 degrees off every world axis there is.
+ */
+function orientedDisc(
+  m: Emissive,
+  cx: number,
+  y: number,
+  cz: number,
+  /** Unit vector the long half-axis runs along, in plan. */
+  ax: number,
+  az: number,
+  halfAlong: number,
+  halfAcross: number,
+  stops: ReadonlyArray<readonly [number, number]>,
+  level: number,
+  segments: number,
+  rise: number,
+): void {
+  const at = (t: number): number => y + rise * t;
+  for (let ring = 1; ring < stops.length; ring++) {
+    const t0 = stops[ring - 1][0];
+    const t1 = stops[ring][0];
+    const y0 = at(t0);
+    const y1 = at(t1);
+    const c0 = scaled(WHITE, stops[ring - 1][1] * level);
+    const c1 = scaled(WHITE, stops[ring][1] * level);
+    for (let s = 0; s < segments; s++) {
+      const a0 = (s / segments) * Math.PI * 2;
+      const a1 = ((s + 1) / segments) * Math.PI * 2;
+      // The rim point at angle `a` and normalised radius `t`, in plan, taken as
+      // `along * cos + across * sin` so the ellipse's long axis is the bridge's.
+      // The winding below is the one `quadUp` wants: `(along, across)` is a
+      // right-handed pair in the XZ plane, and walking `a` upwards walks the rim
+      // the way `disc` does.
+      const p = (a: number, t: number, out: [number, number]): void => {
+        const co = Math.cos(a) * halfAlong * t;
+        const si = Math.sin(a) * halfAcross * t;
+        out[0] = cx + ax * co - az * si;
+        out[1] = cz + az * co + ax * si;
+      };
+      const q00: [number, number] = [0, 0];
+      const q10: [number, number] = [0, 0];
+      const q11: [number, number] = [0, 0];
+      const q01: [number, number] = [0, 0];
+      p(a0, t0, q00);
+      p(a1, t0, q10);
+      p(a1, t1, q11);
+      p(a0, t1, q01);
+      m.quadUp(
+        [q00[0], y0, q00[1]],
+        [q10[0], y0, q10[1]],
+        [q11[0], y1, q11[1]],
+        [q01[0], y1, q01[1]],
+        [c0, c0, c1, c1],
+      );
+    }
+  }
+}
+
+/**
+ * The whole bridge kit in one accumulator: the strings, the columns and the
+ * washes.
+ *
+ * Returns the counts as well as the geometry, because the counts are what the
+ * self-check and the boot log talk about -- "112 arch sprites, 100 deck lamps,
+ * 16 pylon faces" is a line somebody can compare against the next build.
+ */
+function buildBridgeGeometry(plan: BridgeLightPlan): {
+  geometry: BufferGeometry;
+  arch: number;
+  deck: number;
+  faces: number;
+} {
+  const m = new Emissive();
+  const { ax, az } = plan.axis;
+  // Across the bridge in plan. The same pair every function in
+  // `world/bridgelights.ts` works in.
+  const rx = -az;
+  const rz = ax;
+
+  let arch = 0;
+  const chordColour = scaled(BRIDGE_CHORD_COLOUR, BRIDGE_CHORD_LEVEL);
+  for (const chord of plan.chords) {
+    for (let i = 0; i < chord.points.length; i += 3) {
+      blob(m, chord.points[i], chord.points[i + 1], chord.points[i + 2], BRIDGE_CHORD_HALF, chordColour);
+      arch++;
+    }
+  }
+
+  let deck = 0;
+  const dark: Rgb = [0, 0, 0];
+  const shaftLit = scaled(BRIDGE_DECK_COLOUR, BRIDGE_SHAFT_LEVEL);
+  const headColour = scaled(BRIDGE_DECK_COLOUR, BRIDGE_HEAD_LEVEL);
+  for (let i = 0; i < plan.deck.length; i += DECK_LAMP_FLOATS) {
+    const x = plan.deck[i];
+    const y = plan.deck[i + 1];
+    const z = plan.deck[i + 2];
+    const kerb = plan.deck[i + 3];
+    const roadY = y - LAMP_COLUMN_M;
+    // Inboard of the column, which is where a road optic actually throws.
+    const px = x - rx * BRIDGE_POOL_INBOARD * kerb;
+    const pz = z - rz * BRIDGE_POOL_INBOARD * kerb;
+    orientedDisc(
+      m, px, roadY + BRIDGE_POOL_LIFT, pz, ax, az,
+      BRIDGE_POOL_ALONG, BRIDGE_POOL_ACROSS,
+      POOL_FALLOFF, BRIDGE_POOL_LEVEL, BRIDGE_POOL_SEGMENTS, BRIDGE_POOL_RIM_LIFT,
+    );
+    // The shaft, standing on the road under the head rather than in the pool:
+    // the two are `BRIDGE_POOL_INBOARD` apart here where the street lamp has
+    // them in one place, because a kerb column leans its light out and its post
+    // stays on the kerb.
+    for (let p = 0; p < BRIDGE_SHAFT_PLANES; p++) {
+      const a = (p / BRIDGE_SHAFT_PLANES) * Math.PI;
+      const ux = Math.cos(a);
+      const uz = Math.sin(a);
+      m.quad(
+        [x - ux * BRIDGE_SHAFT_HALF_FOOT, roadY + BRIDGE_POOL_LIFT, z - uz * BRIDGE_SHAFT_HALF_FOOT],
+        [x + ux * BRIDGE_SHAFT_HALF_FOOT, roadY + BRIDGE_POOL_LIFT, z + uz * BRIDGE_SHAFT_HALF_FOOT],
+        [x + ux * BRIDGE_SHAFT_HALF_HEAD, y, z + uz * BRIDGE_SHAFT_HALF_HEAD],
+        [x - ux * BRIDGE_SHAFT_HALF_HEAD, y, z - uz * BRIDGE_SHAFT_HALF_HEAD],
+        [dark, dark, shaftLit, shaftLit],
+      );
+    }
+    blob(m, x, y, z, BRIDGE_HEAD_HALF, headColour);
+    deck++;
+  }
+
+  let faces = 0;
+  for (const face of plan.pylons) {
+    const base = face.baseY + BRIDGE_FLOOD_FITTING_LIFT;
+    const height = face.topY - base;
+    if (!(height > 1)) continue;
+    // Stood off the stone so the wash cannot z-fight the granite it is on.
+    const ox = face.x + face.nx * BRIDGE_FLOOD_PROUD;
+    const oz = face.z + face.nz * BRIDGE_FLOOD_PROUD;
+    for (let s = 0; s < BRIDGE_FLOOD_STOPS.length - 1; s++) {
+      const [t0, v0] = BRIDGE_FLOOD_STOPS[s];
+      const [t1, v1] = BRIDGE_FLOOD_STOPS[s + 1];
+      const c0 = scaled(BRIDGE_FLOOD_COLOUR, v0 * BRIDGE_FLOOD_LEVEL);
+      const c1 = scaled(BRIDGE_FLOOD_COLOUR, v1 * BRIDGE_FLOOD_LEVEL);
+      const y0 = base + height * t0;
+      const y1 = base + height * t1;
+      m.quad(
+        [ox - face.fx * face.half, y0, oz - face.fz * face.half],
+        [ox + face.fx * face.half, y0, oz + face.fz * face.half],
+        [ox + face.fx * face.half, y1, oz + face.fz * face.half],
+        [ox - face.fx * face.half, y1, oz - face.fz * face.half],
+        [c0, c0, c1, c1],
+      );
+    }
+    // And the fittings themselves, at the foot of the face: without them the
+    // wash has no source and reads as the stone glowing.
+    blob(
+      m, ox, base, oz, BRIDGE_FLOOD_FITTING_HALF,
+      scaled(BRIDGE_FLOOD_COLOUR, BRIDGE_FLOOD_FITTING_LEVEL),
+    );
+    faces++;
+  }
+
+  return { geometry: m.build('bridge_lights'), arch, deck, faces };
+}
+
+/**
+ * The bridge's night geometry, its material and its one mesh.
+ *
+ * Constructed **visible**, and hidden again by the first `NightLights.update`,
+ * for `CarLights`' reason exactly and with one extra: this object does not exist
+ * until the landmark GLB has landed, which is long after `warmUpPipelines` has
+ * run. The only pass that can compile it is `main.ts`'s scene-wide
+ * `compileAsync` before the first frame, and `_projectObject` skips an invisible
+ * object in that walk exactly as it does in `render`. A kit that booted hidden
+ * would compile its pipeline inside the frame the sun went down, over the
+ * harbour, which is the most expensive place in Sydney to drop a frame.
+ */
+export class BridgeLights {
+  readonly mesh: Mesh;
+  readonly geometry: BufferGeometry;
+  readonly material: MeshBasicNodeMaterial;
+  /** The deck lamps as `LampSource` records. See `bridgeLampRecords`. */
+  readonly lamps: Float32Array<ArrayBuffer>;
+  readonly triangles: number;
+  readonly archSprites: number;
+  readonly deckLamps: number;
+  readonly pylonFaces: number;
+  private live = true;
+
+  constructor(plan: BridgeLightPlan) {
+    const built = buildBridgeGeometry(plan);
+    this.geometry = built.geometry;
+    this.archSprites = built.arch;
+    this.deckLamps = built.deck;
+    this.pylonFaces = built.faces;
+    this.triangles = (this.geometry.getIndex()?.count ?? 0) / 3;
+    this.lamps = bridgeLampRecords(plan.deck);
+    // Offset, because the pools lie flat on the deck and have to keep winning
+    // the depth test at half a kilometre. See `nightMaterial`; the same -8 units
+    // every ground pool in the city uses.
+    this.material = nightMaterial('bridge_lights', true);
+    const mesh = new Mesh(this.geometry, this.material);
+    mesh.name = 'bridge_lights';
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
+    mesh.frustumCulled = false;
+    mesh.visible = true;
+    this.mesh = mesh;
+  }
+
+  /** Whether the sprites are drawn at all. See `NIGHT_VISIBLE_LEVEL`. */
+  setLive(live: boolean): void {
+    if (live === this.live) return;
+    this.live = live;
+    this.mesh.visible = live;
+  }
+
+  dispose(): void {
+    this.geometry.dispose();
+    this.material.dispose();
+  }
+}
+
+/**
+ * The bridge kit, from a loaded landmark set, or null when there is no bridge.
+ *
+ * The whole of the coupling between the landmarks and the night, and it is one
+ * function so that `main.ts` is three lines. Everything it can fail at --  a
+ * world with no landmark contract, a GLB that would not parse, a bridge with no
+ * steel in it -- lands on null and costs the lights and nothing else, which is
+ * `world/landmarks.ts`'s contract restated.
+ */
+export function buildBridgeLights(
+  steel: ArrayLike<number> | null,
+  granite: ArrayLike<number> | null,
+  asphalt: ArrayLike<number> | null,
+): BridgeLights | null {
+  const plan = planBridgeLights(steel, granite, asphalt);
+  return plan === null ? null : new BridgeLights(plan);
+}
+
+// --- The boats ----------------------------------------------------------------
+
+/**
+ * Navigation lights on the harbour, and a lit saloon on the ferries.
+ *
+ * The owner's other five words: *"boats also need lights at nigth"*. The whole
+ * feature is `CarLights` on water, and deliberately so -- `world/boats.ts`
+ * already computes a pose for every ferry in view every frame, so this is one
+ * matrix compose per boat and no simulation of any kind, exactly as the traffic
+ * is. `game/boats.navLamps` owns *where* the four lamps hang and what colour
+ * they are; this owns the sprites and the instance buffers.
+ *
+ * **One `InstancedMesh` per kind over one material**, so it is one pipeline and
+ * at most four draws for the whole harbour. Per kind rather than one set,
+ * because a Freshwater is 70 m and a jetski is 2.9 and a nav light is a lamp on
+ * a *hull* -- the lamp offsets are baked into each kind's vertices, which is the
+ * same trade `CarLights` makes with its two geometries and `buildCarHeadLights`
+ * makes with its one-lamp variant. The tinnies get no set at all: see
+ * `BoatFleet.update`.
+ *
+ * **What this does not do is scale with distance.** A sidelight is 0.4 m of
+ * additive geometry and the ferry draw radius is 4.2 km, so past about a
+ * kilometre the lamps are under a pixel and twinkle as the rasteriser catches
+ * and misses them. That is what a nav light does at that range in life, and the
+ * alternative -- a per-boat scale in the compose -- would grow the *offsets*
+ * with the sprite and walk the lights off the hull. Left as it is, on purpose.
+ */
+
+/**
+ * How many boats of one kind can be lit at once.
+ *
+ * `ferryCount()` is the timetable's own answer -- every ferry and jetski the
+ * routes in `boatroutes.ts` put on the water -- so this cannot drift from the
+ * fleet it draws for, which is the mistake `CAR_LIGHT_CAPACITY` and
+ * `BIKE_LIGHT_CAPACITY` are both written to avoid. The lamp budget is this times
+ * `NAV_LAMPS_PER_BOAT`, and it is the number in the report: the sprites are
+ * baked into the geometry, so an *instance* is a whole boat.
+ *
+ * Each kind's set is sized to the boats of that kind rather than to the fleet,
+ * which is 64 bytes a boat rather than 64 bytes a boat times five.
+ */
+export const BOAT_LIGHT_CAPACITY = /*#__PURE__*/ ferryCount();
+
+/** How big a nav lamp sprite is, by hull length; a bound at each end. */
+const NAV_HALF_PER_METRE = 0.012;
+const NAV_HALF_MIN = 0.16;
+const NAV_HALF_MAX = 0.55;
+const NAV_LEVEL = 3.4;
+
+/** The saloon glow: warm, dim, and the same family as a lit train window. */
+const CABIN_COLOUR: Rgb = [1.0, 0.88, 0.68];
+const CABIN_LEVEL = 0.62;
+/** How far proud of the window band the sheet stands, and how far past its edges it spills. */
+const CABIN_PROUD = 0.06;
+const CABIN_BLEED = 0.35;
+/**
+ * The taper, as fractions across the sheet and the weight at each.
+ *
+ * A 3x3 grid of quads with the weight carried in the corner colours, which is
+ * `buildCarHeadLights`' three-strip beam in both directions at once and for the
+ * identical reason: one quad has a hard edge, and a hard edge on a light is a
+ * decal. Thirty-six triangles a window band a side, and a Freshwater has four
+ * bands.
+ */
+const CABIN_EDGES: readonly number[] = [0, 0.16, 0.84, 1];
+const CABIN_WEIGHTS: readonly number[] = [0, 1, 1, 0];
+
+/** One tapered sheet in a plane of constant z, in the hull's own axes. */
+function glowSheet(
+  m: Emissive,
+  x0: number,
+  x1: number,
+  y0: number,
+  y1: number,
+  z: number,
+  colour: Rgb,
+): void {
+  for (let i = 0; i < 3; i++) {
+    const xa = x0 + (x1 - x0) * CABIN_EDGES[i];
+    const xb = x0 + (x1 - x0) * CABIN_EDGES[i + 1];
+    for (let j = 0; j < 3; j++) {
+      const ya = y0 + (y1 - y0) * CABIN_EDGES[j];
+      const yb = y0 + (y1 - y0) * CABIN_EDGES[j + 1];
+      const w = (a: number, b: number): Rgb => scaled(colour, CABIN_WEIGHTS[a] * CABIN_WEIGHTS[b]);
+      m.quad(
+        [xa, ya, z], [xb, ya, z], [xb, yb, z], [xa, yb, z],
+        [w(i, j), w(i + 1, j), w(i + 1, j + 1), w(i, j + 1)],
+      );
+    }
+  }
+}
+
+/**
+ * One kind's whole kit: four nav lamps, and a saloon sheet each side of every
+ * window band.
+ *
+ * In the hull's own axes -- `+x` is the bow, `+y` up from the waterline, `+z`
+ * starboard -- which is `world/boats.Boxes`' convention and therefore the frame
+ * `game/boats.navLamps` is written in. The instance matrix that places it is the
+ * same yaw `BoatFleet.update` gives the hull, so the lamps cannot be on a
+ * different boat from the boat.
+ */
+function buildBoatLightKit(kind: BoatKind): BufferGeometry {
+  const m = new Emissive();
+  const size = BOAT_SIZE[kind];
+  const half = Math.min(NAV_HALF_MAX, Math.max(NAV_HALF_MIN, size.length * NAV_HALF_PER_METRE));
+  for (const lamp of navLamps(kind)) {
+    blob(m, lamp.forward, lamp.up, lamp.starboard, half, scaled(lamp.colour as Rgb, NAV_LEVEL));
+  }
+  const cabin = scaled(CABIN_COLOUR, CABIN_LEVEL);
+  for (const row of BOAT_WINDOW_ROWS[kind]) {
+    for (const side of [-1, 1]) {
+      glowSheet(
+        m,
+        row.x - row.length / 2 - CABIN_BLEED,
+        row.x + row.length / 2 + CABIN_BLEED,
+        row.y - CABIN_BLEED,
+        row.y + row.height + CABIN_BLEED,
+        side * (row.beam / 2 + CABIN_PROUD),
+        cabin,
+      );
+    }
+  }
+  return m.build(`boat_lights_${kind}`);
+}
+
+/** What `world/boats.BoatFleet` feeds. `CarLightSink` on water. */
+export interface BoatLightSink {
+  /** Start a frame. False when there is nothing to draw, and then `add` is never called. */
+  begin(): boolean;
+  /** One posed boat, at the waterline it is actually riding at. */
+  add(pose: BoatPose, y: number): void;
+  end(): void;
+}
+
+/* --- And the wharves, which are the other half of a lit harbour.
+ *
+ * `boatroutes.WHARVES` is a fixed table of 32 real wharves, each snapped to the
+ * nearest water the Quay can reach -- so a lamp on one stands at the end of the
+ * pontoon, over the water, which is where a ferry wharf's light actually is.
+ * That table is generated and never changes at runtime, so this is `BridgeLights`
+ * again in miniature: **one merged static mesh, one draw, no per-frame work at
+ * all**, over the boats' own material so it costs no pipeline either.
+ *
+ * They earn their place for a reason the ferries do not have. A ferry is a lit
+ * object crossing a dark harbour and it reads from anywhere; a wharf is a place
+ * a **player stands**, at Circular Quay, at Manly, at Balmain East, and there is
+ * nothing there. The city's own lamps are on surveyed power poles on streets,
+ * and a finger wharf is neither -- so the two real `PointLight`s had nothing
+ * within `LAMP_SEARCH_RADIUS` to walk onto, and a player waiting for the Manly
+ * boat at 3 am was standing in the dark next to a lit ship. One record each
+ * fixes that, through `lampsOver`, with no eighth light.
+ */
+
+/** How high the lamp on a wharf hangs over the water. A pontoon column. */
+const WHARF_LAMP_Y = 5.5;
+const WHARF_COLOUR: Rgb = [1.0, 0.9, 0.74];
+const WHARF_HEAD_HALF = 0.28;
+const WHARF_HEAD_LEVEL = 3.0;
+const WHARF_POOL_RADIUS = 11;
+const WHARF_POOL_LEVEL = 0.5;
+const WHARF_POOL_SEGMENTS = 6;
+const WHARF_POOL_LIFT = 0.35;
+const WHARF_POOL_RIM_LIFT = 0.5;
+const WHARF_SHAFT_HALF_HEAD = 0.2;
+const WHARF_SHAFT_HALF_FOOT = 1.4;
+const WHARF_SHAFT_LEVEL = 0.1;
+const WHARF_SHAFT_PLANES = 3;
+
+/**
+ * A lamp over every wharf, and the records for them.
+ *
+ * `seaY` is `boatroutes.SEA_Y` -- the same datum the routes and the hulls are
+ * written against -- rather than the terrain contract's, because a wharf is a
+ * point on a *route* and the two must agree to the centimetre or the pool
+ * floats over the water it is supposed to be on. They are the same number;
+ * `verifyNightLights` is not the place to assert that and `verifyBoats` already
+ * drives every hull off it.
+ */
+function buildWharfLights(seaY: number): { geometry: BufferGeometry; lamps: Float32Array<ArrayBuffer>; count: number } {
+  const m = new Emissive();
+  const names = Object.keys(WHARVES);
+  const lamps = new Float32Array(names.length * LAMP_RECORD_STRIDE);
+  const dark: Rgb = [0, 0, 0];
+  const shaftLit = scaled(WHARF_COLOUR, WHARF_SHAFT_LEVEL);
+  let n = 0;
+  for (const name of names) {
+    const wharf = WHARVES[name];
+    if (wharf === undefined) continue;
+    const x = wharf[0];
+    const z = wharf[1];
+    const y = seaY + WHARF_LAMP_Y;
+    disc(
+      m, x, seaY + WHARF_POOL_LIFT, z, WHARF_POOL_RADIUS,
+      POOL_FALLOFF, WHARF_POOL_LEVEL, WHARF_POOL_SEGMENTS, WHARF_POOL_RIM_LIFT,
+    );
+    for (let p = 0; p < WHARF_SHAFT_PLANES; p++) {
+      const a = (p / WHARF_SHAFT_PLANES) * Math.PI;
+      const ux = Math.cos(a);
+      const uz = Math.sin(a);
+      m.quad(
+        [x - ux * WHARF_SHAFT_HALF_FOOT, seaY + WHARF_POOL_LIFT, z - uz * WHARF_SHAFT_HALF_FOOT],
+        [x + ux * WHARF_SHAFT_HALF_FOOT, seaY + WHARF_POOL_LIFT, z + uz * WHARF_SHAFT_HALF_FOOT],
+        [x + ux * WHARF_SHAFT_HALF_HEAD, y, z + uz * WHARF_SHAFT_HALF_HEAD],
+        [x - ux * WHARF_SHAFT_HALF_HEAD, y, z - uz * WHARF_SHAFT_HALF_HEAD],
+        [dark, dark, shaftLit, shaftLit],
+      );
+    }
+    blob(m, x, y, z, WHARF_HEAD_HALF, scaled(WHARF_COLOUR, WHARF_HEAD_LEVEL));
+    const o = n * LAMP_RECORD_STRIDE;
+    lamps[o] = x;
+    lamps[o + 1] = y;
+    lamps[o + 2] = z;
+    // White, not sodium: a wharf canopy is a fluorescent batten.
+    lamps[o + 3] = 0;
+    n++;
+  }
+  return { geometry: m.build('wharf_lights'), lamps: lamps.subarray(0, n * LAMP_RECORD_STRIDE) as Float32Array<ArrayBuffer>, count: n };
+}
+
+/** The kinds that carry lights, in the order their sets are built. */
+const LIT_BOAT_KINDS: readonly BoatKind[] = [
+  BOAT_KIND.FRESHWATER,
+  BOAT_KIND.HARBOUR,
+  BOAT_KIND.RIVERCAT,
+  BOAT_KIND.JETSKI,
+];
+
+export class BoatLights implements BoatLightSink {
+  readonly meshes: InstancedMesh[];
+  readonly material: MeshBasicNodeMaterial;
+  readonly geometries: BufferGeometry[];
+  /** The wharves' own lamps: one static mesh over the same material. */
+  readonly wharfMesh: Mesh;
+  readonly wharfGeometry: BufferGeometry;
+  /** Their `LampSource` records, for `main.ts` to compose. See `buildWharfLights`. */
+  readonly wharfLamps: Float32Array<ArrayBuffer>;
+  readonly wharfCount: number;
+  /** Boats lit last frame. Read by the dev handle. */
+  drawn = 0;
+  /** True to match the meshes' own `visible`. See `CarLights.live`. */
+  private live = true;
+  private readonly counts: number[];
+  private readonly capacity: number[];
+  /** Kind to set index, or -1 for a kind that carries no lights. */
+  private readonly setOf: number[];
+
+  constructor() {
+    this.material = nightMaterial('boat_lights', false);
+    // How many of each kind the timetable actually puts on the water, so a set
+    // is sized to its own fleet rather than to all of them.
+    const perKind = new Map<BoatKind, number>();
+    for (const f of ferries()) perKind.set(f.kind, (perKind.get(f.kind) ?? 0) + 1);
+
+    this.geometries = [];
+    this.meshes = [];
+    this.counts = [];
+    this.capacity = [];
+    this.setOf = [-1, -1, -1, -1, -1];
+    for (const kind of LIT_BOAT_KINDS) {
+      const geometry = buildBoatLightKit(kind);
+      // At least one, so a route list that lost a kind still leaves a set the
+      // scene pass can compile: an `InstancedMesh` of capacity zero is not a
+      // pipeline, and the frame it would otherwise be compiled on is whichever
+      // frame somebody re-baked the routes.
+      const capacity = Math.max(1, perKind.get(kind) ?? 0);
+      const mesh = new InstancedMesh(geometry, this.material, capacity);
+      mesh.name = `boat_lights_${kind}`;
+      mesh.count = 0;
+      // Culled by the ferry draw radius the poses already came through.
+      mesh.frustumCulled = false;
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      // Never per-instance coloured: red, green and white are all baked into the
+      // one geometry's vertex colours. See `CarLights`' constructor for what the
+      // attribute's mere presence costs.
+      //
+      // Visible at construction and hidden by the first `update`, for the reason
+      // `BikeLights` states at length: a set that boots hidden is a set the boot
+      // scene pass never walks, and its pipeline is compiled inside the frame
+      // the sun goes down over the harbour.
+      mesh.visible = true;
+      this.setOf[kind] = this.meshes.length;
+      this.geometries.push(geometry);
+      this.meshes.push(mesh);
+      this.counts.push(0);
+      this.capacity.push(capacity);
+    }
+
+    // And the wharves. Static, so it is built once here and never touched again
+    // except by `setLive` -- and over `this.material`, which is what keeps the
+    // whole harbour at one pipeline.
+    const wharves = buildWharfLights(SEA_Y);
+    this.wharfGeometry = wharves.geometry;
+    this.wharfLamps = wharves.lamps;
+    this.wharfCount = wharves.count;
+    const wharfMesh = new Mesh(this.wharfGeometry, this.material);
+    wharfMesh.name = 'wharf_lights';
+    wharfMesh.castShadow = false;
+    wharfMesh.receiveShadow = false;
+    // The 32 wharves span 22 km of harbour and river in one geometry, so the
+    // bounding sphere is the whole extent and a per-object frustum test on it
+    // answers "yes" from everywhere. Skipped, like every other set in this file.
+    wharfMesh.frustumCulled = false;
+    wharfMesh.visible = true;
+    this.wharfMesh = wharfMesh;
+  }
+
+  /** Everything `main.ts` puts in the scene: the four boat sets and the wharves. */
+  get sceneObjects(): Object3D[] {
+    return [...this.meshes, this.wharfMesh];
+  }
+
+  setLive(live: boolean): void {
+    if (live === this.live) return;
+    this.live = live;
+    for (const mesh of this.meshes) mesh.visible = live;
+    this.wharfMesh.visible = live;
+  }
+
+  begin(): boolean {
+    for (let i = 0; i < this.counts.length; i++) this.counts[i] = 0;
+    return this.live;
+  }
+
+  add(pose: BoatPose, y: number): void {
+    const set = this.setOf[pose.kind] ?? -1;
+    if (set < 0) return;
+    if (this.counts[set] >= this.capacity[set]) return;
+    // `BoatFleet.update`'s own rotation, as the half-angle quaternion
+    // `CarLights.add` uses: the hull's local +X is its bow, the yaw that sends
+    // +X to (hx, 0, hz) is `atan2(-hz, hx)`, and the quaternion for it is one
+    // square root against three transcendentals.
+    const c = pose.hx;
+    const s = -pose.hz;
+    const w2 = (1 + c) * 0.5;
+    if (w2 > 1e-12) {
+      const w = Math.sqrt(w2);
+      _quaternion.set(0, s / (2 * w), 0, w);
+    } else {
+      _quaternion.set(0, 1, 0, 0);
+    }
+    _carScale.set(1, 1, 1);
+    _position.set(pose.x, y, pose.z);
+    _matrix.compose(_position, _quaternion, _carScale);
+    this.meshes[set].setMatrixAt(this.counts[set], _matrix);
+    this.counts[set]++;
+  }
+
+  end(): void {
+    let drawn = 0;
+    for (let i = 0; i < this.meshes.length; i++) {
+      const mesh = this.meshes[i];
+      if (this.counts[i] > 0 || mesh.count > 0) mesh.instanceMatrix.needsUpdate = true;
+      mesh.count = this.counts[i];
+      drawn += this.counts[i];
+    }
+    this.drawn = drawn;
+  }
+
+  dispose(): void {
+    for (const mesh of this.meshes) mesh.dispose();
+    for (const geometry of this.geometries) geometry.dispose();
+    this.wharfGeometry.dispose();
+    this.material.dispose();
+  }
+}
+
 /**
  * How far into the night the city is, as the last frame left it.
  *
@@ -4511,6 +5268,25 @@ export class NightLights {
   readonly fires: PointLight[] = [];
   readonly carLights = new CarLights();
   readonly bikeLights = new BikeLights();
+  /**
+   * The harbour's navigation lights, fed by `world/boats.BoatFleet`.
+   *
+   * Constructed here with the other two populations so its meshes go into the
+   * scene before the warm-up, and read by `main.ts` as `boats.lights`. See
+   * `BoatLights`.
+   */
+  readonly boatLights = new BoatLights();
+  /**
+   * The Harbour Bridge's, or null until the landmark GLB has landed.
+   *
+   * The one population in this file that cannot be built in a constructor: it is
+   * derived from vertices that arrive over the network a few seconds into the
+   * boot, so `main.ts` assigns it after `loadLandmarks` and this class does
+   * exactly one thing with it -- switches it at dusk, in `update`, with
+   * everything else. Null forever in a world with no bridge, and every line that
+   * touches it is a null check away from the world before this feature existed.
+   */
+  bridge: BridgeLights | null = null;
 
   /**
    * The street lamps' geometry and material are **not** here, and that is
@@ -4645,6 +5421,11 @@ export class NightLights {
 
     for (const mesh of this.carLights.meshes) scene.add(mesh);
     scene.add(this.bikeLights.mesh);
+    // The harbour's, on the fleet's terms exactly: in the scene before the
+    // warm-up, visible at construction, count zero until a ferry is in view.
+    // `sceneObjects` rather than `meshes` because the wharves' static lamps ride
+    // on the same material and have to be in the same walk.
+    for (const object of this.boatLights.sceneObjects) scene.add(object);
 
     // --- And the fourth real light: the saloon of whichever carriage the player
     // is standing in. Added here rather than by the fleet, because *here* is the
@@ -4695,6 +5476,11 @@ export class NightLights {
     const live = rig.level > NIGHT_VISIBLE_LEVEL;
     this.carLights.setLive(live);
     this.bikeLights.setLive(live);
+    this.boatLights.setLive(live);
+    // The bridge, when it has loaded. One boolean write and an early-out inside
+    // `setLive`; the kit itself has no per-frame work at all, which is the whole
+    // point of it being a static merged mesh -- see `BridgeLights`.
+    this.bridge?.setLive(live);
     // The trains are **not** given `live`, and that is the one asymmetry in this
     // function. A train in a bore is lit at noon, so its sprites are not a
     // function of the sun and its level is per carriage rather than per city --
@@ -4936,6 +5722,11 @@ export class NightLights {
   dispose(): void {
     this.carLights.dispose();
     this.bikeLights.dispose();
+    this.boatLights.dispose();
+    // The bridge is **not** disposed here, and for `trainLights`' reason turned
+    // around: this rig does not own it. `main.ts` builds it after the landmarks
+    // land and assigns it; the only caller of this method is the self-check's
+    // throwaway probe, whose `bridge` is null.
     // **And deliberately not `trainLights`.** That one is a module singleton
     // shared with the fleet (see `TrainLights` section 3), and the only caller
     // this method has is the self-check's throwaway probe -- which would
@@ -5986,6 +6777,365 @@ export function verifyNightLights(): string[] {
   // 9. The trains, which are the one population in this file whose level is not
   //    the shared uniform. See `verifyTrainLightKit`.
   for (const failure of verifyTrainLightKit()) failures.push(failure);
+
+  /* 10. **The bridge.**
+   *
+   * `world/bridgelights.verifyBridgeLights` owns the arithmetic -- the axis, the
+   * highest-per-bin rule, the parapet rejection, the 30 m deck pitch -- and runs
+   * on both boot lists. What is left for this side is the half that needs
+   * three: that the plan becomes one geometry over one additive material in one
+   * mesh, that the two files agree about the record stride, and that the mesh
+   * switches at dusk. Every one of them renders: a kit that never hid is a lit
+   * bridge at noon, and a stride that disagreed would feed the two real point
+   * lights garbage coordinates and park them under the terrain.
+   */
+  {
+    for (const failure of verifyBridgeLights()) failures.push(failure);
+    if (BRIDGE_LAMP_RECORD_STRIDE !== LAMP_RECORD_STRIDE) {
+      failures.push(
+        `world/bridgelights.ts writes ${BRIDGE_LAMP_RECORD_STRIDE}-float lamp records where the ` +
+          `rig reads ${LAMP_RECORD_STRIDE}. That file is three-free and cannot import this ` +
+          `constant, so this line is the only thing holding the two together.`,
+      );
+    }
+
+    const fake = fakeBridge();
+    const plan = planBridgeLights(fake.steel, fake.granite, fake.asphalt);
+    if (plan === null) {
+      failures.push('the bridge fixture produced no plan; see verifyBridgeLights for which half.');
+    } else {
+      const kit = new BridgeLights(plan);
+      try {
+        if (kit.mesh.material !== kit.material || kit.mesh.geometry !== kit.geometry) {
+          failures.push('the bridge kit is not one geometry and one material in one mesh.');
+        }
+        if (kit.material.blending !== AdditiveBlending || kit.material.depthWrite !== false) {
+          failures.push(
+            'the bridge material is not additive-and-never-depth-written. It draws over 1.5 km of ' +
+              'steel and asphalt; a depth-writing sprite there occludes the bridge it is on.',
+          );
+        }
+        if (kit.material.opacityNode !== nightOpacity) {
+          failures.push(
+            'the bridge material does not read the shared nightOpacity uniform. There is one dusk ' +
+              'ramp in this build and it is sky/calibration.ts\'s; a second one is a bridge that ' +
+              'lights up at a different minute from the city behind it.',
+          );
+        }
+        if (kit.mesh.visible !== true) {
+          failures.push(
+            'the bridge kit boots hidden. It is built after the landmarks land, so the only pass ' +
+              'that can compile it is the boot scene walk -- and _projectObject skips an invisible ' +
+              'object there exactly as it does in render. See CarLights\' constructor.',
+          );
+        }
+        if (kit.mesh.castShadow || kit.mesh.receiveShadow) failures.push('the bridge kit is in the shadow pass.');
+        if (kit.mesh.frustumCulled) {
+          failures.push('the bridge kit is frustum culled; its bounding box is 1.5 km and the test gets it wrong at the edges.');
+        }
+        kit.setLive(false);
+        if (kit.mesh.visible !== false) failures.push('setLive(false) did not hide the bridge kit.');
+        kit.setLive(true);
+        if (kit.mesh.visible !== true) failures.push('setLive(true) did not show the bridge kit again.');
+
+        if (!(kit.archSprites >= 80)) {
+          failures.push(
+            `${kit.archSprites} arch sprites over two ${fake.span} m chords at a ${ARCH_PITCH_M} m ` +
+              `pitch; about ${Math.round((2 * fake.span * 1.1) / ARCH_PITCH_M)} were expected.`,
+          );
+        }
+        if (kit.deckLamps !== plan.deck.length / DECK_LAMP_FLOATS) {
+          failures.push('the built kit and the plan disagree about how many deck lamps there are.');
+        }
+        if (kit.lamps.length !== kit.deckLamps * LAMP_RECORD_STRIDE) {
+          failures.push(`${kit.lamps.length} floats of lamp records for ${kit.deckLamps} deck lamps.`);
+        }
+        if (kit.pylonFaces !== plan.pylons.length) failures.push('a pylon face was dropped between the plan and the kit.');
+        if (!(kit.triangles > 0)) failures.push('the bridge kit is empty.');
+        // The whole kit has to be **on the bridge**. A sign error in the
+        // across-axis conversion is invisible in the counts and puts a hundred
+        // road pools out in the middle of the harbour, and the fixture's own
+        // extents are the only honest bound.
+        {
+          const position = kit.geometry.getAttribute('position');
+          let stray = 0;
+          let worst = 0;
+          for (let i = 0; i < position.count; i++) {
+            const dx = position.getX(i) - fake.cx;
+            const dz = position.getZ(i) - fake.cz;
+            const s = dx * fake.ax + dz * fake.az;
+            const t = -dx * fake.az + dz * fake.ax;
+            // Half the roadway plus the arch's own offset plus the pool, and
+            // half the deck plus a pool along.
+            const across = Math.abs(t) - (fake.deckHalfWidth + BRIDGE_POOL_ALONG);
+            const along = Math.abs(s) - (fake.deckLength / 2 + BRIDGE_POOL_ALONG);
+            const off = Math.max(across, along);
+            if (off > 0) {
+              stray++;
+              if (off > worst) worst = off;
+            }
+          }
+          if (stray > 0) {
+            failures.push(
+              `${stray} bridge light vertices are up to ${worst.toFixed(1)} m off the structure. ` +
+                `Everything here is placed by converting (along, across) back to world x and z; a ` +
+                `sign error there is a hundred road pools floating over the harbour.`,
+            );
+          }
+        }
+        /* The deck pools have to face **up**, and it is re-derived rather than
+         * trusted for `Emissive.quadUp`'s own reason: a road pool wound the
+         * wrong way is not a subtle bug, it is an invisible one -- `FrontSide`
+         * culls it and the deck simply stays dark, with nothing on screen to say
+         * why. `orientedDisc` rotates the rim into the bridge's plan axis, and a
+         * rotation preserves winding only while its determinant is +1, which is
+         * exactly the sort of thing that survives a refactor by accident.
+         *
+         * Counted rather than asserted per triangle, because the blobs each
+         * carry one horizontal quad emitted **both** ways and contribute equally
+         * to the two tallies. The pools are the only single-winding horizontal
+         * geometry in the kit, so they are the whole of the difference. */
+        {
+          const position = kit.geometry.getAttribute('position');
+          const index = kit.geometry.getIndex();
+          let up = 0;
+          let down = 0;
+          if (index !== null) {
+            for (let i = 0; i < index.count; i += 3) {
+              const a = index.getX(i), b = index.getX(i + 1), c = index.getX(i + 2);
+              const ax2 = position.getX(b) - position.getX(a);
+              const ay2 = position.getY(b) - position.getY(a);
+              const az2 = position.getZ(b) - position.getZ(a);
+              const bx2 = position.getX(c) - position.getX(a);
+              const by2 = position.getY(c) - position.getY(a);
+              const bz2 = position.getZ(c) - position.getZ(a);
+              const nx2 = ay2 * bz2 - az2 * by2;
+              const ny2 = az2 * bx2 - ax2 * bz2;
+              const nz2 = ax2 * by2 - ay2 * bx2;
+              const length = Math.sqrt(nx2 * nx2 + ny2 * ny2 + nz2 * nz2);
+              if (length < 1e-9) continue;
+              const cosine = ny2 / length;
+              if (cosine > 0.9) up++;
+              else if (cosine < -0.9) down++;
+            }
+          }
+          if (!(up > down * 4)) {
+            failures.push(
+              `The bridge kit has ${up} up-facing and ${down} down-facing horizontal triangles. The ` +
+                `hundred deck pools are single-winding and should dominate; anything close to even ` +
+                `means orientedDisc has flipped them and the roadway is lit by nothing.`,
+            );
+          }
+        }
+        // The index has to be able to reach the last vertex. See `Emissive.build`.
+        {
+          const index = kit.geometry.getIndex();
+          const vertices = kit.geometry.getAttribute('position').count;
+          if (index !== null && vertices > 0xffff && index.array instanceof Uint16Array) {
+            failures.push(
+              `the bridge kit has ${vertices} vertices behind a 16-bit index. Everything past ` +
+                `65535 wraps and indexes the wrong vertex, which is a spray of triangles rather ` +
+                `than an error.`,
+            );
+          }
+        }
+      } finally {
+        kit.dispose();
+      }
+    }
+  }
+
+  /* 11. **The boats.**
+   *
+   * `game/boats.verifyBoats` owns the rule -- red to port, green to starboard,
+   * checked in world metres on two headings -- and is on both boot lists. This
+   * side asserts the two things only a renderer can see: that the geometry
+   * carries those colours on those sides of the hull, and that the instance
+   * matrix `add` composes puts a lamp exactly where `navLampWorld` says it goes.
+   *
+   * The second is the one worth having. There are two independent expressions of
+   * the same rotation in this build -- `BoatFleet.update`'s `rotation.y =
+   * atan2(-hz, hx)` for the hull and `add`'s half-angle quaternion for the
+   * lights -- and nothing but this line stops them drifting apart. A ferry whose
+   * lights are rotated a few degrees off its own hull looks *fine* from the
+   * shore and is wrong in every screenshot from the deck.
+   */
+  {
+    if (BOAT_LIGHT_CAPACITY < ferryCount()) {
+      failures.push(
+        `BOAT_LIGHT_CAPACITY is ${BOAT_LIGHT_CAPACITY} against a timetable that runs ` +
+          `${ferryCount()} boats. The lamp budget is that times ${NAV_LAMPS_PER_BOAT}.`,
+      );
+    }
+    const lights = new BoatLights();
+    try {
+      for (const mesh of lights.meshes) {
+        if (mesh.material !== lights.material) failures.push('the boat sets do not share one material.');
+        if (mesh.visible !== true) failures.push(`${mesh.name} boots hidden; see BikeLights' constructor.`);
+        if (mesh.count !== 0) failures.push(`${mesh.name} boots with instances in it.`);
+        if (mesh.frustumCulled) failures.push(`${mesh.name} is frustum culled; the draw radius already bounds it.`);
+      }
+      if (lights.material.opacityNode !== nightOpacity) {
+        failures.push('the boat material does not read the shared nightOpacity uniform.');
+      }
+
+      // --- The wharves: one lamp each, on the same material, over its own point
+      // and above the water rather than under it. A record at the wrong height
+      // is a real light inside the harbour floor, which lights nothing and is
+      // indistinguishable from the feature not being there.
+      {
+        const wanted = Object.keys(WHARVES).length;
+        if (lights.wharfCount !== wanted) {
+          failures.push(`${lights.wharfCount} wharf lamps for ${wanted} wharves in boatroutes.WHARVES.`);
+        }
+        if (lights.wharfLamps.length !== lights.wharfCount * LAMP_RECORD_STRIDE) {
+          failures.push(`${lights.wharfLamps.length} floats of wharf records for ${lights.wharfCount} lamps.`);
+        }
+        if (lights.wharfMesh.material !== lights.material) {
+          failures.push('the wharf lamps do not share the boats\' material; that is a second pipeline for 32 lamps.');
+        }
+        if (!lights.sceneObjects.includes(lights.wharfMesh)) {
+          failures.push('the wharf mesh is not in sceneObjects, so nothing ever adds it to the scene.');
+        }
+        let misplaced = 0;
+        let sunk = 0;
+        for (let i = 0; i < lights.wharfCount; i++) {
+          const o = i * LAMP_RECORD_STRIDE;
+          if (lights.wharfLamps[o + 1] <= SEA_Y) sunk++;
+          if (lights.wharfLamps[o + 3] !== 0) misplaced++;
+          const x = lights.wharfLamps[o];
+          const z = lights.wharfLamps[o + 2];
+          let found = false;
+          for (const name of Object.keys(WHARVES)) {
+            const wharf = WHARVES[name];
+            if (wharf !== undefined && wharf[0] === x && wharf[1] === z) {
+              found = true;
+              break;
+            }
+          }
+          if (!found) misplaced++;
+        }
+        if (sunk > 0) failures.push(`${sunk} wharf lamps are at or under sea level.`);
+        if (misplaced > 0) failures.push(`${misplaced} wharf lamps are not on a wharf, or are flagged sodium.`);
+        lights.setLive(false);
+        if (lights.wharfMesh.visible) failures.push('the wharf lamps are still drawn by day.');
+        lights.setLive(true);
+      }
+
+      // --- The colours, on the sides the rule puts them.
+      for (const kind of [BOAT_KIND.FRESHWATER, BOAT_KIND.HARBOUR, BOAT_KIND.RIVERCAT, BOAT_KIND.JETSKI]) {
+        const geometry = buildBoatLightKit(kind);
+        try {
+          const position = geometry.getAttribute('position');
+          const colour = geometry.getAttribute('color');
+          let redStarboard = 0;
+          let greenPort = 0;
+          let sawRed = 0;
+          let sawGreen = 0;
+          for (let i = 0; i < position.count; i++) {
+            const r = colour.getX(i);
+            const g = colour.getY(i);
+            const z = position.getZ(i);
+            // A lamp vertex, rather than the warm cream of a saloon sheet: one
+            // channel many times the other two.
+            if (r > 1 && g < r * 0.2) {
+              sawRed++;
+              if (z > 0) redStarboard++;
+            } else if (g > 1 && r < g * 0.2) {
+              sawGreen++;
+              if (z < 0) greenPort++;
+            }
+          }
+          if (sawRed === 0 || sawGreen === 0) {
+            failures.push(`kind ${kind}'s light kit has no ${sawRed === 0 ? 'red' : 'green'} sidelight in it.`);
+          }
+          if (redStarboard > 0 || greenPort > 0) {
+            failures.push(
+              `kind ${kind} carries red to starboard or green to port. The hull's local +z is ` +
+                `starboard (world/boats.Boxes), and swapping the two makes a crossing ferry read ` +
+                `as going the other way.`,
+            );
+          }
+        } finally {
+          geometry.dispose();
+        }
+      }
+
+      // --- The compose, against the pure function, on four headings.
+      {
+        const pose = createBoatPose();
+        pose.kind = BOAT_KIND.HARBOUR;
+        pose.x = 1200;
+        pose.z = -2400;
+        const lamps = navLamps(BOAT_KIND.HARBOUR);
+        const point = { x: 0, y: 0, z: 0 };
+        const matrix = new Matrix4();
+        const local = new Vector3();
+        let worst = 0;
+        for (const [hx, hz] of [[0, -1], [0, 1], [1, 0], [0.6, -0.8]] as const) {
+          pose.hx = hx;
+          pose.hz = hz;
+          const y = -71.0;
+          if (!lights.begin()) {
+            failures.push('BoatLights.begin() returned false on a rig that has never been switched off.');
+            break;
+          }
+          lights.add(pose, y);
+          lights.end();
+          const set = lights.meshes.find((mesh) => mesh.name === `boat_lights_${BOAT_KIND.HARBOUR}`);
+          if (set === undefined || set.count !== 1) {
+            failures.push('a harbour ferry did not land in the harbour ferry set.');
+            break;
+          }
+          set.getMatrixAt(0, matrix);
+          for (const index of [NAV_PORT, NAV_STARBOARD]) {
+            const lamp = lamps[index];
+            local.set(lamp.forward, lamp.up, lamp.starboard).applyMatrix4(matrix);
+            navLampWorld(pose, lamp, y, point);
+            const off = Math.sqrt(
+              (local.x - point.x) ** 2 + (local.y - point.y) ** 2 + (local.z - point.z) ** 2,
+            );
+            if (off > worst) worst = off;
+          }
+        }
+        if (worst > 1e-3) {
+          failures.push(
+            `A boat's lamp lands ${worst.toFixed(3)} m from where navLampWorld puts it. The hull's ` +
+              `yaw and the light kit's quaternion are two expressions of one rotation and this is ` +
+              `the only thing that holds them together.`,
+          );
+        }
+      }
+
+      // --- The day gate and the capacity clamp.
+      lights.setLive(false);
+      if (lights.begin()) failures.push('BoatLights.begin() is true with the night off; the day path is a branch per boat.');
+      for (const mesh of lights.meshes) if (mesh.visible) failures.push(`${mesh.name} is still drawn by day.`);
+      lights.setLive(true);
+      {
+        lights.begin();
+        const pose = createBoatPose();
+        pose.kind = BOAT_KIND.FRESHWATER;
+        for (let i = 0; i < BOAT_LIGHT_CAPACITY + 40; i++) lights.add(pose, 0);
+        lights.end();
+        const set = lights.meshes.find((mesh) => mesh.name === `boat_lights_${BOAT_KIND.FRESHWATER}`);
+        if (set !== undefined && set.count > set.instanceMatrix.count) {
+          failures.push(`the Freshwater set drew ${set.count} instances into ${set.instanceMatrix.count} slots.`);
+        }
+        // And a tinnie is refused outright rather than dropped into somebody
+        // else's set: a moored runabout showing red and green says a boat is
+        // under way where none is. See `BoatFleet.update`.
+        lights.begin();
+        const moored = createBoatPose();
+        moored.kind = BOAT_KIND.TINNIE;
+        lights.add(moored, 0);
+        lights.end();
+        if (lights.drawn !== 0) failures.push('a moored tinnie was given navigation lights.');
+      }
+    } finally {
+      lights.dispose();
+    }
+  }
 
   return failures;
 }
