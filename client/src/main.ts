@@ -496,6 +496,10 @@ import {
 // is fed by the streamer (`setStaticCarSink`) and asked by `resolveTake`; see
 // `game/staticcars.ts` and `game/driving.ts` section 1, which this retires.
 import { StaticCarField, verifyParkedBins, verifyStaticCars } from './game/staticcars.ts';
+// The name of the car you just got into, said once as hero text. Three-free and
+// pure, so the modulus that picks the model can be taken here without the fleet
+// -- see `game/carlabels.ts`, which is the whole argument.
+import { carLabel, carPool, verifyCarLabels } from './game/carlabels.ts';
 import {
   DRIVEN_DRAW_RADIUS,
   DrivenCarView,
@@ -4180,6 +4184,38 @@ async function main(): Promise<void> {
           ? `; skipped ${carModels.skipped.map((s) => `${s.file} (${s.why})`).join(', ')}`
           : ''),
     );
+    /*
+     * --- The hero line's pool against the fleet's own, once, here.
+     *
+     * `game/carlabels.carLabel` names the car you get into by taking
+     * `identity % pool.length` over a table, and `carlod` draws it by taking the
+     * same remainder over the pools it just built. Those are two lists that have
+     * to be the same list, and the only moment both exist is this one -- the
+     * boot check cannot see the fleet (it needs three and a fetch) and the fleet
+     * cannot see the boot check.
+     *
+     * A mismatch is not fatal and must not be: the manifest is still what gets
+     * drawn, so the city is right and only the *name* is wrong -- and wrong only
+     * for the identities whose remainder happens to differ, which is exactly the
+     * kind of fault that is never noticed. So it is a `console.error` with the
+     * class and both lengths in it, on the same terms as `loadCarModels`' own
+     * drift guard against `CAR_FLEET`.
+     */
+    {
+      const built = carModels.poolFiles();
+      for (const body of [0, 1, 2, 3, 4, 'police'] as const) {
+        const theirs = built[String(body)] ?? [];
+        const ours = carPool(body);
+        const same = theirs.length === ours.length && theirs.every((f, i) => f === ours[i]);
+        if (!same) {
+          console.error(
+            `[carlod] body ${body}: the fleet draws from ${theirs.length} slots and ` +
+              `\`carlabels.carPool\` names ${ours.length}, so the hero line names a car that is ` +
+              `not the one on screen. Fleet: [${theirs.join(', ')}]. Table: [${ours.join(', ')}].`,
+          );
+        }
+      }
+    }
   }
   /**
    * The two hero trains, on exactly the car models' terms and immediately after
@@ -5685,6 +5721,13 @@ async function main(): Promise<void> {
      */
     ...verifyParkedBins(),
     ...verifyParkedPool(),
+    /*
+     * And what the car you get into is called. Pure -- one modulus over a table
+     * -- so it runs here and on the server, and what it holds is that the name
+     * is *the model the fleet draws*: the same remainder of the same identity
+     * over a pool of the same length. See `game/carlabels.ts`.
+     */
+    ...verifyCarLabels(),
     /*
      * Interiors. The one property that matters is that it is **total**: there
      * is no curated list of buildings, so every footprint in Greater Sydney
@@ -7440,6 +7483,15 @@ async function main(): Promise<void> {
   // for itself when it is worth saying. See UI.md.
   const areaLine = new AreaLine();
   const areaLineView = new AreaLineView();
+  /**
+   * The car whose name the hero line has already said, or 0.
+   *
+   * A record id and not a boolean, so getting out of a HiLux and straight into
+   * the Camry behind it says both names -- and so that a car the server took
+   * away and gave back is announced again, which is the honest answer to "what
+   * am I in now".
+   */
+  let namedCar = 0;
   // The drive's narration. See the frame loop; the suburb is the hero line's.
   const ticker = new Ticker();
 
@@ -13023,6 +13075,39 @@ async function main(): Promise<void> {
      * not shout, and a line nobody reads should cost one fade.
      */
     {
+      /*
+       * --- The car's name, in the same device as the suburb and the lift.
+       *
+       * The owner: *"say the make and model of the vehicle when u get in as
+       * hero text"*. `AreaLine.announce` is the door the lift's *"LEVEL 12"*
+       * already comes through, so this is one string and one moment, and both
+       * of them are decided here rather than in `carlabels.ts` -- that file is
+       * pure and knows nothing about who is driving.
+       *
+       * **The moment is the server's, not the press.** Everything else about a
+       * take is predicted on the frame `E` goes down, because a camera that
+       * waited a round trip would lurch; a name is the opposite trade, and it is
+       * the one `predictTakeCar` already writes down about the theft banner. So
+       * the transition watched is of the *settled* car id -- online that is the
+       * id the server has acknowledged (`net.carSettled`), offline it is
+       * immediate, because offline this client is the authority.
+       *
+       * **The label is the model, not the class.** `carLabel` takes the same
+       * `identity % pool.length` over the same pool that `carlod.consider` takes
+       * to choose the mesh, so what the line says is what is under the camera --
+       * including for a car whose model is still a box because the pool ran out
+       * or the `.glb` never arrived, which is a fault with its own console line
+       * and not a reason to name the car wrongly. No livery: a stolen squad car
+       * is claimed on its body class, so it is named on one too.
+       */
+      const settledCar = net === null || net.carSettled ? playerCombat.drivingCar : 0;
+      if (settledCar !== namedCar) {
+        namedCar = settledCar;
+        if (settledCar !== 0) {
+          const record = carWorld().get(settledCar);
+          if (record !== undefined) areaLine.announce(carLabel(record.carId, record.body));
+        }
+      }
       // The suburb is the hero line's now, not the ticker's: a place name said
       // once, big, and gone, rather than a notice in the pill. Indoors there
       // is no suburb to speak of and the line stays quiet.
@@ -13391,7 +13476,22 @@ async function main(): Promise<void> {
       // as a model and once as the box that did not know. The other order is a
       // frame of double-draw every time a car crosses 90 m, which is exactly the
       // artefact this feature must not have.
-      if (carModels && now - lastCarSweep >= 1000 / SWEEP_HZ) {
+      //
+      // **Or immediately, when the set of cars somebody is driving has
+      // changed**, which is the 2026-09 fix for the owner's *"little weird
+      // jitter geting into vehicles"*. The mechanism is measured in
+      // `CarModelFleet.drivenSetChanged` and reproduced by `verifyParkedPool`:
+      // a parked car you get into keeps its *parked* claim until the next
+      // sweep, and a parked claim makes `claimed()` refuse the driven pose --
+      // so for up to 11 frames at 60 Hz the car you are sitting in is drawn as
+      // a box while a full model of it stands in the bay you took it from, and
+      // then the model teleports onto you. Forcing the sweep on the frame the
+      // driven set moves closes the window to zero, for one walk of the driven
+      // records a frame.
+      // The change test is asked **first** and unconditionally: it is what keeps
+      // the hash it compares against current, and a timer that short-circuited
+      // it would leave a stale hash to fire spuriously on the next frame.
+      if (carModels && (carModels.drivenSetChanged() || now - lastCarSweep >= 1000 / SWEEP_HZ)) {
         lastCarSweep = now;
         carModels.sweep(
           traffic,

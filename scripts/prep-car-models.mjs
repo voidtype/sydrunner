@@ -101,6 +101,17 @@ const DECIMATE_ERROR = 0.02;
  */
 const PRUNE_ERROR = 1.0;
 const MAX_TOTAL_BYTES = 16 * 1024 * 1024; // was 6; eleven textured real cars at ~0.5-1 MB each
+/**
+ * Below this a class gets a warning, not a rejection.
+ *
+ * **Three classes are under it now and that is the shipped state**, not a
+ * regression to fix by putting a generic back: the 2026-09 real-cars round cut
+ * the passenger classes to real makes only, and body 4 has exactly one real van
+ * on disk (the HiAce), body 0 two and body 1 two. The warning is still worth
+ * printing -- it says how thin the mix has become, and one van for all of
+ * Sydney is a fact somebody should keep meaning to fix -- but the answer is
+ * sourcing a second real van, never re-admitting a stand-in.
+ */
 const MIN_PER_CLASS = 3;
 const MAX_PER_CLASS = 8; // was 6; the real cars come first and the generics fill behind them
 const LENGTH_TOLERANCE = 0.02; // 2%, per the verification brief
@@ -117,7 +128,43 @@ const Y_TOLERANCE = 0.02; // 2 cm, per the verification brief
  * the ones expected to fail the tri limit: silently omitting a file from this
  * table would be exactly the kind of silent rejection the brief says not to
  * do, so instead they are listed, attempted, and rejected on the record.
+ *
+ * ---------------------------------------------------------------------------
+ * `standIn`, AND WHY IT IS A FLAG RATHER THAN A DELETED ROW.
+ *
+ * The owner, 2026-09: *"remove fake models keep the new real life ones"*. The
+ * five passenger classes hold real makes only from that round on, so every
+ * stylised or generic candidate for one of them carries `standIn: true` and is
+ * refused before it is opened.
+ *
+ * A flag rather than a deletion for the reason the paragraph above already
+ * gives about the tri limit: this table is the record of what was *considered*,
+ * and a row quietly removed is a candidate that gets re-sourced in a year by
+ * somebody who does not know it was looked at and turned down. It is also the
+ * only way to be sure: `MAX_PER_CLASS` cuts on priority, so deleting six sedan
+ * stand-ins would have promoted the seventh into the free slot.
+ *
+ * The **special** bodies -- bus, garbage, police, taxi -- keep their stand-ins,
+ * and that is about the disk and not about taste: there is no real-make
+ * alternative on it for any of the four roles, and a role whose only mesh is
+ * refused is a role that can never be drawn. Their manifest rows say so.
+ *
+ * ---------------------------------------------------------------------------
+ * `label`: WHAT THE PLAYER IS TOLD THEY ARE SITTING IN.
+ *
+ * Required on every row that can ship, and the run fails if one is missing --
+ * because the alternative is a car that gets into the game and then has to be
+ * named by somebody editing the generated manifest by hand, which is the one
+ * file at the top of which it says not to. `client/src/game/carlabels.ts` holds
+ * the same nineteen strings for the three-free side and states why there are
+ * two copies; `carlod.loadCarModels` compares them at load.
  */
+/** What the four special bodies' manifest rows say about their stand-in. */
+const SPECIAL_NOTE =
+  'No real-make alternative on disk for this role. The passenger classes (0-4) carry real makes ' +
+  'only; the four special bodies keep a stylised stand-in because removing it would leave the ' +
+  'role with no mesh at all.';
+
 const CATALOG = [
   // --- The Sydney mix, sourced 2026-09 (data/vehicles/sourcing-2026-09-sydney-mix.csv):
   // the cars that are actually on the road here, one model year each, ahead
@@ -125,89 +172,101 @@ const CATALOG = [
   // `weight` is the car's share of the road in whole points (the owner's
   // list: Ranger 8, HiLux 8, ...); `carlod` repeats a model in its body's
   // pool that many times, and the generics below get 1 each.
-  { file: 'ford_ranger_2023.glb', body: 3, priority: 0, decimate: true, weight: 8 },
+  { file: 'ford_ranger_2023.glb', body: 3, priority: 0, decimate: true, weight: 8, label: 'Ford Ranger 2023' },
   // `pruneError`: bodies authored as separate panels lose them to the
   // island prune at the default; 2% keeps a door and drops a bolt. See the
   // decimation stage. The Ranger is one shell and takes the default.
   // `maxTris`: 345 meshes of panels that the 2% prune keeps and the collapse
   // then cannot fold below 38k. The most common ute in the country gets the
   // budget rather than the bin; 24 instances of it is under a million.
-  { file: 'toyota_hilux_2021.glb', body: 3, priority: 0, decimate: true, weight: 8, pruneError: 0.02, positionsOnly: true },
+  { file: 'toyota_hilux_2021.glb', body: 3, priority: 0, decimate: true, weight: 8, pruneError: 0.02, positionsOnly: true, label: 'Toyota HiLux 2021' },
   // `paint`: the author's names are upside down -- "Interieur" is 45% of the
   // surface and is the body; the real cabin is "Siege". Pinned off the sheet.
-  { file: 'mitsubishi_l200_dh.glb', body: 3, priority: 0, decimate: true, weight: 4, paint: ['Interieur', 'Body_gris'], pruneError: 0.02 },
-  { file: 'mazda_cx5_tnnv.glb', body: 2, priority: 0, decimate: true, weight: 5 },
+  { file: 'mitsubishi_l200_dh.glb', body: 3, priority: 0, decimate: true, weight: 4, paint: ['Interieur', 'Body_gris'], pruneError: 0.02, label: 'Mitsubishi Triton' },
+  { file: 'mazda_cx5_tnnv.glb', body: 2, priority: 0, decimate: true, weight: 5, label: 'Mazda CX-5' },
   // The body panels are the 37% material named `xtinner23`; `Car_Paint` is the
   // radar cover. Pinned off the sheet.
-  { file: 'nissan_xtrail_2023.glb', body: 2, priority: 0, decimate: true, weight: 4, paint: ['xtinner23', 'Car_Paint'], pruneError: 0.02, maxTris: 40000 },
-  { file: 'hyundai_tucson_2015.glb', body: 2, priority: 0, decimate: true, weight: 3 },
+  { file: 'nissan_xtrail_2023.glb', body: 2, priority: 0, decimate: true, weight: 4, paint: ['xtinner23', 'Car_Paint'], pruneError: 0.02, maxTris: 40000, label: 'Nissan X-Trail 2023' },
+  { file: 'hyundai_tucson_2015.glb', body: 2, priority: 0, decimate: true, weight: 3, label: 'Hyundai Tucson 2015' },
   // `positionsOnly`: every face its own island by UV, so nothing welds and
   // nothing collapses -- 89k triangles after the gentle prune. The maps go
   // (a light bar, a tyre) and the panels stay. See the decimation stage.
-  { file: 'toyota_prado_2013.glb', body: 2, priority: 0, decimate: true, weight: 5, pruneError: 0.02, positionsOnly: true },
-  { file: 'toyota_corolla_2020.glb', body: 1, priority: 0, decimate: true, weight: 5 },
-  { file: 'tesla_model_3.glb', body: 0, priority: 0, decimate: true, weight: 4 },
-  { file: 'toyota_camry_2020.glb', body: 0, priority: 0, decimate: true, weight: 6 },
-  { file: 'toyota_hiace_2020.glb', body: 4, priority: 0, decimate: true, weight: 8 },
+  { file: 'toyota_prado_2013.glb', body: 2, priority: 0, decimate: true, weight: 5, pruneError: 0.02, positionsOnly: true, label: 'Toyota LandCruiser Prado 2013' },
+  { file: 'toyota_corolla_2020.glb', body: 1, priority: 0, decimate: true, weight: 5, label: 'Toyota Corolla 2020' },
+  { file: 'tesla_model_3.glb', body: 0, priority: 0, decimate: true, weight: 4, label: 'Tesla Model 3' },
+  { file: 'toyota_camry_2020.glb', body: 0, priority: 0, decimate: true, weight: 6, label: 'Toyota Camry 2020' },
+  { file: 'toyota_hiace_2020.glb', body: 4, priority: 0, decimate: true, weight: 8, label: 'Toyota HiAce 2020' },
   // --- sedan (0) --- CC0 first, then CC-BY, roughly by cleanliness/size.
-  { file: 'sedan_filler.glb', body: 0, priority: 1 },
-  { file: 'sedan_generic_b.glb', body: 0, priority: 2 },
-  { file: 'sedan_kenney.glb', body: 0, priority: 3 },
-  { file: 'sedan_sports_kenney.glb', body: 0, priority: 4 },
-  { file: 'sedan_generic_a.glb', body: 0, priority: 5 },
-  { file: 'sedan_generic_c.glb', body: 0, priority: 6 },
+  { file: 'sedan_filler.glb', body: 0, priority: 1, standIn: true },
+  { file: 'sedan_generic_b.glb', body: 0, priority: 2, standIn: true },
+  { file: 'sedan_kenney.glb', body: 0, priority: 3, standIn: true },
+  { file: 'sedan_sports_kenney.glb', body: 0, priority: 4, standIn: true },
+  { file: 'sedan_generic_a.glb', body: 0, priority: 5, standIn: true },
+  { file: 'sedan_generic_c.glb', body: 0, priority: 6, standIn: true },
   // Messiest topology of the sedan set (22 nodes, unnamed "Generic_N" meshes)
   // and the 7th candidate against a 6-slot quota -- lowest priority.
-  { file: 'sedan_generic_d.glb', body: 0, priority: 7 },
+  { file: 'sedan_generic_d.glb', body: 0, priority: 7, standIn: true },
   // Both far over MAX_TRIS (11217, 11129) -- listed for the record, expected
   // to be rejected on measurement rather than cut for quota.
-  { file: 'sedan_large_a.glb', body: 0, priority: 8 },
-  { file: 'sedan_large_b.glb', body: 0, priority: 9 },
+  { file: 'sedan_large_a.glb', body: 0, priority: 8, standIn: true },
+  { file: 'sedan_large_b.glb', body: 0, priority: 9, standIn: true },
 
   // --- hatch (1) ---
-  { file: 'hatch_generic_a.glb', body: 1, priority: 1 },
-  { file: 'hatch_kenney.glb', body: 1, priority: 2 },
+  { file: 'hatch_generic_a.glb', body: 1, priority: 1, standIn: true },
+  { file: 'hatch_kenney.glb', body: 1, priority: 2, standIn: true },
   // 72% of it is a material named `Black`, which is the body; `Main` is the trim.
-  { file: 'hatch_filler.glb', body: 1, priority: 3, paint: ['Black', 'Main'] },
-  { file: 'hatch_micro.glb', body: 1, priority: 4 },
-  { file: 'vw_golf_mk.glb', body: 1, priority: 5 },
+  { file: 'hatch_filler.glb', body: 1, priority: 3, paint: ['Black', 'Main'], standIn: true },
+  { file: 'hatch_micro.glb', body: 1, priority: 4, standIn: true },
+  { file: 'vw_golf_mk.glb', body: 1, priority: 5, label: 'Volkswagen Golf' },
   // All three far over MAX_TRIS (11989, 33706, 19720); mazda_rx7 is also the
   // wrong shape for a hatch (it's an RX-7 coupe standing in, per sourcing.csv).
-  { file: 'corolla_ae86.glb', body: 1, priority: 6 },
-  { file: 'hatch_sports.glb', body: 1, priority: 7 },
-  { file: 'mazda_rx7.glb', body: 1, priority: 8 },
+  { file: 'corolla_ae86.glb', body: 1, priority: 6, label: 'Toyota Corolla AE86' },
+  { file: 'hatch_sports.glb', body: 1, priority: 7, standIn: true },
+  { file: 'mazda_rx7.glb', body: 1, priority: 8, label: 'Mazda RX-7' },
 
   // --- suv (2) ---
-  { file: 'suv_generic_a.glb', body: 2, priority: 1 },
-  { file: 'suv_kenney.glb', body: 2, priority: 2 },
-  { file: 'suv_luxury_kenney.glb', body: 2, priority: 3 },
-  { file: 'suv_generic_b.glb', body: 2, priority: 4 },
+  { file: 'suv_generic_a.glb', body: 2, priority: 1, standIn: true },
+  { file: 'suv_kenney.glb', body: 2, priority: 2, standIn: true },
+  { file: 'suv_luxury_kenney.glb', body: 2, priority: 3, standIn: true },
+  { file: 'suv_generic_b.glb', body: 2, priority: 4, standIn: true },
   // 8032 tris in the source manifest -- 32 over the limit. Processed like
   // everything else rather than pre-judged; measured, not assumed.
-  { file: 'suv_filler.glb', body: 2, priority: 5 },
-  { file: 'nissan_terrano.glb', body: 2, priority: 6 },
-  { file: 'suv_offroad_a.glb', body: 2, priority: 7 },
+  { file: 'suv_filler.glb', body: 2, priority: 5, standIn: true },
+  { file: 'nissan_terrano.glb', body: 2, priority: 6, label: 'Nissan Terrano' },
+  { file: 'suv_offroad_a.glb', body: 2, priority: 7, standIn: true },
   // Same author, same rig, same tri count as suv_offroad_a -- a repaint, not
   // a second silhouette. Lowest priority of the SUV set for exactly that
   // reason (silhouette variety is what this curation optimizes for).
-  { file: 'suv_offroad_b.glb', body: 2, priority: 8 },
+  { file: 'suv_offroad_b.glb', body: 2, priority: 8, standIn: true },
   // Both far over MAX_TRIS (10448, 31418).
-  { file: 'suv_offroad_c.glb', body: 2, priority: 9 },
-  { file: 'range_rover.glb', body: 2, priority: 10 },
+  { file: 'suv_offroad_c.glb', body: 2, priority: 9, standIn: true },
+  { file: 'range_rover.glb', body: 2, priority: 10, label: 'Land Rover Range Rover' },
 
   // --- ute (3) --- only 4 candidates exist; all are kept if they pass.
-  { file: 'ute_generic.glb', body: 3, priority: 1 },
-  { file: 'ute_tray_kenney.glb', body: 3, priority: 2 },
-  // `nose: -1`: detection puts its tray at +X (the FrontColor material is a
-  // value-duplicate `dedup` folds away); the sheet showed the tray, so the
-  // nose is pinned by hand. See `NOSE_OVERRIDE` below.
-  { file: 'mitsubishi_l200.glb', body: 3, priority: 3, nose: -1, paint: ['M_0136_Charcoal', 'Color_M08'] },
-  { file: 'toyota_hilux_97.glb', body: 3, priority: 4 },
+  { file: 'ute_generic.glb', body: 3, priority: 1, standIn: true },
+  { file: 'ute_tray_kenney.glb', body: 3, priority: 2, standIn: true },
+  // `nose: 1`: **and it was `-1`, which turned a correct file backwards.**
+  //
+  // The reasoning that put `-1` here was sound and the sign was not: detection
+  // has no signal on this file (the "FrontColor" material is a value-duplicate
+  // of "Color_M00", so `dedup` folds the only directional name away), the
+  // sheet showed a tray, and the conclusion drawn was that the source faced
+  // `-X`. It does not. Rendering `data/vehicles/models/mitsubishi_l200.glb`
+  // through `render-car-sheet.mjs` puts its grille at `+X` -- so the pin was
+  // the *only* thing turning it, and what the sheet had been showing was this
+  // line's own work. The 2026-09 real-cars round caught it on the sheet again
+  // and turned the shipped asset back.
+  //
+  // The lesson, which is the reason this comment is six lines rather than one:
+  // a hand pin is only ever justified against the **source**, never against the
+  // output, because the output already has the pin in it.
+  { file: 'mitsubishi_l200.glb', body: 3, priority: 3, nose: 1, paint: ['M_0136_Charcoal', 'Color_M08'], label: 'Mitsubishi Triton' },
+  { file: 'toyota_hilux_97.glb', body: 3, priority: 4, label: 'Toyota HiLux 1997' },
 
   // --- van (4) --- only 3 candidates exist; all are kept if they pass.
-  { file: 'van_courier_kenney.glb', body: 4, priority: 1 },
-  { file: 'van_generic_a.glb', body: 4, priority: 2 },
-  { file: 'van_panel.glb', body: 4, priority: 3 },
+  { file: 'van_courier_kenney.glb', body: 4, priority: 1, standIn: true },
+  { file: 'van_generic_a.glb', body: 4, priority: 2, standIn: true },
+  { file: 'van_panel.glb', body: 4, priority: 3, standIn: true },
 
   // --- specials: no quota, kept if they pass the same per-model limits ---
   // `length` is each one's own real-world target, not borrowed from a
@@ -215,18 +274,18 @@ const CATALOG = [
   // target_vehicle in the source manifest, "NSW Police general-duties
   // SUV/wagon"), so it is sized like this game's SUV class, not its sedan
   // class, even though "police" is not itself a numbered body.
-  { file: 'police_kenney.glb', body: 'police', priority: 1, length: CAR_BODY_SIZE[2].length },
+  { file: 'police_kenney.glb', body: 'police', priority: 1, length: CAR_BODY_SIZE[2].length, label: 'NSW Police Cruiser' },
   // 9648 tris -- over the limit; the only other police candidate, and the
   // one that *would* have wanted the sedan length.
-  { file: 'police_sedan_charger.glb', body: 'police', priority: 2, length: CAR_BODY_SIZE[0].length },
-  { file: 'taxi_generic.glb', body: 'taxi', priority: 1, length: CAR_BODY_SIZE[0].length },
-  { file: 'taxi_kenney.glb', body: 'taxi', priority: 2, length: CAR_BODY_SIZE[0].length },
+  { file: 'police_sedan_charger.glb', body: 'police', priority: 2, length: CAR_BODY_SIZE[0].length, label: 'NSW Police Charger' },
+  { file: 'taxi_generic.glb', body: 'taxi', priority: 1, length: CAR_BODY_SIZE[0].length, label: 'Sydney Taxi' },
+  { file: 'taxi_kenney.glb', body: 'taxi', priority: 2, length: CAR_BODY_SIZE[0].length, label: 'Sydney Taxi' },
   // A rigid single-deck Sydney Buses bus (Volvo B12BLE / Scania K-series and
   // similar) is about 12.5 m; 12.0 m is a round, slightly conservative
   // stand-in rather than the full figure.
-  { file: 'city_bus.glb', body: 'bus', priority: 1, length: 12.0 },
+  { file: 'city_bus.glb', body: 'bus', priority: 1, length: 12.0, label: 'Sydney Buses Transit' },
   // A kerbside rear-loader garbage truck is about 9-10 m over the cab and bin body.
-  { file: 'garbage_truck_kenney.glb', body: 'garbage', priority: 1, length: 9.0 },
+  { file: 'garbage_truck_kenney.glb', body: 'garbage', priority: 1, length: 9.0, label: 'Council Garbage Truck' },
 ];
 
 const SPECIAL_BODIES = new Set(['police', 'taxi', 'bus', 'garbage']);
@@ -1592,6 +1651,30 @@ function printReport(results) {
 // --- Main --------------------------------------------------------------------------
 
 async function main() {
+  /*
+   * `PREP_CREDITS_ONLY=1`: rebuild `CREDITS.md` and `credits.html` from the
+   * manifest that is already on disk, and stop.
+   *
+   * The attribution surface is generated *from the manifest*, and the manifest
+   * outlives any one run of this script: the 2026-09 real-cars round removed
+   * nineteen rows from it without reprocessing a single `.glb`, and left the
+   * credits naming six CC-BY models that no longer ship. Crediting an asset you
+   * do not use is a small lie in the one document that exists to be exactly
+   * true, and the alternative -- a full run, regenerating nineteen binaries to
+   * fix a text file -- is a diff nobody can review.
+   *
+   * Both builders below are already pure functions of the manifest, so this is
+   * three lines and cannot drift from what a full run would write.
+   */
+  if (process.env.PREP_CREDITS_ONLY) {
+    const manifest = JSON.parse(fs.readFileSync(OUT_MANIFEST_PATH, 'utf8'));
+    fs.writeFileSync(CREDITS_HTML_PATH, buildCreditsHtml(manifest));
+    fs.writeFileSync(CREDITS_MD_PATH, buildCreditsMd(manifest));
+    console.log(`Wrote ${CREDITS_HTML_PATH}`);
+    console.log(`Wrote ${CREDITS_MD_PATH}`);
+    return;
+  }
+
   const srcMeta = JSON.parse(fs.readFileSync(SRC_MANIFEST_PATH, 'utf8'));
 
   fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -1610,6 +1693,18 @@ async function main() {
   const only = process.env.PREP_ONLY ?? '';
   for (const entry of CATALOG) {
     if (only && !entry.file.includes(only)) continue;
+    // Refused on the record, before it is opened. See the CATALOG header on
+    // `standIn`: a passenger class holds real makes only, and a row deleted
+    // instead of flagged would promote the next generic into the free slot.
+    if (entry.standIn) {
+      results.push({
+        file: entry.file,
+        body: entry.body,
+        status: 'rejected',
+        reason: 'stylised or generic stand-in; the passenger classes carry real makes only',
+      });
+      continue;
+    }
     if (!srcMeta[entry.file]) {
       results.push({ file: entry.file, body: entry.body, status: 'rejected', reason: 'not present in source manifest.json' });
       continue;
@@ -1620,6 +1715,10 @@ async function main() {
     }
     try {
       const r = await processFile(entry, srcMeta);
+      // Carried from the row rather than derived: what a car is called is a
+      // human's judgement about a mesh and there is nothing in the file to
+      // read it off. See the CATALOG header on `label`.
+      r.label = entry.label;
       results.push(r);
     } catch (err) {
       results.push({ file: entry.file, body: entry.body, status: 'rejected', reason: `pipeline error: ${err.stack || err.message}` });
@@ -1648,11 +1747,23 @@ async function main() {
     totalBytes = shipped.reduce((s, r) => s + r.bytes, 0);
   }
 
+  // A car that ships with no name is a hero line that says nothing, and it
+  // would be found by a player rather than here. Fatal rather than defaulted:
+  // "Unnamed Vehicle" in the middle of the screen is worse than a failed run.
+  const unnamed = shipped.filter((r) => typeof r.label !== 'string' || r.label.trim() === '');
+  if (unnamed.length > 0) {
+    console.error(`ERROR: no CATALOG label for: ${unnamed.map((r) => r.file).join(', ')}`);
+    console.error('Every shipping model needs one -- it is what the game says when a player gets in.');
+    process.exitCode = 1;
+    return;
+  }
+
   // Manifest: stable file-name order, since a later agent hashes car
   // identity into this list.
   const manifest = shipped
     .map((r) => ({
       file: r.file,
+      label: r.label,
       body: r.body,
       tris: r.tris,
       lengthM: r.lengthM,
@@ -1662,6 +1773,9 @@ async function main() {
       license: r.license,
       attribution: r.attribution,
       source_url: r.source_url,
+      // Only the four special bodies, and only to say why they are the one
+      // place a stand-in still ships. See the CATALOG header on `standIn`.
+      ...(typeof r.body === 'number' ? {} : { note: SPECIAL_NOTE }),
     }))
     .sort((a, b) => a.file.localeCompare(b.file));
   fs.writeFileSync(OUT_MANIFEST_PATH, JSON.stringify(manifest, null, 2) + '\n');

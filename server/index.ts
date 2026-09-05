@@ -85,6 +85,8 @@ import { verifyCarFire } from '../client/src/game/carfire.ts';
 // and paint counts are omitted here and passed by `main.ts`, which is the end
 // that can load the palette; see `verifyStaticCars`.
 import { verifyParkedBins, verifyStaticCars } from '../client/src/game/staticcars.ts';
+// The car-name table, three-free for this list's sake. See `game/carlabels.ts`.
+import { verifyCarLabels } from '../client/src/game/carlabels.ts';
 // And the *drawing* of a car somebody took, which is a browser rule checked here
 // on `verifyViewLatch`'s argument two imports down: `world/drivencars.ts` owns no
 // mesh and imports three only as types, so this process can run every line of it.
@@ -563,6 +565,14 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // lays a tile's instances out in this order and `carlod` addresses them in
     // it, and a disagreement folds a car flat somewhere nobody is looking.
     ['verifyParkedBins', verifyParkedBins()],
+    // And what a car is called. The server never says it -- the hero line is the
+    // browser's -- but the table it is said from is three-free on purpose, and
+    // the property that matters is arithmetic rather than pictorial: the label
+    // is `pool[identity % pool.length]` over the manifest's own order, which is
+    // the same remainder `carlod` takes to pick the mesh. A table that has
+    // drifted names a car that is not on screen, for some identities and not
+    // others, which is the kind of fault nobody reports. See `game/carlabels.ts`.
+    ['verifyCarLabels', verifyCarLabels()],
     // The two traffic checks that were written to run at boot -- their own
     // comments say so -- and had no caller anywhere. `verifyLaneShare` is the
     // one that asserts the lane rule is a pure function of the tick, which is

@@ -92,7 +92,7 @@ const BODY_MIX = [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 4];
 /**
  * The probe tile: few cars, far apart, far from everything else.
  *
- * Deliberately not one of the 40. `PER_MODEL_CAPACITY` is 24 instances per model
+ * Deliberately not one of the 40. `PER_MODEL_CAPACITY` is 64 instances per model
  * file and this check loads exactly one model, so a sweep standing in a dense
  * tile would fill it and the overflow would be the check's own doing rather than
  * a fault -- and `overflows` is a number this asserts stays at zero. Eight cars
@@ -187,6 +187,9 @@ export function verifyParkedPool(): string[] {
     drivenHidden: 0,
     drivenRestored: 0,
     modelsClaimed: 0,
+    mountSweepsForced: 0,
+    mountFramesModelled: 0,
+    mountBoxesFlat: 0,
     boxesFolded: 0,
     boxesRestored: 0,
     mismatchRefused: 0,
@@ -372,6 +375,125 @@ export function verifyParkedPool(): string[] {
     }
     if (fleet.claimedCount !== 0) {
       failures.push(`${fleet.claimedCount} claim(s) survived a sweep 400 km from every car.`);
+    }
+  }
+
+  /*
+   * --- THE MOUNT, FRAME BY FRAME. The jitter, as a number.
+   *
+   * The owner: *"theres a little weird jitter geting into vehicles atm"*. The
+   * mechanism is entirely in the seam this file already owns and is invisible
+   * to every other check, because it is not a wrong matrix -- every matrix here
+   * is right -- it is a matter of *when*.
+   *
+   * A parked car inside `CLAIM_RADIUS` holds a **parked** claim: its box is
+   * folded flat and a model stands in the bay. Get into it and `claimed()`
+   * refuses the driven pose, because the claim it finds is a parked one and a
+   * parked claim is written once and never re-posed. So `TrafficMovers` draws
+   * the car you are sitting in as a *box*, at your body, while the *model* of
+   * the same car is still standing where you took it from -- and nothing
+   * reconciles that until the next `sweep`, which is at `SWEEP_HZ` = 5. Up to
+   * 11 frames at 60 Hz, 28 at 144, of two coincident cars pulling apart at up
+   * to 8 m/s, ending in the model teleporting onto the bonnet.
+   *
+   * The fix is `CarModelFleet.drivenSetChanged`, asked once a frame by the frame
+   * loop and forcing the sweep on the frame the answer moves. What this drives
+   * is exactly that loop, at 60 Hz, over a take -- and what it asserts is the
+   * property a player sees: **zero frames** in which the car being driven is
+   * not the model.
+   */
+  {
+    // Stand among the probe cars again and let them claim.
+    fleet.sweep(field, 4, nearX, nearZ);
+    const mounted = probeData.identity[1];
+    let driving = false;
+    let driverX = PROBE_ORIGIN_X + probeData.x[1];
+    const driverZ = PROBE_ORIGIN_Z + probeData.z[1];
+    fleet.drivenIdentities = (visit) => { if (driving) visit(mounted); };
+    const driven = createCarPose();
+    driven.identity = mounted;
+    driven.body = probeData.body[1];
+    driven.colour = probeData.colour[1];
+    driven.dx = 1;
+    driven.dz = 0;
+    fleet.drivenClaims = (visit) => {
+      if (!driving) return;
+      driven.x = driverX;
+      driven.z = driverZ;
+      visit(driven);
+    };
+
+    let framesAsBox = 0;
+    let forced = 0;
+    let sweepClock = 0;
+    // 60 Hz for a fifth of a second: one whole `SWEEP_HZ` period, which is the
+    // window the artefact used to fill. The take lands on frame 1, immediately
+    // *after* a scheduled sweep, which is the worst case -- the longest wait
+    // for the next one.
+    for (let frame = 0; frame < 12; frame++) {
+      const now = frame * (1000 / 60);
+      if (frame === 1) {
+        driving = true;
+        driverX += 0.5;
+      }
+      // main.ts's own gate, in its own order: the change test first so the hash
+      // it compares against is never stale.
+      const changed = fleet.drivenSetChanged();
+      if (changed || now - sweepClock >= 1000 / 5) {
+        if (changed && frame > 0) forced++;
+        sweepClock = now;
+        fleet.sweep(field, 5 + frame, nearX, nearZ);
+      }
+      fleet.begin();
+      if (driving) {
+        driven.x = driverX;
+        driven.z = driverZ;
+        // `TrafficMovers` asks exactly this, and a false answer is the frame it
+        // draws the box instead.
+        if (!fleet.claimed(driven)) framesAsBox++;
+        driverX += 8 / 60;
+      }
+      fleet.end();
+    }
+    counters.mountSweepsForced = forced;
+    counters.mountFramesModelled = 11 - framesAsBox;
+    if (framesAsBox !== 0) {
+      failures.push(
+        `A car was drawn as a box for ${framesAsBox} frame(s) after being got into, with its own ` +
+          'model still standing in the bay it was taken from. That is the mount jitter: the ' +
+          '`sweep` at 5 Hz is what swaps a parked claim for a driven one, and without ' +
+          '`drivenSetChanged` forcing it the wait is up to 11 frames at 60 Hz.',
+      );
+    }
+    if (forced !== 1) {
+      failures.push(
+        `Taking one car forced ${forced} sweep(s) over 12 frames; it must force exactly one. ` +
+          'None is the jitter back; more than one is a 0.5 ms sweep running every frame because ' +
+          'the driven hash is not stable while nothing changes.',
+      );
+    }
+    // And the box of the car being driven is flat, on the frame it was taken.
+    {
+      const held = diff(snapshot(pool, probeSets), before);
+      // Every claimed car's box is flat -- the ones claimed by distance and the
+      // one claimed by being driven -- so this counts rather than identifies.
+      counters.mountBoxesFlat = held.flat;
+      if (held.flat === 0) {
+        failures.push('Nothing was folded flat across the mount, so the parked boxes are still drawing.');
+      }
+    }
+    driving = false;
+    fleet.drivenIdentities = () => {};
+    fleet.drivenClaims = () => {};
+    fleet.sweep(field, 40, FAR_X, FAR_Z);
+    {
+      const back = diff(snapshot(pool, probeSets), before);
+      if (back.changed !== 0) {
+        failures.push(
+          `Getting out and walking away left ${back.changed} instance(s) different from the matrix ` +
+            'the car was parked with. A mount must be exactly reversible or the bay keeps the dent.',
+        );
+      }
     }
   }
 
