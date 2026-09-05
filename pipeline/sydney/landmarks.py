@@ -170,20 +170,27 @@ TOWER_TOTAL_HEIGHT = 309.0
 TOWER_PODIUM_HEIGHT = 30.0  # the Centrepoint/Westfield retail podium
 TOWER_SHAFT_RADIUS = 3.35  # 6.7 m concrete stalk
 TOWER_TURRET_BOTTOM = 220.0
-TOWER_TURRET_TOP = 262.0
+TOWER_TURRET_TOP = 265.0
 TOWER_CABLES = 56
 # The turret, as the stack of cone frusta it visibly is: (height above ground,
-# radius). Widest a little under half way up, which is the observation and
-# restaurant band.
+# radius). **A drum, not a lemon.** The first profile peaked at 12.5 m half way
+# up and tapered both ways, which the landmark sheet showed for what it was: an
+# olive on a stick. The operator's own fact sheet gives the turret as
+# "approximately 31 metres" across, and the photograph on it gives the shape --
+# a short conical skirt flaring out from the 6.7 m shaft, then a near-vertical
+# glazed drum for the two restaurants and the deck (the 420 windows), leaning
+# out a touch as it rises, then a stepped-in band for the plant and telecom
+# levels, then the roof cone the spire stands on. The observation deck is at
+# 250 m, inside the top of the drum.
 TOWER_TURRET_PROFILE: tuple[tuple[float, float], ...] = (
-    (220.0, 4.6),
-    (225.5, 9.2),
-    (231.0, 11.6),
-    (238.0, 12.5),
-    (245.0, 12.5),
-    (251.0, 10.4),
-    (256.5, 7.6),
-    (262.0, 4.4),
+    (220.0, 4.2),
+    (224.0, 11.5),
+    (228.0, 14.8),
+    (250.5, 15.5),
+    (252.5, 13.2),
+    (258.0, 11.8),
+    (262.0, 8.4),
+    (265.0, 3.2),
 )
 
 
@@ -1727,7 +1734,7 @@ def build_tower(anchors: dict[str, Anchor], terrain) -> Landmark:
     b.cap("landmark_gold", _disc_local(TOWER_TURRET_PROFILE[0][1], 32), base_y + TOWER_TURRET_BOTTOM, up=False)
     # The observation band's glazing, recessed a little so it reads as a window
     # rather than as a stripe of paint.
-    b.frustum("landmark_glass", 0.0, 0.0, base_y + 238.4, base_y + 244.6, 12.2, 12.2, segments=32)
+    b.frustum("landmark_glass", 0.0, 0.0, base_y + 247.0, base_y + 250.6, 15.35, 15.45, segments=32)
     prisms.append(
         Prism(
             _disc_enu(e0, n0, 12.8, 10),
