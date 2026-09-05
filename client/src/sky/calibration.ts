@@ -204,8 +204,33 @@ export const HEMISPHERE_DAY = 3.4;
  * with this is the middle of civil twilight, where the ramp is half way: the
  * fill there goes from 1.87 to 2.28, a fifth of a stop on a sky that is already
  * changing faster than that. There is nothing calibrated at that altitude.
+ *
+ * ---------------------------------------------------------------------------
+ * **IT IS 1.85 NOW -- THE OWNER, 2026-09-05: "NEEDS TO BE BRIGHTER AT NIGHT",
+ * THEN "INCREASE AMBIENT NIGHT LIGHT TOO".**
+ *
+ * The paragraph above said the next request could not be served by this
+ * constant alone, and it was right: the floor was 3% under the ceiling the
+ * torch ratio sets. So this time the *sources* moved with it, which is the work
+ * that paragraph said could not be avoided twice. Everything below is x1.6:
+ *
+ *   - this floor, 1.155 -> 1.85 (0.2431 -> 0.389 of luminance on a shaded wall;
+ *     a 0.25-albedo wall from a display value of 29 to about 40, asphalt 12 to 16);
+ *   - `TORCH_INTENSITY` 110 -> 176, so the torch still puts 4.34x the ambient on
+ *     a wall at 10 m -- the ratio `verifyLightRig` asserts, unchanged;
+ *   - `LAMP_INTENSITY` 70 -> 112 with `LAMP_DISTANCE` 32 -> 36, so the two real
+ *     lamps still stand out of the floor by the same margin;
+ *   - the painted pools and the headlights in `world/nightlights.ts`
+ *     (`POOL_LEVEL`, `HEAD_LEVEL`, `HEADLAMP_LEVEL`, `BEAM_LEVEL`) by the same
+ *     factor, because they are additive over a frame that is now 1.6x brighter
+ *     and would otherwise have read as dimmer lamps on a lighter street.
+ *
+ * `NIGHT_AMBIENT_FLOOR_MAX` and `_MIN` are re-derived from the new torch rather
+ * than nudged: 1.69 / 4 = 0.4224 is the arithmetic ceiling, 0.42 sits inside it,
+ * and 0.35 is just under the shipped 0.389 so it cannot be quietly undone. The
+ * moon is still a multiple of this constant and still an event.
  */
-export const HEMISPHERE_NIGHT = 1.155;
+export const HEMISPHERE_NIGHT = 1.85;
 
 /**
  * The ceiling on the night ambient floor, as luminance on a shaded wall.
@@ -245,7 +270,7 @@ export const HEMISPHERE_NIGHT = 1.155;
  * headlights down with it, because every one of them is quoted as a ratio to
  * this floor.
  */
-export const NIGHT_AMBIENT_FLOOR_MAX = 0.25;
+export const NIGHT_AMBIENT_FLOOR_MAX = 0.42;
 
 /**
  * And the other end of the same bound, which used to be a bare `0.05` inside
@@ -266,7 +291,7 @@ export const NIGHT_AMBIENT_FLOOR_MAX = 0.25;
  * genuinely means to take the night back down has to move this line and read the
  * paragraph attached to it.
  */
-export const NIGHT_AMBIENT_FLOOR_MIN = 0.2;
+export const NIGHT_AMBIENT_FLOOR_MIN = 0.35;
 
 /**
  * Hemisphere sky colour, linear, day and night endpoints.
@@ -638,7 +663,7 @@ export const NIGHT_FULL_ALTITUDE = -6;
  * the 10 m ratio at 4x and it lands at 4.34, so this is the row that decides how
  * much further `HEMISPHERE_NIGHT` can ever go: not much.
  */
-export const TORCH_INTENSITY = 110;
+export const TORCH_INTENSITY = 176;
 
 /**
  * Cut-off distance, metres, and the decay exponent.
@@ -743,10 +768,10 @@ export const LAMP_REAL_COUNT = 2;
  * point. What says "street light" in a photograph is not the road, it is the
  * top-lit fence and the underside of the tree.
  */
-export const LAMP_INTENSITY = 70;
+export const LAMP_INTENSITY = 112;
 
 /** Cut-off, metres. Past 30 m a lamp is worth under 2% of the ambient floor. */
-export const LAMP_DISTANCE = 32;
+export const LAMP_DISTANCE = 36;
 
 /**
  * The two lamp colours, linear, largest channel 1 -- and the decision behind
@@ -1534,8 +1559,8 @@ export function verifyLightRig(rig = solarRig(REFERENCE_SOLAR.altitude)): string
         `20 degrees down, against an ambient floor of ${floor.toFixed(3)} -- ` +
         `${(torchAt10 / floor).toFixed(2)}x, under the 4x that makes a dark street navigable rather ` +
         `than merely lighter. **The likely cause is the ambient rather than the torch**: this ratio ` +
-        `sits at 4.34x as shipped, so HEMISPHERE_NIGHT (${HEMISPHERE_NIGHT}) is three per cent from ` +
-        `breaking it and TORCH_INTENSITY (${TORCH_INTENSITY}) is untouched since it was derived. ` +
+        `sits at 4.34x as shipped, so HEMISPHERE_NIGHT (${HEMISPHERE_NIGHT}) and ` +
+        `TORCH_INTENSITY (${TORCH_INTENSITY}) have to move together -- see the 2026-09-05 note on the floor. ` +
         `Also check that nightLevel still reaches 1.`,
     );
   }

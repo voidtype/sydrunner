@@ -841,7 +841,10 @@ const POOL_FALLOFF: ReadonlyArray<readonly [number, number]> = [
 ];
 
 /** How bright the pool is, linear, before `instanceColor` tints it to the lamp's hue. */
-const POOL_LEVEL = 0.5;
+// x1.6 on 2026-09-05 with `sky/calibration.HEMISPHERE_NIGHT`, so the pool keeps
+// its ratio to a floor that is 1.6x brighter; the note on that constant lists
+// every term that moved with it.
+const POOL_LEVEL = 0.8;
 
 /**
  * The shaft of light between the lamp and its pool: half-width at the head and
@@ -872,7 +875,7 @@ const SHAFT_PLANES = 3;
  * line a bare lamp actually has.
  */
 const HEAD_HALF = 0.34;
-const HEAD_LEVEL = 2.6;
+const HEAD_LEVEL = 3.4;
 
 // --- The car ------------------------------------------------------------------
 
@@ -968,10 +971,10 @@ const BEAM_COLOUR: Rgb = [1.0, 0.93, 0.74];
  * still carries the street and leaves the close pass as a glare you can see
  * through, which is what being beside a headlight actually is.
  */
-const BEAM_LEVEL = 0.22;
+const BEAM_LEVEL = 0.29;
 /** And the lens itself, which is small, hot and the thing you see at 300 m. */
 const HEADLAMP_HALF = 0.15;
-const HEADLAMP_LEVEL = 2.2;
+const HEADLAMP_LEVEL = 2.9;
 
 /**
  * The road under the car, as an elongated pool from the bumper forwards.
@@ -1851,6 +1854,31 @@ export const COLUMN_POLE_RADIUS = 40;
  * wrong by a factor of two to change any tile's answer.
  */
 export const COLUMN_TILE_POLE_FLOOR = 12;
+/**
+ * Up to this `LANE_CLASSES` index a street is a **traffic route** and is lit by
+ * columns regardless of rule 1: trunk, primary and secondary and their links.
+ *
+ * Rule 1 was written for the suburbs, where the survey's pole line *is* the
+ * street lighting and a derived column beside it is an invented light. It was
+ * also what left every arterial through those suburbs dark: Parramatta Road,
+ * the Pacific Highway and King Georges Road all run through pole tiles, and
+ * their poles carry a luminaire on the same hashed 42% a back street gets --
+ * which is a category P rhythm on a category V road. In life a traffic route
+ * has its own columns at 30 m whatever the side streets hang off, and the
+ * owner asked for exactly that. So on these classes the tile's pole count is
+ * not consulted; what is consulted instead is the tile's *lit* lamp records,
+ * so a pole that does carry a luminaire on the arterial still wins over a
+ * column beside it (`COLUMN_LAMP_RADIUS`). Every other class keeps rule 1.
+ */
+export const COLUMN_ARTERIAL_MAX_CLASS = 7;
+/**
+ * A surveyed luminaire nearer than this to a would-be arterial column *is*
+ * that column, metres. Smaller than `COLUMN_POLE_RADIUS` on purpose: that one
+ * keeps a column away from any pole, lit or not, because on a local street the
+ * pole line is the lighting; this one only has to stop two lights standing on
+ * one spot, and half a 30 m bay is the distance at which two lamps read as two.
+ */
+export const COLUMN_LAMP_RADIUS = 15;
 
 /** Two columns nearer than this are one column. See rule 3 above. */
 const COLUMN_MIN_SEPARATION = 24;
@@ -1893,13 +1921,18 @@ const COLUMN_TUNNEL_DEPTH = 1.2;
  * every driveway in Sydney: 9.95 km of them in the nine tiles around Wynyard
  * against 15.8 of tertiary, and lighting them all would double the count for
  * geometry that is mostly behind a roller door.
+ *
+ * 2026-09-05, the owner: *"more street lamps, esp on arterial roads"*. The
+ * traffic routes came down four metres each, to the bottom of category V's
+ * band, and -- the bigger change -- they are now lit **whether or not the tile
+ * has a pole line in it**: see `COLUMN_ARTERIAL_MAX_CLASS`.
  */
 const COLUMN_SPACING: readonly number[] = [
   0, 0, // motorway, motorway_link
-  34, 34, // trunk, trunk_link
-  34, 34, // primary, primary_link
-  36, 36, // secondary, secondary_link
-  40, 40, // tertiary, tertiary_link
+  30, 30, // trunk, trunk_link
+  30, 30, // primary, primary_link
+  32, 32, // secondary, secondary_link
+  36, 36, // tertiary, tertiary_link
   52, // residential
   52, // unclassified
   52, // living_street
@@ -2108,10 +2141,20 @@ export function deriveColumnLamps(
   originX: number,
   originZ: number,
   groundAt: ((x: number, z: number) => number) | null = null,
+  /**
+   * The tile's surveyed luminaires, `LAMP_RECORD_STRIDE` floats each in world
+   * metres -- `buildTileStreetLamps`' output -- or null. Only the traffic
+   * routes read it; see `COLUMN_ARTERIAL_MAX_CLASS`.
+   */
+  litLamps: Float32Array | null = null,
 ): ColumnSite[] {
   const poleCount = poles?.poleCount ?? 0;
-  // Rule 1. The coarse test, and the one that makes this tile-local safely.
-  if (poleCount >= COLUMN_TILE_POLE_FLOOR) return [];
+  // Rule 1. The coarse test, and the one that makes this tile-local safely --
+  // for every class but the traffic routes, which are decided per way below.
+  const denseTile = poleCount >= COLUMN_TILE_POLE_FLOOR;
+  if (denseTile && !ways.some((w) => w.klass <= COLUMN_ARTERIAL_MAX_CLASS && (COLUMN_SPACING[w.klass] ?? 0) > 0)) {
+    return [];
+  }
 
   const sites: ColumnSite[] = [];
   // Rule 3's accelerator: a hash grid at the separation radius, so the check is
@@ -2149,10 +2192,25 @@ export function deriveColumnLamps(
     }
     return false;
   };
+  const lampR2 = COLUMN_LAMP_RADIUS * COLUMN_LAMP_RADIUS;
+  const nearLamp = (x: number, z: number): boolean => {
+    if (litLamps === null) return false;
+    for (let i = 0; i < litLamps.length; i += LAMP_RECORD_STRIDE) {
+      const dx = litLamps[i] - x;
+      const dz = litLamps[i + 2] - z;
+      if (dx * dx + dz * dz < lampR2) return true;
+    }
+    return false;
+  };
 
   for (const way of ways) {
     const spacing = COLUMN_SPACING[way.klass] ?? 0;
     if (spacing <= 0) continue;
+    const arterial = way.klass <= COLUMN_ARTERIAL_MAX_CLASS;
+    if (denseTile && !arterial) continue;
+    // On a traffic route the surveyed *lamps* decide, not the poles; on a
+    // local street any pole does. See `COLUMN_ARTERIAL_MAX_CLASS`.
+    const taken = arterial ? nearLamp : nearPole;
     // The phase, so two parallel streets are not in step, and the side, so a
     // suburb of one-sided streets is not all lit from the north. Both off the
     // OSM id alone, which every tile holding a piece of this way agrees about.
@@ -2201,7 +2259,7 @@ export function deriveColumnLamps(
         for (const side of bothSides ? BOTH_KERBS : hashedSide > 0 ? RIGHT_KERB : LEFT_KERB) {
           const qx = px + nx * offset * side;
           const qz = pz + nz * offset * side;
-          if (nearPole(qx, qz)) continue;
+          if (taken(qx, qz)) continue;
           // Underground streets get nothing. See `COLUMN_TUNNEL_DEPTH`.
           if (groundAt !== null && py < groundAt(qx, qz) - COLUMN_TUNNEL_DEPTH) continue;
           if (!clear(qx, qz)) continue;
@@ -2668,7 +2726,7 @@ const BIKE_BEAM_DROP = 1.04;
  * car's level the whole lower third of the screen washed out the moment the
  * player mounted.
  */
-const BIKE_BEAM_LEVEL = 0.15;
+const BIKE_BEAM_LEVEL = 0.2;
 /** The lens: small, hot, and the thing you see at 300 m. */
 const BIKE_LENS_HALF = 0.075;
 const BIKE_LENS_LEVEL = 3.2;
@@ -5527,6 +5585,43 @@ export function verifyNightLights(): string[] {
         `what makes this pass tile-local and safe: it only ever sees one tile's poles, so a ` +
         `street on a tile seam in a pole-lit suburb would otherwise get a column beside a lamp ` +
         `line it cannot see. Check COLUMN_TILE_POLE_FLOOR.`,
+    );
+  }
+  // (c1) 2026-09-05, "more street lamps, esp on arterial roads": a primary road
+  //      through that same pole tile is lit anyway, at its own spacing, and a
+  //      surveyed luminaire on it still wins over a column on the same spot.
+  const primary = straightWay(14, 4, 0, 0, 600, 0);
+  const arterial = deriveColumnLamps([primary], dense, 0, 0);
+  const wantArterial = Math.floor(600 / COLUMN_SPACING[4]);
+  if (arterial.length < wantArterial - 1 || arterial.length > wantArterial + 1) {
+    failures.push(
+      `A 600 m primary road through a tile with ${dense.poleCount} poles derived ${arterial.length} ` +
+        `columns where ${wantArterial} were expected at ${COLUMN_SPACING[4]} m. Traffic routes are lit ` +
+        `whatever the side streets hang off -- see COLUMN_ARTERIAL_MAX_CLASS.`,
+    );
+  }
+  const litOnIt = new Float32Array(arterial.length * LAMP_RECORD_STRIDE);
+  for (let i = 0; i < arterial.length; i++) {
+    litOnIt[i * LAMP_RECORD_STRIDE] = arterial[i].x + 4;
+    litOnIt[i * LAMP_RECORD_STRIDE + 1] = arterial[i].y + 8;
+    litOnIt[i * LAMP_RECORD_STRIDE + 2] = arterial[i].z;
+  }
+  if (deriveColumnLamps([primary], dense, 0, 0, null, litOnIt).length !== 0) {
+    failures.push(
+      `With a surveyed luminaire 4 m from every one of its would-be columns, the primary road still ` +
+        `derived columns. A pole that carries a lamp on the arterial must win; check COLUMN_LAMP_RADIUS.`,
+    );
+  }
+  const litOffIt = new Float32Array(LAMP_RECORD_STRIDE);
+  litOffIt[0] = 300;
+  litOffIt[2] = COLUMN_LAMP_RADIUS + 40;
+  if (deriveColumnLamps([primary], dense, 0, 0, null, litOffIt).length !== arterial.length) {
+    failures.push('A luminaire well off the arterial changed how many columns it got.');
+  }
+  if (deriveColumnLamps([primary, straightWay(15, 10, 0, 200, 600, 200)], dense, 0, 0).length !== arterial.length) {
+    failures.push(
+      'A residential street in the same dense pole tile derived columns beside the arterial; rule 1 ' +
+        'still binds every class that is not a traffic route.',
     );
   }
   const stray = emptyPower(2, () => [300, 0]);

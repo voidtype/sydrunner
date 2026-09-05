@@ -4310,6 +4310,9 @@ export class TileStreamer implements LampSource {
           // World in, terrain out. `groundAt` above is tile-local like
           // everything else the build places, and a way's coordinates are not.
           (x, z) => groundAt(x - group.position.x, z - group.position.z),
+          // The pole lamps this tile already lit, so a traffic route's columns
+          // stand clear of them. See `COLUMN_ARTERIAL_MAX_CLASS`.
+          lamps,
         );
         if (sites.length > 0) {
           const built = buildTileColumnLamps(sites, this.streetLamps, group.position.x, group.position.z);
