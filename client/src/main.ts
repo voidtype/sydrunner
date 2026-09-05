@@ -2855,7 +2855,7 @@ async function main(): Promise<void> {
       // see `rail-geo.setAccessPlans` for the bug that came of two copies.
       setAccessPlans(stationBoxes);
       setStationPlans(stationBoxes);
-      stationLampRecords = buildStationLampRecords(lampRooms(stationBoxes.boxes));
+      stationLampRecords = buildStationLampRecords(lampRooms(stationBoxes.boxes), stationBoxes.plans);
       // The hole in the street each way in goes down through, on the same
       // plans. See `riding.accessCutAt`. No ground sampler yet at this point
       // of the boot, so the carve length is the geometric estimate;
@@ -4967,7 +4967,7 @@ async function main(): Promise<void> {
     const before = stationBoxes;
     stationBoxes = buildStationBoxes(railBake, world);
     setAccessPlans(stationBoxes);
-    stationLampRecords = buildStationLampRecords(lampRooms(stationBoxes.boxes));
+    stationLampRecords = buildStationLampRecords(lampRooms(stationBoxes.boxes), stationBoxes.plans);
     // The painted lamps hang off the same rooms, and a room's ceiling is read
     // off the terrain, so the table follows the field. See `TunnelLights.setField`.
     tunnelLights?.setField(buildTunnelLamps(railBake, lampRooms(stationBoxes.boxes)));

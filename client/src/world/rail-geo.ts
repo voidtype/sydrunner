@@ -110,6 +110,9 @@
 import { stationAccessPlan, ACCESS_OVERLAP_M, ACCESS_APRON_M, accessCutLength, roomCeilY, concourseY, windOutward, type AccessPlan, type AccessWorld, type Vec3,
   ACCESS_HALF_W,
   ACCESS_HEIGHT_M,
+  accessStair,
+  stairTreads,
+  accessHeadhouse,
 } from '../game/riding.ts';
 
 /**
@@ -1900,6 +1903,14 @@ export class RailWorld {
             if (!uv) return;
             // The platform blade, for the person already on the platform.
             if (!underground) writeSign(signs, concrete, station, uv);
+            // Underground there is no platform to stand a blade over and the
+            // board below is out at the site, which at Wynyard is a block from
+            // the mouth. The name goes on the headhouse lintel instead, where
+            // the decision to go down is actually taken. See `writeMouthSign`.
+            else {
+              const mouthPlan = accessPlans?.planFor(station.name) ?? null;
+              if (mouthPlan !== null) writeMouthSign(signs, mouthPlan, uv);
+            }
             // And the board, for the person in the street who does not yet know
             // there is a station here. See `writeStationBoard`: reported as
             // "there is no sign for the train station", and the platform blade
@@ -4389,17 +4400,79 @@ function writeUndergroundStation(
     const [p, q, r, t] = windOutward(inclineInside, a, b, c, d);
     lining.quad(...p, ...q, ...r, ...t);
   };
-  for (const dy of [0, H]) {
-    inclineShell(at(d0, -HW, yAt(d0) + dy), at(d0, HW, yAt(d0) + dy), at(d1, HW, yAt(d1) + dy), at(d1, -HW, yAt(d1) + dy));
+  // The ceiling, which is a soffit and stays a plane -- a real stair's does.
+  // **The floor is not drawn here any more**: it was the second quad of this
+  // loop, and it was the ramp. See the flight below.
+  inclineShell(at(d0, -HW, yAt(d0) + H), at(d0, HW, yAt(d0) + H), at(d1, HW, yAt(d1) + H), at(d1, -HW, yAt(d1) + H));
+  // **And the flight that replaces it.** The owner: *"the stairs on a station
+  // entrance dont actually look like stairs its just a ramp"*. It was a ramp:
+  // one quad from the mouth to the foot, and the box under it leaned by one
+  // number.
+  //
+  // `riding.stairTreads` is the same enumeration `StationBoxField.floorAt`
+  // stands feet on, so there is exactly one flight here, not a drawing of one.
+  // Two quads a riser -- the tread and the riser face -- on `concrete` rather
+  // than the lining: `FrontSide`, so a tread's normal points up at the body
+  // above it and a riser's points back up the slope at the body descending, and
+  // twice the lining's albedo, which is what makes a step read as a step in a
+  // passage lit by one lamp at the mouth.
+  const stair = accessStair(plan);
+  const treads = stairTreads(stair);
+  for (let k = 0; k < treads.length; k++) {
+    const t = treads[k];
+    const yTop = plan.mouthY - t.drop;
+    // The tread, wound away from a point below it: normal up.
+    const belowT: Vec3 = [at((t.d0 + t.d1) / 2, 0, 0)[0], yTop - 1, at((t.d0 + t.d1) / 2, 0, 0)[2]];
+    {
+      const [p, q, r, s] = windOutward(
+        belowT,
+        at(t.d0, -HW, yTop), at(t.d0, HW, yTop), at(t.d1, HW, yTop), at(t.d1, -HW, yTop),
+      );
+      concrete.quad(...p, ...q, ...r, ...s);
+    }
+    // The riser under its downhill lip, wound away from a point below the
+    // *next* tread: normal back up the incline, at the descending body.
+    const yNext = k + 1 < treads.length ? plan.mouthY - treads[k + 1].drop : plan.floorY;
+    if (yTop - yNext > 1e-4) {
+      const belowR: Vec3 = [at(t.d1 + 1, 0, 0)[0], (yTop + yNext) / 2, at(t.d1 + 1, 0, 0)[2]];
+      const [p, q, r, s] = windOutward(
+        belowR,
+        at(t.d1, -HW, yNext), at(t.d1, HW, yNext), at(t.d1, HW, yTop), at(t.d1, -HW, yTop),
+      );
+      concrete.quad(...p, ...q, ...r, ...s);
+    }
+  }
+  // The flat pad behind the mouth and the flat at the foot, so the flight meets
+  // the street at one end and the tunnel at the other on a surface rather than
+  // on an edge.
+  {
+    const padBelow: Vec3 = [at(d0 / 2, 0, 0)[0], plan.mouthY - 1, at(d0 / 2, 0, 0)[2]];
+    const [p, q, r, s] = windOutward(
+      padBelow,
+      at(d0, -HW, plan.mouthY), at(d0, HW, plan.mouthY), at(0, HW, plan.mouthY), at(0, -HW, plan.mouthY),
+    );
+    concrete.quad(...p, ...q, ...r, ...s);
+    const footBelow: Vec3 = [at(plan.inclineM + 1, 0, 0)[0], plan.floorY - 1, at(plan.inclineM + 1, 0, 0)[2]];
+    const [a, b, c, e] = windOutward(
+      footBelow,
+      at(plan.inclineM, -HW, plan.floorY), at(plan.inclineM, HW, plan.floorY),
+      at(d1, HW, plan.floorY), at(d1, -HW, plan.floorY),
+    );
+    concrete.quad(...a, ...b, ...c, ...e);
   }
   // The side walls -- and **the way out of them**. The tunnel leaves the
   // incline sideways at the foot, so the wall it leaves through is drawn in two
   // pieces with its doorway between them; the other is solid for the full run.
   const tunSide = plan.tunDirX * nx + plan.tunDirZ * nz >= 0 ? 1 : -1;
   const foot = plan.inclineM;
+  // Down to the plane less `stair.dip`, not to the plane: a flight with a
+  // landing in it runs steeper than the plane between its landings and falls as
+  // much as half a metre behind, and a wall that stopped at the plane would show
+  // a slot of nothing along the foot of every flight. See `AccessStair.dip`.
+  const sill = stair.dip;
   const wallSeg = (sgn: number, da: number, db: number): void => {
     if (!(db - da > 1e-3)) return;
-    inclineShell(at(da, HW * sgn, yAt(da)), at(db, HW * sgn, yAt(db)), at(db, HW * sgn, yAt(db) + H), at(da, HW * sgn, yAt(da) + H));
+    inclineShell(at(da, HW * sgn, yAt(da) - sill), at(db, HW * sgn, yAt(db) - sill), at(db, HW * sgn, yAt(db) + H), at(da, HW * sgn, yAt(da) + H));
   };
   for (const sgn of [-1, 1]) {
     if (sgn !== tunSide) {
@@ -4420,8 +4493,27 @@ function writeUndergroundStation(
     at(d1, -HW, yAt(d1)), at(d1, HW, yAt(d1)),
     at(d1, HW, yAt(d1) + H), at(d1, -HW, yAt(d1) + H),
   );
-  // Its lid from above, on concrete, so the street over it is not a hole.
-  concrete.quad(...at(d0, -HW, yAt(d0) + H), ...at(d1, -HW, yAt(d1) + H), ...at(d1, HW, yAt(d1) + H), ...at(d0, HW, yAt(d0) + H));
+  // **Its lid from above, on concrete, and it was facing the wrong way.**
+  //
+  // The comment on this line has always said "so the street over it is not a
+  // hole", and the quad was wound `(-HW at d0), (-HW at d1), (HW at d1),
+  // (HW at d0)` -- which is the order whose normal points *down*. `concrete` is
+  // `FrontSide`, so from the street there was nothing there: the passage lid
+  // stands 4.2 m proud of the pavement at the mouth and every one of its
+  // triangles was culled for the only eye that could ever see it. That is the
+  // second half of the report, exactly: *"from the outside it has no roof"*.
+  //
+  // It is the pair-winding mistake this file's own `windOutward` was written
+  // for, one more time, so it is fixed the way that says it cannot come back:
+  // wound away from a point under the lid, which is where the passage is.
+  {
+    const under: Vec3 = [at(dMid, 0, 0)[0], yAt(dMid), at(dMid, 0, 0)[2]];
+    const [p, q, r, s] = windOutward(
+      under,
+      at(d0, -HW, yAt(d0) + H), at(d0, HW, yAt(d0) + H), at(d1, HW, yAt(d1) + H), at(d1, -HW, yAt(d1) + H),
+    );
+    concrete.quad(...p, ...q, ...r, ...s);
+  }
   // The tunnel from the foot into the room, flat at the floor.
   const tx = -plan.tunDirZ;
   const tz = plan.tunDirX;
@@ -4445,24 +4537,51 @@ function writeUndergroundStation(
   for (const sgn of [-1, 1]) {
     tunnelShell(tat(HW, HW * sgn, plan.floorY), tat(t1, HW * sgn, plan.floorY), tat(t1, HW * sgn, plan.floorY + H), tat(HW, HW * sgn, plan.floorY + H));
   }
-  concrete.quad(...tat(t0, -HW, plan.floorY + H), ...tat(t1, -HW, plan.floorY + H), ...tat(t1, HW, plan.floorY + H), ...tat(t0, HW, plan.floorY + H));
-  // The entrance on the street: a portal frame over the mouth, open toward
-  // the street and into the incline, and a totem beside it a player can see
-  // from a block away -- a 6 m post with a panel in the rail orange, which
-  // is the one colour every Sydneysider reads as "train".
-  const w = HW + 0.6;
-  const y = plan.mouthY;
-  for (const sgn of [-1, 1]) {
-    // a pier each side of the mouth
-    const c = at(0, (HW + 0.3) * sgn, y);
-    concrete.box(c[0] - 0.3, y, c[2] - 0.3, c[0] + 0.3, y + 3.4, c[2] + 0.3);
+  // The link's lid, wound away from under it for the incline lid's reason: the
+  // same order, the same downward normal, and the same claim in the comment
+  // that it is there to be seen from above.
+  {
+    const under: Vec3 = [tat(tMid, 0, 0)[0], plan.floorY, tat(tMid, 0, 0)[2]];
+    const [p, q, r, s] = windOutward(
+      under,
+      tat(t0, -HW, plan.floorY + H), tat(t0, HW, plan.floorY + H), tat(t1, HW, plan.floorY + H), tat(t1, -HW, plan.floorY + H),
+    );
+    concrete.quad(...p, ...q, ...r, ...s);
   }
-  // the lintel, as a thin slab across the piers
-  const l0 = at(0, -w, y);
-  const l1 = at(0, w, y);
-  concrete.box(Math.min(l0[0], l1[0]) - 0.3, y + 3.4, Math.min(l0[2], l1[2]) - 0.3, Math.max(l0[0], l1[0]) + 0.3, y + 3.8, Math.max(l0[2], l1[2]) + 0.3);
+  // **The entrance on the street: a headhouse, which is a building.** It was
+  // two piers and a slab across them -- the frame of an entrance with the
+  // entrance left out -- and from the footpath the report was
+  // *"from the outside it has no roof"*: past the frame, an open rectangular
+  // trench with a ramp in it.
+  //
+  // So: two side walls just clear of the passage, a roof over the whole of the
+  // open cut (`HEADHOUSE_RUN_M` is `accessCutLength`'s own answer rounded up), a
+  // lintel across the front carrying the name, and the totem it always had.
+  // Open at the front and open downward, which is what
+  // makes it an entrance; `riding.accessHeadhouse` is every number in it, and
+  // `verifyStationAccess` asserts the opening is the passage's own width, the
+  // soffit is over a head, and nothing here stands in the doorway plane.
+  //
+  // Drawn only. Nothing here is registered, which is what keeps
+  // `server/underground-check.ts` walking in through the front of it -- a
+  // prism over a mouth is the exact condition that check fails a station for.
+  const y = plan.mouthY;
+  const house = accessHeadhouse(plan);
+  const mf: TrackFrame = { x: plan.mouthX, z: plan.mouthZ, ux: plan.dirX, uz: plan.dirZ };
+  for (const sgn of [-1, 1]) {
+    const o0 = house.clearHalfW * sgn;
+    const o1 = house.wallHalfW * sgn;
+    frameBox(concrete, mf, house.front, house.back, Math.min(o0, o1), Math.max(o0, o1), house.baseY, house.soffitY);
+  }
+  // The roof, over both walls and the opening between them.
+  frameBox(concrete, mf, house.front, house.back, -house.roofHalfW, house.roofHalfW, house.soffitY, house.roofY);
+  // The lintel across the front, which is the face the name goes on.
+  frameBox(
+    concrete, mf, house.lintelD, house.lintelD + house.lintelDepth,
+    -house.roofHalfW, house.roofHalfW, house.lintelY, house.roofY,
+  );
   // the totem
-  const tpost = at(-2.5, w + 1.2, y);
+  const tpost = at(-2.5, house.roofHalfW + 1.2, y);
   concrete.box(tpost[0] - 0.18, y, tpost[2] - 0.18, tpost[0] + 0.18, y + 6.2, tpost[2] + 0.18);
   signs.box(tpost[0] - 0.9, y + 4.6, tpost[2] - 0.9, tpost[0] + 0.9, y + 6.2, tpost[2] + 0.9);
 
@@ -4515,6 +4634,36 @@ function writeUndergroundStation(
       else concrete.quad(p1[0], p1[1], p1[2], p0[0], p0[1], p0[2], q0[0], q0[1], q0[2], q1[0], q1[1], q1[2]);
     }
   }
+}
+
+/**
+ * The station name on the headhouse lintel, for the person on the footpath.
+ *
+ * An underground station has no platform for `writeSign`'s blade to stand over
+ * and its `writeStationBoard` masts are out at the *site* -- which at Wynyard is
+ * seventy-eight metres from the mouth, on the other side of a block. The mouth
+ * is where somebody actually decides to go down, so the mouth gets the name, on
+ * the one flat face the headhouse has facing the street.
+ *
+ * Two quads back to back with the U range reversed, which is `writeSign`'s rule
+ * and its reason: a `DoubleSide` plate shows the same UVs from behind and
+ * renders the name in mirror writing to everybody standing under the canopy.
+ */
+function writeMouthSign(signs: Solid, plan: AccessPlan, uv: readonly number[]): void {
+  const house = accessHeadhouse(plan);
+  const mf: TrackFrame = { x: plan.mouthX, z: plan.mouthZ, ux: plan.dirX, uz: plan.dirZ };
+  // A hair proud of the lintel's own face, so the two do not fight for the
+  // same fragment, and inset from its ends so it reads as a plate on a beam.
+  const d = house.lintelD - 0.02;
+  const w = house.roofHalfW - 0.35;
+  const y0 = house.lintelY + 0.1;
+  const y1 = house.roofY - 0.12;
+  const a = framePoint(mf, d, -w, y0);
+  const b = framePoint(mf, d, w, y0);
+  const c = framePoint(mf, d, w, y1);
+  const e = framePoint(mf, d, -w, y1);
+  signs.quad(...a, ...b, ...c, ...e, [uv[0], uv[1], uv[2], uv[1], uv[2], uv[3], uv[0], uv[3]]);
+  signs.quad(...b, ...a, ...e, ...c, [uv[0], uv[1], uv[2], uv[1], uv[2], uv[3], uv[0], uv[3]]);
 }
 
 /** The station name on a blade, with two posts, at the platform's own end. */
