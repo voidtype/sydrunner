@@ -3514,6 +3514,11 @@ async function checkTraffic(): Promise<void> {
     let speed = 0;
     let rehit = true;
     let heading = 0;
+    // The car that actually landed the hit, kept past the loop. `carHitting`
+    // fills a pose the loop allocates per iteration, so the assertions below
+    // hold their own copy rather than a reference that the next route rewrites.
+    const hitPose = one.createCarPose();
+    let carSpeed = 0;
     for (const route of routes) {
       if (placed) break;
       const slot = Math.floor((now - route.phase) / route.headway);
@@ -3532,6 +3537,8 @@ async function checkTraffic(): Promise<void> {
       if (one.carHitStrength(car) !== 1) continue;
       placed = true;
       heading = Math.sqrt(car.dx * car.dx + car.dz * car.dz);
+      Object.assign(hitPose, car);
+      carSpeed = car.speed;
       ko = one.applyCarHit(victim, car);
       health = victim.health;
       speed = Math.sqrt(
@@ -3548,10 +3555,22 @@ async function checkTraffic(): Promise<void> {
         health === 3 - one.CAR_DAMAGE && !ko,
         `being run down took exactly ${one.CAR_DAMAGE} pip (3 -> ${health})`,
       );
+      // `carThrowSpeed` rather than the flat `CAR_KNOCKBACK_HORIZONTAL` this
+      // used to name, which is the pass-through fix arriving here: on a real
+      // Sydney street the car is doing 11.1 to 22.2 m/s and a flat 10.5 m/s
+      // throw meant the car overtook the body it had just hit and was drawn
+      // driving through it. See `traffic.CAR_CLEAR_SPEED`.
       check(
-        Math.abs(speed - one.CAR_KNOCKBACK_HORIZONTAL) < 1e-9,
-        `it threw them at exactly ${one.CAR_KNOCKBACK_HORIZONTAL} m/s along the car's heading ` +
+        Math.abs(speed - one.carThrowSpeed(hitPose)) < 1e-9,
+        `it threw them at exactly ${one.carThrowSpeed(hitPose).toFixed(2)} m/s along the car's heading, ` +
+          `which is the ${carSpeed.toFixed(2)} m/s the car was doing plus the clearance ` +
           `(measured ${speed.toFixed(6)}, heading is a unit vector to ${Math.abs(1 - heading).toExponential(1)})`,
+      );
+      // And the property that expression exists for, stated in its own right.
+      check(
+        speed > carSpeed,
+        `and that is faster than the ${carSpeed.toFixed(2)} m/s the car itself was doing, so the car ` +
+          'cannot overtake the body it just threw -- which is the whole of the reported bug',
       );
       check(!rehit, 'a victim still in the car flinch cannot be run down again on the same tick');
     }
@@ -3619,8 +3638,20 @@ async function checkTraffic(): Promise<void> {
             );
             if (thrown > worstRampSpeed) worstRampSpeed = thrown;
             if (thrown < gentlestRampSpeed) gentlestRampSpeed = thrown;
-            // Strictly gentler than a run-down and strictly more than nothing.
-            if (!(thrown > 0) || thrown >= one.CAR_KNOCKBACK_HORIZONTAL) rampOutside++;
+            // Strictly gentler than a run-down, and strictly faster than the car
+            // giving the shove.
+            //
+            // The ceiling is derived rather than named: a car on the ramp is by
+            // definition under `CAR_HIT_FULL_SPEED`, so `carThrowSpeed` cannot
+            // return more than that plus the clearance, and every driving class
+            // in `lanes.FREE_SPEED` runs at 11.1 or better -- so this bound is
+            // below the throw of any car actually on its timetable, which is what
+            // "gentler than a run-down" means now that the run-down is not a
+            // single number. The floor is the new invariant: even a kerb crawl
+            // must leave the body in front of the bumper. See
+            // `traffic.CAR_CLEAR_SPEED`.
+            const rampCeiling = one.CAR_HIT_FULL_SPEED + one.CAR_CLEAR_SPEED;
+            if (!(thrown > probe.speed) || thrown > rampCeiling + 1e-9) rampOutside++;
           }
         }
       }
@@ -3638,10 +3669,11 @@ async function checkTraffic(): Promise<void> {
     );
     check(
       rampTried > 0 && rampOutside === 0,
-      `${rampTried} cars caught mid-ramp all threw a victim strictly between nothing and a run-down: ` +
-        `${gentlestRampSpeed.toFixed(2)} to ${worstRampSpeed.toFixed(2)} m/s against the full ` +
-        `${one.CAR_KNOCKBACK_HORIZONTAL} -- the scale is continuous, so a car easing out of a bay tips ` +
-        'you over and a car most of the way up to speed still throws you',
+      `${rampTried} cars caught mid-ramp all threw a victim faster than they were themselves going and ` +
+        `no harder than a car at the full-speed threshold: ${gentlestRampSpeed.toFixed(2)} to ` +
+        `${worstRampSpeed.toFixed(2)} m/s against the ${(one.CAR_HIT_FULL_SPEED + one.CAR_CLEAR_SPEED).toFixed(1)} ` +
+        'ceiling -- the scale is continuous, so a car easing out of a bay tips you over and a car most of ' +
+        'the way up to speed still throws you',
     );
   }
 

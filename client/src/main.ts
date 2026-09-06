@@ -11826,6 +11826,14 @@ async function main(): Promise<void> {
         const car = carHitting(traffic, f.combat, tick, carRoutes, carPose, drivenCars.suppress);
         if (car === null) continue;
         const ko = applyCarHit(f.combat, car);
+        // And the net layer is told, on the same terms `predictedBikeChange` and
+        // `predictedCarChange` are told: here, inside the fixed step, so the seq
+        // it stamps is the one `net.sendInput` at the foot of this step is about
+        // to allocate. `NetClient.predictedCarHit` states what it is for -- the
+        // one predicted thing in this game whose cause is the wall clock rather
+        // than a key, so the two ends fire it together and file it under
+        // different seqs, and the reconciler needs telling which.
+        if (net !== null && f.combat === playerCombat) net.predictedCarHit();
         carHits.count++;
         carHits.lastTick = tick;
         audio.thwack(ko);
