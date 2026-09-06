@@ -52,6 +52,10 @@ import {
  * a spawn bug while testing the spawn.
  *
  * The cost of the headroom is one allocation of empty matrices, once.
+ *
+ * At the 2026-09-05 rate of 1 in 50 the entire circle carries about 1,050 --
+ * measured over the shipped tiles, not estimated -- so this still holds it all
+ * with room, and a resident ring is a third of that.
  */
 export const CAPACITY = 12288;
 

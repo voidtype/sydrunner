@@ -12,10 +12,12 @@
  * one you walked onto; the server, handed the same tile and index, can say
  * whether it is really there and really that colour before it poisons anybody.
  *
- * `SPAWN_RATE` is the owner's number: 5 trees in ten thousand. Over the bushland
- * inside `REGION_RADIUS_M` of the anchor that is a few hundred across a forest
- * you can walk for twenty minutes in, which is the density he asked for -- rare
- * enough to be a find, common enough to be a habit.
+ * `SPAWN_RATE` is the owner's number. It was 5 trees in ten thousand, and a
+ * census of the shipped world (2026-09-05) put that at about thirty mushrooms
+ * across 53,276 trees in the circle -- one a square kilometre of bush, with
+ * nothing in the game pointing at the park. His answer was "make it 1 in 50
+ * trees", which is roughly a thousand a session: still a find under any one
+ * gum, and a forest you can actually pick in.
  *
  * **They move between visits and that is deliberate.** The hash takes an
  * `epoch`, and a client rolls a fresh one per session, so a patch you cleared on
@@ -62,7 +64,7 @@ export const REGION_RADIUS_M = 3000;
  * stays beside it so the next round raises this line and puts it back from the
  * same place rather than typing a number twice.
  */
-export const SPAWN_RATE = 0.0005;
+export const SPAWN_RATE = 1 / 50;
 
 /** What `SPAWN_RATE` goes to for a testing round, so a walk finds them. */
 export const TESTING_SPAWN_RATE = 0.05;
