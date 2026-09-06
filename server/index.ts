@@ -205,6 +205,7 @@ import { verifyStreetlife } from '../client/src/game/streetlife.ts';
 // since the pursuit shipped and has never run here -- on this side of the wire,
 // where the shot is actually adjudicated. See the list below.
 import { verifyPolice } from '../client/src/game/factions.ts';
+import { verifyRoadDeck } from '../client/src/world/road-deck.ts';
 import { verifyEvents } from '../client/src/game/events.ts';
 import { verifyWallet } from './wallet-contract.ts';
 import { verifyTeleport } from '../client/src/game/teleport.ts';
@@ -781,6 +782,13 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // prediction of a pursuit from this process's authority for as long as the
     // pursuit lasts. Only this side booting the check makes that a gate.
     ['verifyPolice', verifyPolice()],
+    // And the surfaces the police walk on, which this process now hands them:
+    // `Sim`'s `FactionCtx.roads` is `world.roads`, so `RoadDeck.standingOn` runs
+    // here on every dispatched body and its band is what keeps one on a bridge
+    // instead of under it. The browser has run this check since the deck landed
+    // and this side never did -- `PREAMBLE`'s rule that a `verify*` belongs in
+    // both boot lists, applied the day the server acquired a caller.
+    ['verifyRoadDeck', verifyRoadDeck()],
     ['verifyEvents', verifyEvents()],
     ['verifyWallet', verifyWallet()],
     // The money. Four checks rather than one, because they are four different

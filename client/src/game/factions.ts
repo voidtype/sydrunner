@@ -1308,6 +1308,39 @@ export interface FactionCtx {
   dt: number;
   collision: CollisionWorld | null;
   groundHeight(x: number, z: number, feetY: number): number;
+  /**
+   * The paved surfaces, so a body that is walking on one stays on it.
+   *
+   * ---------------------------------------------------------------------------
+   * WHY THIS IS A FIELD ON THE CONTEXT AND NOT A LAYER INSIDE `groundHeight`.
+   *
+   *   > *"the cops walking floating below the streets"*
+   *
+   * Every ambient body in this city is placed at `pedestrians.PedBand.y`, which
+   * is the lane sidecar's solved running surface plus thirteen centimetres --
+   * the very height the client draws the road ribbon at, so an officer standing
+   * on the Bradfield Highway is on the Bradfield Highway. `groundHeight` is
+   * `server/world.groundFor`, which is terrain, platforms, collision roofs,
+   * station boxes and the rail cut, and **has never heard of a road deck**. So
+   * the officer was correct until they took a step, and `walkToward` then put
+   * them wherever the DEM says the harbour is.
+   *
+   * It is not folded into `groundHeight` itself because that closure is the
+   * *player's* ground on both ends -- the one `main.ts` and `server/world.ts`
+   * hold at parity over hundreds of thousands of samples -- and a body on a
+   * street is not the same question as a body anywhere. `footGround` composes
+   * the two here, where the only callers are the three `walkToward`s, and
+   * `world/road-deck.RoadDeck.standingOn` carries the argument for the band it
+   * answers in.
+   *
+   * **Structural rather than the class**, as everything this module reaches for
+   * is: `road-deck.ts` imports nothing and is imported by both authorities, and
+   * a `RoadDeck` named here would tie the faction rules to a constructor they
+   * never call. `null` is the honest answer for a process that has not read a
+   * street -- every check in `server/` that stands an actor up on a flat world
+   * passes it -- and the ground is then exactly what it was before this field.
+   */
+  roads: { standingOn(x: number, z: number, groundY: number, feetY: number): number } | null;
   /** The footpaths, for ambient placement and for a beat to walk back to. */
   peds: PedestrianField | null;
   /** Every combatant an actor may consider. Ascending id; the tick order. */
@@ -3280,6 +3313,38 @@ function segmentToCapsule(
 // --- The police themselves --------------------------------------------------------
 
 /**
+ * The ground under a body **on its feet in the street**, which is not the same
+ * question as the ground under a body.
+ *
+ * ---------------------------------------------------------------------------
+ * One function, exported, and every one of the three `walkToward`s in this
+ * project calls it -- this file's, `game/streetlife.ts`' and
+ * `game/characters.ts`' -- because the alternative is the same two lines written
+ * three times and drifting, which is how the meth heads and the police ended up
+ * with different answers to the ped-hit question two rounds ago.
+ *
+ * `ctx.roads` is asked **after** the ground and its answer is `Math.max`ed with
+ * it rather than replacing it, which is the opposite of the platform clause in
+ * `server/world.groundFor` and the difference is real: a platform can be metres
+ * *below* the terrain grid and asphalt never is, because the terrain was
+ * conformed onto it. So the max is safe, and it is what keeps a body standing on
+ * a warehouse roof over a laneway on the roof.
+ *
+ * `RoadDeck.standingOn` is a band and not a maximum -- see it -- so a body under
+ * a viaduct gets nothing from this and stands on the street, and a body on the
+ * viaduct gets the deck. That band is the whole fix and it is one file over.
+ */
+export function footGround(ctx: FactionCtx, x: number, z: number, feetY: number): number {
+  const g = ctx.groundHeight(x, z, feetY);
+  if (ctx.roads === null) return g;
+  // The ground the paving is draped on is the one this caller just computed:
+  // `road-deck.PAVING_RISE_M` says why a second opinion sampled somewhere else
+  // is the wrong number to hand it.
+  const paved = ctx.roads.standingOn(x, z, g, feetY);
+  return paved > g ? paved : g;
+}
+
+/**
  * How an officer moves: toward a point, at a speed, sliding off buildings.
  *
  * Resolved against the prisms with the player's own `CollisionWorld.resolve`,
@@ -3308,7 +3373,7 @@ function walkToward(actor: NpcActor, tx: number, tz: number, speed: number, ctx:
   }
   actor.x = nx;
   actor.z = nz;
-  actor.y = ctx.groundHeight(nx, nz, actor.y);
+  actor.y = footGround(ctx, nx, nz, actor.y);
   return d;
 }
 
@@ -3624,6 +3689,39 @@ export const POLICE = registerNpcKind({
  */
 export function verifyPolice(kitTriangles?: number, snapshotInterval?: number): string[] {
   const failures: string[] = [];
+
+  // --- The ground a dispatched body gets. See `footGround` and `FactionCtx.roads`.
+  //
+  // Four cases and each is a different way the composition could be wrong while
+  // every other check in this file passed: with no deck at all the answer must
+  // be the ground exactly (the world every check in `server/` stands an actor up
+  // in); on a deck it must be the deck; under one it must be the ground; and
+  // where the ground is *higher* than the paving -- a body on a warehouse roof
+  // over a laneway -- it must stay on the roof, which is the whole reason this
+  // is a max rather than a replacement. `world/road-deck.verifyRoadDeck` covers
+  // the band itself; this covers the two lines that use it.
+  {
+    const at = (ground: number, paved: number) => ({
+      groundHeight: () => ground,
+      roads: { standingOn: () => paved },
+    } as unknown as FactionCtx);
+    const bare = { groundHeight: () => 7, roads: null } as unknown as FactionCtx;
+    if (footGround(bare, 0, 0, 7) !== 7) {
+      failures.push('With no carriageways a dispatched body no longer stands on the plain ground.');
+    }
+    if (footGround(at(-65, -22), 0, 0, -22) !== -22) {
+      failures.push(
+        'A body on a deck 43 m over the ground under it is given the ground: this is the report ' +
+          '"the cops walking floating below the streets", and it is back.',
+      );
+    }
+    if (footGround(at(-65, -Infinity), 0, 0, -65) !== -65) {
+      failures.push('A body under a deck is not left on the street it is walking on.');
+    }
+    if (footGround(at(12, 3), 0, 0, 12) !== 12) {
+      failures.push('Paving under a body\'s ground replaces it; a body on a roof is dropped to the lane.');
+    }
+  }
 
   // --- A shot has to survive the snapshot rate. See `FIRE_STATE_TICKS`.
   if (snapshotInterval !== undefined && FIRE_STATE_TICKS < snapshotInterval) {
@@ -4140,6 +4238,8 @@ function verifyArmedAtTwoStars(): string[] {
       dt: 1 / 60,
       collision: null,
       groundHeight: () => 0,
+      // A flat world with no streets in it: the ground is the ground. See `FactionCtx.roads`.
+      roads: null,
       peds: null,
       combatants: [suspect],
       field,

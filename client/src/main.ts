@@ -4638,6 +4638,11 @@ async function main(): Promise<void> {
       dt,
       collision,
       groundHeight: groundHeightAt,
+      // The carriageways this browser has streamed, so an offline officer who is
+      // walking a bridge stays on it. `server/sim.ts` hands its own copy of the
+      // same field, built from the same sidecar bytes -- see `FactionCtx.roads`,
+      // and `world/road-deck.RoadDeck.standingOn` for the band it answers in.
+      roads: roadDeck,
       peds: pedestrians,
       combatants,
       field: factions,

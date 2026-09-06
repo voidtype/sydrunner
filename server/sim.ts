@@ -1501,6 +1501,12 @@ export class Simulation {
       dt: FIXED_DT,
       collision: world.collision,
       groundHeight: (x, z, feet) => this.factionWorld.groundHeight(x, z, feet),
+      // The carriageways, so a dispatched body stays on the one it was standing
+      // on. The whole extent here and a streamed ring in the browser, off the
+      // identical `.lanes.bin` bytes -- see `factions.FactionCtx.roads` for why
+      // this is beside `groundHeight` rather than inside it, and
+      // `world/road-deck.RoadDeck.standingOn` for the band it answers in.
+      roads: world.roads ?? null,
       peds: world.peds,
       combatants: this.combatants,
       field: this.factions,

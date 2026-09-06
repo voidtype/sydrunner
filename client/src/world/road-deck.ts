@@ -182,6 +182,27 @@ const MIN_PAVING_HALF_M = 1.0;
  */
 export const DECK_CARRIES_GROUND_M = 1.5;
 
+/**
+ * How far over a body's feet paving may be and still be what it is standing on.
+ *
+ * `player/controller.STEP_HEIGHT`, and `game/riding.PLATFORM_STEP_M` is the same
+ * number restated for the same reason: a surface within one step is a surface
+ * you are on, because the controller would carry you onto it without a jump.
+ * See `RoadDeck.standingOn`.
+ */
+export const PAVED_STEP_M = 0.42;
+
+/**
+ * And how far under them.
+ *
+ * `game/riding.PLATFORM_REACH_M`, restated: a standing jump apexes at 1.12 m, so
+ * 1.6 m is that plus margin. It is the number that separates *"on the bridge"*
+ * from *"on the street the bridge crosses"*, and it wants to be as small as it
+ * can be while still covering an actor mid-hop -- `decks.MIN_ROAD_CLEARANCE_M`
+ * is 5.0 m, so the nearest thing this could be confused by is three times away.
+ */
+export const PAVED_REACH_M = 1.6;
+
 /** The grid cell strips are filed into, metres. `rail-cut.CELL_M`'s twin. */
 const CELL_M = 64;
 
@@ -474,6 +495,112 @@ export class RoadDeck {
   }
 
   /**
+   * The paved surface **nearest a height**, or `NaN` where nothing is paved.
+   *
+   * ---------------------------------------------------------------------------
+   * WHY A THIRD QUESTION, WHEN `deckAt` ALREADY WALKS THIS LIST.
+   *
+   * `deckAt` takes the maximum, and its header says why: at an interchange the
+   * ground has to be kept up at the top of the stack or the deck on top has a
+   * hole in it. That is the right answer to *"where must the ground not be
+   * carved"* and the wrong answer to *"what is this body standing on"*. A
+   * police officer walking Alfred Street under the Cahill is under a paved
+   * surface twelve metres up, and `deckAt` hands back the viaduct.
+   *
+   * So this asks the question a **body** asks, and it is the identical shape
+   * `game/riding.PlatformField.heightAt` settled on for the identical reason:
+   * 84 of the 288 platforms in the bake are *below* the terrain, so a max cannot
+   * find them and a caller has to say how high it already is. The nearest
+   * surface to `refY` is the one under this body's feet, whatever else is drawn
+   * over or under it.
+   *
+   * **Ties go to the higher surface**, which is not a coin toss: it is what
+   * keeps the answer independent of the order tiles were adopted in, which is
+   * the property the whole file is arranged around -- see the header. Two
+   * strips exactly equidistant from `refY` are a body standing between two
+   * decks; the one it would land on is the one it is standing on.
+   *
+   * `groundY` is required and means what it means in `deckAt`: the caller's own
+   * ground, because foot paving is draped and carries no height of its own. See
+   * `PAVING_RISE_M`.
+   */
+  pavedNear(x: number, z: number, groundY: number, refY: number): number {
+    const list = this.cells.get(cellKey(Math.floor(x / CELL_M), Math.floor(z / CELL_M)));
+    if (list === undefined) return Number.NaN;
+    const draped = groundY + PAVING_RISE_M;
+    const drapedKnown = Number.isFinite(draped);
+    let best = Number.NaN;
+    let bestGap = Infinity;
+    for (const s of list) {
+      if (s.draped && !drapedKnown) continue;
+      const ex = s.bx - s.ax;
+      const ez = s.bz - s.az;
+      const len2 = ex * ex + ez * ez;
+      let t = 0;
+      if (len2 > 1e-9) {
+        t = ((x - s.ax) * ex + (z - s.az) * ez) / len2;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+      }
+      const dx = x - (s.ax + ex * t);
+      const dz = z - (s.az + ez * t);
+      if (dx * dx + dz * dz > s.half * s.half) continue;
+      const y = s.draped ? draped : s.ay + (s.by - s.ay) * t;
+      const gap = y > refY ? y - refY : refY - y;
+      if (gap < bestGap || (gap === bestGap && y > best)) {
+        bestGap = gap;
+        best = y;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * The paved surface a body at `feetY` is **standing on**, or `-Infinity`.
+   *
+   * ---------------------------------------------------------------------------
+   * THE ONE THING THAT PUT THE POLICE UNDER THE STREET.
+   *
+   *   > *"the cops walking floating below the streets"*
+   *
+   * Every ambient body in this city -- an officer on a beat, a patrol pair, a
+   * walker, a drunk, a loiterer, a character -- has its height from
+   * `game/pedestrians.PedBand.y`, which is the lane sidecar's *solved running
+   * surface* plus thirteen centimetres. On a bridge that is the deck. The
+   * instant something dispatches one of them, `factions.walkToward` and its two
+   * twins replace that height with `groundHeight`, which is terrain, platforms,
+   * collision roofs, station boxes and the rail cut -- **and has never heard of
+   * a road deck**. The body is on the Bradfield Highway until it takes a step,
+   * and then it is on the water.
+   *
+   * This is the clause that closes it, and it is `PlatformField.heightAt`'s
+   * band said about asphalt rather than about a platform:
+   *
+   *   - more than `PAVED_STEP_M` above the feet, and the paving is a viaduct
+   *     overhead: you are walking *under* it and there is nothing here;
+   *   - more than `PAVED_REACH_M` below them, and you are on the deck and it is
+   *     the street below: nothing here either;
+   *   - between the two, you are standing on it, and its surface is your ground.
+   *
+   * The caller **maxes** this with the ground rather than letting it replace
+   * one, which is the opposite of what the platform clause asks for and the
+   * difference is that paving is never *below* the surface it is drawn on. A
+   * body on a kerb-height podium beside a footpath is standing on the podium;
+   * a max keeps it there, and a replacement would drop it into the gutter.
+   *
+   * `-Infinity` rather than `NaN` for "nothing here", because the caller is a
+   * `Math.max` and `NaN` poisons one. `deckAt`'s own contract is unchanged and
+   * must stay unchanged: `RailCut` asks it *"is asphalt drawn here"*, which is
+   * a question about the city and not about anybody standing in it.
+   */
+  standingOn(x: number, z: number, groundY: number, feetY: number): number {
+    if (!Number.isFinite(feetY)) return -Infinity;
+    const y = this.pavedNear(x, z, groundY, feetY);
+    if (!Number.isFinite(y)) return -Infinity;
+    if (y > feetY + PAVED_STEP_M || y < feetY - PAVED_REACH_M) return -Infinity;
+    return y;
+  }
+
+  /**
    * Is the paving here **standing on the ground**, rather than flying over it?
    *
    * ---------------------------------------------------------------------------
@@ -721,6 +848,66 @@ export function verifyRoadDeck(): string[] {
   gp.adoptPaving(new Float32Array([0, 0, 40, 0, 1]));
   if (!gp.carriesGroundAt(20, 0, -50)) {
     out.push('foot paving does not carry the ground it is draped on');
+  }
+
+  // 8. THE BODY'S QUESTION: `pavedNear` and `standingOn`, which is the pair the
+  //    police walk on. Two decks over one point -- `way` at 15 m and `upper` at
+  //    35 m at the midpoint -- because one surface can be got right by accident
+  //    and a stack cannot. See `pavedNear` and `standingOn`.
+  const stack = new RoadDeck();
+  stack.adopt('lo', [way]);
+  stack.adopt('hi', [upper]);
+  if (!(Math.abs(stack.deckAt(50, 0, G) - 35) < 1e-4)) {
+    out.push(`deckAt over a stack answers ${stack.deckAt(50, 0, G)}, not the top at 35`);
+  }
+  //    a. Nearest, not highest. A body on the lower deck is on the lower deck.
+  const low = stack.pavedNear(50, 0, G, 15.2);
+  if (!(Math.abs(low - 15) < 1e-4)) out.push(`a body at 15.2 m over a stack is nearest ${low}, not 15`);
+  const high = stack.pavedNear(50, 0, G, 34.5);
+  if (!(Math.abs(high - 35) < 1e-4)) out.push(`a body at 34.5 m over a stack is nearest ${high}, not 35`);
+  //    b. And it is order-independent, which is the property `deckAt` is
+  //       arranged around and this shares its list with.
+  const flipped = new RoadDeck();
+  flipped.adopt('hi', [upper]);
+  flipped.adopt('lo', [way]);
+  if (!Object.is(flipped.pavedNear(50, 0, G, 15.2), low)) {
+    out.push(`pavedNear depends on adoption order: ${flipped.pavedNear(50, 0, G, 15.2)} against ${low}`);
+  }
+  if (Number.isFinite(stack.pavedNear(50, 20, G, 15))) {
+    out.push('pavedNear answers off the ribbon');
+  }
+  //    c. The band. On it, a step under it, a jump over it, and the two rejects
+  //       either side -- the whole of what separates "on the bridge" from "on
+  //       the street the bridge crosses".
+  if (!(Math.abs(stack.standingOn(50, 0, G, 15) - 15) < 1e-4)) {
+    out.push('a body standing on the lower deck is not given it');
+  }
+  if (!(Math.abs(stack.standingOn(50, 0, G, 15 - PAVED_STEP_M + 0.01) - 15) < 1e-4)) {
+    out.push('a body one step under the deck is not given it, and every kerb is a wall');
+  }
+  if (stack.standingOn(50, 0, G, 15 - PAVED_STEP_M - 0.5) !== -Infinity) {
+    out.push('a body well under the deck is handed it, and walking under a viaduct lifts you onto it');
+  }
+  if (!(Math.abs(stack.standingOn(50, 0, G, 15 + PAVED_REACH_M - 0.01) - 15) < 1e-4)) {
+    out.push('a body mid-hop over the deck loses it');
+  }
+  if (stack.standingOn(50, 0, G, 15 + PAVED_REACH_M + 0.5) !== -Infinity) {
+    out.push('a body well over the deck is still standing on it');
+  }
+  if (stack.standingOn(50, 0, G, Number.NaN) !== -Infinity) {
+    out.push('standingOn answers a body whose height is unknown');
+  }
+  if (stack.standingOn(50, 20, G, 15) !== -Infinity) {
+    out.push('standingOn answers off the ribbon');
+  }
+  //    d. And the one that would put the police back under the street: a body on
+  //       the *upper* deck must be given the upper deck and not the lower one
+  //       twenty metres down, whichever way the tiles arrived.
+  if (!(Math.abs(stack.standingOn(50, 0, G, 35) - 35) < 1e-4)) {
+    out.push('a body on the upper deck of a stack is dropped to the lower one');
+  }
+  if (!(Math.abs(flipped.standingOn(50, 0, G, 35) - 35) < 1e-4)) {
+    out.push('a body on the upper deck is dropped to the lower one in the other adoption order');
   }
   return out;
 }
