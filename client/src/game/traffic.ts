@@ -316,7 +316,10 @@ import {
   CAPSULE_HEIGHT,
   CAPSULE_RADIUS,
   FLINCH_LOCKOUT,
-  HITSTOP,
+  // `HITSTOP` is deliberately **not** imported any more. `applyCarHit` used to
+  // set it and the header of that function argues out why a car must not: the
+  // import going away with the line is the point, so a future edit that wants
+  // the freeze back has to reach for it and read the argument on the way.
   KO_SECONDS,
   createCombatant,
   feetY,
@@ -441,7 +444,7 @@ const PAINT_MIX = [0.3, 0.45, 0.55, 0.7, 0.8, 0.88, 0.93, 1.0];
 // --- The knockdown -------------------------------------------------------------
 
 /**
- * What a car does to you, m/s.
+ * What a car does to you, m/s. **The floor, since the pass-through fix.**
  *
  * Just under `combat.KNOCKBACK_HORIZONTAL` (11.0) on purpose, and higher in the
  * vertical than a punch's 5.5. The bat is still the weapon: a car should throw
@@ -449,9 +452,89 @@ const PAINT_MIX = [0.3, 0.45, 0.55, 0.7, 0.8, 0.88, 0.93, 1.0];
  * standing in traffic becomes a better way to cross Pitt Street than running.
  * The extra lift is what makes it read as being hit by a car rather than as
  * being shoved by one -- you go over the bonnet.
+ *
+ * It used to be the whole answer and is now the smaller half of one; see
+ * `carThrowSpeed` for the arithmetic and for the report that changed it.
  */
 export const CAR_KNOCKBACK_HORIZONTAL = 10.5;
 export const CAR_KNOCKBACK_VERTICAL = 7.0;
+
+/**
+ * How much faster than the car that hit you, you leave, m/s.
+ *
+ * ---------------------------------------------------------------------------
+ * THE REPORT, AND WHY THIS NUMBER HAD TO EXIST AT ALL.
+ *
+ * *"when I get hit by a car the car mostly goes through me then the collision
+ * fires"*. Every unit check in this file passed on the code that produced that
+ * sentence, and so it should have: the geometry is right, the impulse is applied
+ * on the correct frame, and the two ends agree about which car and when.
+ * `server/carhit-check.ts` was written to find the network in it and did not
+ * find one -- on the old numbers the client and the server placed the body
+ * within a centimetre of each other through the whole knockdown, and the
+ * reconciler moved it by 2 cm. The bug was not in the timing. It was in the
+ * arithmetic, and it is one line long:
+ *
+ *     every car in this game drives faster than the knockback it imparts.
+ *
+ * `pipeline/sydney/lanes.FREE_SPEED` is the receipt. A residential street runs
+ * at 11.1 m/s, a secondary at 13.9, a trunk at 16.7, a motorway deck at 22.2 --
+ * and the throw was a flat 10.5. So the victim was launched *along the car's own
+ * lane, slower than the car*, and the car spent the next second driving through
+ * them from behind. At 22.2 m/s the whole 4.4 m body passes through a standing
+ * player before they are clear of it. There is no impulse direction that fixes
+ * that and no amount of prediction that hides it: a body thrown down a lane by
+ * something quicker than the throw cannot get out of the lane.
+ *
+ * So the throw is the car's own speed plus this, whenever that is the larger of
+ * the two. The rule stays one rule -- *you leave in front of the thing that hit
+ * you* -- and it stays learnable, which is what `CAR_KNOCKBACK_HORIZONTAL`'s
+ * "set, not added" argument was protecting: the distance still does not depend
+ * on how fast *you* were running, only on how fast the *car* was, which is the
+ * one thing a player can see coming.
+ *
+ * One consequence, recorded because it caught the round that made this change:
+ * a throw that is now 25 m/s off a motorway deck rather than 10.5 everywhere
+ * **did** wake the network up. A body flying three times as fast is a body whose
+ * prediction the reconciler can be a metre or two wrong about, and the seam that
+ * had been invisible at 10.5 -- a knockdown fired on the wall clock is filed
+ * under a different input seq on each end -- became a two-metre stall on screen.
+ * `NetClient.predictedCarHit` is the other half of the fix and exists because of
+ * this half.
+ *
+ * Three, and it is a separation rate rather than a launch speed. The overlap
+ * ends on the frame after contact for any positive value at all -- the body is
+ * already at the car's front face when the hit fires -- so what this buys is the
+ * *picture*: at 3 m/s the bonnet is half a metre behind you within ten frames
+ * and two metres behind you by the time the flight peaks, which reads as being
+ * thrown clear. At 0.5 it would read as being pushed along by a snowplough,
+ * which is the same bug with a smaller number in it.
+ */
+export const CAR_CLEAR_SPEED = 3.0;
+
+/**
+ * How fast this car throws a body, m/s. **`carHitStrength`'s scale is already
+ * in it**, which is the one subtlety in the expression and the reason it is a
+ * function rather than two terms at the call site.
+ *
+ * Applying the scale to the composed maximum would have reintroduced the bug at
+ * the bottom of the ramp: a car pulling out of a bay at 2 m/s scores 0.14, and
+ * `max(10.5, 5) * 0.14` is 1.5 -- a throw *slower than the car doing the
+ * throwing*, which is the pass-through again in miniature and would have been
+ * found by nobody, because nobody watches a car leave a kerb. Scaling the two
+ * terms separately keeps the property that matters at every speed the ramp can
+ * produce: **the body always leaves faster than the car arrived**.
+ *
+ * `verifyTraffic` and `server/carhit-check.ts` both assert against this function
+ * rather than against its arithmetic, because a check that repeated the
+ * expression would be a second copy of the thing it is checking.
+ */
+export function carThrowSpeed(pose: CarPose): number {
+  const k = carHitStrength(pose);
+  const clear = pose.speed + CAR_CLEAR_SPEED * k;
+  const base = CAR_KNOCKBACK_HORIZONTAL * k;
+  return clear > base ? clear : base;
+}
 
 /** One pip, the bat's damage exactly. A car is not a better weapon than a friend. */
 export const CAR_DAMAGE = 1;
@@ -4274,12 +4357,35 @@ export const CAR_HEALTH_FULL_POSE = 100;
  * The impulse is **set, not added**, which is `combat.applyHit`'s rule and is
  * here for the same reason: a sprinting victim clipped from behind would
  * otherwise arrive carrying their own 8 m/s and be thrown twenty metres. Setting
- * it makes every car throw you the same distance, which is what makes the
- * distance a thing a player learns.
+ * it makes the throw a function of the *car* and of nothing else, which is what
+ * makes it a thing a player learns.
  *
  * The direction is the car's heading, flattened, with no component toward the
  * player at all -- you go where the car was going. That is both what happens and
  * the comic read.
+ *
+ * The magnitude is `carThrowSpeed`, which is where the *"the car mostly goes
+ * through me"* report was fixed. Read that constant's essay before touching this
+ * line: a flat 10.5 was slower than every street in the bake, so the car
+ * overtook the body it had just thrown and drove through it.
+ *
+ * **And there is no hitstop.** That is the second half of the same fix and the
+ * one that shows up first on screen. `combat.HITSTOP` freezes a victim's whole
+ * clock for 90 ms -- `combat.advance` returns before it steps anything -- and 90
+ * ms is five and a half frames at 60 Hz. For a punch that is exactly right: two
+ * bodies meet, both stop, and the pause is the impact. For a car it is the bug
+ * in the report, in five frames: the victim stands *perfectly still* while a
+ * two-and-a-half-tonne box drives into them -- 1.4 m of Hilux at a suburban
+ * 15 m/s and 2.1 m at a motorway 22.2 -- and only then flies. The player's own
+ * words for that window are "the car mostly goes through me"; "then the
+ * collision fires" is frame six. A hitstop sells a collision between two things
+ * that then separate. Nothing separates from a car, so the freeze has nothing to
+ * sell and a car's whole body length to hide.
+ *
+ * The *presentation* of the impact is untouched and is where it always was:
+ * `main.ts` calls `feedback.hitTaken`/`knockedOut` and `audio.thwack` on the
+ * same frame. What is gone is only the 90 ms during which the body was not
+ * allowed to move away from the thing hitting it.
  *
  * Returns true if the hit was a knockout.
  */
@@ -4295,10 +4401,14 @@ export function applyCarHit(victim: CombatantState, pose: CarPose): boolean {
   // three seconds of a pull-out that land in between -- and a car easing out of
   // a bay should tip you over, not send you across the road.
   const k = carHitStrength(pose);
+  // `carThrowSpeed` rather than the constant, which is the whole of the
+  // pass-through fix -- and it carries the scale itself, so it is *not*
+  // multiplied by `k` again here. See that function.
+  const throwSpeed = carThrowSpeed(pose);
   victim.body.velocity.set(
-    pose.dx * CAR_KNOCKBACK_HORIZONTAL * k,
+    pose.dx * throwSpeed,
     CAR_KNOCKBACK_VERTICAL * k,
-    pose.dz * CAR_KNOCKBACK_HORIZONTAL * k,
+    pose.dz * throwSpeed,
   );
   // The line `combat.applyHit`'s header calls load-bearing: without it the first
   // tick after the hit charges the victim ground friction for a metre of flight
@@ -4341,8 +4451,17 @@ export function applyCarHit(victim: CombatantState, pose: CarPose): boolean {
     // The extended lockout, spent through the existing phase. See `CAR_STAGGER`.
     victim.phaseT = FLINCH_LOCKOUT - CAR_STAGGER;
   }
-  // On the victim only. There is no attacker to freeze.
-  victim.hitstopT = HITSTOP;
+  // **No hitstop.** The header states the argument in full; the short version is
+  // that `combat.HITSTOP` stops this combatant's clock for five and a half
+  // frames, and a body that may not move for five and a half frames while a car
+  // drives into it is the reported bug rather than the impact it was meant to
+  // sell. `combat.HITSTOP` is still what a bat and a football do, and this is
+  // still the only one of the three damage paths whose attacker does not stop.
+  //
+  // Left as a deliberate absence rather than as `victim.hitstopT = 0`: a car can
+  // land on a body already frozen by a punch that arrived on the same tick, and
+  // zeroing it here would cancel *that* hit's impact frames as a side effect of
+  // a rule about traffic.
   return ko;
 }
 
@@ -4609,8 +4728,31 @@ export function verifyTraffic(
           victim.body.velocity.x * victim.body.velocity.x +
             victim.body.velocity.z * victim.body.velocity.z,
         );
-        if (Math.abs(speed - CAR_KNOCKBACK_HORIZONTAL) > 1e-6) {
-          failures.push(`A car launched the victim at ${speed.toFixed(2)} m/s; it must be ${CAR_KNOCKBACK_HORIZONTAL}.`);
+        // Against `carThrowSpeed` rather than against `CAR_KNOCKBACK_HORIZONTAL`,
+        // which is the assertion the pass-through fix moved: on this 11.1 m/s
+        // street the flat constant is no longer the answer, because 11.1 is
+        // faster than 10.5 and a car must not outrun the body it just threw.
+        const want = carThrowSpeed(found);
+        if (Math.abs(speed - want) > 1e-6) {
+          failures.push(`A car launched the victim at ${speed.toFixed(2)} m/s; it must be ${want.toFixed(2)}.`);
+        }
+        // And the property that number exists for, stated in its own right so a
+        // future retune of `carThrowSpeed` cannot quietly satisfy the line above
+        // while reintroducing the report. See `CAR_CLEAR_SPEED`.
+        if (!(speed > found.speed)) {
+          failures.push(
+            `A car doing ${found.speed.toFixed(2)} m/s threw the victim at ${speed.toFixed(2)} m/s. ` +
+              'The car would overtake them and be drawn driving through the body it had just hit.',
+          );
+        }
+        // The 90 ms freeze is gone. A frozen victim cannot move away from the
+        // car that is still driving into them, which is five and a half frames
+        // of the reported bug. See `applyCarHit`.
+        if (victim.hitstopT > 0) {
+          failures.push(
+            `A car hit left ${(victim.hitstopT * 1000).toFixed(0)} ms of hitstop on the victim. ` +
+              '`combat.advance` steps nothing at all while that runs, so the body stands still inside the car.',
+          );
         }
         if (victim.body.velocity.y <= 0) failures.push('A car did not launch the victim upward.');
         if (victim.body.onGround) failures.push('A launched victim was left on the ground and will be charged friction for their flight.');
@@ -4933,6 +5075,18 @@ export function verifyTraffic(
         failures.push(
           `A car pulling out at ${at.speed.toFixed(2)} m/s threw the victim at ${speed.toFixed(2)} m/s; ` +
             `it must be between 0 and ${CAR_KNOCKBACK_HORIZONTAL}.`,
+        );
+      }
+      // And the bottom of the ramp obeys the same invariant the top of it does,
+      // which is the case `carThrowSpeed`'s essay says would have been found by
+      // nobody: a kerb is where a car is slowest, so it is where a throw scaled
+      // by `carHitStrength` is likeliest to come out slower than the car giving
+      // it -- and a car creeping out of a bay *through* the person it just
+      // tipped over is the reported bug at 4 km/h.
+      if (!(speed > at.speed)) {
+        failures.push(
+          `A car pulling out at ${at.speed.toFixed(2)} m/s threw the victim at only ${speed.toFixed(2)} m/s. ` +
+            'Even a kerb crawl must leave the body in front of the bumper.',
         );
       }
       break;
@@ -6461,11 +6615,27 @@ export function syntheticTile(
   chainCentre: readonly [number, number] | null = null,
   /** Which sidecar version to write. v2 for the one check that reads the old bytes. */
   version = LANES_VERSION,
+  /**
+   * How fast the timetable runs this street, m/s. Defaulted to the 11.1 every
+   * check written before `server/carhit-check.ts` read, so none of them sees a
+   * different fixture.
+   *
+   * It is a parameter because *the speed is the independent variable* of the
+   * one question that driver asks: a knockdown is adjudicated at 60 Hz and a
+   * car covers `speed / 60` metres between two adjacent ticks, so how much car
+   * ends up inside a body before anything visibly happens is a function of this
+   * number and of nothing else in the fixture. One street at 11.1 could only
+   * ever answer it at 11.1. Everything downstream is already written in terms
+   * of the timetable rather than of the constant -- `poseCar` differentiates the
+   * vertex times to get `CarPose.speed`, and `carHitStrength` reads that -- so
+   * the only literal that has to move with it is the bay inset below, which is
+   * eight metres of *arc* expressed as route-time.
+   */
+  speed = 11.1,
 ): TileLanes {
   // Five vertices, the middle one doubled for a red light. World axes: north is
   // -Z, so the lane runs from z = 0 to z = -200, and the left of that is -X.
   const pts: Array<[number, number, number, number]> = [];
-  const speed = 11.1;
   const legs = [0, 50, 100, 100, 150, 200];
   let t = 0;
   for (let i = 0; i < legs.length; i++) {
@@ -6516,9 +6686,11 @@ export function syntheticTile(
   // executable code, what `bays.py` is supposed to produce, and the parked-pose
   // assertion above then reads it back through the real decoder.
   const bayShift = SYNTHETIC_HALF_WIDTH - PARKED_KERB_OFFSET - offset;
-  // `PARK_INSET_M`'s eight metres of arc, as route-time on an 11.1 m/s street,
-  // at both ends. The far bay is measured back from the route's own end.
-  const inset = 8 / 11.1;
+  // `PARK_INSET_M`'s eight metres of arc, as route-time on this street, at both
+  // ends. The far bay is measured back from the route's own end. Off `speed`
+  // rather than off 11.1, so the inset stays eight *metres* when the fixture is
+  // run faster -- see that parameter.
+  const inset = 8 / speed;
   const total = pts[pts.length - 1][3];
   v.setFloat32(o, inset, true);
   v.setFloat32(o + 4, -bayShift, true);

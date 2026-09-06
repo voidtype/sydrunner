@@ -644,15 +644,23 @@ export function applyBlastHit(
 }
 
 /**
- * How hard a blast throws somebody, m/s. Harder than a punch and harder than a
- * car, which is the ordering a player would predict.
+ * How hard a blast throws somebody, m/s. Harder than a punch, and *upward* where
+ * a car is *along*, which is the ordering a player would predict.
  *
  * `combat.KNOCKBACK_HORIZONTAL` is 11 and `traffic.CAR_KNOCKBACK_HORIZONTAL` is
  * 10.5; 13 is a shade past both and the vertical is well past both, because the
- * read of an explosion is *up* where the read of a car is *along*. Restated here
+ * read of an explosion is up where the read of a car is along. Restated here
  * rather than imported and scaled, on `driving.SPRINT_SPEED`'s arrangement: the
  * numbers are the ones this effect wants and `verifyCarFire` asserts the
  * ordering rather than the derivation.
+ *
+ * **The horizontal is no longer the biggest in the game and does not need to
+ * be.** `traffic.carThrowSpeed` throws you at the car's own speed plus a
+ * clearance since the pass-through fix, so a motorway Camry sends you down the
+ * lane at 25 m/s -- further than a blast, and correctly so: a car has a
+ * direction and momentum and this does not. What separates a blast is that it
+ * takes you *off the ground*, which is the vertical, and that is still the
+ * largest in the game by half again.
  */
 const BLAST_KNOCKBACK_HORIZONTAL = 13;
 const BLAST_KNOCKBACK_VERTICAL = 8.5;

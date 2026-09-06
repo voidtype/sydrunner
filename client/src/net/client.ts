@@ -257,10 +257,12 @@ const TELEPORT_ARM_SNAPSHOTS = 100;
  * How far the server's own position must jump for it to be a teleport, metres.
  *
  * Twenty metres between consecutive snapshots is 400 m/s at 20 Hz. The hardest
- * thing in this game is a car knockback at `CAR_KNOCKBACK_HORIZONTAL` (10.5 m/s)
- * and the fastest is a tuned bike at 26 m/s, so the gap between "legitimate
- * motion" and this threshold is more than an order of magnitude -- which is what
- * makes it safe to leave the arming window open for five seconds.
+ * thing in this game is a car knockback, which since the pass-through fix is
+ * `traffic.carThrowSpeed` -- the car's own speed plus a clearance, so 25.2 m/s
+ * off a motorway deck rather than the flat 10.5 this used to name -- and the
+ * fastest is a tuned bike at 26 m/s. So the gap between "legitimate motion" and
+ * this threshold is still more than an order of magnitude, which is what makes
+ * it safe to leave the arming window open for five seconds.
  */
 const TELEPORT_MIN_M = 20;
 
@@ -2087,6 +2089,22 @@ export class NetClient {
    * exactly the test the pending-input queue is already keyed on.
    */
   private bikePredictedAt = -1;
+  /**
+   * The input seq a predicted car knockdown rides on, or -1.
+   *
+   * Its two neighbours protect a *fact* the server owns (which bike, which car)
+   * from snapshots that predate the press. This one protects a **position**, and
+   * from the opposite direction: the server has already applied the shove and
+   * has attributed it to an older seq than this client did. See
+   * `predictedCarHit` and the block in `reconcile` that reads this.
+   */
+  private carHitPredictedAt = -1;
+  /**
+   * Set for the one frame on which the gate above lifts, and consumed at the
+   * foot of `reconcile`. It is how the answer to a predicted knockdown reaches
+   * the body without reaching the camera.
+   */
+  private carHitLift = false;
 
   /**
    * Tell the net layer that `main.ts` just predicted a mount or dismount.
@@ -2110,6 +2128,36 @@ export class NetClient {
    */
   predictedCarChange(): void {
     this.carPredictedAt = (this.seq + 1) & 0xffff;
+  }
+
+  /**
+   * `main.ts` has just thrown this body over a bonnet. **The third of the
+   * predicted-change trio and the only one nobody pressed a key for.**
+   *
+   * `game/traffic.ts`'s header states the arrangement this protects: a car is a
+   * pure function of the wall clock, so the browser evaluates `carHitting` at
+   * the same tick the server does and applies the same `applyCarHit` on the
+   * frame it happens rather than waiting for a round trip. That has always been
+   * true and has always been right. What it did not account for is that the two
+   * ends, firing on the same millisecond, disagree about which **input seq** the
+   * shove belongs to -- and the reconciler is built entirely on the identity
+   * "the server's position for seq S is what my position after seq S should
+   * be". `reconcile` states the consequence and the measurement; this is only
+   * the record that a prediction is outstanding.
+   *
+   * `seq + 1` on `predictedBikeChange`'s arithmetic and for its reason: the
+   * shove is applied inside the fixed step and the input carrying that step goes
+   * out at the end of it, so the seq this rides on is the one `sendInput` is
+   * about to allocate. `main.ts` calls this from the traffic block, which is
+   * after `combat.advance` and before `net.sendInput` -- the same window, in the
+   * same order, as everything else in that step.
+   *
+   * Called for the **local player only**. Offline there is no `net` at all and
+   * the whole question does not arise; online `main.ts` already refuses to
+   * evaluate the traffic against anybody else's body.
+   */
+  predictedCarHit(): void {
+    this.carHitPredictedAt = (this.seq + 1) & 0xffff;
   }
 
   /**
@@ -2534,6 +2582,12 @@ export class NetClient {
         // current velocity until an acknowledgement refills it. See
         // `ackedVelocity`.
         this.ackedVelocityKnown = false;
+        // And nothing predicted about the *old* body survives either. A car
+        // knockdown that killed this player is a prediction the respawn has just
+        // made unanswerable: there is no seq left in the queue to acknowledge it
+        // on, so the gate in `reconcile` would hold the position of a body that
+        // no longer exists. See `predictedCarHit`.
+        this.carHitPredictedAt = -1;
         this.correction.set(0, 0, 0);
         this.lastServerTick = -1;
         return out.copy(this.correction);
@@ -2543,7 +2597,13 @@ export class NetClient {
     // --- `/unstuck`, which is the other teleport this client cannot predict.
     //     One call, because the whole of the decision is `adoptTeleport`'s and
     //     the correction path below must not see it. See that method.
-    if (this.adoptTeleport(local, self)) return out.copy(this.correction);
+    if (this.adoptTeleport(local, self)) {
+      // A teleport outranks a knockdown: the body the shove was predicted on is
+      // not where it was, so the gate has nothing left to protect. See
+      // `predictedCarHit`.
+      this.carHitPredictedAt = -1;
+      return out.copy(this.correction);
+    }
 
     // --- The position. Drop every input the server has acknowledged.
     const ack = this.pendingAck;
@@ -2565,6 +2625,63 @@ export class NetClient {
         this.ackedVelocity.set(done.vx, done.vy, done.vz);
         this.ackedVelocityKnown = true;
       }
+    }
+
+    // --- The predicted car knockdown, on the bike's own gate and for a reason
+    //     the bike does not have. See `predictedCarHit`.
+    //
+    // This is the one prediction in this file whose cause is **not in the input
+    // stream**. A bike, a car, a ride: all three are pressed, so the seq that
+    // carries the press is the seq the server decides them on, and the gate a
+    // few dozen lines up -- "ignore snapshots until the input that carried it is
+    // acknowledged" -- makes the two ends agree about *when*. A car hitting you
+    // is a function of the wall clock and of nothing this client sent, so the two
+    // ends fire it on the same millisecond and attribute it to **different
+    // seqs**: the client to the one it is about to send, the server to the one it
+    // happened to be applying, which is a one-way trip older.
+    //
+    // The replay below cannot bridge that, and the failure is not subtle. The
+    // server's acknowledged position for seq S already contains a one-way trip
+    // of flight; the replay then flies the whole pending queue on top of it, so
+    // it lands about a trip's worth of knockback *ahead* of where this client
+    // actually is -- 0.9 m at the speeds `traffic.carThrowSpeed` now produces.
+    // `server/carhit-check.ts` measured what that looks like: six frames in which
+    // the drawn body stalls and drifts backwards toward the car that just hit it,
+    // and then a 3.7 m snap. That is *"then the collision fires"*, arriving from
+    // the reconciler rather than from the hit test, and it is the half of the
+    // report the impulse fix does not reach.
+    //
+    // So the position is left alone for the one round trip in which the two ends
+    // are talking about different seqs. What happens on the frame the gate lifts
+    // is deliberately the ordinary path with the snap threshold armed: if the
+    // server agreed, the residual is the seq-attribution offset -- one one-way
+    // trip of flight, about 1.9 m at the speeds a motorway car now throws at --
+    // and if it **refused**, because the player had moved and the server
+    // adjudicated against a body that was never in the lane, the error is the
+    // whole knockback and `CORRECTION_SNAP` takes the server's position outright
+    // and derives the velocity from its own two samples. Either way the body is
+    // put where the server says exactly the way a punch nobody predicted already
+    // puts it. There is no double knockdown to guard against on top of that:
+    // `main.ts`'s `netHandlers().onHit` reads a car event about the local player
+    // as a feed line and applies no impulse.
+    //
+    // `carHitLift` is what makes the *presentation* of that frame right, and it
+    // is the snap branch's own rule applied to a case that does not reach it: a
+    // knockback is flown, not dragged. Left to the ordinary branch, the residual
+    // would be handed to the camera and walked off over 80 ms -- which is a view
+    // trailing two metres behind a body doing 28 m/s and then catching up, and
+    // is the "stall, then jump" half of the report arriving from the correction
+    // filter instead of from the hit test. Cleared, the body simply carries on
+    // from where the server has it. See the block at the end of this method.
+    if (this.carHitPredictedAt >= 0) {
+      if (ack < 0 || !seqLE(this.carHitPredictedAt, ack)) {
+        this.lastServerPos.set(self.x, self.y, self.z);
+        this.lastServerTick = this.pendingSelfTick;
+        return out.copy(this.correction);
+      }
+      this.carHitPredictedAt = -1;
+      this.carHitLift = true;
+      this.correction.set(0, 0, 0);
     }
 
     // --- Riding: the same replay, one basis in.
@@ -2742,6 +2859,15 @@ export class NetClient {
         local.body.velocity.copy(body.velocity);
         local.body.onGround = body.onGround;
       }
+    }
+
+    // The frame a predicted knockdown was answered. Whatever the branch above
+    // decided about the *body*, the camera is told nothing: a knockback is flown
+    // and not dragged, which is the rule the snap branch already states and the
+    // reason it clears this vector too. See the gate near the top of this method.
+    if (this.carHitLift) {
+      this.carHitLift = false;
+      this.correction.set(0, 0, 0);
     }
 
     this.lastServerPos.set(self.x, self.y, self.z);
