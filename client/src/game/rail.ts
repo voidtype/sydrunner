@@ -73,8 +73,16 @@ export const RAIL_MAGIC = 0x4c494152;
  * for why a strip carries no height and `RoadDeck.adoptPaving` for what reads
  * it. Exact, like every version before it: a cached rail.bin from before this
  * would decode as carrying no paving, which is the defect, silently.
+ * 5: the `lateral` buffer, and the consist the solver believed in
+ * (`physics.consistHalfM`, `originStandS`). Both are the same correction: this
+ * module used to *derive* the lateral offset at decode from a rule that existed
+ * nowhere else, which meant the pipeline could prove no two trains share a rail
+ * while being unable to read the offset that made a rail a rail. The rule moved
+ * to `rail.compute_lateral`, the array is shipped, and the numbers the solve
+ * used are shipped beside it so `server/train-conflict-check.ts` can assert the
+ * two ends agree about how long a train is.
  */
-export const RAIL_VERSION = 4;
+export const RAIL_VERSION = 5;
 
 /**
  * 2026-01-01T00:00:00Z. The same instant `traffic.ts` counts from.
@@ -262,8 +270,9 @@ export interface RailBake {
    * runs in both compass directions on one centreline, which is a single OSM
    * way carrying a double-track railway -- and zero within `SHARED_STOP_M` of
    * any calling stop, where the platform was built on the centreline. See
-   * `computeLateral`: it is what stops opposite trains passing through each
-   * other, which the owner watched happen under the CBD.
+   * `pipeline/sydney/rail.compute_lateral`, which is where it is computed and
+   * where the solver can read it: it is what stops opposite trains passing
+   * through each other, which the owner watched happen under the CBD.
    */
   lateral: Float32Array;
   stations: RailStation[];
@@ -309,6 +318,18 @@ export interface RailBake {
     accel: number; brake: number; vLocal: number; vExpress: number;
     expressMinM: number; dwell: number;
     blockTargetM: number; sepS: number; sepJunctionS: number; maxGradient: number;
+    /**
+     * What the *solver* believed a train is, and how long one stands at its
+     * origin. `game/riding.SUBURBAN`/`METRO`/`SUBURBAN_PITCH`/`METRO_PITCH`
+     * and `ORIGIN_STAND_S` here are the other copy; the pipeline cannot read
+     * them, so it ships what it used and `server/train-conflict-check.ts`
+     * asserts the two agree. Optional because a bake older than version 5 does
+     * not carry them.
+     */
+    consistHalfM?: number;
+    consistHalfMetroM?: number;
+    originStandS?: number;
+    sepFoulS?: number;
   };
   notes: string[];
   degraded: Record<string, string>;
@@ -340,7 +361,7 @@ export function railKey(block: number, slot: number): number {
  */
 const BUFFER_ORDER = [
   'vertices', 'cum', 'phases', 'stanchions', 'stanchionKinds', 'vertexFlags',
-  'vertexClearance', 'paving',
+  'vertexClearance', 'paving', 'lateral',
 ] as const;
 
 /**
@@ -533,7 +554,7 @@ export function decodeRail(buffer: ArrayBuffer): RailBake {
     blockJunction: Uint8Array.from((meta.blocks.junction as boolean[]).map((b) => (b ? 1 : 0))),
     blockTracks: Int32Array.from(meta.blocks.tracks as number[]),
     vertices: arrays.vertices as Float32Array,
-    lateral: computeLateral(lines, arrays.vertices as Float32Array, arrays.cum as Float64Array),
+    lateral: arrays.lateral as Float32Array,
     cum: arrays.cum as Float64Array,
     phases: arrays.phases as Float64Array,
     stanchions: arrays.stanchions as Float32Array,
@@ -666,22 +687,32 @@ export function tripIndexAt(dir: RailDirection, t: number, j: number): number {
   return Math.floor((t - dir.offset) / dir.line.period) - j;
 }
 
-/** How far a train on a shared segment sits off the centreline, metres. Left-hand running, so half a track pitch. */
+/**
+ * How far a train on a shared segment sits off the centreline, metres.
+ * Left-hand running, so half a track pitch, and two opposed trains on one
+ * centreline end up a real 4 m track spacing apart.
+ *
+ * **`pipeline/sydney/rail.SHARED_OFFSET_M`, and the array itself is baked.**
+ * It used to be derived here at decode by a `computeLateral` that existed only
+ * in this file, which meant the *solver* -- the thing that proves no two trains
+ * are ever in one place -- could not see the offset its own `slot` was a claim
+ * about. It proved an invariant about rails against geometry it could not read.
+ * Bake version 5 moves the rule to `rail.compute_lateral` and ships the result;
+ * `verifyRail` below still checks the invariant from this side, which is the
+ * cross-check that used to be impossible.
+ */
 export const SHARED_OFFSET_M = 2.0;
-/** No offset this close to a calling stop: the platform there was built on the centreline. */
+/**
+ * No offset this close to a calling stop: `world/rail-solids` builds the
+ * platform deck 1.62 m off the anchor centreline **on both sides**, so a train
+ * pushed sideways at a platform is a train drawn inside the platform.
+ *
+ * This is why `server/train-conflict-check.ts` still finds two trains in one
+ * place at some stations, and why that number is a budget rather than a zero:
+ * moving the alignments is RAIL-CORRIDOR.md's P5, with platforms in it.
+ */
 export const SHARED_STOP_M = 110;
 
-/**
- * The lateral offsets: `SHARED_OFFSET_M` on every vertex whose outgoing segment
- * the bake also runs the other way, ramped to zero over the segment before and
- * after (the sampler interpolates between vertices) and held at zero near a
- * calling stop.
- *
- * A segment is keyed by its two endpoints rounded to the half metre, unordered
- * for identity and ordered for orientation; a key seen in both orientations is
- * shared. Every direction of every line is walked, so two lines sharing a
- * trunk agree. Integer keys and a `Map`, no trig, the same on both ends.
- */
 /**
  * `SPAN_DEEP` on every vertex the pipeline measured as buried past `DEEP_M`,
  * and on every vertex inside a served underground station's box: a station
@@ -716,85 +747,6 @@ export function deepen(flags: Uint8Array, clearance: Float32Array, vertices: Flo
 }
 /** How far past a bore station's box its approach spans count as the bore too; `RailCut` uses the same reach. */
 export const BORE_APPROACH_M = 30;
-
-export function computeLateral(lines: readonly RailLine[], vertices: Float32Array, cum: Float64Array): Float32Array {
-  const n = vertices.length / 3;
-  const lateral = new Float32Array(n);
-  // Every segment's midpoint and unit heading, in a metre grid, so a segment
-  // can find the ones drawn on top of it whatever way their endpoints were
-  // rounded. Two OSM ways for one railway are rarely the same coordinates;
-  // they are the same *place*, within a metre, running the other way.
-  const CELL = 4;
-  const grid = new Map<string, number[]>();
-  const mids = new Float64Array(n * 2);
-  const heads = new Float64Array(n * 2);
-  const owner = new Int32Array(n).fill(-1);
-  let segIndex = 0;
-  const segs: Array<[number, number]> = []; // [vertex i, direction index]
-  lines.forEach((line, li) => {
-    line.dirs.forEach((dir, di) => {
-      for (let i = dir.vertexOff; i + 1 < dir.vertexOff + dir.vertexCount; i++) {
-        const ax = vertices[i * 3], az = vertices[i * 3 + 2];
-        const bx = vertices[(i + 1) * 3], bz = vertices[(i + 1) * 3 + 2];
-        const dx = bx - ax, dz = bz - az;
-        const len = Math.sqrt(dx * dx + dz * dz);
-        if (!(len > 1e-6)) continue;
-        mids[i * 2] = (ax + bx) / 2;
-        mids[i * 2 + 1] = (az + bz) / 2;
-        heads[i * 2] = dx / len;
-        heads[i * 2 + 1] = dz / len;
-        owner[i] = li * 2 + di;
-        const key = `${Math.floor(mids[i * 2] / CELL)},${Math.floor(mids[i * 2 + 1] / CELL)}`;
-        const list = grid.get(key);
-        if (list) list.push(i); else grid.set(key, [i]);
-        segs.push([i, li * 2 + di]);
-        segIndex++;
-      }
-    });
-  });
-  void segIndex;
-  const shared = new Uint8Array(n);
-  for (const [i] of segs) {
-    const mx = mids[i * 2], mz = mids[i * 2 + 1];
-    const hx = heads[i * 2], hz = heads[i * 2 + 1];
-    const cx = Math.floor(mx / CELL), cz = Math.floor(mz / CELL);
-    let hit = false;
-    for (let gx = cx - 1; gx <= cx + 1 && !hit; gx++) {
-      for (let gz = cz - 1; gz <= cz + 1 && !hit; gz++) {
-        const list = grid.get(`${gx},${gz}`);
-        if (!list) continue;
-        for (const j of list) {
-          if (j === i || owner[j] === owner[i]) continue;
-          // The same place, run the other way: within a track's width of each
-          // other and antiparallel.
-          const ox = mids[j * 2] - mx, oz = mids[j * 2 + 1] - mz;
-          if (ox * ox + oz * oz > 1.2 * 1.2) continue;
-          if (hx * heads[j * 2] + hz * heads[j * 2 + 1] > -0.9) continue;
-          hit = true;
-          break;
-        }
-      }
-    }
-    if (hit) shared[i] = 1;
-  }
-  for (const line of lines) {
-    for (const dir of line.dirs) {
-      const end = dir.vertexOff + dir.vertexCount;
-      const nearStop = (i: number): boolean => {
-        const s = cum[i];
-        for (const st of dir.stops) if (st.calls && Math.abs(st.s - s) < SHARED_STOP_M) return true;
-        return false;
-      };
-      for (let i = dir.vertexOff; i + 1 < end; i++) {
-        if (!shared[i]) continue;
-        if (nearStop(i) || nearStop(i + 1)) continue;
-        lateral[i] = SHARED_OFFSET_M;
-        lateral[i + 1] = SHARED_OFFSET_M;
-      }
-    }
-  }
-  return lateral;
-}
 
 /**
  * Where arc length `s` along a direction's polyline is, and which way it points.
