@@ -142,6 +142,121 @@ PLATFORM_INNER_M = 1.62
 PLATFORM_WIDTH_M = 5.5
 PLATFORM_TOP_M = 1.05
 
+# --- What a train actually is, on the ground -------------------------------------
+#
+# **Reported as *"the trains going through each other"*, and the first half of
+# the answer is that the solver had never been told how long a train is.**
+# `occupancy` mapped the arc-length range of the *pose* -- one point, the
+# consist's centre -- so eighty metres of train hung off each end of every
+# claim the timetable made. Twenty seconds of separation between two centres is
+# six hundred metres at line speed and **nothing at all at a platform**, where
+# both trains are stationary, which is exactly where the report came from.
+#
+# `game/riding.SUBURBAN`/`METRO`/`SUBURBAN_PITCH`/`METRO_PITCH` and
+# `world/trains.COUPLER_GAP_M`. Restated here because the pipeline has no
+# TypeScript, and asserted against the TypeScript by
+# `server/train-conflict-check.ts`, which reads both.
+SUBURBAN_CARS = 8
+SUBURBAN_PITCH_M = 20.4
+METRO_CARS = 6
+METRO_PITCH_M = 22.0
+COUPLER_GAP_M = 0.9
+
+
+def consist_half(metro: bool) -> float:
+    """Half a train's length, nose to tail: 81.15 m suburban, 65.55 m Metro."""
+    n = METRO_CARS if metro else SUBURBAN_CARS
+    p = METRO_PITCH_M if metro else SUBURBAN_PITCH_M
+    return (n * p - COUPLER_GAP_M) / 2.0
+
+
+# --- The train that is there before the timetable starts ---------------------------
+#
+# `game/rail.ORIGIN_STAND_S`. A trip used to begin at the instant of departure,
+# so a terminus never had a train with its doors open and nobody could board
+# there -- `server/underground-check.ts` found it, and the answer was to give
+# every trip forty-five seconds standing at its first stop before it leaves.
+#
+# **The solver was never told.** Occupancy ran from `t = 0`, so for those
+# forty-five seconds a full-length train sat across the first blocks of its
+# route as far as anybody could see and not at all as far as the timetable was
+# concerned. That is Central platform 1465 with a T8 standing on it while the
+# T8 four departures ahead comes back round the City Circle through the same
+# rail, and it is Olympic Park, where the shuttle's two directions terminate on
+# one rail and the arriving train reaches it before the standing one has left.
+# Both were in the report.
+ORIGIN_STAND_S = 45.0
+
+
+# --- The foul test: two carriage bodies in one piece of Sydney --------------------
+#
+# The second half of the same report, and the reason a block is not enough.
+# `BlockSet.key` puts the two directions of a corridor on different *rails* --
+# correctly, a double-track railway is what passing is for -- but a rail is a
+# claim about geometry, and the only thing that makes the claim true is
+# `compute_lateral` shoving each direction half a track pitch off a shared
+# centreline. Wherever that offset is not there, the two rails are one line on
+# the ground and two trains on them are inside each other however happy the
+# block solver is.
+#
+# So the solver is given the geometry as well: every place two *drawn* car
+# bodies would foul becomes a synthetic occupancy site, keyed like a rail and
+# constrained like one. See `foul_sites`.
+CAR_BODY_HALF_M = 1.55  # `world/envelope.CAR_BODY_HALF_M`
+FOUL_PLAN_M = 2 * CAR_BODY_HALF_M  # centreline separation at which two bodies touch
+FOUL_HEIGHT_M = 3.0  # ...and how much height it takes to be past each other
+# Two alignments this close are the *same* rails drawn twice: `world/track-atlas
+# .COINCIDENT_M`. Further apart than this and running parallel, they are two
+# tracks and a train on each is a pass, not a collision -- the spacing there is
+# RAIL-CORRIDOR.md's lateral budget and its gauge ratchet, not the timetable's.
+FOUL_COINCIDENT_M = 1.5
+FOUL_PARALLEL_COS = 0.94  # `world/track-atlas.PARALLEL_COS`
+# How finely the drawn polylines are walked looking for fouls. Vertices are up to
+# `SEGMENT_MAX_M` (120 m) apart, so a crossing between two of them is invisible
+# to a vertex-only test; 4 m is well inside the 3.1 m body width it is looking
+# for and keeps the point set near 200,000.
+FOUL_SAMPLE_M = 4.0
+# Foul sites are cells of this size. Small enough that two tracks either side of
+# a platform do not land in one cell, large enough that a 400 m foul run is
+# thirty constraints rather than a hundred.
+FOUL_CELL_M = 12.0
+# The clearance a foul site demands on top of the two car bodies being out of
+# each other. **`SEP_S`'s twenty seconds is a block margin and a foul site is
+# not a block** -- it is twelve metres of flat crossing, and the window either
+# side of it is already the whole 163 m of train. `SEP_JUNCTION_S` is the number
+# this network already uses for how long a train needs to be out of a *place*
+# rather than out of a section, and a flat crossing is exactly a junction.
+# Charged the block margin instead, the solve came back with nine of the eleven
+# lines on a six-minute headway and no assignment even then.
+SEP_FOUL_S = SEP_JUNCTION_S
+
+# --- The lateral offset, which is what makes a slot a rail ------------------------
+#
+# Metres a train sits to the **left of its own travel**, per direction vertex.
+# Non-zero only on a segment the bake runs both ways on one centreline -- a
+# single OSM way carrying a double-track railway -- so the up road and the down
+# road are `2 * SHARED_OFFSET_M` = 4 m apart, which is Sydney's track spacing.
+#
+# **Baked from here rather than derived at decode.** It used to be computed in
+# `client/src/game/rail.computeLateral` and nowhere else, which meant the
+# pipeline's solver could not see the geometry its own `slot` was a claim about:
+# it proved two trains were on different rails while the only code that knew
+# whether they were was in the browser. One implementation, on the side that
+# solves.
+SHARED_OFFSET_M = 2.0
+# No offset this close to a calling stop. `world/rail-solids` builds a platform
+# 1.62 m off the anchor centreline **on both sides**, so a train pushed two
+# metres sideways at a platform is a train drawn inside the platform. Until
+# RAIL-CORRIDOR.md's P5 moves the alignments themselves, the centreline is where
+# a stopping train has to be -- and `foul_sites` is what stops two of them being
+# there at once.
+SHARED_STOP_M = 110.0
+# The grid a segment is filed under when looking for the same segment run the
+# other way, and how near the two have to be. `rail.computeLateral`'s numbers.
+SHARED_CELL_M = 4.0
+SHARED_NEAR_M = 1.2
+SHARED_ANTI_COS = -0.9
+
 # Vertical offsets applied to the terrain before the grade projection, metres.
 TUNNEL_DEPTH = 16.0
 BRIDGE_RISE = 7.0
@@ -291,7 +406,11 @@ RAIL_EPOCH_MS = 1767225600000
 #    declines over a footway exactly as it already declines over a carriageway.
 #    Exact, again, and for the reason 3 is: a browser holding an old rail.bin
 #    would read the paving count off a file that has no paving in it.
-BAKE_VERSION = 4
+# 5: `lateral` is baked rather than derived at decode. The solver reasons about
+# where trains are *drawn*, so the offset that decides it has to be an input to
+# the solve and an output of the bake -- not a rule the browser applies
+# afterwards and the pipeline has to hope it agrees with.
+BAKE_VERSION = 5
 RAIL_MAGIC = 0x4C494152  # 'RAIL' little-endian
 
 OUT_DIR = config.DATA_ROOT / "scratch" / "rail"
@@ -2652,6 +2771,15 @@ class Direction:
     # per station, because a 200 m platform changes category along its own
     # length, which is exactly what Chatswood does.
     clearance: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float32))
+    # Per vertex, metres this direction's train sits to the left of its own
+    # travel. `compute_lateral`; baked, and read straight back by `decodeRail`.
+    lateral: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float32))
+    # Extra seconds of dwell at a calling stop, by leg boundary index. A hold:
+    # the service stands longer at the previous station rather than meeting its
+    # own next departure somewhere it cannot pass. It is a phase with `v0 = 0`
+    # like every other dwell, so it costs nothing on the wire and nothing in
+    # `poseTrain`. See `solve_phases`' hold pass.
+    holds: dict[int, float] = field(default_factory=dict)
     phases: list[tuple[float, float, float, float]] = field(default_factory=list)
     duration: float = 0.0
     period: int = BASE_PERIOD_S
@@ -3442,7 +3570,7 @@ def build_curve(d: Direction) -> None:
         arrivals.append(t)
         if k < len(boundaries) - 1:
             phases.append((t, s, 0.0, 0.0))
-            t += DWELL_S
+            t += DWELL_S + float(d.holds.get(k, 0.0))
     phases.append((t, s, 0.0, 0.0))  # the terminating rest, so lookup never falls off
     d.phases = phases
     d.duration = t
@@ -3511,6 +3639,11 @@ class BlockSet:
     # passing each other on a double-track railway", and OSM does not say it.
     tracks: list[int] = field(default_factory=list)
     dirvec: list[tuple[float, float]] = field(default_factory=list)
+    # Whether `_track_counts` actually *found* a companion rail beside this
+    # block, as opposed to defaulting the count to two. `tracks` cannot answer
+    # it -- one companion and no companion both come out as 2 -- and the
+    # difference is the whole of `key` below.
+    per_track: list[bool] = field(default_factory=list)
 
     def key(self, block: int, slot: int) -> int:
         """The thing a train actually occupies: a rail, not a corridor.
@@ -3671,6 +3804,7 @@ def _track_counts(g: RailGraph, bs: BlockSet) -> None:
     if not used:
         bs.tracks = [1] * bs.count
         bs.dirvec = [(1.0, 0.0)] * bs.count
+        bs.per_track = [True] * bs.count
         return
     idx = np.asarray(used, dtype=np.int64)
     p0 = g.xy[g.edges[idx, 0]]
@@ -3684,10 +3818,12 @@ def _track_counts(g: RailGraph, bs: BlockSet) -> None:
 
     tracks = [2] * bs.count
     dirvec = [(1.0, 0.0)] * bs.count
+    per_track = [False] * bs.count
     for b in range(bs.count):
         rows = np.flatnonzero(blk == b)
         if rows.size == 0:
             tracks[b] = 1
+            per_track[b] = True
             continue
         dirvec[b] = (float(unit[rows[0], 0]), float(unit[rows[0], 1]))
         # Three samples along the block rather than one: a block that runs into
@@ -3717,8 +3853,10 @@ def _track_counts(g: RailGraph, bs: BlockSet) -> None:
         # The count is what decides a cantilever mast from a portal gantry, so
         # it is worth more than a boolean.
         tracks[b] = 1 + best if best else 2
+        per_track[b] = best > 0
     bs.tracks = tracks
     bs.dirvec = dirvec
+    bs.per_track = per_track
 
 
 def map_blocks(d: Direction, g: RailGraph, blocks: BlockSet) -> None:
@@ -3756,20 +3894,430 @@ def map_blocks(d: Direction, g: RailGraph, blocks: BlockSet) -> None:
     d.blocks = runs
 
 
-def occupancy(d: Direction, blocks: BlockSet) -> list[tuple[int, float, float]]:
+def occupancy(
+    d: Direction,
+    blocks: BlockSet,
+    half: float = 0.0,
+    fouls: Sequence[tuple[int, float, float]] = (),
+) -> list[tuple[int, float, float]]:
     """(rail key, t_enter, t_exit) for this direction's single trip, from t=0.
 
     Keyed on the *rail*, via `BlockSet.key`, not on the block: a double-track
     corridor holds two trains at once and always has.
+
+    **`half` is half a train.** The window is the time from the moment the nose
+    enters to the moment the tail leaves -- `T(s0 - half)` to `T(s1 + half)` --
+    and not the time the *centre* is between the block's ends. Those differ by
+    163 m of railway, which is three seconds at line speed and the better part
+    of a minute at a platform, and the platform is where the report came from.
+    Pass `half=0.0` and this is the point-occupancy the bake shipped with.
+
+    `fouls` are the synthetic sites `foul_sites` found: places where two drawn
+    car bodies would be inside each other whatever the block model says. They
+    are already time windows and already keyed, so they are appended and the
+    solver never learns they are a different kind of thing.
     """
     out: list[tuple[int, float, float]] = []
+    total = float(d.cum[-1])
     for b, s0, s1, slot in d.blocks:
-        t0 = curve_time_at(d.phases, s0)
-        t1 = curve_time_at(d.phases, s1)
+        a = max(0.0, s0 - half)
+        t0 = curve_time_at(d.phases, a)
+        t1 = curve_time_at(d.phases, min(total, s1 + half))
         if t1 < t0:
             t0, t1 = t1, t0
+        # `a == 0` means the train's body is over this block while it is still
+        # standing at its origin, so it has been there since `-ORIGIN_STAND_S`.
+        if a <= 0.0:
+            t0 = -ORIGIN_STAND_S
         out.append((blocks.key(b, slot), t0, t1))
+    out.extend(fouls)
     return out
+
+
+# --- The lateral offset, computed once, on the side that solves --------------------
+
+
+def compute_lateral(lines: Sequence[Line]) -> int:
+    """Fill `Direction.lateral`: metres each vertex's train sits left of travel.
+
+    The rule is `client/src/game/rail.computeLateral`'s, moved here whole. A
+    segment is shared when some *other* direction draws the same place running
+    the other way -- within `SHARED_NEAR_M` of the midpoint and antiparallel --
+    and a shared segment's two endpoints carry `SHARED_OFFSET_M`, held at zero
+    within `SHARED_STOP_M` of a calling stop because the platform there is on
+    the centreline.
+
+    Returns how many vertices came out non-zero, for the build log.
+    """
+    grid: dict[tuple[int, int], list[tuple[int, int]]] = defaultdict(list)
+    # (owner, mid x, mid z, unit heading x, unit heading z) per (unit, vertex).
+    mids: dict[tuple[int, int], tuple[float, float, float, float]] = {}
+    units: list[tuple[int, Direction]] = []
+    for li, ln in enumerate(lines):
+        for d in ln.dirs:
+            units.append((li * 2 + d.index, d))
+    for owner, d in units:
+        d.lateral = np.zeros(len(d.xyz), dtype=np.float32)
+        for i in range(len(d.xyz) - 1):
+            ax, az = float(d.xyz[i, 0]), float(d.xyz[i, 2])
+            bx, bz = float(d.xyz[i + 1, 0]), float(d.xyz[i + 1, 2])
+            dx, dz = bx - ax, bz - az
+            ln_ = math.hypot(dx, dz)
+            if not (ln_ > 1e-6):
+                continue
+            mx, mz = (ax + bx) / 2.0, (az + bz) / 2.0
+            mids[(owner, i)] = (mx, mz, dx / ln_, dz / ln_)
+            grid[(math.floor(mx / SHARED_CELL_M), math.floor(mz / SHARED_CELL_M))].append(
+                (owner, i)
+            )
+
+    shared: set[tuple[int, int]] = set()
+    for kkey, (mx, mz, hx, hz) in mids.items():
+        owner = kkey[0]
+        cx = math.floor(mx / SHARED_CELL_M)
+        cz = math.floor(mz / SHARED_CELL_M)
+        hit = False
+        for gx in range(cx - 1, cx + 2):
+            if hit:
+                break
+            for gz in range(cz - 1, cz + 2):
+                if hit:
+                    break
+                for other in grid.get((gx, gz), ()):
+                    if other == kkey or other[0] == owner:
+                        continue
+                    ox, oz, ohx, ohz = mids[other]
+                    if (ox - mx) ** 2 + (oz - mz) ** 2 > SHARED_NEAR_M**2:
+                        continue
+                    if hx * ohx + hz * ohz > SHARED_ANTI_COS:
+                        continue
+                    hit = True
+                    break
+        if hit:
+            shared.add(kkey)
+
+    marked = 0
+    for owner, d in units:
+        calls = [st.s for st in d.stops if st.stops]
+        cum = np.asarray(d.cum, dtype=np.float64)
+
+        def near_stop(i: int) -> bool:
+            s = float(cum[i])
+            return any(abs(c - s) < SHARED_STOP_M for c in calls)
+
+        for i in range(len(d.xyz) - 1):
+            if (owner, i) not in shared:
+                continue
+            if near_stop(i) or near_stop(i + 1):
+                continue
+            d.lateral[i] = SHARED_OFFSET_M
+            d.lateral[i + 1] = SHARED_OFFSET_M
+        marked += int(np.count_nonzero(d.lateral))
+    return marked
+
+
+# --- Where two drawn trains would be inside each other -----------------------------
+
+
+def _drawn_samples(d: Direction) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Resample this direction's *drawn* centreline every `FOUL_SAMPLE_M`.
+
+    Drawn, not routed: the lateral offset is applied, because a train is where
+    `sampleAlong` puts it and that is the only position anybody sees. Returns
+    `(xyz, s, heading)` -- world points, their arc length, and the unit heading
+    at each, all parallel.
+    """
+    cum = np.asarray(d.cum, dtype=np.float64)
+    total = float(cum[-1])
+    if total <= 0 or len(cum) < 2:
+        z = np.zeros((0, 3))
+        return z, np.zeros(0), np.zeros((0, 2))
+    s = np.arange(0.0, total, FOUL_SAMPLE_M)
+    i = np.clip(np.searchsorted(cum, s, side="right") - 1, 0, len(cum) - 2)
+    span = np.maximum(cum[i + 1] - cum[i], 1e-9)
+    u = ((s - cum[i]) / span)[:, None]
+    a = np.asarray(d.xyz, dtype=np.float64)[i]
+    b = np.asarray(d.xyz, dtype=np.float64)[i + 1]
+    p = a + (b - a) * u
+    hx = b[:, 0] - a[:, 0]
+    hz = b[:, 2] - a[:, 2]
+    hl = np.maximum(np.hypot(hx, hz), 1e-9)
+    hx, hz = hx / hl, hz / hl
+    lat = d.lateral[i] + (d.lateral[i + 1] - d.lateral[i]) * u[:, 0]
+    # `sampleAlong`'s own two lines: left of travel is (-hz, +hx).
+    p[:, 0] += -hz * lat
+    p[:, 2] += hx * lat
+    return p, s, np.stack([hx, hz], axis=1)
+
+
+def foul_sites(
+    lines: Sequence[Line], blocks: BlockSet, log=print
+) -> dict[int, list[tuple[int, float, float]]]:
+    """Every place two drawn car bodies would foul, as occupancy the solver reads.
+
+    The block model answers *"are these two trains on the same rail"*. This
+    answers the question the player actually asked, which is *"are these two
+    trains in the same place"*, and the two come apart wherever a `slot` is a
+    claim the geometry does not keep -- at every platform on a corridor OSM drew
+    as one centreline, and at every flat crossing where two routes share a node
+    and no block.
+
+    A pair of sampled points fouls when they are inside `FOUL_PLAN_M` in plan
+    and `FOUL_HEIGHT_M` in height **and** they are not a legitimate pass:
+
+      * closer than `FOUL_COINCIDENT_M` -- one alignment drawn twice, always a
+        foul, whatever the two are doing;
+      * further apart than that but not parallel -- a crossing;
+      * further apart than that and parallel -- **two tracks**, and a train on
+        each is what a double-track railway is. Excluded here. The spacing on
+        those is RAIL-CORRIDOR.md's lateral budget, and `rail-gauge-check` is
+        the check that ratchets it.
+
+    Each fouling pair is filed under the `FOUL_CELL_M` cell of its midpoint, and
+    the arc-length span each direction has in a cell becomes one occupancy
+    window widened by half a train at each end -- so the constraint is *"your
+    train must be clear of this place before mine reaches it"*, which is the
+    same sentence the block constraint makes about a rail.
+
+    Keys are negative so nothing can confuse a foul site with a rail, and
+    `blocks.junction[k // 2]` is never asked about one: `SEP_S` is the margin
+    everywhere here, and a foul site is not a signalled block.
+    """
+    from scipy.spatial import cKDTree
+
+    units: list[tuple[Direction, float]] = []
+    for ln in lines:
+        for d in ln.dirs:
+            units.append((d, consist_half(ln.metro)))
+
+    pts: list[np.ndarray] = []
+    arcs: list[np.ndarray] = []
+    heads: list[np.ndarray] = []
+    owner: list[np.ndarray] = []
+    for ui, (d, _h) in enumerate(units):
+        p, s, h = _drawn_samples(d)
+        pts.append(p)
+        arcs.append(s)
+        heads.append(h)
+        owner.append(np.full(len(s), ui, dtype=np.int64))
+    P = np.concatenate(pts) if pts else np.zeros((0, 3))
+    S = np.concatenate(arcs) if arcs else np.zeros(0)
+    H = np.concatenate(heads) if heads else np.zeros((0, 2))
+    O = np.concatenate(owner) if owner else np.zeros(0, dtype=np.int64)
+    if len(P) == 0:
+        return {}
+
+    tree = cKDTree(P[:, [0, 2]])
+    pairs = tree.query_pairs(FOUL_PLAN_M, output_type="ndarray")
+    if len(pairs) == 0:
+        log("  fouls: none -- no two drawn car bodies share a place")
+        return {}
+    a, b = pairs[:, 0], pairs[:, 1]
+    keep = O[a] != O[b]
+    a, b = a[keep], b[keep]
+    dxz = np.hypot(P[a, 0] - P[b, 0], P[a, 2] - P[b, 2])
+    dy = np.abs(P[a, 1] - P[b, 1])
+    cos = np.abs(H[a, 0] * H[b, 0] + H[a, 1] * H[b, 1])
+    real = (dy < FOUL_HEIGHT_M) & (
+        (dxz < FOUL_COINCIDENT_M) | (cos < FOUL_PARALLEL_COS)
+    )
+    a, b = a[real], b[real]
+    if len(a) == 0:
+        log("  fouls: none -- every close pass is on a parallel track")
+        return {}
+
+    # **Only what the block model misses.** Where the two fouling points are on
+    # the same rail key the block constraint already says everything this would
+    # -- and says it better, because `map_blocks` gives one trip disjoint time
+    # ranges and a twelve-metre cell does not. Restating it here was how a
+    # service's own second lap of the City Circle became a self-conflict no
+    # period on the ladder could clear, against a rail `self_conflicts` had
+    # already cleared it against.
+    ka = _rail_keys(units, O, S, blocks)
+    same = ka[a] == ka[b]
+    dropped = int(np.count_nonzero(same))
+    a, b = a[~same], b[~same]
+    if len(a) == 0:
+        log(f"  fouls: none the block model does not already hold ({dropped:,} pairs)")
+        return {}
+
+    # One cell per fouling midpoint. Both members register their own arc length
+    # under it, so the site is a place two named services must not share.
+    mx = ((P[a, 0] + P[b, 0]) / 2 / FOUL_CELL_M).astype(np.int64)
+    mz = ((P[a, 2] + P[b, 2]) / 2 / FOUL_CELL_M).astype(np.int64)
+    my = ((P[a, 1] + P[b, 1]) / 2 / FOUL_HEIGHT_M).astype(np.int64)
+
+    # Which kind of place each cell is. A site where the two alignments are the
+    # *same* rails drawn twice wants the full `SEP_S`: it is a piece of running
+    # line, and clearing it is clearing a block. A site where they merely cross
+    # is a flat junction, and the network already has a number for how long a
+    # train needs to be out of one -- `SEP_JUNCTION_S`. Giving every crossing
+    # the running-line margin is what made T2's own City Circle self-crossing
+    # unschedulable at every rung of the ladder, against a nine-second miss.
+    coincident = dxz[real][~same] < FOUL_COINCIDENT_M
+    heavy: set[tuple[int, int, int]] = set()
+
+    span: dict[tuple[int, int, int, int], list[float]] = defaultdict(list)
+    for k in range(len(a)):
+        cell = (int(mx[k]), int(mz[k]), int(my[k]))
+        if coincident[k]:
+            heavy.add(cell)
+        span[(cell[0], cell[1], cell[2], int(O[a[k]]))].append(float(S[a[k]]))
+        span[(cell[0], cell[1], cell[2], int(O[b[k]]))].append(float(S[b[k]]))
+
+    # A cell only one service reaches constrains nothing -- it happens where a
+    # pair straddles a cell boundary -- and would otherwise cost the solver a
+    # self-conflict against a place only it goes.
+    reach: dict[tuple[int, int, int], set[int]] = defaultdict(set)
+    for (cx, cz, cy, ui) in span:
+        reach[(cx, cz, cy)].add(ui)
+
+    out: dict[int, list[tuple[int, float, float]]] = defaultdict(list)
+    ids: dict[tuple[int, int, int], int] = {}
+    shared_cells: set[tuple[int, int, int]] = set()
+    windows = 0
+    for (cx, cz, cy, ui), arcs_here in sorted(span.items()):
+        cell = (cx, cz, cy)
+        if len(reach[cell]) < 2:
+            continue
+        if cell in heavy:
+            # A shared alignment: two services drawn on one set of rails,
+            # which is almost always a platform road the router gave to more
+            # trains than a platform road can hold. **Measured, and not
+            # constrained here**, because constraining it is not a timetable
+            # question -- see `SHARED_FOUL_NOTE` and RAIL-CORRIDOR.md's P5.
+            shared_cells.add(cell)
+            continue
+        key = ids.get(cell)
+        if key is None:
+            # Negative and never a block: `blocks.junction` is never asked
+            # about one, because every reader of a key goes through `_sep_for`
+            # and `_where`. Odd so that `-key // 2` numbers the sites from one.
+            key = -(2 * (len(ids) + 1) + 1)
+            ids[cell] = key
+        # **A route can pass through one cell twice.** T2 and T8 run the City
+        # Circle, so they reach the same twelve metres of Sydney at minute two
+        # and again at minute fifty -- and taking the min and max of the arc
+        # lengths made one window 450 s wide, which no period on the ladder can
+        # clear and which is not what the train does. Consecutive visits are
+        # split wherever the arc length jumps further than a cell can explain.
+        for s0, s1 in _runs(sorted(arcs_here), FOUL_CELL_M * 4):
+            out[ui].append((key, s0, s1))
+            windows += 1
+
+    log(
+        f"  fouls: {len(ids)} crossings constrained ({windows} arc-length spans) and "
+        f"{len(shared_cells)} shared-alignment sites measured but not constrained; "
+        f"{len(a):,} sampled pairs after {dropped:,} the block model already holds"
+    )
+    foul_shared_sites.clear()
+    foul_shared_sites.update(shared_cells)
+    return dict(out)
+
+
+# Filled by the last `foul_sites` call: the twelve-metre cells where two
+# services are drawn on one alignment and the timetable is not asked to keep
+# them apart. `rail-audit` prints them; `SHARED_FOUL_NOTE` says why.
+foul_shared_sites: set[tuple[int, int, int]] = set()
+
+SHARED_FOUL_NOTE = (
+    "two services drawn on one alignment; the timetable cannot separate them "
+    "without a six-minute headway everywhere (measured), and the alignment is "
+    "RAIL-CORRIDOR.md P5's to move"
+)
+
+
+def foul_windows(
+    d: Direction, half: float, spans: Sequence[tuple[int, float, float]]
+) -> list[tuple[int, float, float]]:
+    """`foul_sites`' arc spans, timed against this direction's current curve.
+
+    Separate from `foul_sites` because a **hold** changes the curve and does not
+    move a metre of railway: the arc lengths are geometry and are computed once,
+    the times are a timetable and are recomputed every time the timetable moves.
+
+    The window runs from the nose entering the site to the tail leaving it, the
+    same widening `occupancy` applies to a block, and overlapping windows of one
+    direction on one site are merged -- a route that crosses a cell once can
+    still land two spans on it, because the cell is binned on the *midpoint* of
+    a fouling pair, and `self_conflicts` would read the two as a train meeting
+    its own next departure at zero offset. One trip is one train.
+    """
+    total = float(d.cum[-1])
+    by_key: dict[int, list[tuple[float, float]]] = defaultdict(list)
+    for key, s0, s1 in spans:
+        a = max(0.0, s0 - half)
+        t0 = -ORIGIN_STAND_S if a <= 0.0 else curve_time_at(d.phases, a)
+        t1 = curve_time_at(d.phases, min(total, s1 + half))
+        by_key[key].append((t0, t1) if t1 >= t0 else (t1, t0))
+    out: list[tuple[int, float, float]] = []
+    for key, rows in by_key.items():
+        rows.sort()
+        cur0, cur1 = rows[0]
+        for t0, t1 in rows[1:]:
+            if t0 <= cur1:
+                cur1 = max(cur1, t1)
+                continue
+            out.append((key, cur0, cur1))
+            cur0, cur1 = t0, t1
+        out.append((key, cur0, cur1))
+    return out
+
+
+def _rail_keys(
+    units: Sequence[tuple[Direction, float]],
+    owner: np.ndarray,
+    arc: np.ndarray,
+    blocks: BlockSet,
+) -> np.ndarray:
+    """The rail key under every sampled point, or -1 off any block.
+
+    `_rail_at` in vector form: one `searchsorted` per direction over its own
+    block runs, which are already sorted and abutting by construction.
+    """
+    out = np.full(len(arc), -1, dtype=np.int64)
+    for ui, (d, _half) in enumerate(units):
+        rows = np.flatnonzero(owner == ui)
+        if rows.size == 0 or not d.blocks:
+            continue
+        s0 = np.asarray([r[1] for r in d.blocks], dtype=np.float64)
+        s1 = np.asarray([r[2] for r in d.blocks], dtype=np.float64)
+        keys = np.asarray([blocks.key(r[0], r[3]) for r in d.blocks], dtype=np.int64)
+        i = np.clip(np.searchsorted(s0, arc[rows], side="right") - 1, 0, len(s0) - 1)
+        ok = (arc[rows] >= s0[i]) & (arc[rows] <= s1[i])
+        out[rows] = np.where(ok, keys[i], -1)
+    return out
+
+
+def _runs(sorted_s: Sequence[float], gap: float) -> list[tuple[float, float]]:
+    """Contiguous runs of a sorted arc-length list, split on a gap wider than `gap`."""
+    out: list[tuple[float, float]] = []
+    if not sorted_s:
+        return out
+    lo = hi = sorted_s[0]
+    for s in sorted_s[1:]:
+        if s - hi > gap:
+            out.append((lo, hi))
+            lo = s
+        hi = s
+    out.append((lo, hi))
+    return out
+
+
+def _where(key: int, blocks: BlockSet) -> str:
+    """A key, in words. Half the solver's reports name one of these."""
+    if key < 0:
+        return f"foul site {-key // 2} (a flat crossing)"
+    b = key // 2
+    return (f"block {b}{' (junction)' if blocks.junction[b] else ''}, "
+            f"{blocks.length[b]:.0f} m")
+
+
+def _sep_for(key: int, blocks: BlockSet) -> float:
+    """The clearance a key demands. `SEP_FOUL_S` says why a site is not a block."""
+    if key < 0:
+        return SEP_FOUL_S
+    return SEP_JUNCTION_S if blocks.junction[key // 2] else SEP_S
 
 
 # --- The phase solver ---------------------------------------------------------------
@@ -3839,14 +4387,14 @@ def self_conflicts(
     for k, t0, t1 in occ:
         by_rail[k].append((t0, t1))
     for k, runs in by_rail.items():
-        sep = SEP_JUNCTION_S if blocks.junction[k // 2] else SEP_S
+        sep = _sep_for(k, blocks)
         for i, (a0, a1) in enumerate(runs):
             held = (a1 - a0) + sep
             if held >= period:
                 bad += 1
                 if held > worst:
                     worst = held
-                    example = (f"block {k // 2} held {a1 - a0:.1f} s + {sep:.0f} s "
+                    example = (f"{_where(k, blocks)} held {a1 - a0:.1f} s + {sep:.0f} s "
                                f"clearance against a {period} s period")
             for j, (b0, b1) in enumerate(runs):
                 if j == i:
@@ -3857,16 +4405,27 @@ def self_conflicts(
                 if hi - lo >= period:
                     bad += 1
                     example = example or (
-                        f"block {k // 2} is visited twice and the two visits cover "
+                        f"{_where(k, blocks)} is visited twice and the two visits cover "
                         f"the whole {period} s period"
                     )
                     continue
                 base = -period * math.floor(-lo / period)
+                # **Zero is the trip itself, and a train is not two trains.**
+                # This test asks whether one departure's second visit lands on
+                # the *next* departure's first, so the repeat that matters is a
+                # non-zero multiple of the period. On a block that never came
+                # up -- `map_blocks` gives one trip disjoint time ranges -- but
+                # a foul site is binned on the midpoint of a fouling pair, so
+                # one trip can hold two windows on one site eleven seconds
+                # apart, and reading that as a collision made T9 unschedulable
+                # at every period on the ladder against nothing at all.
+                if base == 0:
+                    base = period
                 if lo < base < hi:
                     bad += 1
                     if not example:
                         example = (
-                            f"block {k // 2} is visited twice, {b0 - a0:.0f} s apart, "
+                            f"{_where(k, blocks)} is visited twice, {b0 - a0:.0f} s apart, "
                             f"and the gap is a multiple of the {period} s period"
                         )
     return bad, example
@@ -3903,14 +4462,15 @@ def _forbidden(
         rows = by_rail.get(k)
         if not rows:
             continue
-        b = k // 2
-        sep = SEP_JUNCTION_S if blocks.junction[b] else SEP_S
+        sep = _sep_for(k, blocks)
         for b0, b1 in rows:
             lo = b0 - a1 - sep
             hi = b1 - a0 + sep
             if hi - lo >= cycle:
                 forbid[:] = True
-                why.setdefault(0, f"block {b} is held right around the {cycle} s cycle")
+                why.setdefault(
+                    0, f"{_where(k, blocks)} is held right around the {cycle} s cycle"
+                )
                 continue
             for g in offsets:
                 s = lo + g
@@ -3923,11 +4483,7 @@ def _forbidden(
                     d = v % cycle
                     if not forbid[d]:
                         forbid[d] = True
-                        why.setdefault(
-                            d,
-                            f"block {b}{' (junction)' if blocks.junction[b] else ''}, "
-                            f"{blocks.length[b]:.0f} m",
-                        )
+                        why.setdefault(d, _where(k, blocks))
     return forbid, why
 
 
@@ -4054,6 +4610,116 @@ def _attempt(
     return None, cycle, {"kind": "search", "rail": -1, "lines": {}}
 
 
+# --- The hold ---------------------------------------------------------------------
+#
+# The last resort, and TRAINS.md never needed it because the block model never
+# convicted anybody of this. A service whose route runs over one piece of
+# railway twice meets its **own next departure** there if the gap between its
+# two visits happens to be near a multiple of its period, and no phase offset
+# can help -- both trains belong to the same service and there is no offset
+# between them. The ladder is the first answer: a different period moves the
+# multiple. When *no* rung on the ladder moves it -- T2 westbound reaches one
+# site 358 s into its run having first reached it at the start, and 358 is
+# within two seconds of 360 -- the only thing left that changes the gap and not
+# the frequency is to **stand still for longer somewhere between the two**.
+#
+# It costs the passenger those seconds and nothing else: a dwell is a phase with
+# `v0 = 0`, so the wire, `poseTrain` and every determinism check are untouched.
+MAX_HOLD_S = 90.0  # per calling stop; longer than this is a timetable nobody would ride
+MAX_HOLD_TOTAL_S = 150.0  # per direction
+HOLD_ROUNDS = 12
+HOLD_MARGIN_S = 2.0  # how far past the offending repeat to push the gap
+
+
+def _self_offender(
+    occ: Sequence[tuple[int, float, float]], period: int, blocks: BlockSet
+) -> tuple[int, float, float, float] | None:
+    """The worst same-service conflict: `(key, t_between, needed_hold, gap)`.
+
+    Same arithmetic as `self_conflicts`, but it reports what would fix it: how
+    many seconds the later visit has to move to put the offending repeat of the
+    period outside the pair's combined window, and the instant the hold must be
+    taken before.
+    """
+    by_key: dict[int, list[tuple[float, float]]] = defaultdict(list)
+    for k, t0, t1 in occ:
+        by_key[k].append((t0, t1))
+    best: tuple[int, float, float, float] | None = None
+    for k, runs in by_key.items():
+        sep = _sep_for(k, blocks)
+        for i, (a0, a1) in enumerate(runs):
+            for j, (b0, b1) in enumerate(runs):
+                if j == i or b0 < a1:
+                    continue
+                lo = b0 - a1 - sep
+                hi = b1 - a0 + sep
+                if hi - lo >= period:
+                    continue  # only a longer period can help; the ladder owns it
+                m = math.ceil(lo / period) * period
+                if m <= 0:
+                    m = period
+                if not (lo < m < hi):
+                    continue
+                need = m - lo + HOLD_MARGIN_S
+                if need > MAX_HOLD_S:
+                    continue
+                if best is None or need < best[2]:
+                    best = (k, b0, need, b0 - a1)
+    return best
+
+
+def _apply_holds(
+    units: Sequence[tuple[int, Line, Direction]],
+    spans: dict[int, list[tuple[int, float, float]]],
+    blocks: BlockSet,
+    log=print,
+) -> list[str]:
+    """Stand a service longer at a station rather than let it meet itself.
+
+    Run at `BASE_PERIOD_S`, before the ladder, because a hold that makes the
+    base period work is worth more than a period that makes the hold
+    unnecessary: two minutes with a longer stop beats six minutes without one.
+    The ladder still re-checks self-clearance at every rung it tries, so a hold
+    that stops helping at 180 s simply stops that rung being chosen.
+    """
+    notes: list[str] = []
+    for i, (_li, ln, d) in enumerate(units):
+        half = consist_half(ln.metro)
+        total = 0.0
+        for _round in range(HOLD_ROUNDS):
+            occ = occupancy(d, blocks, half, foul_windows(d, half, spans.get(i, ())))
+            hit = _self_offender(occ, BASE_PERIOD_S, blocks)
+            if hit is None:
+                break
+            key, before, need, gap = hit
+            if total + need > MAX_HOLD_TOTAL_S:
+                break
+            # The last calling stop the train reaches before the second visit.
+            # `arrivals` is per calling stop and `build_curve` indexes its holds
+            # by the same boundary, so this is the stop the passenger waits at.
+            k = -1
+            for bi, t in enumerate(d.arrivals):
+                if 0 < bi < len(d.arrivals) - 1 and t < before:
+                    k = bi
+            if k < 0:
+                break
+            d.holds[k] = d.holds.get(k, 0.0) + need
+            build_curve(d)
+            total += need
+            stop = [s for s in d.stops if s.stops]
+            name = stop[k].name if 0 <= k < len(stop) else f"stop {k}"
+            notes.append(
+                f"{ln.id} {d.label}: {need:.0f} s longer at {name} -- "
+                f"{_where(key, blocks)} is {gap:.0f} s into a "
+                f"{BASE_PERIOD_S} s period"
+            )
+    if notes:
+        log(f"  holds: {len(notes)} stations stand longer so a service clears itself")
+        for n in notes[:6]:
+            log(f"    {n}")
+    return notes
+
+
 def solve_phases(lines: Sequence[Line], blocks: BlockSet, log=print) -> dict:
     """An integer phase per line-direction, or a longer period for whoever needs one.
 
@@ -4073,7 +4739,24 @@ def solve_phases(lines: Sequence[Line], blocks: BlockSet, log=print) -> dict:
     for li, ln in enumerate(lines):
         for d in ln.dirs:
             units.append((li, ln, d))
-    occ = [occupancy(d, blocks) for _, _, d in units]
+    # The geometry the `slot` was a claim about. `compute_lateral` first,
+    # because a foul is between two *drawn* trains and the offset is what
+    # decides whether two rails on one centreline are two places or one.
+    marked = compute_lateral(lines)
+    log(f"  lateral: {marked} vertices offset {SHARED_OFFSET_M} m onto their own rail")
+    spans = foul_sites(lines, blocks, log=log)
+
+    def build_occ() -> list[list[tuple[int, float, float]]]:
+        return [
+            occupancy(
+                d, blocks, consist_half(ln.metro),
+                foul_windows(d, consist_half(ln.metro), spans.get(i, ())),
+            )
+            for i, (_, ln, d) in enumerate(units)
+        ]
+
+    held = _apply_holds(units, spans, blocks, log=log)
+    occ = build_occ()
 
     periods: dict[str, int] = {ln.id: BASE_PERIOD_S for ln in lines}
     degraded: dict[str, str] = {}
@@ -4195,6 +4878,8 @@ def solve_phases(lines: Sequence[Line], blocks: BlockSet, log=print) -> dict:
         "degraded": degraded,
         "attempts": attempts,
         "recovered": recovered,
+        "holds": held,
+        "foul_sites": len({k for rows in spans.values() for k, _, _ in rows}),
         **_shared_stats(occ),
     }
 
@@ -4229,7 +4914,7 @@ def _pressure(
         lid = units[i][1].id
         period = float(units[i][2].period)
         for k, t0, t1 in o:
-            sep = SEP_JUNCTION_S if blocks.junction[k // 2] else SEP_S
+            sep = _sep_for(k, blocks)
             f = (t1 - t0 + sep) / period
             load[k] += f
             share[k][lid] += f
@@ -5097,6 +5782,7 @@ def write_bake(
     out_dir.mkdir(parents=True, exist_ok=True)
 
     verts: list[np.ndarray] = []
+    laterals: list[np.ndarray] = []
     cums: list[np.ndarray] = []
     flags: list[np.ndarray] = []
     clears: list[np.ndarray] = []
@@ -5119,6 +5805,10 @@ def write_bake(
             if cl.size != xyz.shape[0]:
                 cl = np.zeros(xyz.shape[0], dtype=np.float32)
             clears.append(cl)
+            lt = np.asarray(d.lateral, dtype=np.float32)
+            if lt.size != xyz.shape[0]:
+                lt = np.zeros(xyz.shape[0], dtype=np.float32)
+            laterals.append(lt)
             n = int(xyz.shape[0])
             ph = list(d.phases)
             for t0, s0, v0, a in ph:
@@ -5169,6 +5859,7 @@ def write_bake(
     cum_arr = np.concatenate(cums) if cums else np.zeros(0, dtype=np.float64)
     flag_arr = np.concatenate(flags) if flags else np.zeros(0, dtype=np.uint8)
     clear_arr = np.concatenate(clears) if clears else np.zeros(0, dtype=np.float32)
+    lat_arr = np.concatenate(laterals) if laterals else np.zeros(0, dtype=np.float32)
     ph_arr = np.asarray(phases, dtype=np.float64)
     st_arr = np.asarray(
         [[s.x, s.y, s.z, s.dx, s.dz] for s in stanchions], dtype=np.float32
@@ -5302,6 +5993,17 @@ def write_bake(
             "expressMinM": EXPRESS_MIN_M, "dwell": DWELL_S,
             "blockTargetM": BLOCK_TARGET_M, "sepS": SEP_S, "sepJunctionS": SEP_JUNCTION_S,
             "maxGradient": MAX_GRADIENT,
+            # What the solver believed a train *is*. `game/riding.SUBURBAN`,
+            # `METRO`, the two pitches and `world/trains.COUPLER_GAP_M` are the
+            # other copy, in TypeScript, and the pipeline cannot read them --
+            # so it ships what it used and `server/train-conflict-check.ts`
+            # asserts the two agree. A solver that proved its invariant about a
+            # 163 m train against a renderer drawing a 132 m one would be the
+            # same class of bug as the one this round is about.
+            "consistHalfM": consist_half(False),
+            "consistHalfMetroM": consist_half(True),
+            "originStandS": ORIGIN_STAND_S,
+            "sepFoulS": SEP_FOUL_S,
         },
         "solve": {k: v for k, v in solve.items() if k != "degraded"},
         "degraded": solve.get("degraded", {}),
@@ -5347,6 +6049,12 @@ def write_bake(
         # metres, no height. See `corridor_paving` for why there is no height and
         # `world/road-deck.RoadDeck.adoptPaving` for what reads it.
         ("paving", pav_arr),
+        # Metres each vertex's train sits to the left of its own travel.
+        # **Baked from bake version 5, and derived at decode before that.**
+        # `compute_lateral` is the only implementation now, and it has to be on
+        # this side: the solver proves that two trains are never in one place,
+        # and it cannot prove it against an offset only the browser knows.
+        ("lateral", lat_arr),
     )
     header["buffers"] = {
         name: {"count": int(arr.size), "itemBytes": int(arr.itemsize)}
@@ -6578,6 +7286,53 @@ def audit(radius_m: float, built: dict | None = None, log=print) -> int:
         f"{closest:.1f} s against a {SEP_S:.0f} s rule",
     )
 
+    # --- 5b. THE SAME SWEEP, ASKED ABOUT A TRAIN INSTEAD OF A POINT.
+    #
+    # **This is the section the report "the trains going through each other"
+    # bought.** Section 5 above walks the clock and asks which rail the
+    # *centre* of each train is on, which is the invariant `solve_phases` used
+    # to prove, and it was green on the bake the report was filed against. A
+    # train is 163 m long. Eighty metres of it hangs off each end of the point
+    # everybody was watching, so two trains twenty seconds apart at a platform
+    # -- where twenty seconds is no distance at all, because both are standing
+    # -- were inside each other with every check green.
+    #
+    # So this sweeps the same clock and asks which rails the whole consist is
+    # on, nose to tail, and it includes the forty-five seconds a train stands
+    # at its origin before the timetable thinks it exists. `occupancy` now
+    # models both; this is the independent reader that says so, and
+    # `server/train-conflict-check.ts` is a third from the TypeScript decoder.
+    log("")
+    log("--- 5b. The same sweep over the whole 163 m consist, and the origin stand")
+    cviol, csamples, cclosest, cworst = consist_sweep(lines, blocks, cycle, hz=4)
+    check(
+        cviol == 0,
+        f"{csamples} sampled (consist, rail) occupancies over the {cycle} s cycle and "
+        f"{cviol} violation(s)"
+        + (f" -- worst {cworst}" if cworst else "")
+        + f"; the closest two consists came to sharing a rail was {cclosest:.1f} s",
+    )
+    log(
+        f"  the geometry the timetable was solved against: "
+        f"{solve.get('foul_sites', 0)} crossing site(s) constrained, "
+        f"{len(foul_shared_sites)} shared-alignment site(s) measured and not "
+        f"constrained -- {SHARED_FOUL_NOTE}"
+    )
+    if solve.get("holds"):
+        log(f"  {len(solve['holds'])} hold(s) applied so a service clears its own next departure:")
+        for h in solve["holds"]:
+            log(f"    {h}")
+
+    # --- 5b'. The hold, exercised. A mechanism that never fires on the shipped
+    #          bake is a mechanism nobody has tested, so it is fired here on a
+    #          synthetic case with a known answer: a service that reaches one
+    #          rail twice, exactly one period apart, which no offset can fix and
+    #          only a longer stand between the two visits can.
+    log("")
+    log("--- 5b'. The hold mechanism, on a case built to need one")
+    ok, why = _hold_selftest(blocks)
+    check(ok, why)
+
     # --- 5c. THE ORDERING INVARIANT, asserted rather than believed.
     #
     # The check that would have caught the regression this section was written
@@ -6800,6 +7555,110 @@ def separation_sweep(
     viol = int(np.count_nonzero(gaps < sep))
     closest = float(gaps.min()) if gaps.size else 0.0
     return viol, int(rail.size), closest
+
+
+def consist_sweep(
+    lines: Sequence[Line], blocks: BlockSet, cycle: int, hz: int = 4
+) -> tuple[int, int, float, str]:
+    """`separation_sweep`, asked about the whole train instead of its centre.
+
+    Same clock, same evaluator, one difference: a train claims every rail its
+    body is over -- `consist_half` either side of the pose -- and it claims them
+    from `-ORIGIN_STAND_S`, because a train standing at its origin with the
+    doors open is a train on a rail whatever the timetable thinks.
+
+    Four hertz rather than ten. A 163 m consist crossing a 386 m block cannot
+    slip through a quarter-second sample, and the rail set per sample is ten
+    times bigger, so the cheaper clock buys the wider train.
+    """
+    rows: list[tuple[int, float, int]] = []  # (rail, t, trip)
+    steps = int(round(cycle * hz))
+    for li, ln in enumerate(lines):
+        half = consist_half(ln.metro)
+        for d in ln.dirs:
+            if not d.phases or not d.blocks:
+                continue
+            total = float(d.cum[-1])
+            bs = np.asarray([r[1] for r in d.blocks], dtype=np.float64)
+            be = np.asarray([r[2] for r in d.blocks], dtype=np.float64)
+            bk = np.asarray([blocks.key(r[0], r[3]) for r in d.blocks], dtype=np.int64)
+            period = d.period
+            span = math.ceil((d.duration + ORIGIN_STAND_S) / period) + 1
+            for k in range(steps):
+                t = k / hz
+                for j in range(span + 1):
+                    n = math.floor((t - d.offset) / period) - j
+                    age = t - d.offset - n * period
+                    if age < -ORIGIN_STAND_S or age > d.duration:
+                        continue
+                    s_mid, _v = eval_curve(d.phases, max(0.0, age))
+                    lo = max(0.0, s_mid - half)
+                    hi = min(total, s_mid + half)
+                    i0 = int(np.searchsorted(bs, lo, side="right")) - 1
+                    i1 = int(np.searchsorted(bs, hi, side="right")) - 1
+                    for i in range(max(i0, 0), min(i1, len(bs) - 1) + 1):
+                        if be[i] < lo or bs[i] > hi:
+                            continue
+                        rows.append((int(bk[i]), t, (li * 2 + d.index) * 100_000 + (n % 100_000)))
+    if not rows:
+        return 0, 0, 0.0, ""
+    rows.sort()
+    viol = 0
+    closest = float("inf")
+    worst = ""
+    for i in range(1, len(rows)):
+        ra, ta, wa = rows[i - 1]
+        rb, tb, wb = rows[i]
+        if ra != rb or wa == wb:
+            continue
+        gap = tb - ta
+        if gap < closest:
+            closest = gap
+        # Two different trains on one rail at the same instant is the fault;
+        # the time margin is section 5's business and this one is about metal.
+        if gap <= 0.0:
+            viol += 1
+            if not worst:
+                worst = f"rail {ra} (block {ra // 2}) at t={ta:.1f}s"
+    return viol, len(rows), (0.0 if closest == float("inf") else closest), worst
+
+
+def _hold_selftest(blocks: BlockSet) -> tuple[bool, str]:
+    """Fire `_self_offender` and the hold on a case built to need one.
+
+    A service that reaches one rail twice exactly `BASE_PERIOD_S` apart meets
+    its own next departure there, and no phase offset exists to fix it because
+    both trains belong to the same service. The hold is the only answer, and
+    this asserts it finds one and that the one it finds actually clears.
+    """
+    period = BASE_PERIOD_S
+    key = -2  # a shared-alignment foul site, so the margin is `SEP_FOUL_S`
+    sep = _sep_for(key, blocks)
+    occ = [(key, 10.0, 20.0), (key, 10.0 + period, 20.0 + period)]
+    hit = _self_offender(occ, period, blocks)
+    if hit is None:
+        return False, "a service meeting its own next departure on one rail was not detected"
+    _k, _before, need, gap = hit
+    del sep
+    moved = [(key, 10.0, 20.0), (key, 10.0 + period + need, 20.0 + period + need)]
+    bad, _ex = self_conflicts(moved, period, blocks)
+    if bad:
+        return False, f"a {need:.0f} s hold did not clear a conflict {gap:.0f} s into the period"
+    # The negative control: half the hold must NOT clear it, or the hold is not
+    # what fixed anything. `need - HOLD_MARGIN_S` is deliberately not the test --
+    # that is the boundary the margin exists to stand clear of, and a boundary
+    # case passing proves nothing either way.
+    short = [(key, 10.0, 20.0),
+             (key, 10.0 + period + need / 2, 20.0 + period + need / 2)]
+    if not self_conflicts(short, period, blocks)[0]:
+        return False, (
+            f"NEGATIVE CONTROL: half the {need:.0f} s hold also cleared, so the hold is not "
+            "what fixed it"
+        )
+    return True, (
+        f"a service meeting its own next departure {gap:.0f} s into a {period} s period is "
+        f"detected, a {need:.0f} s hold clears it, and half of one does not"
+    )
 
 
 def _rail_at(d: Direction, blocks: BlockSet, s: float) -> int:

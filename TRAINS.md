@@ -110,6 +110,56 @@ problem — it is a **constraint-solving problem at build time**:
    a second, independent reader — the bays/hex precedent: never trust one
    implementation of an invariant.
 
+### 3a. What the block model missed, and what it cost — added 2026-09-07
+
+Reported as *"the trains going through each other"*, with every check above
+green. The invariant this section describes is about **a point on a rail key**;
+what a player sees is **eight carriage bodies drawn in world space**, and four
+things came between them. Three are now in the solve and one is measured and
+named:
+
+1. **A train is 163 m long and occupancy was a point.** `occupancy` mapped the
+   arc-length range of the *pose*, the consist's centre, so eighty metres of
+   train hung off each end of every claim the timetable made. Twenty seconds
+   between two centres is six hundred metres at line speed and nothing at all
+   at a platform. Fixed: the window now runs from the nose entering a block to
+   the tail leaving it (`rail.consist_half`).
+2. **The forty-five second stand at the origin was invisible.** `poseTrain`
+   gives every trip `ORIGIN_STAND_S` at its first stop with the doors open —
+   added so a terminus was boardable — and the solver's occupancy started at
+   `t = 0`. A T8 stood on Central's platform while the T8 four departures ahead
+   came back round the City Circle through the same rail. Fixed: occupancy of
+   the first blocks starts at `-ORIGIN_STAND_S`.
+3. **A flat crossing is not a shared block.** Two routes crossing at a node
+   without sharing a block section have no rail key in common, so the solver
+   had nothing to constrain. Fixed: `rail.foul_sites` walks the *drawn*
+   polylines, finds every place two car bodies would foul, and hands the
+   solver synthetic occupancy sites it reads exactly like rails. Nine such
+   crossings exist in the 60 km disc.
+4. **The `slot` is a claim about geometry the geometry does not keep.** Where
+   OSM draws a double-track corridor as one centreline, `compute_lateral`
+   pushes each direction 2 m off it — except within 110 m of a calling stop,
+   where `world/rail-solids` builds the platform 1.62 m off the centreline *on
+   both sides* and a train pushed sideways would be drawn inside the platform.
+   **Not fixed, and both alternatives were measured and refused:** merging the
+   two slots into one occupancy makes the solve fail outright with nine lines
+   on six-minute headways, and carrying the offset through the platform trades
+   this fault for the one the owner already reported about platforms. Moving
+   the alignment is RAIL-CORRIDOR.md's **P5**.
+
+**The price, stated.** Telling the solver how long a train is, and that it
+stands at its origin, costs frequency, and the ladder reports it rather than
+hiding it: T4, T7 and T8 fall from 120 s to 180 s, T5 and T9 from 180 s to
+360 s. That is the honest cost of the claim actually being true; TRAINS.md
+section 3's rule was always "degraded, reported, not hidden".
+
+**Acceptance** is `server/train-conflict-check.ts` — the whole timetable swept
+over one cycle at 10 Hz, every carriage body against every other — plus
+`rail-audit` sections 5b and 5b'. Two trains claiming one rail: **8 pairs
+before, 0 after**. Bodies inside each other on one alignment with one rail key:
+**4 before, 0 after**. At a flat crossing: **4 before, 0 after**. The shared
+alignment case above: **76 before, 60 after**, budgeted and ratcheting.
+
 Same-line following is safe by construction (uniform period, uniform curve —
 successive trips are time-translates that never converge).
 
