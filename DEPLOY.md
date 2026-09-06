@@ -632,6 +632,23 @@ block from it. So:
    It ends on a control that proves the crossing predicate can both convict a
    grade separation and excuse an intersection. `--near x,z --radius m` scopes
    it.
+   Then `bun run server/clash-check.ts` — **622 s** over the whole build, and
+   the one that catches a retile which put two of the world's populations in the
+   same cubic metre. Twelve pairs sharing one tile loop, each with its own
+   `BUDGET_*` ratchet and its own control: trees in buildings, furniture in
+   buildings and in carriageways, parked cars in buildings and in each other,
+   footprints in footprints, decks through buildings and under the terrain,
+   anything baked inside the volume a train sweeps, station rooms inside
+   buildings, water against the ground, buildings under water. It opens no
+   `.glb` — every population here is an instance row or a collision ring — which
+   is what keeps the 60 km inside ten minutes. Today it measures 63,089 water
+   vertices, 14,562 furniture items in a carriageway and 4,850 overlapping
+   footprint pairs at the top of the table, all twelve budgets are ratchets at
+   the 2026-09-07 measurement, and **the fixes are all in `pipeline/`, so only a
+   retile moves any of them — the retile that carries one lowers its budget to
+   what it measures.** `docs/CLASH-ROUND.md` is the round report: the table, and
+   which pass would remove each of the three worst. `--near x,z --radius m`
+   scopes it; `--sample N` takes every Nth tile; neither can gate.
 3. **Restore region mtimes** for bundles whose hash did not change
    (`data/scratch/station-round/restore-region-mtimes.py`), so a
    size-and-mtime uploader sends only the ones that did.
