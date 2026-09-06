@@ -136,6 +136,7 @@ import {
   NPC_KIND,
   NPC_STATE,
   REASON,
+  footGround,
   npcKind,
   policeHostileTo,
   registerNpcKind,
@@ -2520,7 +2521,7 @@ function walkToward(actor: NpcActor, tx: number, tz: number, speed: number, ctx:
   }
   actor.x = nx;
   actor.z = nz;
-  actor.y = ctx.groundHeight(nx, nz, actor.y);
+  actor.y = footGround(ctx, nx, nz, actor.y);
   return d;
 }
 

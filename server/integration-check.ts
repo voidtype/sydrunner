@@ -6888,7 +6888,7 @@ async function checkPolice(): Promise<void> {
     two.reportCrime(9, two.REASON.WILDLIFE);
     field.step({
       tick: 1, dt: 1 / 60, collision: null,
-      groundHeight: () => 0, peds: null, combatants: [], field,
+      groundHeight: () => 0, roads: null, peds: null, combatants: [], field,
       investigationOf: (id) => field.investigationOf(id),
       damagePlayer: () => {},
       emit: () => {},
@@ -6908,7 +6908,7 @@ async function checkPolice(): Promise<void> {
     two.reportCrime(-1, two.REASON.ASSAULT);
     field.step({
       tick: 2, dt: 1 / 60, collision: null,
-      groundHeight: () => 0, peds: null, combatants: [], field,
+      groundHeight: () => 0, roads: null, peds: null, combatants: [], field,
       investigationOf: (id) => field.investigationOf(id),
       damagePlayer: () => {},
       emit: () => {},
@@ -7570,6 +7570,7 @@ async function checkStreetlife(): Promise<void> {
     dt: 1 / 60,
     collision,
     groundHeight: (x: number, z: number, feetY: number) => probeWorld.groundHeight(x, z, feetY),
+    roads: world.roads ?? null,
     peds: world.peds,
     combatants,
     field,

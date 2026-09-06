@@ -2488,6 +2488,8 @@ function verifyStandDown(): string[] {
       dt: 1 / 60,
       collision: null,
       groundHeight: () => 0,
+      // A flat world with no streets in it: the ground is the ground. See `FactionCtx.roads`.
+      roads: null,
       peds,
       combatants: [combatant],
       field,
@@ -2604,6 +2606,8 @@ function stubCtx(field: FactionField, combatants: readonly CombatantState[]): Fa
     dt: 1 / 60,
     collision: null,
     groundHeight: () => 0,
+    // A flat world with no streets in it: the ground is the ground. See `FactionCtx.roads`.
+    roads: null,
     peds: null,
     combatants,
     field,
