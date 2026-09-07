@@ -239,6 +239,16 @@ class Terrain:
         # the bed went are the same polygons the water is drawn on. Two sources
         # for where the harbour is would be one too many.
         self.water = None
+        # The stated pads this surface was levelled under, when it was: one
+        # `pads.PadRecord` each, carrying the water-clipped geometry the pass
+        # wrote inside and the height it wrote. Two readers, and they are the
+        # only two. `terrain-rules-check.py`'s gate asks for the geometry,
+        # because a check that rebuilds the zones is checking a different rule
+        # from the one that ran; and `landmarks.stated_pad` asks for the height,
+        # because a landmark levelled to a pad must build on that pad and not on
+        # a re-reading of it through one cell of harbour. Everything else in the
+        # build wants `sample`, where the pads already are.
+        self.pads = []
 
     # --- Construction --------------------------------------------------------
 
@@ -249,6 +259,7 @@ class Terrain:
         zoom: int = TERRARIUM_ZOOM,
         conform_roads: bool = True,
         conform_water: bool = True,
+        conform_pads: bool = True,
     ) -> Terrain:
         """The extent's ground, with the streets levelled into it.
 
@@ -290,6 +301,17 @@ class Terrain:
         `road-grade-audit` reports the shore stations on their own line rather
         than either hiding them or blaming `roadgrade.py` for them; see
         `cli._tidal_plan`.
+
+        `conform_pads` is the third and last pass and is on for everything that
+        ships. `pads.py` is `roadgrade.py`'s argument carried to the two places
+        where what the DSM is reading is not beside the thing but on top of it:
+        the interchange roof over a bridge-tagged station's platforms, and the
+        cliff the DEM runs through a hero landmark's own footprint. It runs
+        **after** the water and may not undo it -- every zone is clipped against
+        the mapped water first -- and its plateau is a stated extent with a one
+        cell feather, which is what lets `terrain-rules-check.py` assert that
+        nothing outside those extents moved by a millimetre. Read `pads.py`'s
+        header before changing the order of these three.
         """
         dem, origin_px, mpp = cls._load_dem(radius_m, zoom)
 
@@ -358,6 +380,26 @@ class Terrain:
                 heights, -reach, -reach, spacing, field.water
             )
             stats["water"]["area_m2"] = field.water.area
+            stats["min"] = float(heights.min())
+            stats["max"] = float(heights.max())
+        if conform_pads:
+            # Last, and reading the surface the first two passes left: a station
+            # pad is the *solved street*, which does not exist until the road
+            # pass has run, and a landmark's base is `terrain.sample` at its own
+            # centroid, which is the number `build_*` will ask for later. Both
+            # are therefore functions of ground that is already final, and this
+            # pass is the only one that moves it afterwards -- which is what
+            # stops the surface being a function of itself. The pad the model
+            # then builds on is the one recorded here, not a re-sample; see
+            # `landmarks.stated_pad` for the 3.82 m that distinction is worth at
+            # Luna Park's entrance.
+            from . import pads as pads_module
+
+            zones = pads_module.station_pads(radius_m, field.road_surface)
+            zones += pads_module.landmark_pads(radius_m, field.sample)
+            stats["pads"] = pads_module.conform(
+                heights, -reach, -reach, spacing, zones, field.water, field.pads
+            )
             stats["min"] = float(heights.min())
             stats["max"] = float(heights.max())
         return field

@@ -583,6 +583,96 @@ def suppression_zones(anchors: dict[str, Anchor]) -> dict[str, Polygon | MultiPo
     return zones
 
 
+# --- Which landmarks get to say where their own ground is ----------------------
+#
+# `pads.py` levels the lattice under a hero landmark's footprint to that
+# landmark's base. This is the list it reads, and it is deliberately a **short
+# declared list with a reason each way** rather than a property inferred from the
+# code, because the inference that suggests itself -- "the model takes `base_y`
+# from `terrain.sample`" -- is true of Sydney Tower as well, and Sydney Tower
+# must not be in it. The three that are out, with the numbers behind each:
+#
+#   * **The bridge is out because its base is the water.** Every height in
+#     `build_bridge` is `sea + <n> AHD`: the deck at 49.0, the bearings, the arch
+#     crest, the pylon tops. There is no `base_y` in its audit to pull to, its
+#     `bridge_deck` anchor is the 1,149 m deck outline lying over open harbour,
+#     and levelling the ground under that outline is the one operation in this
+#     pipeline that would fill Port Jackson. Not an exception to the rule: the
+#     rule has nothing to say about a structure that is not standing on ground.
+#
+#   * **The Opera House is out because its podium is already a stated AHD
+#     platform.** `build_opera` works from `podium_y = sea + OPERA_PODIUM_TOP_AHD`
+#     and cuts it into Bennelong Point, walls run down to the ground wherever the
+#     ground is, and the audit reports `podium_ahd`, not a `base_y`. Levelling
+#     the lattice to a number the model never asks the ground for buys nothing
+#     and would move the forecourt for no reason.
+#
+#   * **Sydney Tower is out because `roadgrade.py` has already done it.** It does
+#     take `base_y` from the ground -- but the footprint it would level is
+#     Westfield Sydney's 11,753 m2 block in the middle of the CBD, four sides of
+#     which are streets whose conform reaches a cell diagonal in from every kerb.
+#     There is no cliff running through it to remove, and a pad pass over it is a
+#     second opinion about ground the road solve is already the authority on.
+#
+# Luna Park is in, and `landmarks.py`'s own Luna header is the argument: the site
+# is flat in life and the DEM runs the Milsons Point cliff through it, 9.5 m of
+# it between two towers thirteen metres apart. That header ends "the model cannot
+# flatten that -- the terrain is baked". This is the entry that unbakes it.
+#
+# Each row is `(landmark, footprint keys, the key whose centroid is the base)`.
+# The base key is the entrance canopy for exactly the reason `build_luna_park`
+# takes its pad there: it is the middle of the three readings across the
+# entrance, so the Face clears the bank at both ends.
+#
+# The promenade is in the key list and levels nothing, and that is not an
+# oversight. `pads._clip_water` takes the mapped harbour out of every zone, and
+# the `man_made=pier` OSM draws for the promenade lies **entirely** inside it, so
+# the polygon contributes only the dry part of the margin around itself -- which
+# is the foreshore the halls were claiming anyway. Listing it says what the park
+# is; the water rule says how much of it this pass may touch. `_luna_boardwalk`
+# goes on decking its own way at `max(ground, sea) + 0.35`, which is what a pier
+# is and is not a thing a pad should be arguing with.
+_GROUND_FOUNDED: tuple[tuple[str, tuple[str, ...], str], ...] = (
+    (
+        "luna_park",
+        tuple(LUNA_GENERIC_TOPS) + ("luna_ferris_wheel", "luna_boardwalk"),
+        "luna_gate_roof",
+    ),
+)
+
+
+def ground_founded() -> tuple[tuple[str, tuple[str, ...], str], ...]:
+    """The landmarks whose footprint decides the ground under it. See above."""
+    return _GROUND_FOUNDED
+
+
+def stated_pad(terrain, name: str) -> float | None:
+    """The pad `pads.py` levelled this landmark's ground to, if it levelled any.
+
+    ONE EXPRESSION, TWO READERS, and this is the second reader. `pads.py` takes
+    the pad by sampling the base key's centroid on the ground as the road and
+    water passes left it, levels the footprints to it, and records the number.
+    `build_*` then asks for it back rather than re-sampling, because re-sampling
+    is not the same number and the difference is measured: Luna Park's entrance
+    canopy is 13 m from the mapped harbour, so one of the four lattice posts its
+    cell is interpolated from is a water post `water.conform` owns and this pass
+    may not raise. Re-sampled, the canopy reads 3.82 m below the pad the park was
+    actually levelled to, and the model would then build the entrance 3.82 m
+    under its own halls -- a defect invented entirely by asking the same question
+    twice and accepting two answers.
+
+    Returns None when the pass did not run (`conform_pads=False`, which is what
+    `road-grade-audit` and the before column of every comparison use) or did not
+    claim this landmark, and every caller then falls back to what it always did.
+    """
+    for rec in getattr(terrain, "pads", ()) or ():
+        if getattr(rec, "kind", "") == "landmark" and getattr(rec, "name", "") == name:
+            base = rec.note.get("base_y")
+            if base is not None:
+                return float(base)
+    return None
+
+
 def _tower_podium_zone(anchors: dict[str, Anchor]) -> Polygon:
     """The Centrepoint podium footprint, as a disc about the tower.
 
@@ -2148,10 +2238,20 @@ def _luna_pad(terrain, ring) -> tuple[float, float]:
     opens on the downhill side. Unlike `mesh` there is no ceiling on that depth:
     Crystal Palace's footprint spans seventeen metres of the DEM's cliff, and a
     capped skirt on it is a hole a player can look up through.
+
+    **Where the ground under the park has been levelled to a stated pad, that
+    number is the pad and the centroid is not consulted at all** -- see
+    `stated_pad`. Seven of the park's thirteen footprints sample it back to the
+    millimetre; the other six have a mapped-harbour post in their own cell and
+    sample 0.22 to 7.31 m low, so re-deriving the pad per structure would put
+    Luna Lounge six metres under Crystal Palace on ground that is flat. The floor
+    is still *measured*, because the floor is a question about the ground and not
+    about the pad.
     """
     poly = Polygon(np.asarray(ring, dtype=np.float64))
     c = poly.centroid
-    pad = float(terrain.sample(float(c.x), float(c.y)))
+    stated = stated_pad(terrain, "luna_park")
+    pad = stated if stated is not None else float(terrain.sample(float(c.x), float(c.y)))
     low = min(float(terrain.sample(float(e), float(n))) for e, n in np.asarray(ring))
     return pad, min(low, pad) - LUNA_SKIRT_MIN
 
@@ -2891,6 +2991,11 @@ def build_luna_park(anchors: dict[str, Anchor], terrain) -> Landmark:
     gate_w, gate_e = anchors["luna_gate_w"], anchors["luna_gate_e"]
     pad_w, floor_w = _luna_pad(terrain, gate_w.ring)
     pad_e, floor_e = _luna_pad(terrain, gate_e.ring)
+    # `_luna_pad` returns the stated pad where the ground has been levelled to
+    # one, so the three readings across the entrance are one number rather than
+    # three; the *floors* are still measured, so a plinth still buries where the
+    # shore drops away, which is the one thing the levelling cannot remove and
+    # the one thing this entrance has always been built to survive.
     pad, roof_floor = _luna_pad(terrain, anchors["luna_gate_roof"].ring)
     floor = min(floor_w, floor_e, roof_floor)
     ground = floor + LUNA_SKIRT_MIN  # the lowest real ground under the entrance

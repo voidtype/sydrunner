@@ -5610,7 +5610,8 @@ def place_stanchions(g: RailGraph, blocks: BlockSet) -> list[Stanchion]:
 #
 # That is not a theoretical preference; it was measured. This module loads the DEM
 # **unconformed** (`build_all`: `Terrain.load(..., conform_roads=False,
-# conform_water=False)`), because the rail solve has to see the ground before
+# conform_water=False, conform_pads=False)`), because the rail solve has to see
+# the ground before
 # `roadgrade.py` moved it. Against the shipped `.terr.bin` lattice, at 15,149 foot
 # paving vertices within 40 m of a corridor, that surface differs by a median of
 # 0.56 m, a p90 of 3.26 m and a maximum of 29.66 m -- and 69% of it by more than
@@ -6115,7 +6116,16 @@ def write_bake(
 
 
 def build_all(radius_m: float, log=print, terrain=True) -> dict:
-    """Read, graph, route, curve, block, solve, stanchion. Everything but writing."""
+    """Read, graph, route, curve, block, solve, stanchion. Everything but writing.
+
+    `terrain` is `True` for the shipped arrangement -- load the DEM here,
+    **unconformed**, for the reason the `PAVING_REACH_M` block above sets out at
+    length -- `False` for no ground at all, or **a `Terrain` object the caller
+    has already solved**, which is the one way to measure this bake against a
+    ground that is not the raw DEM. `sydney/terrain-rules-check.py` uses it to
+    ask what Chatswood measures once `pads.py` has taken the interchange roof
+    off the platforms; nothing that ships passes it.
+    """
     t0 = time.time()
     ways, stations, platforms, entrances = read_rail(radius_m)
     corridors = read_corridors(radius_m)
@@ -6134,11 +6144,29 @@ def build_all(radius_m: float, log=print, terrain=True) -> dict:
 
     field = None
     ground_note = "no terrain sampled; every height is relative to the datum"
-    if terrain:
+    if terrain is not True and terrain:
+        field = terrain
+        ground_note = (
+            f"a terrain field supplied by the caller (datum y=0 is "
+            f"{field.base_elevation:.1f} m AHD, "
+            f"{len(getattr(field, 'pads', ()) or ())} stated pad(s) levelled into it). "
+            "Not the shipped arrangement: this bake normally reads the DEM "
+            "unconformed. See `build_all`."
+        )
+        log(f"  terrain: {ground_note}")
+    elif terrain:
         try:
             from .terrain import Terrain
 
-            field = Terrain.load(radius_m, conform_roads=False, conform_water=False)
+            # All three conform passes off, and `conform_pads` is off for the
+            # same reason as the other two: this is the ground *before* anything
+            # in the pipeline told it where to be. It would otherwise default on
+            # and level a landmark's footprint into a lattice whose whole claim
+            # is that nothing has moved it -- which for Luna Park is 54 posts of
+            # difference in a surface the rail solve is entitled to read as raw.
+            field = Terrain.load(
+                radius_m, conform_roads=False, conform_water=False, conform_pads=False
+            )
             ground_note = (
                 f"terrarium DEM, unconformed (datum y=0 is {field.base_elevation:.1f} m AHD). "
                 "It is a *surface* model, so CBD ground reads high by roughly a "
