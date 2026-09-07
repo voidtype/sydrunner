@@ -3587,14 +3587,25 @@ async function main(): Promise<void> {
    * this client.
    */
   function withDeadline<T>(work: Promise<T>, ms: number, what: string): Promise<T | null> {
+    // The timer is cleared when the work settles first. Before it was, every
+    // deadline on this path printed its warning at `ms` regardless of whether the
+    // asset had arrived, and a console full of "did not finish" lines beside a
+    // fleet that reported `loaded: true` was the first thing the 2026-09 car
+    // investigation had to see through. A warning that fires on success is
+    // worse than none: it is the one line a reader trusts, and it is wrong.
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const settled = work.catch(() => null).then((v) => {
+      if (timer !== null) clearTimeout(timer);
+      return v;
+    });
     return Promise.race([
-      work.catch(() => null),
-      new Promise<null>((resolve) =>
-        setTimeout(() => {
+      settled,
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => {
           console.warn(`[sydney] ${what} did not finish in ${ms} ms; carrying on without it.`);
           resolve(null);
-        }, ms),
-      ),
+        }, ms);
+      }),
     ]);
   }
 
