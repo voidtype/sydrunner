@@ -265,6 +265,19 @@ const CORE_LANDING_M = 1.4;
  * to the outline would refuse the stair a terrace has room for. A corridor
  * this wide less a wall's half thickness is 0.82 m, and the arrival's elbow
  * room `BODY_CLEARANCE_M` is sized to settle in it.
+ *
+ * **Both branches of `placeCore` ask for it, and for a while only one did.**
+ * The hallway branch asked for 0.15 m at the core's run ends instead, on the
+ * argument that the landing was already guaranteed by setting the core back
+ * `CORE_LANDING_M + 0.3` from the end of the hall -- which is true of the
+ * *oriented box* the hall is a strip of, and false of the building wherever
+ * the hull is cut off at an angle to its box. Sixteen buildings within 800 m
+ * of the spawn had their stair placed against a wall that was not there, and a
+ * body coming up the first flight had 0.5 m of floor to stand in and needed
+ * 0.84. This constant is the whole of the answer: it leaves 0.56 m past the
+ * core's end, which is 6 cm more than `checkInteriors` walks a body to prove
+ * it got off the stair. See `placeCore`, and the St Peters dogleg in
+ * `verifyInterior`.
  */
 const CORE_SHELL_M = 0.9;
 
@@ -1482,7 +1495,9 @@ function placeCore(
   // room on the floor is a walk down the hall from them. A stair goes there
   // too, set back a landing from the end wall so the flight that opens that
   // way has somewhere to arrive. Walked in from the end until the core's
-  // corners clear the shell and no doorway is under it.
+  // corners clear the shell by `CORE_SHELL_M` along the run and no doorway is
+  // under it -- the setback alone is not the landing, because the hall's ends
+  // are the oriented box's and the building's are the hull's.
   {
     const hall = ground.find((r) => r.corridor);
     if (hall !== undefined) {
@@ -1510,10 +1525,29 @@ function placeCore(
               else cut.u0 = hall.u - longHalf - 1;
             } else if (end > 0) cut.v1 = hall.v + longHalf + 1;
             else cut.v0 = hall.v - longHalf - 1;
+            // The corners, grown by the margin, against the shell.
+            //
+            // **`CORE_SHELL_M` along the run and a jamb's worth across**, and
+            // the asymmetry is the whole point. Across, the core is the hall's
+            // own width and the partitions beside it are cut back to
+            // `CORE_CUT_M` anyway, so a shell margin there would refuse every
+            // hall core there is. Along the run, the only thing between the
+            // core's end and the shell is floor -- and it is the floor a body
+            // coming off the top of a flight has to stand on and turn round in.
+            //
+            // This asked for 0.15 m for two protocol versions and it is what
+            // sixteen buildings within 800 m of the spawn were stranded by: the
+            // landing is `endInset` metres of *the oriented box*, and on any
+            // footprint whose hull is cut off at an angle to its box the box's
+            // end is outside the building. The stair was set back 1.7 m from a
+            // wall that is not there, arrived with 0.5 m of real floor in front
+            // of it, and a body 0.34 m wide could not get past its own
+            // staircase. Fifteen centimetres is not a landing, it is not even a
+            // body -- and the constant that says so was already in this file.
             let clear = true;
             for (const [du, dv] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
-              const u = cu + du * (eu + 0.15);
-              const v = cv + dv * (ev + 0.15);
+              const u = cu + du * (eu + (alongU ? CORE_SHELL_M : 0.15));
+              const v = cv + dv * (ev + (alongU ? 0.15 : CORE_SHELL_M));
               const x = u * box.ux - v * box.uz;
               const z = u * box.uz + v * box.ux;
               for (const pl of planes) {
@@ -4433,6 +4467,75 @@ export function verifyInterior(): string[] {
       if (maxY < it.levels[3].y + CEILING_M - 0.01) failures.push('the mesh stops below the top floor\'s ceiling.');
       const line = interiorLine(it);
       if (!line.includes('stairs')) failures.push(`"${line}" does not mention the stairs.`);
+    }
+  }
+
+  // --- The St Peters dogleg: a hallway whose end wall is not where the box
+  // says it is.
+  //
+  // Every rectangle above passes this on the old code, because on a rectangle
+  // the oriented box *is* the hull and `placeCore`'s hallway branch could set
+  // the stair back a landing from the box's end and be setting it back a
+  // landing from a real wall. This footprint is the case that separates them:
+  // eight corners, two arms at an angle, and a hall down the box's long axis
+  // whose far end leaves the building thirteen metres before the box does. The
+  // stair was placed 1.7 m inside a wall that is not there, arrived on level 1
+  // with 0.5 m of floor in front of it, and a body 0.34 m wide could not get
+  // off its own staircase -- the landing measured **0.2 m inside the shell**.
+  //
+  // Kept verbatim off the bake to two centimetres, the Erskineville shed's
+  // convention, because the thing that convicts the generator here is the exact
+  // angle between the arms and no invented polygon has it. It is one of the
+  // sixteen `checkInteriors` reported (eight corners at -3005, 4344) and the
+  // first one it names.
+  {
+    const pts = poly(
+      0, 0, 6.47, 28.54, 14.52, 26.73, 13.05, 20.24,
+      31.3, 16.14, 30.25, 11.55, 21.96, 13.41, 18.01, -4.04,
+    );
+    const it = southDoor(pts, 0, 6.3, 278082168);
+    if (it === null) failures.push('the St Peters dogleg generated no interior.');
+    else if (it.core === null) failures.push('the St Peters dogleg got no core.');
+    else if (it.core.kind !== CORE.STAIR) {
+      failures.push('the St Peters dogleg got a lift, not the stair this case is about.');
+    } else if (it.levels.length < 2) failures.push('the St Peters dogleg has one level; there is no flight to climb.');
+    else {
+      const core = it.core;
+      const ax = -core.lz;
+      const az = core.lx;
+      if (!it.rooms.some((r) => r.corridor)) failures.push('the St Peters dogleg lost its hallway; this case no longer tests the hall branch.');
+      // Up every flight, the controller's own 8 cm steps.
+      for (let k = 0; k + 1 < it.levels.length; k++) {
+        const e = coreOpenEnd(core, k);
+        const lane = k & 1 ? core.hw / 2 : -core.hw / 2;
+        let x = core.x + core.lx * (e * (core.hr + 0.8)) + ax * lane;
+        let z = core.z + core.lz * (e * (core.hr + 0.8)) + az * lane;
+        let feet = it.levels[k].y;
+        for (let step = 0; step < 400; step++) {
+          const r = it.resolver.resolve(x, z, x - e * core.lx * 0.08, z - e * core.lz * 0.08, 0.35, feet + 0.42);
+          x = r.x;
+          z = r.z;
+          feet = interiorGround(it, x, z, feet);
+          if (-e * coreLocal(core, x, z).r > core.hr + 0.5) break;
+        }
+        const along = -e * coreLocal(core, x, z).r;
+        if (along <= core.hr + 0.5) {
+          failures.push(`the St Peters dogleg's flight ${k} strands a body ${along.toFixed(2)} m along a ${core.hr.toFixed(2)} m half-run.`);
+        } else if (Math.abs(feet - it.levels[k + 1].y) > 0.05) {
+          failures.push(`the St Peters dogleg's flight ${k} came out at ${feet.toFixed(2)} m, not the next floor at ${it.levels[k + 1].y.toFixed(2)}.`);
+        }
+      }
+      // And the landing is floor, not the inside of the outer wall. This is the
+      // measurement that read -0.20 m: the check above only says a body cannot
+      // walk there, this says why.
+      for (let k = 1; k < it.levels.length; k++) {
+        const e = coreOpenEnd(core, k);
+        const lane = (k - 1) & 1 ? core.hw / 2 : -core.hw / 2;
+        const x = core.x + core.lx * (e * (core.hr + 0.7)) + ax * lane;
+        const z = core.z + core.lz * (e * (core.hr + 0.7)) + az * lane;
+        const room = it.resolver.clearance(x, z, it.levels[k].y);
+        if (room < 0.35) failures.push(`the St Peters dogleg's level ${k} landing has ${room.toFixed(2)} m for a 0.35 m body.`);
+      }
     }
   }
 
