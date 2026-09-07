@@ -105,7 +105,13 @@ def _load_buildings(con, radius_m: float, rebuild: bool) -> list[merge.Building]
     ms = msbuildings.load(con, radius_m)
     print(f"    {len(ms):,} Microsoft footprints")
 
-    print("  merging (OSM wins on overlap) ...")
+    print("  merging (OSM wins on overlap, and against itself) ...")
+    # Before the merge and not after it, on `carriageway.verify`'s terms: this is
+    # the pass that can delete the city, its report is a count, and a count
+    # cannot tell "the duplicates went" from "the terraces went".
+    bad = merge.verify()
+    if bad:
+        raise SystemExit("building merge control failed:\n  " + "\n  ".join(bad))
     buildings, stats = merge.merge(osm_buildings, ms)
     print("    " + json.dumps(stats))
 
