@@ -342,6 +342,11 @@ class TilePower:
 
     poles: list[Pole] = field(default_factory=list)
     spans: list[Span] = field(default_factory=list)
+    # Poles the carriageway keep-out took out of this tile. Carried on the tile
+    # for the reason `furniture.TileFurniture` states in full: the emit forks,
+    # so a counter on the network reads zero in the parent whether the filter
+    # fired or was never attached.
+    carriageway_dropped: int = 0
 
     def is_empty(self) -> bool:
         return not self.poles and not self.spans
@@ -395,6 +400,13 @@ class PowerNetwork:
         self._terrain = terrain
         self._pole_cache: dict[int, list[Pole]] = {}
         self._span_cache: dict[int, list[Span]] = {}
+        # The carriageway keep-out, attached by `cli.build` once the lane graph
+        # is solved -- which is after this object is constructed, because the
+        # lane graph is the last network in the chain. `_kept_poles_on_way` is
+        # where it is applied and `carriageway.py` is why it is not applied in
+        # `_blocked_at`.
+        self._carriageway = None
+        self._kept_cache: dict[int, list[Pole]] = {}
 
         # Junction proxies: the end points of every street-class way. Built the
         # same way the other two modules build theirs, with the same caveat --
@@ -507,6 +519,21 @@ class PowerNetwork:
         """
         return set(self._orphans_by_tile)
 
+    def set_carriageway(self, keep_out) -> None:
+        """Attach the carriageway keep-out. See `carriageway.py`.
+
+        Called by `cli.build` after `lanes.LaneNetwork.load` and before any tile
+        is emitted, because the lane graph is the last network built and this
+        object is the fourth. The span cache is dropped with it: a span is a
+        walk over consecutive *kept* poles, so one built before the keep-out
+        arrived would wire a pole that is no longer there. The pole cache is
+        deliberately kept -- `_poles_on_way` is the placer's answer and does not
+        change, and `_kept_poles_on_way` is the filtered view of it.
+        """
+        self._carriageway = keep_out
+        self._kept_cache.clear()
+        self._span_cache.clear()
+
     def poles_near(self, region: BaseGeometry) -> list[Pole]:
         """Every pole standing near `region`, from both sources.
 
@@ -517,10 +544,11 @@ class PowerNetwork:
 
         Deliberately *not* the per-tile answer, on exactly the argument
         `vegetation.trees_near` makes for the mirror case. It skips the per-tile
-        cap, so it can return a pole that `instances` will go on to drop. That is
-        the conservative direction for a keep-out and it is also the stable one:
-        a bin's fate must not depend on how crowded the tile it happens to sit in
-        turned out to be.
+        cap **and the carriageway keep-out**, so it can return a pole that
+        `instances` will go on to drop. That is the conservative direction for a
+        keep-out and it is also the stable one: a bin's fate must not depend on
+        how crowded the tile it happens to sit in turned out to be, nor on
+        whether the pole beside it was standing in a slip lane.
         """
         out: list[Pole] = []
         for i in self._streets.ways_near(region):
@@ -548,18 +576,38 @@ class PowerNetwork:
 
         poles: list[Pole] = []
         spans: list[Span] = []
+        # What the placer put in this tile, before the keep-out -- the subtrahend
+        # of the per-tile drop count. Counted rather than derived because a way
+        # crosses several tiles and `_kept_poles_on_way` is cached per way, so
+        # the filter's own tally cannot be attributed to one of them.
+        placed = 0
         for i in self._streets.ways_near(region):
-            poles.extend(p for p in self._poles_on_way(i) if inside(p.east, p.north))
+            if self._carriageway is not None:
+                placed += sum(1 for p in self._poles_on_way(i) if inside(p.east, p.north))
+            poles.extend(p for p in self._kept_poles_on_way(i) if inside(p.east, p.north))
             spans.extend(s for s in self._spans_on_way(i) if inside(s.mid_east, s.mid_north))
-        poles.extend(self._orphans_by_tile.get(tile_key, []))
+        # The orphans are the one source `_kept_poles_on_way` cannot reach -- they
+        # are bucketed by tile rather than by way -- so the keep-out is applied to
+        # them here. A surveyed pole standing in a carriageway is still a pole
+        # standing in a carriageway; `power=pole` nodes are mapped at the kerb and
+        # an orphan is one no way came within reach of, which is exactly the case
+        # most likely to be mapped a road's width out of place.
+        orphans = self._orphans_by_tile.get(tile_key, [])
+        if self._carriageway is not None:
+            placed += len(orphans)
+            orphans = self._carriageway.filter(orphans, "pole")
+        poles.extend(orphans)
 
         # Ordered before anything greedy runs over it, so the cap below cannot
         # depend on which way `ways_near` happened to return first.
         poles.sort(key=lambda p: (p.east, p.north))
         spans.sort(key=lambda s: (s.mid_east, s.mid_north))
+        # Before the cap, so the two reasons a pole is missing stay separate: the
+        # cap has its own counter and this is not it.
+        on_road = max(placed - len(poles), 0) if self._carriageway is not None else 0
         poles = self._cap(poles)
 
-        out = TilePower(poles, spans)
+        out = TilePower(poles, spans, carriageway_dropped=on_road)
         self._tally(out)
         return out
 
@@ -755,6 +803,24 @@ class PowerNetwork:
 
     # --- Chains ---------------------------------------------------------------
 
+    def _kept_poles_on_way(self, i: int) -> list[Pole]:
+        """`_poles_on_way`, less anything standing in a carriageway.
+
+        The emission-side view of a way's run, and the only one `instances` and
+        `_build_spans_on_way` read. Separate from `_poles_on_way` rather than
+        folded into it because `poles_near` must keep seeing the unfiltered run
+        -- see that method -- and cached separately for the same reason
+        `_pole_cache` exists: a way is asked about by every tile it touches.
+        """
+        if self._carriageway is None:
+            return self._poles_on_way(i)
+        cached = self._kept_cache.get(i)
+        if cached is not None:
+            return cached
+        out = self._carriageway.filter(self._poles_on_way(i), "pole")
+        self._kept_cache[i] = out
+        return out
+
     def _spans_on_way(self, i: int) -> list[Span]:
         cached = self._span_cache.get(i)
         if cached is not None:
@@ -770,8 +836,13 @@ class PowerNetwork:
         client derives -- see `tiles.write_power`. Emitting one line rather than
         two halves the sidecar and, more usefully, means the two strands cannot
         drift apart in the data.
+
+        Over the **kept** poles, so a pole the carriageway keep-out removed takes
+        its two spans with it and the run re-chains across the gap -- a longer
+        span rather than a hole, and a chain break where the new gap is over
+        `MAX_SPAN`, which is what a real line does when a pole is missing.
         """
-        poles = self._poles_on_way(i)
+        poles = self._kept_poles_on_way(i)
         if len(poles) < 2:
             return []
         out: list[Span] = []

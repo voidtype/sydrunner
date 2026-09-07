@@ -641,6 +641,15 @@ class TileFurniture:
     bins: list[Bin] = field(default_factory=list)
     posts: list[NamePost] = field(default_factory=list)
     signals: list[Signal] = field(default_factory=list)
+    # How many of the three the carriageway keep-out took out of this tile.
+    #
+    # Carried on the tile rather than only tallied on the network, and that is
+    # not tidiness: `cli.build` emits on a `fork` pool, so a counter incremented
+    # inside `instances` lives in a child process and the parent prints a zero
+    # for the whole run. A number that reads 0 whether the filter fired or never
+    # ran is the one shape of report this repo will not have. `tiles.TileResult`
+    # carries it home the way every other per-tile count comes home.
+    carriageway_dropped: int = 0
 
     def is_empty(self) -> bool:
         return not self.bins and not self.posts and not self.signals
@@ -680,6 +689,12 @@ class FurnitureNetwork:
         self._power = power_network
         self._terrain = terrain
         self._bin_cache: dict[int, list[Bin]] = {}
+        # The carriageway keep-out, attached by `cli.build` once the lane graph
+        # is solved -- which is after this object is constructed, because the
+        # lane graph is the last network in the chain. Applied in `instances`,
+        # to items that are already placed; `carriageway.py` is the whole
+        # argument for why it is not a fifth test inside `_blocked_at`.
+        self._carriageway = None
 
         self.stats: dict[str, int] = {
             "bin_ways_considered": 0,
@@ -776,6 +791,16 @@ class FurnitureNetwork:
         """
         return set(self._posts_by_tile) | set(self._signals_by_tile)
 
+    def set_carriageway(self, keep_out) -> None:
+        """Attach the carriageway keep-out. See `carriageway.py`.
+
+        Called by `cli.build` after `lanes.LaneNetwork.load` and before any tile
+        is emitted. Nothing is invalidated: bins are placed lazily per way and
+        posts and signals are placed in `__init__`, and the keep-out filters what
+        comes out of `instances` rather than changing where anything was put.
+        """
+        self._carriageway = keep_out
+
     def instances(self, tile_key: str) -> TileFurniture:
         """Everything standing inside one tile."""
         e0, n0, e1, n1 = streets._tile_bounds(tile_key)
@@ -796,11 +821,23 @@ class FurnitureNetwork:
         posts = sorted(self._posts_by_tile.get(tile_key, ()), key=lambda p: (p.east, p.north))
         signals = sorted(self._signals_by_tile.get(tile_key, ()), key=lambda s: (s.east, s.north))
 
+        # The carriageway keep-out, before the caps rather than after: a cap is a
+        # budget on what a tile ships and there is no sense spending it on an
+        # object that is about to be deleted for standing in a road. See
+        # `carriageway.py`.
+        on_road = 0
+        if self._carriageway is not None:
+            was = len(bins) + len(posts) + len(signals)
+            bins = self._carriageway.filter(bins, "bin")
+            posts = self._carriageway.filter(posts, "post")
+            signals = self._carriageway.filter(signals, "signal")
+            on_road = was - (len(bins) + len(posts) + len(signals))
+
         bins = self._cap(bins, MAX_BINS_PER_TILE, "drop_bin_cap")
         posts = self._cap(posts, MAX_POSTS_PER_TILE, "drop_post_cap")
         signals = self._cap(signals, MAX_SIGNALS_PER_TILE, "drop_signal_cap")
 
-        out = TileFurniture(bins, posts, signals)
+        out = TileFurniture(bins, posts, signals, carriageway_dropped=on_road)
         self._tally(out)
         return out
 

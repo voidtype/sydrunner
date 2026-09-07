@@ -10,6 +10,30 @@ suburban sprawl that no one has hand-mapped.
 So the rule is: OSM footprint wins wherever one exists, Microsoft fills the gaps.
 Overlap is detected geometrically rather than by ID, because the two datasets
 share no identifiers.
+
+AND OSM WINS AGAINST ITSELF TOO, which is the half of that sentence this module
+did not implement for a long time and `server/clash-check.ts` costed at 4,850
+overlapping pairs and 687,629 m2 of shared footprint. Two of the three ways a
+building ends up drawn twice were never tested:
+
+  * **OSM against OSM.** `merge` took the OSM list whole -- literally
+    `out = [_from_osm(b) for b in osm_buildings]` -- so the one source that is
+    hand-mapped by thousands of people, and therefore the one where the same
+    warehouse gets drawn twice by two of them, was the one nothing checked. The
+    top of that audit's table was *exact* duplicates: `61,572 m2 shared of
+    61,572 m2`, twice. `_dedupe_osm` is that test, at the same fraction.
+  * **A Microsoft blob measured against its own area.** The union test below was
+    written for an ML segmentation that swallows a block of terraces, and it
+    fixed *what* is measured while leaving *what it is measured against*: a
+    3,017 m2 blob over seven hand-mapped 50 m2 terraces is 14% covered and
+    survived, and shipped lying across all seven. Measured against the smaller
+    of the two sides it does not. `SWALLOW_FLOOR` is what keeps that sentence
+    from deleting a real warehouse for having a mapped kiosk inside it.
+
+Both are the same threshold, `OVERLAP_FRACTION`, on the same argument, and both
+have a control in `verify` that convicts the duplicate *and* excuses the party
+wall -- because a filter over the building list is the one thing in this pass
+that can quietly delete the city, and its report is a count.
 """
 
 from __future__ import annotations
@@ -49,6 +73,26 @@ from .sources import msbuildings, osm
 # whole fix; the threshold is unchanged, because the threshold was never the
 # thing that was wrong.
 OVERLAP_FRACTION = 0.35
+
+# The floor under the swallow test: how much of a Microsoft footprint has to be
+# hand-mapped before OSM is allowed to delete the whole thing.
+#
+# THE CASE THIS EXISTS TO REFUSE. `merge`'s swallow test drops a footprint when
+# the OSM under it is mostly inside it, measured on the OSM side -- which is
+# right for an ML blob laid over a block of terraces and catastrophic without a
+# floor, because a genuine 3,000 m2 warehouse with one hand-mapped 20 m2 kiosk
+# inside it satisfies "the OSM under it is 100% covered" just as completely. A
+# ratio alone cannot separate the two; how much of the footprint OSM actually
+# accounts for can.
+#
+# A tenth, and it is measured rather than guessed. Every footprint the swallow
+# test catches over the 60 km carries between 14% and 35% of its own area in
+# hand-mapped buildings that are mostly inside it -- these are blobs two to five
+# times what is under them, not a hundred times -- so a tenth clears every real
+# case and still refuses a footprint that is 99% unexplained ground. Under this
+# line the ML footprint is the only thing saying a building is there at all, and
+# deleting it costs the world a building rather than an overlap.
+SWALLOW_FLOOR = 0.10
 
 # Separates a row's id from the index of one house cut out of it by `rows.py`.
 # Lives here because this module owns the id format -- the `o`/`m` namespacing
@@ -252,11 +296,282 @@ def _from_ms(f: msbuildings.Footprint) -> Building:
     )
 
 
+def _detail(b: Building) -> int:
+    """How much this mapping actually says about the building.
+
+    The tie-breaker when one footprint has been drawn twice, and the only
+    defensible one: neither copy is from a better *source* -- they are both OSM
+    -- so the one to keep is the one a player gets more of. A stated height or a
+    level count changes the building's own shape; a name, a material, a colour, a
+    roof shape and an amenity all reach `attributes.apply` and change what it is
+    made of. `building=yes` is not a statement and does not count.
+    """
+    return sum(
+        1
+        for v in (
+            b.name,
+            b.stated_height,
+            b.levels,
+            b.building_type if b.building_type not in (None, "yes") else None,
+            b.material,
+            b.colour,
+            b.roof_shape,
+            b.roof_material,
+            b.amenity,
+            b.shop,
+            b.start_date,
+            True if b.heritage else None,
+        )
+        if v is not None
+    )
+
+
+def _dedupe_osm(out: list[Building]) -> tuple[list[int], dict[str, int]]:
+    """The indices of `out` that survive: one of every duplicated pair goes.
+
+    Indices rather than the buildings themselves so `merge` can drop the same
+    entries out of the raw `osm_buildings` list in lockstep -- the two lists are
+    parallel, and an id is not a key here: nothing guarantees OSM hands back two
+    distinct polygons with distinct way ids.
+
+    ---------------------------------------------------------------------------
+    **Nothing in this build compared OSM against OSM, and 4,850 overlapping pairs
+    is what that cost.** `merge` below deduplicates Microsoft against OSM with a
+    unioned 35% overlap test and then takes the OSM list whole -- the line was
+    `out = [_from_osm(b) for b in osm_buildings]`, unconditionally -- so the one
+    source that is hand-mapped by thousands of people, and therefore the one
+    source where the same warehouse gets drawn twice by two of them, was the one
+    nothing checked. `server/clash-check.ts` found the top of that table to be
+    *exact* duplicates: `61,572 m2 shared of 61,572 m2`, twice; `11,456 of
+    11,456`; `9,807 of 9,807`. One footprint, extruded twice, z-fighting with
+    itself for the whole height of the building.
+
+    So this is the test that module already has, turned on its own OSM input, at
+    the same `OVERLAP_FRACTION`. **Pairwise and not unioned**, which is the one
+    place it deliberately differs: the union form exists for an ML blob laid over
+    a block of hand-mapped terraces, and its mirror image in OSM -- a mapped
+    block outline over the houses inside it -- is a case where dropping the big
+    polygon and dropping the small ones are both defensible and the pipeline has
+    no way to tell which the mapper meant. A pair that shares more than a third
+    of the smaller of the two is not that case; it is one building drawn twice.
+
+    WHICH ONE GOES. `_detail`, then area, then the id -- in that order, and the
+    order matters. Source cannot decide it here, and "keep the first" would make
+    the world a function of the order libgdal hands back a multipolygon layer.
+
+    WHAT IT LEAVES ALONE. A bridge. `elevated.py` turns a `bridge` way into a
+    structural prism with air under it, so a deck over a building is
+    `DECK_IN_BUILDING` -- a different row of that audit and a different fix --
+    and collapsing the two into one footprint here would delete a viaduct for
+    crossing a warehouse.
+    """
+    polys = [Polygon(b.ring, b.holes) for b in out]
+    valid = [(p if p.is_valid else p.buffer(0)) for p in polys]
+    tree = STRtree(valid)
+
+    # Largest first, then by id: a deterministic walk, so the pair's loser does
+    # not depend on the order the source layer was read in.
+    order = sorted(range(len(out)), key=lambda i: (-out[i].area, out[i].id))
+    dropped: set[int] = set()
+    exact = 0
+    for i in order:
+        if i in dropped:
+            continue
+        a = valid[i]
+        if a.is_empty or out[i].bridge:
+            continue
+        for j in tree.query(a.envelope):
+            j = int(j)
+            if j == i or j in dropped or valid[j].is_empty or out[j].bridge:
+                continue
+            smaller = min(a.area, valid[j].area)
+            if smaller <= 0.0:
+                continue
+            shared = a.intersection(valid[j]).area
+            if shared <= smaller * OVERLAP_FRACTION:
+                continue
+            if shared >= smaller * 0.999:
+                exact += 1
+            loser = j if _rank(out[i]) >= _rank(out[j]) else i
+            dropped.add(loser)
+            if loser == i:
+                break
+    keep = [k for k in range(len(out)) if k not in dropped]
+    return keep, {
+        "osm_dropped_as_duplicate": len(dropped),
+        # Called out separately for the same reason `ms_dropped_as_blob` is: it
+        # is the count that says the top of the audit's table went, and a build
+        # where it returns to 0 has lost the test.
+        "osm_dropped_exact": exact,
+    }
+
+
+def _rank(b: Building) -> tuple[int, float, str]:
+    """Higher wins the pair. See `_dedupe_osm`."""
+    return (_detail(b), b.area, b.id)
+
+
+def verify() -> list[str]:
+    """The control on `_dedupe_osm`: what it must drop, and what it must not.
+
+    A filter over the building list is the one place in this pass that can
+    quietly delete the city -- `landmarks.suppress` says the same about itself --
+    and its report is a count, which cannot tell "the duplicates went" from "the
+    terraces went". So both cases go through the real function: a footprint drawn
+    twice must lose one copy and the copy kept must be the one that says more,
+    and a terrace row's party wall must survive, in both orders.
+    """
+    import numpy as np
+
+    def mk(i: int, ring, **kw) -> Building:
+        r = np.asarray(ring, dtype=float)
+        return Building(id=f"o{i}", source="osm", ring=r, area=Polygon(r).area, **kw)
+
+    square = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)]
+    # Sharing the long edge and nothing else, which is what a terrace row is.
+    neighbour = [(10.0, 0.0), (20.0, 0.0), (20.0, 10.0), (10.0, 10.0)]
+    bad: list[str] = []
+
+    rich = mk(1, square, name="Marrickville Metro", levels=3)
+    bare = mk(2, square)
+    for pair, label in (([rich, bare], "rich first"), ([bare, rich], "bare first")):
+        keep, stats = _dedupe_osm(pair)
+        if len(keep) != 1:
+            bad.append(f"merge: a footprint drawn twice survives twice ({label})")
+        elif pair[keep[0]].name != "Marrickville Metro":
+            bad.append(f"merge: the copy with a name and a level count is the one dropped ({label})")
+        if stats["osm_dropped_exact"] != 1:
+            bad.append(f"merge: an exact duplicate is not counted as one ({label})")
+
+    keep, _ = _dedupe_osm([mk(1, square), mk(2, neighbour)])
+    if len(keep) != 2:
+        bad.append(
+            f"merge: two footprints sharing a party wall are deduplicated;"
+            f" OVERLAP_FRACTION is {OVERLAP_FRACTION} and the count is terraces"
+        )
+
+    deck = mk(2, square)
+    deck.bridge = True
+    if len(_dedupe_osm([mk(1, square), deck])[0]) != 2:
+        bad.append("merge: a bridge over a building is deduplicated against it")
+
+    bad += _verify_swallow()
+    return bad
+
+
+def _verify_swallow() -> list[str]:
+    """The control on the Microsoft side: the blob goes, the neighbour stays.
+
+    Griffin Street in miniature. A 40 x 40 m ML footprint with four 10 x 10 m
+    hand-mapped houses under it is 25% covered, which is under
+    `OVERLAP_FRACTION` on its own area and 100% of theirs, and it is the case
+    that shipped. Two more go through beside it, because a filter that could
+    only ever convict would prove nothing: the same blob with one house clipping
+    its corner, which is two buildings that touch and not one drawn twice; and
+    the same blob with a single 4 x 4 m shed inside it, which is 100% of the OSM
+    and 1% of the footprint -- the warehouse-and-kiosk case `SWALLOW_FLOOR`
+    exists for, and the one where deleting the blob costs the world a building.
+    """
+    import numpy as np
+
+    class _Ms:
+        def __init__(self, ring, ident):
+            self.ring = np.asarray(ring, dtype=float)
+            self.id = ident
+            self.area = Polygon(self.ring).area
+            self.centroid = tuple(Polygon(self.ring).centroid.coords)[0]
+            self.ms_height = None
+
+    class _Osm:
+        def __init__(self, ring, ident):
+            self.ring = np.asarray(ring, dtype=float)
+            self.holes: list = []
+            self.osm_id = str(ident)
+            self.area = Polygon(self.ring).area
+            self.centroid = tuple(Polygon(self.ring).centroid.coords)[0]
+            for a in (
+                "name building levels height material colour roof_shape roof_material"
+                " start_date amenity shop min_height min_level man_made"
+            ).split():
+                setattr(self, a, None)
+            self.heritage = False
+            self.bridge = False
+            self.layer = 0
+
+    def sq(x, y, w):
+        return [(x, y), (x + w, y), (x + w, y + w), (x, y + w)]
+
+    blob = _Ms(sq(0, 0, 40), "blob")
+    # Four houses inside it, apart from each other: 400 m2 of the blob's 1,600.
+    houses = [
+        _Osm(sq(2, 2, 10), 1), _Osm(sq(26, 2, 10), 2),
+        _Osm(sq(2, 26, 10), 3), _Osm(sq(26, 26, 10), 4),
+    ]
+    bad: list[str] = []
+    out, stats = merge(houses, [blob])
+    if stats["ms_dropped_as_swallow"] != 1:
+        bad.append(
+            "merge: an ML blob covering four hand-mapped houses whole is kept;"
+            f" it is {100 * 400 / 1600:.0f}% of its own area and 100% of theirs"
+        )
+    if any(b.source == "ms" for b in out):
+        bad.append("merge: the blob survived the swallow test")
+
+    # Crown Street: one hand-mapped block mostly under a footprint three times
+    # its size, with an untouched neighbour whose bounding box reaches the
+    # footprint and whose only job here is to inflate a union denominator. It is
+    # the case the first version of this test let through, so it is the case with
+    # a control on it.
+    # 256 m2 of the footprint's 1,600 -- 16%, under `OVERLAP_FRACTION` on the
+    # footprint's own area and over `SWALLOW_FLOOR` -- and clear of the
+    # footprint's centroid, so neither test above can reach it. The neighbour is
+    # 900 m2 that touches nothing: unioned in, the covered share falls to 22% and
+    # the footprint survives, which is what Crown Street did.
+    blob = _Ms(sq(0, 0, 40), "blob")
+    block = _Osm(sq(2, 2, 16), 7)
+    away = _Osm(sq(41, 30, 30), 8)
+    out, stats = merge([block, away], [blob])
+    if stats["ms_dropped_as_swallow"] != 1:
+        bad.append(
+            "merge: a footprint sitting whole on a hand-mapped block is kept because an"
+            " untouched neighbour joined the denominator -- ask it per polygon, not of the union"
+        )
+    if any(b.source == "ms" for b in out):
+        bad.append("merge: the Crown Street footprint survived")
+
+    # And the two that must survive. First the neighbour, clipping the corner.
+    out, stats = merge([_Osm(sq(-7.5, -7.5, 10), 5)], [_Ms(sq(0, 0, 40), "blob")])
+    if stats["ms_dropped_as_duplicate"] != 0:
+        bad.append(
+            "merge: a footprint a neighbour clips the corner of is deduplicated;"
+            f" OVERLAP_FRACTION is {OVERLAP_FRACTION} and the Microsoft set is being deleted"
+        )
+    # Then the warehouse with a kiosk in it: 16 m2 of hand mapping, 1% of the
+    # footprint, and the footprint is the only thing that says the warehouse is
+    # there. 100% of the OSM is inside it and it must survive anyway.
+    out, stats = merge([_Osm(sq(4, 4, 4), 6)], [_Ms(sq(0, 0, 40), "blob")])
+    if stats["ms_dropped_as_duplicate"] != 0:
+        bad.append(
+            "merge: a footprint with one small mapped building inside it is deleted;"
+            f" SWALLOW_FLOOR is {SWALLOW_FLOOR} and does nothing"
+        )
+    if not any(b.source == "ms" for b in out):
+        bad.append("merge: the warehouse went with its kiosk")
+    return bad
+
+
 def merge(
     osm_buildings: list[osm.OsmBuilding], ms_footprints: list[msbuildings.Footprint]
 ) -> tuple[list[Building], dict[str, int]]:
-    """OSM first, then Microsoft footprints that do not duplicate an OSM one."""
-    out = [_from_osm(b) for b in osm_buildings]
+    """OSM first -- deduplicated against itself -- then Microsoft's gaps."""
+    osm_all = [_from_osm(b) for b in osm_buildings]
+    kept, osm_stats = _dedupe_osm(osm_all)
+    out = [osm_all[i] for i in kept]
+    # In lockstep, so the Microsoft pass below measures itself against the OSM
+    # set that is actually going into the world. A duplicate left in the tree
+    # here would keep on suppressing the Microsoft footprint under it after the
+    # OSM copy it duplicates had already been dropped.
+    osm_buildings = [osm_buildings[i] for i in kept]
 
     osm_polys = [Polygon(b.ring, b.holes) for b in osm_buildings]
     valid = [(p if p.is_valid else p.buffer(0)) for p in osm_polys]
@@ -264,6 +579,7 @@ def merge(
 
     dropped = 0
     dropped_by_union = 0
+    dropped_by_swallow = 0
     for f in ms_footprints:
         cand = tree.query(Polygon(f.ring).envelope)
         if len(cand):
@@ -272,6 +588,7 @@ def merge(
                 ms_poly = ms_poly.buffer(0)
             hit = False
             union_hit = False
+            swallow_hit = False
             for i in cand:
                 other = valid[i]
                 if other.is_empty:
@@ -291,13 +608,55 @@ def merge(
                 covered = ms_poly.intersection(unary_union(near)).area if near else 0.0
                 if covered / ms_poly.area > OVERLAP_FRACTION:
                     hit = union_hit = True
+                # ...and the swallow case, which is the half of that the union
+                # test above still cannot see however it is unioned.
+                #
+                # A 3,017 m2 ML blob laid over seven hand-mapped 50 m2 terraces on
+                # Griffin Street is 14% covered, so it passed every test above and
+                # shipped, lying across all seven -- the exact failure this
+                # module's header describes and believed the union had closed. It
+                # had not: the union fixed *what* is measured and left *what it is
+                # measured against*, and against its own area a blob can always be
+                # big enough to survive. The rule this module states is "OSM
+                # footprint wins wherever one exists", and a footprint that
+                # swallows a hand-mapped building is not filling a gap.
+                #
+                # **Asked per OSM polygon and not of the union**, which is the
+                # correction to the first version of this test and is not a
+                # nicety: `near` is everything whose *envelope* meets the
+                # footprint's, so an untouched neighbour twenty metres away joins
+                # the union and inflates the denominator. On Crown Street that
+                # left a 1,472 m2 footprint sitting on 89% of a 247 m2 brutalist
+                # block, still convicted by `clash-check` after the sweep had run.
+                # So a polygon counts as swallowed when *it* is mostly inside the
+                # footprint, and the footprint goes when the ones that are add up
+                # to a real share of it -- the union only of what is genuinely
+                # underneath. Over the 60 km this drops **1,228** footprints of
+                # 1,157,238 -- the tail, not the suburbs -- against 692 when the
+                # denominator was the whole union.
+                #
+                # `SWALLOW_FLOOR` is that share, and it is what stops the same
+                # sentence deleting a real warehouse for having one mapped kiosk
+                # in it; see that constant.
+                if not hit:
+                    swallowed = [
+                        o for o in near
+                        if ms_poly.intersection(o).area > OVERLAP_FRACTION * o.area
+                    ]
+                    if swallowed:
+                        under = ms_poly.intersection(unary_union(swallowed)).area
+                        if under / ms_poly.area >= SWALLOW_FLOOR:
+                            hit = swallow_hit = True
             if hit:
                 dropped += 1
                 dropped_by_union += union_hit
+                dropped_by_swallow += swallow_hit
                 continue
         out.append(_from_ms(f))
 
     stats = {
+        "osm_input": len(osm_all),
+        **osm_stats,
         "osm": len(osm_buildings),
         "ms_input": len(ms_footprints),
         "ms_dropped_as_duplicate": dropped,
@@ -305,6 +664,13 @@ def merge(
         # ML blobs are being caught -- it went 0 -> 193 when the union test
         # went in, and a build where it returns to 0 has lost the test.
         "ms_dropped_as_blob": dropped_by_union,
+        # And the other half of the blob case: the footprint bigger than what it
+        # covers, caught on the OSM side of the fraction rather than its own.
+        # Counted apart from `ms_dropped_as_blob` for the same reason that one is
+        # counted apart from the total, and a build where it returns to 0 has
+        # lost the test. 1,228 over the 60 km, against 1,748 caught on the
+        # footprint's own side.
+        "ms_dropped_as_swallow": dropped_by_swallow,
         "ms_kept": len(ms_footprints) - dropped,
         "total": len(out),
     }

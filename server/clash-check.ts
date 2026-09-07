@@ -55,26 +55,39 @@
  *     `world/cars.ts` run. Every one of these is an *instance list* -- a
  *     position and a size -- so the drawn object is recoverable exactly, and a
  *     mesh would tell us nothing the row does not.
- *   - **The ground**: `<key>.terr.bin`, sampled bilinearly. That sampling was
- *     validated rather than assumed: over 60,000 poles the terrain read here
- *     agrees with `TilePower.groundY` -- which the pipeline wrote from its own
- *     DEM -- to a mean of **18 mm**, and the mirrored row order disagrees by
- *     6.9 m. Row 0 is the northern edge, and there is now a measurement that
- *     says so; `runControls` repeats it every run over 2,000 poles, because a
+ *   - **The ground**: `<key>.terr.bin`, sampled as **two triangles per cell,
+ *     split north-west to south-east**. Row 0 is the northern edge, and there is
+ *     a measurement that says so rather than an assumption: over 2,000 poles the
+ *     terrain read here agrees with `TilePower.groundY` -- which the pipeline
+ *     wrote from its own DEM -- to a mean of **0 mm**, and the mirrored row
+ *     order disagrees by 6.9 m. `runControls` repeats that every run, because a
  *     grid that transposed would turn two of these pairs into noise silently.
  *
- *     **It is bilinear and the client draws triangles, and the two are not the
- *     same surface.** `water._wet_pieces` says it in as many words -- *"a sheet
- *     spanning a whole 31.25 m cell would carry a depth that is the bilinear
- *     interpolation of its corners while the ground under it is two flat
- *     triangles"* -- and the gap between them peaks at the cell centre, at a
- *     quarter of the cell's own diagonal curvature. Bilinear is used anyway
- *     because it is what `TilePower.groundY` agrees with to 18 mm and what
- *     `undrawn-solids-check.sampleGround` already reads, so the two audits
- *     answer "where is the ground" the same way. The consequence is stated
- *     rather than corrected: `DECK_UNDER_TERRAIN` and `WATER_OVER_TERRAIN` both
- *     carry thresholds (1.0 m and 0.5 m) set well over that residue, and a
- *     disagreement under a metre on a rough cell is not evidence of anything.
+ *     That zero is itself the second proof of the paragraph below. The same
+ *     2,000 poles read bilinearly agree to 11 mm and not to nothing, because
+ *     `power.py` sets a pole's `ground_y` from `terrain.Terrain.sample` and that
+ *     is the triangle split; 11 mm was the residue of reading it the other way
+ *     on ground flat enough to hide it.
+ *
+ *     **This was bilinear, and the difference was an entire row of the table.**
+ *     `water._wet_pieces` says why in as many words -- *"a sheet spanning a whole
+ *     31.25 m cell would carry a depth that is the bilinear interpolation of its
+ *     corners while the ground under it is two flat triangles"* -- and the gap
+ *     between the two is the cell's twist, `(nw + se - ne - sw) / 4`, peaking at
+ *     the centre and carrying both signs. On a footpath that is millimetres,
+ *     which is why 2,000 poles could not see it; on a harbour cell with one
+ *     corner cut twenty metres down to the bed and the next standing on a cliff
+ *     it is metres, and it produced all 63,089 of `WATER_OVER_TERRAIN` out of a
+ *     world whose water bed was right everywhere. Under the split the pipeline
+ *     cuts against and the client draws, that row is **0**.
+ *
+ *     Three authorities already agreed on the split -- `terrain.Terrain.sample`,
+ *     `tiles.write_terrain`'s format note and `client/src/world/terrain.ts` --
+ *     and this file was the only reader that did not. `runControls` now pins it
+ *     against a synthetic twisted cell, because a pole check demonstrably
+ *     cannot. **`undrawn-solids-check.sampleGround` is still bilinear**; nothing
+ *     it measures lives on a shoreline, so nothing here says it is wrong, only
+ *     that it has not been asked.
  *   - **The railway**: `rail/rail.bin` and `world/track-atlas.ts`, exactly as
  *     `server/rail-gauge-check.ts` reads them.
  *
@@ -275,11 +288,23 @@ export const BUDGET_DECK_IN_BUILDING = 513;
 /**
  * Decks whose whole solid is under the terrain that is drawn over them.
  *
- * 34, and they are **one deck**: every one of the twelve worst is within four
+ * 35, and they are **one deck**: every one of the twenty worst is within six
  * metres of (501, -1204), because `decks.prisms` emits one prism per segment and
  * a buried run buries all of them. A count of prisms, not of places.
+ *
+ * ---------------------------------------------------------------------------
+ * **This was 34 and the raise is not a defect appearing.** `sampleGround` now
+ * reads the ground as the two triangles the pipeline cut it into and the client
+ * draws it as, rather than bilinearly, and one prism of that same buried run
+ * moved from 0.99 m under the hill to just over the metre `DECK_BURIED_M` asks
+ * for. The whole-build run either side of that one change is otherwise identical
+ * -- twelve rows, `index.built` 1788586540, nothing in `pipeline/` touched and
+ * nothing re-emitted -- and the deck at (501, -1204) is the same deck it was.
+ * The header's rule is that a raise wants the new number written down beside it;
+ * this is it. See `sampleGround`, and `BUDGET_WATER_OVER_TERRAIN`, which is the
+ * row that change was made for.
  */
-export const BUDGET_DECK_UNDER_TERRAIN = 34;
+export const BUDGET_DECK_UNDER_TERRAIN = 35;
 
 /**
  * Baked instances standing inside the volume a train sweeps.
@@ -319,16 +344,27 @@ export const BUDGET_STATION_IN_BUILDING = 65;
 /**
  * Water vertices whose own bed and the shipped terrain disagree.
  *
- * 63,089 of 7,623,838, which is 0.83 %: 38,076 where the bed the sheet was cut
- * against is over the ground that shipped, and 25,013 where the ground stands
- * out of the water. The second half contradicts `water.py`'s own stated
- * guarantee -- *"every post inside a water polygon is at least
- * `SHORE_CLEARANCE_M` below that polygon's surface, so no ground pokes through a
- * drawn sheet"* -- and `_wet_pieces` exists to enforce it, so this is not a rule
- * nobody wrote. It is a rule enforced against one terrain and shipped beside
- * another.
+ * **Zero, over 7,461,326 vertices of the same shipped build that measured
+ * 63,089** -- and the world did not move. The 63,089 were this file reading the
+ * ground bilinearly while the pipeline cut the sheet against, and the client
+ * draws, two triangles per cell. `sampleGround` now reads the split all three of
+ * them use and the row empties: 38,076 "floating" and 25,013 "proud", worst
+ * 23.35 m, all of it the cell twist at a shoreline, none of it a bed.
+ *
+ * `water.py`'s stated guarantee -- *"every post inside a water polygon is at
+ * least `SHORE_CLEARANCE_M` below that polygon's surface, so no ground pokes
+ * through a drawn sheet"* -- was being kept the whole time, and `_wet_pieces`
+ * was enforcing it against the lattice that shipped. Nothing in `pipeline/` was
+ * changed to reach this number and nothing should be: moving 63,089 water
+ * vertices off the ground the client draws to satisfy an interpolation this
+ * scan alone used would have made the harbour worse.
+ *
+ * A zero row is the one thing this file refuses to take on trust, so
+ * `runControls` now pins the split itself against a synthetic twisted cell as
+ * well as pinning the lattice against 2,000 poles' own `groundY`. See
+ * `sampleGround`.
  */
-export const BUDGET_WATER_OVER_TERRAIN = 63089;
+export const BUDGET_WATER_OVER_TERRAIN = 0;
 
 /**
  * Building footprints standing under a water surface.
@@ -900,18 +936,62 @@ function loadGround(key: string): Float32Array | null {
 }
 const groundCache = new Lru(1200, loadGround);
 
+/**
+ * The ground at a point in one tile: **two triangles per cell, split north-west
+ * to south-east**, which is the surface all three of this world's authorities
+ * draw and sample.
+ *
+ * ---------------------------------------------------------------------------
+ * **This used to be bilinear, and that alone was the whole of
+ * `WATER_OVER_TERRAIN`.** The header above still argues for bilinear on the
+ * grounds that it agrees with `TilePower.groundY` to 18 mm and that
+ * `undrawn-solids-check.sampleGround` reads the same way -- both true, and both
+ * beside the point on the one population that lives on the ground's own
+ * waterline. A pole stands on a footpath, where a cell is nearly flat and the
+ * two surfaces agree to millimetres. A harbour sheet is cut against a cell with
+ * one corner on a cut bed twenty metres down and the next on a dry cliff twenty
+ * metres up, and there the *twist* of the cell -- `(nw + se - ne - sw) / 4` --
+ * is metres, peaks at the cell centre, and carries both signs. That is exactly
+ * the shape the old row had: 38,076 "floating" and 25,013 "proud", worst
+ * 23.35 m, from a bed that was never wrong.
+ *
+ * Measured over every water vertex in the shipped build -- the same 7.46 M this
+ * scan reads, the same `index.built` 1788586540, nothing in `pipeline/` touched
+ * -- bilinear names 63,089 vertices and the triangle split names **zero**, worst
+ * 0.00 m. The pipeline's `water._wet_pieces` clips the sheet against
+ * `terrain.Terrain.sample`, `tiles.build_tile` writes `.terr.bin` from
+ * `Terrain.grid_for_tile`, and both read the one lattice; the client's
+ * `world/terrain.ts sampleTileGrid` draws it back with the same split. All
+ * three agree, and this file was the only reader that did not.
+ *
+ * So the constant this replaces was not a threshold set too tight. It was a
+ * different surface, and the row it produced was this scan measuring its own
+ * interpolation. `DECK_UNDER_TERRAIN` reads the ground through here too and is
+ * on the same footing, which is why its budget moves with this.
+ *
+ * `terrain.Terrain.sample`'s note -- *"Change one and all three must change
+ * together"* -- now has a fourth reader, and `runControls` asserts the split
+ * rather than trusting this comment: a cell with a known twist is sampled at
+ * its centre and must return the diagonal's own mean, not the bilinear value.
+ */
 function sampleGround(g: Float32Array, t: TileEntry, x: number, z: number): number {
   const lx = ((x - t.bounds[0]) / SIZE) * GRID;
   const lz = ((z - t.bounds[1]) / SIZE) * GRID;
   const c0 = Math.max(0, Math.min(GRID - 1, Math.floor(lx)));
   const r0 = Math.max(0, Math.min(GRID - 1, Math.floor(lz)));
-  const fx = Math.max(0, Math.min(1, lx - c0));
-  const fz = Math.max(0, Math.min(1, lz - r0));
+  const fc = Math.max(0, Math.min(1, lx - c0));
+  const fr = Math.max(0, Math.min(1, lz - r0));
   const at = (r: number, c: number): number => g[r * (GRID + 1) + c];
-  return (
-    (at(r0, c0) * (1 - fx) + at(r0, c0 + 1) * fx) * (1 - fz) +
-    (at(r0 + 1, c0) * (1 - fx) + at(r0 + 1, c0 + 1) * fx) * fz
-  );
+  const nw = at(r0, c0);
+  const ne = at(r0, c0 + 1);
+  const sw = at(r0 + 1, c0);
+  const se = at(r0 + 1, c0 + 1);
+  // The diagonal runs north-west to south-east, so it is the line fr === fc. On
+  // the north-east side of it the triangle is NW/NE/SE; on the other, NW/SE/SW.
+  // Both expressions agree along the diagonal, so there is no seam inside a cell.
+  return fc >= fr
+    ? nw + (ne - nw) * fc + (se - ne) * fr
+    : nw + (sw - nw) * fr + (se - sw) * fc;
 }
 
 /** The ground anywhere in the build, or NaN off the extent. */
@@ -1704,10 +1784,36 @@ function runControls(): string[] {
     }
   }
 
-  // 8. The terrain read, which four pairs rest on. Row 0 is the northern edge and
-  //    the mirrored reading is 6.9 m out; if the grid ever transposes, the deck
-  //    and water pairs silently become noise. Asserted against the poles' own
-  //    `groundY`, which the pipeline wrote from its own DEM.
+  // 8a. The terrain read is two triangles per cell and not a bilinear patch, and
+  //     a control is the only thing that can say which. A pole check cannot: the
+  //     two surfaces differ by the cell's *twist* and a footpath cell has none,
+  //     which is how bilinear passed that check for as long as it did and still
+  //     produced 63,089 water vertices out of nothing. So the twist is put in by
+  //     hand. A cell with corners nw=0, ne=10, sw=10, se=0 sampled at its centre
+  //     is 5 m under either reading -- the two agree on the diagonal -- so the
+  //     probe is off the diagonal, at three quarters east and one quarter south,
+  //     where the NW/NE/SE triangle gives 0 + 10(0.75) - 10(0.25) = 5.00 and
+  //     bilinear gives (10)(0.75)(0.75) + (10)(0.25)(0.25) = 6.25.
+  {
+    const n = GRID + 1;
+    const cell = new Float32Array(n * n);
+    cell[0] = 0; cell[1] = 10; cell[n] = 10; cell[n + 1] = 0;
+    const fake: TileEntry = { key: '0_0', b: 0, bounds: [0, 0, SIZE, SIZE] };
+    const post = SIZE / GRID;
+    const got = sampleGround(cell, fake, 0.75 * post, 0.25 * post);
+    if (Math.abs(got - 5.0) > 1e-6) {
+      bad.push(
+        `the terrain read is not the north-west-to-south-east split: a twisted cell reads ${got.toFixed(2)} m ` +
+          'where the triangle it is in says 5.00 (bilinear would say 6.25). ' +
+          'terrain.Terrain.sample, tiles.write_terrain and world/terrain.ts are the other three readers of this split.',
+      );
+    }
+  }
+
+  // 8b. ...and it is the same lattice the pipeline wrote. Row 0 is the northern
+  //    edge and the mirrored reading is 6.9 m out; if the grid ever transposes,
+  //    the deck and water pairs silently become noise. Asserted against the
+  //    poles' own `groundY`, which the pipeline wrote from its own DEM.
   let checked = 0;
   let sum = 0;
   for (const t of tiles) {
