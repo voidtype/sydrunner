@@ -326,27 +326,37 @@ export const SWEEP_HZ = 5;
 /**
  * Instances per model file.
  *
- * **This paragraph used to be an estimate and it was wrong.** It said "a dozen
- * or so per model at the worst measured point", and 24 was twice that again.
- * The 2026-09 real-cars round measured it instead, over all 13,362 baked
- * `.cars.bin` sidecars -- 1,398,902 parked cars -- by standing at every car in
- * the sixty densest tiles, counting what falls inside `CLAIM_RADIUS`, and
- * taking `identity % pool.length` for each. The answer even *before* the
- * stand-ins were removed was **35 Corollas** at one point in the inner west,
- * against a ceiling of 24: this fleet has been quietly overflowing at its
- * densest points since it shipped, and an overflow is a car drawn as a box
- * among models.
+ * **This paragraph used to be an estimate, then it was a wrong measurement, and
+ * this is the third version.** The estimate said "a dozen or so per model at the
+ * worst measured point". The 2026-09 real-cars round replaced it with figures --
+ * 47 Corollas at one point in the inner west, 179 parked cars inside 90 m in
+ * tile `-61_36` -- and raised the ceiling from 24 to 64 on the strength of them.
  *
- * With the passenger classes cut to real makes only the worst point is **47**
- * (`toyota_corolla_2020`, tile `-61_36`, 179 parked cars inside 90 m), because
- * body 1 is now five parts Corolla to one part Golf. The runners-up are the
- * Tesla at 36 and the Camry at 34. To those add the schedule fleet and the
- * driven records, which claim out of the same pools -- counted in tens near the
- * player, spread over five classes -- so 64 is the measurement plus a third.
+ * **Those figures are not in the shipped world.** Re-measured exhaustively
+ * against the same corpus (all 13,362 baked `.cars.bin` sidecars, 1,398,902
+ * parked cars) by standing at *every one of them* rather than at the cars of the
+ * sixty densest tiles, counting neighbours inside `CLAIM_RADIUS` **across tile
+ * seams** through a global 100 m hash, and taking `identity % pool.length` for
+ * each:
+ *
+ *   - the densest 90 m circle in Greater Sydney holds **77 parked cars**, in
+ *     tile `-72_-22` (E -35,518, N -10,903) -- not 179;
+ *   - the worst per-model crowd is **22** (`toyota_corolla_2020`, tile `-57_36`,
+ *     E -28,325, N 18,420), then the Camry at 19, the Prado at 18 and the CX-5
+ *     at 17 -- not 47.
+ *
+ * So this fleet was **not** overflowing at 24, and it is nowhere near
+ * overflowing at 64. The ceiling stays at 64 anyway and the reason is that it
+ * costs nothing to be wrong in this direction: buffer bytes only, and the
+ * schedule fleet and the driven records claim out of these same pools without
+ * appearing in a parked-car census at all. What the correction buys is that the
+ * next person sizing this reads a number that exists.
  *
  * It is a hard ceiling rather than a guideline: a car that finds its model full
  * simply is not claimed and draws as the box it already was, which is the
- * correct way for this feature to run out of room.
+ * correct way for this feature to run out of room. `verifyCarVisibility` drives
+ * a tile dense enough to reach it and asserts that the refusal happens *before*
+ * anything folds the box -- an overflow must cost a model, never a car.
  *
  * An `InstancedMesh` costs its capacity in buffer bytes and its `count` in draw
  * work, so raising it from 24 buys nothing at frame time and costs buffer only:

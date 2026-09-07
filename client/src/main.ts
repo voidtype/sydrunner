@@ -122,6 +122,7 @@ import { verifyRangeAlloc } from './world/rangealloc.ts';
 // those shared meshes -- and the one species with a second owner reaching into
 // its matrices. See `world/parkedpool-check.ts`.
 import { verifyParkedPool } from './world/parkedpool-check.ts';
+import { verifyCarVisibility } from './world/carvisibility-check.ts';
 import { verifyFloorPlan } from './world/floorplan.ts';
 import { buildingSeed, doorAt, verifyDoorway, type DoorSite } from './world/doorway.ts';
 import { CITY_SPACE, spaceForBuilding, verifySpaces } from './net/spaces.ts';
@@ -4170,7 +4171,7 @@ async function main(): Promise<void> {
   // And the near field, where a box stops being enough.
   //
   // Every car within 90 m of the camera -- moving or parked, from either fleet --
-  // is drawn as one of 24 real models instead, chosen by the car's own stable
+  // is drawn as one of 15 real models instead, chosen by the car's own stable
   // identity so it is the same car to everyone forever. `world/carlod.ts` carries
   // the whole argument; the three lines below are the whole of the wiring, and
   // each is a different half of it: the models have to be *in the scene* before
@@ -4179,9 +4180,24 @@ async function main(): Promise<void> {
   // as it arrives and take them back as it leaves.
   //
   // Awaited here, well above the scene pass, and bounded like every other asset
-  // on this path. 2.4 MB of glTF, and losing it costs the near field its models
-  // -- which is the picture this game had for its whole life -- where waiting
-  // forever for it costs the game.
+  // on this path. Losing it costs the near field its models -- which is the
+  // picture this game had for its whole life -- where waiting forever for it
+  // costs the game.
+  //
+  // **6.9 MB of glTF, not the 2.4 MB this comment used to claim.** The 2026-09
+  // real-cars round swapped two dozen Kenney and generic files of ~100 kB each
+  // for fifteen Sketchfab makes, four of which are near a megabyte on their own
+  // (`nissan_xtrail_2023` 997 kB, `toyota_hilux_2021` 932 kB,
+  // `hyundai_tucson_2015` 896 kB, `toyota_prado_2013` 867 kB), and the deadline
+  // beside them was not revisited. They are fetched in parallel, so the number
+  // that matters against `FAR_LAYER_DEADLINE_MS` is the whole 6.9 MB over
+  // whatever link the player has -- and `withDeadline` is all-or-nothing: one
+  // timeout is *every* car in Sydney back to a box, reported by
+  // `sydney.carModelReport().loaded === false` and by the
+  // "did not finish in 15000 ms" line above it. A single file that fails on its
+  // own is the softer case and leaves a `weight`-wide hole in one pool, which
+  // `carModelReport().skipped` names. Both are the first thing to read when
+  // somebody says the near-field cars look wrong.
   const carModels = await withDeadline(
     loadCarModels(undefined, createCarPose()),
     FAR_LAYER_DEADLINE_MS,
@@ -5745,6 +5761,18 @@ async function main(): Promise<void> {
      */
     ...verifyParkedBins(),
     ...verifyParkedPool(),
+    /*
+     * And the picture those two produce, which is a different question from the
+     * bookkeeping and is the one the owner keeps reporting: *"some of the car
+     * models are invisible"*. `verifyParkedPool` can be entirely green while
+     * every near-field car is gone, because neither `InstancedMesh.count` nor
+     * `BufferAttribute.version` -- the two things that decide what a frame
+     * actually rasterises -- appears anywhere in it. This drives 900 frames of
+     * the loop below over parked, schedule, driven, overflowed and holed cars
+     * and asserts the one property a player sees: every car is drawn by exactly
+     * one fleet. See `world/carvisibility-check.ts`.
+     */
+    ...verifyCarVisibility(),
     /*
      * And what the car you get into is called. Pure -- one modulus over a table
      * -- so it runs here and on the server, and what it holds is that the name
