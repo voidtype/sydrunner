@@ -348,6 +348,7 @@ export function verifyWaypoint(): string[] {
       dollars: 0,
       npcId: '',
       node: '',
+      control: '',
     });
     const quest = (id: string, steps: QuestStep[]): Quest => ({
       id,

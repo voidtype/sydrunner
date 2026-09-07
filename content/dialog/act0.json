@@ -30,7 +30,16 @@
     "back, which is why the quest\u0027s giver is the Ladmaster and its turn-in is",
     "on Ray\u0027s tree. His numbers about the claim are game/cash.ts\u0027s real ones",
     "($100, seven in-game days, per office, six metres from the door) and his",
-    "complaint is DeFAULT\u0027s Click \u0026 Collect, teams.ts id 31."
+    "complaint is DeFAULT\u0027s Click \u0026 Collect, teams.ts id 31.",
+    "",
+    "DENISE TEACHES THE KEYS, BECAUSE NOTHING ON THE SCREEN DOES ANY MORE.",
+    "",
+    "The block of keycaps in the bottom-right corner now empties itself as each",
+    "control is used (client/src/game/controlshint.ts), so the words have to",
+    "come from somebody. `howto` is that branch and it is a swap, not an",
+    "addition: six choices is the cap on a node, so the wait joke moved one rung",
+    "down into it. The Ladmaster names wasd and shift where he gives directions,",
+    "which is the only place a first-timer is standing still and reading."
   ],
   "npcs": [
     {
@@ -80,7 +89,7 @@
         },
         {
           "id": "nudge",
-          "line": "Out the park and up the road cuz. Big square, glass front, blokes on the bench out the front. If ya lost the bike thats on you, I only had the one.",
+          "line": "Out the park and up the road cuz. Big square, glass front, blokes on the bench out the front. Wasd to walk, shift if yar in a hurry. If ya lost the bike thats on you, I only had the one.",
           "choices": [{ "text": "Got it.", "goto": "" }]
         },
         {
@@ -196,7 +205,7 @@
             { "text": "What am I meant to be doing?", "goto": "obligations" },
             { "text": "I've done it.", "goto": "turnins" },
             { "text": "About that course.", "goto": "upskilled" },
-            { "text": "How long's the wait?", "goto": "smalltalk" },
+            { "text": "How does any of this work?", "goto": "howto" },
             {
               "text": "You wanted to see me.",
               "goto": "review",
@@ -258,6 +267,28 @@
             { "text": "I did the course.", "turnin": "act0-training" },
             { "text": "I sat through the review.", "turnin": "act0-review" }
           ]
+        },
+        {
+          "id": "howto",
+          "line": "It is all on the phone. Q takes it out. J is the list of what you owe us, and it is the same list either way. I did not design it. There was a consultant.",
+          "choices": [
+            { "text": "And when I've finished one?", "goto": "howto_back" },
+            { "text": "How long's the wait?", "goto": "smalltalk" },
+            { "text": "Right.", "goto": "hello" }
+          ]
+        },
+        {
+          "id": "howto_back",
+          "line": "You walk back in here and you press E at me. At me, not at the door. The door is not part of the system, whatever the sign on it says.",
+          "choices": [
+            { "text": "Understood.", "goto": "hello" },
+            { "text": "And to get anywhere?", "goto": "howto_out" }
+          ]
+        },
+        {
+          "id": "howto_out",
+          "line": "M is a map of the whole thing. There are trains and there are cars and both of them are E. I am not the transport department. I am told that quite often.",
+          "choices": [{ "text": "Ta, Denise.", "goto": "hello" }]
         },
         {
           "id": "upskilled",

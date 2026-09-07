@@ -182,6 +182,35 @@ banner's, which is the law shouting, not the interface. Every string in
 `index.html` was reread for this pass; the controls list keeps every binding it
 had and loses the essays.
 
+## The controls block earns its exit
+
+A tester, relayed by the owner: *"a tutorial mission instead of constant on
+screen instructions"*. The block in the bottom-right corner was the constant
+instruction — twenty-two keycaps, on the screen from the first frame of the
+first session to the last frame of the thousandth — and the corner it sits in
+was the one place this document had left alone, because everything in it was
+individually correct.
+
+It empties itself now. **A row is drawn until its control has been used, and
+then it is not**: no timer, no dismiss button, no setting, because the one event
+that proves a row has done its job is the player doing the thing the row
+describes. Nine of them go inside two minutes. What stays whatever else has
+gone is the eyebrow — `controls · h for all of them` — because the moment the
+last row disappears is the moment the block stops being a reference, and `h`
+has to still be findable; `h` itself is untouched and lists every binding the
+game has. The used set is remembered in `localStorage`, so a returning player is
+not handed the wall again on Tuesday.
+
+What replaces it while somebody is being taught something is **one keycap on the
+step they are on**, in the tracker, drawn from the step's own `control` field
+and gone the moment that step is done. That is rule 6 kept rather than bent: the
+instruction is scoped to the moment it is true, and the surface it uses is one a
+player already looks at instead of a fifth thing on the screen.
+
+The ids and the arithmetic are `client/src/game/controlshint.ts`; the words stay
+in `index.html`, because that corner paints before a module has loaded, and
+`verifyIndexDom` asserts the two lists are the same rows in the same order.
+
 ## Costs, per rule 8
 
 Two woff2 files, 69 KB, cached forever; zero wire; the hero is one `opacity`
@@ -190,8 +219,14 @@ lines to under 1,400 and from fifty-odd hex literals to the table above.
 
 ## Checks
 
+- `verifyControlsHint` on both boot lists: the row set shrinks monotonically and
+  never grows one back, `h` always yields the whole list, nothing stored yields
+  the whole list, a full stored set yields none, and a corrupt stored value
+  yields the whole list rather than a throw.
 - `verifyAreaLine` on both boot lists.
-- `verifyIndexDom` gains the hero's ids and the blade's.
+- `verifyIndexDom` gains the hero's ids and the blade's, the `data-ctl` rows of
+  `#help` against `game/controlshint.ts`, and a probe that a `span` marked
+  `hidden` in that block is actually hidden.
 - `verifyTeams` is untouched and still greps for a name in the wrong case.
 - Rendering is judged by its pure parts; what only eyes can judge — whether the
   cream reads over a noon sky — the owner looks at on the remote.

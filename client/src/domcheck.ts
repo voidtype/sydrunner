@@ -34,6 +34,11 @@
  * `document`. Everything else added tonight is pure and runs on both.
  */
 
+// The rows the compact controls block is meant to have, and their keycaps. The
+// markup is the copy a player sees; this is the copy the code acts on, and the
+// check below is what stops the two from drifting.
+import { CONTROL_ROWS } from './game/controlshint.ts';
+
 /**
  * Ids `client/src` reaches for with a non-null assertion.
  *
@@ -137,6 +142,66 @@ export function verifyIndexDom(): string[] {
       if (!values.includes(want)) {
         failures.push(`no join tab carries data-join="${want}"; JoinGate can never select it.`);
       }
+    }
+  }
+
+  /*
+   * --- The collapsing controls block: the markup and the module are one list.
+   *
+   * `game/controlshint.ts` owns the ids and the arithmetic; `index.html` owns
+   * the words and carries a `data-ctl` on every row. That duplication is
+   * deliberate -- the corner has to paint before a module has loaded -- and this
+   * is the check that makes it safe. The failure it convicts is silent in this
+   * file's own sense: a row added to the markup with no id here never goes
+   * away, and an id here with no row in the markup is a control the block can
+   * never stop shouting about.
+   *
+   * As a **sequence**, not a set, so a row moved in one place and not the other
+   * is caught too. The order is what a player reads down.
+   */
+  const help = document.getElementById('help');
+  if (help !== null) {
+    const marked = Array.from(help.querySelectorAll<HTMLElement>('[data-ctl]')).map((el) => el.dataset.ctl ?? '');
+    const wanted = CONTROL_ROWS.map((row) => row.id);
+    if (marked.join(',') !== wanted.join(',')) {
+      failures.push(
+        `#help carries [${marked.join(', ')}] and game/controlshint.ts carries [${wanted.join(', ')}]; ` +
+          `a row in one and not the other is a row that never collapses or a control the block cannot name.`,
+      );
+    }
+    // And the words match, so a keycap can be corrected in one file and stay
+    // wrong in the other -- which is how a legend ends up teaching the wrong key.
+    for (const row of CONTROL_ROWS) {
+      const el = help.querySelector<HTMLElement>(`[data-ctl="${row.id}"]`);
+      if (el === null) continue;
+      const key = el.querySelector('kbd')?.textContent ?? '';
+      if (key !== row.key) {
+        failures.push(`#help draws "${key}" for the ${row.id} control where game/controlshint.ts says "${row.key}".`);
+      }
+    }
+    // The eyebrow has no id and must not get one: it is what keeps `h`
+    // findable once every row has gone.
+    const eyebrow = help.querySelector('.eyebrow');
+    if (eyebrow === null) failures.push('#help has no eyebrow, so a player whose block has collapsed can never find h.');
+    else if ((eyebrow as HTMLElement).dataset.ctl !== undefined) {
+      failures.push('the #help eyebrow carries a data-ctl and would collapse with the rows it labels.');
+    }
+    // And `hidden` hides, here as well. `hud.paintControls` sets the attribute
+    // and `#help span { display: inline-flex }` is exactly the kind of rule that
+    // outranks it -- which is the bug this whole file was written for.
+    const probe = document.createElement('span');
+    probe.hidden = true;
+    probe.style.position = 'fixed';
+    probe.style.left = '-9999px';
+    const line = help.querySelector('div.keys') ?? help;
+    line.appendChild(probe);
+    const shown = getComputedStyle(probe).display !== 'none';
+    probe.remove();
+    if (shown) {
+      failures.push(
+        'a span marked hidden inside #help is still displayed -- a stylesheet rule is outranking ' +
+          '[hidden], and the controls block will never collapse.',
+      );
     }
   }
 

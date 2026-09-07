@@ -204,6 +204,16 @@
       #help span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
       #help .more { color: var(--cream-3); font-size: var(--t-body); }
       #help .more kbd { background: var(--steel-3); color: var(--cream); }
+      /* --- A used row, and a line with nothing left in it.
+         `hud.paintControls` sets the `hidden` attribute and the two rules above
+         are exactly the kind that outrank it: `[hidden] { display: none }` is
+         the lowest-specificity rule in the language, and `#help div.keys` beats
+         it on an id, a class and a type. That is the bug `client/src/domcheck.
+         ts` was written for, one element along, so this is `!important` on
+         purpose rather than out of habit -- it is the only weight that survives
+         somebody adding a fourth row selector later. `domcheck` asserts it
+         works by asking the browser. */
+      #help [hidden] { display: none !important; }
       #help.hidden { opacity: 0; }
       body.suggesting #help, body:has(#phone.shown) #help { opacity: 0; }
       @media (max-height: 460px) { #help .keys { display: none; } }
@@ -392,6 +402,13 @@
       #questtrack-steps .row { display: flex; align-items: baseline; justify-content: flex-end; gap: 6px; font-size: var(--t-body); line-height: 1.35; text-shadow: var(--lift); }
       #questtrack-steps .row b { font-weight: 400; }
       #questtrack-steps .row i { flex: 0 0 auto; font-style: normal; font-size: var(--t-micro); font-variant-numeric: tabular-nums; color: var(--cream-3); }
+      /* The control hint on the open step, and only ever on the open step --
+         `client/src/game/questtrack.ts` owns that rule. `:empty` collapses it
+         on the other five rows, so a job that teaches nothing has the layout it
+         always had. Smaller than the legend's keycaps: this one sits inside a
+         line of running text rather than in a list of its own. */
+      #questtrack-steps .row kbd { flex: 0 0 auto; font-size: var(--t-micro); padding: 2px 5px; }
+      #questtrack-steps .row kbd:empty { display: none; }
       #questtrack-steps .row.now b { color: #ffffff; }
       #questtrack-steps .row.next b { color: var(--cream-3); }
       #questtrack-steps .row.done b { color: var(--cream-4); text-decoration: line-through; }
@@ -1049,14 +1066,28 @@
     <!-- The legend. Rows of keycaps and verbs; `hud.ts` only toggles a class
          on this block. The first three rows are the first minute; the rest
          answer later questions a step quieter. `j` and `q` are one line
-         because they are one list. See UI.md. -->
+         because they are one list. See UI.md.
+
+         **Every row carries a `data-ctl`, and every row goes away the first
+         time its control is used.** The ids and the arithmetic are
+         `client/src/game/controlshint.ts`; `hud.markControl` sets `hidden` on
+         the span and on the line once the line is empty; `domcheck.ts` asserts
+         this markup and that module list the same rows in the same order. The
+         words stay here rather than being rendered from the module because
+         this corner is on the screen before a single module has been imported,
+         and a legend that is blank for the first second of a cold boot is
+         blank for the one second it exists for.
+
+         The eyebrow has no `data-ctl` and never goes: the moment the last row
+         disappears is the moment this stops being a reference, and `h` has to
+         still be findable. -->
     <div id="help">
       <div class="eyebrow">controls · h for all of them</div>
-      <div class="keys"><span><kbd>wasd</kbd>move</span><span><kbd>space</kbd>jump</span><span><kbd>shift</kbd>sprint</span></div>
-      <div class="keys"><span><kbd>mouse</kbd>look</span><span><kbd>left click</kbd>bat</span><span><kbd>right click</kbd>footy</span></div>
-      <div class="keys"><span><kbd>wheel</kbd>zoom</span><span><kbd>c</kbd>third person</span><span><kbd>f</kbd>torch</span><span><kbd>e</kbd>doors, cars, bikes</span></div>
-      <div class="more"><span><kbd>1</kbd>bat</span><span><kbd>2</kbd>footy</span><span><kbd>4</kbd>fists</span><span><kbd>shift+n</kbd>off hand</span><span><kbd>b</kbd>your build</span><span><kbd>x</kbd>furnish a room</span></div>
-      <div class="more"><span><kbd>j</kbd>jobs</span><span><kbd>m</kbd>map</span><span><kbd>i</kbd>chat</span><span><kbd>tab</kbd>scores</span><span><kbd>esc</kbd>suggestions · what's new · report a bug · talents</span></div>
+      <div class="keys"><span data-ctl="move"><kbd>wasd</kbd>move</span><span data-ctl="jump"><kbd>space</kbd>jump</span><span data-ctl="sprint"><kbd>shift</kbd>sprint</span></div>
+      <div class="keys"><span data-ctl="look"><kbd>mouse</kbd>look</span><span data-ctl="bat"><kbd>left click</kbd>bat</span><span data-ctl="footy"><kbd>right click</kbd>footy</span></div>
+      <div class="keys"><span data-ctl="zoom"><kbd>wheel</kbd>zoom</span><span data-ctl="third"><kbd>c</kbd>third person</span><span data-ctl="torch"><kbd>f</kbd>torch</span><span data-ctl="interact"><kbd>e</kbd>doors, cars, bikes</span><span data-ctl="phone"><kbd>q</kbd>your phone</span></div>
+      <div class="more"><span data-ctl="slot-bat"><kbd>1</kbd>bat</span><span data-ctl="slot-footy"><kbd>2</kbd>footy</span><span data-ctl="slot-fists"><kbd>4</kbd>fists</span><span data-ctl="offhand"><kbd>shift+n</kbd>off hand</span><span data-ctl="build"><kbd>b</kbd>your build</span><span data-ctl="furnish"><kbd>x</kbd>furnish a room</span></div>
+      <div class="more"><span data-ctl="jobs"><kbd>j</kbd>jobs</span><span data-ctl="map"><kbd>m</kbd>map</span><span data-ctl="chat"><kbd>i</kbd>chat</span><span data-ctl="scores"><kbd>tab</kbd>scores</span><span data-ctl="panels"><kbd>esc</kbd>suggestions · what's new · report a bug · talents</span></div>
     </div>
     <div id="helpfull">
       <h1>controls</h1>
