@@ -195,6 +195,13 @@ class TileResult:
     # build can be checked for relief without opening a sidecar.
     ground_min: float = 0.0
     ground_max: float = 0.0
+    # Poles, bins, posts and signals the carriageway keep-out removed from this
+    # tile -- things that were placed and are not in the sidecars above. It rides
+    # here rather than on `carriageway.KeepOut`'s own tally for one reason: the
+    # tile loop runs on a `fork` pool, so a counter incremented inside
+    # `instances` never leaves the child, and the parent's report would read 0
+    # whether the sweep fired or was never attached. See `carriageway.report`.
+    carriageway_dropped: int = 0
 
 
 def _accessor_min_max(arr: np.ndarray, components: int) -> tuple[list[float], list[float]]:
@@ -2171,6 +2178,7 @@ def build_tile(
         lanes_bytes=lanes_bytes,
         ground_min=float(ground.min()),
         ground_max=float(ground.max()),
+        carriageway_dropped=lines.carriageway_dropped + props.carriageway_dropped,
     )
 
 

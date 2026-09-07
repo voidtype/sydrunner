@@ -45,6 +45,7 @@ from tqdm import tqdm
 from . import (
     attributes,
     bays,
+    carriageway,
     config,
     contact,
     creeks,
@@ -705,6 +706,20 @@ def cmd_build(args: argparse.Namespace) -> int:
     )
     _report_lanes(lane_network)
 
+    # The carriageway keep-out, and it has to be here: it is swept from the lane
+    # graph, which is the last network built, and it is applied to the two
+    # networks built before it. Nothing is re-placed -- both placers filter what
+    # comes out of `instances`, which the tile loop below has not called yet --
+    # so this is a filter over placed items and not a fifth keep-out inside
+    # `furniture._blocked_at`. `carriageway.py`'s header is the argument for why
+    # that distinction is the whole fix.
+    keep_out = carriageway.KeepOut(lane_network)
+    power_network.set_carriageway(keep_out)
+    furniture_network.set_carriageway(keep_out)
+    bad = carriageway.verify()
+    if bad:
+        raise SystemExit("carriageway keep-out control failed:\n  " + "\n  ".join(bad))
+
     # Spec 8.3's powerups. Independent of the four instanced networks above --
     # it clears nothing and is cleared by nothing, because a floating icon
     # occupies no ground -- so it takes only the streets (for the paving its
@@ -848,6 +863,11 @@ def cmd_build(args: argparse.Namespace) -> int:
     _report_parking(parking_network, results)
     _report_power(power_network, results)
     _report_furniture(furniture_network, results)
+    # After both of those, because it is the count they do not carry: what each
+    # of them lost to the road rather than to its own keep-outs. Counted off
+    # `results` and not off the keep-out's own tally, which is a child process's
+    # -- see `carriageway.report`, where that mistake is written down.
+    print(carriageway.report(keep_out, results))
     _report_powerups(powerup_network)
     _report_awnings(awning_network)
     _report_doors(door_network)
