@@ -235,13 +235,14 @@ import {
   inCore,
   interiorAdmits,
   interiorGround,
+  levelIndex,
   verifyInterior,
   type Interior,
 } from '../client/src/world/interior.ts';
 import { BODY_RADIUS_M, MAX_PER_SPACE, boxClearance, boxOf, verifyPlaceables } from '../client/src/world/placeables.ts';
 import { InteriorStore, verifyInteriorStore } from './interiors.ts';
 import { FURNISH_OP } from '../client/src/net/protocol.ts';
-import { CITY_SPACE, spaceForBuilding, verifySpaces } from '../client/src/net/spaces.ts';
+import { CITY_OCCUPANCY, CITY_SPACE, spaceForBuilding, verifySpaces } from '../client/src/net/spaces.ts';
 import { AccountStore } from './accounts.ts';
 // Global chat. See `checkChat` at the foot of this file: cross-room delivery over
 // real sockets, which is the one claim in this server that contradicts
@@ -11307,6 +11308,17 @@ async function checkInteriors(): Promise<void> {
     );
   }
 
+  /**
+   * The first multi-storey building near the spawn that will let a body in.
+   *
+   * Found in 6a and used again in 7, because the building the rest of this
+   * function uses is whatever is nearest the spawn and that is a single-storey
+   * terrace -- so every assertion about a *floor* made against it is an
+   * assertion about level 0, which is the one level both of the bugs this
+   * branch fixed were exact on.
+   */
+  let tallBuilding: { prism: Prism; it: Interior } | null = null;
+
   // --- 5. One building, one inside, for everybody.
   {
     const q = sim.join(0, null, 'Sheila');
@@ -11330,17 +11342,132 @@ async function checkInteriors(): Promise<void> {
     const index = new InterestIndex();
     const held = new InterestSet();
     const out: number[] = [];
-    const snap = sim.snapshot([]);
-    index.begin(snap, [], [], (id) => sim.participants.get(id)?.space ?? CITY_SPACE);
-    index.select(p.combat.body.position.x, p.combat.body.position.z, p.space, held, out);
+    let snap = sim.snapshot([]);
+    // The **occupancy**, not the space: the interest key is the room, which is
+    // the building with the storey folded into it. See
+    // `Simulation.occupancyFor` and `net/spaces.occupancyOf`.
+    const roomOf = (id: number): number => {
+      const who = sim.participants.get(id);
+      return who === undefined ? CITY_OCCUPANCY : sim.occupancyFor(who);
+    };
+    index.begin(snap, [], [], roomOf);
+    index.select(p.combat.body.position.x, p.combat.body.position.z, sim.occupancyFor(p), held, out);
     check(out.includes(p.id), 'somebody indoors is in their own working set, so prediction can still reconcile');
     check(out.includes(q.id), 'and sees the other person in the pub with them');
     check(!out.includes(r.id), 'and not the bystander standing two metres away through the wall');
 
     const heldOut = new InterestSet();
-    index.select(r.combat.body.position.x, r.combat.body.position.z, r.space, heldOut, out);
+    index.select(r.combat.body.position.x, r.combat.body.position.z, sim.occupancyFor(r), heldOut, out);
     check(out.includes(r.id), 'the bystander is in their own working set');
     check(!out.includes(p.id) && !out.includes(q.id), 'and is sent nobody from inside the building');
+
+    // --- 6a. And the storey, which is the half a building-wide key cannot see.
+    //
+    // Every radius in `server/aoi.ts` is horizontal, so two people on floors 0
+    // and 1 of one building are **zero metres apart** by every test that file
+    // has. `server/interior-share-check.ts` measured what that used to look
+    // like over a fixture -- a body drawn six metres up through the ceiling
+    // with a nameplate over it -- and this is the same question asked of a
+    // building out of the real bake, which is the only place a floor is a real
+    // floor.
+    //
+    // **It finds its own building rather than using the one above**, and that
+    // is the whole reason this is twenty lines instead of five: the building
+    // nearest the spawn is a single-storey terrace, so a section that reused it
+    // would print a note about being skipped and this repo has learned what a
+    // zero counter is worth. The first multi-storey building within 800 m that
+    // will let a body in is the subject, in a `Simulation` of its own.
+    {
+      const around: Prism[] = [];
+      world.collision.prismsWithin(world.spawn.x, world.spawn.z, 800, around);
+      let tall: { sim: Simulation; a: Participant; b: Participant; levels: number } | null = null;
+      for (const block of around) {
+        if (block.structural || !interiorAdmits(block.points, block.height)) continue;
+        const made = buildInterior(block.points, block.base, block.height, buildingSeed(block));
+        if (made === null || made.levels.length < 2) continue;
+        const s3 = new Simulation(world);
+        const up = s3.join(0, null, 'Upstairs');
+        const down = s3.join(0, null, 'Downstairs');
+        // In through the building's own door, which is the only entrance a
+        // body has: a concave outline can put the hull's longest edge across a
+        // notch, so a few refuse before one admits.
+        let admitted = true;
+        for (const body of [up, down]) {
+          const d = made.door;
+          const sx = d.x + d.nx;
+          const sz = d.z + d.nz;
+          body.combat.body.position.set(sx, eyeAt(groundFor(world), sx, sz), sz);
+          body.combat.body.velocity.set(0, 0, 0);
+          body.combat.body.yaw = Math.atan2(d.nx, d.nz);
+          if (s3.doorPress(body.id) === null || body.interior === null) admitted = false;
+        }
+        if (!admitted || up.interior === null) continue;
+        tall = { sim: s3, a: up, b: down, levels: up.interior.levels.length };
+        tallBuilding = { prism: block, it: made };
+        break;
+      }
+      if (tall === null) {
+        check(false, 'a building with more than one storey within 800 m of the spawn will let two bodies in');
+      } else {
+        const { sim: s3, a: up, b: down } = tall;
+        const levels = up.interior?.levels ?? [];
+        // Same room first, because a filter that excluded everybody would pass
+        // every assertion below it and fail the feature completely.
+        const idx3 = new InterestIndex();
+        // One held set per viewer, not one shared: `held` is what *that* client
+        // had last snapshot and it is what the leave band is measured against.
+        // Sharing it would have one body's history deciding the other's edge.
+        const heldUp3 = new InterestSet();
+        const heldDown3 = new InterestSet();
+        const out3: number[] = [];
+        const roomOf3 = (id: number): number => {
+          const who = s3.participants.get(id);
+          return who === undefined ? CITY_OCCUPANCY : s3.occupancyFor(who);
+        };
+        const look = (who: Participant): number[] => {
+          // Stepped first, because `Simulation.snapshot` describes the bodies
+          // this simulation has integrated and a participant that has never
+          // been stepped is not in one. Every other AOI assertion in this file
+          // steps before it looks, for the same reason.
+          s3.step(tick);
+          idx3.begin(s3.snapshot([]), [], [], roomOf3);
+          return idx3.select(
+            who.combat.body.position.x,
+            who.combat.body.position.z,
+            s3.occupancyFor(who),
+            who === up ? heldUp3 : heldDown3,
+            out3,
+          );
+        };
+        const together = look(up);
+        check(
+          together.includes(up.id) && together.includes(down.id),
+          `two people on the ground floor of a real ${tall.levels}-storey building see each other`,
+        );
+        // And one of them upstairs.
+        up.combat.body.position.y = levels[1].y + EYE_HEIGHT;
+        check(
+          s3.occupancyFor(up) !== s3.occupancyFor(down),
+          `a body one floor up is in a different room from the one below it (${(levels[1].y - levels[0].y).toFixed(1)} m of slab)`,
+        );
+        const fromBelow = look(down);
+        check(fromBelow.includes(down.id), 'the person on the ground floor still sees themselves');
+        check(
+          !fromBelow.includes(up.id),
+          'and is no longer sent the person on the floor above, who is zero metres away by every radius in the AOI',
+        );
+        const fromAbove = look(up);
+        check(
+          fromAbove.includes(up.id) && !fromAbove.includes(down.id),
+          'and the reciprocal: upstairs is sent nobody from downstairs',
+        );
+        // Back down, which is the assertion that stops all of this passing by
+        // filtering everybody out of everything.
+        up.combat.body.position.y = levels[0].y + EYE_HEIGHT;
+        const back = look(down);
+        check(back.includes(up.id), 'and they see each other again the moment they come back down');
+      }
+    }
 
     sim.leave(q.id);
     sim.leave(r.id);
@@ -11502,17 +11629,35 @@ async function checkInteriors(): Promise<void> {
     const wentIn = home.doorPress(who.id);
     check(wentIn !== null, 'the fixture walks into the building');
     const wasAt = { x: who.combat.body.position.x, z: who.combat.body.position.z };
+    // **Upstairs, if there is an upstairs.** The whole of what this section
+    // used to be unable to see: the save wrote `interior.base` and the restore
+    // read the *body's* current height -- which `join` had just set to the
+    // city's ground at coordinates inside a footprint, so it was the roof --
+    // and both are exact on the ground floor, which is the only floor this
+    // fixture ever stood on. A logout on level 1 of a 25 m tower came back on
+    // level 7. See `Simulation.carryOf` and `server/interior-share-check.ts`.
+    const savedLevels = who.interior?.levels ?? [];
+    const savedLevel = savedLevels.length >= 2 ? 1 : 0;
+    if (savedLevel > 0) who.combat.body.position.y = savedLevels[1].y + EYE_HEIGHT;
     home.leave(who.id);
     check(record.lastPos?.building === seed, 'and the building is saved beside the position when they disconnect');
     check(
-      Math.abs((record.lastPos?.y ?? -1) - (who.interior?.base ?? -2)) < 0.01,
-      'with the interior floor as the height, not the terrain outside',
+      Math.abs((record.lastPos?.y ?? -1) - (savedLevels[savedLevel]?.y ?? -2)) < 0.01,
+      `with the floor of the storey they were standing on as the height (level ${savedLevel}), not the terrain outside`,
     );
 
     const back = new Simulation(world, { accounts });
     const again = back.join(0, null, 'Doorman', record);
     check(again.space === space, 'and they log back in inside the same building');
     check(again.interior !== null, 'with an inside to stand in');
+    const backLevel =
+      again.interior === null
+        ? -1
+        : levelIndex(again.interior.levels, again.combat.body.position.y - EYE_HEIGHT);
+    check(
+      backLevel === savedLevel,
+      `on the storey they logged off on (level ${backLevel} against ${savedLevel})`,
+    );
     const drift = Math.hypot(again.combat.body.position.x - wasAt.x, again.combat.body.position.z - wasAt.z);
     check(drift < 1.5, `standing where they logged off, not in the doorway (${drift.toFixed(2)} m)`);
     check(again.restored, 'and are told it was a restore rather than an ordinary spawn');
@@ -11540,6 +11685,70 @@ async function checkInteriors(): Promise<void> {
       outAgain !== null && Math.hypot(outAgain.x - (doorX + outX * 1.3), outAgain.z - (doorZ + outZ * 1.3)) < 0.6,
       'through the door they came in by, onto the pavement outside it',
     );
+
+    // --- 7b. And the same round trip **from upstairs**, which is the only
+    //     version of it that could ever have failed.
+    //
+    // Everything above happened on the ground floor of a single-storey terrace,
+    // where `interior.base`, the storey's floor and the height a restore reads
+    // are all the same number -- so the two bugs this branch fixed were exact
+    // there and invisible. On level 1 of a real tower they were twenty metres
+    // apart: `carryOf` wrote the building's pad instead of the floor being
+    // stood on, and `join` handed `restoreInterior` the height `eyeAt` had just
+    // put the body at, which for coordinates inside a footprint is the **roof**.
+    // A logout on the second floor came back on the eighth.
+    if (tallBuilding === null) {
+      check(false, 'a multi-storey building was found for the upstairs logout');
+    } else {
+      const it = tallBuilding.it;
+      const upDoor = it.door;
+      const upSeed = it.seed;
+      const upstairsPath = `${dir}/interiors-check-upstairs.json`;
+      await Bun.$`rm -f ${upstairsPath}`.quiet().nothrow();
+      const upAccounts = new AccountStore(upstairsPath);
+      await upAccounts.load();
+      const made = await upAccounts.signup('Liftie', 'hunter2hunter2', 'Liftie', null);
+      const upRecord = upAccounts.byHandle('liftie');
+      if (!made.ok || !upRecord) {
+        check(false, 'the upstairs fixture signed up');
+      } else {
+        const tower = new Simulation(world, { accounts: upAccounts });
+        const climber = tower.join(0, null, 'Liftie', upRecord);
+        const sx = upDoor.x + upDoor.nx;
+        const sz = upDoor.z + upDoor.nz;
+        climber.combat.body.position.set(sx, eyeAt(groundFor(world), sx, sz), sz);
+        climber.combat.body.velocity.set(0, 0, 0);
+        climber.combat.body.yaw = Math.atan2(upDoor.nx, upDoor.nz);
+        const wentUp = tower.doorPress(climber.id);
+        const inside2 = climber.interior;
+        check(wentUp !== null && inside2 !== null, 'the upstairs fixture walks into a multi-storey building');
+        if (inside2 !== null) {
+          const top = inside2.levels.length - 1;
+          climber.combat.body.position.y = inside2.levels[top].y + EYE_HEIGHT;
+          const climbedTo = levelIndex(inside2.levels, climber.combat.body.position.y - EYE_HEIGHT);
+          check(climbedTo === top && top >= 1, `and stands on its top floor, level ${climbedTo} of ${top}`);
+          tower.leave(climber.id);
+          check(
+            Math.abs((upRecord.lastPos?.y ?? -1) - inside2.levels[top].y) < 0.01,
+            `the floor of the storey they were on is what is written down (${(upRecord.lastPos?.y ?? -1).toFixed(2)} m ` +
+              `against a ${inside2.base.toFixed(2)} m pad)`,
+          );
+          const returned = new Simulation(world, { accounts: upAccounts });
+          const backUp = returned.join(0, null, 'Liftie', upRecord);
+          check(backUp.space === spaceForBuilding(upSeed), 'and they log back in inside the same tower');
+          const landedOn =
+            backUp.interior === null
+              ? -1
+              : levelIndex(backUp.interior.levels, backUp.combat.body.position.y - EYE_HEIGHT);
+          check(
+            landedOn === top,
+            `on the floor they logged off on rather than one the roof height happens to name (level ${landedOn} against ${top})`,
+          );
+        }
+        await upAccounts.close();
+      }
+      await Bun.$`rm -f ${upstairsPath}`.quiet().nothrow();
+    }
     await Bun.$`rm -f ${accountPath}`.quiet().nothrow();
   }
 

@@ -128,7 +128,7 @@ import type { WalletStore } from './wallets.ts';
 import type { AccountRecord, AccountStore } from './accounts.ts';
 import { botName } from './bots.ts';
 import { FrameGroups, InterestIndex, InterestSet } from './aoi.ts';
-import { CITY_SPACE } from '../client/src/net/spaces.ts';
+import { CITY_OCCUPANCY } from '../client/src/net/spaces.ts';
 import type { FurnishRequest } from '../client/src/net/protocol.ts';
 import type { InteriorStore } from './interiors.ts';
 import { Simulation, applyButtons, type Participant, type TickOutput } from './sim.ts';
@@ -686,7 +686,13 @@ export class Room {
   // --- Interest management, phase 2.
   private readonly interest = new InterestIndex();
   /**
-   * Which world a player id is in, for the interest index. See `sendSnapshots`.
+   * Which **room** a player id is in, for the interest index. See
+   * `sendSnapshots`.
+   *
+   * The space *and* the storey, through `Simulation.occupancyFor`: a building
+   * is up to eight walkable floors and every radius in `server/aoi.ts` is
+   * horizontal, so the space alone put two people two floors apart in one
+   * working set. That function is where the argument and the packing live.
    *
    * A bound arrow held on the room rather than made per tick, because it is
    * handed to `InterestIndex.begin` twenty times a second forever and a closure
@@ -695,7 +701,10 @@ export class Room {
    * safe direction and is only reachable for a body that left between the
    * snapshot and the send.
    */
-  private readonly spaceOf = (id: number): number => this.sim.participants.get(id)?.space ?? CITY_SPACE;
+  private readonly occupancyOf = (id: number): number => {
+    const p = this.sim.participants.get(id);
+    return p === undefined ? CITY_OCCUPANCY : this.sim.occupancyFor(p);
+  };
   private readonly groups = new FrameGroups();
   /** Per-client scratch: the ids and record indices this client is being sent. */
   private readonly setIds: number[] = [];
@@ -1774,10 +1783,13 @@ export class Room {
     const npcs = sim.npcSnapshot();
     const aboard = sim.aboardSnapshot();
     // The fourth argument is protocol v23's: which world each body is in, asked
-    // by `InterestIndex.select` before it measures a single distance. A closure
-    // rather than a field on the record, because the space is deliberately not
-    // on the wire -- see `PROTOCOL_VERSION`'s v23 note and `server/aoi.ts`.
-    this.interest.begin(players, balls, npcs, this.spaceOf);
+    // by `InterestIndex.select` before it measures a single distance -- now the
+    // space **and the storey**, because a building is eight of them and every
+    // radius over there is horizontal. A closure rather than a field on the
+    // record, because the occupancy is deliberately not on the wire -- see
+    // `PROTOCOL_VERSION`'s v23 note, `net/spaces.occupancyOf` and
+    // `server/aoi.ts`.
+    this.interest.begin(players, balls, npcs, this.occupancyOf);
     this.groups.begin();
     // WORKSTREAM AD: what the cap is capping, sampled here rather than counted
     // per client, because it is a property of the room and not of a viewer.
@@ -1791,7 +1803,11 @@ export class Room {
       prof.at(SEC.aoi);
       const x = p.combat.body.position.x;
       const z = p.combat.body.position.z;
-      this.interest.select(x, z, p.space, conn.interest, this.setIds);
+      // The room, not the building: `occupancyFor` folds the floor in. The two
+      // sections below still ask about the *space*, and correctly -- a football
+      // and a police officer are both city-only, so all either of them needs to
+      // know is whether this client is indoors at all.
+      this.interest.select(x, z, this.sim.occupancyFor(p), conn.interest, this.setIds);
       // WORKSTREAM AD: the ball selection takes this client's own id now, so it
       // can drop the throws `net/client.interpolateBalls` would discard anyway.
       // See `InterestIndex.selectBalls` for that rule and for the cap beside it.

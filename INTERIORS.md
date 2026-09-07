@@ -94,7 +94,7 @@ that one field.
 | `client/src/world/doorway.ts` | `doorAt(prisms, px, pz, gazeX, gazeZ, reach?, facingMin?)` → the door on the building you are facing. `buildingSeed(prism)` names a building by its own geometry, rounded to a centimetre before hashing so a float's last bit cannot rename it. |
 | `client/src/world/interior.ts` | walls with doorways cut in them, a convex shell you cannot walk out of, `InteriorResolver` (the `MoveResolver` both ends step against), `arrivalAt` (per entrant, because the door is), `interiorMesh` (triangles), `interiorLine` (the sentence). |
 | `client/src/world/interiorview.ts` | the twenty three-aware lines: one `BufferGeometry`, one material, one layer. |
-| `client/src/net/spaces.ts` | `CITY_SPACE = 0`, `spaceForBuilding(seed)` (never zero), `sanitiseSpace`, `sameSpace`. |
+| `client/src/net/spaces.ts` | `CITY_SPACE = 0`, `spaceForBuilding(seed)` (never zero), `sanitiseSpace`, `sameSpace`, and `occupancyOf(space, level)` — the space with the storey folded in, which is what the working set is actually keyed on. |
 
 Every one of those but `interiorview.ts` is three-free and runs on **both** boot
 lists (`client/src/main.ts` and `server/index.ts`), because a check that only
@@ -137,6 +137,35 @@ snapshot — 25 kbit/s at a full working set — to send a number already known 
 be equal: interest filters by space before it measures a distance, so everybody
 in a snapshot is by construction in the sender's own space.
 
+### The room is the space *and* the floor
+
+`net/spaces.occupancyOf(space, level)` — `space * 256 + level`, one number — is
+what the area of interest actually filters on, and `Simulation.occupancyFor` is
+where a body's is derived. The space alone was half right for three protocol
+versions: it is the correct question about a **building**, and every radius in
+`server/aoi.ts` is horizontal, so once every storey became walkable two people
+on floors 0 and 2 of one tower were *zero metres apart* by every test that file
+has. The symptom, measured by `server/interior-share-check.ts` before it was
+fixed, is a body drawn six metres up through the ceiling with a nameplate over
+it. Distance is not the question across a slab either.
+
+It is **still not on the wire**, on exactly the argument above: a level byte on
+`PLAYER_BYTES` would be 20 B/s per player in view — 6.4 kbit/s at
+`AOI_MAX_PLAYERS` — to carry a number that is equal by construction for
+everybody a client is sent. The snapshot is unchanged at 17 bytes a player and
+`PROTOCOL_VERSION` does not move for this.
+
+Two things still ask about the **space** and not the room, and both are right
+to: furniture (`Room.furnish`) and the lift's ride (`Room.liftPress`) belong to
+the whole building, and so does a melee candidate — a swing reaches about two
+metres against a 3.1 m storey, so the body's own 3D distance already refuses the
+punch through a ceiling, and it refuses it *correctly* on a staircase, where two
+people a step apart read as being on different floors.
+
+And `MSG.SPACE` now forgets this client's remotes as well as its couches: both
+belong to the room it has just left, and until it did, walking out of a pub drew
+its drinkers standing on the pavement until the next `INTEREST` delta.
+
 ## Properties the checks defend
 
 - **Total.** Any wall in sixty kilometres can be walked up to, so a footprint
@@ -161,6 +190,10 @@ in a snapshot is by construction in the sender's own space.
   apart in two different worlds, and no radius could ever separate them. The
   same question is asked of the melee candidates one layer down.
 
+`server/interior-share-check.ts` runs the same questions from the **browser's**
+side in about a second, with no city loaded: three real `NetClient`s over three
+loopback transports against a real `Room`, a fixture block eight storeys tall,
+and thirty assertions about what each client's decoded state actually holds.
 `SYDNEY_CHECK_ONLY=interiors` runs the whole round trip over the shipped bake in
 a real `Simulation`: a real building found near the spawn, a body let in, the
 sprint, out at the door it used, two people handed one inside, a bystander two
@@ -244,9 +277,18 @@ The pieces, all in `world/interior.ts`:
 - **Furniture stays on the ground floor.** A placement has no storey, so the
   resolver applies couches on level 0 only, the server refuses a `FURNISH` from
   any other level, and the ghost is red up there.
-- **A save remembers the level.** The eye height is already in `LastPos`;
-  `restoreInterior` reads the level from it and puts a body saved mid-flight on
-  the flight where it stood.
+- **A save remembers the level.** `LastPos.y` is the floor of the storey being
+  stood on, and `restoreInterior` reads the level back out of it the way the
+  resolver reads a level every tick. This line was in this document for two
+  protocol versions before it was true: the save wrote `interior.base` -- the
+  building's ground floor, always -- and `join` handed the restore the body's
+  *current* height, which `eyeAt` had just set to the city's ground at
+  coordinates inside a footprint, i.e. the **roof**. Both are exact on level 0,
+  which is the only level any fixture ever logged off on, so a logout on the
+  second floor of a 25 m tower came back on the eighth and nothing said a word.
+  `server/interior-share-check.ts` is where it was finally asked from upstairs;
+  `checkInteriors` now does the same round trip on the top floor of a real
+  building out of the bake.
 
 `verifyInterior` climbs every flight of a four-storey building with the
 controller's own 8 cm steps, walks into the shut lane and off the divider,
@@ -280,6 +322,16 @@ asserts the hall and its wings on a 30 x 14 block and none on a terrace;
 it, and has a sign on every level.
 
 ## What is not built
+
+- **A stairwell is two rooms.** The interest filter is the exact storey, which
+  is the same rule `Simulation.furnish` already uses to decide what floor a
+  couch is on. On a flight, `levelIndex` reads the level below until the feet
+  are within `LEVEL_TOL_M` of the next, so two people climbing together stay in
+  each other's working set and a cab full of people rides as one room — but
+  somebody standing at the head of the stairs and somebody three steps down are
+  on two indices and do not see each other. Both are inside a walled core, so
+  there is nothing to see through; whether it reads as a pop at the top step is
+  the one thing here only eyes can judge.
 
 - **Rooms on the upper floors are drawn and walled but empty**, and a level's
   rooms can be cut off from each other by the core's apron on a floor the
