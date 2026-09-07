@@ -291,7 +291,7 @@ import {
   sanitisePlacement,
   type Placement,
 } from '../client/src/world/placeables.ts';
-import { CITY_SPACE, spaceForBuilding } from '../client/src/net/spaces.ts';
+import { CITY_OCCUPANCY, CITY_SPACE, occupancyOf, spaceForBuilding } from '../client/src/net/spaces.ts';
 import { InteriorStore } from './interiors.ts';
 import type { TerritoryStore } from './territory.ts';
 import { hexAt } from '../client/src/game/territory.ts';
@@ -654,8 +654,12 @@ export interface Participant {
    * against a server-simulated body every tick -- so an instance cannot be a
    * client trick: this process has to know which space you are in and simulate
    * you there. Everything else about interiors on this end hangs off this
-   * number: interest is filtered by it before any distance is measured, a swing
-   * cannot land across it, and it is saved beside the position it belongs to.
+   * number: a swing cannot land across it, the furniture and the lift cab are
+   * addressed by it, and it is saved beside the position it belongs to.
+   *
+   * **Interest is filtered by `Simulation.occupancyFor`, not by this**, and the
+   * difference is a whole storey: a building is up to eight of them and this
+   * field names all eight at once. See that function.
    *
    * Zero for every bot, every guest and every account that logged off outdoors,
    * which is very nearly everybody at any moment.
@@ -1790,6 +1794,17 @@ export class Simulation {
      * exactly one point and it is the point the body is about to stand on.
      */
     let remembered: { x: number; z: number; yaw: number } | null = null;
+    /**
+     * The floor height that was saved with an indoor spot, or null.
+     *
+     * Kept beside `remembered` rather than in it, because it is the one field
+     * of a saved spot the *outdoor* path must never use: `restoreSpawnPoint`
+     * re-derives a height from the terrain, deliberately, so that a spot saved
+     * before a rebake does not put a body underground. Only `restoreInterior`
+     * reads this, and it is the whole of how the storey survives a logout --
+     * see `restoreInterior` and `carryOf`.
+     */
+    let indoorY: number | null = null;
     let lostSpot = false;
     /*
      * --- And the fourth thing that can refuse a spot: it was indoors.
@@ -1812,6 +1827,7 @@ export class Simulation {
       if (saved !== null && saved.building !== 0) {
         indoors = saved.building;
         remembered = { x: saved.x, z: saved.z, yaw: saved.yaw };
+        indoorY = saved.y;
         // Zeros mean "no door was saved" -- see `accounts.LastPos.doorX`.
         if (saved.doorNX !== 0 || saved.doorNZ !== 0) {
           savedDoor = { x: saved.doorX, z: saved.doorZ, nx: saved.doorNX, nz: saved.doorNZ };
@@ -1974,11 +1990,31 @@ export class Simulation {
      * answer than this function guessing a pavement.
      */
     if (indoors !== 0) {
+      /*
+       * The **saved** height, not the body's current one.
+       *
+       * This read `participant.combat.body.position.y`, which is what `join`
+       * set a few lines above out of `eyeAt(world, spot.x, spot.z)` -- the
+       * *city's* ground at those coordinates, and the coordinates are inside a
+       * footprint, so it is the height of the **roof**. `restoreInterior` reads
+       * the storey out of the number it is handed, so a player who logged off
+       * on the second floor of a 25 m tower came back on the eighth: the roof
+       * is 25 m up and `levelIndex` answers the top of the shaft.
+       *
+       * Nothing about that is visible from inside the building -- there is a
+       * floor, there are walls, the door works -- which is why it survived
+       * `checkInteriors`, whose fixture logs off on the ground floor where the
+       * roof height and the pad happen to round to the same level.
+       *
+       * `indoorY` is non-null whenever `indoors` is, since both are written on
+       * the same line; the fallback is the eye height for a saved spot with no
+       * height in it at all, which lands on the ground floor as it always did.
+       */
       const back = this.restoreInterior(
         participant,
         indoors,
         participant.combat.body.position.x,
-        participant.combat.body.position.y,
+        (indoorY ?? 0) + EYE_HEIGHT,
         participant.combat.body.position.z,
         savedDoor,
       );
@@ -2032,15 +2068,35 @@ export class Simulation {
     // for a body on a warehouse roof and exactly the wrong one for a body on the
     // ground floor *inside* the warehouse: it would save the pavement outside,
     // and the restore -- which puts them back in the building the seed names --
-    // would drop them through the floor. The interior's own base is the floor
-    // they are standing on and is the only height that means anything in here.
+    // would drop them through the floor. The floor of the storey they are
+    // standing on is the only height that means anything in here, and it is
+    // also the one `restoreInterior` reads the storey back out of.
     if (p.interior !== null) {
       const d = p.door ?? p.interior.door;
+      // **The floor they are standing on, not the building's ground floor.**
+      //
+      // This said `p.interior.base` and it was wrong by up to twenty-two
+      // metres. INTERIORS.md says the save remembers the level -- *"the eye
+      // height is already in `LastPos`; `restoreInterior` reads the level from
+      // it"* -- and the restore does read it, faithfully, from a number that
+      // had already been flattened to the ground floor before it was written.
+      // Nothing anywhere noticed: the round trip is exact for a body on level 0
+      // and every fixture that ever tested it was on level 0.
+      // `server/interior-share-check.ts` is where it was finally asked from
+      // upstairs.
+      //
+      // The *level's* floor rather than the body's own feet, because that is
+      // what this field means everywhere else -- the outdoor branch below saves
+      // `spawnGround`, the ground beneath the body -- and because a body saved
+      // mid-jump or mid-flight has feet at a height no level is at, which
+      // `levelIndex` would read as the storey below on the way back in.
+      const levels = p.interior.levels;
+      const floorY = levels[levelIndex(levels, p.combat.body.position.y - EYE_HEIGHT)].y;
       return {
         name: p.name,
         kills: p.kos,
         x,
-        y: p.interior.base,
+        y: floorY,
         z,
         yaw: p.combat.body.yaw,
         building: p.interior.seed,
@@ -6139,6 +6195,44 @@ export class Simulation {
   placedIn(space: number): readonly PlacedItem[] {
     if (space === CITY_SPACE || this.interiorStore === null) return EMPTY_PLACED;
     return this.interiorStore.for(space);
+  }
+
+  /**
+   * Which **room** this body is in: the space, with the storey folded in.
+   *
+   * The one thing the area of interest asks about a participant, and the reason
+   * it is not simply `p.space`: a building is up to eight walkable storeys
+   * (INTERIORS.md, "Upstairs") and every radius in `server/aoi.ts` is
+   * horizontal, so two people on floors 0 and 2 of one tower are zero metres
+   * apart by every test that file has. `server/interior-share-check.ts`
+   * measured the result before this existed -- a body drawn six metres up
+   * through the ceiling, with a nameplate over it, in a room it is not in.
+   *
+   * The storey is read from the **feet**, through the same `levelIndex` the
+   * resolver picks a level with every tick and `furnish` refuses a couch with.
+   * That is deliberate rather than convenient: three call sites deciding
+   * independently which floor somebody is on is three chances to disagree, and
+   * the one that matters here is the lift. A cab mid-ride carries every body in
+   * it at one height, so they all read the same index and stay in each other's
+   * working set for the whole ride -- with no ride state consulted and no
+   * special case for it.
+   *
+   * Derived per snapshot rather than cached on the participant, on
+   * `Room.spaceOf`'s own terms: it is a pure function of two fields that are
+   * already in cache, asked once per player per snapshot tick in
+   * `InterestIndex.begin`, and a cached copy would be a fourth place that can
+   * be wrong about a floor.
+   *
+   * A space with no interior behind it is impossible -- `enterInterior` sets
+   * both or neither -- and reads as that building's ground floor rather than as
+   * the street, which is the safe direction: the worst it can do is put
+   * somebody in a room of one.
+   */
+  occupancyFor(p: Participant): number {
+    if (p.space === CITY_SPACE) return CITY_OCCUPANCY;
+    const inside = p.interior;
+    if (inside === null) return occupancyOf(p.space, 0);
+    return occupancyOf(p.space, levelIndex(inside.levels, p.combat.body.position.y - EYE_HEIGHT));
   }
 
   /**

@@ -133,8 +133,11 @@ import {
 } from '../client/src/net/protocol.ts';
 import { SpatialHash } from '../client/src/game/spatialhash.ts';
 // Interiors. **The first question this file asks, before any distance.** See
-// `sameSpace`'s own note there, and INTERIORS.md.
-import { CITY_SPACE } from '../client/src/net/spaces.ts';
+// `occupancyOf`'s own note there, and INTERIORS.md. The *occupancy* rather than
+// the space: a building is eight storeys and every radius here is horizontal,
+// so the space alone put two people on different floors in one working set --
+// one metre apart across the grid and six metres apart through a slab.
+import { CITY_OCCUPANCY, CITY_SPACE, occupancyOf } from '../client/src/net/spaces.ts';
 
 /**
  * The AOI grid's cell edge, metres. See the header, and `game/spatialhash.ts`'s
@@ -252,15 +255,21 @@ export class InterestIndex {
    */
   private readonly bySlot = new Map<number, number>();
   /**
-   * Which world each slot's player is in, by slot. See `begin`.
+   * Which **room** each slot's player is in, by slot. See `begin`.
    *
-   * A parallel array rather than a field on `SnapshotPlayer`, because the space
-   * is deliberately **not on the wire** (`PROTOCOL_VERSION`'s v23 note): a
-   * record is what goes out, and this is a fact about the sender that never
-   * does. Grown to a high-water mark and rewritten in place, on this file's own
-   * allocation rule.
+   * A `spaces.occupancyOf` key -- the space with the storey folded into it --
+   * and one array rather than two for that function's own reason: the compare
+   * below runs once per candidate per client per snapshot, and the whole
+   * argument for testing it here rather than keeping a second index per space
+   * is that it costs one lookup.
+   *
+   * A parallel array rather than a field on `SnapshotPlayer`, because the
+   * occupancy is deliberately **not on the wire** (`PROTOCOL_VERSION`'s v23
+   * note, and `spaces.ts`' own): a record is what goes out, and this is a fact
+   * about the sender that never does. Grown to a high-water mark and rewritten
+   * in place, on this file's own allocation rule.
    */
-  private readonly spaces: number[] = [];
+  private readonly rooms: number[] = [];
 
   /** Distances and ids of the current selection, kept sorted nearest-first. */
   private readonly selD2: number[] = [];
@@ -283,20 +292,23 @@ export class InterestIndex {
     players: readonly SnapshotPlayer[],
     balls: readonly SnapshotBall[],
     npcs: readonly SnapshotNpc[],
-    spaceOf: ((id: number) => number) | null = null,
+    occupancyOf: ((id: number) => number) | null = null,
   ): void {
     this.players = players;
     this.balls = balls;
     this.npcs = npcs;
     this.hash.clear();
     this.bySlot.clear();
-    this.spaces.length = players.length;
+    this.rooms.length = players.length;
     for (let i = 0; i < players.length; i++) {
       this.hash.insert(i, players[i].x, players[i].z);
       this.bySlot.set(players[i].id, i);
       // Null means a world with no interiors in it, which is what every check
-      // below runs against and what this file did before there were any.
-      this.spaces[i] = spaceOf === null ? CITY_SPACE : spaceOf(players[i].id);
+      // below runs against and what this file did before there were any. The
+      // city's occupancy is zero, which is what `CITY_SPACE` has always been --
+      // so every caller that passed a bare space for a world with no buildings
+      // in it is still asking exactly the right question.
+      this.rooms[i] = occupancyOf === null ? CITY_OCCUPANCY : occupancyOf(players[i].id);
     }
   }
 
@@ -319,8 +331,12 @@ export class InterestIndex {
   }
 
   /**
-   * The working set for a client standing at `(x, z)`, into `out` (ascending
-   * ids). `held` is what that client had last snapshot; see the header's rule.
+   * The working set for a client standing at `(x, z)` in `room`, into `out`
+   * (ascending ids). `held` is what that client had last snapshot; see the
+   * header's rule.
+   *
+   * `room` is a `spaces.occupancyOf` key -- the space *and* the storey -- and
+   * `CITY_OCCUPANCY` (which is zero, as `CITY_SPACE` is) for anybody outdoors.
    *
    * A client's **own** id needs no special case: it is at distance zero from
    * itself, so it is always eligible and always the first thing the cap keeps.
@@ -328,7 +344,7 @@ export class InterestIndex {
    * reconciles against its own record in every snapshot, and a set that could
    * omit you would be a client that stopped being able to reconcile in a crowd.
    */
-  select(x: number, z: number, space: number, held: InterestSet, out: number[]): number[] {
+  select(x: number, z: number, room: number, held: InterestSet, out: number[]): number[] {
     const d2s = this.selD2;
     const ids = this.selId;
     d2s.length = 0;
@@ -337,7 +353,7 @@ export class InterestIndex {
 
     this.hash.forEachWithin(x, z, AOI_LEAVE_RADIUS, (slot) => {
       seen++;
-      // **The space, before the distance, and it is not a refinement of it.**
+      // **The room, before the distance, and it is not a refinement of it.**
       //
       // An interior sits at its building's own coordinates (see
       // `world/interior.ts`), so somebody standing in a terrace and somebody on
@@ -347,10 +363,17 @@ export class InterestIndex {
       // boundary. Without this line the two of them draw each other through the
       // wall, and `server/sim.ts` lets them punch each other through it.
       //
+      // **And the storey is the same argument turned ninety degrees.** Every
+      // radius here is horizontal, so two people on floors 0 and 2 of one
+      // building are zero metres apart by this test and six metres apart
+      // through two slabs. The occupancy key folds the floor in, so the one
+      // compare answers both -- see `spaces.occupancyOf`, which is where the
+      // packing and its cost are argued.
+      //
       // Asked here rather than by filtering the records in `begin`, because the
       // index is built once per snapshot tick and consulted once per client:
-      // one array lookup per candidate against a second index per space.
-      if (this.spaces[slot] !== space) return;
+      // one array lookup per candidate against a second index per room.
+      if (this.rooms[slot] !== room) return;
       const p = this.players[slot];
       const dx = p.x - x;
       const dz = p.z - z;
@@ -1116,17 +1139,19 @@ export function verifyAoi(): string[] {
     // Four bodies within two metres of each other, which is what a terrace row
     // with two people inside it actually looks like.
     const bodies = [player(1, 0, 0), player(2, 1, 0), player(3, 2, 0), player(4, 0, 1)];
+    // Ground floors, so this section keeps asking the question it was written
+    // to ask. The storey has its own section below it.
     const spaceOf = (id: number): number =>
-      id === 1 || id === 2 ? PUB : id === 3 ? SHOP : CITY_SPACE;
+      id === 1 || id === 2 ? occupancyOf(PUB, 0) : id === 3 ? occupancyOf(SHOP, 0) : CITY_OCCUPANCY;
     index.begin(bodies, [], [], spaceOf);
 
-    index.select(0, 0, PUB, held, out);
+    index.select(0, 0, occupancyOf(PUB, 0), held, out);
     if (!out.includes(1)) failures.push('a player indoors could not see themselves; prediction would stop reconciling.');
     if (!out.includes(2)) failures.push('two players in one pub could not see each other; the interior is not shared.');
     if (out.includes(3)) failures.push('somebody in a shop was drawn into a pub two metres away.');
     if (out.includes(4)) failures.push('somebody on the pavement was drawn inside the pub they were leaning on.');
 
-    index.select(0, 1, CITY_SPACE, held, out);
+    index.select(0, 1, CITY_OCCUPANCY, held, out);
     if (!out.includes(4)) failures.push('a player in the street could not see themselves.');
     if (out.includes(1) || out.includes(2) || out.includes(3)) {
       failures.push('somebody in the street was sent the people inside the building beside them.');
@@ -1151,10 +1176,65 @@ export function verifyAoi(): string[] {
 
     // A world with no interiors in it is the one every check above this line
     // runs in, and it has to keep behaving exactly as it did: `begin` with no
-    // space function means everybody is outdoors.
+    // occupancy function means everybody is outdoors.
     index.begin(bodies, [], []);
-    index.select(0, 0, CITY_SPACE, held, out);
+    index.select(0, 0, CITY_OCCUPANCY, held, out);
     if (out.length !== 4) failures.push(`with no interiors anywhere, a client saw ${out.length} of 4 players.`);
+  }
+
+  // --- Interiors: the **storey**, asked in the same breath as the space.
+  //
+  // The half the space alone could not answer, and the one a radius can never
+  // reach: `world/interior.ts` makes every storey walkable, so two people in
+  // one building can be on floors 0 and 7 -- twenty-two metres apart, and
+  // **zero metres apart** by every test in this file, all of which are
+  // horizontal. `server/interior-share-check.ts` measured what that looks like
+  // before this section existed: a body drawn six metres up through the ceiling
+  // with a nameplate over it.
+  //
+  // Four bodies stacked in one lift shaft, which is the worst arrangement the
+  // geometry allows and the one an eight-storey tower produces every day.
+  {
+    const TOWER = 777;
+    const index = new InterestIndex();
+    const held = new InterestSet();
+    const out: number[] = [];
+    // All four at the same (x, z) -- a stairwell -- so nothing but the floor
+    // can separate them and a regression cannot hide behind a distance.
+    const bodies = [player(1, 0, 0), player(2, 0, 0), player(3, 0, 0), player(4, 0, 0)];
+    const levelOf = (id: number): number =>
+      id === 1 || id === 2 ? occupancyOf(TOWER, 0) : id === 3 ? occupancyOf(TOWER, 2) : CITY_OCCUPANCY;
+    index.begin(bodies, [], [], levelOf);
+
+    index.select(0, 0, occupancyOf(TOWER, 0), held, out);
+    if (!out.includes(1)) failures.push('a player on a floor could not see themselves; prediction would stop reconciling upstairs.');
+    if (!out.includes(2)) failures.push('two people standing in one room could not see each other; the floor is not shared.');
+    if (out.includes(3)) failures.push('somebody two floors up was drawn through the ceiling of the room below.');
+    if (out.includes(4)) failures.push('somebody on the pavement was drawn standing in the lobby.');
+
+    // And from upstairs, which is the reciprocal and is not implied: a filter
+    // that read the *viewer's* floor and not the candidate's would pass the
+    // assertion above and fail this one.
+    index.select(0, 0, occupancyOf(TOWER, 2), held, out);
+    if (!out.includes(3)) failures.push('a player on the second floor could not see themselves.');
+    if (out.includes(1) || out.includes(2)) {
+      failures.push('somebody upstairs was sent the people standing in the lobby under them.');
+    }
+
+    // The empty floor: a room nobody is in is an empty working set, not the
+    // building's. This is the case a filter written as "same space, or no floor
+    // known" would get wrong, and its symptom is everybody in the tower drawn
+    // in one room.
+    index.select(0, 0, occupancyOf(TOWER, 5), held, out);
+    if (out.length !== 0) failures.push(`an empty fifth floor held ${out.length} people.`);
+
+    // A one-storey building still behaves exactly as it did before floors
+    // existed: everybody in it is on level 0, so the occupancy is the space and
+    // nothing about the terrace case has moved.
+    const terrace = occupancyOf(4242, 0);
+    index.begin(bodies, [], [], () => terrace);
+    index.select(0, 0, terrace, held, out);
+    if (out.length !== 4) failures.push(`a single-storey pub with four drinkers showed ${out.length} of them.`);
   }
 
   return failures;

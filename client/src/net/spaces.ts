@@ -97,6 +97,108 @@ export function sameSpace(a: number, b: number): boolean {
   return sanitiseSpace(a) === sanitiseSpace(b);
 }
 
+// --- Occupancy: the space and the storey, as one number -----------------------
+
+/**
+ * Where somebody actually is: a space and, inside a building, a floor.
+ *
+ * ## Why the space alone was not enough
+ *
+ * `sameSpace` was the whole of the interest test for three protocol versions
+ * and it is exactly half right. Two people in one building are in one space,
+ * which is correct and is the owner's first decision about interiors ("a pub
+ * with one drinker in it is a worse pub"). But `world/interior.ts` has made
+ * every storey the plan draws walkable, and a building is eight of them: two
+ * people in the same space can be eighteen metres apart *vertically* and one
+ * metre apart in the (x, z) the area of interest measures. Every radius in
+ * `server/aoi.ts` is horizontal, so the AOI cannot separate them, and the
+ * symptom is the one `server/interior-share-check.ts` measured before this
+ * existed: **a body drawn six metres up through the ceiling**, with a nameplate
+ * over it, in a room it is not in.
+ *
+ * That is the same failure the space itself was written to fix, one axis over,
+ * and it gets the same answer: ask about the room before you measure a
+ * distance, because distance is not the question across a slab either.
+ *
+ * ## Why it is one number and not two
+ *
+ * `InterestIndex.select`'s callback runs once per candidate per client per
+ * snapshot -- it is the hottest loop this feature touches, and its own comment
+ * defends "one array lookup per candidate" as the reason the space test lives
+ * there rather than in a second index. Two fields would be two lookups and two
+ * compares. Packed, it stays one of each, and the parallel array in `aoi.ts`
+ * stays one array.
+ *
+ * `space * 256 + level` is exact in a float64 for every space id: a `u32` space
+ * shifted eight bits is under 2^40, which is thirteen bits inside the 2^53 an
+ * integer-valued double holds without rounding. It is deliberately **not** a
+ * bitwise pack: `|` and `<<` in JavaScript are 32-bit operations and would fold
+ * a space of 0xffffffff onto -1. This file is the bottom of the import graph on
+ * both ends and gets asked about the worst seed available, so the arithmetic is
+ * the arithmetic that survives it.
+ *
+ * ## And why nothing about it is on the wire
+ *
+ * For the same reason the space is not, argued out in `protocol.ts`'s v23 note
+ * and in INTERIORS.md: interest filters by occupancy **before** it measures a
+ * distance, so everybody in a snapshot is by construction in the sender's own
+ * room. A level byte on `PLAYER_BYTES` would be 20 B/s per player in view -- 6.4
+ * kbit/s at `AOI_MAX_PLAYERS` -- to carry a number already known to be equal.
+ * What a client needs to know about a remote's floor is whether it is its own,
+ * and the answer is yes for everybody it is sent.
+ */
+export const LEVELS_PER_SPACE = 256;
+
+/** The city, and the storey a body outdoors is on. Zero, as `CITY_SPACE` is. */
+export const CITY_OCCUPANCY = 0;
+
+/**
+ * The occupancy key for a space and a storey.
+ *
+ * The level is clamped rather than masked, on `sanitiseSpace`'s rule: a level
+ * of 300 arriving from a generator that grew a storey should read as the top of
+ * the building rather than wrap to level 44 in the same one, which would put
+ * two bodies in one room that are eight hundred metres apart vertically. A
+ * non-finite level, or any level at all in the city, reads as the ground.
+ */
+export function occupancyOf(space: number, level: number): number {
+  const s = sanitiseSpace(space);
+  if (s === CITY_SPACE) return CITY_OCCUPANCY;
+  const raw = typeof level === 'number' ? level : Number(level);
+  const k = !Number.isFinite(raw)
+    ? 0
+    : Math.trunc(raw) < 0
+      ? 0
+      : Math.min(Math.trunc(raw), LEVELS_PER_SPACE - 1);
+  return s * LEVELS_PER_SPACE + k;
+}
+
+/** The space an occupancy key names. `CITY_SPACE` for the street. */
+export function occupancySpace(key: number): number {
+  const n = typeof key === 'number' && Number.isFinite(key) ? Math.trunc(key) : 0;
+  if (n <= 0) return CITY_SPACE;
+  return sanitiseSpace(Math.floor(n / LEVELS_PER_SPACE));
+}
+
+/** The storey an occupancy key names. Zero outdoors. */
+export function occupancyLevel(key: number): number {
+  const n = typeof key === 'number' && Number.isFinite(key) ? Math.trunc(key) : 0;
+  if (n <= 0) return 0;
+  return n % LEVELS_PER_SPACE;
+}
+
+/**
+ * Are these two in the same room?
+ *
+ * `sameSpace`'s question with the floor in it, and the one the working set asks.
+ * Everything that belongs to a *building* rather than to a body -- the
+ * furniture, the lift cab's ride -- still asks `sameSpace`, and that difference
+ * is the whole of why both functions exist.
+ */
+export function sameOccupancy(a: number, b: number): boolean {
+  return a === b;
+}
+
 /** Self-check. On both boot lists. */
 export function verifySpaces(): string[] {
   const failures: string[] = [];
@@ -170,6 +272,71 @@ export function verifySpaces(): string[] {
     if (!sameSpace(sanitiseSpace(undefined), CITY_SPACE)) {
       failures.push('a participant with no space field fell out of the city.');
     }
+  }
+
+  // --- The floor, which is the half a space id cannot carry.
+  //
+  // Every property here is one the interest filter reads directly, so a failure
+  // is a person drawn in a room they are not in -- through a ceiling, which is
+  // what makes it invisible to every other check in this file.
+  {
+    const pub = spaceForBuilding(0xabc123);
+    const shop = spaceForBuilding(0xabc124);
+
+    // The city is still zero, so every call site that passed `CITY_SPACE` where
+    // an occupancy is now wanted is still asking the right question.
+    if (CITY_OCCUPANCY !== CITY_SPACE) failures.push('the city and the city occupancy are different numbers.');
+    if (occupancyOf(CITY_SPACE, 0) !== CITY_OCCUPANCY) failures.push('the ground of the city was not the city.');
+    // A storey outdoors is meaningless and must not split the street in two: a
+    // player standing on a roof and a player in the gutter are in one world.
+    if (occupancyOf(CITY_SPACE, 7) !== CITY_OCCUPANCY) failures.push('a storey outdoors split the city into floors.');
+
+    // Two floors of one building are two rooms; two buildings are never one.
+    if (sameOccupancy(occupancyOf(pub, 0), occupancyOf(pub, 1))) {
+      failures.push('two floors of one building read as the same room; a body would be drawn through the ceiling.');
+    }
+    if (!sameOccupancy(occupancyOf(pub, 3), occupancyOf(pub, 3))) failures.push('one floor did not equal itself.');
+    if (sameOccupancy(occupancyOf(pub, 0), occupancyOf(shop, 0))) {
+      failures.push('the ground floors of two different buildings read as one room.');
+    }
+    if (sameOccupancy(occupancyOf(pub, 0), CITY_OCCUPANCY)) {
+      failures.push('a ground floor read as the street; the wall stopped being opaque.');
+    }
+
+    // **No two (space, level) pairs may collide**, which is the one property the
+    // packing could get wrong and the only one whose symptom is two strangers in
+    // different buildings punching each other. The neighbouring case is the
+    // sharp one: space s at level 255 must not be space s+1 at level 0.
+    {
+      const top = occupancyOf(1234, LEVELS_PER_SPACE - 1);
+      const next = occupancyOf(1235, 0);
+      if (top === next) failures.push('the top floor of one building is the ground floor of the next.');
+    }
+
+    // It survives the worst space id there is. `|` and `<<` would fold
+    // 0xffffffff to -1 here, which is why the packing is arithmetic.
+    for (const seed of [1, 2, 0x7fffffff, 0x80000000, 0xfffffffe, MAX_SPACE]) {
+      const space = spaceForBuilding(seed);
+      for (const level of [0, 1, 127, LEVELS_PER_SPACE - 1]) {
+        const key = occupancyOf(space, level);
+        if (!Number.isSafeInteger(key)) {
+          failures.push(`space ${space} on level ${level} produced ${key}, which is past what a double holds exactly.`);
+          break;
+        }
+        if (occupancySpace(key) !== space) failures.push(`space ${space} did not survive the pack (got ${occupancySpace(key)}).`);
+        if (occupancyLevel(key) !== level) failures.push(`level ${level} did not survive the pack (got ${occupancyLevel(key)}).`);
+      }
+    }
+
+    // Rubbish clamps rather than wraps, on `sanitiseSpace`'s direction: a level
+    // past the top is the top, never a different floor of the same building.
+    const pubTop = occupancyOf(pub, LEVELS_PER_SPACE - 1);
+    if (occupancyOf(pub, 10_000) !== pubTop) failures.push('a level past the top wrapped instead of clamping.');
+    if (occupancyOf(pub, -3) !== occupancyOf(pub, 0)) failures.push('a negative level was not folded to the ground.');
+    if (occupancyOf(pub, NaN) !== occupancyOf(pub, 0)) failures.push('a NaN level was not folded to the ground.');
+    if (occupancySpace(CITY_OCCUPANCY) !== CITY_SPACE) failures.push('the city occupancy did not read back as the city.');
+    if (occupancyLevel(CITY_OCCUPANCY) !== 0) failures.push('the city occupancy had a storey in it.');
+    if (occupancySpace(-5) !== CITY_SPACE) failures.push('a negative occupancy was not folded to the city.');
   }
 
   return failures;

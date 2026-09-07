@@ -2015,6 +2015,30 @@ export class NetClient {
         this.pendingSpace = f;
         this.correction.set(0, 0, 0);
         this.pendingSelf = null;
+        /*
+         * **And the people, on exactly the couches' argument one line down.**
+         *
+         * Everybody this client can see is somebody the server put in its
+         * working set for the room it was in a moment ago, and that room is
+         * gone. The server agrees within one snapshot -- `Room.doorPress`
+         * clears the connection's interest set for this reason, so the next
+         * `INTEREST` frame re-enters whoever is really here -- but "within one
+         * snapshot" is up to 50 ms of a browser drawing a pub's drinkers
+         * standing on the pavement, at an interpolation delay, in a world with
+         * the city's collision switched back on. `server/interior-share-check.ts`
+         * measured two ticks of it.
+         *
+         * Dropped rather than hidden, and through `dropRemote` rather than by
+         * clearing the map, so the renderer is told: `onDrop` is what takes a
+         * rig, its nameplate, its team ring and whatever is parented to its
+         * bones out of the scene. A remote who is in fact still with you --
+         * somebody who walked in the same door on the same tick -- comes back
+         * on the next `INTEREST` entrance as `fresh`, which is the same path a
+         * joiner takes and hides them until their first authoritative position.
+         * Fifty milliseconds of one fewer body is the correct half of that
+         * trade; the other half is a body in the wrong world.
+         */
+        for (const id of [...this.remotes.keys()]) this.dropRemote(id);
         // The room's contents belong to the room we just left. Cleared here
         // rather than waiting for the `PLACED` that follows, so that a frame
         // lost or reordered leaves an empty room rather than the last one's
