@@ -321,6 +321,25 @@ asserts the hall and its wings on a 30 x 14 block and none on a terrace;
 `verifyInterior` asserts the lift stands in the hall's far half, opens down
 it, and has a sign on every level.
 
+**The setback is not the landing.** The hall is a strip down the long axis of
+the footprint's *oriented box*, so "a landing in from the end of the hall" is a
+landing in from the end of the **box** -- and wherever the hull is cut off at an
+angle to its box, the box's end is outside the building. The corner test that
+was supposed to catch that asked for 15 cm of shell clearance, which is not a
+landing and is not even a body: it let the stair stand with its top flight
+arriving into half a metre of floor, and a body 0.34 m wide could not get off
+its own staircase. Sixteen buildings within 800 m of the spawn were like that,
+every one of them a hall core, and `checkInteriors` had been reporting them.
+The hallway branch now asks for `CORE_SHELL_M` (0.9 m) along the run, the same
+margin the fallback branch has always asked for at all four corners -- across
+it still asks for a jamb's worth, because the core is the hall's own width and
+a shell margin there would refuse every hall core in Sydney. 1,118 of the 1,177
+interiors within 800 m are byte-identical across the change; of the 59 that
+moved, 16 were the stranded ones and one is a building whose hall no longer
+fits a flight and gets a lift instead. `verifyInterior` keeps the first of them
+verbatim as **the St Peters dogleg** -- eight corners, two arms at an angle,
+whose level 1 landing measured 0.20 m *inside* the outer wall.
+
 ## What is not built
 
 - **A stairwell is two rooms.** The interest filter is the exact storey, which
