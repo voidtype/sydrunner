@@ -339,13 +339,21 @@ import {
   EMPTY_BUNDLE,
   MAX_NPCS_PER_BUNDLE,
   MAX_QUESTS_PER_BUNDLE,
+  STEP_KIND,
+  openStep,
   parseDialogPack,
   parseQuestPack,
   questView,
   verifyDialog,
   verifyQuests,
   type ContentBundle,
+  type Quest,
 } from './game/questmodel.ts';
+// WORKSTREAM AU. The controls block that empties itself as controls are used,
+// and the three quest steps that are watching for the same events. The table
+// and the arithmetic are three-free and checked on both boot lists; this file
+// owns only the wiring -- which key, which frame, which click.
+import { CONTROL, controlForKey, verifyControlsHint } from './game/controlshint.ts';
 import { MAX_STACK, verifyMushrooms } from './game/mushrooms.ts';
 import { GodRoom } from './world/godroom.ts';
 /** The flag God's blessing is, and the only thing that persists it. See `server/god.ts`. */
@@ -363,7 +371,7 @@ import { verifyQuestAim } from './game/questaim.ts';
 import { verifyQuestAreas } from './game/questareas.ts';
 import { verifyBuildBudget } from './world/buildbudget.ts';
 import { verifyInterpDelay } from './net/interpdelay.ts';
-import { blankQuestState } from './net/quests.ts';
+import { QUEST_OP, blankQuestState } from './net/quests.ts';
 // WORKSTREAM AN: the `!` and the `?` in the street. Wired in the same block.
 import { QuestMarkerField, verifyQuestMarkers, type QuestMarkerSource } from './world/questmarkers.ts';
 // WORKSTREAM AO: and the givers standing under them. Same block, same beat.
@@ -5834,6 +5842,16 @@ async function main(): Promise<void> {
     ...verifyQuestHubs(),
     ...verifyQuestTrack(),
     ...verifyQuestLog(),
+    /*
+     * WORKSTREAM AU. The controls block, and the rule that lets it go away.
+     *
+     * Pure and on the server's boot list as well, which is not ceremony: what
+     * it catches is a corrupt `localStorage` value hiding the controls from a
+     * player on their first session, a row bound to a `code` no keyboard sends,
+     * and a block that grows a row back. None of the three has a screenshot
+     * that says so, and the first one only happens to somebody else.
+     */
+    ...verifyControlsHint(),
     ...verifyQuestTracker(),
     ...verifyQuestLogPanel(),
     /*
@@ -6137,6 +6155,77 @@ async function main(): Promise<void> {
     hubs: () => hubs,
     pinned: () => waypoint.pinnedQuest ?? '',
   });
+  /*
+   * --- WORKSTREAM AU: one funnel for "the player just used this control".
+   *
+   * A tester, relayed by the owner: *"a tutorial mission instead of constant on
+   * screen instructions"*. Two things read the same event and this is the only
+   * place either of them is told about it:
+   *
+   *   - `hud.markControl` takes the row out of the block in the bottom-right
+   *     corner, for good, across sessions. See `game/controlshint.ts`.
+   *   - a `use` step of an accepted quest is completed by it, which is how Act 0
+   *     teaches `Q` and `J` and the driver's seat: the step's own completion is
+   *     the proof the control was learned.
+   *
+   * **The message is sent only when a step is waiting for it.** `wantedControls`
+   * is re-derived on a half-second timer from the cursors the tracker already
+   * reads, so pressing `Q` in an ordinary session costs zero bytes -- which
+   * matters because this funnel is also called from the frame loop. The
+   * cooldown is the other half: a claim the server declines (a cursor it has
+   * already moved on, a quest abandoned in the same breath) must not become one
+   * message every half second for the rest of the session.
+   */
+  let wantedControls = new Set<string>();
+  const controlSent = new Map<string, number>();
+  /** How long before the same claim may be made twice. Two seconds; see above. */
+  const USED_RESEND_MS = 2000;
+  /**
+   * The bundle by id, rebuilt only when the bundle object itself is replaced.
+   *
+   * Six thousand quests ship, and a `find` over them on a keypress is a scan
+   * nobody would write on purpose. `questBundle` is assigned whole, once, when
+   * `/content` answers, so a reference compare is the whole of the invalidation.
+   */
+  let questIndex = new Map<string, Quest>();
+  let questIndexOf: ContentBundle | null = null;
+  const refreshWantedControls = (): void => {
+    if (questIndexOf !== questBundle) {
+      questIndex = new Map(questBundle.quests.map((q) => [q.id, q]));
+      questIndexOf = questBundle;
+    }
+    const want = new Set<string>();
+    const cursors = cursorsFrom(questFrame());
+    for (const id of Object.keys(cursors)) {
+      const quest = questIndex.get(id);
+      if (quest === undefined) continue;
+      const step = openStep(cursors[id], quest);
+      if (step !== null && step.kind === STEP_KIND.USE && step.control !== '') want.add(step.control);
+    }
+    wantedControls = want;
+  };
+  const wantedTicker = window.setInterval(refreshWantedControls, 500);
+  // Owned like the dialog panel's, and for the same reason: a device-loss
+  // reload or a page teardown must not leave a timer reading cursors that
+  // belong to a session that has gone.
+  window.addEventListener('pagehide', () => window.clearInterval(wantedTicker), { once: true });
+  /**
+   * Cheap enough for the frame loop: a set membership test and a return.
+   *
+   * `hud.markControl` is itself a `Set.has` once the row is gone, and
+   * `wantedControls` is empty for every player who is not standing in the
+   * middle of a tutorial step. Nothing here walks a quest.
+   */
+  const useControl = (id: string): void => {
+    if (id === '') return;
+    hud.markControl(id);
+    if (!wantedControls.has(id)) return;
+    const now = performance.now();
+    if (now - (controlSent.get(id) ?? -Infinity) < USED_RESEND_MS) return;
+    controlSent.set(id, now);
+    net?.quest(QUEST_OP.USED, id);
+  };
+
   const questLog = new QuestLogPanel({
     bundle: () => questBundle,
     cursors: () => cursorsFrom(questFrame()),
@@ -8867,6 +8956,11 @@ async function main(): Promise<void> {
       }
       return;
     }
+    // WORKSTREAM AU: the two rows the legend leads with. Here rather than at
+    // the top of this listener, because a click the phone or the customiser ate
+    // is not a swing and must not dismiss the row that teaches one.
+    if (e.button === 0) useControl(CONTROL.BAT);
+    if (e.button === 2) useControl(CONTROL.FOOTY);
     if (e.button === 0) punchBuffer = PUNCH_BUFFER;
     // Right click throws a football. Under pointer lock the context menu does
     // not appear anyway, but the listener below covers the drag-to-look fallback
@@ -9046,6 +9140,9 @@ async function main(): Promise<void> {
       // from you, which is the one every chase camera in every game zooms out on.
       // Whole notches only; what happens to the remainder is decided by the size
       // of the event that produced it -- see the header.
+      // WORKSTREAM AU: a whole notch, not a nudge -- a trackpad that drifts one
+      // pixel has not taught anybody what the wheel does.
+      useControl(CONTROL.ZOOM);
       const notches = Math.trunc(wheelCamera / WHEEL_CAMERA_STEP);
       wheelCamera = Math.abs(delta) >= WHEEL_CAMERA_STEP ? 0 : wheelCamera - notches * WHEEL_CAMERA_STEP;
       setCameraDistance(stepCameraDistance(cameraDistance, notches));
@@ -9057,6 +9154,9 @@ async function main(): Promise<void> {
     // Under pointer lock the cursor is captured and only movement deltas exist.
     // Dragging is the fallback, and uses the same deltas.
     if (!locked && !dragging) return;
+    // WORKSTREAM AU: looking around is the one control nobody has to be told
+    // about, which is exactly why its row should be the first to go.
+    if (e.movementX !== 0 || e.movementY !== 0) useControl(CONTROL.LOOK);
     input.yaw -= e.movementX * MOUSE_SENSITIVITY;
     input.pitch -= e.movementY * MOUSE_SENSITIVITY;
   });
@@ -9075,6 +9175,20 @@ async function main(): Promise<void> {
     if (hud.typing) return;
     const held = keys.has(e.code);
     keys.add(e.code);
+    /*
+     * WORKSTREAM AU. **Before `money.keydown`, which consumes half of these.**
+     *
+     * `Q`, `J`, `M`, `Escape` and the number row never reach the branches below
+     * -- `money.keydown` answers them and returns true -- so a mark taken after
+     * that call would be a mark that never happens for exactly the five keys
+     * the tutorial cares about most. This is a table lookup and a `Set.has`;
+     * see `game/controlshint.controlForKey` for why the mapping is in a checked
+     * module rather than a switch here, and `useControl` for what it does.
+     *
+     * Not edge-triggered on `held`: a control the player is holding down is a
+     * control they have used, and both halves of this are idempotent.
+     */
+    useControl(controlForKey(e.code, e.shiftKey));
     // The number row, the phone's Escape and the Centrelink `E`. **After** the
     // `hud.typing` interlock, so none of them fires while somebody is typing,
     // and before every branch below, so the phone's Escape beats the
@@ -12430,6 +12544,46 @@ async function main(): Promise<void> {
     const look = (keys.has('ArrowDown') ? 1 : 0) - (keys.has('ArrowUp') ? 1 : 0);
     if (turn) input.yaw -= turn * KEY_TURN_RATE * frameDt;
     if (look) input.pitch -= look * KEY_TURN_RATE * 0.6 * frameDt;
+
+    /*
+     * --- WORKSTREAM AU: the four rows no keydown can honestly dismiss.
+     *
+     * Read off the **assembled input** rather than off the keyboard, which is
+     * the whole reason they are here and not in `controlForKey`:
+     *
+     *   - `move` has to count the arrow keys above and the touch stick, or the
+     *     row stays up for every player on a phone.
+     *   - `sprint` is shift *while going somewhere*. Shift on its own is a
+     *     modifier -- `shift+2` is the off hand -- and a legend that struck out
+     *     "shift sprint" because somebody swapped weapons would be teaching a
+     *     thing that had not happened.
+     *   - `car` and `train` are the two `E` does that the tutorial names
+     *     separately, and both are states rather than presses: the honest
+     *     moment is the frame you are in the seat.
+     *
+     * Four `Set.has` calls a frame once the rows are gone. See `useControl`,
+     * which is written to be called from here.
+     */
+    if (input.forward !== 0 || input.right !== 0) useControl(CONTROL.MOVE);
+    if (input.jump) useControl(CONTROL.JUMP);
+    if (input.sprint && (input.forward !== 0 || input.right !== 0)) useControl(CONTROL.SPRINT);
+    if (playerCombat.drivingCar !== 0) useControl(CONTROL.CAR);
+    if (isAboard(playerCombat.aboard)) useControl(CONTROL.TRAIN);
+    /*
+     * And the three panels, off the panel rather than off the key.
+     *
+     * `controlForKey` already answers `Q`, `J` and `M`, and these are not a
+     * duplicate of that -- they are the honest question. The phone opens from
+     * the Map tile and from the register's own button; the job list opens from
+     * inside the phone; and a player on a touch device has no keyboard at all
+     * and `#help` is hidden for them anyway. What Act 0 asks is *"take your
+     * phone out"*, and the phone being out is what answers it, whichever route
+     * it came by. Both marks are idempotent, so having two of them costs a
+     * `Set.has`.
+     */
+    if (money.isPhoneVisible()) useControl(CONTROL.PHONE);
+    if (questLog.visible) useControl(CONTROL.JOBS);
+    if (bigmap.visible) useControl(CONTROL.MAP);
 
     // The lean, from the yaw rate that just came out of the steering.
     //

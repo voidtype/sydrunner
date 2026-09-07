@@ -46,6 +46,23 @@
   "The review is the rung-2 door and its final conversation is where a handler",
   "walks in.",
   "",
+  "ACT 0 IS THE CONTROLS TUTORIAL NOW, AND THE THREADING IS THESE TWO FIELDS.",
+  "A tester asked for `a tutorial mission instead of constant on screen",
+  "instructions`, so the block of keycaps in the bottom-right corner empties",
+  "itself as each control is used (client/src/game/controlshint.ts) and what",
+  "teaches the controls instead is this chain. Every step carries a `control`,",
+  "which is a hint: game/questtrack.ts draws that keycap beside the step while",
+  "it is the open one and beside no other step, ever. Three steps are `use`",
+  "steps, whose `control` is the completion itself -- the phone, the job list",
+  "and the driver's seat are the three things a server cannot see any other",
+  "way. The order a player walks is: move to Ray and Denise, take the phone",
+  "out (q), open the job list (j), walk a job to Surry Hills (m) and swing the",
+  "bat there, photograph the town hall on the phone, catch a train (e) and",
+  "find a car (e), then the course and the review.",
+  "",
+  "A `use` step may not go on a repeatable quest -- the parser refuses it -- so",
+  "if a weekly job ever wants to teach a key, it wants a different kind.",
+  "",
   "Coordinates are world metres: +X east, +Z south, origin at Town Hall. The",
   "Centrelink is the real Redfern office out of game/centrelink-data.ts."
  ],
@@ -66,7 +83,8 @@
      "z": 4211.1,
      "radius": 30,
      "label": "ride down to Cenno and find Ray",
-     "objective": "GET TO CENNO"
+     "objective": "GET TO CENNO",
+     "control": "move"
     }
    ],
    "reward": {
@@ -81,7 +99,7 @@
    "id": "act0-report",
    "act": 0,
    "title": "Initial Participation Appointment",
-   "blurb": "You have been asked to attend the Redfern service centre. Attendance is compulsory. The appointment time was in a letter.",
+   "blurb": "You have been asked to attend the Redfern service centre. Attendance is compulsory. Bring the phone. Everything is on the phone now.",
    "giver": "centrelink-clerk",
    "level": 1,
    "steps": [
@@ -90,7 +108,18 @@
      "x": -3344.9,
      "z": 4208.3,
      "radius": 30,
-     "label": "get to the St Peters service centre"
+     "label": "get to the St Peters service centre",
+     "control": "interact"
+    },
+    {
+     "kind": "use",
+     "control": "phone",
+     "label": "take your phone out"
+    },
+    {
+     "kind": "use",
+     "control": "jobs",
+     "label": "open the job list, it is all on there"
     }
    ],
    "reward": {
@@ -117,13 +146,15 @@
      "x": 416.6,
      "z": 1204.6,
      "radius": 60,
-     "label": "get to Surry Hills, where the jobs are"
+     "label": "get to Surry Hills, where the jobs are",
+     "control": "map"
     },
     {
      "kind": "ko",
      "npc": "eshay",
      "count": 3,
-     "label": "network with three locals"
+     "label": "network with three locals",
+     "control": "bat"
     },
     {
      "kind": "earn",
@@ -155,7 +186,8 @@
      "x": 0,
      "z": 0,
      "radius": 90,
-     "label": "photograph the town hall as proof you exist"
+     "label": "photograph the town hall as proof you exist",
+     "control": "phone"
     }
    ],
    "reward": {
@@ -170,7 +202,7 @@
    "id": "act0-travel",
    "act": 0,
    "title": "Approved Travel",
-   "blurb": "You are eligible for assistance with transport to an appointment you have already attended. Take a train. Any train.",
+   "blurb": "You are eligible for assistance with transport to an appointment you have already attended. Take a train. Any train. Then find a car.",
    "giver": "centrelink-clerk",
    "level": 1,
    "requires": [
@@ -182,7 +214,13 @@
      "line": -1,
      "from": "",
      "to": "",
-     "label": "catch a train to a station, any station"
+     "label": "catch a train to a station, any station",
+     "control": "train"
+    },
+    {
+     "kind": "use",
+     "control": "car",
+     "label": "find a car for the trip back"
     }
    ],
    "reward": {
@@ -214,7 +252,8 @@
      "kind": "dialog",
      "npc": "centrelink-clerk",
      "node": "upskilled",
-     "label": "have the course marked off at the desk"
+     "label": "have the course marked off at the desk",
+     "control": "interact"
     }
    ],
    "reward": {
@@ -247,7 +286,8 @@
      "kind": "dialog",
      "npc": "centrelink-clerk",
      "node": "review",
-     "label": "sit through the review"
+     "label": "sit through the review",
+     "control": "interact"
     }
    ],
    "reward": {

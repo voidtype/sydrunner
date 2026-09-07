@@ -314,6 +314,7 @@ import { verifyGiverMap } from '../client/src/game/givermap.ts';
 // has no screenshot that says so, and the server can read all three.
 import { verifyQuestHubs } from '../client/src/game/questhubs.ts';
 import { verifyQuestTrack } from '../client/src/game/questtrack.ts';
+import { verifyControlsHint } from '../client/src/game/controlshint.ts';
 import { verifyQuestLog } from '../client/src/game/questlog.ts';
 // WORKSTREAM AT. The three pure halves of the stall instruments. Same
 // arrangement and the same reason: a carry that spills a stall into the next
@@ -924,6 +925,19 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     ['verifyGiverMap', verifyGiverMap()],
     ['verifyQuestHubs', verifyQuestHubs()],
     ['verifyQuestTrack', verifyQuestTrack()],
+    /*
+     * --- WORKSTREAM AU. The controls block, checked on the process with no screen.
+     *
+     * It looks like a client concern and two of the three things it catches are
+     * this process's business. `questmodel.parseStep` folds a step's `control`
+     * through `controlshint.controlId` and `QuestHandler.used` compares a
+     * client's claim against the same table, so a row renamed on one side of
+     * that table is a `use` step **this** server can never complete -- a player
+     * stuck on step two of Act 0 with no way forward and nothing in any log.
+     * The third is the parse of a corrupt stored value, which fails toward the
+     * wall rather than toward a blank corner, and is arithmetic.
+     */
+    ['verifyControlsHint', verifyControlsHint()],
     ['verifyQuestLog', verifyQuestLog()],
     ['verifyFrameStep', verifyFrameStep()],
     ['verifyStallRing', verifyStallRing()],

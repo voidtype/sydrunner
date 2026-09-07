@@ -951,7 +951,11 @@ async function main(): Promise<void> {
     // Every step kind in the DSL is exercised somewhere in the shipped content,
     // which is what "the content is the proof the DSL is sufficient" means.
     const kinds = new Set(shipped.bundle.quests.flatMap((q) => q.steps.map((s) => s.kind)));
-    for (const kind of ['goto', 'ko', 'buy', 'photo', 'ride', 'earn', 'dialog']) {
+    // `use` joined the list with Act 0's controls tutorial: the three things a
+    // server cannot observe -- the phone, the job list, the driver's seat -- are
+    // steps now, and a pack that stopped exercising the kind would be a
+    // tutorial that had quietly stopped teaching them.
+    for (const kind of ['goto', 'ko', 'buy', 'photo', 'ride', 'earn', 'dialog', 'use']) {
       check(kinds.has(kind as never), `the shipped content exercises "${kind}"`);
     }
   }

@@ -116,6 +116,10 @@ import { MSG } from '../client/src/net/protocol.ts';
 import { TEAM_NAME, type Team } from '../client/src/game/teams.ts';
 import { npcKinds } from '../client/src/game/factions.ts';
 import { KIND_NAME } from '../client/src/game/powerups.ts';
+// The one control-table import on this side: `used` folds a client's claim
+// before it compares it. See `game/controlshint.ts`, which is three-free for
+// exactly this reason.
+import { controlId } from '../client/src/game/controlshint.ts';
 import { weekKey } from '../client/src/net/suggestions.ts';
 import { isWeekly, completionFlag,
   EMPTY_BUNDLE,
@@ -1219,6 +1223,9 @@ export class QuestEngine implements QuestSink {
       case QUEST_OP.PHOTO:
         this.photo(playerId, id);
         return;
+      case QUEST_OP.USED:
+        this.used(playerId, id);
+        return;
       default:
         return;
     }
@@ -1453,6 +1460,27 @@ export class QuestEngine implements QuestSink {
         withinStep(step, at.x, at.z),
       1,
     );
+  }
+
+  /**
+   * "I used this control." The tutorial's step, and the one nothing checks.
+   *
+   * `photo` above at least has a place to check. This has nothing: the phone,
+   * the job list and the driver's seat are all things that happen in a browser
+   * and never reach a tick here, and Act 0 has to be able to notice them or it
+   * cannot teach them. See `questmodel.ts`'s header for the two structural
+   * bounds -- a closed table of control ids, and no `use` step on a repeatable
+   * quest -- and `net/quests.QUEST_OP.USED` for the shape.
+   *
+   * `controlId` folds the claim before it is compared, so a client that sends
+   * eight hundred bytes of rubbish matches no step rather than being asked
+   * about. The rate limiter above is the other half and is the same one every
+   * op on this message shares.
+   */
+  private used(playerId: number, control: string): void {
+    const wanted = controlId(control);
+    if (wanted === '') return;
+    this.progress(playerId, (step) => step.kind === STEP_KIND.USE && step.control === wanted, 1);
   }
 
   // --- What the simulation tells us ------------------------------------------------

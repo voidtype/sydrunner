@@ -39,6 +39,21 @@
  * interrupt -- a thing that is always there does not need to announce itself,
  * and that is a cheaper way to obey rule 6 than a toast with a shorter timeout.
  *
+ * ## And it is where a control hint goes. Workstream AU.
+ *
+ * A tester: *"a tutorial mission instead of constant on screen instructions"*.
+ * The corner is the answer to the second half of that sentence. `#help` in the
+ * bottom right now empties itself as controls are used
+ * (`game/controlshint.ts`), and what replaces it for a player being taught
+ * something is **one keycap on the step they are on** -- drawn here, from the
+ * step's own `control` field, and gone the moment that step is done.
+ *
+ * It is here rather than in a banner or a pill for the reason this whole file
+ * exists: the tracker is the surface a player does not have to decide to
+ * consult, so a hint put on it costs nothing and interrupts nobody. A hint put
+ * anywhere else would be a fifth thing on the screen, which is what was being
+ * complained about.
+ *
  * ## Pure, and the reason is the usual one
  *
  * `client/src/questtracker.ts` is the DOM half and holds four `textContent`
@@ -47,6 +62,7 @@
  * are split the same way and for the same reason.
  */
 
+import { CONTROL_HINT } from './controlshint.ts';
 import { questAim, type AimTarget } from './questaim.ts';
 import { hubBearingWord, hubCountText, nearestHub, type QuestHub } from './questhubs.ts';
 import {
@@ -70,6 +86,23 @@ export interface TrackStep {
   state: TrackStepState;
   /** `2 of 3`, `$40 of $100`, or `''`. `questmodel.stepCounter`'s. */
   counter: string;
+  /**
+   * The keycap for the one control this step is about, **or `''`**.
+   *
+   * Non-empty on the open step and on nothing else, ever, and that rule is the
+   * whole of the feature rather than a detail of it. A tester asked for *"a
+   * tutorial mission instead of constant on screen instructions"*; an
+   * instruction attached to a step you have already done, or to one three
+   * places down the list, is a constant on-screen instruction with a quest
+   * wrapped round it. `q` is on the screen for as long as taking your phone out
+   * is the thing being asked of you, and then it is not.
+   *
+   * The words are the step's `label` and are the giver's -- Denise says "take
+   * your phone out", not "press Q to open the phone" -- and this is the HUD's
+   * half of the same sentence. See `questmodel.QuestStep.control` and the table
+   * in `game/controlshint.ts`.
+   */
+  controlKey: string;
 }
 
 /** Everything drawn in the corner, and where the arrow should point. */
@@ -199,6 +232,9 @@ export function trackFrame(
         label: stepLabel(step, 44),
         state,
         counter: stepCounter(step, cursor?.c[i] ?? 0),
+        // Only on the open one. See `TrackStep.controlKey`; an unknown id folds
+        // to nothing here rather than drawing an empty keycap.
+        controlKey: state === 'now' ? (CONTROL_HINT[step.control]?.key ?? '') : '',
       });
     }
     const others = live.length - (live.some((l) => l.quest.id === quest.id) ? 1 : 0);
@@ -258,7 +294,7 @@ export function verifyQuestTrack(): string[] {
   });
   const step = (kind: string, x: number, z: number, extra: Record<string, unknown> = {}): unknown => ({
     kind, x, z, radius: 30, label: `do ${kind}`, objective: '', npc: '', count: 0,
-    powerup: '', line: -1, from: '', to: '', node: '', dollars: 0, ...extra,
+    powerup: '', line: -1, from: '', to: '', node: '', dollars: 0, control: '', ...extra,
   });
   const quest = (id: string, giver: string, steps: unknown[]): unknown => ({
     id, act: 0, title: id.toUpperCase(), blurb: '', giver, level: 1, faction: '',
@@ -367,6 +403,49 @@ export function verifyQuestTrack(): string[] {
     const many = { ...bundle, quests: [quest('many', 'clerk', Array.from({ length: 20 }, () => step('goto', 1, 1)))] } as unknown as ContentBundle;
     const f = trackFrame(many, { many: cursor(0, false, new Array(20).fill(0)) }, pose, hubs);
     if (f.steps.length > MAX_TRACK_STEPS) failures.push(`A 20-step job drew ${f.steps.length} lines in the corner.`);
+  }
+
+  /*
+   * --- THE OTHER ONE THAT MATTERS. A control hint is on the open step and
+   * nowhere else.
+   *
+   * Workstream AU. The failure this rules out is the one the tester reported in
+   * the first place: an instruction that is on the screen when it is not being
+   * asked for. A keycap on a finished step is a lie about what to do next, and
+   * a keycap on step four while you are on step one is the wall of controls
+   * again with a quest around it.
+   */
+  {
+    const teaching = {
+      ...bundle,
+      quests: [
+        quest('teach', 'clerk', [
+          step('goto', 100, 0, { control: 'move' }),
+          step('use', 0, 0, { control: 'phone', label: 'take your phone out' }),
+          step('goto', 200, 0, { control: 'jobs' }),
+        ]),
+      ],
+    } as unknown as ContentBundle;
+    const on = trackFrame(teaching, { teach: cursor(1, false, [1, 0, 0]) }, pose, hubs);
+    if (on.steps[1]?.controlKey !== 'q') {
+      failures.push(`The open step's keycap read ${JSON.stringify(on.steps[1]?.controlKey)}, not "q".`);
+    }
+    if (on.steps[0]?.controlKey !== '') failures.push('A finished step was still telling the player which key to press.');
+    if (on.steps[2]?.controlKey !== '') failures.push('A step three places away was already shouting its key.');
+    // A job not taken has no open step, so it has no hint either -- a register
+    // row must not teach a control for work nobody has agreed to do.
+    const untaken = trackFrame(teaching, {}, pose, hubs, 'teach');
+    if (untaken.steps.some((s) => s.controlKey !== '')) failures.push('An untaken job put a keycap on the screen.');
+    // And a finished one: every step done, nothing open, nothing to press.
+    const finished = trackFrame(teaching, { teach: cursor(3, true, [1, 1, 1]) }, pose, hubs);
+    if (finished.steps.some((s) => s.controlKey !== '')) failures.push('A finished job left a keycap in the corner.');
+    // A control nobody has heard of draws nothing rather than an empty keycap.
+    const junk = {
+      ...bundle,
+      quests: [quest('junk', 'clerk', [step('goto', 100, 0, { control: 'wiggle' })])],
+    } as unknown as ContentBundle;
+    const j = trackFrame(junk, { junk: cursor(0, false, [0]) }, pose, hubs);
+    if (j.steps[0]?.controlKey !== '') failures.push('An unknown control drew an empty keycap.');
   }
 
   if (othersText(0) !== '') failures.push('The tracker offered to count zero other jobs.');

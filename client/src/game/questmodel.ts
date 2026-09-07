@@ -45,7 +45,7 @@
  * ---------------------------------------------------------------------------
  * THE STEP KINDS ARE EVENTS THE SIMULATION ALREADY EMITS
  *
- * There is no new event bus. Every one of the seven step kinds is something
+ * There is no new event bus. Every one of the step kinds is something
  * `server/sim.ts` already knows on a tick it already runs:
  *
  *     goto    a distance test against the body it is already integrating
@@ -55,13 +55,50 @@
  *     ride    the aboard record the snapshot already carries
  *     earn    the wallet credit that already composes "+$34 fare"
  *     dialog  a node the client walked to and the server re-walked
+ *     use     the client asserts, and this process cannot check it at all
  *
- * The three that need a *message* rather than a tick (`photo`, `dialog`, and
- * the accept/turn-in either side of all of them) are the three that ride
+ * The ones that need a *message* rather than a tick (`photo`, `use`, `dialog`,
+ * and the accept/turn-in either side of all of them) are the ones that ride
  * `MSG.QUEST`. Everything else is observed, because a step a client can claim
- * is a step a client can forge -- and `photo` is the one exception, checked by
+ * is a step a client can forge -- and `photo` was the one exception, checked by
  * range on arrival, because there is no other way for this process to know a
  * shutter was pressed.
+ *
+ * ---------------------------------------------------------------------------
+ * `use` IS THE SECOND EXCEPTION, AND IT IS A WIDER ONE. WORKSTREAM AU.
+ *
+ * A tester asked for *"a tutorial mission instead of constant on screen
+ * instructions"*, and a tutorial that teaches a key has to be able to notice
+ * the key. Six of the nine controls Act 0 walks a player through are already
+ * step kinds -- walking is a `goto`, the bat is a `ko`, the train is a `ride`.
+ * Three are not, because three of them happen entirely inside the browser and
+ * this process has no way to see them: **taking the phone out, opening the job
+ * list, and getting into a car.** There is no tick on which a server learns
+ * that somebody pressed `Q`.
+ *
+ * So `use` is a step whose *occurrence* is trusted outright -- `photo` at
+ * least has a place to check, and this has nothing. That is a real hole and it
+ * is bounded rather than argued away:
+ *
+ *   - **A `use` step names a control** out of `game/controlshint.ts`, the same
+ *     table the legend in the corner is drawn from, so the set of forgeable
+ *     claims is a closed list of twenty-four strings rather than anything an
+ *     author can invent.
+ *   - **A repeatable quest may not contain one.** `parseQuestPack` refuses it,
+ *     which is the structural half: the exposure is a one-off reward on a story
+ *     quest that writes its `q:` mark and never comes round again, and not a
+ *     farm. That refusal is in the parser rather than in a note, for the same
+ *     reason the improv rule is.
+ *   - **What it buys back is the whole feature**: the step's own completion is
+ *     the proof the control was learned, which is what lets the permanent
+ *     instructions in the corner go away.
+ *
+ * The `control` field is on **every** kind, not just `use`, and there it is a
+ * hint rather than a condition: `game/questtrack.ts` draws a keycap beside the
+ * open step and beside no other one. A `goto` that wants to mention `shift`
+ * says so for as long as it is the step you are on, which is the answer to "a
+ * tutorial mission instead of constant on screen instructions" -- the
+ * instruction is scoped to the moment it is true.
  *
  * ---------------------------------------------------------------------------
  * WHAT SURVIVES MONDAY, STATED ONCE
@@ -270,10 +307,23 @@ export const MAX_GOTO_RADIUS_M = 250;
  */
 export const CONTENT_LIMIT_M = 200_000;
 
+// --- What a step may teach ------------------------------------------------------
+
+/*
+ * The control table, imported rather than restated.
+ *
+ * `game/controlshint.ts` is three-free for this file's own reason -- the server
+ * imports this module, so everything it imports has to run in a process with no
+ * DOM in it. What comes across is `controlId`, which folds the `control` field
+ * of a step, and nothing else: the words and the keycaps are the legend's and
+ * `game/questtrack.ts` reads them there.
+ */
+import { controlId } from './controlshint.ts';
+
 // --- The step kinds ------------------------------------------------------------
 
 /**
- * The seven, named once.
+ * The eight, named once.
  *
  * Strings rather than numbers, deliberately and against this repo's habit
  * everywhere else: these are read and written **by a person in a text editor**,
@@ -290,6 +340,11 @@ export const STEP_KIND = {
   RIDE: 'ride',
   EARN: 'earn',
   DIALOG: 'dialog',
+  /**
+   * "I used this control." The tutorial's kind; see the header for the hole it
+   * opens and the two things that bound it.
+   */
+  USE: 'use',
 } as const;
 export type StepKind = (typeof STEP_KIND)[keyof typeof STEP_KIND];
 
@@ -353,6 +408,23 @@ export interface QuestStep {
   /** DIALOG: which NPC and which node must be reached. */
   npcId: string;
   node: string;
+  /**
+   * The one control this step is about. A `game/controlshint.CONTROL` id, or `''`.
+   *
+   * **Two jobs, and the kind picks which.** On a `use` step it is the
+   * completion condition and is mandatory -- a `use` with no control is a step
+   * nobody can finish, and the parser refuses it. On every other kind it is a
+   * *hint*: `game/questtrack.ts` draws its keycap beside the step while that
+   * step is the open one and beside no other step, ever, so a job can say "you
+   * will want shift for this" without putting another line on the screen for
+   * the rest of the session.
+   *
+   * That scoping is the whole point of the field. The tester's complaint was
+   * *"constant on screen instructions"*, and the answer is not fewer
+   * instructions -- it is instructions that are only up while they are the
+   * thing you are being asked to do.
+   */
+  control: string;
 }
 
 function blankStep(): QuestStep {
@@ -373,6 +445,7 @@ function blankStep(): QuestStep {
     dollars: 0,
     npcId: '',
     node: '',
+    control: '',
   };
 }
 
@@ -647,12 +720,17 @@ function parseStep(raw: unknown, where: string, errors: string[]): QuestStep | n
   const row = raw as Record<string, unknown>;
   const kind = typeof row.kind === 'string' ? row.kind.trim().toLowerCase() : '';
   if (!STEP_KINDS.includes(kind)) {
-    errors.push(`${where}: "${kind}" is not a step kind. The seven are ${STEP_KINDS.join(', ')}.`);
+    errors.push(`${where}: "${kind}" is not a step kind. The eight are ${STEP_KINDS.join(', ')}.`);
     return null;
   }
   const step = blankStep();
   step.kind = kind as StepKind;
   step.label = str(row.label, MAX_TITLE_CHARS);
+  // On every kind, because on every kind but one it is only a hint. Folded
+  // rather than refused for the same reason the radius is clamped: a typo in a
+  // keycap should cost the keycap. The `use` branch below is where it stops
+  // being optional. See `QuestStep.control`.
+  step.control = controlId(row.control);
   // Clipped rather than refused, on the radius rule below: an author who writes
   // a thirty-character banner should lose six characters, not the pack.
   step.objective = str(row.objective, MAX_OBJECTIVE_CHARS);
@@ -692,6 +770,19 @@ function parseStep(raw: unknown, where: string, errors: string[]): QuestStep | n
       errors.push(`${where}: a dialog step needs an npc id and a node id.`);
       return null;
     }
+  } else if (kind === STEP_KIND.USE) {
+    step.count = 1;
+    // The one place the fold is not forgiving, and it is not forgiving because
+    // the alternative is worse than a refused pack: a `use` step with no
+    // control can never be completed by anybody, so the quest holding it is a
+    // chain that stops. Refusing it says so at publish, once, to the author.
+    if (step.control === '') {
+      errors.push(
+        `${where}: a use step needs a "control" the game teaches -- see game/controlshint.ts. ` +
+          `Without one it is a step nobody can ever finish.`,
+      );
+      return null;
+    }
   }
   if (step.label === '') step.label = defaultLabel(step);
   return step;
@@ -720,6 +811,10 @@ export function defaultLabel(step: QuestStep): string {
       return step.to === '' ? 'catch a train' : `catch a train to ${step.to}`;
     case STEP_KIND.EARN:
       return `earn $${step.dollars}`;
+    case STEP_KIND.USE:
+      // The keycap is `questtrack`'s and is drawn beside this, so the words say
+      // the thing rather than repeating the key.
+      return `try it`;
     default:
       return 'talk to them';
   }
@@ -798,6 +893,28 @@ export function parseQuestPack(
       else steps.push(step);
     }
     if (!stepsOk) continue;
+
+    /*
+     * A `use` step may not sit on a weekly job, and the refusal is structural.
+     *
+     * `use` is the one kind whose occurrence this game cannot check -- see the
+     * header. On a story quest that is a one-off: the turn-in writes `q:<id>`,
+     * the job never comes round, and the exposure is a single capped reward.
+     * On a **repeatable** it would be a farm that costs a keystroke a week and
+     * pays every Monday for ever, which is not a hole to be careful about, it
+     * is a hole to close.
+     *
+     * Refused here rather than noted in the README on `DialogImprov`'s
+     * argument exactly: a guarantee the parser enforces is a guarantee, and a
+     * guarantee in a comment is a hope.
+     */
+    if (q.repeatable === true && steps.some((s) => s.kind === STEP_KIND.USE)) {
+      errors.push(
+        `${where}: a repeatable quest may not have a "use" step. Its completion is the client's word, ` +
+          `and a weekly job that pays for a keystroke is a farm.`,
+      );
+      continue;
+    }
 
     const rewardRaw =
       typeof q.reward === 'object' && q.reward !== null && !Array.isArray(q.reward)
@@ -1904,6 +2021,75 @@ export function verifyQuests(): string[] {
         `A ${200}-character objective came back ${[...long.steps[0].objective].length} long, not ${MAX_OBJECTIVE_CHARS}.`,
       );
     }
+  }
+
+  /*
+   * --- The tutorial's own kind, and the field that is a hint on every other one.
+   *
+   * WORKSTREAM AU. Four things, and each of them is a way Act 0 stops teaching:
+   * a `use` step that loses its control is a step nobody can finish; a control
+   * that survives on a `goto` is the keycap the tracker draws while you are
+   * walking; a typo that refuses the pack is Act 0 offline over a keycap; and a
+   * `use` on a repeatable is the farm the header refuses to leave open.
+   */
+  {
+    const { value, errors } = parseQuestPack(
+      {
+        quests: [
+          {
+            id: 'tut2',
+            giver: 'denise',
+            steps: [
+              { kind: 'use', control: 'phone', label: 'take your phone out' },
+              { kind: 'goto', x: 1, z: 2, label: 'walk it', control: 'sprint' },
+              { kind: 'goto', x: 3, z: 4, label: 'no hint here' },
+              { kind: 'use', control: '  CAR  ', label: 'get in a car' },
+            ],
+          },
+        ],
+      },
+      'fixture',
+    );
+    if (errors.length > 0) failures.push(`A quest teaching controls produced errors: ${errors.join('; ')}`);
+    const q = value.quests[0];
+    if (!q) {
+      failures.push('The control-teaching fixture produced no quest.');
+    } else {
+      if (q.steps[0]?.kind !== STEP_KIND.USE) failures.push(`A use step came back as "${q.steps[0]?.kind}".`);
+      if (q.steps[0]?.control !== 'phone') failures.push(`A use step's control came back as ${JSON.stringify(q.steps[0]?.control)}.`);
+      if (q.steps[0]?.count !== 1) failures.push('A use step asked to be done more than once.');
+      if (q.steps[1]?.control !== 'sprint') failures.push('A hint on a goto step was dropped.');
+      if (q.steps[2]?.control !== '') failures.push('A step with no control invented one.');
+      if (q.steps[3]?.control !== 'car') failures.push('A control was not trimmed and folded to lower case.');
+    }
+    // A `use` with nothing to use is refused rather than shipped as a dead end.
+    for (const bad of [{ kind: 'use' }, { kind: 'use', control: 'wiggle' }, { kind: 'use', control: 7 }]) {
+      const dead = parseQuestPack({ quests: [{ id: 'dead', giver: 'd', steps: [bad] }] }, 'fixture');
+      if (dead.value.quests.length !== 0) failures.push(`A use step of ${JSON.stringify(bad)} was accepted.`);
+      if (dead.errors.length === 0) failures.push(`A use step of ${JSON.stringify(bad)} was dropped without a reason.`);
+    }
+    // A bad control on any other kind costs the keycap, not the pack.
+    const kept = parseQuestPack(
+      { quests: [{ id: 'kept', giver: 'd', steps: [{ kind: 'goto', x: 0, z: 0, control: 'wiggle' }] }] },
+      'fixture',
+    );
+    if (kept.value.quests.length !== 1) failures.push('A typo in a hint refused the whole pack.');
+    else if (kept.value.quests[0].steps[0].control !== '') failures.push('An unknown control was kept as a hint.');
+    // And the farm the header closes.
+    const weekly = parseQuestPack(
+      {
+        quests: [
+          { id: 'farm', giver: 'd', repeatable: true, steps: [{ kind: 'use', control: 'phone' }], reward: { cash: 200 } },
+        ],
+      },
+      'fixture',
+    );
+    if (weekly.value.quests.length !== 0) failures.push('A repeatable quest paid $200 for one press of Q.');
+    const weeklyOk = parseQuestPack(
+      { quests: [{ id: 'ok', giver: 'd', repeatable: true, steps: [{ kind: 'goto', x: 0, z: 0, control: 'phone' }] }] },
+      'fixture',
+    );
+    if (weeklyOk.value.quests.length !== 1) failures.push('A repeatable quest was refused for merely hinting at a control.');
   }
 
   // --- The hero mark, which is a field on the npc rather than on the quest.

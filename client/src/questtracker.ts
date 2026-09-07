@@ -70,8 +70,15 @@ export class QuestTracker {
   private readonly footEl = document.getElementById('questtrack-foot');
   private readonly source: QuestTrackSource;
 
-  /** The pooled rows. Each is a `div.row` holding a `b` and an `i`. */
-  private readonly rows: Array<{ row: HTMLElement; label: HTMLElement; count: HTMLElement }> = [];
+  /**
+   * The pooled rows. Each is a `div.row` holding a `kbd`, a `b` and an `i`.
+   *
+   * The `kbd` is the control hint and is empty on every row but the open one --
+   * `game/questtrack.TrackStep.controlKey` is where that rule lives and why.
+   * `#questtrack-steps .row kbd:empty` collapses it, so a step with nothing to
+   * teach costs no space at all rather than an indent.
+   */
+  private readonly rows: Array<{ row: HTMLElement; hint: HTMLElement; label: HTMLElement; count: HTMLElement }> = [];
 
   /** What was last drawn. See the header for why one string and not six. */
   private drawn = '';
@@ -121,7 +128,7 @@ export class QuestTracker {
     const foot = frame.kind === 'hub' ? 'J — the job list' : othersText(frame.others);
     const signature =
       `${frame.kind}|${frame.title}|${range}|${frame.note}|${foot}|` +
-      frame.steps.map((s) => `${s.state}${s.label}${s.counter}`).join('');
+      frame.steps.map((s) => `${s.state}${s.label}${s.counter}${s.controlKey}`).join('');
     if (signature === this.drawn) return;
     this.drawn = signature;
 
@@ -134,11 +141,14 @@ export class QuestTracker {
     while (this.rows.length < shown) {
       const row = document.createElement('div');
       row.className = 'row';
+      // Before the words, because the row is right-aligned and the keycap is
+      // the thing the eye should land on first: `[q] take your phone out`.
+      const hint = document.createElement('kbd');
       const label = document.createElement('b');
       const count = document.createElement('i');
-      row.append(label, count);
+      row.append(hint, label, count);
       this.stepsEl.append(row);
-      this.rows.push({ row, label, count });
+      this.rows.push({ row, hint, label, count });
     }
     for (let i = 0; i < this.rows.length; i++) {
       const slot = this.rows[i];
@@ -149,6 +159,7 @@ export class QuestTracker {
       const step = frame.steps[i];
       slot.row.style.display = '';
       slot.row.className = `row ${step.state}`;
+      slot.hint.textContent = step.controlKey;
       slot.label.textContent = step.label;
       slot.count.textContent = step.counter;
     }

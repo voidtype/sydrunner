@@ -722,4 +722,5 @@ const BLANK_STEP: QuestStep = {
   dollars: 0,
   npcId: '',
   node: '',
+  control: '',
 };

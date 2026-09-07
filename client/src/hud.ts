@@ -20,6 +20,11 @@ import { TEAM, TEAM_COLOUR, TEAM_NAME, type Team } from './game/teams.ts';
 // asserting lives one module away and is checked on both ends. Same arrangement
 // `formatMoney` above is here under. See `game/levelhud.ts`.
 import { levelLine, xpBarWidth } from './game/levelhud.ts';
+// The collapsing controls block: which rows are left, and how the used set is
+// stored and read back. Three-free and checked on both boot lists, for the
+// reason its own header gives -- the parse is the part with a failure mode and
+// a browser is not where a failure mode should first be found.
+import { CONTROLS_STORE_KEY, readUsed, visibleRows, writeUsed } from './game/controlshint.ts';
 import type { Vector3 } from 'three/webgpu';
 import type { SolarPosition } from './sky/solar.ts';
 import { type RosterEntry } from './net/protocol.ts';
@@ -539,6 +544,36 @@ export function verifyHud(maxBallCharges: number): string[] {
   return failures;
 }
 
+/**
+ * `localStorage`, wrapped, both ways.
+ *
+ * Two functions rather than an inline try/catch at each site, because there are
+ * three sites and the *behaviour on failure* is the decision: a read that fails
+ * is `null`, which `readUsed` turns into the full block, and a write that fails
+ * is nothing at all -- the row still goes away for this session and comes back
+ * next time, which is a much better session than a thrown exception inside a
+ * keydown handler.
+ *
+ * The accessor itself can throw, not just the operation: a browser set to block
+ * site data throws on `window.localStorage`, and a thumbnail or preview context
+ * can too. So the property read is inside the `try` as well.
+ */
+function readStoredControls(): string | null {
+  try {
+    return window.localStorage.getItem(CONTROLS_STORE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredControls(value: string): void {
+  try {
+    window.localStorage.setItem(CONTROLS_STORE_KEY, value);
+  } catch {
+    // A full or blocked store. See the note above: this session is unaffected.
+  }
+}
+
 export class Hud {
   private readonly loading = document.getElementById('loading')!;
   private readonly loadingText = document.getElementById('loading-text')!;
@@ -547,6 +582,35 @@ export class Hud {
   private readonly hint = document.getElementById('hint')!;
   private readonly help = document.getElementById('help')!;
   private readonly helpFull = document.getElementById('helpfull')!;
+  /**
+   * The rows of the compact block, by the `data-ctl` `index.html` puts on them.
+   *
+   * Read out of the markup rather than built from `game/controlshint.ts`, on
+   * that file's own argument: the corner has to be on the screen before a
+   * module has been imported, so the words stay in the document and this only
+   * finds them again. `domcheck.verifyIndexDom` is what asserts the two lists
+   * are the same rows in the same order, which is the guarantee a template
+   * would have given for the cost of the first paint.
+   */
+  private readonly controlRow: ReadonlyMap<string, HTMLElement> = (() => {
+    const map = new Map<string, HTMLElement>();
+    for (const el of this.help.querySelectorAll<HTMLElement>('[data-ctl]')) {
+      const id = el.dataset.ctl ?? '';
+      if (id !== '') map.set(id, el);
+    }
+    return map;
+  })();
+  /**
+   * Which controls this player has already used, across sessions.
+   *
+   * `localStorage` is per-origin and per-browser and can be gone or can throw
+   * outright -- a private window, cleared site data, a browser set to block
+   * storage -- so every touch of it here is wrapped and a failure produces the
+   * **full list**, which is the safe direction: a returning player sees a block
+   * they have read before, rather than a new player being shown nothing.
+   * `game/controlshint.readUsed` is where that decision is written down.
+   */
+  private controlsUsed: Set<string> = readUsed(readStoredControls());
   private readonly pips = document.getElementById('pips')!;
   private readonly staminaBar = document.getElementById('stamina')!;
   private readonly ballBar = document.getElementById('balls')!;
@@ -1007,6 +1071,64 @@ export class Hud {
   }
 
   // --- The controls -----------------------------------------------------------
+
+  /**
+   * Paint the compact block once, at boot, for whoever this player already is.
+   *
+   * The only thing this class has ever needed a constructor for. A returning
+   * player has used most of these controls and the block is mostly gone before
+   * the first frame; a new one gets every row, which is what it was always for.
+   */
+  constructor() {
+    this.paintControls();
+  }
+
+  /**
+   * "This control has just been used." The whole of the collapsing block.
+   *
+   * Called from `main.ts`'s keydown, mouse and frame paths -- see
+   * `game/controlshint.ts` for why a row goes away when its control is used and
+   * for nothing else. Returns whether this was the **first** time, which is what
+   * `main.ts` uses to decide whether the server needs telling: a quest step
+   * waiting on a control is told every time, an ordinary press is told never.
+   *
+   * Cheap to call at any rate. The common case after the first two minutes is a
+   * set membership test and a return, and nothing touches the DOM or storage
+   * unless the set actually changed.
+   */
+  markControl(id: string): boolean {
+    if (id === '' || this.controlsUsed.has(id)) return false;
+    this.controlsUsed.add(id);
+    this.paintControls();
+    // After the paint, not before: the row going away is the thing the player
+    // is owed and a storage quota exception must not be able to keep it.
+    writeStoredControls(writeUsed(this.controlsUsed));
+    return true;
+  }
+
+  /** Has this control been used in this browser? For the check and the console. */
+  controlUsed(id: string): boolean {
+    return this.controlsUsed.has(id);
+  }
+
+  /**
+   * Hide the rows whose controls are done, and any line left with nothing in it.
+   *
+   * The line as well as the row, because `#help div.keys` is a flex row with a
+   * gap: an emptied line still costs its gap and the block would drift upward in
+   * steps that do not line up with anything. `hidden` rather than a class, on
+   * `domcheck.ts`'s own lesson -- `[hidden]` is the lowest-specificity rule in
+   * the language, so this file also asserts nothing in the stylesheet overrides
+   * it for these elements.
+   */
+  private paintControls(): void {
+    const keep = new Set(visibleRows(this.controlsUsed).map((row) => row.id));
+    for (const [id, el] of this.controlRow) el.hidden = !keep.has(id);
+    for (const line of this.help.querySelectorAll<HTMLElement>('div.keys, div.more')) {
+      const rows = line.querySelectorAll<HTMLElement>('[data-ctl]');
+      line.hidden = rows.length > 0 && Array.from(rows).every((el) => el.hidden);
+    }
+  }
 
   /**
    * Show or hide the full control list, and hide the compact block behind it

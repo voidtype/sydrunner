@@ -78,6 +78,26 @@ export const QUEST_OP = {
   NODE: 4,
   /** "I photographed *landmark*." Checked against the body's position. */
   PHOTO: 5,
+  /**
+   * "I used the *id* control." The tutorial's op, and the one this process
+   * cannot check at all.
+   *
+   * `PHOTO` is the step whose *occurrence* is trusted and whose *place* is not.
+   * This is a step where there is no place either: there is no tick on which a
+   * server learns that somebody pressed `Q`, and Act 0 has to be able to teach
+   * `Q`. The two things that bound it are in `questmodel.ts`'s header -- the
+   * control is one of a closed table of ids, and a repeatable quest may not
+   * carry a `use` step, so the exposure is a one-off capped reward on a story
+   * job rather than a farm.
+   *
+   * `id` is the control id (`game/controlshint.CONTROL`); `node` and `choice`
+   * are unused, and are on the frame anyway because every op's are.
+   *
+   * The client sends this only when one of its own open steps is waiting on
+   * that control -- see `main.ts` -- so pressing `Q` in an ordinary session is
+   * still zero bytes.
+   */
+  USED: 6,
 } as const;
 
 /** `choice` on a `NODE` op that means "I have just opened this conversation". */
