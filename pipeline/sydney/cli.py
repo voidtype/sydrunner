@@ -3570,7 +3570,13 @@ def cmd_road_grade_audit(args: argparse.Namespace) -> int:
         # foreshore roads by metres, see `_tidal_plan` -- but the shore split
         # below reports that on its own line either way.
         conform = args.surface != "raw"
-        field = Terrain.load(radius, conform_roads=conform, conform_water=conform)
+        # The pads go with the roads and the water for the same reason: `raw` is
+        # the surface before the pipeline told the ground anything, and a lattice
+        # with a landmark's footprint levelled into it but no road conformance is
+        # another surface that never existed at any point in the build.
+        field = Terrain.load(
+            radius, conform_roads=conform, conform_water=conform, conform_pads=conform
+        )
         label = "a fresh lattice, " + (
             "roads conformed" if conform else "roads NOT conformed (the before)"
         )

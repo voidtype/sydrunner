@@ -1,9 +1,10 @@
 """Cache the solved terrain, keyed on everything it is a function of.
 
 WHY THIS EXISTS. `Terrain.load` is the head of every build. It samples the DEM,
-then `roadgrade.solve`/`conform` and `water.conform` pull the ~3.7M-post lattice
-onto the road network and cut the harbour bed -- a global solve that takes the
-better part of three hours and peaks near a 16 GB machine's ceiling. It is
+then `roadgrade.solve`/`conform`, `water.conform` and `pads.conform` pull the
+~3.7M-post lattice onto the road network, cut the harbour bed and level the
+stated pads -- a global solve that takes the better part of three hours and
+peaks near a 16 GB machine's ceiling. It is
 recomputed from scratch on every build, and yet the solved lattice is a **pure
 function** of the DEM, the OSM extract and the code that solves them -- none of
 which a vegetation, deck, fence, furniture or overpass round touches. The
@@ -22,15 +23,16 @@ from it is byte-identical -- which is the gate this change lives or dies by.
 THE KEY, AND WHY IT IS PARANOID. The key hashes exactly the inputs the solved
 lattice depends on:
 
-  * the load arguments (`radius_m`, `zoom`, the two conform flags);
+  * the load arguments (`radius_m`, `zoom`, the three conform flags);
   * the OSM extract, by full content hash -- a re-pull changes the roads and the
     water and must miss;
   * the DEM tiles for this zoom, by a (name, size, mtime) signature -- terrarium
     PNGs are immutable once fetched, so this is a sufficient and cheap proxy;
   * the **source of every module that shapes the lattice** -- `terrain`,
-    `roadgrade`, `water`, `geo`, `config`, and the OSM reader -- so that a
-    changed constant or a changed algorithm invalidates the cache even though no
-    data moved.
+    `roadgrade`, `water`, `pads`, `landmarks`, `rail`, `geo`, `config`, and the
+    OSM reader -- so that a changed constant or a changed algorithm invalidates
+    the cache even though no data moved. The last three are the third conform
+    pass's price and `_CODE_FILES` argues for paying it.
 
 The bias is absolute: over-invalidation costs one recompute; a stale hit would
 silently ship a world built on the wrong ground and corrupt every round after
@@ -53,10 +55,23 @@ from .terrain import TERRARIUM_ZOOM, Terrain
 # The modules whose code decides what the lattice is. Hashing their source is how
 # a changed constant or algorithm invalidates a cache that no data change would.
 # Paths are relative to this file's directory.
+#
+# `pads.py`, `landmarks.py` and `rail.py` joined the list when the third conform
+# pass did, and the last two are expensive company: `rail.py` is under constant
+# change and a rail-only edit that cannot move a lattice post now costs a fresh
+# solve anyway. That is the bias this header already states, taken at face value
+# -- `pads.py` reads a station's platform polygons out of `rail.read_rail` and a
+# landmark's footprint out of `landmarks.read_anchors`, so a change to either
+# reader *can* move the ground, and there is no way to hash "only the part that
+# can" that does not go stale the first time somebody refactors across it. One
+# recompute is the price; a stale hit is the world on the wrong ground.
 _CODE_FILES = (
     "terrain.py",
     "roadgrade.py",
     "water.py",
+    "pads.py",
+    "landmarks.py",
+    "rail.py",
     "geo.py",
     "config.py",
     "sources/osm.py",
@@ -99,7 +114,13 @@ def _code_signature() -> str:
     )
 
 
-def _key(radius_m: float, zoom: int, conform_roads: bool, conform_water: bool) -> str:
+def _key(
+    radius_m: float,
+    zoom: int,
+    conform_roads: bool,
+    conform_water: bool,
+    conform_pads: bool,
+) -> str:
     pbf = config.CACHE_DIR / "sydney.osm.pbf"
     pbf_hash = _file_hash(str(pbf)) if pbf.exists() else "no-pbf"
     payload = "|".join(
@@ -109,6 +130,7 @@ def _key(radius_m: float, zoom: int, conform_roads: bool, conform_water: bool) -
             f"zoom={zoom}",
             f"roads={int(conform_roads)}",
             f"water={int(conform_water)}",
+            f"pads={int(conform_pads)}",
             f"pbf={pbf_hash}",
             f"dem={_dem_signature(zoom)}",
             f"code={_code_signature()}",
@@ -126,6 +148,7 @@ def load(
     zoom: int = TERRARIUM_ZOOM,
     conform_roads: bool = True,
     conform_water: bool = True,
+    conform_pads: bool = True,
     use_cache: bool = True,
 ) -> Terrain:
     """`Terrain.load` with a solved-lattice cache in front of it.
@@ -136,9 +159,9 @@ def load(
     """
     if not use_cache or _disabled():
         print("  terrain cache: off, solving fresh")
-        return Terrain.load(radius_m, zoom, conform_roads, conform_water)
+        return Terrain.load(radius_m, zoom, conform_roads, conform_water, conform_pads)
 
-    key = _key(radius_m, zoom, conform_roads, conform_water)
+    key = _key(radius_m, zoom, conform_roads, conform_water, conform_pads)
     cache_dir = config.CACHE_DIR / _CACHE_SUBDIR
     path = cache_dir / f"{key}.pkl"
 
@@ -153,7 +176,7 @@ def load(
             print(f"  terrain cache: hit {key[:12]} but unpickle failed ({err}); solving fresh")
 
     print(f"  terrain cache: MISS {key[:12]}, solving fresh")
-    terrain = Terrain.load(radius_m, zoom, conform_roads, conform_water)
+    terrain = Terrain.load(radius_m, zoom, conform_roads, conform_water, conform_pads)
     try:
         cache_dir.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".pkl.tmp")
