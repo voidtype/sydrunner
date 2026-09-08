@@ -162,7 +162,7 @@ import {
 } from '../client/src/game/driving.ts';
 import { decodeCars, StaticCarField } from '../client/src/game/staticcars.ts';
 import {
-  SEPARATION_SLOP,
+  MAX_PENETRATION,
   createRigidBody,
   createRigidContact,
   rigidOverlap,
@@ -394,10 +394,17 @@ function launch(
  * whichever one the row is about -- because a sweep that pushed a car out of a
  * Camry and into a bus would pass a narrower test.
  *
- * `SEPARATION_SLOP` is not subtracted and does not need to be: `rigid.ts` leaves
- * a resolved pair exactly a millimetre inside each other on purpose, so the
- * comparison at the call site is against twice that, which is `verifyRigid`'s
- * own bound.
+ * **The floor is `rigid.MAX_PENETRATION` and it used to be twice
+ * `SEPARATION_SLOP`**, and the change is not a loosened bound -- it is the same
+ * sentence about a layer whose contract now says something different.
+ * `rigidSeparate` used to push the whole of an overlap out in one tick and leave
+ * a millimetre; since the settling rules (`game/rigid.ts` section 7) it pushes
+ * four tenths, and the thing that keeps a *driven* contact shallow is the
+ * `MAX_PENETRATION` cap rather than the fraction. So the deepest overlap the
+ * layer will deliberately leave standing is that cap, and quoting anything
+ * smaller here is quoting a promise the module no longer makes. The row it shows
+ * up in is "another player's car, closing", which measures **exactly 0.1000 m** --
+ * the cap, doing precisely what it says.
  */
 function deepestOverlap(
   sim: Simulation,
@@ -465,12 +472,12 @@ function deepestOverlap(
     const dvz = b.vz - mine.vz;
     const relative = Math.sqrt(dvx * dvx + dvz * dvz);
     const own = Math.sqrt(mine.vx * mine.vx + mine.vz * mine.vz);
-    const allowance = (relative + own) * FIXED_DT + SEPARATION_SLOP * 2;
+    const allowance = (relative + own) * FIXED_DT + MAX_PENETRATION;
     const unexplained = contact.depth - allowance;
     if (unexplained > worst) {
       worst = unexplained;
       blame.what = `${what}, ${contact.depth.toFixed(4)} m deep with `
-        + `${(allowance - SEPARATION_SLOP * 2).toFixed(4)} m of one tick's travel allowed for`;
+        + `${(allowance - MAX_PENETRATION).toFixed(4)} m of one tick's travel allowed for`;
     }
   };
 

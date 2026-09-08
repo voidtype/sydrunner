@@ -1035,6 +1035,11 @@ export class Simulation {
    */
   private readonly factionWorld: CombatWorld;
   /**
+   * And the world every car record is grounded against, with its own
+   * `lastGround`. See the constructor and `driving.CarField.groundAt`.
+   */
+  private readonly carWorld: CombatWorld;
+  /**
    * `applyFootyHit` takes its report rather than allocating one, because
    * `game/footy.ts` imports nothing from three and cannot construct a
    * `Vector3`. One for the process, made through `combat.createHitReport` --
@@ -1588,6 +1593,17 @@ export class Simulation {
     this.fareCtx.peds = world.peds;
     this.ballWorld = groundFor(world);
     this.factionWorld = groundFor(world);
+    // --- **Where the ground is under a car nobody is in.** See
+    //     `driving.CarField.groundAt`, whose essay lists the four ways a record
+    //     used to end up hanging in the air, and the owner's *"some cars are
+    //     floating"* which is all four of them.
+    //
+    // Its own `groundFor` closure on `ballWorld`'s stated argument: that closure
+    // remembers the last tile it had terrain for, so sharing a participant's
+    // would make a wreck's height depend on where a player happened to be
+    // standing, and two wrecks would perturb each other through it.
+    this.carWorld = groundFor(world);
+    this.cars.groundAt = (x, z, near) => this.carWorld.groundHeight(x, z, near);
     this.factionCtx = {
       tick: 0,
       dt: FIXED_DT,
@@ -5722,6 +5738,26 @@ export class Simulation {
         );
         c.body.position.x = moved.x;
         c.body.position.z = moved.z;
+        // --- **And up onto whatever it was shoved onto.** `controller.step`'s
+        //     own snap clause, run one tick early because the shove happens
+        //     after the step that would otherwise have run it.
+        //
+        // A shunt is the one thing in this game that moves a body sideways
+        // *outside* the controller, so a car pushed over a kerb, onto a footpath
+        // or onto a road deck spends the rest of this tick at the height of the
+        // road it left -- and `CarField.follow` copies exactly that height onto
+        // the record a few sweeps later, which is what a spectator draws. One
+        // frame of a car at the wrong height is a flicker; on a deck it is a
+        // metre.
+        //
+        // **Upward only, and that is the whole rule.** Lifting a body to the
+        // ground it is standing on is what the controller does and cannot
+        // surprise anybody. *Lowering* one would teleport a driver shoved off
+        // the edge of a bridge straight to the street below, where what should
+        // happen -- and what `controller.step` does on the next tick -- is that
+        // they fall.
+        const ground = this.carWorld.groundHeight(moved.x, moved.z, feet);
+        if (c.body.position.y < ground + EYE_HEIGHT) c.body.position.y = ground + EYE_HEIGHT;
       }
       // The record follows the driver at the end of the tick (`follow`), so
       // nothing here writes the record's pose -- writing it would be a second
@@ -5739,6 +5775,10 @@ export class Simulation {
       const moved = this.pushBody(car.x, car.z, car.x + pushX, car.z + pushZ, car.y);
       car.x = moved.x;
       car.z = moved.z;
+      // The third of `driving.CarField.groundAt`'s four floating paths: a record
+      // with nobody in it has no capsule to re-ground it, so the class is its
+      // ground and this is the sweep that has just moved it.
+      this.cars.reground(car);
     }
     // A **parked** car that has just been shunted is now a car that rolls,
     // which is what makes a car park something you can push your way through.

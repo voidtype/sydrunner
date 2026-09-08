@@ -3788,6 +3788,15 @@ export class CarField implements DrivingLookup {
       burningMs: NOT_BURNING,
       igniteLockMs: 0,
     };
+    // **On the ground at the place it was actually born**, which is the second
+    // of `groundAt`'s four floating paths and is two bugs in one line. The `y`
+    // that arrives here is the struck car's, sampled at the struck car's centre:
+    // for a parked one that is `staticcars.STATIC_CAR_CLEARANCE_Y` over the
+    // ground (a permanent two-centimetre float on the whole kerb fleet), and for
+    // either fleet the record is minted at a position the separation has already
+    // moved -- `sim.resolveStaticContacts` walks it out through `pushBody` --
+    // which can be most of a metre away and over a kerb.
+    car.y = this.groundAt(car.x, car.z, source.y);
     this.byId.set(id, car);
     this.bySource.set(car.carId, car);
     this.dirty = true;
@@ -3852,6 +3861,14 @@ export class CarField implements DrivingLookup {
       }
       car.x = body.x;
       car.z = body.z;
+      // **And back onto the ground it just rolled over**, which is the first and
+      // largest of the four floating paths `groundAt`'s essay lists. A wreck
+      // punted across an intersection covers up to 37 m (`rigid.ROLLING_DECAY`);
+      // without this line it covers all of it at the height of the bay it left.
+      // Both ends run this call with their own ground function and the two agree
+      // to a centimetre, which is the same arrangement a parked car's height has
+      // had since workstream S -- see `staticcars.ts` section 3.
+      car.y = this.groundAt(body.x, body.z, car.y);
       // `rigidYaw`'s one `Math.atan2`, on that function's stated terms: the
       // value is quantised to a `u16` by `encodeCars` before anybody else sees
       // it, and this runs on at most eight cars a tick.
@@ -3880,6 +3897,74 @@ export class CarField implements DrivingLookup {
 
   /** Scratch for `integrateLoose`, so a tick with eight wrecks in it allocates nothing. */
   private readonly looseBody: RigidBody = createRigidBody();
+
+  /**
+   * **Where the ground is under a car record.** Set by whoever owns the field.
+   *
+   * ---------------------------------------------------------------------------
+   * THE FLOATING CAR, AND WHY IT NEEDED A CLOSURE RATHER THAN A FIX PER SWEEP.
+   *
+   * The owner's report on the live build opened *"some cars are floating"*, and
+   * every path that produced one has the same shape: something moved a record in
+   * **plan** and nothing put it back on the ground. There were four of them and
+   * all four were invisible to every check in this project, because a `DrivenCar`
+   * has an unquestioned `y` that nothing ever asserts against the terrain:
+   *
+   *   1. `integrateLoose` rolls a knocked car ten to forty metres across an
+   *      intersection and writes `x` and `z`. The `y` it keeps is the `y` of the
+   *      bay it was punted out of, so a wreck that crossed a crowned road, a
+   *      driveway crossover or a park stayed at the kerb's height for the whole
+   *      roll and for the rest of the session. This is the big one -- it is the
+   *      only path where the plan error grows without bound.
+   *   2. `knockLoose` mints the record at the struck car's `y`, and a **parked**
+   *      car's `y` is `staticcars.STATIC_CAR_CLEARANCE_Y` over the ground, so a
+   *      car lifted out of a kerb bay was born two centimetres high and never
+   *      came down. Small, but it is a permanent offset on the one population
+   *      that is most of the cars in a street -- and the record is also born at
+   *      a *separated* position, which is not where its `y` was sampled.
+   *   3. a record with nobody in it that is **shunted** (`sim.applyCarBody`, and
+   *      the browser's mirror of it) is walked sideways through the prism
+   *      resolver -- over a kerb, onto a footpath, down a driveway -- with its
+   *      `y` untouched.
+   *   4. and the same again for a car separated onto a road deck, which is case
+   *      3 with the biggest number in it.
+   *
+   * A *driven* car has none of these, and the reason is exactly the fix: its `y`
+   * is `follow`'s copy of the driver's feet, and the driver is a capsule
+   * `controller.step` re-grounds every single tick. **A record nobody is in has
+   * no such body, so this class has to be its ground.**
+   *
+   * The closure is `game/staticcars.StaticCarField.groundAt`'s, field for field
+   * and signature for signature, and that is deliberate: it is the same question
+   * about the same fleet one layer along, the two ends already fill it from the
+   * two ground functions that agree to a centimetre (`server/world.groundFor`
+   * and `main.ts`' composed `groundHeightAt`), and a second shape of the same
+   * query would be a second answer. **The default is the identity** -- "keep the
+   * height you had" -- which is the correct failure for a self-check, for
+   * `?offline` before anything has streamed, and for every fixture in every
+   * driver in this project: a car that cannot be told where the ground is stays
+   * where it was put rather than falling to zero.
+   *
+   * The third argument is the record's **own** current `y`, which is what makes
+   * a car on the Cahill Expressway stay on the Cahill: `groundHeight`'s `near`
+   * is how every ground query in this game distinguishes a deck from the street
+   * under it, and a wreck's best evidence about which one it is on is where it
+   * was last tick.
+   */
+  groundAt: (x: number, z: number, near: number) => number = (_x, _z, near) => near;
+
+  /**
+   * Put a record back on the ground under it. **Call this on any tick a record's
+   * `x` or `z` was written by anything other than a driver.**
+   *
+   * A method rather than four copies of one line, because the four call sites
+   * are in three files and two processes and the failure when one of them
+   * forgets is a car hanging in the air that nothing in the project asserts
+   * about. See `groundAt`.
+   */
+  reground(car: DrivenCar): void {
+    car.y = this.groundAt(car.x, car.z, car.y);
+  }
 
   /**
    * Give a knocked car back to the timetable once it has stood still long
@@ -5827,6 +5912,139 @@ export function verifyCarPhysics(): string[] {
       }
       if (shunt.impulse !== 0 || shunt.closing !== 0) {
         failures.push('A contact that did not happen left an impulse behind for the caller to read.');
+      }
+    }
+  }
+
+  // --- WORKSTREAM AT: **a car nobody is in stays on the ground.** The owner's
+  //     *"some cars are floating"*, as the four paths `CarField.groundAt`'s
+  //     essay names, each measured against a ground that is not flat.
+  //
+  //     A flat ground would pass on the code that produced the report, which is
+  //     the whole trap here: every fixture in this project sits a car at y 0 on
+  //     terrain at y 0, and a `y` that is never written is indistinguishable
+  //     from a `y` that is written correctly. So the ground below is a **1 in 10
+  //     ramp along +X** -- steeper than anything in Sydney and chosen for that:
+  //     a metre of plan error is a decimetre of visible float.
+  {
+    /** A 1-in-10 ramp. Deterministic, and not flat, which is the point. */
+    const ramp = (x: number, _z: number, _near: number): number => x * 0.1;
+    /** How far off the ground a record is. The one number all four cases print. */
+    const off = (car: DrivenCar): number => {
+      const d = car.y - ramp(car.x, car.z, car.y);
+      return d < 0 ? -d : d;
+    };
+    /** The owner's tolerance: five centimetres is under a kerb and over a seam. */
+    const GROUNDED = 0.05;
+
+    // (1) A knocked car rolls, and every tick of the roll is on the ground.
+    //
+    //     Six hundred ticks, which is ten seconds and comfortably past the
+    //     `rigid.ROLLING_DECAY` stop -- so what is asserted covers both the roll
+    //     and the rest afterwards.
+    {
+      const field = new CarField();
+      field.groundAt = ramp;
+      const car = field.knockLoose(
+        { identity: 0xf10a7, body: 0, colour: 0, x: 0, y: 0, z: 0, yaw: -Math.PI / 2, parked: false },
+        12, 0, 0,
+      );
+      if (car === null) {
+        failures.push('A car could not be knocked loose for the grounding case.');
+      } else {
+        let worst = off(car);
+        for (let i = 0; i < 600; i++) {
+          field.integrateLoose(1 / 60, null);
+          const d = off(car);
+          if (d > worst) worst = d;
+        }
+        if (!(Math.abs(car.x) > 5)) {
+          failures.push(
+            `The grounding case only rolled the wreck ${Math.abs(car.x).toFixed(2)} m, so a y that never ` +
+              'moved would pass it. It has to travel for the assertion to mean anything.',
+          );
+        }
+        if (worst > GROUNDED) {
+          failures.push(
+            `A car knocked loose rolled ${Math.abs(car.x).toFixed(1)} m and spent the trip up to ` +
+              `${worst.toFixed(2)} m off the ground under it. CarField.integrateLoose has to re-sample ` +
+              'the ground every tick it moves a record -- see CarField.groundAt.',
+          );
+        }
+      }
+    }
+
+    // (2) And it is born on the ground, at the place it is actually born --
+    //     which is not where the struck car's `y` was sampled, because the
+    //     separation has already moved it. A parked car's `y` also carries
+    //     `staticcars.STATIC_CAR_CLEARANCE_Y`, so the source height is wrong by
+    //     construction before anything moves at all.
+    {
+      const field = new CarField();
+      field.groundAt = ramp;
+      const car = field.knockLoose(
+        // Born 30 m along the ramp, handed the `y` of the bay 30 m back plus the
+        // parked fleet's own clearance. Every number here is a real one.
+        { identity: 0xf10a8, body: 0, colour: 0, x: 30, y: 0.02, z: 0, yaw: 0, parked: false },
+        0, 0, 0,
+      );
+      if (car === null) {
+        failures.push('A car could not be knocked loose for the birth-height case.');
+      } else if (off(car) > GROUNDED) {
+        failures.push(
+          `A car knocked out of a bay was born ${off(car).toFixed(2)} m off the ground. CarField.knockLoose ` +
+            'is handed the struck car\'s height and the separated position, and those are two different places.',
+        );
+      }
+    }
+
+    // (3) A record with nobody in it that is shunted sideways is re-grounded by
+    //     whoever shunted it. This is the one the class cannot do on its own --
+    //     `sim.applyCarBody` and the browser's mirror of it move the record --
+    //     so what is asserted here is that the method they call does the job.
+    {
+      const field = new CarField();
+      field.groundAt = ramp;
+      const car = field.take(
+        { identity: 0xf10a9, body: 0, colour: 0, x: 0, y: 0, z: 0, yaw: 0, parked: true },
+        0,
+      );
+      if (car === null) {
+        failures.push('A car could not be taken for the shunt-grounding case.');
+      } else {
+        field.leave(car.id);
+        // Shoved four metres up the ramp, which is 40 cm of height.
+        car.x += 4;
+        field.reground(car);
+        if (off(car) > GROUNDED) {
+          failures.push(
+            `A record shunted 4 m up a 1-in-10 grade is ${off(car).toFixed(2)} m off the ground after ` +
+              'CarField.reground. That method is the whole of what sim.applyCarBody calls.',
+          );
+        }
+      }
+    }
+
+    // (4) And the default is the identity, which is the correct failure for a
+    //     world that cannot say: a car stays where it was put rather than
+    //     falling to zero. Every check in this project and the first second of
+    //     every session take this branch.
+    {
+      const field = new CarField();
+      const car = field.knockLoose(
+        { identity: 0xf10aa, body: 0, colour: 0, x: 0, y: 12.5, z: 0, yaw: 0, parked: false },
+        4, 0, 0,
+      );
+      if (car === null) {
+        failures.push('A car could not be knocked loose for the no-ground case.');
+      } else {
+        for (let i = 0; i < 120; i++) field.integrateLoose(1 / 60, null);
+        if (car.y !== 12.5) {
+          failures.push(
+            `With no ground function a rolling wreck went from y 12.5 to ${car.y}. The default is "keep the ` +
+              'height you had", because a viaduct is where most of the fixtures in this project put a car.',
+          );
+        }
       }
     }
   }
