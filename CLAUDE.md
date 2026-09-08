@@ -28,6 +28,12 @@ match that voice, and read the header of any file before changing it.
   the check that convicts anything that forgets to ask.
 - **[PERFORMANCE.md](PERFORMANCE.md)** / **[EXPANSION.md](EXPANSION.md)** —
   the budgets (1 vCPU / 1 GB box, wire per player, memory caps).
+- **[GRAPHICS.md](GRAPHICS.md)** — what every surface is shaded with, what the
+  four lights and the one shadow map are, what three's WebGPU path can and
+  cannot do here, and the ranked plan toward a modern open-world look. The
+  switches for the 2026-09 pass live in `sky/calibration.ts`, and the
+  two rules that decide the ranking are there: a pipeline compiled inside a
+  frame is a stall, and the published rgb triples are load-bearing.
 - **[DESIGN.md](DESIGN.md)** — the taste ledger: the eight rules every
   mechanic must pass, and the researched verdicts (adopt / later / refuse)
   from WoW, Skyrim, GTA and the player suggestion board. A brief that
