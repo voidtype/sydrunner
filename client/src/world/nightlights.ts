@@ -41,6 +41,17 @@
  * somebody having read all of them. What has never changed is the rule: they are
  * all built at boot and none of them is ever hidden.)
  *
+ * (And there is now one thing that *borrows* two of them rather than asking for
+ * an eighth and a ninth. A police light bar within 40 m of a player the police
+ * are actually chasing takes the two street-lamp lights, turns them red and
+ * blue, and puts them on the bar; the moment the pursuit ends or moves away they
+ * go back to being lamps. The count never changes, so no pipeline is ever
+ * rebuilt. **Which two, and why those two**, is the longest argument in this
+ * file after this one, and it is written out above `PursuitSource` -- the short
+ * version is that the lamps are the only two of the seven doing the same job the
+ * bar is doing, so the loan swaps one street light for another instead of
+ * removing a light nothing replaces.)
+ *
  * So the seven are constructed before `warmUpPipelines` runs, added to the scene
  * there and then, and never touched again except through `position`, `color` and
  * `intensity` -- none of which is in any cache key. By day their intensity is
@@ -2733,6 +2744,309 @@ export class CarLights implements CarLightSink {
   }
 }
 
+// --- The light bar ------------------------------------------------------------
+//
+// The owner, 2026-09: *"with the lights actually being lights"*.
+//
+// What a police light bar was until this section: two little boxes of coloured
+// plastic on the roof of `world/highway-patrol.ts`'s procedural patrol car,
+// swapped by a `visible` toggle twice a second. Unlit, in the strict sense --
+// `MeshBasicNodeMaterial`, so the same red at midnight as at noon, and throwing
+// nothing on anything. At night, in a street with two lamps in it, a car chasing
+// you was a dark shape with two bright pixels on top.
+//
+// So the bar gets both halves of what every other lamp in this file has:
+//
+//   - **the glow**, as additive sprites on the same path the headlights,
+//     the tail lamps and the bike beacons are drawn on -- one instance per lit
+//     lens, two draws for every patrol car in Sydney, and no per-frame cost at
+//     all when nobody is being chased;
+//   - **the light**, as two of the seven real ones, borrowed. `BEACON_BORROW`
+//     is the argument for which two and why.
+//
+// And the flash itself stops being a wall clock. `beaconPhase(identity, tick)`
+// is a pure function of the car and the shared tick, which is `DESIGN.md` rule
+// 5 applied to a strobe: two players watching the same pursuit see the same bar
+// flash at the same instant, with nothing sent, and a self-check can sweep an
+// hour of it in a loop.
+
+/**
+ * How long the bar holds each colour, in ticks, and how far two cars are held
+ * apart in the cycle.
+ *
+ * Fifteen ticks is a quarter of a second, which is what `highway-patrol`'s own
+ * `STROBE_PERIOD` was and is what a bar actually does -- about two flashes a
+ * second per colour. The stagger runs over the **whole** cycle rather than half
+ * of it: staggering by less than a half-cycle leaves every car in the city in
+ * step, because two cars whose offsets differ by less than the hold flip
+ * together on almost every boundary. Thirty possible offsets over a thirty-tick
+ * cycle is a pursuit whose four cars are visibly not one machine.
+ */
+export const BEACON_HALF_CYCLE_TICKS = 15;
+const BEACON_CYCLE_TICKS = BEACON_HALF_CYCLE_TICKS * 2;
+
+/**
+ * Which half of the bar is lit for this car on this tick: 0 red, 1 blue.
+ *
+ * Pure and framework-free on `torchSway`'s and `fireFlicker`'s terms, and with
+ * one extra constraint those two do not have: **it is evaluated on both ends**
+ * -- the renderer draws the sprite from it and `world/highway-patrol.ts` toggles
+ * the lens plastic from it -- so it obeys the determinism rule in `CLAUDE.md`
+ * and contains no `Math.sin`, no `Math.pow` and nothing that rounds differently
+ * on two machines. Integer division and a parity, and that is the whole of it.
+ *
+ * `Math.floor` rather than `| 0`, because the tick is the *shared* tick and is
+ * past 2^31 within a fortnight of the epoch; a bitwise or would wrap it and the
+ * bar would stop flashing.
+ */
+export function beaconPhase(identity: number, tick: number): number {
+  const stagger = (identity >>> 0) % BEACON_CYCLE_TICKS;
+  const step = Math.floor((tick + stagger) / BEACON_HALF_CYCLE_TICKS);
+  return ((step % 2) + 2) % 2;
+}
+
+/** The two lens colours, linear. Hotter and more saturated than the plastic, because this is the light coming out of it. */
+const BEACON_RED: Rgb = [1.0, 0.07, 0.06];
+const BEACON_BLUE: Rgb = [0.1, 0.18, 1.0];
+
+/**
+ * How big the glow is and how bright, and what it is worth by day.
+ *
+ * `BEACON_DAY` is the one place in this file where an additive sprite is drawn
+ * at noon on purpose, and it is worth saying why the file's own argument does
+ * not forbid it. Everything else here is gated on `nightOpacity` because adding
+ * orange to a sunlit footpath at 4-5 scene-linear is a tint nobody can see --
+ * true, and the reason the street lamps are off by day. A police strobe is the
+ * exception a real street contains: it is *designed* to be the one thing you
+ * can see in full sun, which is why it exists at all, and a pursuit whose bar
+ * only lights up after dusk would be a pursuit you cannot find at two in the
+ * afternoon. So it rides the per-instance path `TrainLights` opened -- the level
+ * in `instanceColor`, the material's own opacity 1 -- at a third of its night
+ * value, which is enough to read against sky and not enough to bloom.
+ */
+const BEACON_LENS_HALF = 0.17;
+const BEACON_LEVEL = 1.9;
+const BEACON_DAY = 0.34;
+
+/** How many lit lenses can be drawn at once. `PATROL_CAPACITY` is four and this is that with room. */
+export const BEACON_CAPACITY = 16;
+
+/** x, y, z and the phase per pursuing car in the buffer a `PursuitSource` fills. */
+export const PURSUIT_RECORD_STRIDE = 4;
+
+/**
+ * How close a pursuing car has to be before it is worth two real lights, metres.
+ * The brief's 40: a bar further away than that is a thing you see rather than a
+ * thing that is lighting you.
+ */
+export const BEACON_REAL_RADIUS = 40;
+
+/**
+ * How bright the borrowed pair is and how far it reaches, and how dim the half
+ * that is not flashing sits.
+ *
+ * A bar is a smaller source than a street lamp and it is 1.6 m off the road
+ * rather than 7, so it is dimmer and shorter than `LAMP_INTENSITY` over
+ * `LAMP_DISTANCE`: 34 at 26 m puts about a lamp's own illuminance on a car five
+ * metres in front of it and essentially nothing at the end of the block, which
+ * is the read this is for. The dim floor is not zero because a strobe's dark
+ * half is not off -- there is always some spill from the lit one across the
+ * housing -- and because a light whose intensity slams to zero and back at 4 Hz
+ * is a light three's tone mapper flickers the whole street with.
+ */
+const BEACON_INTENSITY = 34;
+const BEACON_DISTANCE = 26;
+const BEACON_DIM = 0.16;
+
+/*
+ * WHICH TWO OF THE SEVEN, AND WHY THOSE TWO.
+ *
+ * The count is fixed at seven and the file header says at length why it is a
+ * shader constant rather than a budget: every light on the render list is in
+ * every material's cache key, so an eighth is a full recompile of a
+ * sixty-kilometre city. A police bar that lights the street therefore cannot be
+ * an addition. It has to be a **loan**, and the question is who lends.
+ *
+ * The seven are: the torch, the saloon of the carriage the player is standing
+ * in, the nearest open train doorway, the two nearest street lamps, and the two
+ * nearest burning cars.
+ *
+ * **The two street lamps lend**, and the argument is that they are the only two
+ * of the seven that are doing the same job. A lamp light is there to put light
+ * on the road around the player; a pursuing car's bar 40 m away is putting more
+ * light on that same road than a 32 m luminaire is, from a source the player is
+ * looking directly at. Swapping them swaps one street light for another rather
+ * than removing a light nobody replaces -- and the loss is masked by the thing
+ * that caused it, which is the definition of a trade that costs nothing.
+ *
+ * The other five were each considered and each refused:
+ *
+ *   - the **torch** is in the player's hand and is aimed where they are looking.
+ *     Taking it during a pursuit takes it at the exact moment the player is
+ *     running down a lane trying to see the fence at the end of it.
+ *   - the **saloon** and the **doorway** are inside and around a train, and a
+ *     patrol car is not. They light rooms the bar cannot reach and the bar
+ *     lights a street they cannot; neither is a substitute for the other, so
+ *     the loan would be a straight loss.
+ *   - the **two fire lights** are the tempting pair, because a car fire is rare
+ *     and a pursuit is not. They are refused for exactly the reason that makes
+ *     them tempting to take: a pursuit is *how cars catch fire in this game* --
+ *     police ram, the wreck burns, `carfire.CHAIN_M` takes the one beside it --
+ *     so the moment the loan came due would be the moment both were needed, and
+ *     the player would be standing next to a burning car in the dark with a
+ *     police light on the wall instead. The one thing additive geometry cannot
+ *     fake is the shading of everything else, and that is as true of a fire as
+ *     of a bar.
+ *
+ * The loan is taken only while it is worth taking: a pursuing car inside
+ * `BEACON_REAL_RADIUS`, at night, with the player's own heat above zero. The
+ * heat gate is the **caller's** -- `main.ts` passes null for the source when the
+ * player is not wanted -- because heat is `game/heat.ts`'s and this file must not
+ * import it, which is the same division `FireSource` and `LampSource` are drawn
+ * on.
+ */
+
+/**
+ * Where the two borrowed lights get their pursuing car from.
+ *
+ * `LampSource` and `FireSource`'s third twin, and an interface for their reason:
+ * this file must not import `world/highway-patrol.ts`, which is a renderer with
+ * its own imports. What it hands back is world metres and the phase the caller
+ * already computed -- deliberately the phase and not the identity, so that the
+ * real light and the sprite cannot disagree about which colour is lit even by
+ * a frame.
+ */
+export interface PursuitSource {
+  /**
+   * Fill `out` with the nearest pursuing patrol cars -- the world x, y, z of the
+   * bar and `beaconPhase`'s answer for that car -- and return how many were
+   * written.
+   */
+  nearestPursuit(x: number, y: number, z: number, radius: number, out: Float32Array, max: number): number;
+}
+
+/**
+ * What fills the beacon sprites, once per lit lens, from wherever patrol cars
+ * are drawn.
+ *
+ * `CarLightSink`'s shape and its argument: the caller has a pose in its hand and
+ * is already computing the bar's world position to place the lens plastic, so
+ * being *handed* it is the only way to guarantee the glow is on the lamp rather
+ * than near it.
+ */
+export interface PoliceBeaconSink {
+  begin(): void;
+  /** One lit lens: the world centre of it, and which half of the bar it is (0 red, 1 blue). */
+  add(x: number, y: number, z: number, phase: number): void;
+  end(): void;
+}
+
+/** The glow over one lens: three quads crossing at a point, which is a billboard with no per-frame cost. */
+function buildBeaconLens(): BufferGeometry {
+  const m = new Emissive();
+  // White, because the hue and the day/night level both ride in `instanceColor`
+  // -- see `PoliceBeacons`. A second geometry per colour would be a second
+  // buffer to keep in step for nothing.
+  blob(m, 0, 0, 0, BEACON_LENS_HALF, [1, 1, 1]);
+  return m.build('police_beacon');
+}
+
+/**
+ * Every lit light bar in view.
+ *
+ * Two `InstancedMesh`es over one geometry and one material -- red and blue --
+ * and a car goes into exactly one of them per frame, whichever half of its bar
+ * `beaconPhase` says is lit. Two sets rather than one with a per-instance colour
+ * doing the alternation, for the reason `world/highway-patrol.ts` section 2
+ * gives about the plastic: a hard swap is what a strobe *is*, and a set whose
+ * count is zero costs one skipped draw call.
+ *
+ * **Never hidden and never gated on the night**, unlike the head and tail lamps.
+ * The day/night term is per instance (`TrainLights` section 1's mechanism, for a
+ * different reason -- see `BEACON_DAY`), so a summer afternoon with nobody being
+ * chased is two instanced draws of zero instances, which is free, and a pursuit
+ * at noon still has a bar on it.
+ */
+export class PoliceBeacons implements PoliceBeaconSink {
+  readonly meshes: InstancedMesh[];
+  readonly material: MeshBasicNodeMaterial;
+  readonly geometry: BufferGeometry;
+  /** Lenses lit last frame. Read by the dev handle. */
+  drawn = 0;
+
+  /** 0 by day, 1 once dark, written by `NightLights.update` before the fleet fills this. */
+  private level = 0;
+  private counts = [0, 0];
+
+  constructor() {
+    this.material = nightMaterial('police_beacon', false, true);
+    this.geometry = buildBeaconLens();
+    this.meshes = [0, 1].map((i) => {
+      const mesh = new InstancedMesh(this.geometry, this.material, BEACON_CAPACITY);
+      mesh.name = i === 0 ? 'police_beacon_red' : 'police_beacon_blue';
+      mesh.count = 0;
+      mesh.frustumCulled = false;
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.visible = true;
+      // The trap `TrainLights` section 1 carries: `setupDiffuseColor`
+      // multiplies by `instanceColor` **only when the attribute exists at the
+      // moment the node graph is built**. Absent then, absent forever, and every
+      // bar in Sydney is drawn at full night level in the middle of the day.
+      _colour.setRGB(1, 1, 1);
+      mesh.setColorAt(0, _colour);
+      return mesh;
+    });
+  }
+
+  /** The dusk term, from `nightRig`. See `BEACON_DAY` for why this is not simply the night. */
+  setLevel(level: number): void {
+    this.level = BEACON_DAY + (1 - BEACON_DAY) * Math.max(0, Math.min(1, level));
+  }
+
+  begin(): void {
+    this.counts[0] = 0;
+    this.counts[1] = 0;
+  }
+
+  add(x: number, y: number, z: number, phase: number): void {
+    const set = phase === 0 ? 0 : 1;
+    const n = this.counts[set];
+    if (n >= BEACON_CAPACITY) return;
+    // No rotation: the glow is three quads crossing on the three axes, so it
+    // presents the same shape from every bearing and the car's heading is not
+    // this object's business. The caller has already turned the lens into world
+    // metres.
+    _position.set(x, y, z);
+    _quaternion.set(0, 0, 0, 1);
+    _carScale.set(1, 1, 1);
+    _matrix.compose(_position, _quaternion, _carScale);
+    this.meshes[set].setMatrixAt(n, _matrix);
+    const hue = set === 0 ? BEACON_RED : BEACON_BLUE;
+    _colour.setRGB(hue[0] * this.level * BEACON_LEVEL, hue[1] * this.level * BEACON_LEVEL, hue[2] * this.level * BEACON_LEVEL);
+    this.meshes[set].setColorAt(n, _colour);
+    this.counts[set] = n + 1;
+  }
+
+  end(): void {
+    for (let i = 0; i < 2; i++) {
+      const mesh = this.meshes[i];
+      if (this.counts[i] > 0 || mesh.count > 0) {
+        mesh.instanceMatrix.needsUpdate = true;
+        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      }
+      mesh.count = this.counts[i];
+    }
+    this.drawn = this.counts[0] + this.counts[1];
+  }
+
+  dispose(): void {
+    for (const mesh of this.meshes) mesh.dispose();
+    this.geometry.dispose();
+    this.material.dispose();
+  }
+}
+
 // --- The bike lights ----------------------------------------------------------
 
 /**
@@ -5267,6 +5581,14 @@ export class NightLights {
    */
   readonly fires: PointLight[] = [];
   readonly carLights = new CarLights();
+  /**
+   * Every lit police light bar in view, fed by `world/highway-patrol.ts`.
+   *
+   * Owned here rather than by the patrol fleet for `carLights`' reason exactly:
+   * its meshes have to be in the scene before `warmUpPipelines` runs, and this
+   * class is the one place in the boot that is guaranteed to be.
+   */
+  readonly policeBeacons = new PoliceBeacons();
   readonly bikeLights = new BikeLights();
   /**
    * The harbour's navigation lights, fed by `world/boats.BoatFleet`.
@@ -5304,6 +5626,12 @@ export class NightLights {
   lampsLit = 0;
   /** ...and how many of the two fire lights found a burning car this frame. */
   firesLit = 0;
+  /**
+   * ...and whether the two lamp lights are currently on a pursuing car's bar
+   * instead of on a lamp. 0 or 2, never 1: the pair is red and blue and half a
+   * bar is not a bar. See the borrow argument above `PursuitSource`.
+   */
+  beaconsLit = 0;
 
   private readonly aim = new Vector3(0, 0, -1);
   private readonly forward = new Vector3();
@@ -5313,6 +5641,10 @@ export class NightLights {
   private readonly worldUp = new Vector3(0, 1, 0);
   private readonly found = new Float32Array(LAMP_REAL_COUNT * LAMP_RECORD_STRIDE);
   private readonly foundFires = new Float32Array(FIRE_REAL_COUNT * FIRE_RECORD_STRIDE);
+  /** One record: the borrow only ever goes to the nearest pursuing car. */
+  private readonly foundPursuit = new Float32Array(PURSUIT_RECORD_STRIDE);
+  /** Whether the two lamp lights were on a bar last frame, so the release can undo what the loan wrote. */
+  private borrowed = false;
   private clock = 0;
   private repickIn = 0;
   /**
@@ -5420,6 +5752,7 @@ export class NightLights {
     }
 
     for (const mesh of this.carLights.meshes) scene.add(mesh);
+    for (const mesh of this.policeBeacons.meshes) scene.add(mesh);
     scene.add(this.bikeLights.mesh);
     // The harbour's, on the fleet's terms exactly: in the scene before the
     // warm-up, visible at construction, count zero until a ferry is in view.
@@ -5467,6 +5800,7 @@ export class NightLights {
     lamps: LampSource | null,
     mount: TorchMount | null = null,
     fires: FireSource | null = null,
+    pursuit: PursuitSource | null = null,
   ): void {
     const rig = nightRig(solarAltitudeDeg);
     this.level = rig.level;
@@ -5475,6 +5809,10 @@ export class NightLights {
 
     const live = rig.level > NIGHT_VISIBLE_LEVEL;
     this.carLights.setLive(live);
+    // **Not** `setLive`. A police bar is the one additive thing in this file
+    // that is drawn at noon, and the day/night term rides in its instance
+    // colours instead of in a visibility flag. See `BEACON_DAY`.
+    this.policeBeacons.setLevel(rig.level);
     this.bikeLights.setLive(live);
     this.boatLights.setLive(live);
     // The bridge, when it has loaded. One boolean write and an early-out inside
@@ -5660,6 +5998,69 @@ export class NightLights {
       for (const light of this.lamps) light.intensity = 0;
     }
 
+    // --- ...and the loan. Read the argument above `PursuitSource` first: this
+    // is where the two lamp lights stop being lamps.
+    //
+    // **After** the lamp block and not inside it, deliberately. The lamps still
+    // do their whole re-pick at 6 Hz underneath, so the frame the loan ends --
+    // the car turns off, the suspect gets away, the sun comes up -- the two
+    // lights are already sitting on the right lamps at the right intensity and
+    // simply stop being overwritten. There is no "give it back" path to get
+    // wrong, which is the same shape as `fireFlicker`'s release: not assigning
+    // a light *is* releasing it.
+    //
+    // **Every frame**, where the lamps re-pick at 6 Hz, and for the fire
+    // lights' reason: the thing this has to be prompt about is a bar going out.
+    // A red glow standing in the middle of an empty street a sixth of a second
+    // after the pursuit ended is a thing you can see, and the search is a walk
+    // over at most four records.
+    const borrow =
+      pursuit === null || rig.level <= 0
+        ? 0
+        : pursuit.nearestPursuit(eye.x, eye.y, eye.z, BEACON_REAL_RADIUS, this.foundPursuit, 1);
+    this.beaconsLit = borrow > 0 ? LAMP_REAL_COUNT : 0;
+    if (borrow > 0) {
+      const bx = this.foundPursuit[0];
+      const by = this.foundPursuit[1];
+      const bz = this.foundPursuit[2];
+      // The phase comes from the source rather than being recomputed here, so
+      // the light and the sprite over the same lens cannot disagree about which
+      // colour is lit -- not even by the frame of lag the source itself has.
+      const phase = this.foundPursuit[3] < 0.5 ? 0 : 1;
+      for (let i = 0; i < LAMP_REAL_COUNT; i++) {
+        const light = this.lamps[i];
+        const hue = i === 0 ? BEACON_RED : BEACON_BLUE;
+        light.position.set(bx, by, bz);
+        light.color.setRGB(hue[0], hue[1], hue[2]);
+        light.distance = BEACON_DISTANCE;
+        // The lit half at full, the dark half at the floor. See `BEACON_DIM`.
+        const lit = (i === 0 ? 0 : 1) === phase;
+        light.intensity = BEACON_INTENSITY * rig.level * (lit ? 1 : BEACON_DIM);
+      }
+    } else if (this.borrowed) {
+      // Handing the pair back means handing back everything the loan wrote, and
+      // there are two of those rather than one. `distance`: a `PointLight` left
+      // at 26 m would light a six-metre-shorter street for the rest of the
+      // session, which is a bug nothing on screen explains. And `color`, which
+      // the lamp block only writes **on a re-pick** -- so without forcing the
+      // next one, the two lamps over the street the pursuit just left stay red
+      // and blue for up to a sixth of a second after it has gone.
+      for (let i = 0; i < LAMP_REAL_COUNT; i++) {
+        const light = this.lamps[i];
+        light.distance = LAMP_DISTANCE;
+        // ...and the intensity, **on this frame** rather than on the next
+        // re-pick. Forcing the re-pick alone leaves one frame in which the two
+        // lights are still red and blue at a bar's intensity standing over an
+        // empty street, which at 4 Hz is exactly the artefact the whole "release
+        // is the same line as never having assigned it" rule exists to have none
+        // of. What a lamp light's intensity *is* when it is a lamp is one line
+        // and it is this one.
+        light.intensity = i < this.lampsLit ? rig.lampIntensity : 0;
+      }
+      this.repickIn = 0;
+    }
+    this.borrowed = borrow > 0;
+
     // --- The burning cars.
     //
     // **Re-picked every frame**, where the lamps re-pick at 6 Hz, and the
@@ -5721,6 +6122,7 @@ export class NightLights {
    */
   dispose(): void {
     this.carLights.dispose();
+    this.policeBeacons.dispose();
     this.bikeLights.dispose();
     this.boatLights.dispose();
     // The bridge is **not** disposed here, and for `trainLights`' reason turned
@@ -6016,6 +6418,180 @@ export function verifyNightLights(): string[] {
       );
     }
     fireRig.dispose();
+  }
+
+  /* --- The light bar: the flash, and the loan.
+   *
+   * Four claims, and every one of them draws a perfectly good frame when it is
+   * wrong: the flash alternates rather than sitting on one colour, it is the
+   * same answer in every process for the same car on the same tick, two cars are
+   * not one machine, and the loan **never grows the budget** -- which is the
+   * claim that matters, because breaking it does not look like anything at all
+   * until the frame it recompiles every pipeline in a sixty-kilometre city.
+   */
+  {
+    // The alternation, swept over an hour of ticks rather than asserted from
+    // the constant. `fireFlicker`'s check one block up, for its reason.
+    let red = 0;
+    let blue = 0;
+    let flips = 0;
+    let previous = beaconPhase(7, 0);
+    for (let t = 0; t < 60 * 60 * 60; t++) {
+      const phase = beaconPhase(7, t);
+      if (phase === 0) red++;
+      else blue++;
+      if (phase !== previous) flips++;
+      previous = phase;
+      if (phase !== 0 && phase !== 1) {
+        failures.push(`beaconPhase gave ${phase} at tick ${t}; the bar has two halves.`);
+        break;
+      }
+    }
+    if (Math.abs(red - blue) > BEACON_CYCLE_TICKS) {
+      failures.push(
+        `Over an hour the bar was red for ${red} ticks and blue for ${blue}. A bar that favours ` +
+          `one colour is a broken lamp, not a strobe.`,
+      );
+    }
+    const expected = Math.floor((60 * 60 * 60) / BEACON_HALF_CYCLE_TICKS);
+    if (Math.abs(flips - expected) > 2) {
+      failures.push(
+        `The bar changed colour ${flips} times in an hour against ${expected} at ` +
+          `${BEACON_HALF_CYCLE_TICKS} ticks a half-cycle. Slower is a beacon and faster is a fault.`,
+      );
+    }
+    // Deterministic, which is the whole reason it is not a wall clock: two
+    // processes drawing the same pursuit have to flash together.
+    for (let t = 0; t < 240; t++) {
+      if (beaconPhase(0x51d7e1, t) !== beaconPhase(0x51d7e1, t)) {
+        failures.push('beaconPhase is not deterministic; two clients would flash a pursuit out of step.');
+        break;
+      }
+    }
+    // ...and two cars are not one machine. Same test shape as the two fires.
+    let together = 0;
+    for (let t = 0; t < 3600; t++) {
+      if (beaconPhase(11, t) === beaconPhase(26, t)) together++;
+    }
+    if (together > 3600 * 0.75) {
+      failures.push(
+        `Two patrol cars flashed the same colour on ${((together / 3600) * 100).toFixed(0)}% of ` +
+          `ticks. A pursuit strobing in unison reads as one object with four bodies; see the ` +
+          `stagger in beaconPhase.`,
+      );
+    }
+
+    // And the rig, driven for real. A car being chased 12 m away at midnight,
+    // then nothing.
+    const barCam = new PerspectiveCamera(70, 1.6, 0.1, 2000);
+    barCam.position.set(0, 1.7, 0);
+    barCam.updateMatrixWorld(true);
+    const chasing: PursuitSource = {
+      nearestPursuit(x, _y, z, radius, out, max) {
+        if (max < 1 || Math.hypot(12 - x, z) > radius) return 0;
+        out[0] = 12;
+        out[1] = 1.58;
+        out[2] = 0;
+        out[3] = 0;
+        return 1;
+      },
+    };
+    const barRig = new NightLights(new Object3D());
+    const barIdentity = (): string => barRig.realLights.map((l) => `${l.id}:${l.visible ? 1 : 0}`).join(',');
+    const barBefore = barIdentity();
+    const barCount = barRig.realLights.length;
+    barRig.update(1 / 60, barCam, -20, 0, null, null, null, chasing);
+    if (barRig.realLights.length !== barCount) {
+      failures.push(
+        `Borrowing two lights for a police bar changed the real-light count from ${barCount} to ` +
+          `${barRig.realLights.length}. The count is a shader constant: this feature is a loan and ` +
+          `must never be an addition.`,
+      );
+    }
+    if (barRig.beaconsLit !== LAMP_REAL_COUNT) {
+      failures.push(`A pursuing car 12 m away borrowed ${barRig.beaconsLit} lights, not ${LAMP_REAL_COUNT}.`);
+    }
+    if (Math.abs(barRig.lamps[0].position.x - 12) > 1e-6 || Math.abs(barRig.lamps[1].position.x - 12) > 1e-6) {
+      failures.push('The borrowed pair is not on the bar it was borrowed for.');
+    }
+    if (!(barRig.lamps[0].color.r > barRig.lamps[0].color.b) || !(barRig.lamps[1].color.b > barRig.lamps[1].color.r)) {
+      failures.push('The borrowed pair is not one red and one blue; a bar with two lights the same colour is a lamp.');
+    }
+    if (!(barRig.lamps[0].intensity > barRig.lamps[1].intensity)) {
+      failures.push(
+        `At phase 0 the red light is ${barRig.lamps[0].intensity} against the blue's ` +
+          `${barRig.lamps[1].intensity}. The lit half has to be the brighter one or the sprite and ` +
+          `the light disagree about which colour the bar is showing.`,
+      );
+    }
+    // The pursuit ends: the pair goes back to being lamps, on the frame, with
+    // its own reach back.
+    barRig.update(1 / 60, barCam, -20, 0, null, null, null, null);
+    if (barRig.beaconsLit !== 0) failures.push('The bar light was not released when the pursuit ended.');
+    if (barRig.lamps[0].intensity !== 0 || barRig.lamps[1].intensity !== 0) {
+      failures.push(
+        `The pursuit ended and the pair is still burning at (${barRig.lamps[0].intensity}, ` +
+          `${barRig.lamps[1].intensity}) with no lamp under it. The release has to land on the frame, ` +
+          `not on the next re-pick, or there is a red light standing over an empty street.`,
+      );
+    }
+    if (barRig.lamps[0].distance !== LAMP_DISTANCE) {
+      failures.push(
+        `A returned lamp light reaches ${barRig.lamps[0].distance} m rather than ${LAMP_DISTANCE}. ` +
+          `The loan has to hand back everything it wrote, or the street stays short for the session.`,
+      );
+    }
+    // ...and by day there is no loan at all, so the lamps behave exactly as they
+    // did before this feature existed.
+    barRig.update(1 / 60, barCam, 57.11, 0, null, null, null, chasing);
+    if (barRig.beaconsLit !== 0 || barRig.lamps[0].intensity !== 0) {
+      failures.push('A pursuit at 3 pm borrowed a real light. Every source in this file is gated on the shared night level.');
+    }
+    if (barIdentity() !== barBefore) {
+      failures.push(
+        `Lending and returning the pair changed the set of real lights to "${barIdentity()}". ` +
+          `A borrowed light must be the same light with a different colour, never a new one.`,
+      );
+    }
+    // The sprites: a lit lens goes into exactly one of the two sets, and the day
+    // level is a reduction rather than an off switch.
+    {
+      const beacons = new PoliceBeacons();
+      beacons.setLevel(1);
+      beacons.begin();
+      beacons.add(0, 1.58, 12, 0);
+      beacons.add(0, 1.58, 30, 1);
+      beacons.end();
+      if (beacons.meshes[0].count !== 1 || beacons.meshes[1].count !== 1) {
+        failures.push(
+          `Two lit lenses, one of each colour, filled ${beacons.meshes[0].count} red and ` +
+            `${beacons.meshes[1].count} blue instances. A car is in exactly one set per frame.`,
+        );
+      }
+      beacons.begin();
+      beacons.end();
+      if (beacons.meshes[0].count !== 0 || beacons.meshes[1].count !== 0) {
+        failures.push('A frame with no pursuit in it left beacon instances drawn from the last one.');
+      }
+      for (const mesh of beacons.meshes) {
+        if (!mesh.visible) failures.push(`${mesh.name} starts hidden; the bar is drawn by day as well as by night.`);
+        if (!mesh.instanceColor) {
+          failures.push(
+            `${mesh.name} has no instanceColor at construction. NodeMaterial only multiplies by it ` +
+              `when the attribute exists as the graph is built, so every bar in Sydney would be ` +
+              `drawn at full night level at midday.`,
+          );
+        }
+      }
+      if (beacons.material.opacityNode !== undefined && beacons.material.opacityNode !== null) {
+        failures.push(
+          'The beacon material reads the shared nightOpacity uniform, which would switch the bar ' +
+            'off at dawn. Its day/night term is per instance; see BEACON_DAY.',
+        );
+      }
+      beacons.dispose();
+    }
+    barRig.dispose();
   }
 
   const day = nightRig(57.11);
