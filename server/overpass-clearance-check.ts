@@ -149,7 +149,7 @@ export const MIN_CLEARANCE_M = 5.0;
  * The shipped bake's measurement, 1,306 before the 2026-08-23 retile and this
  * after it. A ratchet: see the header.
  */
-export const CLEARANCE_BUDGET = 1055;
+export const CLEARANCE_BUDGET = 1021;
 
 /**
  * And how many may be under `TRUCK_M`, the height a heavy vehicle needs.
@@ -162,7 +162,7 @@ export const CLEARANCE_BUDGET = 1055;
  */
 export const TRUCK_M = 4.5;
 /** 1,297 before the 2026-08-23 retile. A ratchet, like the one above. */
-export const TRUCK_BUDGET = 1006;
+export const TRUCK_BUDGET = 979;
 
 /** How near a crossing a way's own vertex has to be to be the junction's. */
 export const JUNCTION_M = 1.0;

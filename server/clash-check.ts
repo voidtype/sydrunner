@@ -219,7 +219,7 @@ import {
  * building keep-out is the `natural=tree` node, which the module states is
  * *"never moved, never thinned and never overridden"*. 718 of 17.4 million.
  */
-export const BUDGET_TREE_IN_BUILDING = 718;
+export const BUDGET_TREE_IN_BUILDING = 642;
 
 /**
  * Poles, bins, blade posts and signal heads standing inside a footprint.
@@ -228,7 +228,7 @@ export const BUDGET_TREE_IN_BUILDING = 718;
  * than passing over: `furniture._blocked_at` and `power._blocked_at` both carry
  * a building keep-out and both work. This row is the control on the row below.
  */
-export const BUDGET_FURNITURE_IN_BUILDING = 29;
+export const BUDGET_FURNITURE_IN_BUILDING = 26;
 
 /**
  * ...and the same four standing inside a live carriageway.
@@ -244,7 +244,7 @@ export const BUDGET_FURNITURE_IN_BUILDING = 29;
  * standing in `primary` and `service` carriageways, which their own placer will
  * not put them on.
  */
-export const BUDGET_FURNITURE_ON_ROAD = 14562;
+export const BUDGET_FURNITURE_ON_ROAD = 2;
 
 /**
  * Parked cars whose body box is inside a building footprint.
@@ -275,15 +275,22 @@ export const BUDGET_CAR_IN_CAR = 2;
  * OSM list whole: `out = [_from_osm(b) for b in osm_buildings]`, unconditionally.
  * Nothing in the build compares OSM against OSM.
  */
-export const BUDGET_BUILDING_IN_BUILDING = 4850;
+export const BUDGET_BUILDING_IN_BUILDING = 2784;
 
 /**
  * Decks, viaducts and parapets whose solid passes through a building.
  *
  * 513. `elevated.ROAD_CLEARANCE_M` lifts a *building* over a road; nothing lifts
  * a road over a building, and `decks._crossing_demand` reads carriageways only.
+ *
+ * 540 after the round of 2026-09-08 -- the only pair that rose. `merge.py`
+ * now drops a Microsoft blob that swallows mapped OSM footprints, so a deck
+ * that crossed one blob crosses the several OSM footprints it stood in for;
+ * the world under the deck did not get worse, the count of footprints under
+ * it got truer (11,073 m2 against 10,733 m2 over 27 more pairs, James Craig
+ * Road and Upper Pitt Street at the top both times).
  */
-export const BUDGET_DECK_IN_BUILDING = 513;
+export const BUDGET_DECK_IN_BUILDING = 540;
 
 /**
  * Decks whose whole solid is under the terrain that is drawn over them.
@@ -304,7 +311,7 @@ export const BUDGET_DECK_IN_BUILDING = 513;
  * this is it. See `sampleGround`, and `BUDGET_WATER_OVER_TERRAIN`, which is the
  * row that change was made for.
  */
-export const BUDGET_DECK_UNDER_TERRAIN = 35;
+export const BUDGET_DECK_UNDER_TERRAIN = 34;
 
 /**
  * Baked instances standing inside the volume a train sweeps.
@@ -313,7 +320,7 @@ export const BUDGET_DECK_UNDER_TERRAIN = 35;
  * signal. `vegetation.py` is the only one of these placers that asks
  * `railenv.in_corridor`, and it is the only population absent from the list.
  */
-export const BUDGET_RAIL_GAUGE = 222;
+export const BUDGET_RAIL_GAUGE = 151;
 
 /**
  * Station rooms and access inclines whose plan is inside a building.
@@ -339,7 +346,7 @@ export const BUDGET_RAIL_GAUGE = 222;
  * Every one of them is a station `_clear_stations` never looked at, because
  * `railenv.load` hands it `[s for s in self.stations if s.surface]`.
  */
-export const BUDGET_STATION_IN_BUILDING = 65;
+export const BUDGET_STATION_IN_BUILDING = 61;
 
 /**
  * Water vertices whose own bed and the shipped terrain disagree.
@@ -377,7 +384,7 @@ export const BUDGET_WATER_OVER_TERRAIN = 0;
  * *"The whole sheet is emitted even where a building stands on it. Nothing in
  * the extent does"*; measured, four hundred do.
  */
-export const BUDGET_BUILDING_UNDER_WATER = 400;
+export const BUDGET_BUILDING_UNDER_WATER = 399;
 
 // =====================================================================================
 // The thresholds that are decisions

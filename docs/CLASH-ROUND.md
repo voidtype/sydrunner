@@ -157,3 +157,23 @@ notch of an L against a square inside a square, an object 4 m from a running lin
 against one on it, a real span from the real rail index against a point 56 m off
 it. The build's own terrain read is re-validated every run. A zero row in this
 table means the scan looked; it is not an absence of evidence.
+
+## The retile of 2026-09-08
+
+Full middle-stage retile at bcdf131 with `carriageway.py` and the `merge.py` dedupe in.
+
+| pair | before | after |
+|---|---:|---:|
+| `FURNITURE_ON_ROAD` | 14,562 | **2** |
+| `BUILDING_IN_BUILDING` | 4,850 | **2,784** |
+| `TREE_IN_BUILDING` | 718 | 642 |
+| `RAIL_GAUGE` | 222 | 151 |
+| `STATION_IN_BUILDING` | 65 | 61 |
+| `FURNITURE_IN_BUILDING` | 29 | 26 |
+| `DECK_UNDER_TERRAIN` | 35 | 34 |
+| `BUILDING_UNDER_WATER` | 400 | 399 |
+| `DECK_IN_BUILDING` | 513 | 540 (see the constant's note: truer footprints under the same decks) |
+| `CAR_IN_CAR` / `CAR_IN_BUILDING` / `WATER_OVER_TERRAIN` | 2 / 1 / 0 | unchanged |
+
+Every budget is set to its row. `BUILDING_IN_BUILDING`'s citywide fall was 57 %, against the
+four-tile estimate of 96 %: the terrace stock the proof used is where the blob case is worst.
