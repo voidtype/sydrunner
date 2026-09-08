@@ -62,6 +62,8 @@ import {
 } from 'three/tsl';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { Group, Mesh, MeshStandardNodeMaterial } from 'three/webgpu';
+// WORKSTREAM AQ, `GRAPHICS.md` item 2. See `createGlassMaterial`.
+import { createGlazingMaterial } from './skyreflect.ts';
 import { fetchWorldBuffer } from './cdn.ts';
 
 /**
@@ -310,8 +312,29 @@ function createShellMaterial(): MeshStandardNodeMaterial {
   return material;
 }
 
+/**
+ * The glazing. `GRAPHICS.md` item 2, and the one landmark material that is not
+ * a landmark material at all.
+ *
+ * Roughness 0.14, metalness 0.28 -- which is `facade.MATERIAL_LOOK`'s
+ * `curtain_wall` to within a rounding, and it has exactly the same defect for
+ * exactly the same reason: 28% of the diffuse is traded for an indirect
+ * specular that `EnvironmentNode` feeds and this build has never set
+ * `scene.environment`. On the turret's observation band -- the one surface in
+ * the city a player looks *up* at from three kilometres away and expects to see
+ * the sky in -- that trade has been silently returning nothing since the day the
+ * tower was generated.
+ *
+ * So it takes the same coat the CBD's curtain wall takes, through the same
+ * factory, at the same two constants. **The whole surface, at strength 1**: this
+ * slot has no wall in it, it is glass from end to end (`landmark_glass` is the
+ * observation band, the glazed mouths under the shells and every shell
+ * underside), so there is no mask to build and the default is correct.
+ * `sky/reflection.GLAZING_COAT` lists it beside the twenty-two facade slots so
+ * that "what is glass in this world" is one list, and `verifyGlazing` walks it.
+ */
 function createGlassMaterial(): MeshStandardNodeMaterial {
-  const material = new MeshStandardNodeMaterial();
+  const material = createGlazingMaterial();
   material.name = 'landmark_glass';
   // Dark, and the darkness is the point: this slot is the glazed mouths under
   // the shells, the turret's observation band, and every shell's underside. All

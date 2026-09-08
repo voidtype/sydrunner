@@ -334,7 +334,12 @@ const SOLID_PER_ROW = 7;
 const linear = (l) => Math.round(255 * (l <= 0.0031308 ? l * 12.92 : 1.055 * Math.pow(l, 1 / 2.4) - 0.055));
 const srgb = (t) => `rgb(${linear(t[0])},${linear(t[1])},${linear(t[2])})`;
 const PALETTE = {
-  bodyWhite: srgb([0.805, 0.81, 0.808]),
+  // `sky/carpaint.CAR_PAINT_ALBEDO[0]`, which is where `CAR_LIVERY_WHITE` now
+  // comes from. It moved from 0.805 in 2026-09 when the palette was re-derived
+  // against the clearcoat, which is two sRGB code values here (232 -> 234) --
+  // so the shipped `nsw_police.glb` is two values under the fleet until this
+  // script is next run, and that is a rebuild rather than a deploy.
+  bodyWhite: srgb([0.825550, 0.829009, 0.824876]),
   chequerBlue: srgb([0.05, 0.14, 0.44]),
   chequerWhite: srgb([0.82, 0.85, 0.88]),
   tyre: 'rgb(34,34,36)',

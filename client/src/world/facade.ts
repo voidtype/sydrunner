@@ -62,6 +62,17 @@ import {
 import { MeshStandardNodeMaterial, Vector3, type DataTexture } from 'three/webgpu';
 
 import { ROW_SHIFT, ROW_TEXELS, TEXELS_PER_BUILDING } from './params-atlas.ts';
+// WORKSTREAM AQ, `GRAPHICS.md` item 2: the sky, on glass. `sky/reflection.ts`
+// carries the argument and the check (three-free, so the server runs it);
+// `world/skyreflect.ts` carries the twelve lines of TSL. What lives here is the
+// *mask* -- where in this material a pane of glass actually is -- because that
+// is the one part of it only the window grammar below can answer.
+import {
+  GLAZING_COAT,
+  GLAZING_ON_GLASS,
+  GLAZING_WHOLE_SURFACE,
+} from '../sky/reflection.ts';
+import { ClearcoatNodeMaterial, createGlazingMaterial } from './skyreflect.ts';
 
 /**
  * Material slot order. Must match `mesh.MATERIALS` in the pipeline, element for
@@ -134,6 +145,23 @@ export type FacadeMaterialName = Exclude<MaterialName, SurfaceMaterialName>;
  */
 export const STREET_MATERIALS = ['road_asphalt', 'footpath_concrete', 'kerb_sandstone'] as const;
 export type StreetMaterialName = (typeof STREET_MATERIALS)[number];
+
+/**
+ * The glazing coat's slot table, checked against this file's list of slots.
+ *
+ * This is the assignment and it is the whole check: `GLAZING_COAT` is declared
+ * `as const` over in `sky/reflection.ts`, so its keys are literal types, and
+ * assigning it to a `Record<MaterialName, number>` is a **compile error** the
+ * moment a slot is added to `MATERIALS` without a row saying whether it is
+ * glass. Exactly the guarantee `MATERIAL_LOOK` gives, for exactly the same
+ * reason: a slot that quietly defaulted to "no coat" would be a hole nobody
+ * could see, and a slot that quietly defaulted to "coat" would be a sky
+ * reflection on a footpath.
+ *
+ * The table lives there rather than here because the server runs
+ * `verifyGlazing` and may not import three. The two ends meet at this line.
+ */
+const GLAZING_BY_SLOT: Record<MaterialName, number> = GLAZING_COAT;
 
 export function isSurfaceMaterial(slot: MaterialName): slot is SurfaceMaterialName {
   return (SURFACE_MATERIALS as readonly string[]).includes(slot);
@@ -209,6 +237,14 @@ const MATERIAL_LOOK: Record<
   concrete_precast: { colour: [0.315, 0.305, 0.288], roughness: 0.82, metalness: 0.0 },
   // Blue-green glazing. Dark by design -- a curtain wall's brightness is its
   // reflection, which is the specular lobe, not this. -> rgb( 79, 112, 117)
+  //
+  // The `metalness` on this row is the one number in the table that used to be
+  // writing a cheque nothing cashed: three's metallic split hands 28% of the
+  // diffuse to an indirect specular term that `EnvironmentNode` feeds, and this
+  // build has never set `scene.environment`. `GRAPHICS.md` item 2 is that term,
+  // and it now arrives as a coat at the bottom of `createFacadeMaterial` --
+  // which is why this row is unchanged rather than lifted the way `cars.ts`
+  // lifted its palette for the same missing reflection.
   curtain_wall: { colour: [0.070, 0.115, 0.120], roughness: 0.10, metalness: 0.28 },
   // rho 0.29. Weathered galvanised steel: dull zinc. Roughness up from 0.66 and
   // metalness down from 0.42, because spec 7.3 says **never shiny** and what is
@@ -1684,7 +1720,22 @@ export function createFacadeMaterial(
   globals: FacadeGlobals,
 ): MeshStandardNodeMaterial {
   const look = MATERIAL_LOOK[slot];
-  const material = new MeshStandardNodeMaterial();
+  /**
+   * Coated if this slot has any glass in it at all, plain if it has none.
+   *
+   * The decision is per *slot* and the strength is per *pixel*, and both are
+   * needed. A roof and a fence have no windows, so they get the class that
+   * shipped and not one ALU of coat; a brick terrace has windows in it, so it
+   * gets the coated class with a mask that is zero on every square metre of
+   * brick. `GLAZING_BY_SLOT` is the table, `sky/reflection.GLAZING_COAT` is
+   * where it is argued, and `verifyGlazing` asserts the zero rows by name.
+   *
+   * Zero new pipelines either way. `RenderObject.getCacheKey` folds in the
+   * material, and this is still one material per slot per streamer -- the same
+   * count `warmup.ts` compiles before the first frame.
+   */
+  const material =
+    GLAZING_BY_SLOT[slot] > 0 ? createGlazingMaterial() : new MeshStandardNodeMaterial();
   material.name = slot;
 
   // --- Per-building parameter fetch -----------------------------------------
@@ -3939,6 +3990,62 @@ export function createFacadeMaterial(
     .mul(glazed.mul(lit).mul(0.9).mul(litThrough))
     .add(reflected.mul(glazed).mul(revealShade).mul(reflectionGain));
   material.emissiveNode = fanlight ? emissive.add(fanlight) : emissive;
+
+  /**
+   * And the sky, on the glass itself. `GRAPHICS.md` item 2.
+   *
+   * Everything above this line reflects the sky through `emissiveNode`, and
+   * everything above this line is frozen at 3 pm: `GLASS_SKY` is a pair of
+   * literals off the Preetham dome at the reference instant, and
+   * `globals.nightFactor.oneMinus()` switches the whole term off after dark --
+   * which is what the night table twenty lines up means by *unlit glass rgb(0,
+   * 0, 0)*. So at golden hour a Sydney window reflects a blue afternoon over a
+   * burning sky, and at night it reflects nothing at all.
+   *
+   * This is the second term, and it is the same reflection driven off the *rig*
+   * instead of off a literal: warm at dusk, at the night floor after dark, exact
+   * at every hour in between, for three uniforms shared with every car in the
+   * world. `sky/reflection.ts`' glazing section carries the whole argument,
+   * including the honest one -- two coats in series over-reflect head-on by
+   * about four points of a sky dimmer than the one `GLASS_SKY` uses, and nothing
+   * at grazing, where a mistake would have shown.
+   *
+   * WHAT THE MASK IS, WHICH IS THE PART ONLY THIS FILE KNOWS:
+   *
+   *   - on `curtain_wall`, **one, everywhere**. The slot is a glass wall; its
+   *     mullions and spandrels are glass panels too, they carry the same
+   *     metalness 0.28 that has had nothing to reflect since the build began,
+   *     and past four hundred metres they are all a tower is.
+   *   - on every other wall slot, `glazed` -- the bare glass of a window, with
+   *     the joinery, the blinds and any aircon box already taken out of it by
+   *     the lines above. It is **exactly zero** on brick, sandstone, render,
+   *     fibro, precast and steel sheet, so every display value published in
+   *     `MATERIAL_LOOK` is bit-for-bit what it was. `verifyGlazing` asserts that
+   *     by identity rather than by tolerance.
+   *
+   * Predicted at 3 pm on 15 February through the same chain as the tables above,
+   * for the surface this exists for -- a curtain wall, looking a little up, on
+   * the shaded side of a street. The first column is what shipped:
+   *
+   *   spandrel, near head-on      rgb( 21,  44,  44) -> rgb( 48,  68,  76)
+   *   the same at 60 deg off      rgb( 21,  44,  44) -> rgb(105, 124, 139)
+   *   the same at grazing         rgb( 21,  44,  44) -> rgb(162, 183, 207)
+   *   sunlit, near head-on        rgb( 68,  99, 105) -> rgb( 80, 109, 117)
+   *   sunlit, at grazing          rgb( 68,  99, 105) -> rgb(167, 192, 215)
+   *
+   * and after dark, where the emissive above has gone to zero and this is the
+   * only thing left:
+   *
+   *   unlit pane, head-on         rgb(  0,   0,   0) -> rgb(  1,   7,  17)
+   *   unlit pane, at grazing      rgb(  0,   0,   0) -> rgb( 51,  63,  80)
+   *
+   * A tower that is a dark shape with a lit rim, rather than a dark shape.
+   */
+  if (material instanceof ClearcoatNodeMaterial) {
+    material.coatStrength = (GLAZING_WHOLE_SURFACE as readonly string[]).includes(slot)
+      ? float(1)
+      : glazed.mul(float(GLAZING_ON_GLASS));
+  }
 
   return material;
 }

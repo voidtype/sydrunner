@@ -109,11 +109,36 @@
  * of sky, which is what a clearcoat looks like.
  *
  * ---------------------------------------------------------------------------
+ * ## WHAT ELSE IS IN THIS FILE
+ *
+ * The environment above was built for cars and it turned out to be the term
+ * three other surfaces were missing, so this file now has three arms hanging off
+ * one dome. They share `skyEnvFor` and nothing else, and each has its own
+ * switch in `calibration.ts` and its own check at the bottom:
+ *
+ *   - **the coat** -- `CAR_SKY_REFLECT`, `verifyReflection`. The paragraphs
+ *     above.
+ *   - **the glazing arm** -- `GLAZING_SKY_REFLECT`, `verifyGlazing`.
+ *     `GRAPHICS.md` item 2. The same coat at glass's own two constants, over
+ *     `curtain_wall`, the window rectangles inside every other wall slot, and
+ *     the landmark glazing band. Its own section below opens with what the audit
+ *     got wrong about it, which is worth reading before touching `world/facade.ts`.
+ *   - **the aerial arm** -- `FAR_AERIAL`, `verifyAerial`. `GRAPHICS.md` item 4.
+ *     The far city, hazed toward the same horizon band by distance, because
+ *     three's `Fog` colour is a `Color` and a `Color` cannot hold the 2.49 of
+ *     linear radiance the low sky actually sits at.
+ *
+ * Three arms and one dome is the point rather than an accident: a car, a tower's
+ * glass and a suburb four kilometres off now agree about what the sky is doing,
+ * at every hour, because there is one function that says so.
+ *
+ * ---------------------------------------------------------------------------
  * Pure and three-free, like `calibration.ts` and for the same reason: the server
- * runs `verifyReflection` and may not import three, and the offline car sheet
- * (`scripts/render-car-sheet.mjs --pbr`) evaluates the same arithmetic on the
- * CPU. `world/skyreflect.ts` holds the twelve lines of TSL that say this again
- * in a shader, and the two are kept honest by `SHEET_REFERENCE` below.
+ * runs all three checks and may not import three, and the two offline sheets
+ * (`scripts/render-car-sheet.mjs --pbr`, `scripts/render-landmark-sheet.mjs
+ * --pbr`) evaluate the same arithmetic on the CPU. `world/skyreflect.ts` holds
+ * the twelve lines of TSL that say this again in a shader, and the copies are
+ * kept honest by `SHEET_REFERENCE`, `SHEET_ENV` and `SHEET_GLAZING` below.
  */
 
 import {
@@ -307,6 +332,394 @@ export function clearcoatOver(lit: Readonly<Rgb>, env: Readonly<Rgb>, nDotV: num
 }
 
 /* ---------------------------------------------------------------------------
+ * THE GLAZING ARM. `GRAPHICS.md` item 2.
+ *
+ * ## WHAT THE AUDIT SAID, AND WHERE IT WAS WRONG
+ *
+ * `GRAPHICS.md` reads, in the item this section delivers:
+ *
+ *   > *"`curtain_wall` carries `roughness 0.10, metalness 0.28` and the facade
+ *   > shader gives every window a glazing-keyed reflectivity -- against an
+ *   > environment that does not exist. A metallic workflow with no environment
+ *   > is a black object, so every window in the CBD is a hole."*
+ *
+ * The first sentence is true and the second is only true after dark, and the
+ * distinction is the whole design of what follows. That audit was written off
+ * the *material table*; `world/facade.ts` has for a long time carried a
+ * hand-authored answer of its own -- `GLASS_SKY`, a two-anchor dome with a
+ * fitted falloff, a sun-half gradient, an aureole and a full Schlick, added
+ * through `emissiveNode` so that reflected radiance does not scale with the
+ * irradiance landing on the wall. By day a Sydney window is not a hole. It is
+ * one of the best-argued surfaces in the build.
+ *
+ * What is actually wrong with it is three things, and they are all one thing:
+ *
+ *   1. **It is frozen at 3 pm.** `GLASS_SKY` is a pair of literals off the
+ *      Preetham dome at the reference instant. At golden hour the CBD reflects
+ *      a blue afternoon while the sky behind it is orange, which is precisely
+ *      the fault `sky/dusk.ts` fixed for `scene.fog` and gave the reason for:
+ *      *"a pale blue haze over a burning horizon reads as a bug in the renderer
+ *      rather than as distance."*
+ *   2. **It is switched off at night** -- `globals.nightFactor.oneMinus()` --
+ *      and `facade.ts`'s own night table says what that costs: *unlit glass
+ *      rgb(0, 0, 0)*. That is the hole the audit named, and it is a hole for
+ *      half of every day.
+ *   3. **The material's own specular is still fed by nothing.** `curtain_wall`
+ *      at metalness 0.28 hands 28% of its diffuse to an indirect specular term
+ *      that `EnvironmentNode` would supply and this build has never had. The
+ *      emissive is masked to the *glass*, so the mullion and spandrel grid --
+ *      which is most of the area of a tower at any distance where the panes
+ *      have gone sub-pixel -- gets none of it back.
+ *
+ * All three are the same missing term, and it is the term `skyEnvFor` above
+ * already computes off the rig: a sky that is exact at every hour, warm at
+ * dusk, and at a night floor rather than at zero.
+ *
+ * ## SO IT IS THE SAME COAT, WITH TWO CONSTANTS CHANGED
+ *
+ *     out = lit * (1 - F * strength)  +  env(reflect(V, N)) * F * strength
+ *
+ * Identical to the car's, and convex for the same reason and with the same
+ * consequence: **no pixel this runs over can be brighter than the brighter of
+ * the surface and the sky**, at any angle, for any input. That is what lets it
+ * default to on across a facade table whose every row is a measured
+ * reflectance with a published display value beside it.
+ *
+ * `strength` is per pixel rather than per material, and it is what keeps brick
+ * brick. See `GLAZING_COAT` for the slot table and `world/facade.ts` for the
+ * mask inside a slot.
+ *
+ * ## THE TWO COATS IN SERIES, WHICH IS THE ONE THING TO BE HONEST ABOUT
+ *
+ * On a window pane the facade's own `glazing` term has already taken its
+ * Fresnel share `f` of the outgoing radiance and replaced it with the sharp
+ * dome. This coat then takes `F` of *what is left*, so the total reflective
+ * share is `f + F - f*F` where the physically correct answer is `f`. Head-on
+ * that is an over-reflection of `F0*(1 - f)` -- about four points -- of an
+ * environment that is *dimmer* than the one the emissive used, because this one
+ * is a twenty-degree cone average and that one is the raw ten-degree haze peak.
+ * At grazing `f` runs to 1 and the over-reflection vanishes, which is the end
+ * where a mistake would have shown.
+ *
+ * Four points of a dimmer sky, bounded by convexity, bought against a term that
+ * is exact all day and does not switch off at night. That is the trade, stated
+ * rather than hidden, and it is why `GLAZING_ON_GLASS` exists as a name even
+ * though it is 1.
+ *
+ * Doing it the other way -- feeding the live environment *into* `GLASS_SKY` --
+ * was the first design and it is wrong: that table is a mirror-lobe sample of
+ * the raw dome, eight times the zenith, and this one is a roughness-0.35 cone
+ * average at two and a half. Substituting one for the other would darken every
+ * window in the city by a factor of three and move sixteen published display
+ * values that were measured against the sky drawn behind them. The two lobes
+ * are both real and they belong to different roughnesses; the composite carries
+ * both.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Reflectance of glass head-on.
+ *
+ * 0.04, which is float glass, full stop: `((1.52 - 1) / (1.52 + 1))^2` is
+ * 0.0426 and every renderer in the world rounds it to 0.04. Unlike `COAT_F0`
+ * this is **not** shaded down for a lifted palette underneath, because there is
+ * no lifted palette underneath -- `MATERIAL_LOOK.curtain_wall` is a measured
+ * blue-green at rho 0.11 and `facade.ts` says in as many words that *"a curtain
+ * wall's brightness is its reflection, which is the specular lobe, not this"*.
+ * This is that lobe.
+ */
+export const GLAZING_F0 = 0.04;
+
+/**
+ * And the cap at grazing, which is the one taste decision in this section.
+ *
+ * The car's cap is 0.5 and the argument for it is geometric -- a 110-triangle
+ * body reports far more grazing area than the curve it stands for. **That
+ * argument does not apply here.** A wall is a flat quad with a true normal, and
+ * real glass at grazing incidence genuinely is a mirror; Schlick running to 1.0
+ * would be correct optics.
+ *
+ * It is capped anyway, at 0.85, and the reason is the one `facade.ts` already
+ * gives for its own dome: *"what is deliberately not modelled: occlusion. The
+ * glass sees an unobstructed dome, so inside a narrow canyon it reflects haze
+ * band where a real window would reflect the building across the street."* At
+ * `F = 1` the silhouette of every tower in the CBD becomes a perfect mirror of
+ * a sky with no city in it, which is a brighter and flatter error than the one
+ * being fixed -- and spec 7.3's **never shiny** is aimed at exactly that frame.
+ * 0.85 leaves a fifteen per cent floor of the building's own surface in the
+ * grazing pixels, which is about the share a real skyline occupies of the low
+ * sky it stands in.
+ *
+ * This is the knob. If the CBD reads as a disco ball, it is this number, and
+ * `GLAZING_SKY_REFLECT` in `calibration.ts` is the switch behind it.
+ */
+export const GLAZING_MAX = 0.85;
+
+/** Schlick's exponent, again. */
+export const GLAZING_POWER = 5;
+
+/**
+ * How much coat a window pane gets, against the mullion beside it.
+ *
+ * One, and it is a name rather than a literal so that the argument above --
+ * two coats in series over-reflect head-on by `F0*(1 - f)` -- has somewhere to
+ * be turned into a number if a frame says it should be. Reaching for it means
+ * deciding that four points of a dim sky on a pane that is already mirroring a
+ * bright one is visible, which is a thing only eyes can say.
+ */
+export const GLAZING_ON_GLASS = 1;
+
+/**
+ * Fresnel of the glazing coat at a given `N.V`. Schlick, clamped, between
+ * `GLAZING_F0` and `GLAZING_MAX`.
+ */
+export function glazingFresnel(nDotV: number): number {
+  const c = 1 - (nDotV < 0 ? 0 : nDotV > 1 ? 1 : nDotV);
+  return GLAZING_F0 + (GLAZING_MAX - GLAZING_F0) * Math.pow(c, GLAZING_POWER);
+}
+
+/**
+ * The composite, with a per-pixel strength.
+ *
+ * `strength` is the glass mask: 1 on a pane, 0 on the brick around it, and
+ * whatever the shader's `smoothstep` gives on the edge between. **At strength 0
+ * this returns `lit` bit-for-bit** -- `lit * (1 - 0) + env * 0` is `lit * 1 + 0`
+ * -- and `verifyGlazing` asserts that by identity rather than by tolerance,
+ * because it is the property that lets a coated material be handed to every
+ * wall slot in the city without a single masonry value moving.
+ */
+export function glazingCoatOver(
+  lit: Readonly<Rgb>,
+  env: Readonly<Rgb>,
+  nDotV: number,
+  strength: number,
+): Rgb {
+  const f = glazingFresnel(nDotV) * (strength < 0 ? 0 : strength > 1 ? 1 : strength);
+  return [
+    lit[0] * (1 - f) + env[0] * f,
+    lit[1] * (1 - f) + env[1] * f,
+    lit[2] * (1 - f) + env[2] * f,
+  ];
+}
+
+/**
+ * Which slots the coat runs on at all, and how hard, as a fraction of `F`.
+ *
+ * **Three kinds of row, and the middle one is the answer to "is a window in a
+ * brick wall a slot".** It is not. There are twenty-two material slots in this
+ * city and exactly one of them is glazing; a window in a terrace is a *rectangle
+ * inside* `brick_red`, computed per pixel by the facade shader's window
+ * grammar, and there is no slot that names it and never will be one.
+ *
+ *   1.0   `curtain_wall` -- the slot that *is* glass. The coat runs over the
+ *         whole surface, mullions and spandrels included, because those are the
+ *         panels whose metalness 0.28 has never had anything to reflect and
+ *         because past about four hundred metres they are all a tower is.
+ *   1.0   `landmark_glass` -- not a facade slot at all; it is
+ *         `world/landmarks.ts`' own material, at roughness 0.14 and metalness
+ *         0.28, and it is the Sydney Tower turret's observation band and the
+ *         glazed mouths under the Opera House shells. Same physics, same
+ *         defect, same fix, and it is in this table rather than in that file so
+ *         that "what is glass in this world" is one list.
+ *   1.0   the eight wall slots that carry windows -- `brick_red`,
+ *         `brick_cream`, `brick_brown`, `sandstone`, `concrete_precast`,
+ *         `corrugated_steel`, `render_painted`, `fibro`. The strength here is a
+ *         *ceiling*: the shader multiplies it by the glass mask, which is zero
+ *         on every pixel of wall, so a brick facade is bit-identical outside its
+ *         window rectangles. See `world/facade.ts`.
+ *   0     everything else. Roofs have no windows and `finishRoof` returns before
+ *         the window grammar is built. The awning fascia and the three fence
+ *         styles are served by their own modules. The seven ground surfaces are
+ *         not facade materials at all.
+ *
+ * Keyed by plain strings rather than by `MaterialName`, because this file is
+ * three-free so that the server can run the check and `world/facade.ts` is not.
+ * The type system still closes the loop from the other side: `facade.ts` assigns
+ * this to a `Record<MaterialName, number>`, so a new slot with no row here is a
+ * **compile error**, which is the same guarantee `MATERIAL_LOOK` gives and for
+ * the same reason.
+ */
+export const GLAZING_COAT = {
+  brick_red: 1,
+  brick_cream: 1,
+  brick_brown: 1,
+  sandstone: 1,
+  concrete_precast: 1,
+  curtain_wall: 1,
+  corrugated_steel: 1,
+  render_painted: 1,
+  fibro: 1,
+  roof_terracotta: 0,
+  roof_steel: 0,
+  road_asphalt: 0,
+  footpath_concrete: 0,
+  kerb_sandstone: 0,
+  park_grass: 0,
+  contact_ao: 0,
+  awning_fascia: 0,
+  fence_masonry: 0,
+  fence_iron: 0,
+  fence_timber: 0,
+  bush_floor: 0,
+  wetland_mud: 0,
+  landmark_glass: 1,
+} as const;
+
+/**
+ * The slots whose *whole surface* is glass, as against the ones where the coat
+ * is gated by a per-pixel window mask.
+ *
+ * The distinction cannot be read off `GLAZING_COAT` -- both kinds carry 1, and
+ * they have to, because the number there is a ceiling on `F` and not a coverage
+ * fraction. So it is written out, and `verifyGlazing` checks that every name
+ * here has a nonzero row above it.
+ */
+export const GLAZING_WHOLE_SURFACE: readonly string[] = ['curtain_wall', 'landmark_glass'];
+
+/* ---------------------------------------------------------------------------
+ * THE AERIAL ARM. `GRAPHICS.md` item 4.
+ *
+ * ## THE FOG CANNOT REACH THE SKY, AND THAT IS A TYPE ERROR IN THREE
+ *
+ * `world/far.ts` draws 12,778 unlit prisms with one global `SLAB_LIGHT`
+ * multiply, so the far suburbs sit at a uniform pastel from 1.8 km to the 4.5 km
+ * edge and `scene.fog` does every bit of the depth work. `main.ts` set that fog
+ * up carefully and then wrote down the reason it could not finish the job:
+ *
+ *   > *"A `Fog` colour is capped at 1.0 linear so it cannot reach the horizon
+ *   > band's brightness; this gets as close as the cap allows while keeping a
+ *   > blue bias."*
+ *
+ * That is exact and it is the whole item. `Fog.color` is a `THREE.Color`, and a
+ * `Color` is three channels in [0, 1]. The low sky at 3 pm is **2.49 of
+ * luminance**. So the fog fades the far city toward `0.686, 0.807, 0.956` --
+ * a value two and a half times *darker* than the sky it is standing in for --
+ * and the more distance a building has, the further below its own background it
+ * is dragged. Distance that darkens is not aerial perspective, it is murk, and
+ * it is why the far suburbs read as cut-outs pasted on a bright sky.
+ *
+ * `skyEnvFor` publishes the number the fog is not allowed to hold. This term is
+ * a second, uncapped haze that mixes toward it.
+ *
+ * ## THE WEIGHT
+ *
+ * Beer-Lambert, and the extinction is the one number worth arguing about.
+ * Meteorological visibility `V` and extinction `beta` are related by the Koschmieder
+ * contrast threshold, `beta = 3.912 / V`. Sydney's clear-air visibility on the day
+ * this dome is calibrated to is on the order of 40 km, so `beta` is 0.098 per
+ * kilometre, and over the 4.5 km from the eye to the world's edge that is
+ * `1 - exp(-0.44)`, or **0.36**. `AERIAL_MAX` is that, rounded to two figures,
+ * and it is a derivation rather than a taste: the far city at the horizon is
+ * about a third sky and two thirds building, which is what a photograph of
+ * Sydney from the Anzac Bridge shows.
+ *
+ * Zero at the near edge is not a taper, it is a requirement. `far.ts` slabs and
+ * streamed tiles overlap for as long as it takes a GLB to arrive, and a slab
+ * that was hazier than the real building standing in the same place would make
+ * that swap a visible flash. `AERIAL_NEAR` is the streaming radius exactly.
+ *
+ * The height term is the second half of real aerial perspective and it is the
+ * half that is usually left out: haze is a ground-hugging scale-height thing, so
+ * a tower's top is *less* hazed than its base at the same range. Without it the
+ * far city fades as a flat card and the effect reads as a wash over the whole
+ * image rather than as air standing between you and it.
+ *
+ * ## AND IT MUST BE ZERO AT NIGHT
+ *
+ * `skyEnvFor`'s night floor is a **lighting** floor, not a radiance: the rig
+ * holds `HEMISPHERE_NIGHT` up so that a player can see, and the environment
+ * inherits it, which is right for a car (a rim of ambient on a dark flank) and
+ * wrong for the sky behind a silhouette. At midnight the environment's horizon
+ * is 0.51 of luminance and the far city under `NIGHT_SLAB` is 0.058 -- so a haze
+ * that ran at night would put the far suburbs *nine times brighter* than they
+ * are now and turn a silhouette skyline into a grey one.
+ *
+ * In-scattering is what aerial perspective is, and at night there is none: that
+ * is why `sky/dusk.ts` takes the fog to `FOG_NIGHT` at 0.016. So the weight
+ * carries a daylight factor, `far.ts` supplies it from the same
+ * `characters.slabLight` curve the slabs are already lit by, and the term is
+ * **exactly zero** whenever that curve is at its night floor. Not small: zero,
+ * asserted by identity, so the night skyline that ships is the night skyline
+ * that shipped.
+ * ------------------------------------------------------------------------- */
+
+/** Where the haze starts: the streaming radius, so a slab and its tile agree. */
+export const AERIAL_NEAR = 1800;
+
+/** And where it reaches `AERIAL_MAX`: the far edge of the drawn world. */
+export const AERIAL_FAR = 4500;
+
+/** See the header: Koschmieder at 40 km of visibility over 4.5 km of air. */
+export const AERIAL_MAX = 0.36;
+
+/**
+ * The scale height of the haze, in metres of world y.
+ *
+ * 220 m, which is a shade over Sydney Tower's shaft and a good deal more than
+ * anything else in the city, so the term reaches about `1/e` of full strength at
+ * the top of the tallest thing it draws and is essentially flat across the
+ * suburbs. Chosen against the *skyline* rather than against a real atmosphere,
+ * whose scale height is 8 km and would be indistinguishable from a constant over
+ * a 300 m city -- what this is buying is the read that the tops of the towers
+ * are standing out of the haze, which needs a height constant on the order of
+ * the towers.
+ */
+export const AERIAL_SCALE_HEIGHT = 220;
+
+/**
+ * The haze weight at a distance, a height and a daylight fraction.
+ *
+ * `distance` is metres from the eye, `height` is metres of world y above sea
+ * level (which is what `far.ts` slabs carry -- they are built in world space and
+ * their y is an AHD elevation), `day` is 0 at the night floor and 1 in full
+ * daylight.
+ *
+ * Smoothstepped rather than ramped in distance because the near end has to leave
+ * *exactly* zero and a linear ramp leaves a first derivative instead, which is a
+ * visible crease at 1.8 km along a line that is already the seam between two
+ * levels of detail.
+ */
+export function aerialWeight(distance: number, height: number, day: number): number {
+  const d = smoothstep01((distance - AERIAL_NEAR) / (AERIAL_FAR - AERIAL_NEAR));
+  const h = Math.exp(-Math.max(0, height) / AERIAL_SCALE_HEIGHT);
+  const k = day < 0 ? 0 : day > 1 ? 1 : day;
+  return AERIAL_MAX * d * h * k;
+}
+
+/**
+ * The daylight fraction, from the far city's own light curve.
+ *
+ * `game/characters.slabLight` returns `NIGHT_SLAB + (1 - NIGHT_SLAB) * day`, so
+ * the day fraction is that, inverted. Written here rather than read off the
+ * curve directly because the number this term needs is **zero at the night
+ * floor**, and `slabLight` is 0.14 there -- multiplying by 0.14 would leave a
+ * fourteen per cent haze on a silhouette skyline, which is the one thing the
+ * header says must not happen. Inverting is the difference between "nearly
+ * nothing" and "nothing", and only the second of those is assertable.
+ *
+ * `far.ts` passes its own `NIGHT_SLAB` rather than this file importing it: that
+ * constant lives in `game/characters.ts` with the rest of the day curve, and a
+ * second copy of it here is a second place for it to be wrong.
+ */
+export function aerialDayFraction(slabLight: number, nightFloor: number): number {
+  if (!(nightFloor < 1)) return 0;
+  const d = (slabLight - nightFloor) / (1 - nightFloor);
+  return d < 0 ? 0 : d > 1 ? 1 : d;
+}
+
+/**
+ * The composite. A convex mix toward the horizon band, on the same terms and
+ * with the same guarantee as the coats above.
+ */
+export function aerialOver(slab: Readonly<Rgb>, env: SkyEnv, weight: number): Rgb {
+  const w = weight < 0 ? 0 : weight > 1 ? 1 : weight;
+  return [
+    slab[0] * (1 - w) + env.horizon[0] * w,
+    slab[1] * (1 - w) + env.horizon[1] * w,
+    slab[2] * (1 - w) + env.horizon[2] * w,
+  ];
+}
+
+/* ---------------------------------------------------------------------------
  * THE SEAM WITH THE OFFLINE SHEET.
  *
  * `scripts/render-car-sheet.mjs` is a Node script with its own scanline
@@ -350,6 +763,41 @@ export const SHEET_REFERENCE: ReadonlyArray<{
   { nDotV: 0.5, dirY: 0.0, fresnel: 0.044688, radiance: 2.487826 },
   { nDotV: 0.1, dirY: -1.0, fresnel: 0.30753, radiance: 0.239369 },
 ];
+
+/**
+ * The same fence, for the glazing arm and the *landmark* sheet.
+ *
+ * `scripts/render-landmark-sheet.mjs --pbr` draws the Sydney Tower's turret and
+ * the Opera House's glazed mouths with this coat on them, and it is a second
+ * `.mjs` with a third copy of the arithmetic in it. It shares `SHEET_ENV` above
+ * -- the environment is one environment and the whole point of it is that it is
+ * shared -- and needs only its own three Fresnel probes, because that is the
+ * only thing the glazing arm changes.
+ *
+ * The sheet prints these and refuses to draw if they disagree, exactly as the
+ * car sheet does. `verifyGlazing` is the other half.
+ */
+export const SHEET_GLAZING: ReadonlyArray<{ nDotV: number; fresnel: number }> = [
+  { nDotV: 1.0, fresnel: 0.04 },
+  { nDotV: 0.5, fresnel: 0.065312 },
+  { nDotV: 0.1, fresnel: 0.518297 },
+];
+
+/**
+ * The two paints the checks below hang their anchors on.
+ *
+ * `verifyReflection` evaluates a white roof in sun and a black car in shade
+ * through the real chain, and both of those have to be paints the game actually
+ * uses or the assertion is about a car nobody sees. The palette lives in
+ * `sky/carpaint.ts` -- which imports *this* file, because the palette is derived
+ * from `COAT_F0` -- so it cannot be imported back the other way without a cycle.
+ *
+ * These two rows are therefore the copy, and `verifyCarPaint` is the assertion
+ * that they are `CAR_PAINT_ALBEDO[0]` and `[3]`. One direction, one check, no
+ * cycle, and neither end can be edited alone.
+ */
+export const PALETTE_ANCHOR_WHITE: Rgb = [0.82555, 0.829009, 0.824876];
+export const PALETTE_ANCHOR_BLACK: Rgb = [0.109055, 0.109422, 0.119722];
 
 /* ---------------------------------------------------------------------------
  * THE CHECK.
@@ -505,11 +953,14 @@ export function verifyReflection(): string[] {
     const rig = solarRig(REFERENCE_ALTITUDE);
     const E = rig.sunIntensity * Math.sin((REFERENCE_ALTITUDE * Math.PI) / 180);
     // A roof: horizontal, so the beam lands square-ish and the reflection is the
-    // zenith. Albedo 0.805 (`PAINT[0]`, white), metalness 0.4 already priced in.
+    // zenith. `PALETTE_ANCHOR_WHITE`, metalness 0.4 already priced in -- and it
+    // is that constant rather than a literal now, because `sky/carpaint.ts`
+    // re-derived the palette against this very coat and a stale 0.805 here
+    // would be checking a car the game stopped painting.
     const roofLit: Rgb = [
-      (0.805 * (E * rig.sunColour[0] + rig.hemisphereIntensity * rig.skyColour[0])) / Math.PI,
-      (0.805 * (E * rig.sunColour[1] + rig.hemisphereIntensity * rig.skyColour[1])) / Math.PI,
-      (0.805 * (E * rig.sunColour[2] + rig.hemisphereIntensity * rig.skyColour[2])) / Math.PI,
+      (PALETTE_ANCHOR_WHITE[0] * (E * rig.sunColour[0] + rig.hemisphereIntensity * rig.skyColour[0])) / Math.PI,
+      (PALETTE_ANCHOR_WHITE[1] * (E * rig.sunColour[1] + rig.hemisphereIntensity * rig.skyColour[1])) / Math.PI,
+      (PALETTE_ANCHOR_WHITE[2] * (E * rig.sunColour[2] + rig.hemisphereIntensity * rig.skyColour[2])) / Math.PI,
     ];
     const roofPlain = toDisplay(roofLit);
     const roofCoat = toDisplay(clearcoatOver(roofLit, envRadiance(env, 1), 1));
@@ -531,7 +982,9 @@ export function verifyReflection(): string[] {
       rig.hemisphereIntensity * rig.skyColour[2],
     ];
     const blackLit: Rgb = [
-      (0.11 * shadeE[0]) / Math.PI, (0.112 * shadeE[1]) / Math.PI, (0.124 * shadeE[2]) / Math.PI,
+      (PALETTE_ANCHOR_BLACK[0] * shadeE[0]) / Math.PI,
+      (PALETTE_ANCHOR_BLACK[1] * shadeE[1]) / Math.PI,
+      (PALETTE_ANCHOR_BLACK[2] * shadeE[2]) / Math.PI,
     ];
     const blackPlain = toDisplay(blackLit);
     const blackCoat = toDisplay(clearcoatOver(blackLit, envRadiance(env, 0.2), 0.6));
@@ -579,6 +1032,516 @@ export function verifyReflection(): string[] {
       failures.push(
         `SHEET_REFERENCE says the environment is ${row.radiance} of luminance at y ${row.dirY} and it is ` +
           `${r.toFixed(6)}. Same rule: the sheet asserts this too.`,
+      );
+    }
+  }
+
+  return failures;
+}
+
+/* ---------------------------------------------------------------------------
+ * THE GLAZING CHECK.
+ *
+ * Separate from `verifyReflection` rather than folded into it, and the reason is
+ * the switch: `GLAZING_SKY_REFLECT` and `CAR_SKY_REFLECT` are two decisions
+ * (`calibration.ts` says why), so a frame that goes wrong should produce a
+ * failure that names which of them to reach for. Both boot lists carry both.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * What `world/facade.ts` publishes for the two surfaces this coat lands on
+ * hardest, restated here because this file is three-free and that one is not.
+ *
+ * `shadedWall` and `sunlitWall` are the pair of irradiances quoted above
+ * `glazing` in that file -- a shaded wall and a sunlit one at 3 pm on 15
+ * February, in the same linear units as everything else here. `curtainWall` is
+ * `MATERIAL_LOOK.curtain_wall`, to the digit. If either moves there and not here
+ * this check goes on asserting a facade the game does not draw, which is why
+ * both are named in `facade.ts`'s own comment as the other half of this.
+ */
+const FACADE_ANCHOR = {
+  shadedWall: [3.44, 3.19, 3.05] as Rgb,
+  sunlitWall: [9.85, 10.16, 10.59] as Rgb,
+  curtainWall: [0.07, 0.115, 0.12] as Rgb,
+  curtainMetalness: 0.28,
+};
+
+export function verifyGlazing(): string[] {
+  const failures: string[] = [];
+  const env = skyEnvAt(REFERENCE_ALTITUDE);
+
+  /* --- 1. The slot table covers the world, and covers the right half of it.
+   *
+   * Every material slot in the city has a row -- `world/facade.ts` closes this
+   * from the type side by assigning the table to a `Record<MaterialName, ...>`,
+   * so a missing slot is a compile error there, and this end asserts the count
+   * so that a slot *deleted* from the pipeline does not leave a row behind
+   * pointing at nothing. */
+  {
+    const rows = Object.entries(GLAZING_COAT);
+    // 22 material slots plus `landmark_glass`, which is not one.
+    if (rows.length !== 23) {
+      failures.push(
+        `GLAZING_COAT has ${rows.length} rows. It is meant to be the 22 slots in ` +
+          '`world/facade.MATERIALS` plus `landmark_glass`, so that "what is glass in this world" is ' +
+          'one list. A row too few is a compile error in facade.ts; a row too many is this.',
+      );
+    }
+    for (const [slot, k] of rows) {
+      if (!(k >= 0 && k <= 1)) {
+        failures.push(`GLAZING_COAT.${slot} is ${k}; it is a ceiling on a Fresnel and lives in [0, 1].`);
+      }
+    }
+    for (const slot of GLAZING_WHOLE_SURFACE) {
+      const k = (GLAZING_COAT as Record<string, number>)[slot];
+      if (!(k > 0)) {
+        failures.push(
+          `GLAZING_WHOLE_SURFACE names ${slot} as a slot that is glass all over, and GLAZING_COAT gives ` +
+            `it ${k}. One of the two lists has been edited alone.`,
+        );
+      }
+    }
+    // And the roofs and the ground, explicitly, because these are the rows a
+    // careless "coat everything" edit would flip and nothing else would notice.
+    for (const slot of [
+      'roof_terracotta', 'roof_steel', 'road_asphalt', 'footpath_concrete', 'kerb_sandstone',
+      'park_grass', 'contact_ao', 'awning_fascia', 'fence_masonry', 'fence_iron', 'fence_timber',
+      'bush_floor', 'wetland_mud',
+    ]) {
+      if ((GLAZING_COAT as Record<string, number>)[slot] !== 0) {
+        failures.push(
+          `GLAZING_COAT.${slot} is nonzero. A roof has no windows, the ground is not a facade material at ` +
+            'all, and the awning and the three fences are drawn by their own modules -- a coat on any of ' +
+            'them is a sky reflection on a surface nobody asked one for.',
+        );
+      }
+    }
+  }
+
+  /* --- 2. At strength zero the coat is the identity, by identity.
+   *
+   * The property the whole slot table rests on. Every wall slot in the city gets
+   * a coated material, and what keeps a brick wall bit-for-bit what it was is
+   * that the mask is zero on it -- so this is asserted as exact equality across
+   * a sweep of angles and directions rather than to a tolerance, because a
+   * tolerance here would be admitting the possibility. */
+  {
+    const probes: Rgb[] = [
+      [0, 0, 0], [0.235, 0.083, 0.058], [0.51, 0.39, 0.225], [0.7, 0.68, 0.62], [4, 4, 4],
+    ];
+    let bad = 0;
+    for (const lit of probes) {
+      for (let n = 0; n <= 1.0001; n += 0.05) {
+        for (const y of [-1, -0.2, 0, 0.4, 1]) {
+          const out = glazingCoatOver(lit, envRadiance(env, y), Math.min(n, 1), 0);
+          for (let i = 0; i < 3; i++) if (out[i] !== lit[i]) bad++;
+        }
+      }
+    }
+    if (bad > 0) {
+      failures.push(
+        `The glazing coat moved an uncoated surface on ${bad} of the probes. At strength 0 it is ` +
+          '`lit * (1 - 0) + env * 0`, which is `lit` exactly, and every brick, sandstone, render and fibro ' +
+          'pixel in the city is relying on that -- they all wear a coated material with a zero mask.',
+      );
+    }
+  }
+
+  /* --- 3. The Fresnel is a Fresnel. Same shape as the car's, two constants up. */
+  {
+    if (Math.abs(glazingFresnel(1) - GLAZING_F0) > 1e-12) {
+      failures.push(`Head-on glass reflectance is ${glazingFresnel(1)}, not GLAZING_F0.`);
+    }
+    if (Math.abs(glazingFresnel(0) - GLAZING_MAX) > 1e-12) {
+      failures.push(`Grazing glass reflectance is ${glazingFresnel(0)}, not GLAZING_MAX.`);
+    }
+    if (!(GLAZING_F0 >= COAT_F0)) {
+      failures.push(
+        `GLAZING_F0 (${GLAZING_F0}) is under COAT_F0 (${COAT_F0}). Glass is more reflective head-on than ` +
+          "a clearcoat over paint -- the car's figure is deliberately shaded down for a lifted palette and " +
+          'this one is not, so this ordering is the thing that says the two arms are still two arms.',
+      );
+    }
+    if (!(GLAZING_MAX > 0.5 && GLAZING_MAX <= 0.92)) {
+      failures.push(
+        `GLAZING_MAX is ${GLAZING_MAX}. Under about a half and a tower stops being a mirror at its ` +
+          'silhouette, which is the read this is for; past about 0.92 every grazing pixel in the CBD is a ' +
+          "perfect mirror of a sky with no city in it, and spec 7.3's \"never shiny\" is aimed at that frame.",
+      );
+    }
+    let last = -Infinity;
+    for (let n = 0; n <= 1.0001; n += 0.01) {
+      const f = glazingFresnel(Math.min(n, 1));
+      if (f > last + 1e-12 && n > 0) {
+        failures.push(`Glass reflectance rose as the pane turned to face the camera, at N.V = ${n.toFixed(2)}.`);
+        break;
+      }
+      last = f;
+    }
+    if (glazingFresnel(-3) !== GLAZING_MAX) failures.push('A back-facing glass normal was not clamped to grazing.');
+    if (glazingFresnel(9) !== GLAZING_F0) failures.push('An over-unity glass dot was not clamped to head-on.');
+    if (GLAZING_ON_GLASS < 0 || GLAZING_ON_GLASS > 1) {
+      failures.push(`GLAZING_ON_GLASS is ${GLAZING_ON_GLASS}; it is a fraction of a Fresnel.`);
+    }
+  }
+
+  /* --- 4. And it is still a convex combination, at every strength.
+   *
+   * The car's check walks strength 1 only, because a car has no mask. This one
+   * has to walk the mask as well: the edge of a window rectangle is a
+   * `smoothstep`, so every value in between is a strength some pixel in the city
+   * is actually running at. */
+  {
+    const probes: Rgb[] = [
+      [0, 0, 0], [0.05, 0.083, 0.086], [0.4, 0.41, 0.43], [1.38, 1.4, 1.42], [8, 8, 8],
+    ];
+    for (const lit of probes) {
+      for (const s of [0, 0.17, 0.5, 0.83, 1]) {
+        for (let n = 0; n <= 1.0001; n += 0.1) {
+          for (const y of [-1, -0.2, 0, 0.4, 1]) {
+            const e = envRadiance(env, y);
+            const out = glazingCoatOver(lit, e, Math.min(n, 1), s);
+            for (let i = 0; i < 3; i++) {
+              const hi = Math.max(lit[i], e[i]) + 1e-9;
+              const lo = Math.min(lit[i], e[i]) - 1e-9;
+              if (out[i] > hi || out[i] < lo) {
+                failures.push(
+                  `The glazing coat put ${out[i].toFixed(4)} outside [${lo.toFixed(4)}, ${hi.toFixed(4)}] ` +
+                    `at N.V ${n.toFixed(2)}, y ${y}, strength ${s}. It is meant to be a mix, not an add.`,
+                );
+                return failures;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /* --- 5. The anchors.
+   *
+   * The white car roof again, on the *glazing* constants, because it is the one
+   * surface in the game measured to sit level with the sky it reflects and
+   * therefore the one place a coat that was secretly an add would show. Two code
+   * values, the same tolerance the car coat holds, at a higher F0.
+   *
+   * Then the surface this is actually for: a curtain wall on the shaded side of
+   * a street, which is the frame `facade.ts` calls the tell of real glazing. It
+   * has to *gain*, and it has to stay under the sky it is reflecting. */
+  {
+    const rig = solarRig(REFERENCE_ALTITUDE);
+    const beam = rig.sunIntensity * Math.sin((REFERENCE_ALTITUDE * Math.PI) / 180);
+    const roofLit: Rgb = [
+      (PALETTE_ANCHOR_WHITE[0] * (beam * rig.sunColour[0] + rig.hemisphereIntensity * rig.skyColour[0])) / Math.PI,
+      (PALETTE_ANCHOR_WHITE[1] * (beam * rig.sunColour[1] + rig.hemisphereIntensity * rig.skyColour[1])) / Math.PI,
+      (PALETTE_ANCHOR_WHITE[2] * (beam * rig.sunColour[2] + rig.hemisphereIntensity * rig.skyColour[2])) / Math.PI,
+    ];
+    const plain = toDisplay(roofLit);
+    const coated = toDisplay(glazingCoatOver(roofLit, envRadiance(env, 1), 1, 1));
+    const moved = Math.max(...plain.map((v, i) => Math.abs(v - coated[i])));
+    if (moved > 2) {
+      failures.push(
+        `A neutral surface calibrated to the sky's own level moved ${moved} code values under the glazing ` +
+          `coat, from rgb(${plain.join(',')}) to rgb(${coated.join(',')}). GLAZING_F0 is ${GLAZING_F0} and ` +
+          'the composite is a mix, so this is meant to be within the two code values the car coat holds.',
+      );
+    }
+
+    // A shaded curtain wall, through three's own metallic split: the diffuse
+    // that survives `metalness` is `colour * (1 - metalness)`, and the specular
+    // it was traded for has had nothing to integrate against since the build
+    // began. This is the pixel the item exists for.
+    const albedo = FACADE_ANCHOR.curtainWall.map((c) => c * (1 - FACADE_ANCHOR.curtainMetalness));
+    const wallLit: Rgb = [
+      (albedo[0] * FACADE_ANCHOR.shadedWall[0]) / Math.PI,
+      (albedo[1] * FACADE_ANCHOR.shadedWall[1]) / Math.PI,
+      (albedo[2] * FACADE_ANCHOR.shadedWall[2]) / Math.PI,
+    ];
+    // Looking slightly up at a vertical wall from the street: the mirror
+    // direction leaves near the horizon, which is where most of a city's glass
+    // reflections come from.
+    const wallEnv = envRadiance(env, 0.2);
+    const wallPlain = toDisplay(wallLit);
+    const wallCoated = toDisplay(glazingCoatOver(wallLit, wallEnv, 0.55, 1));
+    const gained = luminance(wallCoated as unknown as Rgb) - luminance(wallPlain as unknown as Rgb);
+    if (!(gained > 4)) {
+      failures.push(
+        `A shaded curtain wall went from rgb(${wallPlain.join(',')}) to rgb(${wallCoated.join(',')}) -- it ` +
+          'gained nothing worth the instructions. This is the surface the item exists for: metalness 0.28 ' +
+          'with no environment is 28% of the diffuse traded for a specular fed by nothing, and if the coat ' +
+          'is not visible here it is not doing the job.',
+      );
+    }
+    if (luminance(wallCoated as unknown as Rgb) > luminance(toDisplay(wallEnv) as unknown as Rgb)) {
+      failures.push(
+        `A shaded curtain wall at rgb(${wallCoated.join(',')}) is brighter than the sky it is reflecting at ` +
+          `rgb(${toDisplay(wallEnv).join(',')}). A mix cannot do that; something has become an add.`,
+      );
+    }
+
+    /* And the night, which is the hole the audit named.
+     *
+     * `world/facade.ts` gates its own `glazing` term with
+     * `nightFactor.oneMinus()` and its night table says what is left: *unlit
+     * glass rgb(0, 0, 0)*. This coat is driven by `solarRig` instead, so after
+     * dark it delivers the rig's night floor rather than nothing. Small -- it
+     * has to be, or the skyline stops being a silhouette -- but not zero, and
+     * "not zero" is the entire claim. */
+    const nightEnv = skyEnvAt(-30);
+    const nightGlass = glazingCoatOver([0, 0, 0], envRadiance(nightEnv, 0.2), 0.55, 1);
+    if (!(luminance(nightGlass) > 0)) {
+      failures.push(
+        'After dark an unlit pane still reflects exactly nothing. The environment is driven off the rig, ' +
+          'which holds a night floor, so this is the one thing that should be impossible here.',
+      );
+    }
+    if (luminance(nightGlass) > luminance(envRadiance(nightEnv, 0.2)) * 0.5) {
+      failures.push(
+        `An unlit pane at night is ${luminance(nightGlass).toFixed(4)} against a night sky at ` +
+          `${luminance(envRadiance(nightEnv, 0.2)).toFixed(4)}. Past half of it the night skyline stops ` +
+          "being a silhouette, which is spec 6.4's whole night.",
+      );
+    }
+  }
+
+  /* --- 6. The landmark sheet's copy of the Fresnel. See `SHEET_GLAZING`. */
+  for (const row of SHEET_GLAZING) {
+    const f = glazingFresnel(row.nDotV);
+    if (Math.abs(f - row.fresnel) > 1e-5) {
+      failures.push(
+        `SHEET_GLAZING says the glazing coat is ${row.fresnel} at N.V ${row.nDotV} and it is ${f.toFixed(6)}. ` +
+          '`scripts/render-landmark-sheet.mjs --pbr` asserts these same three numbers at startup and refuses ' +
+          'to draw the turret if they have drifted; update both.',
+      );
+    }
+  }
+
+  /* --- 7. And the sheet's table is untouched by all of the above.
+   *
+   * `SHEET_ENV` is hard-coded a second time in `scripts/render-car-sheet.mjs`.
+   * Nothing in this arm may move it -- the glazing coat changes two Fresnel
+   * constants and adds a mask, and the *environment* is shared. Asserted here as
+   * well as in `verifyReflection` because this is the check that runs when
+   * somebody has been editing the glazing arm, and a shared constant moved by
+   * accident is exactly what a second assertion is for. */
+  for (const key of ['zenith', 'horizon', 'ground'] as const) {
+    for (let i = 0; i < 3; i++) {
+      if (Math.abs(env[key][i] - SHEET_ENV[key][i]) > 1e-5) {
+        failures.push(
+          `The glazing arm has moved SHEET_ENV.${key}: the rig now gives ` +
+            `(${env[key].map((c) => c.toFixed(6)).join(', ')}) against the published ` +
+            `(${SHEET_ENV[key].map((c) => c.toFixed(6)).join(', ')}). The offline car sheet hard-codes the ` +
+            'published one and refuses to draw if they disagree. Nothing in the glazing arm is meant to ' +
+            'touch the environment at all.',
+        );
+        break;
+      }
+    }
+  }
+
+  return failures;
+}
+
+/* ---------------------------------------------------------------------------
+ * THE AERIAL CHECK.
+ *
+ * Its own function for the same reason `verifyGlazing` is: `FAR_AERIAL` is a
+ * third switch, and a failure should say which of the three to reach for.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * `game/characters.NIGHT_SLAB`, restated.
+ *
+ * Not imported: `game/characters.ts` is a very large module with a station
+ * table and a street-life model in it, and this file is the one the *server*
+ * pulls in to check a look. One number, and `world/far.ts` passes the real one
+ * to `aerialDayFraction` at runtime, so the copy here can only ever make this
+ * check assert the wrong midnight -- never make the game draw one.
+ */
+const NIGHT_SLAB_ANCHOR = 0.14;
+
+export function verifyAerial(): string[] {
+  const failures: string[] = [];
+  const env = skyEnvAt(REFERENCE_ALTITUDE);
+
+  /* --- 1. Zero at the near edge, and zero inside it, exactly.
+   *
+   * Not "small". A `far.ts` slab and the streamed tile that replaces it stand in
+   * the same place for as long as it takes a GLB to arrive, and a slab that was
+   * hazier than the real building would make that swap a visible flash. The
+   * smoothstep is what buys this -- a linear ramp would leave a first derivative
+   * at 1,800 m instead, which is a crease along the seam between two levels of
+   * detail. */
+  {
+    for (const d of [0, 100, 900, AERIAL_NEAR - 1, AERIAL_NEAR]) {
+      const w = aerialWeight(d, 0, 1);
+      if (w !== 0) {
+        failures.push(
+          `The far city is hazed by ${w} at ${d} m, inside AERIAL_NEAR (${AERIAL_NEAR} m). A slab and the ` +
+            'tile that replaces it overlap for as long as a GLB takes to arrive, and a slab that is hazier ' +
+            'than the building standing in the same place makes that swap a flash.',
+        );
+      }
+    }
+    // And the derivative is zero there too, which is the whole reason it is a
+    // smoothstep. One metre in should still be under a ten-thousandth.
+    if (!(aerialWeight(AERIAL_NEAR + 1, 0, 1) < 1e-4)) {
+      failures.push(
+        `One metre past the near edge the haze is already ${aerialWeight(AERIAL_NEAR + 1, 0, 1)}. That is a ` +
+          'ramp, not a smoothstep, and it is a visible crease along the streaming radius.',
+      );
+    }
+  }
+
+  /* --- 2. Monotone in distance, and bounded by AERIAL_MAX. */
+  {
+    let last = -Infinity;
+    for (let d = 0; d <= 12000; d += 25) {
+      const w = aerialWeight(d, 0, 1);
+      if (w < last - 1e-12) {
+        failures.push(`The haze thinned with distance, at ${d} m: ${w} after ${last}.`);
+        break;
+      }
+      if (!(w >= 0 && w <= AERIAL_MAX + 1e-12) || !Number.isFinite(w)) {
+        failures.push(`The haze at ${d} m is ${w}, outside [0, AERIAL_MAX (${AERIAL_MAX})].`);
+        break;
+      }
+      last = w;
+    }
+    if (Math.abs(aerialWeight(AERIAL_FAR, 0, 1) - AERIAL_MAX) > 1e-9) {
+      failures.push(
+        `At the far edge (${AERIAL_FAR} m) the haze is ${aerialWeight(AERIAL_FAR, 0, 1)} rather than ` +
+          `AERIAL_MAX (${AERIAL_MAX}). The far edge is where the Koschmieder derivation in the header lands ` +
+          'and the two have to be the same number.',
+      );
+    }
+    if (!(AERIAL_NEAR < AERIAL_FAR)) {
+      failures.push(`AERIAL_NEAR (${AERIAL_NEAR}) is not inside AERIAL_FAR (${AERIAL_FAR}).`);
+    }
+    if (!(AERIAL_MAX > 0 && AERIAL_MAX < 0.75)) {
+      failures.push(
+        `AERIAL_MAX is ${AERIAL_MAX}. Zero is no aerial perspective; past about three quarters the far ` +
+          'suburbs stop being a city and become weather.',
+      );
+    }
+  }
+
+  /* --- 3. The height term: full at sea level, thinning upward, never negative. */
+  {
+    if (Math.abs(aerialWeight(AERIAL_FAR, 0, 1) - aerialWeight(AERIAL_FAR, -50, 1)) > 1e-12) {
+      failures.push('A slab below sea level is hazed differently from one at it; the height is clamped at zero.');
+    }
+    let last = Infinity;
+    for (let h = 0; h <= 400; h += 5) {
+      const w = aerialWeight(AERIAL_FAR, h, 1);
+      if (w > last + 1e-12) {
+        failures.push(`The haze thickened with height, at ${h} m.`);
+        break;
+      }
+      last = w;
+    }
+    const top = aerialWeight(AERIAL_FAR, AERIAL_SCALE_HEIGHT, 1) / AERIAL_MAX;
+    if (Math.abs(top - Math.exp(-1)) > 1e-9) {
+      failures.push(
+        `At AERIAL_SCALE_HEIGHT the haze is ${top.toFixed(4)} of full rather than 1/e. That constant is a ` +
+          'scale height and the term is meant to be an exponential in it.',
+      );
+    }
+  }
+
+  /* --- 4. The night floor, preserved by identity.
+   *
+   * The load-bearing assertion of the whole arm. `skyEnvFor`'s night value is a
+   * *lighting* floor rather than a radiance -- the rig holds `HEMISPHERE_NIGHT`
+   * up so a player can see -- so at midnight the environment's horizon is nine
+   * times brighter than the far city under `NIGHT_SLAB`, and a haze that ran at
+   * night would turn a silhouette skyline into a grey one. In-scattering is what
+   * aerial perspective *is*, and at night there is none.
+   *
+   * So this is asserted as exact equality on the output, not as a bound on the
+   * weight: the night skyline that ships has to be the night skyline that
+   * shipped, bit for bit. */
+  {
+    const dayFrac = aerialDayFraction(NIGHT_SLAB_ANCHOR, NIGHT_SLAB_ANCHOR);
+    if (dayFrac !== 0) {
+      failures.push(
+        `At the far city's night floor the daylight fraction is ${dayFrac}, not 0. ` +
+          '`game/characters.slabLight` sits at NIGHT_SLAB all night and this term has to go out with it.',
+      );
+    }
+    if (aerialDayFraction(1, NIGHT_SLAB_ANCHOR) !== 1) {
+      failures.push(`At noon the daylight fraction is ${aerialDayFraction(1, NIGHT_SLAB_ANCHOR)}, not 1.`);
+    }
+    const nightEnv = skyEnvAt(-30);
+    const slabs: Rgb[] = [
+      [0.0729, 0.0715, 0.0695], // concrete at NIGHT_SLAB x BASE_SHADE
+      [0.0167, 0.0278, 0.0298], // curtain wall, the darkest tint in the table
+      [0.1424, 0.1402, 0.1315], // painted render, the brightest
+    ];
+    for (const slab of slabs) {
+      for (const d of [AERIAL_NEAR, 3000, AERIAL_FAR, 9000]) {
+        const w = aerialWeight(d, 0, dayFrac);
+        const out = aerialOver(slab, nightEnv, w);
+        for (let i = 0; i < 3; i++) {
+          if (out[i] !== slab[i]) {
+            failures.push(
+              `At night a far slab moved from ${slab[i]} to ${out[i]} at ${d} m. The weight carries a ` +
+                'daylight factor precisely so this is zero rather than small -- the environment at midnight ' +
+                'is a lighting floor nine times brighter than the far city, and a haze toward it is a grey ' +
+                'skyline where a silhouette belongs.',
+            );
+            return failures;
+          }
+        }
+      }
+    }
+    // And a monotone daylight fraction in between, so dusk is a fade and not a switch.
+    let last = -Infinity;
+    for (let k = NIGHT_SLAB_ANCHOR; k <= 1.0001; k += 0.01) {
+      const v = aerialDayFraction(Math.min(k, 1), NIGHT_SLAB_ANCHOR);
+      if (v < last - 1e-12) {
+        failures.push(`The daylight fraction fell as the day came up, at slabLight ${k.toFixed(2)}.`);
+        break;
+      }
+      last = v;
+    }
+  }
+
+  /* --- 5. And by day it is a convex mix, like everything else in this file. */
+  {
+    const slabs: Rgb[] = [
+      [0, 0, 0], [0.1193, 0.1985, 0.2132], [0.521, 0.5109, 0.4965], [1.0176, 1.0013, 0.9396], [6, 6, 6],
+    ];
+    for (const slab of slabs) {
+      for (const d of [1800, 2400, 3600, 4500, 9000]) {
+        for (const h of [0, 60, 260]) {
+          const w = aerialWeight(d, h, 1);
+          const out = aerialOver(slab, env, w);
+          for (let i = 0; i < 3; i++) {
+            const hi = Math.max(slab[i], env.horizon[i]) + 1e-9;
+            const lo = Math.min(slab[i], env.horizon[i]) - 1e-9;
+            if (out[i] > hi || out[i] < lo) {
+              failures.push(
+                `The haze put ${out[i].toFixed(4)} outside [${lo.toFixed(4)}, ${hi.toFixed(4)}] at ${d} m, ` +
+                  `${h} m up. It is meant to be a mix, not an add.`,
+              );
+              return failures;
+            }
+          }
+        }
+      }
+    }
+    // The direction that matters: the far city is darker than the low sky, so
+    // distance has to *brighten* it. It used to darken, because `scene.fog`'s
+    // colour is a `THREE.Color` and cannot hold the 2.49 the low sky sits at --
+    // which is the entire item.
+    const near = toDisplay([0.521, 0.5109, 0.4965]);
+    const far = toDisplay(aerialOver([0.521, 0.5109, 0.4965], env, aerialWeight(AERIAL_FAR, 0, 1)));
+    if (!(luminance(far as unknown as Rgb) > luminance(near as unknown as Rgb))) {
+      failures.push(
+        `A concrete slab at the far edge went from rgb(${near.join(',')}) to rgb(${far.join(',')}) -- distance ` +
+          'made it darker or left it alone. The low sky at 3 pm is 2.49 of luminance and the far city is ' +
+          'about a fifth of that, so haze brightens it. Distance that darkens is murk, not aerial perspective.',
       );
     }
   }
