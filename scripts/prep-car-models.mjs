@@ -1849,7 +1849,11 @@ function printReport(results) {
         r.minY,
         `${r.axis}${r.sign > 0 ? '+' : '-'}`,
         r.directionConfidence,
-        `${r.steeringZ === null || r.steeringZ === undefined ? '-' : r.steeringZ.toFixed(2)} / ${r.mirrored ? 'yes' : 'no'} / ${r.trisBefore ?? '-'}` + (r.atlas ? ' / atlas' : '') + (r.painted ? ` / paint: ${r.painted.join(',')} x${r.gain} of ${(r.materials ?? []).join(' ')}` : r.roles ? ` / ${r.roles} roles` : ''),
+        `${r.steeringZ === null || r.steeringZ === undefined ? '-' : r.steeringZ.toFixed(2)} / ${r.mirrored ? 'yes' : 'no'} / ${r.trisBefore ?? '-'}` + (r.atlas ? ' / atlas' : '') + (r.painted ? ` / paint: ${r.painted.join(',')} x${r.gain} of ${(r.materials ?? []).join(' ')}` : r.roles ? ` / ${r.roles} roles` : '') +
+          // The per-texel mask, when one ran: without this line the only way to
+          // know a car's paint was decided by threshold rather than by name is
+          // to open the .glb. See `soleMaterialRefinement`.
+          (r.refined ? ` / per-texel mask: ${r.refined}` : ''),
       ].join(' | '),
     );
   }
