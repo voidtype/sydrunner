@@ -95,7 +95,13 @@
  *     `cli.WALKABLE_UNDER_M` and `invisible-walls.HEAD_ROOM_M`, the third
  *     writing of the same 2.2 m, and it must stay the same number: a check that
  *     drew the line somewhere else would be disagreeing with both authorities
- *     about which volumes are bridges.
+ *     about which volumes are bridges. **And the ground it is measured from is
+ *     the drawn one** -- two triangles per cell, north-west to south-east --
+ *     because a threshold of 2.2 m asked at the centre of a footprint is asked
+ *     at exactly the point where a bilinear patch is furthest from the surface
+ *     the pipeline cut and the client draws. See `sampleGround`, which was
+ *     bilinear until `clash-check.ts` convicted the identical function, and
+ *     item 4 of `runControl`, which is what says so every run.
  *   - **The railway's own solids.** `world/rail-geo.ts` builds platforms,
  *     piers, trench walls and station boxes on the client and registers them
  *     through `CollisionWorld.addPrisms`, and `RailSolidField` is the shared
@@ -417,18 +423,52 @@ function groundOf(key: string): Float32Array | null {
   if (buf === null) return null;
   return new Float32Array(buf);
 }
+/**
+ * The ground at a point in one tile: **two triangles per cell, split north-west
+ * to south-east**, which is the surface the pipeline cut and the client draws.
+ *
+ * ---------------------------------------------------------------------------
+ * **This was bilinear, and `server/clash-check.ts` had already convicted the
+ * identical function.** That file's `sampleGround` header names this one by
+ * name -- *"`undrawn-solids-check.sampleGround` is still bilinear"* -- and the
+ * row it produced over there was 63,089 water vertices out of nothing at all:
+ * the two surfaces differ by the cell's *twist*, `(nw + se - ne - sw) / 4`,
+ * which is zero on a footpath and metres on a harbour cliff.
+ *
+ * What that costs **here** is smaller and is worth stating exactly, because it
+ * is not nothing. The only thing this file asks the ground is the walk-under
+ * rule: `p.base - g >= WALKABLE_UNDER_M` decides whether a prism is a viaduct
+ * the player walks under or a wall they are stopped by, and it asks it at the
+ * *centre of the footprint* -- which is the one place in a cell where the twist
+ * peaks. So a bilinear read moved that one comparison by up to the twist of the
+ * cell the prism stands in, in either direction, and 2.2 m is a threshold a
+ * decimetre either way can cross. A prism excused as a bridge that is really a
+ * wall is a silent hole in a ratchet that reads zero.
+ *
+ * `terrain.Terrain.sample`'s note -- *"Change one and all three must change
+ * together"* -- has four readers and this is the fourth. `runControl` asserts
+ * the split with a hand-made twisted cell rather than trusting this paragraph:
+ * a pole check cannot tell the two surfaces apart, which is exactly how the
+ * bilinear read survived in `clash-check.ts` for as long as it did.
+ */
 function sampleGround(g: Float32Array, t: TileEntry, x: number, z: number): number {
   const lx = ((x - t.bounds[0]) / SIZE) * GRID;
   const lz = ((z - t.bounds[1]) / SIZE) * GRID;
   const c0 = Math.max(0, Math.min(GRID - 1, Math.floor(lx)));
   const r0 = Math.max(0, Math.min(GRID - 1, Math.floor(lz)));
-  const fx = Math.max(0, Math.min(1, lx - c0));
-  const fz = Math.max(0, Math.min(1, lz - r0));
+  const fc = Math.max(0, Math.min(1, lx - c0));
+  const fr = Math.max(0, Math.min(1, lz - r0));
   const at = (r: number, c: number): number => g[r * (GRID + 1) + c];
-  return (
-    (at(r0, c0) * (1 - fx) + at(r0, c0 + 1) * fx) * (1 - fz) +
-    (at(r0 + 1, c0) * (1 - fx) + at(r0 + 1, c0 + 1) * fx) * fz
-  );
+  const nw = at(r0, c0);
+  const ne = at(r0, c0 + 1);
+  const sw = at(r0 + 1, c0);
+  const se = at(r0 + 1, c0 + 1);
+  // The diagonal runs north-west to south-east, so it is the line fr === fc. On
+  // the north-east side of it the triangle is NW/NE/SE; on the other, NW/SE/SW.
+  // Both expressions agree along the diagonal, so there is no seam inside a cell.
+  return fc >= fr
+    ? nw + (ne - nw) * fc + (se - ne) * fr
+    : nw + (sw - nw) * fr + (se - sw) * fc;
 }
 
 /** The plan positions of everything drawn in `slots`, in world metres. */
@@ -760,6 +800,38 @@ function runControl(): string[] {
     );
   }
 
+  // 4. And the ground under all of it is read the way the world is *drawn* --
+  //    two triangles per cell, split north-west to south-east -- which is a
+  //    thing only a control can say. Item 2 above cannot: it asks whether the
+  //    terrain is readable and finite, and a bilinear patch is both. Nor can a
+  //    real place, because the two surfaces differ by the cell's *twist* and
+  //    every cell a footpath crosses has none -- which is exactly how the
+  //    bilinear read survived in `clash-check.ts` until a harbour sheet found
+  //    it. So the twist is put in by hand, on that file's own numbers: a cell
+  //    with nw=0, ne=10, sw=10, se=0 read at its centre is 5 m under either
+  //    surface (the two agree along the diagonal), so the probe is off the
+  //    diagonal at three quarters east and one quarter south, where the
+  //    NW/NE/SE triangle gives 0 + 10(0.75) - 10(0.25) = 5.00 and bilinear
+  //    gives (10)(0.75)(0.75) + (10)(0.25)(0.25) = 6.25.
+  const twistProbe = ((): number => {
+    const n = GRID + 1;
+    const cell = new Float32Array(n * n);
+    cell[0] = 0; cell[1] = 10; cell[n] = 10; cell[n + 1] = 0;
+    const fake: TileEntry = { key: '0_0', b: 0, bounds: [0, 0, SIZE, SIZE] };
+    const post = SIZE / GRID;
+    return sampleGround(cell, fake, 0.75 * post, 0.25 * post);
+  })();
+  if (Math.abs(twistProbe - 5.0) > 1e-6) {
+    bad.push(
+      `the terrain read is not the north-west-to-south-east split: a twisted cell reads ` +
+        `${twistProbe.toFixed(2)} m where the triangle it is in says 5.00 (bilinear would say 6.25). ` +
+        `The walk-under rule is a 2.2 m threshold asked at the centre of a footprint, which is ` +
+        `where a cell's twist peaks, so a prism can be excused as a bridge that is really a wall. ` +
+        `terrain.Terrain.sample, tiles.write_terrain, world/terrain.ts sampleTileGrid and ` +
+        `clash-check.sampleGround are the other four readers of this split.`,
+    );
+  }
+
   say('');
   say(
     `  CONTROL  a ${CONTROL_HALF * 2} m box at Pacific Highway x Critchett Road ` +
@@ -768,6 +840,9 @@ function runControl(): string[] {
   say(
     `           stands on ${on.toFixed(0)} m2 of ${CLASSES[klass] ?? '?'} carriageway, ground ${g.toFixed(1)} m, ` +
       `${bldVerts} building vertices inside it`,
+  );
+  say(
+    `           twisted-cell probe ${twistProbe.toFixed(2)} m (the NW-SE split says 5.00, bilinear 6.25)`,
   );
   say(
     bad.length === 0
