@@ -90,6 +90,7 @@ import {
   Vector3,
 } from 'three/webgpu';
 
+import { createCarMaterial } from './skyreflect.ts';
 import { CAR_BODY_SIZE, staticCarIdentity } from '../game/traffic.ts';
 import {
   CAR_STAGE_PARKED_IN,
@@ -600,7 +601,23 @@ export class CarAssets {
       this.vertices.push(g.getAttribute('position')?.count ?? 0);
     }
 
-    const material = new MeshStandardNodeMaterial();
+    /*
+     * A clearcoat over the paint, if `CAR_SKY_REFLECT` is on -- see
+     * `world/skyreflect.ts` and `sky/reflection.ts`. It is one line here because
+     * it is meant to be: the subclass changes nothing about how this material is
+     * configured below, adds no pipeline, and reflects the sky in the grazing
+     * facets that the "no environment map and no ambient specular" paragraph at
+     * the top of this file says are the reason every albedo underneath is a lift.
+     *
+     * The lift itself has **not** been unwound. The coat is a convex mix, so a
+     * surface already sitting at the sky's own level does not move -- the white
+     * roof anchored to the sunlit footpath is asserted to hold within two code
+     * values -- and the dark end simply stops being as much of a fiction as it
+     * was. Re-deriving all eight albedos against a renderer that finally has the
+     * term is the follow-up, and it is written up in `GRAPHICS.md` rather than
+     * done here at night.
+     */
+    const material = createCarMaterial();
     material.name = 'car_paint';
     // No `colorNode`, exactly as `vegetation.ts` has none: `NodeMaterial` already
     // multiplies the material colour by the geometry `color` attribute and then
