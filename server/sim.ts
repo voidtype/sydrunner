@@ -206,10 +206,12 @@ import {
   REASON,
   reportCrime,
   createBeatPose,
+  createBeatScratch,
   createWitness,
   npcHitTest,
   npcKind,
   policeWitness,
+  strikeAmbientPolice,
   strikeNpc,
   type FactionCtx,
   type FactionEvent,
@@ -3504,18 +3506,23 @@ export class Simulation {
           // A football out of a car window is still knocking somebody down.
           this.markRough(owner.id);
         }
-        // And the officers, swept over the same one-tick segment. `npcHitTest`
-        // reconstructs the previous position from the velocity exactly as
+        // And the officers, swept over the same one-tick segment. The previous
+        // position is reconstructed from the velocity exactly as
         // `strikePedestrianWithBall` does -- which is what `footy.stepFooty`
         // itself works with and is exact for the straight line a ball flies in
         // one tick.
-        const actor = npcHitTest(
-          this.factions,
+        //
+        // Through `strikeBodyAt`, so a football finds an officer on a beat as
+        // well as one already chasing somebody: the ball is one of the four ways
+        // a player can hurt anybody in this game and all four go through the same
+        // pair of tiers. See there.
+        this.strikeBodyAt(
           ball.x - ball.vx * FIXED_DT, ball.y - ball.vy * FIXED_DT, ball.z - ball.vz * FIXED_DT,
           ball.x, ball.y, ball.z,
           BALL_RADIUS,
+          1,
+          owner,
         );
-        if (actor !== null) this.hitNpc(actor, 1, owner);
       }
     }
 
@@ -4972,6 +4979,57 @@ export class Simulation {
           // second rather than one per body.
           const scuffed = this.cars.damage(car.id, PEDESTRIAN_DAMAGE);
           if (scuffed !== null) this.carChanges.push(scuffed);
+        }
+      }
+
+      // --- And the police, who are the third kind of body standing in a street
+      //     and were the only one this sweep had never heard of.
+      //
+      // The owner: *"also i cant run over police"*. The sweep above walks
+      // players and the one below it walks the crowd, and a faction actor was in
+      // neither -- so a car driven at a constable passed through them at 60 km/h
+      // and the constable kept strolling. That is the same hole
+      // `strikeBodyAt` fixes for the bat, one weapon over, and it is fixed the
+      // same way: both tiers, one body, through `hitNpc`.
+      //
+      // **The car's box rather than the bat's cast.** `strikeBodyAt` takes a
+      // segment and a pad, so the car is handed to it as the segment from its
+      // tail to its nose with the half-width as the pad -- which is a capsule
+      // where `carOverlaps` uses a rectangle, generous by a few centimetres at
+      // the corners in exactly the direction `carOverlaps`' own header says this
+      // error has to fall: *"a car that visibly passes through somebody without
+      // touching them is the version of this mistake players notice"*.
+      //
+      // **A full knockdown, not one pip**, and it is the one number here worth
+      // defending. `NpcKindDef.maxHealth`'s comment says a car is worth one pip,
+      // which is the right answer for a swipe and the wrong one for a Camry:
+      // `runDownPedestrian` puts a walker on the ground in one pass and
+      // `applyCarHit` throws a player across the street, and an officer who
+      // bounced off a bonnet and carried on walking would be *"i cant run over
+      // police"* arriving again in a different shape. So a car that qualifies
+      // for the run-down sweep at all -- `RUN_DOWN_SPEED` and a non-zero
+      // `carHitStrength`, both already asked above -- spends the officer's whole
+      // health bar, which makes the crime `REASON.MURDER_POLICE` and worth the
+      // ladder's 380 points, exactly as knocking one out with a bat is.
+      //
+      // The driver is looked up rather than assumed, because `hitNpc` writes a
+      // name into a feed line and reports a crime against an id: a car whose
+      // driver has disconnected this tick is still rolling and is nobody's
+      // assault. It is the same `participants.get` the ball sweep makes about
+      // its owner, for the same reason.
+      {
+        const driver = this.participants.get(car.driverId);
+        const officer = npcKind(NPC_KIND.POLICE);
+        if (driver !== undefined) {
+          const nose = pose.halfLength;
+          const waist = pose.y + pose.height * 0.5;
+          this.strikeBodyAt(
+            pose.x - pose.dx * nose, waist, pose.z - pose.dz * nose,
+            pose.x + pose.dx * nose, waist, pose.z + pose.dz * nose,
+            pose.halfWidth,
+            officer ? officer.maxHealth : 1,
+            driver,
+          );
         }
       }
 
@@ -7215,10 +7273,85 @@ export class Simulation {
     const bx = ax - Math.sin(c.body.yaw) * cp * REACH;
     const by = ay + Math.sin(c.body.pitch) * REACH;
     const bz = az - Math.cos(c.body.yaw) * cp * REACH;
-    const actor = npcHitTest(this.factions, ax, ay, az, bx, by, bz, CAST_RADIUS);
-    if (actor === null) return;
-    this.hitNpc(actor, 1, p);
+    this.strikeBodyAt(ax, ay, az, bx, by, bz, CAST_RADIUS, 1, p);
   }
+
+  /**
+   * One cast, against **both tiers of body a faction has**, and then through the
+   * one damage door.
+   *
+   * ---------------------------------------------------------------------------
+   * The owner: *"but right now i cant get the cops"*, and *"make it so polICE
+   * are hitable like normal players"*.
+   *
+   * `npcHitTest` walks `FactionField.actors`, which is the promoted tier and
+   * nothing else -- so the only officer in this city a player could touch was
+   * one already chasing them. An officer on a beat, which is every officer you
+   * meet before you have done anything, was a body the bat went through. That is
+   * not what the framework says: `factions.ts`' lifecycle promises that *"ambient
+   * actors can still be seen and still be hit, and being hit is one of the
+   * things that promotes them"*, and `resolveStrike` a screen up already argues
+   * that an officer on a beat is not rewound *because* they are a pure function
+   * of the tick that both ends evaluate. Only the hit test disagreed.
+   *
+   * So: the promoted tier first, because somebody chasing you is the body you
+   * meant to hit and is standing where the snapshot says; then the ambient tier
+   * through `factions.strikeAmbientPolice`, which promotes the officer the cast
+   * found and hands them back looking exactly like one that was already there.
+   * Everything downstream of this line -- the crime, the feed, the money, the
+   * reinforcements, the `EVENT.HIT` -- is `hitNpc`, unchanged and unaware of
+   * which tier the body came out of.
+   *
+   * **One body per cast, and never two.** The tiers are asked in order and the
+   * second is only asked if the first found nobody, which is the same
+   * nearest-wins-once rule `resolveStrike` states about a player, a pedestrian
+   * and an officer being three disjoint sets.
+   *
+   * The ambient tier is police-only, and deliberately: the street factions and
+   * the characters promote on *notice* rather than on a hit (`characters.ts`
+   * says so at length -- an ambient character "cannot be hit" is a design
+   * decision there, not an oversight), and the wildlife's ambient birds have
+   * their own placement. What was broken was the police, whose whole ambient
+   * population is the thing a player walks past all day.
+   */
+  private strikeBodyAt(
+    ax: number, ay: number, az: number,
+    bx: number, by: number, bz: number,
+    pad: number,
+    pips: number,
+    p: Participant,
+  ): void {
+    const promoted = npcHitTest(this.factions, ax, ay, az, bx, by, bz, pad);
+    if (promoted !== null) {
+      this.hitNpc(promoted, pips, p);
+      return;
+    }
+    const ambient = strikeAmbientPolice(
+      this.factions,
+      this.world.peds,
+      trafficTick(Date.now()),
+      ax, ay, az, bx, by, bz,
+      pad,
+      // Promoted onto the person who hit them, which is the lifecycle's own
+      // sentence rather than an extra: an officer you have just hit is an
+      // officer who is now after you. `hitNpc` opens the investigation that
+      // makes it stick on the very next line.
+      p.id,
+      this.beatScratch,
+    );
+    if (ambient === null) return;
+    this.hitNpc(ambient, pips, p);
+  }
+
+  /**
+   * The scratch `strikeBodyAt` poses a beat with, built once in the constructor.
+   *
+   * `witnessCtx`'s arrangement and for its reason: this runs on every swing,
+   * every football that reaches the street and every driven car in the room, and
+   * a fresh record on each would be the one thing in this feature that allocates
+   * per event rather than per process.
+   */
+  private readonly beatScratch = createBeatScratch();
 
   /**
    * One NPC, hit by one player, through the framework's single door.

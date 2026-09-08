@@ -75,6 +75,11 @@ import {
   citySwell,
   fillCityBed,
 } from './citybed.ts';
+// One list of URLs, so that `bark` can tell an officer from a bush turkey
+// without every call site being made to state it. `game/factions.ts` is
+// three-free and imports nothing from here, so there is no cycle -- and this is
+// the same list `main.ts` already preloads through `loadClip`. See `POLICE_GAIN`.
+import { POLICE_CLIPS } from './factions.ts';
 
 /**
  * How hard a crash has to be before glass breaks. `CombatAudio.carCrunch`'s
@@ -299,7 +304,19 @@ export class CombatAudio {
     const t = ctx.currentTime;
     const until = this.clipCooldown.get(url) ?? 0;
     if (t < until) return false;
-    const gain = 1 / (1 + Math.max(0, distance) / 22);
+    // **Police clips three decibels up**, and the test is on the clip rather
+    // than on an argument at the call site. See `POLICE_GAIN`.
+    //
+    // This method is the whole city's voice -- an officer, a meth head, a drunk,
+    // a bush turkey -- and it is called from four places in `main.ts`, two of
+    // which do not know what kind of body they are speaking for (the offline
+    // aggro drain walks `FactionField.events`, which is every faction's). A
+    // parameter would have made all four state something, and two of them would
+    // have had to look it up. `POLICE_CLIPS` is the officers' voice pack, it is
+    // exported for the preloader already, and "is this an officer" is exactly
+    // what it answers.
+    const kind = POLICE_CLIPS.includes(url) ? POLICE_GAIN : 1;
+    const gain = kind / (1 + Math.max(0, distance) / 22);
     if (gain < 0.05) return false;
     this.clipCooldown.set(url, t + Math.max(cooldownSeconds, buffer.duration));
 
@@ -345,7 +362,13 @@ export class CombatAudio {
     const noise = this.noise;
     if (!ctx || !master || !noise) return;
     const t = ctx.currentTime;
-    const gain = 1 / (1 + Math.max(0, distance) / 30);
+    // Three decibels up with the rest of the police. Applied to the whole shot
+    // rather than to one layer, so the crack, the muzzle blast and the slapback
+    // keep their proportions -- which is the anatomy the paragraph above is
+    // about. Every caller in this build is an officer or Polair's marksman; see
+    // `POLICE_GAIN`, and the day something else fires a pistol it wants its own
+    // level rather than this one.
+    const gain = POLICE_GAIN / (1 + Math.max(0, distance) / 30);
     if (gain < 0.02) return;
 
     // --- The crack.
@@ -1964,9 +1987,9 @@ export class CombatAudio {
     const master = this.master;
     if (!ctx || !master) return;
 
-    const sirenWanted = mix !== null && mix.sirenDistance < SIREN_RANGE;
+    const siren = mix !== null && sirenWanted(mix.stars, mix.sirenDistance);
     const rotorWanted = mix !== null && mix.rotor > 0.01;
-    if (!sirenWanted && !rotorWanted) {
+    if (!siren && !rotorWanted) {
       this.heatSilence();
       return;
     }
@@ -1981,12 +2004,12 @@ export class CombatAudio {
     // happen, and a warning you cannot hear until it is too late to act on is
     // not a warning. Cut to nothing at the range rather than tapering forever,
     // so a car three suburbs away is not a node running for the session.
-    const d = sirenWanted ? Math.max(0, mix.sirenDistance) : SIREN_RANGE;
-    const sirenGain = sirenWanted ? SIREN_GAIN / (1 + d / SIREN_HALF_DISTANCE) : 0;
+    const d = siren ? Math.max(0, mix.sirenDistance) : SIREN_RANGE;
+    const sirenGain = siren ? SIREN_GAIN / (1 + d / SIREN_HALF_DISTANCE) : 0;
     chain.sirenOut.gain.setTargetAtTime(sirenGain, t, 0.12);
     // The wail widens as it closes, which is the Doppler-adjacent cue that
     // actually reads: near, the sweep is the whole octave; far, it is a warble.
-    const sweep = SIREN_SWEEP_HZ * (sirenWanted ? Math.max(0.35, 1 - d / SIREN_RANGE) : 0.35);
+    const sweep = SIREN_SWEEP_HZ * (siren ? Math.max(0.35, 1 - d / SIREN_RANGE) : 0.35);
     chain.sirenSweep.gain.setTargetAtTime(sweep, t, 0.2);
 
     // --- The rotor. A level **and** a distance now; see `HeatMix.rotorDistance`
@@ -3903,8 +3926,26 @@ const ANNOUNCE_EDGE_S = 0.015;
  * position for a helicopter that does not exist.
  */
 export interface HeatMix {
-  /** Metres to the nearest patrol car with its lights on, or `Infinity`. */
+  /**
+   * Metres to the nearest patrol car **that is part of a live pursuit**, or
+   * `Infinity` for none. See `sirenWanted`, which is the rule this is one half
+   * of, and the caller in `main.ts` for which states count as pursuing.
+   */
   sirenDistance: number;
+  /**
+   * How wanted the **local player** is, 0..5. The other half of `sirenWanted`.
+   *
+   * **Required rather than optional**, which is the one field on this record
+   * that is, and the exception is deliberate. Every other member here widens the
+   * *quality* of a sound that was already correct without it -- a Doppler shift,
+   * an orbit phase -- so a caller that has not been updated should keep sounding
+   * as it did, which is what the defaults in `heatUpdate` are for. This one
+   * decides whether a sound plays **at all**, and a default would be a silent
+   * choice between two bugs: default it high and somebody else's pursuit is
+   * audible from your own quiet street, default it low and the siren never
+   * plays. A compile error is the right failure for a field like that.
+   */
+  stars: number;
   /** Polair's beam, 0..1. `Polair.intensity`. */
   rotor: number;
   /**
@@ -3967,6 +4008,131 @@ interface HeatChain {
 }
 
 /**
+ * **Is a siren wanted at all?** One predicate, two clauses, and the whole of the
+ * owner's *"make it so their siren stops when they despawn or u on 0 stars"*.
+ *
+ * ---------------------------------------------------------------------------
+ * WHAT WAS WRONG. The test used to be `mix.sirenDistance < SIREN_RANGE` and
+ * nothing else, which asks *"is there a patrol car near me"* where the question
+ * a siren answers is *"is somebody after me"*. Two ways that came apart, and
+ * both are things a player hears rather than sees:
+ *
+ *   - **Somebody else's pursuit.** `game/heat.ts` promotes a highway patrol car
+ *     for whoever is at three stars, and every client in the room decodes it out
+ *     of the same NPC section. A player standing on a quiet street in Balmain
+ *     with no stars at all heard a siren for three hundred metres because
+ *     somebody in the CBD had been busy. Nothing was broken; the sound was
+ *     simply about a person it was not being played to.
+ *   - **A car that has stood down.** A patrol car whose investigation has ended
+ *     takes `NPC_STATE.RETURN` and drives home, which takes as long as the drive
+ *     does. It is still a liveried car and it is still within range, so the
+ *     siren ran the whole way -- the pursuit ended, the banner cleared, the star
+ *     row emptied, and the siren carried on.
+ *
+ * ---------------------------------------------------------------------------
+ * THE RULE. A siren is wanted while **the local player is wanted** and **a
+ * source that is part of a pursuit is in range**. Both clauses are necessary and
+ * neither is sufficient, and each one is the fix to one of the two above.
+ *
+ * `stars` is the local player's own count -- `MSG.HEAT` online, `HeatField` off
+ * -- so the first clause is exactly "this pursuit is mine". The second is
+ * `sirenDistance`, which the caller computes over promoted patrol cars in a
+ * pursuing state; see the loop in `main.ts`, which is where "pursuing" is
+ * decided, because that is where the state bytes are.
+ *
+ * **The fade is not in here**, and that is deliberate rather than an omission.
+ * When this answers false the chain is torn down by `heatSilence`, whose ramp is
+ * a 70 ms time constant -- inaudible inside a fifth of a second and long gone
+ * inside the one the owner asked for -- and when Polair is still overhead the
+ * chain survives and the siren's own gain glides to zero on a 0.12 s constant
+ * instead. Either way a source that resolves, despawns or is cleared by the
+ * countdown reaching zero takes the sound with it, without anything here having
+ * to know which of the three happened.
+ *
+ * Pure, so `verifyAudioSiren` can put the whole table through it.
+ */
+export function sirenWanted(stars: number, sirenDistance: number): boolean {
+  return stars > 0 && sirenDistance < SIREN_RANGE;
+}
+
+/**
+ * The siren's ownership rule, as a table.
+ *
+ * Every row is a state this build can actually be in, and the ones that matter
+ * are the two that used to answer wrongly: no stars with a car beside you (a
+ * pursuit that is not yours), and stars with the last source gone (a pursuit
+ * that has ended, or a car that despawned). Neither has a frame that says so --
+ * a siren playing for the wrong reason looks exactly like a siren.
+ *
+ * Client-side, and wired into `main.ts`'s boot checks beside `verifyPoliceKit`
+ * rather than into `server/index.ts`'s: this module is the browser's mixer, the
+ * server has no audio graph and never calls any of it, and `verifyPoliceKit`
+ * is the standing precedent for a check that cannot compile into Bun.
+ */
+export function verifyAudioSiren(): string[] {
+  const failures: string[] = [];
+  const near = SIREN_RANGE * 0.1;
+  const far = SIREN_RANGE * 1.5;
+  const table: Array<[number, number, boolean, string]> = [
+    [0, near, false, 'no stars, a patrol car right beside you: somebody else\'s pursuit, and it is not your siren'],
+    [0, Infinity, false, 'no stars and no source'],
+    [1, Infinity, false, 'wanted, and the last source has resolved or despawned'],
+    [5, Infinity, false, 'wanted at the top rung with every source gone: the siren still has to stop'],
+    [1, near, true, 'wanted, with a pursuing car beside you'],
+    [1, SIREN_RANGE - 1, true, 'wanted, with a pursuing car just inside the range'],
+    [1, SIREN_RANGE, false, 'a car exactly at the range is out of it -- the cut is what stops a node running for the session'],
+    [3, far, false, 'wanted, with the nearest source three suburbs away'],
+  ];
+  for (const [stars, distance, want, what] of table) {
+    if (sirenWanted(stars, distance) !== want) {
+      failures.push(
+        `The siren is ${want ? 'not ' : ''}wanted at ${stars} star(s) with the nearest source at ` +
+          `${distance === Infinity ? 'no source' : `${distance.toFixed(0)} m`}: ${what}.`,
+      );
+    }
+  }
+  // And the two clauses are genuinely both load-bearing, which a table of
+  // hand-written rows can accidentally stop testing if somebody edits it.
+  if (sirenWanted(0, 0)) failures.push('The star gate is gone: a player with no stars hears a siren.');
+  if (!sirenWanted(1, 0)) failures.push('The range gate answers no at zero metres; nobody would ever hear a siren.');
+  if (POLICE_GAIN <= 1) {
+    failures.push(`POLICE_GAIN is ${POLICE_GAIN}, which is not a lift. The police were asked to be louder.`);
+  }
+  // Three decibels, to the bit the owner asked for. A future round that wants
+  // four should change the exponent rather than the number this compares to.
+  if (Math.abs(20 * Math.log10(POLICE_GAIN) - 3) > 1e-9) {
+    failures.push(`POLICE_GAIN is ${(20 * Math.log10(POLICE_GAIN)).toFixed(2)} dB, not the 3 dB that was asked for.`);
+  }
+  return failures;
+}
+
+/**
+ * **The police, three decibels up.** The owner: *"and are slightly louder"*.
+ *
+ * `10 ** (3 / 20)`, written as the arithmetic rather than as 1.4125, which is
+ * `RIDE_GAIN`'s own convention one section up: *"so the next person to touch it
+ * can see what was asked for instead of a magic number"*. Three is the smallest
+ * change in level that is reliably audible as a change rather than as a
+ * different mix -- it is about a fifth louder to the ear, and the word in the
+ * request was *slightly*.
+ *
+ * It multiplies **three sounds and no others**, which is what "the police" means
+ * here: the siren (`SIREN_GAIN`), the shout (`bark`, for the officers' clips
+ * only -- a drunk and a bush turkey go through the same method and are not
+ * police), and the shot (`gunshot`, which in this build has no caller that is
+ * not an officer or Polair's marksman). The rotor is deliberately not in the
+ * list: `ROTOR_GAIN`'s own note says it is *"a presence, not an event"*, and it
+ * is already the loudest thing in the mix by duration.
+ *
+ * **Checked against the limiter rather than assumed**, which is this file's
+ * standing rule. The siren was the loudest of the three at 0.30 and goes to
+ * 0.424; through the master's 0.55 that is 0.233 against the compressor's -8 dB
+ * threshold of 0.398, so it still never engages it on its own. The shot's crack
+ * peaks at `0.85 * gain` and is 1.5 ms long, which is what the limiter is for.
+ */
+export const POLICE_GAIN = 10 ** (3 / 20);
+
+/**
  * How far a siren carries, metres, and where it is half as loud.
  *
  * **Further than anything else in this file**, and further than a rave: 300 m
@@ -3983,7 +4149,7 @@ interface HeatChain {
 const SIREN_RANGE = 300;
 const SIREN_HALF_DISTANCE = 55;
 /** Level at the car. Under a gunshot and over a bark: it is loud, not startling. */
-const SIREN_GAIN = 0.30;
+const SIREN_GAIN = 0.30 * POLICE_GAIN;
 
 /**
  * The wail: where the tone sits, how far it sweeps, and how fast.
