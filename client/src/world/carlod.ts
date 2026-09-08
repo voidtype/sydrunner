@@ -485,7 +485,7 @@ function mappedBody(entry: CarModelEntry): BodyKey | null {
 // --- Merging one file -----------------------------------------------------------
 
 /** What the merge produced, or why it did not. */
-interface MergedModel {
+export interface MergedModel {
   /** The one map the prep packed for this file, or null for a flat-coloured model. */
   map: Texture | null;
   geometry: BufferGeometry;
@@ -529,17 +529,58 @@ interface Piece {
  * The two passes are not tidiness: the value normalisation in section 6 needs
  * every material's coverage and its own bright end before any final colour can
  * be written, and both are only known once the whole file has been walked.
+ *
+ * ---------------------------------------------------------------------------
+ * **Exported, and the export is deliberately the flattener and nothing else.**
+ *
+ * `world/highway-patrol.ts` draws the pursuing car as a hero object out of the
+ * same `nsw_police.glb` this fleet has an ambient row for, and its header used
+ * to argue that reaching over here for it would mean either touching these
+ * pools -- whose *order is a contract* -- or growing a second copy of two
+ * hundred lines of glTF flattening in a file about police. Neither is
+ * necessary: what that file wants is this function, which is **pure**. It takes
+ * a scene and returns a geometry, it reads nothing on `CarModelFleet`, it
+ * writes nothing anywhere, and no claim ledger, pool, manifest row or instance
+ * is reachable through it. So this is exported and the fleet is not, which is
+ * exactly the line that header drew -- the merge was never the part that had
+ * an owner.
+ *
+ * `accept` narrows the walk to a subset of the file's primitives, so a caller
+ * that needs a lamp lens on its own geometry can have three merges of one file
+ * instead of one merge it then has to take apart. Absent, every mesh is taken,
+ * which is what the fleet wants and is the behaviour this had before.
+ *
+ * Two things a filtered caller has to know, both of which are properties this
+ * already had and neither of which is new here:
+ *
+ *   - the returned geometry is translated so **its own** lowest vertex sits at
+ *     y = 0 (appearance fix 1, below), which for a subset is not the car's
+ *     ground plane. `seat` is how far it moved, so two merges of one file are
+ *     put back in a common frame by translating the second by its own `seat`
+ *     less the first's;
+ *   - `box` is measured in the frame `yaw` leaves behind, so a caller that
+ *     rotates a nose-`+X` file onto some other axis must read the extents it
+ *     cares about off the geometry rather than off these three labels.
  */
-function mergeModel(root: Object3D, tint: 'multiply' | 'none', yaw: number): MergedModel {
+export function mergeModel(
+  root: Object3D,
+  tint: 'multiply' | 'none',
+  yaw: number,
+  accept?: (mesh: Mesh) => boolean,
+): MergedModel {
   root.updateMatrixWorld(true);
   _yawMatrix.makeRotationY(yaw);
 
   // Collected before anything is read, on `landmarks.loadLandmarks`' own trap:
   // mutating the child array a `traverse` is walking runs it off the end.
+  //
+  // The world matrices above are computed over the **whole** root regardless of
+  // the filter, so a subset merge bakes the same transforms the full one would
+  // and the two land in the same frame.
   const meshes: Mesh[] = [];
   root.traverse((node) => {
     const mesh = node as Mesh;
-    if (mesh.isMesh && mesh.geometry) meshes.push(mesh);
+    if (mesh.isMesh && mesh.geometry && (accept === undefined || accept(mesh))) meshes.push(mesh);
   });
 
   const materials: Array<{ triangles: number; values: number[] }> = [];

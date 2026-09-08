@@ -675,6 +675,7 @@ import {
   Polair,
   createPolairView,
   highwayPatrolWarmupParts,
+  loadPatrolModel,
   verifyHighwayPatrol,
 } from './world/highway-patrol.ts';
 // Workstream R: the helicopter's orbit, its beam schedule and its marksman. Pure,
@@ -4497,6 +4498,31 @@ async function main(): Promise<void> {
   /** The patrol cars and the RBTs in view, from whichever authority is running. */
   const patrolFleet = new HighwayPatrolFleet(patrolAssets);
   scene.add(patrolFleet.group);
+  /*
+   * --- WORKSTREAM police-car: the pursuing car is `nsw_police.glb` now.
+   *
+   * 363 kB, already in the browser's cache because `carlod` fetched the same URL
+   * for its ambient row a moment ago, merged into three geometries and drawn as
+   * three instanced sets. See `world/highway-patrol.ts` section 1 for why this
+   * file loads a model at all now, and section 2 for the light bar.
+   *
+   * **Losing is a supported outcome and is not an error.** `loadPatrolModel`
+   * answers null for a 404, a parse failure or a merge that is not a patrol car,
+   * `withDeadline` answers null for a slow link, and either way the fleet keeps
+   * drawing the procedural box car it was constructed with -- which is the whole
+   * reason that car still exists. Nothing below is conditional on the model.
+   *
+   * `warm` is the trains' arrangement for the trains' reason: the boot warm-up
+   * ran two thousand lines ago and could not list geometry that had not been
+   * fetched, and the scene pass cannot reach an instanced set whose count is
+   * zero. Without it the first patrol car of a session is three synchronous
+   * pipeline compiles in the frame a player is certain to be watching.
+   */
+  const patrolModel = await withDeadline(loadPatrolModel(), FAR_LAYER_DEADLINE_MS, 'the patrol car model');
+  if (patrolModel) {
+    patrolFleet.adopt(patrolModel);
+    await withDeadline(patrolFleet.warm(precompileGroup), WARMUP_DEADLINE_MS, 'the patrol car shader pass');
+  }
   /**
    * Polair: an airframe on a lagging orbit, a searchlight that hunts, three nav
    * lamps and a marksman who misses. See `game/polair.ts` and section 4 of

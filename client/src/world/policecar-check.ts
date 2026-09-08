@@ -27,6 +27,7 @@ import { CharacterAssets } from '../player/character.ts';
 import { verifyCarLabels } from '../game/carlabels.ts';
 import { verifyCarVisibility } from './carvisibility-check.ts';
 import { CharacterKitAssets, verifyCharacterKit } from './characters.ts';
+import { HighwayPatrolAssets, verifyHighwayPatrol } from './highway-patrol.ts';
 import { verifyNightLights } from './nightlights.ts';
 import { verifyParkedPool } from './parkedpool-check.ts';
 import { PoliceAssets, verifyPoliceKit } from './police.ts';
@@ -42,6 +43,14 @@ const sections: Array<[string, string[]]> = [
   ['verifyParkedPool', verifyParkedPool()],
   ['verifyCharacterKit', verifyCharacterKit(new CharacterKitAssets(characters))],
   ['verifyPoliceKit', verifyPoliceKit(new PoliceAssets(characters))],
+  // The pursuit: the box car's geometry, Polair's rig driven for three minutes,
+  // and -- since the round that made the pursuing car `nsw_police.glb` -- the
+  // merge itself. That last part is why this line is worth its runtime here
+  // rather than only in a tab: `verifyPatrolMerge` drives the real
+  // `buildPatrolModel` over a synthetic file whose bar centre is knowable, and
+  // `verifyPatrolPaths` runs four seconds of a synthetic pursuit through both
+  // the model fleet and the procedural one and compares them matrix by matrix.
+  ['verifyHighwayPatrol', verifyHighwayPatrol(new HighwayPatrolAssets())],
   // The night rig builds its own throwaway probes against a bare `Object3D`,
   // which is exactly why its constructor takes one rather than a `Scene`.
   ['verifyNightLights', verifyNightLights()],
