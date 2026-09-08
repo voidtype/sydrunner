@@ -252,6 +252,7 @@ import { policeLiveried } from '../game/factions.ts';
 import { CAR_FLEET } from '../game/carlabels.ts';
 import { binCarsByBody } from '../game/staticcars.ts';
 import { BODY_COUNT, CAR_LIVERY_WHITE, CAR_PAINT, crumpleScale, crumpleTone, type TileCars } from './cars.ts';
+import { createCarMaterial } from './skyreflect.ts';
 import type { PooledSet } from './instancepool.ts';
 
 // --- The contract with the rest of the client -----------------------------------
@@ -1095,7 +1096,12 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
    * both, so a wreck's headlights are as sooty as its panels.
    */
   private materialFor(map: Texture | null, paint: InstancedBufferAttribute, file: string): MeshStandardNodeMaterial {
-    const material = new MeshStandardNodeMaterial();
+    // The same coated material the box fleet takes, through the same factory --
+    // see the paragraph in `cars.ts` and `world/skyreflect.ts`. It has to be the
+    // same decision in both places for the reason this whole file exists: a car
+    // that changed its shading as the player walked toward it is exactly the
+    // swap artefact `carlod` is built to avoid.
+    const material = createCarMaterial();
     material.name = map === null ? 'car_model' : 'car_model_mapped';
     material.color = new Color(1, 1, 1);
     material.vertexColors = false;

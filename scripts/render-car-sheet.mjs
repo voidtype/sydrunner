@@ -44,7 +44,7 @@
  * divide is owed. It costs one texel fetch per covered pixel and it is the
  * difference between a picture of the cars and a picture of their triangles.
  *
- *   node scripts/render-car-sheet.mjs [--out path] [--only a.glb,b.glb] [--px N]
+ *   node scripts/render-car-sheet.mjs [--out path] [--only a.glb,b.glb] [--px N] [--pbr]
  */
 import { NodeIO } from '@gltf-transform/core';
 import { KHRONOS_EXTENSIONS } from '@gltf-transform/extensions';
@@ -74,6 +74,21 @@ const MASK = args.includes('--mask');
  */
 const pxArg = args.indexOf('--px');
 const CELL_W = pxArg >= 0 ? Math.max(64, Math.round(Number(args[pxArg + 1]))) : 320;
+/**
+ * `--pbr`: put the clearcoat on, so the sky reflection that ships in the game can
+ * be looked at without a browser.
+ *
+ * `client/src/sky/reflection.ts` adds a Fresnel-weighted reflection of an
+ * analytic sky to every car, and the thing it does that a number cannot judge is
+ * the *silhouette*: how much sky lands on a grazing facet, whether a low-poly
+ * flank turns into a mirror, whether the fleet reads as painted or as chrome.
+ * That is a picture, and this is the place this project takes pictures.
+ *
+ * The arithmetic below is the same arithmetic as `sky/reflection.ts` -- see
+ * `SHEET_REFERENCE` there for why it exists twice and how the two are kept
+ * honest. `assertReflectionMatches` refuses to draw if they have drifted.
+ */
+const PBR = args.includes('--pbr');
 
 const W = CELL_W, H = Math.round(CELL_W * 190 / 320);
 /** Four cars a row on the fleet sheet; fewer when `--only` asked for fewer, so a one-car sheet is one car wide and not a quarter of a picture. */
@@ -83,6 +98,76 @@ const PAINT = [0.18, 0.36, 0.78];
 const VIEWS = [{ cam: [1, 0.55, 0.75] }, { cam: [-1, 0.55, 0.75] }];
 
 const io = new NodeIO().registerExtensions(KHRONOS_EXTENSIONS);
+
+/* ---------------------------------------------------------------------------
+ * THE CLEARCOAT, SECOND COPY.
+ *
+ * Every constant and every line here is `client/src/sky/reflection.ts`, restated
+ * because this file is `.mjs` running under a bare `node` in a handoff and that
+ * one is TypeScript. `SHEET_REFERENCE` in that file holds the three probes
+ * below; if a constant moves there and not here, `verifyReflection` fails in
+ * both boot lists *and* this script refuses to draw. Neither copy can be edited
+ * alone and get away with it, which is the most a duplication like this can be
+ * asked to promise.
+ *
+ * The environment is the reference instant -- 3 pm on 15 February -- because the
+ * sheet has one fixed light and no clock: two runs of it must differ only where
+ * a model differs.
+ * ------------------------------------------------------------------------- */
+const COAT_F0 = 0.03, COAT_MAX = 0.5, COAT_POWER = 5;
+const HORIZON_LOW = -0.12, HORIZON_HIGH = 0.3;
+const ENV = {
+  zenith: [0.680544, 0.99246, 1.4178],
+  horizon: [2.236382, 2.520226, 2.907285],
+  ground: [0.28356, 0.233937, 0.163047],
+};
+const luma = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+const smooth01 = (x) => { const t = x < 0 ? 0 : x > 1 ? 1 : x; return t * t * (3 - 2 * t); };
+const coatFresnel = (nDotV) => {
+  const c = 1 - (nDotV < 0 ? 0 : nDotV > 1 ? 1 : nDotV);
+  return COAT_F0 + (COAT_MAX - COAT_F0) * Math.pow(c, COAT_POWER);
+};
+const envRadiance = (dirY) => {
+  const t = dirY <= 0
+    ? smooth01((dirY - HORIZON_LOW) / (0 - HORIZON_LOW))
+    : smooth01(dirY / HORIZON_HIGH);
+  const [a, b] = dirY <= 0 ? [ENV.ground, ENV.horizon] : [ENV.horizon, ENV.zenith];
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+};
+/**
+ * The sheet is not tone mapped and its whites live at 1.0, while the game's
+ * environment is in scene-linear radiance where the horizon band is 2.5. One
+ * scalar, set so the horizon lands at the sheet's white: the *shape* of the
+ * gradient and the whole of the Fresnel are what this picture is for, and the
+ * absolute level is `calibration.ts`'s business and is checked there.
+ */
+const SHEET_SKY = 1 / luma(ENV.horizon);
+
+/*
+ * The three probes `sky/reflection.ts` publishes as `SHEET_REFERENCE`. If these
+ * disagree, one of the two copies has been edited and the picture would be of a
+ * car the game does not draw -- which is worse than no picture, because somebody
+ * would believe it.
+ */
+{
+  const want = [
+    { nDotV: 1.0, dirY: 1.0, fresnel: 0.03, radiance: 0.956856 },
+    { nDotV: 0.5, dirY: 0.0, fresnel: 0.044688, radiance: 2.487826 },
+    { nDotV: 0.1, dirY: -1.0, fresnel: 0.30753, radiance: 0.239369 },
+  ];
+  for (const row of want) {
+    const f = coatFresnel(row.nDotV), r = luma(envRadiance(row.dirY));
+    if (Math.abs(f - row.fresnel) > 1e-5 || Math.abs(r - row.radiance) > 1e-4) {
+      console.error(
+        `the clearcoat in this script has drifted from client/src/sky/reflection.ts:\n` +
+          `  at N.V ${row.nDotV}, y ${row.dirY}: F ${f.toFixed(6)} (want ${row.fresnel}), ` +
+          `radiance ${r.toFixed(6)} (want ${row.radiance})\n` +
+          `  SHEET_REFERENCE and SHEET_ENV in that file are the other half of this check. Update both.`,
+      );
+      process.exit(1);
+    }
+  }
+}
 
 /*
  * --- The manifest against the directory, before a pixel is drawn.
@@ -234,6 +319,27 @@ for (const f of files) {
       const nl = Math.hypot(nx, ny, nz) || 1;
       const sgn = flipped ? -1 : 1;
       const lam = 0.35 + 0.65 * Math.max(0, (sgn * (nx * light[0] + ny * light[1] + nz * light[2])) / nl);
+      /*
+       * The clearcoat, per face. Flat-shaded like the game's own fleet
+       * (`cars.ts` sets `flatShading = true`), so a face normal is the whole
+       * story and this can live out here rather than per pixel.
+       *
+       * The camera is orthographic here, so the view ray is the camera forward
+       * for every pixel -- which is the one simplification this picture makes
+       * against the shader, and it costs nothing at a 320-pixel cell.
+       */
+      // The clearcoat's two per-face terms, applied per fragment below on top
+      // of the sampled texel: the face normal is the whole story (flat-shaded
+      // fleet), so F and the sky radiance are constants across the triangle.
+      let coatF = null, coatE = null;
+      if (PBR) {
+        const n = [(sgn * nx) / nl, (sgn * ny) / nl, (sgn * nz) / nl];
+        const vdn = fwd[0] * n[0] + fwd[1] * n[1] + fwd[2] * n[2];
+        coatF = coatFresnel(-vdn);
+        // reflect(view, normal), and only its y is read: the dome has no azimuth.
+        const ry = fwd[1] - 2 * vdn * n[1];
+        coatE = envRadiance(ry);
+      }
       const minX = Math.max(0, Math.floor(Math.min(A[0], B[0], C[0]))), maxX = Math.min(W - 1, Math.ceil(Math.max(A[0], B[0], C[0])));
       const minY = Math.max(0, Math.floor(Math.min(A[1], B[1], C[1]))), maxY = Math.min(H - 1, Math.ceil(Math.max(A[1], B[1], C[1])));
       for (let y = minY; y <= maxY; y++) {
@@ -275,6 +381,12 @@ for (const f of files) {
           img[o * 3] = (r + (PAINT[0] * value - r) * mask) * lam;
           img[o * 3 + 1] = (g + (PAINT[1] * value - g) * mask) * lam;
           img[o * 3 + 2] = (b + (PAINT[2] * value - b) * mask) * lam;
+          if (PBR && coatF !== null) {
+            const f = coatF, e = coatE;
+            img[o * 3] = img[o * 3] * (1 - f) + e[0] * SHEET_SKY * f;
+            img[o * 3 + 1] = img[o * 3 + 1] * (1 - f) + e[1] * SHEET_SKY * f;
+            img[o * 3 + 2] = img[o * 3 + 2] * (1 - f) + e[2] * SHEET_SKY * f;
+          }
         }
       }
     }

@@ -301,6 +301,11 @@ import { verifyMandala } from '../client/src/game/mandala.ts';
 import { verifyQuestAim } from '../client/src/game/questaim.ts';
 import { verifyQuestAreas } from '../client/src/game/questareas.ts';
 import { verifyBuildBudget } from '../client/src/world/buildbudget.ts';
+// WORKSTREAM AQ (the 2026-09 graphics pass). Both are pure and three-free for
+// exactly this reason: the checks that guard the look run in the process that
+// draws nothing, on `verifySpawn`'s argument. See GRAPHICS.md.
+import { verifyGrade } from '../client/src/sky/grade.ts';
+import { verifyReflection } from '../client/src/sky/reflection.ts';
 import { verifyInterpDelay } from '../client/src/net/interpdelay.ts';
 import { verifyDialog, verifyQuests } from '../client/src/game/questmodel.ts';
 // WORKSTREAM AO: who the givers in that content *are* -- kit, heading, stance
@@ -894,6 +899,13 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     ['verifyQuestAim', verifyQuestAim()],
     ['verifyQuestAreas', verifyQuestAreas()],
     ['verifyBuildBudget', verifyBuildBudget()],
+    // WORKSTREAM AQ: the colour grade's luminance invariant and the car
+    // clearcoat's convex-mix invariant. Here as well as in the browser because
+    // both are arithmetic over `sky/calibration.ts`, and an arithmetic failure
+    // in a look is silent in both runtimes -- a slightly wrong grade is not a
+    // crash, it is a game that is a bit off colour and nobody can say why.
+    ['verifyGrade', verifyGrade()],
+    ['verifyReflection', verifyReflection()],
     ['verifyInterpDelay', verifyInterpDelay()],
     ['verifyQuests', verifyQuests()],
     ['verifyDialog', verifyDialog()],
