@@ -612,6 +612,26 @@ export interface CombatantState {
    */
   carSpeed: number;
   /**
+   * And the two the body layer added: how fast that car is sliding **across**
+   * its heading (m/s, positive left) and how fast it is turning about itself
+   * (rad/s, positive left). Both zero on foot and on every metre of every
+   * ordinary drive.
+   *
+   * Here beside `carSpeed` for `carSpeed`'s own reasons, all three of which
+   * apply word for word: `combat.advance` and `net/client.reconcile`'s replay
+   * both have to reach them, neither may import `game/driving.CarField`, and
+   * `protocol.INPUT_BYTES` carries no number a client could set them with. They
+   * are integrated by the same `driving.stepCarSpeed` that integrates the
+   * speed, copied out to the wire by the same `CarField.follow`, and written by
+   * exactly one thing: a contact resolved through `game/rigid.ts`.
+   *
+   * See `driving.DriveState.carSlip`, which is the same pair of fields and
+   * carries the argument for why a slip becomes `InputSnapshot.right` without
+   * giving up "a car does not crab".
+   */
+  carSlip: number;
+  carYawRate: number;
+  /**
    * The condition of that car, 0..`driving.CAR_HEALTH_MAX`. See
    * `driving.DriveState.carHealth`, which is the same field and carries the
    * argument for why it is here rather than read off the record.
@@ -887,6 +907,8 @@ export function createCombatant(id: number, x = 0, z = 0): CombatantState {
     // scale and a combatant on foot would otherwise be carrying a wreck around
     // waiting for the first car they get into to inherit a dead engine.
     carHealth: CAR_HEALTH_MAX,
+    carSlip: 0,
+    carYawRate: 0,
     carCrashDv: 0,
     carCrashHeadOn: 1,
     // On foot. See `CombatantState.aboard`: the record is allocated here once
@@ -1066,6 +1088,11 @@ export function advance(
     // just gone through the windscreen belongs.
     c.drivingCar = 0;
     c.carSpeed = 0;
+    // And the body layer's two, on the speed's own argument: a player thrown
+    // out of a car that was slewing sideways would otherwise walk away crabbing.
+    // See `driving.DriveState.carSlip`.
+    c.carSlip = 0;
+    c.carYawRate = 0;
     // And the two fields that hang off the car: the mirrored condition back to
     // full, so the next car this combatant gets into is not born a wreck, and
     // the crash outbox emptied, so an impact detected on the tick they came out
@@ -1647,6 +1674,11 @@ export function applyWorldDamage(
   c.ridingBike = 0;
   c.drivingCar = 0;
   c.carSpeed = 0;
+  // And the body layer's two, on the speed's own argument: a player thrown
+  // out of a car that was slewing sideways would otherwise walk away crabbing.
+  // See `driving.DriveState.carSlip`.
+  c.carSlip = 0;
+  c.carYawRate = 0;
   // And the two fields that hang off the car: the mirrored condition back to
   // full, so the next car this combatant gets into is not born a wreck, and
   // the crash outbox emptied, so an impact detected on the tick they came out
@@ -1786,6 +1818,11 @@ export function applyHit(
   // above gives.
   victim.drivingCar = 0;
   victim.carSpeed = 0;
+  // And the body layer's two, on the speed's own argument: a player thrown
+  // out of a car that was slewing sideways would otherwise walk away crabbing.
+  // See `driving.DriveState.carSlip`.
+  victim.carSlip = 0;
+  victim.carYawRate = 0;
   // And the two fields that hang off the car: the mirrored condition back to
   // full, so the next car this combatant gets into is not born a wreck, and
   // the crash outbox emptied, so an impact detected on the tick they came out
@@ -1878,6 +1915,11 @@ export function respawnAt(c: CombatantState, x: number, y: number, z: number, ya
   // holding it would drag it across Redfern.
   c.drivingCar = 0;
   c.carSpeed = 0;
+  // And the body layer's two, on the speed's own argument: a player thrown
+  // out of a car that was slewing sideways would otherwise walk away crabbing.
+  // See `driving.DriveState.carSlip`.
+  c.carSlip = 0;
+  c.carYawRate = 0;
   // And the two fields that hang off the car: the mirrored condition back to
   // full, so the next car this combatant gets into is not born a wreck, and
   // the crash outbox emptied, so an impact detected on the tick they came out

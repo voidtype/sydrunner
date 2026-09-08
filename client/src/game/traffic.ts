@@ -392,7 +392,75 @@ export const TRAFFIC_EPOCH_MS = 1767225600000;
  * processes handed the same millisecond produce the same integer.
  */
 export function trafficTick(nowMs: number): number {
-  return Math.floor((nowMs - TRAFFIC_EPOCH_MS) * (TRAFFIC_HZ / 1000));
+  return Math.floor((nowMs + trafficClockSkewMs - TRAFFIC_EPOCH_MS) * (TRAFFIC_HZ / 1000));
+}
+
+/**
+ * How far this process's wall clock is from the host's, milliseconds.
+ *
+ * ---------------------------------------------------------------------------
+ * **WHY A MUTABLE MODULE-LEVEL NUMBER EXISTS IN THE FILE WHOSE WHOLE ARGUMENT
+ * IS THAT IT HAS NO STATE**, and it is the same admission `HoldLedger` makes
+ * one screen down: the alternative is worse and this one is bounded.
+ *
+ * The header says the fleet is a pure function of the wall clock and that this
+ * is what makes six thousand cars cost zero bytes. It is -- but *whose* wall
+ * clock was never stated, and the honest answer until now was "each process's
+ * own". The server reads `Date.now()` on the box. A browser reads `Date.now()`
+ * on a laptop, and a laptop's clock is whatever the laptop says it is.
+ *
+ * `protocol.Welcome.clockMs` has carried the host's instant since v11 and
+ * `net/client.clockSkewMs` has held the difference ever since, with a comment
+ * saying *"Nothing in the simulation reads this and nothing should"* -- because
+ * at the time it was written the only consumer was the sky, where being four
+ * minutes out is four minutes of private evening. The same comment then
+ * describes, without meaning to, exactly what a wrong clock does to the
+ * traffic: *"a machine that is four minutes fast gets -240,000"*. Four minutes
+ * of traffic is not a private evening. It is every car in Sydney drawn
+ * somewhere it is not, on the client that is drawing it, while the server
+ * hit-tests where it really is -- **which is the owner's report that the car
+ * hitbox felt too long, arriving from the clock rather than from the geometry**.
+ * `server/carcrash-check.ts` section 5 measures it: the displacement is the
+ * skew times the car's speed, so 50 ms is 0.69 m at 50 km/h and one second is
+ * fourteen metres.
+ *
+ * So the skew is applied **here**, inside the one function every consumer of
+ * the timetable already calls, rather than at the thirty-odd
+ * `trafficTick(Date.now())` call sites in `main.ts`. Three properties make that
+ * safe:
+ *
+ *   1. **It is zero unless somebody sets it**, so the server, every check and
+ *      every offline session behave exactly as they always did. `verifyTraffic`
+ *      asserts the default.
+ *   2. **It is set once, from the `WELCOME`**, beside `sky.setServerClock` and
+ *      from the same number -- so there is one place a client learns what time
+ *      the host thinks it is, and the sky and the street now agree about it.
+ *   3. **Its error is one one-way trip**, because that is when the sample was
+ *      taken. Tens of milliseconds against a quantity that was previously
+ *      unbounded.
+ *
+ * The `HoldLedger` is the one thing that holds a *tick* across a change of
+ * skew, and it is already self-healing by design (`HOLD_EVICT_TICKS`, and a
+ * `Math.abs` on the staleness test for exactly this reason): a client that
+ * adopted the host's clock mid-session throws its entries away within five
+ * seconds and rebuilds them.
+ */
+let trafficClockSkewMs = 0;
+
+/**
+ * Adopt the host's wall clock for the timetable. `serverNow - localNow`, ms.
+ *
+ * Called once, by `main.ts`, on the frame the `WELCOME` arrives. Never by the
+ * server, which *is* the clock, and never by a check -- which is what makes the
+ * default of zero the tested path.
+ */
+export function setTrafficClockSkew(ms: number): void {
+  trafficClockSkewMs = Number.isFinite(ms) ? ms : 0;
+}
+
+/** What the skew currently is. The dev overlay, and `server/carcrash-check.ts`. */
+export function trafficClockSkew(): number {
+  return trafficClockSkewMs;
 }
 
 /** Ticks to seconds. One divide, so the two ends cannot round differently. */
@@ -2856,7 +2924,36 @@ interface HoldEntry {
   atTick: number;
   /** The last tick this identity was looked at, for eviction. */
   seen: number;
+  /**
+   * The tick this car stops being pinned where it stands, or 0.
+   *
+   * **The one thing the hold does that is not a queue.** See `HoldLedger.stun`.
+   */
+  stunUntil: number;
 }
+
+/**
+ * How long a car somebody has driven into stands where it is, in 60 Hz ticks.
+ * **Three seconds.**
+ *
+ * The brief's "a few seconds", and the number is set by what it has to cover: a
+ * driver who hits a car, is stopped by it, and reverses off it. That is two to
+ * three seconds of hands on the wheel, and a hold that expired inside it would
+ * put the struck car back on its timetable *through* the car that hit it --
+ * which is the pass-through this whole feature exists to remove, arriving one
+ * second late.
+ *
+ * Bounded rather than open-ended for `HOLD_MAX_LAG`'s reason and it is the same
+ * lie told the same way: a car pinned forever is a route whose whole fleet
+ * stacks up behind one point, and the honest failure is that the street goes
+ * back to being a street. Three seconds against a residential 12.5 m/s is 37 m
+ * of timetable, which is inside `HOLD_MAX_LAG`'s own 30 m ceiling for anything
+ * slower than an arterial -- so on most streets the stun expires *and* the lag
+ * ceiling catches it, and on a motorway the ceiling catches it first. Both
+ * outcomes are "the traffic resumes", which is the outcome this rule is allowed
+ * to have.
+ */
+const HOLD_STUN_TICKS = 180;
 
 /** What `resolveHeld` needs to know about a car somebody is driving or has left. */
 export interface HoldBlocker {
@@ -2975,12 +3072,33 @@ export class HoldLedger {
   lagOf(identity: number, tick: number, speed: number): number {
     const entry = this.entries.get(identity);
     if (entry === undefined) return 0;
+    const elapsed = (tick - entry.atTick) / TRAFFIC_HZ;
+    // --- Pinned by a crash. See `stun`.
+    //
+    // The **same closed form with the sign turned round**, which is what makes
+    // this rule obey the class header's property 2 rather than being an
+    // exception to it: the timetable runs on and the car does not, so the lag
+    // *grows* at exactly the speed the schedule is trying to move it at, and
+    // two processes at the same tick compute the same number without either
+    // having integrated anything.
+    //
+    // Clamped at `HOLD_MAX_LAG` rather than abandoned, and the consequence is
+    // worth knowing: on a motorway deck at 22 m/s the ceiling is reached after
+    // 1.4 s of a 3 s pin, and from there the car creeps forward at the schedule
+    // speed while still reporting as held. That is `HOLD_MAX_LAG`'s own promise
+    // arriving early -- "the hold is abandoned and the car resumes its
+    // timetable" -- and it is the right failure for the same reason: a car
+    // pinned forever is a route whose whole fleet stacks into one box.
+    if (entry.stunUntil > tick) {
+      const lag = entry.lag + (speed > 0 ? speed : 0) * elapsed;
+      return lag > HOLD_MAX_LAG ? HOLD_MAX_LAG : lag;
+    }
     // The closed form. See the class header, property 2: the rate is read fresh
     // off the car's *current* schedule speed, which is itself a pure function of
     // the tick, so two processes at the same tick get the same number without
     // either having integrated anything.
     const rate = Math.min(HOLD_CATCH_UP, 0.5 * (speed > 0 ? speed : 0));
-    const lag = entry.lag - rate * ((tick - entry.atTick) / TRAFFIC_HZ);
+    const lag = entry.lag - rate * elapsed;
     return lag > 0 ? lag : 0;
   }
 
@@ -2988,7 +3106,7 @@ export class HoldLedger {
   record(identity: number, lag: number, tick: number): void {
     let entry = this.entries.get(identity);
     if (entry === undefined) {
-      entry = { lag, atTick: tick, seen: tick };
+      entry = { lag, atTick: tick, seen: tick, stunUntil: 0 };
       this.entries.set(identity, entry);
       if (this.entries.size > HOLD_LEDGER_MAX) this.evict(tick);
       return;
@@ -2996,6 +3114,67 @@ export class HoldLedger {
     entry.lag = lag;
     entry.atTick = tick;
     entry.seen = tick;
+  }
+
+  /**
+   * **Somebody drove into this car. It stands where it is for three seconds.**
+   *
+   * The queue this class was written for answers "there is something in my
+   * lane, six metres ahead" -- and that covers a driver who stops *in front of*
+   * an ambient car and nothing else. A T-bone, a hit from behind, a car clipped
+   * across an intersection: in every one of those the blocker is not ahead of
+   * the struck car in its own lane, so `resolveHeld` finds nothing and the car
+   * carries on driving out of the wreck it is in the middle of.
+   *
+   * So a contact stuns. What that means is exactly two things and no more: the
+   * lag stops recovering (the closed form in `lagOf` is skipped, so the car does
+   * not walk forward at `HOLD_CATCH_UP`) and the pose reports a speed of zero,
+   * which is what makes it harmless to a pedestrian (`carHitStrength`) for as
+   * long as it stands there. It does **not** move the car, which is the whole
+   * distinction between this and the driven set: an ambient car is a
+   * closed-form lookup with nowhere to write a new position, and a car that has
+   * been hit hard enough that standing still is not a plausible answer stops
+   * being ambient altogether (`driving.KNOCK_LOOSE_SPEED`).
+   *
+   * ---------------------------------------------------------------------------
+   * **WHOSE STUN IT IS.** Both ends run this from their own detection of their
+   * own driver's crash (`driving.crashIntoTraffic`, which `sim.stepCars` and
+   * `main.ts`'s car block both call at the same tick with the same arguments),
+   * so a player's own hit is stunned identically on both. A *remote* player's
+   * hit is the server's alone, and this client will not stun for it -- so a car
+   * somebody else rammed keeps rolling on your screen for as long as the entry
+   * is missing.
+   *
+   * That is a real and bounded lie and it is the one this class was already
+   * built to tell: the header's property 3 is that the ledger is bounded and
+   * self-healing, and the cost of this particular disagreement is a car drawn
+   * up to three seconds ahead of where the server has it, on a street where
+   * somebody has just crashed. Fixing it properly would mean the stun on the
+   * wire -- an identity and a tick per struck ambient car, which is the
+   * per-NPC city state DESIGN.md rule 5 exists to forbid.
+   */
+  stun(identity: number, tick: number): void {
+    let entry = this.entries.get(identity);
+    if (entry === undefined) {
+      entry = { lag: 0, atTick: tick, seen: tick, stunUntil: tick + HOLD_STUN_TICKS };
+      this.entries.set(identity, entry);
+      if (this.entries.size > HOLD_LEDGER_MAX) this.evict(tick);
+      return;
+    }
+    entry.seen = tick;
+    // **Extended and never shortened**, so a second hit inside the window
+    // restarts the clock rather than being ignored -- a driver grinding against
+    // a stopped car is hitting it many times and the car has to stay stopped
+    // for all of them.
+    const until = tick + HOLD_STUN_TICKS;
+    if (until > entry.stunUntil) entry.stunUntil = until;
+  }
+
+  /** Is this car pinned where it stands? `resolveHeld`'s gate. See `stun`. */
+  stunned(identity: number, tick: number): boolean {
+    const entry = this.entries.get(identity);
+    if (entry === undefined) return false;
+    return entry.stunUntil > tick;
   }
 
   /** This identity has caught up, or was never behind. */
@@ -3125,6 +3304,14 @@ export function resolveHeld(pose: CarPose, ledger: HoldLedger, tick: number): nu
   // schedule position, because the thing that can be blocked is the car, and the
   // car is where the last hold left it.
   let lag = ledger.lagOf(pose.identity, tick, pose.speed);
+  // **Somebody drove into this one**, which is the half of the hold that is not
+  // a queue. See `HoldLedger.stun`: the lag above has already been computed
+  // with the sign turned round, so all that is left here is the consequence a
+  // pedestrian can feel -- a car standing still is not a car that can run you
+  // down (`carHitStrength`), and a stunned car is standing still whether or not
+  // it also happens to have something in its lane.
+  const pinned = ledger.stunned(pose.identity, tick);
+  if (pinned) pose.speed = 0;
   if (lag > 0) {
     pose.x -= pose.dx * lag;
     pose.z -= pose.dz * lag;
@@ -3176,9 +3363,13 @@ export function resolveHeld(pose: CarPose, ledger: HoldLedger, tick: number): nu
     return lag;
   }
 
-  if (lag <= 0) {
+  if (lag <= 0 && !pinned) {
     // Nothing in the way and nothing owed. The common case for every car in
     // Sydney, and it costs one map lookup and four `Math.floor`s.
+    //
+    // `!pinned` because a car stunned on the tick it was hit owes nothing yet --
+    // its lag is still zero -- and forgetting it here would throw the stun away
+    // one tick after it was written.
     ledger.forget(pose.identity);
     pose.held = 0;
     return 0;
@@ -5559,6 +5750,67 @@ export function verifyTraffic(
   //     still cars parked that never move that other cars just pass thru ...
   //     cars should never pass thru each other".
   for (const f of verifyLaneShare(NORTH_LANE_OFFSET)) failures.push(f);
+
+  // --- WORKSTREAM AQ: the clock the whole fleet is a function of, and the pin
+  //     a crash puts on one car. Both fail by drawing a perfectly good city.
+  {
+    // **The default is zero**, which is what makes the server, every check and
+    // every offline session the tested path. See `setTrafficClockSkew`: this is
+    // a mutable module-level number and this line is the only thing standing
+    // between it and a check suite that quietly ran on somebody else's clock.
+    if (trafficClockSkew() !== 0) {
+      failures.push(
+        `The traffic clock skew is ${trafficClockSkew()} ms and not 0. Nothing but a client adopting a ` +
+          'host WELCOME may set it, and it must be zero everywhere else.',
+      );
+    }
+    const before = trafficTick(TRAFFIC_EPOCH_MS + 1000);
+    setTrafficClockSkew(1000);
+    const after = trafficTick(TRAFFIC_EPOCH_MS + 1000);
+    setTrafficClockSkew(0);
+    if (after - before !== TRAFFIC_HZ) {
+      failures.push(
+        `A second of clock skew moved the traffic tick by ${after - before} rather than ${TRAFFIC_HZ}. ` +
+          'That number times the car speed is how far every car in the city is drawn from where the ' +
+          'server hit-tests it -- fourteen metres a second at 50 km/h.',
+      );
+    }
+    if (trafficTick(TRAFFIC_EPOCH_MS + 1000) !== before) failures.push('The skew did not go back to zero.');
+  }
+  {
+    const ledger = new HoldLedger();
+    const tick = 1000;
+    if (ledger.stunned(7, tick)) failures.push('A car nobody has hit is pinned.');
+    ledger.stun(7, tick);
+    if (!ledger.stunned(7, tick)) failures.push('A car that was just hit is not pinned.');
+    // It stops. That is what a pedestrian can feel, through `carHitStrength`.
+    const pose = createCarPose();
+    pose.identity = 7;
+    pose.speed = 10;
+    pose.dz = -1;
+    pose.dx = 0;
+    resolveHeld(pose, ledger, tick);
+    if (pose.speed !== 0) failures.push(`A car pinned by a crash is still doing ${pose.speed} m/s.`);
+    // And it falls behind its timetable at the speed it was doing, so it stands
+    // where it was hit rather than driving out of the wreck.
+    //
+    // The schedule speed is put back first, because that is what the real
+    // caller does: `forEachCarNear` fills the pose from `poseCar` -- which is
+    // the timetable and knows nothing about the pin -- and *then* asks this
+    // function. Reusing the zeroed pose would ask the growth rate to be read
+    // off a car this function had already stopped, which is the one way to
+    // write this test so that it passes on a pin that does nothing.
+    pose.speed = 10;
+    resolveHeld(pose, ledger, tick + 60);
+    if (!(pose.held > 5)) {
+      failures.push(
+        `A second after being hit, a 10 m/s car is only ${pose.held.toFixed(2)} m behind its timetable. ` +
+          'It is driving on through the car that hit it.',
+      );
+    }
+    // Three seconds later it is a car again.
+    if (ledger.stunned(7, tick + 60 * 4)) failures.push('A car pinned by a crash never resumes its timetable.');
+  }
 
   return failures;
 }

@@ -80,12 +80,26 @@ import { trafficSeconds,
   forEachCarNear,
   nearestBay,
   trafficTick,
+  // WORKSTREAM AQ: the host's wall clock, adopted for the timetable. See
+  // `traffic.setTrafficClockSkew` -- this is the fix for the owner's "maybe the
+  // car hitbox is too long", which was never the hitbox.
+  setTrafficClockSkew,
   verifyTraffic,
   type CarPose,
   type LaneRoute,
   verifyLaneShare,
   verifyResidency,
 } from './game/traffic.ts';
+// WORKSTREAM AQ: the game's 2D rigid-body layer. Three-free, so the server runs
+// this exact file -- see its header for why there is one layer for cars, bikes
+// and (later) boats rather than one per vehicle, and why there is no library.
+import {
+  createRigidBody,
+  createRigidContact,
+  rigidAlong,
+  rigidSlip,
+  verifyRigid,
+} from './game/rigid.ts';
 import {
   IMPOSTOR_CAPACITY,
   PedestrianAssets,
@@ -490,6 +504,20 @@ import {
   crashDamage,
   // WORKSTREAM T: driving into the ambient fleet is a crash, not an ejection.
   crashIntoTraffic,
+  // --- WORKSTREAM AQ: the body layer, as cars use it. `resolveTrafficContact`
+  // is the *prediction* of the sweep `sim.stepCars` runs authoritatively, on
+  // `crashIntoTraffic`'s own terms: the same call with the same arguments at
+  // the same tick, so it is a prediction and not a second opinion.
+  KNOCK_LOOSE_SPEED,
+  NOSE_HEAD,
+  NOSE_RADIUS,
+  NOSE_STEP,
+  carRigidBody,
+  createCarShunt,
+  resolveCarContact,
+  resolveTrafficContact,
+  verifyCarPhysics,
+  type DrivenCar,
   snapToBay,
   verifyDamageGrade,
   resolveTake,
@@ -1253,6 +1281,23 @@ async function main(): Promise<void> {
   // unit is a car that everybody reports as "feeling slow". See
   // `game/driving.ts` and `world/drivencars.ts`.
   const drivingFailures = timed('driving', verifyDriving);
+  // --- WORKSTREAM AQ: the body layer under all of it, and the car half of its
+  // wiring. Three-free, so the server runs the identical pair.
+  //
+  // Every failure in `verifyRigid` renders a perfectly good frame and most of
+  // them render a plausible one: two cars welded together sliding down George
+  // Street, a T-bone that slews the struck car the wrong way (which is
+  // *physics* to anybody who was not standing at the intersection), a ute a
+  // sedan pushes as far as the ute pushes it. The determinism case is the one
+  // that costs a session rather than a frame -- two ends integrating the same
+  // impulse to different answers is a car that rubber-bands, and it arrives as
+  // "the netcode is bad" rather than as a physics bug. See `game/rigid.ts`.
+  const rigidFailures = timed('rigid', verifyRigid);
+  // And the car half: the mass table against the body table, a slip that
+  // reaches the controller, a slip that does *not* change an ordinary drive,
+  // grip that reaches exactly zero, and a knocked car that rolls, stops and is
+  // given back. See `driving.verifyCarPhysics`.
+  const carPhysicsFailures = timed('car physics', verifyCarPhysics);
   // --- WORKSTREAM S. The parked fleet's decoder, its yaw convention and the
   // residency's byte accounting. `BODY_COUNT`/`CAR_PAINT.length` are handed in
   // rather than imported by that module, on `verifyTraffic(carBodySizes())`'s
@@ -1732,6 +1777,8 @@ async function main(): Promise<void> {
     spawnFailures.length ||
     bikeFailures.length ||
     drivingFailures.length ||
+    rigidFailures.length ||
+    carPhysicsFailures.length ||
     staticCarFailures.length ||
     drivenCarFailures.length ||
     carSoundFailures.length ||
@@ -1832,6 +1879,8 @@ async function main(): Promise<void> {
           ...spawnFailures,
           ...bikeFailures,
           ...drivingFailures,
+          ...rigidFailures,
+          ...carPhysicsFailures,
           ...staticCarFailures,
           ...drivenCarFailures,
           ...carSoundFailures,
@@ -4301,6 +4350,29 @@ async function main(): Promise<void> {
    * `server/sim.drivenPose` is the same field on the other end.
    */
   const carCrashPose: CarPose = createCarPose();
+  /**
+   * --- WORKSTREAM AQ: the body layer's scratch, on `carRoutes`' argument
+   * exactly and `sim.bodyA`'s on the other end. Two bodies, one contact and one
+   * result, reused for every fixed step -- a literal per contact would be four
+   * allocations on the tick anybody touches anything.
+   */
+  const carBodyA = createRigidBody();
+  const carBodyB = createRigidBody();
+  const carContact = createRigidContact();
+  const carShunt = createCarShunt();
+  /** Loose cars that moved this frame. Owned and reused; see `CarField.integrateLoose`. */
+  const carLooseSweep: DrivenCar[] = [];
+  /**
+   * The collision world as `CarField.integrateLoose` wants it, bound once.
+   *
+   * `sim.looseResolve` is the identical closure on the other end and exists for
+   * the identical reason: `game/driving.ts` is three-free and must not learn
+   * what a `CollisionWorld` is, and binding it here is one closure for the life
+   * of the session rather than one a frame.
+   */
+  const carLooseResolve = (
+    fx: number, fz: number, tx: number, tz: number, r: number, feetY: number, headY?: number,
+  ): { x: number; z: number; hit: boolean } => collision.resolve(fx, fz, tx, tz, r, feetY, headY);
   /**
    * How many times a car has knocked somebody over this session, and when the
    * last one was. Diagnostics only, and the only observable this feature has:
@@ -7478,6 +7550,18 @@ async function main(): Promise<void> {
        * the skew is a difference between two running clocks and stays correct
        * for the session. See `net/client.clockSkewMs`. */
       sky.setServerClock(client.clockSkew);
+      /* **And the street, from the same number.** WORKSTREAM AQ.
+       *
+       * The comment above this one describes the sky's failure -- "four minutes
+       * of private evening nobody could see" -- and, without meaning to,
+       * describes the traffic's, which nobody was fixing: `game/traffic.ts` is
+       * a pure function of the wall clock, and until this line the wall clock
+       * it read was *this laptop's*. A machine a second fast drew every car in
+       * Sydney fourteen metres from where the server hit-tests it, which is the
+       * owner's report that the car hitbox felt too long arriving from the
+       * clock rather than from the geometry. `server/carcrash-check.ts` section
+       * 5 is the measurement and `traffic.setTrafficClockSkew` is the essay. */
+      setTrafficClockSkew(client.clockSkew);
       const w = client.welcome;
       if (w) {
         dev.boot = 'ground at server spawn';
@@ -11575,6 +11659,10 @@ async function main(): Promise<void> {
           id: c.id,
           drivingCar: c.drivingCar,
           carSpeed: c.carSpeed,
+          // WORKSTREAM AQ: and the body layer's two, which travel to the record
+          // exactly as the speed does. `sim.stepCars` builds the identical view.
+          carSlip: c.carSlip,
+          carYawRate: c.carYawRate,
           x: c.body.position.x,
           feetY: c.body.position.y - EYE_HEIGHT,
           z: c.body.position.z,
@@ -11651,8 +11739,9 @@ async function main(): Promise<void> {
       if (c.drivingCar !== 0) {
         const mine = cars.get(c.drivingCar);
         if (mine !== undefined) {
+          const tick = trafficTick(Date.now());
           const into = crashIntoTraffic(
-            traffic, mine, trafficTick(Date.now()), carRoutes, carCrashPose, carPose, drivenCars.suppress,
+            traffic, mine, tick, carRoutes, carCrashPose, carPose, drivenCars.suppress,
           );
           if (into > 0) {
             if (cars.damage(mine.id, crashDamage(into)) !== null) {
@@ -11661,8 +11750,142 @@ async function main(): Promise<void> {
               audio.carScrape();
             }
           }
+          // --- WORKSTREAM AQ: and **what the contact did**, which is the half
+          // the damage call above cannot express.
+          //
+          // `sim.resolveTrafficContacts` runs the identical call with the
+          // identical arguments at the identical tick, so this is a prediction
+          // and not a second opinion -- the same relationship the damage
+          // prediction two blocks up has with `sim.stepCars`. What it buys is
+          // the whole picture of the impact arriving on the frame of the
+          // impact: the car is pushed back out of the bus, it rebounds, it
+          // slews, and the ambient car it hit stops dead instead of driving on
+          // through the wreck. Without it all four of those would arrive a
+          // round trip later as a correction.
+          //
+          // **The driver's own car only**, exactly like the wall and the damage
+          // above it: somebody else's crash is theirs to predict and reaches
+          // this end as a record.
+          //
+          // The knock-loose branch is deliberately *not* predicted. It creates a
+          // record with an id only the server may allocate -- see
+          // `driving.CarField`'s section 4, "ids are handed out at runtime" --
+          // and a client that minted one would have to un-mint it when the
+          // authoritative `MSG.CARS` arrived with a different number. The stun
+          // is predicted because it is a fact about the timetable that both
+          // ends already compute from the same ledger.
+          // From the **record**, not from the live body, and `sim.stepCars`'
+          // own sweep says why in full: `crashIntoTraffic` above decided what
+          // this crash cost off `drivenCarPose(mine)`, and two rules that ask
+          // about different boxes fire on different ticks -- the cheaper one
+          // wins by a hair and cancels the other.
+          const body = carRigidBody(mine, carBodyA);
+          const struck = resolveTrafficContact(
+            traffic, mine, tick, carRoutes, carCrashPose, carPose, drivenCars.suppress,
+            body, carBodyB, carContact, carShunt,
+          );
+          if (struck !== null) {
+            c.carSpeed = rigidAlong(body);
+            c.carSlip = rigidSlip(body);
+            c.carYawRate = body.yawRate;
+            // The separation, through the same resolver `controller.step` moves
+            // this body with -- `game/rigid.ts` section 4's rule, and the whole
+            // of why that layer reports a displacement instead of applying one.
+            const push = carShunt.push;
+            if (push[0] !== 0 || push[1] !== 0) {
+              const feet = c.body.position.y - EYE_HEIGHT;
+              const moved = collision.resolve(
+                c.body.position.x, c.body.position.z,
+                c.body.position.x + push[0], c.body.position.z + push[1],
+                NOSE_RADIUS, feet + NOSE_STEP, feet + NOSE_HEAD,
+              );
+              c.body.position.x = moved.x;
+              c.body.position.z = moved.z;
+            }
+            if (carShunt.closing < KNOCK_LOOSE_SPEED) traffic.held.stun(struck.identity, tick);
+          }
+          // --- And the **records with nobody in them**, which is the other
+          // half of "cars should never pass thru each other" and the half a
+          // player meets in a car park.
+          //
+          // Deliberately only the unoccupied ones. An occupied car's record
+          // holds the kerb its driver took it from -- `follow` carries the pose
+          // on the server without broadcasting it, and `world/drivencars.ts`'
+          // own header is about the bug that caused -- so this end has no
+          // honest idea where somebody else's moving car is. Driven against
+          // driven is therefore the server's alone and arrives here as a
+          // `CAR_SHUNT` record (`protocol.CarRecord.shunt`). A *parked* record
+          // is exactly where it says it is, on every end, which is what makes
+          // this one predictable.
+          //
+          // It is also the whole of what makes `?offline` a real test of this
+          // feature rather than a second implementation of it: offline there is
+          // no server and this is the authority.
+          for (const other of cars.all()) {
+            if (other.id === mine.id) continue;
+            if (other.driverId !== 0) continue;
+            const dy = other.y - mine.y;
+            if (dy > TAKE_HEIGHT || dy < -TAKE_HEIGHT) continue;
+            carRigidBody(
+              {
+                body: mine.body,
+                x: c.body.position.x,
+                z: c.body.position.z,
+                yaw: c.body.yaw,
+                speed: c.carSpeed,
+                slip: c.carSlip,
+                yawRate: c.carYawRate,
+              },
+              carBodyA,
+            );
+            carRigidBody(other, carBodyB);
+            if (!resolveCarContact(carBodyA, carBodyB, carContact, carShunt)) continue;
+            c.carSpeed = rigidAlong(carBodyA);
+            c.carSlip = rigidSlip(carBodyA);
+            c.carYawRate = carBodyA.yawRate;
+            const push = carShunt.push;
+            if (push[0] !== 0 || push[1] !== 0) {
+              const feet = c.body.position.y - EYE_HEIGHT;
+              const moved = collision.resolve(
+                c.body.position.x, c.body.position.z,
+                c.body.position.x + push[0], c.body.position.z + push[1],
+                NOSE_RADIUS, feet + NOSE_STEP, feet + NOSE_HEAD,
+              );
+              c.body.position.x = moved.x;
+              c.body.position.z = moved.z;
+            }
+            // The car that was shoved is written back too, and offline that is
+            // the authority; online the next `MSG.CARS` corrects it, on the
+            // health byte's own terms. Either way a parked car that has just
+            // been pushed is a car that rolls, which is what `loose` means.
+            other.speed = rigidAlong(carBodyB);
+            other.slip = rigidSlip(carBodyB);
+            other.yawRate = carBodyB.yawRate;
+            other.restMs = 0;
+            if (other.speed !== 0 || other.slip !== 0 || other.yawRate !== 0) other.loose = true;
+            if (push[2] !== 0 || push[3] !== 0) {
+              const moved = collision.resolve(
+                other.x, other.z, other.x + push[2], other.z + push[3],
+                NOSE_RADIUS, other.y + NOSE_STEP, other.y + NOSE_HEAD,
+              );
+              other.x = moved.x;
+              other.z = moved.z;
+            }
+          }
         }
       }
+      // --- WORKSTREAM AQ: the wrecks, rolled forward on the mirror.
+      //
+      // **The same call the server makes, with the same integrator**, which is
+      // what lets a loose car's pose be sent at 10 Hz instead of 60 -- see
+      // `driving.LOOSE_BROADCAST_TICKS`, where the difference is 20 kbit/s a
+      // player against 120. What arrives from the server is a correction; what
+      // is on screen between corrections is this.
+      //
+      // Online as well as offline, unlike the `follow` sweep above: a loose car
+      // is the one record whose position is *not* derived from a driver, so
+      // there is nothing else for either end to derive it from.
+      cars.integrateLoose(FIXED_DT, carLooseResolve, carLooseSweep);
       // The clocks. `CarField.age` removes nothing -- see `game/driving.ts`
       // section 6 -- and online the cooldown it advances is the *prediction's*,
       // which is why it runs on the mirror as well as on the authority.
