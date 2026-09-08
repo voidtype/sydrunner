@@ -658,17 +658,52 @@ function driveTheWholeThing(filedAs: Candidate, label: string): void {
   // --- A second of throttle. At `DRIVE_ACCELERATION` that is tens of metres of
   //     street, and it is the only thing that separates "a record exists" from
   //     "the car is mine".
+  //
+  // --- WORKSTREAM AS: **and then a second with the wheel turned, if the first
+  //     one ran into something.**
+  //
+  // Parked cars are solid now (`driving.resolveStaticContact`), and that changed
+  // what a straight line measures at exactly one of the two kinds of bay this
+  // driver was written for. A car in a **kerb bay** has the road in front of it.
+  // A car at a `traffic.synthesiseLaneBay` **lane edge** is parked at the left
+  // edge of its own lane, which is precisely where `.cars.bin` puts the kerb
+  // fleet -- so it is parked *in the row*, with the next car about four and a
+  // half metres diagonally ahead of it. Measured on the first run of this gate
+  // after the change: the car covered 1.54 m and stopped dead against static
+  // 0x4c2c9d5e, 0.23 m into its flank, and stayed there for the rest of the
+  // second with the throttle down.
+  //
+  // That is not "taken but not drivable". It is parallel parking, and the answer
+  // is the one every driver in Sydney uses: **turn the wheel.** A car doing
+  // 1.5 m/s steers at `driving.DRIVE_TURN_RATE`, so half a radian off the kerb
+  // is a car pulling into the lane. What this gate is for -- a record that
+  // exists and a car that will not move -- is unchanged and is still caught,
+  // because a car that is genuinely undrivable does not move on the second
+  // attempt either.
   const fromX = record.x;
   const fromZ = record.z;
-  player.input.forward = 1;
-  for (let i = 0; i < TICK_HZ; i++) sim.step(out);
-  player.input.forward = 0;
-  const after = sim.cars.get(carId);
-  const moved = after === undefined ? 0 : Math.hypot(after.x - fromX, after.z - fromZ);
+  const drive = (turn: number): number => {
+    player.input.yaw = player.combat.body.yaw + turn;
+    player.input.forward = 1;
+    for (let i = 0; i < TICK_HZ; i++) sim.step(out);
+    player.input.forward = 0;
+    const at = sim.cars.get(carId);
+    return at === undefined ? 0 : Math.hypot(at.x - fromX, at.z - fromZ);
+  };
+  let moved = drive(0);
+  if (moved < 2) {
+    // Away from whatever it is against. The sign is arbitrary and both are
+    // tried, because a car parked on the left of the road and one on the right
+    // pull out in opposite directions and this driver does not know which it has.
+    const right = drive(0.6);
+    moved = Math.max(moved, right);
+    if (moved < 2) moved = Math.max(moved, drive(-0.6));
+    if (moved >= 2) say(`  ${label}: straight was blocked; it pulled out with the wheel turned.`);
+  }
   if (moved < 2) {
     fail(
-      `${label}: a second of full throttle moved the car ${moved.toFixed(2)} m. ` +
-        `Taken but not drivable is the same bug wearing a hat.`,
+      `${label}: a second of full throttle moved the car ${moved.toFixed(2)} m, and two more with the ` +
+        `wheel turned either way did no better. Taken but not drivable is the same bug wearing a hat.`,
     );
   }
 
