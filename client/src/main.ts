@@ -549,6 +549,9 @@ import {
 // pure, so the modulus that picks the model can be taken here without the fleet
 // -- see `game/carlabels.ts`, which is the whole argument.
 import { carLabel, carPool, verifyCarLabels } from './game/carlabels.ts';
+// WORKSTREAM footcar: the three fleets, as boxes a body on foot walks around.
+// See `game/carsolids.ts`; the wiring is five lines beside `drivenCars`.
+import { CarSolidField, verifyCarSolids } from './game/carsolids.ts';
 import {
   DRIVEN_DRAW_RADIUS,
   DrivenCarView,
@@ -1322,6 +1325,14 @@ async function main(): Promise<void> {
   // kills a tile's draw call; see `verifyStaticCars`.
   const staticCarFailures = timed('static cars', () => verifyStaticCars(BODY_COUNT, CAR_PAINT_COUNT));
   const drivenCarFailures = timed('drivencars', verifyDrivenCars);
+  // --- WORKSTREAM footcar. The three fleets as *walls*, which is the half of
+  // "a car is solid" that had no check at all: `server/carcoverage-check.ts`
+  // rams every population with a car and its report ended "On foot, everything.
+  // The static fleet is not in the collision prisms and no pedestrian capsule is
+  // tested against it." This asserts the suppression, the tick and the
+  // order-independence of the push; `verifyMovementBasis` above owns the
+  // geometry, because the step that meets a car lives in the controller.
+  const carSolidFailures = timed('car solids', verifyCarSolids);
   // --- WORKSTREAM AL. What the traffic sounds like, and every failure in it is
   // silent in the sense this list means: the game runs, the cars move, and the
   // audio is subtly wrong in a way nobody can screenshot. A pitch curve that is
@@ -1807,6 +1818,7 @@ async function main(): Promise<void> {
     carPhysicsFailures.length ||
     staticCarFailures.length ||
     drivenCarFailures.length ||
+    carSolidFailures.length ||
     carSoundFailures.length ||
     cityBedFailures.length ||
     carSmokeFailures.length ||
@@ -1909,6 +1921,7 @@ async function main(): Promise<void> {
           ...carPhysicsFailures,
           ...staticCarFailures,
           ...drivenCarFailures,
+          ...carSolidFailures,
           ...carSoundFailures,
           ...cityBedFailures,
           ...carSmokeFailures,
@@ -4408,7 +4421,10 @@ async function main(): Promise<void> {
    */
   const carLooseResolve = (
     fx: number, fz: number, tx: number, tz: number, r: number, feetY: number, headY?: number,
-  ): { x: number; z: number; hit: boolean } => collision.resolve(fx, fz, tx, tz, r, feetY, headY);
+    // `resolveCity`: a wreck is a car, and a car meeting a car is
+    // `game/rigid.ts` with two masses. `sim.looseResolve` is the identical
+    // choice on the other end; see `CollisionWorld.resolveCity`.
+  ): { x: number; z: number; hit: boolean } => collision.resolveCity(fx, fz, tx, tz, r, feetY, headY);
   /**
    * How many times a car has knocked somebody over this session, and when the
    * last one was. Diagnostics only, and the only observable this feature has:
@@ -7222,6 +7238,48 @@ async function main(): Promise<void> {
   // the traffic must not steer round where it used to be either.
   traffic.obstacles.suppress = drivenCars.suppress;
   trafficMovers.driven = drivenCars.source;
+
+  // --- WORKSTREAM footcar: **on foot, cars are solid.**
+  //
+  // The whole of the wiring on this end, and `server/sim.ts` has the same five
+  // lines. `game/carsolids.ts` carries the argument; what is worth saying at the
+  // call site is which three fleets these are and why they are the ones the
+  // *server* also holds:
+  //
+  //   - `staticCars` is this end's `.cars.bin` ring, fed tile by tile by
+  //     `world/streamer.ts`. The server's residency is a strict superset of it
+  //     around any player (`driving.resolveTake`'s paragraph, and it holds here
+  //     verbatim), so this end can never be stopped by a car the server would
+  //     walk through -- only the reverse, which arrives as a correction like
+  //     every other misprediction on this path.
+  //   - `traffic` is the timetable, and a schedule car's pose is a pure
+  //     function of `(route, slot, tick)`, so the two ends see the same box at
+  //     the same tick by construction. See `carSolids.tick`, set at the top of
+  //     the fixed step.
+  //   - `carWorld()` is whichever `CarField` is authoritative right now --
+  //     `net.cars` online, `localCars` off -- read through a closure rather than
+  //     captured, because that switches the moment a connection opens.
+  //
+  // `suppressed` is `drivenCars.suppress`, which is the same predicate the
+  // traffic movers, the model fleet and the take all go through: a car somebody
+  // has driven away in stops being a wall in its bay on the same frame it stops
+  // being drawn there.
+  //
+  // **The take still reaches.** A player is now held `halfWidth + PLAYER_RADIUS`
+  // off a car's centre, which for the widest body in `CAR_BODY_SIZE` is 1.29 m
+  // against `driving.TAKE_RADIUS`'s 2.2 -- so walking up to a car at the kerb
+  // and pressing `E` is unchanged, and `verifyCarSolids` asserts the inequality
+  // rather than trusting this sentence. The one approach that *did* change is
+  // walking into the **nose** of a van, where the standoff is 3.05 m and out of
+  // reach; that is left alone deliberately, because `TAKE_RADIUS` is
+  // `bikes.MOUNT_RADIUS` by rule ("E has one reach") and because you do not get
+  // into a car by standing in front of it.
+  const carSolids = new CarSolidField();
+  carSolids.statics = staticCars;
+  carSolids.traffic = traffic;
+  carSolids.driven = { all: () => carWorld().all() };
+  carSolids.suppressed = drivenCars.suppress;
+  collision.setCarSolids(carSolids);
   // --- WORKSTREAM AL: and a fifth sink on the same loop, for the same reason the
   // four above it are sinks -- that loop already visits every car in view and
   // already has the position, heading and speed an engine needs. The mix is
@@ -11376,6 +11434,19 @@ async function main(): Promise<void> {
     hud.derived(promptLine);
     touch?.setPrompt(promptLine);
 
+    // The tick the car boxes stand at, before anything reads them.
+    //
+    // WORKSTREAM footcar: `CarSolidField.tick` is what makes a schedule car's
+    // box a pure function of the clock rather than of when it happened to be
+    // asked -- see `game/carsolids.ts` section 4. It is written here, at the top
+    // of the fixed step and *before* `reconcile`, because the reconciler's
+    // replay re-runs three to five frames through `controller.step` and every
+    // one of them has to meet the cars at the same instant the live frame will.
+    // A field that read `Date.now()` itself would give the replay a different
+    // street on every frame, which is a body sliding along a car that is not
+    // there. `sim.step` writes the same field in the same position.
+    carSolids.tick = trafficTick(Date.now());
+
     // Reconciliation, at the top of the tick and before anything is advanced.
     //
     // Here rather than in the render loop so a correction is folded in and then
@@ -11891,7 +11962,7 @@ async function main(): Promise<void> {
             const push = carShunt.push;
             if (push[0] !== 0 || push[1] !== 0) {
               const feet = c.body.position.y - EYE_HEIGHT;
-              const moved = collision.resolve(
+              const moved = collision.resolveCity(
                 c.body.position.x, c.body.position.z,
                 c.body.position.x + push[0], c.body.position.z + push[1],
                 NOSE_RADIUS, feet + NOSE_STEP, feet + NOSE_HEAD,
@@ -11947,7 +12018,7 @@ async function main(): Promise<void> {
               c.carYawRate = carBodyA.yawRate;
               const push = carShunt.push;
               if (push[0] !== 0 || push[1] !== 0) {
-                const moved = collision.resolve(
+                const moved = collision.resolveCity(
                   c.body.position.x, c.body.position.z,
                   c.body.position.x + push[0], c.body.position.z + push[1],
                   NOSE_RADIUS, feet + NOSE_STEP, feet + NOSE_HEAD,
@@ -12010,7 +12081,7 @@ async function main(): Promise<void> {
             const push = carShunt.push;
             if (push[0] !== 0 || push[1] !== 0) {
               const feet = c.body.position.y - EYE_HEIGHT;
-              const moved = collision.resolve(
+              const moved = collision.resolveCity(
                 c.body.position.x, c.body.position.z,
                 c.body.position.x + push[0], c.body.position.z + push[1],
                 NOSE_RADIUS, feet + NOSE_STEP, feet + NOSE_HEAD,
@@ -12028,7 +12099,7 @@ async function main(): Promise<void> {
             other.restMs = 0;
             if (other.speed !== 0 || other.slip !== 0 || other.yawRate !== 0) other.loose = true;
             if (push[2] !== 0 || push[3] !== 0) {
-              const moved = collision.resolve(
+              const moved = collision.resolveCity(
                 other.x, other.z, other.x + push[2], other.z + push[3],
                 NOSE_RADIUS, other.y + NOSE_STEP, other.y + NOSE_HEAD,
               );
@@ -13336,7 +13407,10 @@ async function main(): Promise<void> {
         // snap the chase in against a soffit the player is walking happily
         // under. See `CollisionWorld.resolve`.
         return (
-          collision.resolve(px, pz, px, pz, CHASE_RADIUS, py, py).hit ||
+          // `resolveCity`: the boom is a point that lives *inside* the player's
+          // own car for the whole time the chase camera matters, so the cars
+          // are deliberately not consulted. See `CollisionWorld.resolveCity`.
+          collision.resolveCity(px, pz, px, pz, CHASE_RADIUS, py, py).hit ||
           py < groundHeightAt(px, pz, py) + CHASE_FLOOR
         );
       };

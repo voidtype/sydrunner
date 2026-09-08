@@ -89,6 +89,9 @@ import { verifyCarFire } from '../client/src/game/carfire.ts';
 // and paint counts are omitted here and passed by `main.ts`, which is the end
 // that can load the palette; see `verifyStaticCars`.
 import { verifyParkedBins, verifyStaticCars } from '../client/src/game/staticcars.ts';
+// WORKSTREAM footcar: the same three fleets, as walls. Three-free by rule; see
+// `game/carsolids.ts`, whose whole point is that this list can run it.
+import { verifyCarSolids } from '../client/src/game/carsolids.ts';
 // The car-name table, three-free for this list's sake. See `game/carlabels.ts`.
 import { verifyCarLabels } from '../client/src/game/carlabels.ts';
 // And the *drawing* of a car somebody took, which is a browser rule checked here
@@ -585,6 +588,17 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // lays a tile's instances out in this order and `carlod` addresses them in
     // it, and a disagreement folds a car flat somewhere nobody is looking.
     ['verifyParkedBins', verifyParkedBins()],
+    // And the same three fleets as **walls**. WORKSTREAM footcar.
+    // `server/carcoverage-check.ts` proves every population of car collides with
+    // a car; its report ended "On foot, everything. The static fleet is not in
+    // the collision prisms and no pedestrian capsule is tested against it." This
+    // is that half: the suppression (a stolen car stops being a wall in its
+    // bay), the tick (a schedule car's box follows the timetable), and the
+    // order-independence of the push, which is the one that costs a session --
+    // two ends resolving the same two cars in different adoption orders is a
+    // player who rubber-bands along a kerb row. `verifyMovementBasis` below owns
+    // the geometry.
+    ['verifyCarSolids', verifyCarSolids()],
     // And what a car is called. The server never says it -- the hero line is the
     // browser's -- but the table it is said from is three-free on purpose, and
     // the property that matters is arithmetic rather than pictorial: the label

@@ -14,7 +14,7 @@
 
 import { Euler, Vector3 } from 'three/webgpu';
 
-import { BODY_HEIGHT_M, type MoveResolver } from './collision.ts';
+import { BODY_HEIGHT_M, CollisionWorld, type CarSolid, type MoveResolver } from './collision.ts';
 
 export interface InputSnapshot {
   forward: number; // -1..1
@@ -368,6 +368,97 @@ export function verifyMovementBasis(): string[] {
       `Strafe at yaw 0 moved (${s.position.x.toFixed(2)}, ${s.position.z.toFixed(2)}); ` +
         `it should be purely along X.`,
     );
+  }
+
+  // --- And a car is a wall. See `collision.CarSolid`.
+  //
+  // The geometry, here, with a box written out as a literal: this function owns
+  // the step that meets it, and the four sides of a parked sedan are the four
+  // ways a player walks into one. `game/carsolids.verifyCarSolids` owns the
+  // layer above -- the three fleets, the suppression, the tick and the
+  // order-independence -- and cannot be reached from this file without a cycle,
+  // which is the only reason there are two checks and not one.
+  //
+  // A 4.6 x 1.8 m sedan at the origin with its nose along +X: 2.3 m of box along
+  // X and 0.9 m across Z, plus `PLAYER_RADIUS` of capsule on whichever face is
+  // approached. The walk is 150 ticks of `step`, which is 2.5 seconds and far
+  // more than enough to close 6 m and settle.
+  {
+    const SEDAN: CarSolid = {
+      identity: 1, x: 0, y: 0, z: 0, dx: 1, dz: 0,
+      halfLength: 2.3, halfWidth: 0.9, height: 1.45,
+    };
+    const world = new CollisionWorld();
+    world.setCarSolids({
+      forEachCarSolidNear: (x, _feetY, z, radius, visit) => {
+        const dx = SEDAN.x - x;
+        const dz = SEDAN.z - z;
+        if (dx * dx + dz * dz <= radius * radius) visit(SEDAN);
+      },
+    });
+    const walk = (fx: number, fz: number, yaw: number): PlayerState => {
+      const body = createPlayerState(fx, fz);
+      const held: InputSnapshot = { forward: 1, right: 0, jump: false, sprint: false, yaw, pitch: 0 };
+      for (let i = 0; i < 150; i++) step(body, held, 1 / 60, world, () => 0);
+      return body;
+    };
+    const faces: Array<[string, number, number, number, 'x' | 'z', number]> = [
+      ['north into the flank', 0, 6, 0, 'z', SEDAN.halfWidth + PLAYER_RADIUS],
+      ['south into the flank', 0, -6, Math.PI, 'z', -(SEDAN.halfWidth + PLAYER_RADIUS)],
+      ['east into the boot', 9, 0, Math.PI / 2, 'x', SEDAN.halfLength + PLAYER_RADIUS],
+      ['west into the nose', -9, 0, -Math.PI / 2, 'x', -(SEDAN.halfLength + PLAYER_RADIUS)],
+    ];
+    for (const [label, fx, fz, yaw, axis, want] of faces) {
+      const body = walk(fx, fz, yaw);
+      const at = axis === 'x' ? body.position.x : body.position.z;
+      const off = axis === 'x' ? body.position.z : body.position.x;
+      if (Math.abs(at - want) > 0.02) {
+        failures.push(
+          `Walking ${label} of a parked sedan stopped at ${axis} = ${at.toFixed(3)} m; the box face plus ` +
+            `the ${PLAYER_RADIUS} m capsule is ${want.toFixed(3)} m. A car is not solid, or it is the wrong size.`,
+        );
+      }
+      if (Math.abs(off) > 0.05) {
+        failures.push(`Walking ${label} of a parked sedan drifted ${off.toFixed(3)} m sideways; a flat face does not steer.`);
+      }
+    }
+
+    // Sliding: a body pressed into the flank while walking along it keeps going.
+    // 45 degrees into the side of the car, which without a slide stops dead.
+    //
+    // **A slide in this controller is lossy and that is not a car's doing.**
+    // `step` scales the *whole* velocity by the fraction of the wanted move it
+    // achieved rather than projecting it onto the face, so a body leaning 45
+    // degrees into any wall creeps along it at about a quarter of a walk. That
+    // is the behaviour every facade in Sydney already has and a car inherits it
+    // unchanged; what is asserted here is the difference between creeping and
+    // sticking, which is the failure a wrong push normal produces. From
+    // x = -0.24 (where the diagonal meets the flank) it reached 1.6 m on the run
+    // this was written against; the bar is a metre.
+    const slid = walk(-3, 4, -Math.PI / 4);
+    if (slid.position.x < 1) {
+      failures.push(
+        `A body walking diagonally into a parked sedan reached x = ${slid.position.x.toFixed(2)} m in 150 ` +
+          'ticks, having met the flank at about -0.24 m. It is stuck to the car rather than sliding along it.',
+      );
+    }
+    if (slid.position.z < SEDAN.halfWidth + PLAYER_RADIUS - 0.05) {
+      failures.push(`The sliding body ended up ${slid.position.z.toFixed(3)} m across, which is inside the car.`);
+    }
+
+    // A car roof is not a step. `STEP_HEIGHT` is 0.42 and the shortest body in
+    // `traffic.CAR_BODY_SIZE` is 1.45, so no lifted foot ever clears a bonnet
+    // and nothing would hold a body up if one did.
+    if (STEP_HEIGHT >= SEDAN.height) {
+      failures.push(
+        `STEP_HEIGHT is ${STEP_HEIGHT} m against a ${SEDAN.height} m sedan roof. A car has become a kerb, ` +
+          'and there is no ground function on either end that would hold a body up on one.',
+      );
+    }
+    const overRoof = world.resolve(0, 6, 0, 0, PLAYER_RADIUS, SEDAN.height + 0.01, SEDAN.height + BODY_HEIGHT_M);
+    if (overRoof.hit) {
+      failures.push('A body with its feet above the roof was stopped by the car; that is a wall in the air.');
+    }
   }
 
   return failures;

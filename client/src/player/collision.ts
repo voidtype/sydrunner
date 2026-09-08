@@ -235,6 +235,126 @@ export interface MoveResolver {
   ): { x: number; z: number; hit: boolean };
 }
 
+/**
+ * One car, as a box a body on foot has to walk **around**.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY A CAR IS NOT A PRISM, AND WHY IT IS NEVERTHELESS RESOLVED HERE.
+ *
+ * `server/carcoverage-check.ts` printed the hole in one sentence: *"On foot,
+ * everything. The static fleet is not in the collision prisms and no pedestrian
+ * capsule is tested against it."* Every car in Sydney -- the 1.4 M parked at the
+ * kerb, the forty on the timetable in any draw radius, the wrecks somebody has
+ * knocked loose -- was solid to another **car** and to nobody's **legs**. You
+ * walked through them.
+ *
+ * The obvious fix is to put a footprint per car into the prism grid and let
+ * `resolve` do what it already does, and it is wrong three times:
+ *
+ *   - **A prism is baked and a car is not.** `addTile` decodes a payload once
+ *     and holds the records for the life of the tile; a schedule car's pose is a
+ *     closed-form function of the clock (`traffic.poseCar`) and would have to be
+ *     re-inserted into the grid every tick, for every car in the city, on both
+ *     ends. That is the per-NPC city state `PERFORMANCE.md` forbids.
+ *   - **A car can stop being there.** `driving.CarField.suppressed` is how a
+ *     stolen or burnt car leaves the kerb, and a grid the suppression had to
+ *     reach into is a grid two processes have to agree about the contents of.
+ *     Asking the fleet per query asks the same predicate the take already asks.
+ *   - **Half the callers of `resolve` must not see cars at all.** A car's own
+ *     nose probe (`driving.stepCarSpeed`), the shunt separations, the loose-car
+ *     integrator and the chase camera are all moving *cars*, and car-on-car is
+ *     already adjudicated by `game/rigid.ts` with masses and impulses. They call
+ *     `resolveCity` below, which is this method as it was before cars existed.
+ *
+ * So the cars are a **source, asked per query**, and the box is the box the rest
+ * of the game already uses: `driving.carRigidBody`'s half extents for a record
+ * and a kerb car, `traffic.CarPose`'s own for a schedule car. One box per car in
+ * this game -- a player and a car must not disagree about where a car is.
+ *
+ * `y` is the ground the wheels stand on and `height` is the roof over it, so the
+ * band a car occupies is `[y, y + height)` and is tested exactly the way a
+ * prism's `[base, top)` is. **A car roof is never a step**: the shortest body in
+ * `CAR_BODY_SIZE` is the 1.45 m sedan and the tallest step `controller.step`
+ * probes with is `STEP_HEIGHT` at 0.42 m, so no lifted foot ever clears a
+ * bonnet, and nothing here (or in either end's `groundHeightAt`) would hold a
+ * body up if one did. A car is a wall you walk round, which is what a car is.
+ */
+export interface CarSolid {
+  /**
+   * Who this car is: `traffic.staticCarIdentity` for a kerb car,
+   * `traffic.identityOf` for a schedule car, `DrivenCar.carId` for a record.
+   *
+   * Carried for one reason and it is not diagnostics: it is the **tie-break**
+   * that makes the push order-independent. See `resolveCars`.
+   */
+  identity: number;
+  x: number;
+  /** The ground the wheels are on. The box is `[y, y + height)`. */
+  y: number;
+  z: number;
+  /** Unit nose direction in the world plan. Left of it is `(dz, -dx)`. */
+  dx: number;
+  dz: number;
+  halfLength: number;
+  halfWidth: number;
+  height: number;
+}
+
+/**
+ * Where the cars are, as `CollisionWorld` asks it once per resolved move.
+ *
+ * An interface rather than the class in `game/carsolids.ts` for the reason
+ * `PrismCarver` is one: this file is the shared authority and imports nothing.
+ * The server hands it a field over its residency, the browser hands it one over
+ * the streamed ring, and a self-check hands it four cars in an array.
+ *
+ * `feetY` is the asker's own feet and is passed *in* rather than being the
+ * caller's business afterwards, on `staticcars.StaticCarSource`'s argument
+ * exactly: it is the `near` hint the ground functions take, and without it a car
+ * on Alfred Street and the Cahill over it are one query with two answers.
+ */
+export interface CarSolidSource {
+  forEachCarSolidNear(
+    x: number,
+    feetY: number,
+    z: number,
+    radius: number,
+    visit: (car: CarSolid) => void,
+  ): void;
+}
+
+/**
+ * How far past its own radius a body has to look to find every car that could
+ * touch it, metres.
+ *
+ * The half-diagonal of the largest box any source can hand over: the van at
+ * 5.4 x 1.9, scaled by `traffic.poseCar`'s 1.04 ceiling and with
+ * `traffic.HIT_MARGIN` on both half extents, is `hypot(2.908, 1.088)` = 3.105.
+ * Rounded up, and asserted against `CAR_BODY_SIZE` by `verifyCarSolids` so that
+ * a sixth body type cannot silently outgrow it.
+ */
+export const CAR_SOLID_REACH = 3.2;
+
+/**
+ * How many cars one query keeps. See `resolveCars`.
+ *
+ * Sixteen, and it is a ceiling rather than a working number: a car is 1.75 m
+ * wide at its narrowest, so a 3.54 m disc round a player's capsule cannot
+ * physically contain more than about eight of them. The cap exists so that a
+ * body standing in the middle of a car park cannot make one tick allocate or
+ * loop without bound, and the eviction is by distance with the identity as the
+ * tie-break, so *which* sixteen is the same answer in every process.
+ */
+const MAX_CAR_SOLIDS = 16;
+
+/** Scratch record. `resolveCars` owns these for the life of the world. */
+function emptyCarSolid(): CarSolid & { d2: number; inside: boolean } {
+  return {
+    identity: 0, x: 0, y: 0, z: 0, dx: 0, dz: 1,
+    halfLength: 0, halfWidth: 0, height: 0, d2: 0, inside: false,
+  };
+}
+
 /** Uniform grid over prisms, so a move query touches only nearby buildings. */
 export class CollisionWorld implements MoveResolver {
   private readonly cells = new Map<string, Prism[]>();
@@ -302,6 +422,29 @@ export class CollisionWorld implements MoveResolver {
   private count = 0;
   /** `prismsWithin`'s query counter. See `Prism.seen`. */
   private visit = 0;
+  /**
+   * The cars, or `null` where nothing has said. See `CarSolidSource`.
+   *
+   * Null in every process that has not wired one, which is deliberately most of
+   * them: `server/world.loadWorld` builds a world with no cars in it and every
+   * check that drives a bare `CollisionWorld` -- `actor-ground-check`,
+   * `integration-check`'s twenty resolve sites, `world/collision-window-check`
+   * -- therefore sees byte for byte the world that shipped. Exactly two
+   * processes call `setCarSolids`: `server/sim.ts`'s `Simulation` and
+   * `client/src/main.ts`. Both hand over a `game/carsolids.CarSolidField` fed
+   * from the same three fleets.
+   */
+  private carSolids: CarSolidSource | null = null;
+  /**
+   * The query's own scratch, allocated once. See `resolveCars`.
+   *
+   * On the world rather than on the call because `resolve` runs once per body
+   * per tick for every player, bot, officer, pedestrian and knocked-out body in
+   * the room, and sixteen records a tick times a hundred bodies is a garbage
+   * rate this project has spent a lot of effort not having.
+   */
+  private readonly carScratch: Array<CarSolid & { d2: number; inside: boolean }> =
+    Array.from({ length: MAX_CAR_SOLIDS }, emptyCarSolid);
 
   constructor(cellSize = 32) {
     this.cellSize = cellSize;
@@ -800,7 +943,70 @@ export class CollisionWorld implements MoveResolver {
    * point under a viaduct is refused only where the viaduct is within 40 cm of
    * being a wall anyway.
    */
+  /**
+   * The city **and the cars**. Every body on foot goes through here.
+   *
+   * Two stages, in this order and never the other: the prisms first, exactly as
+   * they always were, and then the cars against the position the prisms left the
+   * body at. The order is the honest one -- a building is a fact about the world
+   * and a car is a thing standing on it, so a car pushed into a wall must not be
+   * able to push a body *through* the wall. Running the cars second and then
+   * refusing the whole move if the body is still inside one is what makes that
+   * true without a third pass: the worst case is a body wedged between a terrace
+   * and a Camry, which stays where it was.
+   *
+   * With no car source this is `resolveCity` and one null check, which is what
+   * every check and every process that has not wired a fleet gets.
+   */
   resolve(
+    fromX: number,
+    fromZ: number,
+    toX: number,
+    toZ: number,
+    radius: number,
+    feetY: number,
+    headY: number = feetY + BODY_HEIGHT_M,
+  ): { x: number; z: number; hit: boolean } {
+    const city = this.resolveCity(fromX, fromZ, toX, toZ, radius, feetY, headY);
+    if (this.carSolids === null) return city;
+    return this.resolveCars(fromX, fromZ, city.x, city.z, radius, feetY, headY, city.hit);
+  }
+
+  /**
+   * The city, and only the city. `resolve` as it was before cars were solid.
+   *
+   * **Four kinds of caller are here on purpose and none of them is a body on
+   * foot.** They are all moving a *car*, or something standing in for one, and
+   * car-on-car is `game/rigid.ts`' business with masses, restitution and an
+   * impulse -- a second opinion from a capsule resolver would fight it every
+   * tick, and a car would find itself solid against its own box:
+   *
+   *   - `driving.stepCarSpeed`'s nose probe, which asks whether the far end of
+   *     the bonnet is inside something the driver's capsule would squeeze past.
+   *   - the shunt separations on both ends (`sim.pushBody`, and `main.ts`'s
+   *     three), which move a driver's body by the displacement `rigid.ts` just
+   *     computed *from* a car contact.
+   *   - `CarField.integrateLoose`'s resolver, which walks a wreck downhill.
+   *   - `main.ts`'s chase camera boom, which is a point that lives inside the
+   *     player's own car for the whole time the camera matters.
+   *
+   * A fifth kind would be a bug: if a thing has legs, it calls `resolve`.
+   *
+   * **The one caller that is both is the driver**, and it is left on `resolve`
+   * deliberately. A body at the wheel is still moved by `controller.step` --
+   * that is how a car is steered in this game, the car follows the driver rather
+   * than the other way round -- so a driver's 0.34 m capsule meets the car boxes
+   * like anybody else's. Their *own* car cannot touch them, because a box whose
+   * footprint already contains where the move started is exempt (see
+   * `resolveCars`) and a driver is inside their own car by construction. Every
+   * other car is separated by `game/rigid.ts` long before the capsule reaches
+   * it: two sedans side by side make contact at 1.8 m centre to centre and the
+   * capsule clamp is at 1.24 m, head on they make contact at 4.6 m and the clamp
+   * is at 2.64 m. So the clamp is a backstop under the impulse rather than a
+   * second opinion beside it, and `server/carcoverage-check.ts` measures every
+   * one of those contacts at nought overlap with the fleet wired in.
+   */
+  resolveCity(
     fromX: number,
     fromZ: number,
     toX: number,
@@ -843,6 +1049,170 @@ export class CollisionWorld implements MoveResolver {
     // tick they spent under a bridge, which is a freeze rather than a wall.
     if (hit && this.overlaps(x, z, radius, feetY, headY, fromX, fromZ)) {
       return { x: fromX, z: fromZ, hit: true };
+    }
+    return { x, z, hit };
+  }
+
+  /**
+   * Wire the fleets in, or take them out again. See `CarSolidSource`.
+   *
+   * One call per process, at construction. Idempotent, and `null` restores the
+   * world to prisms alone -- which is what `verifyCarSolids` uses to prove that
+   * the same walk answers differently with the cars in and out.
+   */
+  setCarSolids(source: CarSolidSource | null): void {
+    this.carSolids = source;
+  }
+
+  /** Is a fleet wired in? The dev overlay, and the checks. */
+  get hasCarSolids(): boolean {
+    return this.carSolids !== null;
+  }
+
+  /**
+   * Slide the capsule out of every car box it is inside. See `resolve`.
+   *
+   * ---------------------------------------------------------------------------
+   * ONE QUERY, THEN THREE PASSES OVER WHAT IT RETURNED, DEEPEST FIRST.
+   *
+   * The query is the expensive half and it runs **once**: the fleets are asked
+   * for every car within `radius + CAR_SOLID_REACH` of where the prisms left the
+   * body, the answers are copied into `carScratch` (the sources hand out reused
+   * poses, so a reference kept across a second `visit` would be a different car),
+   * and the pushes then run in memory. That is the whole of the cost bound this
+   * feature was given: one fleet query per body per tick, at a radius of about
+   * three and a half metres.
+   *
+   * **Deepest first, and that is a determinism requirement rather than a
+   * preference.** Two pushes do not commute -- a body in the corner between a
+   * ute and a hatch ends up somewhere different depending on which it is pushed
+   * out of first -- and the iteration order of the sources is not the same in
+   * two processes: `StaticCarField.forEachStaticNear` walks a `Map` of tiles in
+   * *adoption* order, which on the server is residency order and in the browser
+   * is streaming order (`driving.resolveTake`'s header already says so about the
+   * take, and breaks its own tie on an integer for the same reason). So each
+   * pass picks the single deepest overlap, breaking an exact tie on the smaller
+   * `identity`, and pushes out of that one. Order in, order out.
+   *
+   * Three passes: one for the car you walked into, one for the car you were
+   * pushed into, and one to be sure. A fourth buys nothing a body between three
+   * cars would notice, and the guard below is what catches the case it cannot
+   * solve.
+   *
+   * **A car whose box already contains where the move started is not solid this
+   * tick**, which is `solidFor`'s clause 4 said about a car instead of a soffit,
+   * and it is load-bearing three times over. It is how a driver -- whose capsule
+   * is inside their own car by construction -- is not shoved out of the seat
+   * every tick. It is how a schedule car that parks on top of somebody lets them
+   * walk out instead of pinning them. And it is how a body the *prisms* pushed
+   * into a car escapes rather than being returned to `from` forever, which is a
+   * freeze and is the failure mode this file already learned about under a
+   * bridge. Tested at `from` so both the passes and the guard get one answer.
+   *
+   * No `Math.hypot` and no transcendental: subtract, multiply, compare, and one
+   * `Math.sqrt`, which is exact on both engines. The two ends run this on the
+   * same boxes and have to agree about where a body ends up.
+   */
+  private resolveCars(
+    fromX: number,
+    fromZ: number,
+    toX: number,
+    toZ: number,
+    radius: number,
+    feetY: number,
+    headY: number,
+    cityHit: boolean,
+  ): { x: number; z: number; hit: boolean } {
+    const source = this.carSolids;
+    if (source === null) return { x: toX, z: toZ, hit: cityHit };
+
+    // --- The one query.
+    const scratch = this.carScratch;
+    let n = 0;
+    let worst = -1;
+    const query = radius + CAR_SOLID_REACH;
+    source.forEachCarSolidNear(toX, feetY, toZ, query, (car) => {
+      // The band, on `solidFor` clause 1 and 3's terms exactly: a body whose
+      // feet are at or over the roof is standing on it (nothing does, see
+      // `CarSolid`) and a body whose head is under the sills is under the car.
+      // The 0.05 is the same epsilon a kerb is climbed with.
+      if (feetY >= car.y + car.height - 0.05) return;
+      if (headY <= car.y) return;
+      const dx = car.x - toX;
+      const dz = car.z - toZ;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > query * query) return;
+
+      let slot = n;
+      if (n === MAX_CAR_SOLIDS) {
+        // Full: evict the farthest, and only if this one is nearer. The
+        // tie-break is the identity, so two processes keep the same sixteen.
+        if (worst < 0) return;
+        const w = scratch[worst];
+        if (d2 > w.d2 || (d2 === w.d2 && car.identity >= w.identity)) return;
+        slot = worst;
+      } else {
+        n++;
+      }
+      const out = scratch[slot];
+      out.identity = car.identity;
+      out.x = car.x;
+      out.y = car.y;
+      out.z = car.z;
+      out.dx = car.dx;
+      out.dz = car.dz;
+      out.halfLength = car.halfLength;
+      out.halfWidth = car.halfWidth;
+      out.height = car.height;
+      out.d2 = d2;
+      out.inside = carContains(out, fromX, fromZ);
+      // Re-find the farthest. Sixteen compares, and only once the list is full.
+      if (n === MAX_CAR_SOLIDS) {
+        worst = 0;
+        for (let i = 1; i < n; i++) {
+          const a = scratch[i];
+          const b = scratch[worst];
+          if (a.d2 > b.d2 || (a.d2 === b.d2 && a.identity > b.identity)) worst = i;
+        }
+      }
+    });
+    if (n === 0) return { x: toX, z: toZ, hit: cityHit };
+
+    // --- Three passes over what it returned, deepest first.
+    let x = toX;
+    let z = toZ;
+    let hit = cityHit;
+    for (let pass = 0; pass < 3; pass++) {
+      let best = -1;
+      let bestPen = 0;
+      for (let i = 0; i < n; i++) {
+        const car = scratch[i];
+        if (car.inside) continue;
+        const pen = carPenetration(car, x, z, radius);
+        if (pen <= 0) continue;
+        const b = best < 0 ? null : scratch[best];
+        if (b === null || pen > bestPen || (pen === bestPen && car.identity < b.identity)) {
+          best = i;
+          bestPen = pen;
+        }
+      }
+      if (best < 0) break;
+      carPushOut(scratch[best], x, z, radius, CAR_PUSH);
+      x = CAR_PUSH.x;
+      z = CAR_PUSH.z;
+      hit = true;
+    }
+
+    // --- And the guard, on `resolve`'s own terms: a body that could not be
+    //     freed is refused the move rather than left inside a car. It asks the
+    //     same question the passes asked, `inside` included, so a body that
+    //     started inside a car is never returned to `from` for it.
+    if (hit) {
+      for (let i = 0; i < n; i++) {
+        const car = scratch[i];
+        if (car.inside) continue;
+        if (carContains(car, x, z)) return { x: fromX, z: fromZ, hit: true };
+      }
     }
     return { x, z, hit };
   }
@@ -1066,6 +1436,105 @@ function recordFor(
     seen: 0,
     carveStamp: stamp,
   };
+}
+
+// --- A capsule against an oriented car box ------------------------------------
+//
+// Three functions, all of them the same change of frame: a car is an oriented
+// box, so everything is easier in the car's own axes, where `along` is the nose
+// direction and `across` is its left -- `(dz, -dx)`, which is the axis
+// `lanes.py` offsets a lane along and the one `traffic.carOverlaps` already
+// tests a victim in. Doing it any other way means four edges and a polygon
+// clip, which is what `pushOut` above does for a building and is thirty times
+// the arithmetic for a shape that has a heading.
+
+/** Is this point inside the car's footprint? The push's exemption and its guard. */
+function carContains(car: CarSolid, x: number, z: number): boolean {
+  const rx = x - car.x;
+  const rz = z - car.z;
+  const along = rx * car.dx + rz * car.dz;
+  if (along > car.halfLength || along < -car.halfLength) return false;
+  const across = rx * car.dz - rz * car.dx;
+  return across <= car.halfWidth && across >= -car.halfWidth;
+}
+
+/**
+ * How deep a circle of `radius` at (x, z) is inside this car, metres. <= 0 clear.
+ *
+ * The ordering key for the pass loop, and it has to rank a centre *inside* the
+ * box above every centre outside it however close: a body that has somehow got
+ * in must be pushed out before it is nudged along by a neighbour, or the two
+ * pushes fight and it stays. So the inside branch is `radius` plus the shortest
+ * way out, which is strictly greater than the outside branch's `radius` minus a
+ * positive distance.
+ */
+function carPenetration(car: CarSolid, x: number, z: number, radius: number): number {
+  const rx = x - car.x;
+  const rz = z - car.z;
+  const along = rx * car.dx + rz * car.dz;
+  const across = rx * car.dz - rz * car.dx;
+  const overLength = along > car.halfLength ? along - car.halfLength
+    : along < -car.halfLength ? -car.halfLength - along : 0;
+  const overWidth = across > car.halfWidth ? across - car.halfWidth
+    : across < -car.halfWidth ? -car.halfWidth - across : 0;
+  if (overLength === 0 && overWidth === 0) {
+    // Inside. The shortest way out is the nearer of the two faces.
+    const outLength = car.halfLength - (along < 0 ? -along : along);
+    const outWidth = car.halfWidth - (across < 0 ? -across : across);
+    return radius + (outLength < outWidth ? outLength : outWidth);
+  }
+  const d2 = overLength * overLength + overWidth * overWidth;
+  if (d2 >= radius * radius) return 0;
+  return radius - Math.sqrt(d2);
+}
+
+/** Where `carPenetration`'s push lands. Reused; `resolveCars` reads it at once. */
+const CAR_PUSH = { x: 0, z: 0 };
+
+/**
+ * Put the circle on the surface of the box, along the shortest way out.
+ *
+ * Writes `out` rather than returning an object, on the same argument the rest of
+ * this file makes about a query that runs once a tick per body in the room.
+ */
+function carPushOut(
+  car: CarSolid,
+  x: number,
+  z: number,
+  radius: number,
+  out: { x: number; z: number },
+): void {
+  const rx = x - car.x;
+  const rz = z - car.z;
+  let along = rx * car.dx + rz * car.dz;
+  let across = rx * car.dz - rz * car.dx;
+
+  const clampedAlong = along > car.halfLength ? car.halfLength
+    : along < -car.halfLength ? -car.halfLength : along;
+  const clampedAcross = across > car.halfWidth ? car.halfWidth
+    : across < -car.halfWidth ? -car.halfWidth : across;
+  const offAlong = along - clampedAlong;
+  const offAcross = across - clampedAcross;
+
+  if (offAlong === 0 && offAcross === 0) {
+    // Inside: out through the nearer face, and the sign decides which of the
+    // two it is. Dead on the centre line is `+`, arbitrarily and stated so --
+    // it is a divide-by-zero the caller can never see, because a centre exactly
+    // on a car's axis is one push either way and both are the same distance.
+    const outLength = car.halfLength - (along < 0 ? -along : along);
+    const outWidth = car.halfWidth - (across < 0 ? -across : across);
+    if (outLength < outWidth) along = (along < 0 ? -1 : 1) * (car.halfLength + radius);
+    else across = (across < 0 ? -1 : 1) * (car.halfWidth + radius);
+  } else {
+    // Outside, within `radius` of the surface: out along the vector from the
+    // nearest point on the box, which for a box *is* the contact normal.
+    const d = Math.sqrt(offAlong * offAlong + offAcross * offAcross);
+    along = clampedAlong + (offAlong / d) * radius;
+    across = clampedAcross + (offAcross / d) * radius;
+  }
+
+  out.x = car.x + along * car.dx + across * car.dz;
+  out.z = car.z + along * car.dz - across * car.dx;
 }
 
 /**

@@ -31,6 +31,17 @@
  * must read `contact = yes`, and the day a ninth population is added it gets a
  * row here or it is a car people drive through.
  *
+ * **It rams them with a car, and that is half the question.** This driver's
+ * report used to end "On foot, everything. The static fleet is not in the
+ * collision prisms and no pedestrian capsule is tested against it" -- every one
+ * of the eight was solid to a car and to nobody's legs. That half now has its
+ * own driver, `server/footcar-check.ts`, and its own boot check,
+ * `game/carsolids.verifyCarSolids`. Nothing here changed for it: a body on foot
+ * goes through `CollisionWorld.resolve` and a car's bonnet goes through
+ * `resolveCity`, so every population below is still adjudicated by
+ * `game/rigid.ts` with two masses and none of these rows can be answered by a
+ * capsule push.
+ *
  * What it found on the run it was written for, before workstream AS:
  *
  *   - **the kerb fleet was not asked at all.** `resolveTrafficContacts` walks a
