@@ -74,6 +74,23 @@ export const GRADE_ENABLED = true;
  */
 export const CAR_SKY_REFLECT = true;
 
+/**
+ * The same coat on glass: `curtain_wall`, the window panes in every other wall
+ * slot, and the landmark glazing band. See `sky/reflection.ts`' glazing section.
+ *
+ * Separate from `CAR_SKY_REFLECT` deliberately, and `GRAPHICS.md` says why: spec
+ * 7.3's standing instruction is **never shiny**, and this is the one term in the
+ * 2026-09 pass that argues with it. A fleet that reads as chrome and a CBD that
+ * reads as a disco ball are two different mistakes with two different knobs, and
+ * whoever is looking at a frame at three in the morning should be able to turn
+ * off one without losing the other.
+ *
+ * Off restores exactly the image that shipped before it. The coat is a convex
+ * mix at a strength that is zero on every non-glazing pixel, so nothing else in
+ * the city -- brick, sandstone, render, roofs, the whole ground plane -- has a
+ * value quoted against it.
+ */
+export const GLAZING_SKY_REFLECT = true;
 
 /**
  * Direct-beam intensity with the sun at the zenith and no atmosphere in the way.

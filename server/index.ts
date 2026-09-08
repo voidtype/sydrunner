@@ -309,7 +309,7 @@ import { verifyBuildBudget } from '../client/src/world/buildbudget.ts';
 // exactly this reason: the checks that guard the look run in the process that
 // draws nothing, on `verifySpawn`'s argument. See GRAPHICS.md.
 import { verifyGrade } from '../client/src/sky/grade.ts';
-import { verifyReflection } from '../client/src/sky/reflection.ts';
+import { verifyGlazing, verifyReflection } from '../client/src/sky/reflection.ts';
 import { verifyInterpDelay } from '../client/src/net/interpdelay.ts';
 import { verifyDialog, verifyQuests } from '../client/src/game/questmodel.ts';
 // WORKSTREAM AO: who the givers in that content *are* -- kit, heading, stance
@@ -931,6 +931,12 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // crash, it is a game that is a bit off colour and nobody can say why.
     ['verifyGrade', verifyGrade()],
     ['verifyReflection', verifyReflection()],
+    // The same coat on glass. Here for the same reason as the two above: the
+    // slot table it walks decides which of the twenty-two material slots in the
+    // city is glass, and a wrong row there is silent in both runtimes -- a
+    // footpath with a sky reflection on it is not a crash, it is a city that is
+    // a bit wrong and nobody can say why.
+    ['verifyGlazing', verifyGlazing()],
     ['verifyInterpDelay', verifyInterpDelay()],
     ['verifyQuests', verifyQuests()],
     ['verifyDialog', verifyDialog()],

@@ -64,6 +64,28 @@
  * and it gets a paint's worth. Fixing it needs the `_PAINT` mask that the prep
  * already writes to be read here as a coat strength, which is a change to the
  * geometry path rather than to this file, and it is written up in `GRAPHICS.md`.
+ *
+ * ---------------------------------------------------------------------------
+ * ## AND THEN THE BUILDINGS. `GRAPHICS.md` item 2.
+ *
+ * The same twelve lines, over glass. `sky/reflection.ts`' glazing section holds
+ * the argument -- what the facade already had, which of the audit's three
+ * complaints were true, and why two coats in series over-reflect head-on by four
+ * points of a dim sky and nothing at grazing. What this file adds is one word in
+ * the class below: `coatStrength` was a number and is now **a number or a node**.
+ *
+ * That single generalisation is what lets one class serve a car, a curtain wall,
+ * a window rectangle inside a brick terrace and the Sydney Tower's observation
+ * band, and it is what keeps the pipeline count at zero: a facade slot already
+ * has exactly one material, the coat is folded into its graph, and
+ * `RenderObject.getCacheKey` sees the same one material it saw yesterday. A
+ * *second* material for glazed pixels would have been a second pipeline per slot
+ * per tile, which is `streamer.ts`' named killer.
+ *
+ * The mask itself is built in `world/facade.ts`, not here, and it has to be:
+ * `glassArea` is `inWindow * (1 - frameMask)` minus whatever an aircon box is
+ * covering, and every one of those is a hundred lines of window grammar that
+ * only that file knows. This file takes the node and asks no questions.
  */
 
 import {
@@ -85,11 +107,14 @@ import {
   vec4,
 } from 'three/tsl';
 
-import { CAR_SKY_REFLECT } from '../sky/calibration.ts';
+import { CAR_SKY_REFLECT, GLAZING_SKY_REFLECT } from '../sky/calibration.ts';
 import {
   COAT_F0,
   COAT_MAX,
   COAT_POWER,
+  GLAZING_F0,
+  GLAZING_MAX,
+  GLAZING_POWER,
   HORIZON_HIGH,
   HORIZON_LOW,
   skyEnvAt,
@@ -164,19 +189,42 @@ const envAlong = /*#__PURE__*/ Fn(([dirY]: [any]) => {
  */
 export class ClearcoatNodeMaterial extends MeshStandardNodeMaterial {
   /**
-   * How much of the coat this surface gets, 0 to 1.
+   * How much of the coat this surface gets, 0 to 1 -- **a number or a node**.
    *
-   * A plain number folded into the shader rather than a uniform, because it is a
+   * A number is folded into the shader as a constant, because for a car it is a
    * property of the *material* and never changes: a value per material is a
    * constant per pipeline, and there is no frame on which a tyre becomes a
-   * windscreen. Exposed at all so that the follow-up in the header -- reading
-   * the prep's `_PAINT` mask so glass gets more coat than paint -- has somewhere
-   * to land without a second class.
+   * windscreen.
+   *
+   * A node is the same thing said per pixel, and it is how a facade gets glazed:
+   * `world/facade.ts` hands over its window mask, so the coat runs at full
+   * strength inside a window rectangle and at **exactly zero** on the brick
+   * around it. Zero matters more than one does here -- `sky/reflection.ts`'
+   * `verifyGlazing` asserts by identity rather than by tolerance that a
+   * zero-strength coat returns its input bit-for-bit, because every masonry,
+   * render and fibro value published in `MATERIAL_LOOK` is relying on it.
    */
-  coatStrength = 1;
+  coatStrength: number | Node = 1;
+
+  /**
+   * The Fresnel this coat runs, as `[F0, grazing cap, exponent]`.
+   *
+   * Defaults to the car's -- `COAT_F0` under a real clearcoat's 0.04 because the
+   * paint beneath is lifted, `COAT_MAX` at a half because a faceted low-poly
+   * body over-reports grazing area. Glass wants neither of those apologies and
+   * `createGlazingMaterial` sets both to the glazing pair instead.
+   *
+   * Per material rather than per pixel, and it has to be: this is what decides
+   * whether the surface is paint or glass, and no pixel is both.
+   */
+  coatF0 = COAT_F0;
+  coatMax = COAT_MAX;
+  coatPower = COAT_POWER;
 
   setupOutput(builder: NodeBuilder, outputNode: Node): Node {
-    if (this.coatStrength <= 0) return super.setupOutput(builder, outputNode);
+    if (typeof this.coatStrength === 'number' && this.coatStrength <= 0) {
+      return super.setupOutput(builder, outputNode);
+    }
 
     // `outputNode` is declared as a bare `Node` in three's typings even though
     // the contract says it is a `vec4`, so the swizzles below have nothing to
@@ -194,9 +242,16 @@ export class ClearcoatNodeMaterial extends MeshStandardNodeMaterial {
     // of this arithmetic have to agree about what happens then.
     const nDotV = normal.dot(view.negate()).saturate();
     const reflected = view.sub(normal.mul(view.dot(normal).mul(2)));
-    const fresnel = float(COAT_F0)
-      .add(float(COAT_MAX - COAT_F0).mul(nDotV.oneMinus().pow(COAT_POWER)))
-      .mul(this.coatStrength);
+    // `saturate` on the strength rather than trust: a mask is a `smoothstep`
+    // product in the caller's graph, and the CPU copy in `reflection.ts` clamps
+    // it, so the two have to agree about what happens outside [0, 1].
+    const strength =
+      typeof this.coatStrength === 'number'
+        ? float(this.coatStrength)
+        : (this.coatStrength as any).saturate();
+    const fresnel = float(this.coatF0)
+      .add(float(this.coatMax - this.coatF0).mul(nDotV.oneMinus().pow(this.coatPower)))
+      .mul(strength);
     const coated = mix(lit.rgb, vec3(envAlong(reflected.y) as any), fresnel as any);
     return super.setupOutput(builder, vec4(coated, lit.a));
   }
@@ -213,4 +268,38 @@ export class ClearcoatNodeMaterial extends MeshStandardNodeMaterial {
  */
 export function createCarMaterial(): MeshStandardNodeMaterial {
   return CAR_SKY_REFLECT ? new ClearcoatNodeMaterial() : new MeshStandardNodeMaterial();
+}
+
+/**
+ * The material a glazed surface should be built with. `GRAPHICS.md` item 2.
+ *
+ * Same factory rule as the car's and the same reason -- `GLAZING_SKY_REFLECT` is
+ * read in exactly one place, and off returns literally the class that shipped,
+ * so no dead `coatStrength` sits inside a subclass pretending to be nothing.
+ *
+ * The caller owns the mask and hands it over afterwards:
+ *
+ *     const m = createGlazingMaterial();
+ *     ...
+ *     if (m instanceof ClearcoatNodeMaterial) m.coatStrength = glassMask;
+ *
+ * rather than taking it as an argument, because the two callers get their mask
+ * at opposite ends of their own construction. `world/facade.ts` cannot know
+ * where a window is until it has built five hundred lines of window grammar, and
+ * `world/landmarks.ts` knows the answer before it starts (the whole slot is
+ * glass) and leaves the default 1 alone. An argument would have forced the first
+ * of those to restructure around this file, which is backwards.
+ *
+ * **The default when the switch is off is a plain `MeshStandardNodeMaterial`,
+ * which has no `coatStrength` at all** -- hence the `instanceof` at the call
+ * site rather than an unconditional assignment. That is deliberate: a property
+ * quietly landing on a base material is how a switch stops meaning anything.
+ */
+export function createGlazingMaterial(): MeshStandardNodeMaterial {
+  if (!GLAZING_SKY_REFLECT) return new MeshStandardNodeMaterial();
+  const material = new ClearcoatNodeMaterial();
+  material.coatF0 = GLAZING_F0;
+  material.coatMax = GLAZING_MAX;
+  material.coatPower = GLAZING_POWER;
+  return material;
 }

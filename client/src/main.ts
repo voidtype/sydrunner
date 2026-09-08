@@ -35,7 +35,7 @@ import { EXPOSURE, NIGHT_FULL_ALTITUDE } from './sky/calibration.ts';
 // See GRAPHICS.md.
 import { verifyGrade } from './sky/grade.ts';
 import { installGrade, updateGrade } from './sky/gradenode.ts';
-import { verifyReflection } from './sky/reflection.ts';
+import { verifyGlazing, verifyReflection } from './sky/reflection.ts';
 import { updateSkyReflect } from './world/skyreflect.ts';
 import { SydneySky } from './sky/sky.ts';
 import { CYCLE_MS, verifyCycle } from './sky/cycle.ts';
@@ -6081,6 +6081,13 @@ async function main(): Promise<void> {
     // neither has a screenshot that says so.
     ...verifyGrade(),
     ...verifyReflection(),
+    // And the same coat on glass -- `GRAPHICS.md` item 2. A third check rather
+    // than a longer second one, because `GLAZING_SKY_REFLECT` and
+    // `CAR_SKY_REFLECT` are two switches and a failure should say which of them
+    // to reach for. Its load-bearing assertion is the *zero* end: every wall
+    // slot in the city now wears a coated material, and what keeps a brick
+    // terrace bit-for-bit what it was is that the mask is zero on brick.
+    ...verifyGlazing(),
     ...verifyInterpDelay(),
     ...verifyQuests(),
     ...verifyDialog(),
