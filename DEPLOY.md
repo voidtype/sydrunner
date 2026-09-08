@@ -1132,3 +1132,15 @@ welcome, ≥20 snapshots, a rising `ackSeq`, and a close code of 1000.
 - **Transport.** Still a WebSocket, not spec 10's WebTransport. The certificate
   that blocked the swap now exists — see the README's transport note for the
   seam (`NetTransport` in `net/protocol.ts`).
+
+### B3. The round as three scripts (2026-09-09)
+
+`scripts/world-round/round-build.sh`, `round-audit.sh` and `round-publish.sh`, each taking
+`SYDNEY_ROUND=<data/scratch/round-YYYY-MM-DD>`, are §B steps 1–5 as run on 2026-09-08 (a full
+middle-stage retile, 3 h 51 min to build, 66,417 changed objects published). Three things that
+round hit which the prose above did not say: `sydney build` does **not** run `hex-pack` or
+`far-cover`, so the audit script runs both first; region bundle names begin with `-`, so any
+`shasum`/`stat` over them needs `./` in front or the name is read as an option; and the
+pipeline's stdout is block-buffered into the log, so the build looks silent for hours — check the
+process, not the log. `round-publish.sh` with `STOP_AFTER_R2=1` uploads without switching
+anything live; the second run with `SKIP_R2=1` does the box, the pivots and the gate.
