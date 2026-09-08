@@ -7027,6 +7027,17 @@ async function main(): Promise<void> {
   // --- Workstream B: the cars. `bikeWorld` above is the pattern for all of it.
   /** The offline authority. Unused while a server is answering; see `carWorld`. */
   const localCars = new CarField();
+  // --- **Where the ground is under a car nobody is in.** `staticCars.groundAt`
+  //     two thousand lines up, on the same fleet one layer along, and
+  //     `driving.CarField.groundAt`'s essay is the whole argument: a record with
+  //     no driver has no capsule to re-ground it, so the field is its ground.
+  //     The server sets the identical closure off `world.groundFor`, which is the
+  //     same composition of the same terrain -- see `game/staticcars.ts` section
+  //     3 for why a centimetre of disagreement between the two is harmless.
+  //
+  //     `net.cars` gets it too, where the socket is accepted; the field this
+  //     line can reach is only the offline one.
+  localCars.groundAt = groundHeightAt;
   const carWorld = (): CarField => (net ? net.cars : localCars);
   /** Where `driving.shapeDriveSteering` writes. One object, reused every frame. */
   const driveSteering: DriveSteering = { right: 0, yawDelta: 0 };
@@ -7628,6 +7639,13 @@ async function main(): Promise<void> {
     ]);
     if (settled) {
       net = client;
+      // The authoritative mirror needs the same ground the offline field got at
+      // its construction. See `localCars.groundAt` and
+      // `driving.CarField.groundAt`: `CarField.integrateLoose` runs on this end
+      // between the server's 10 Hz corrections, and a mirror that rolled a wreck
+      // without re-grounding it would draw the car floating for the ninety
+      // milliseconds between them -- which is most of the time.
+      client.cars.groundAt = groundHeightAt;
       // The talent hooks predict off the same `TeamField` the server folds --
       // the client's copy is refilled from the TALENTS mirror once a frame.
       // Offline there is no team and the hooks keep reading `NO_TEAMS`.
@@ -11856,6 +11874,29 @@ async function main(): Promise<void> {
         const mine = cars.get(c.drivingCar);
         if (mine !== undefined) {
           const tick = trafficTick(Date.now());
+          // --- **Is the authority telling us about a contact on this very
+          //     tick?** If so this end predicts none of its own. WORKSTREAM AT.
+          //
+          // `net/client.NetClient.shunted` carries the argument in full and it
+          // is the second half of the owner's *"can vibrate between 2 spot"*:
+          // `reconcile` has, a few dozen lines before this block runs, taken the
+          // server's post-impact velocity outright, and the server's *position*
+          // for the same impact is landing through the replay beside it. Running
+          // the three sweeps below on top of that pushes the same penetration
+          // out a second time from a position that has already been corrected --
+          // and the correction comes back on the next snapshot, once per round
+          // trip, which is a beat rather than a lag.
+          //
+          // The **damage** prediction above is deliberately still run: it is
+          // funnelled through `CarField.damage`'s half-second cooldown, so a
+          // second charge for one impact is swallowed rather than doubled, and
+          // the sound is the thing a player would miss.
+          //
+          // One tick, and only the tick the answer arrives on. The next one
+          // predicts as usual, from the server's velocity and the server's
+          // position, which is a better place to predict from than the one this
+          // clause stood down from.
+          const deferToShunt = net !== null && net.shunted;
           const into = crashIntoTraffic(
             traffic, mine, tick, carRoutes, carCrashPose, carPose, drivenCars.suppress,
           );
@@ -11896,7 +11937,7 @@ async function main(): Promise<void> {
           // about different boxes fire on different ticks -- the cheaper one
           // wins by a hair and cancels the other.
           const body = carRigidBody(mine, carBodyA);
-          const struck = resolveTrafficContact(
+          const struck = deferToShunt ? null : resolveTrafficContact(
             traffic, mine, tick, carRoutes, carCrashPose, carPose, drivenCars.suppress,
             body, carBodyB, carContact, carShunt,
           );
@@ -11952,7 +11993,7 @@ async function main(): Promise<void> {
           // the one round trip between the hit and that record landing, this end
           // keeps meeting a car the server has already lifted out of the kerb;
           // the correction is the same one every take takes.
-          if (staticCars.carCount > 0) {
+          if (!deferToShunt && staticCars.carCount > 0) {
             carRigidBody(mine, carBodyA);
             const feet = c.body.position.y - EYE_HEIGHT;
             if (
@@ -12004,7 +12045,9 @@ async function main(): Promise<void> {
           // It is also the whole of what makes `?offline` a real test of this
           // feature rather than a second implementation of it: offline there is
           // no server and this is the authority.
-          for (const other of cars.all()) {
+          //
+          // ...and this one stands down on a shunt tick too. See `deferToShunt`.
+          if (!deferToShunt) for (const other of cars.all()) {
             if (other.id === mine.id) continue;
             if (other.driverId !== 0) continue;
             const dy = other.y - mine.y;
@@ -12053,6 +12096,11 @@ async function main(): Promise<void> {
               );
               other.x = moved.x;
               other.z = moved.z;
+              // And back onto the ground it was shoved over. `sim.applyCarBody`
+              // makes the identical call at the identical point; see
+              // `driving.CarField.groundAt` for the four ways a record used to
+              // end up hanging in the air and which of them this one is.
+              cars.reground(other);
             }
           }
         }

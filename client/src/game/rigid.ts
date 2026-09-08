@@ -156,6 +156,69 @@
  * water dragged along with the hull, which makes a vessel behave heavier in a
  * collision than it is at rest. That is one multiplier on the effective mass in
  * `rigidResolve` and would be a parameter on the body rather than a rewrite.
+ *
+ * ---------------------------------------------------------------------------
+ * 7. A CONTACT THAT PERSISTS HAS TO **SETTLE**, AND THAT IS FOUR RULES.
+ *
+ * The owner's second sentence on the live build was *"there needs some
+ * damp[ening] for collision otherwise can vibrate between 2 spot"*, and he is
+ * describing the one failure mode this file shipped with. Everything above was
+ * written about a contact that happens **once** -- two cars meet, they bounce,
+ * they leave. What none of it was written about is the contact that is still
+ * there on the next tick, and the next, which is most of the contacts a player
+ * actually has: a car nosed against a kerb car, a car parked between two others
+ * in a bay, a wreck that has rolled to a stop against a bumper.
+ *
+ * A persistent contact resolved by the rules above is a **limit cycle**, and it
+ * is worth writing the loop out because it is invisible in every single-tick
+ * check in this project:
+ *
+ *   1. the pair overlap by `d`; `rigidSeparate` pushes out the whole of `d`;
+ *   2. `rigidResolve` gives back `0.2 * closing` of rebound however small the
+ *      closing was, so the pair leaves with a velocity that was not there;
+ *   3. next tick the driver's throttle (or gravity, or the other car's own
+ *      rebound) closes the gap again, and the depth comes back;
+ *   4. go to 1.
+ *
+ * The displacement per tick is millimetres, so nothing "moves"; what a player
+ * sees is a car whose position **alternates in sign every tick forever**, which
+ * at 60 Hz is a buzz. Two spots.
+ *
+ * The four rules that end it, all of them standard and all of them stated here
+ * because a reader retuning one has to see the other three:
+ *
+ *   - **`SEPARATION_SLOP` is 2 cm and not a millimetre.** Below it no positional
+ *     correction is applied at all. A pair allowed to rest 2 cm inside each
+ *     other is a pair that stops asking to be moved, and 2 cm is under the
+ *     panel gap between two cars parked against each other -- it is not a
+ *     distance anybody can see, and it is the *only* rule of the four that can
+ *     bring the loop to an exact stop rather than to a small one.
+ *   - **`CONTACT_CORRECTION` is 0.4 and not 1.** What is left over the slop is
+ *     pushed out four tenths at a time, so a deep overlap comes apart over about
+ *     six ticks instead of being snapped apart in one. Snapping is what turns a
+ *     shunt into a launch, and it is also what makes the *sign* of the next tick
+ *     unpredictable: a full correction routinely overshoots into the body on the
+ *     other side, which is precisely the two-spot report inside a parking bay.
+ *   - **`RESTITUTION_SPEED` is 1 m/s.** Under it the contact is perfectly
+ *     inelastic -- `e` is 0, the impulse removes exactly the closing velocity
+ *     and adds nothing. A restitution applied at 5 cm/s is a bounce with no
+ *     energy in it that nevertheless never ends, because the thing that produced
+ *     the 5 cm/s is still pressing. Over it, `restitution` is what it always was
+ *     and a real crash is unchanged.
+ *   - **`CONTACT_SETTLE` is 0.2 on a resting contact.** A fifth of the
+ *     tangential velocity and a fifth of the spin come off each dynamic body
+ *     every tick it stays in a resting contact. This is the rule that stops a
+ *     car *rocking* against the one it is leaning on: the normal direction is
+ *     dealt with by the three above, and what is left is a slew and a slide that
+ *     the caller's own grip (`driving.CAR_SLIP_GRIP`) only sheds at a fixed
+ *     rate. Contact damping sheds it geometrically and only while touching.
+ *
+ * All four are `+ - * /` and none of them is new arithmetic; section 5's rule is
+ * untouched. The pair `verifyRigid` asserts is **convergence** rather than
+ * separation-in-one-tick: after 60 ticks the per-tick displacement is under a
+ * centimetre and the sign of the displacement along the normal has not
+ * alternated more than twice. That is the property the owner reported the
+ * absence of, and it is the one a single-tick assertion cannot state.
  */
 
 // --- The body -------------------------------------------------------------------
@@ -500,12 +563,17 @@ function boxRadius(b: RigidBody, nx: number, nz: number): number {
  * the smaller share, a kinematic one does not move at all, and the two shares
  * always sum to the depth so the pair is exactly separated whoever is heavier.
  *
- * `SEPARATION_SLOP` is not zero for the reason every positional correction in
- * every solver has a slop: a contact resolved to exactly touching re-detects on
- * the next tick with a depth of a few times 1e-16, and a pair of cars parked
- * against each other would jitter forever at machine precision. A millimetre is
- * under the wire's own quantisation (`protocol.quantisePos` is in centimetres)
- * and is therefore invisible by construction.
+ * **`SEPARATION_SLOP` and `CONTACT_CORRECTION` are the first two of section 7's
+ * four settling rules**, and they are both on this line:
+ *
+ *     depth = (contact.depth - SEPARATION_SLOP) * CONTACT_CORRECTION
+ *
+ * The slop is the depth this function refuses to have an opinion about, and the
+ * correction is the fraction of what is left that it asks for this tick. Read
+ * section 7 before changing either; the short version is that a full correction
+ * of every millimetre is what makes a pair of cars leaning on each other
+ * alternate in sign at 60 Hz forever, which the owner reported as vibrating
+ * between two spots.
  */
 export function rigidSeparate(
   a: RigidBody,
@@ -516,7 +584,13 @@ export function rigidSeparate(
   const ia = rigidInvMass(a);
   const ib = rigidInvMass(b);
   const total = ia + ib;
-  const depth = contact.depth - SEPARATION_SLOP;
+  let depth = (contact.depth - SEPARATION_SLOP) * CONTACT_CORRECTION;
+  // --- **And never leave more than `MAX_PENETRATION` standing**, whatever the
+  //     fraction says. See that constant: the fraction governs a contact that is
+  //     settling and the cap governs one that is being *driven*, and the two
+  //     never meet because they live at depths an order of magnitude apart.
+  const excess = contact.depth - MAX_PENETRATION;
+  if (excess > depth) depth = excess;
   if (total <= 0 || depth <= 0) {
     out[0] = 0; out[1] = 0; out[2] = 0; out[3] = 0;
     return out;
@@ -532,8 +606,117 @@ export function rigidSeparate(
   return out;
 }
 
-/** How much overlap is left standing rather than pushed out. See `rigidSeparate`. */
-export const SEPARATION_SLOP = 0.001;
+/**
+ * How much overlap is left standing rather than pushed out. **2 cm.**
+ *
+ * Section 7's first settling rule, and it was a millimetre until the owner's
+ * *"can vibrate between 2 spot"*. A millimetre is the number a solver needs to
+ * stop re-detecting a contact it resolved to exactly touching; it is nowhere
+ * near the number a solver needs for a pair of bodies somebody is **still
+ * pressing together** to come to rest, because the press puts a fresh
+ * millimetre of depth in every tick and the correction takes it straight back
+ * out. What ends that loop is a dead band wider than one tick of the press: at
+ * `driving.DRIVE_ACCELERATION` a car resting against another one gains 1.7 mm
+ * of depth a tick, so 2 cm is a dozen ticks of dead band and the contact
+ * genuinely stops moving.
+ *
+ * 2 cm is chosen against what it costs rather than against what it fixes, which
+ * is the honest way round: it is the gap two cars parked against each other are
+ * *drawn* with, it is under the panel line on any of the five bodies, and it is
+ * twice `protocol.quantisePos`' own centimetre -- so a pair resting at the slop
+ * is a pair the wire cannot describe as anything but touching.
+ */
+export const SEPARATION_SLOP = 0.02;
+
+/**
+ * And how much of what is left over the slop is pushed out per tick. **0.4.**
+ *
+ * Section 7's second rule. The classic Baumgarte fraction and it is here for the
+ * classic reason plus one of this game's own:
+ *
+ *   - a correction of 1 routinely **overshoots**. The separation is computed
+ *     from a depth measured before the impulse, and the impulse is about to move
+ *     the pair apart as well -- so the full push lands the body past where it
+ *     needed to be, and in a parking bay that is *into the car on the other
+ *     side*, whose full correction then lands it back. That is the two-spot
+ *     report with a car at each spot.
+ *   - and a correction of 1 is a **teleport**. A car rammed 40 cm into a bus is
+ *     snapped 40 cm backwards in one frame, which reads as the bus spitting it
+ *     out. At 0.4 the same 40 cm comes apart over six ticks -- a tenth of a
+ *     second -- and reads as the panels pushing back.
+ *
+ * The pair is still exactly separated in the limit, which is the property that
+ * matters: 0.4 is a rate and not a share, so the depth decays geometrically to
+ * the slop and stays there. Lower would leave two cars visibly interpenetrating
+ * for a quarter of a second; higher walks back toward the overshoot.
+ */
+export const CONTACT_CORRECTION = 0.4;
+
+/**
+ * And the deepest overlap the layer will leave standing at any speed. **10 cm.**
+ *
+ * `CONTACT_CORRECTION`'s companion, and the reason the fraction is safe. A
+ * fraction on its own has an equilibrium wherever the correction it produces
+ * equals the depth the closing puts back, and for two drivers holding the
+ * throttle into each other at 21 m/s apiece that is `0.7 / 0.4`, or **1.75 m** --
+ * two sedans most of the way through each other for as long as both hold W.
+ * `server/carcrash-check.ts` section 1 measured 0.88 m of it on the first run
+ * after the settling rules landed, which is the check doing its job.
+ *
+ * So the correction is the *larger* of the fraction and whatever it takes to get
+ * back under this cap. The two rules never argue, because they live at depths an
+ * order of magnitude apart: a contact that is settling is a centimetre deep and
+ * the cap is silent, and a contact that is 10 cm deep is a crash where nothing
+ * about a fraction of a millimetre matters.
+ *
+ * **10 cm** because it is what a crumple zone looks like. Two cars meeting at
+ * 150 km/h and ending a tenth of a metre inside each other for the two frames
+ * before they come apart reads as panels folding; a metre reads as one car
+ * inside the other, and nought reads as a wall.
+ */
+export const MAX_PENETRATION = 0.1;
+
+/**
+ * The closing speed under which a contact does not bounce at all, m/s. **1.**
+ *
+ * Section 7's third rule. `DEFAULT_RESTITUTION` is 0.2 and is right for a crash;
+ * applied to a *press* it is the engine of the limit cycle, because 20 % of a
+ * closing speed the throttle is about to restore is a rebound that arrives every
+ * tick for the rest of the session. Under this threshold `e` is 0 and the
+ * contact is perfectly inelastic -- the impulse removes exactly the closing
+ * velocity and puts nothing back -- which is the standard resting-contact rule
+ * and is what "the car stops against the other car" means.
+ *
+ * **1 m/s** because that is walking pace and is the speed below which a bounce
+ * has no picture: two cars that meet at 3.6 km/h and rebound are two cars a
+ * player would describe as magnetic. It is also comfortably above what a
+ * persistent press generates -- a car held against another at full throttle
+ * closes at the 0.1 m/s one tick of `DRIVE_ACCELERATION` buys -- and comfortably
+ * below anything anybody would call a crash (`driving.CRASH_FREE_SPEED` is 12).
+ */
+export const RESTITUTION_SPEED = 1;
+
+/**
+ * How much of the slide and the spin a resting contact takes off, per tick. **0.2.**
+ *
+ * Section 7's fourth rule, and the only one of the four that is about a
+ * direction the other three do not touch. Once the normal is settled what is
+ * left of a shove is a body **rocking** against the one it leans on: a slip
+ * across the contact and a yaw rate about it, neither of which the separation or
+ * the normal impulse has any opinion about, and both of which the caller's own
+ * grip only sheds at a fixed rate (`driving.CAR_SLIP_GRIP` is 8 m/s^2, which is
+ * a fifth of a second from a hard shunt and is a fifth of a second of a car
+ * grinding along its neighbour).
+ *
+ * A fifth per tick is a geometric decay with a time constant of 75 ms, so a
+ * shove that has come to rest against something stops slewing inside a tenth of
+ * a second -- and it is applied **only while a resting contact exists**, so a
+ * car sliding freely is untouched and a hard T-bone (which is not resting) keeps
+ * every radian of its spin. Both of those are properties `verifyRigid` asserts,
+ * because a damping that applied everywhere would be a handling change wearing a
+ * collision fix's clothes.
+ */
+export const CONTACT_SETTLE = 0.2;
 
 /**
  * The impulse: what the contact does to both bodies' velocities and spins.
@@ -609,7 +792,12 @@ export function rigidResolve(a: RigidBody, b: RigidBody, contact: RigidContact):
   const denom = inv + crossAn * crossAn * iia + crossBn * crossBn * iib;
   if (denom <= 0) return 0;
 
-  const e = Math.min(a.restitution, b.restitution);
+  // --- Section 7's third rule. A contact that is barely closing does not bounce
+  //     at all: `e` is 0, the impulse removes exactly the closing velocity, and
+  //     what is left is a body resting against another body. Above the threshold
+  //     the restitution is what it always was and a crash is unchanged.
+  const resting = -vn <= RESTITUTION_SPEED;
+  const e = resting ? 0 : Math.min(a.restitution, b.restitution);
   const j = (-(1 + e) * vn) / denom;
   if (!(j > 0)) return 0;
 
@@ -641,7 +829,44 @@ export function rigidResolve(a: RigidBody, b: RigidBody, contact: RigidContact):
     }
   }
 
+  // --- And section 7's fourth rule, last, because it is the only thing here
+  //     that is not an impulse and must not be inside the Coulomb clamp.
+  //
+  // Only on a resting contact: a car sliding freely is untouched and a T-bone
+  // keeps its spin. See `CONTACT_SETTLE`.
+  if (resting) {
+    settleContact(a, nx, nz);
+    settleContact(b, nx, nz);
+  }
+
   return j;
+}
+
+/**
+ * Take `CONTACT_SETTLE` off a body's slide and its spin. See section 7.
+ *
+ * A multiply and not an `approach`, which is the opposite of the choice
+ * `driving.stepCarSpeed` makes about grip and is right for the opposite reason:
+ * that one has to reach *exactly* zero because it runs on every tick of every
+ * drive forever, and this one only runs while two bodies are touching -- so a
+ * geometric decay cannot leave a residue behind, because the thing that applies
+ * it stops existing the moment the contact does. What it must be instead is
+ * scale-free, so a car leaning hard and a car leaning gently settle in the same
+ * *time* rather than the harder one taking longer.
+ */
+function settleContact(b: RigidBody, nx: number, nz: number): void {
+  if (b.kinematic) return;
+  b.yawRate -= b.yawRate * CONTACT_SETTLE;
+  // Across the contact only. The normal direction is the impulse's and damping
+  // it here would be a second opinion about the one quantity `rigidResolve`
+  // exists to decide.
+  const tx = nz;
+  const tz = -nx;
+  const vt = b.vx * tx + b.vz * tz;
+  if (vt === 0) return;
+  const shed = vt * CONTACT_SETTLE;
+  b.vx -= shed * tx;
+  b.vz -= shed * tz;
 }
 
 /** One body's share of an impulse, linear and angular. See `rigidResolve`. */
@@ -857,9 +1082,30 @@ export function verifyRigid(): string[] {
     const b = sedan(0, 4.2, 0, 10);          // facing -Z, driving -Z
     const j = collide(a, b);
     if (j <= 0) failures.push('Two sedans meeting head-on at 10 m/s each produced no impulse at all.');
-    if (rigidOverlap(a, b, contact) && contact.depth > SEPARATION_SLOP * 2) {
+    // **Separated over a handful of ticks and not in one**, which is section 7's
+    // `CONTACT_CORRECTION` and is the assertion that changed when the settling
+    // rules landed. What is required of the layer is that the depth *converges*
+    // to the slop; a solver that got there in one tick would be the one that
+    // overshoots into whatever is on the other side.
+    // The slop is where it converges *to*, so the bound is the slop plus a
+    // float's worth -- a geometric decay reaches it from above and never through.
+    const settled = SEPARATION_SLOP + 1e-6;
+    let depthAfter = rigidOverlap(a, b, contact) ? contact.depth : 0;
+    for (let i = 0; i < 60 && depthAfter > settled; i++) {
+      const was = depthAfter;
+      collide(a, b);
+      depthAfter = rigidOverlap(a, b, contact) ? contact.depth : 0;
+      if (depthAfter > was + 1e-9) {
+        failures.push(
+          `Two sedans resolved from ${was.toFixed(4)} m of overlap to ${depthAfter.toFixed(4)} m. A ` +
+            'separation that grows the penetration is the loop the owner saw as vibration.',
+        );
+        break;
+      }
+    }
+    if (depthAfter > settled) {
       failures.push(
-        `Two sedans are still ${contact.depth.toFixed(4)} m inside each other after the tick they met on.`,
+        `Two sedans are still ${depthAfter.toFixed(4)} m inside each other a second after they met.`,
       );
     }
     // Moving apart: `a` is behind `b` along +Z, so a separating pair has `b`
@@ -959,7 +1205,12 @@ export function verifyRigid(): string[] {
     if (wall.vx !== 0 || wall.vz !== 0 || wall.yawRate !== 0) {
       failures.push('A kinematic body was moved by being hit, which is the whole of what kinematic means.');
     }
-    if (rigidOverlap(a, wall, contact) && contact.depth > SEPARATION_SLOP * 2) {
+    // Converged rather than separated-in-one, on case 1's own argument.
+    for (let i = 0; i < 60; i++) {
+      if (!rigidOverlap(a, wall, contact) || contact.depth <= SEPARATION_SLOP + 1e-6) break;
+      collide(a, wall);
+    }
+    if (rigidOverlap(a, wall, contact) && contact.depth > SEPARATION_SLOP + 1e-6) {
       failures.push(`A car is still ${contact.depth.toFixed(4)} m inside the kinematic body it hit.`);
     }
     if (!(a.vz > 0)) {
@@ -1070,6 +1321,268 @@ export function verifyRigid(): string[] {
     if (rigidOverlap(a, b, contact)) failures.push('Two cars twenty metres apart were reported as touching.');
     const side = sedan(6, 0, 0, 10);
     if (rigidOverlap(a, side, contact)) failures.push('Two cars six metres apart across the road were reported as touching.');
+  }
+
+  // --- 9. **A contact that persists settles.** Section 7, and the owner's
+  //        *"can vibrate between 2 spot"*.
+  //
+  //        Every case above this line resolves a contact **once**. The failure
+  //        this file shipped with only exists on the second tick and every tick
+  //        after it, so nothing above could have caught it and nothing above
+  //        would catch it coming back. What is measured is convergence: the
+  //        per-tick displacement along the contact normal, and how often its
+  //        sign flips.
+  {
+    /** Below this a displacement is float noise rather than a direction. Metres. */
+    const SETTLE_NOISE = 1e-5;
+
+    /**
+     * One body pressed into another for `ticks` steps, as a settling record.
+     *
+     * `press` is an acceleration along +Z applied to `a` every tick before the
+     * contact, which is what a driver holding W against a parked car is: the
+     * limit cycle needs a *sustained* push to exist at all, and a case that let
+     * go after the first tick would pass on the code that produced the report.
+     */
+    const settle = (
+      a: RigidBody,
+      b: RigidBody,
+      press: number,
+      ticks: number,
+    ): { late: number; flips: number } => {
+      const dt = 1 / 60;
+      let late = 0;
+      let flips = 0;
+      let sign = 0;
+      for (let i = 0; i < ticks; i++) {
+        const wasZ = a.z;
+        if (press !== 0) a.vz += press * dt;
+        if (rigidOverlap(a, b, contact)) {
+          rigidSeparate(a, b, contact, push);
+          a.x += push[0];
+          a.z += push[1];
+          b.x += push[2];
+          b.z += push[3];
+          rigidResolve(a, b, contact);
+        }
+        rigidIntegrate(a, dt, 0, 0);
+        rigidIntegrate(b, dt, 0, 0);
+        const step = a.z - wasZ;
+        if (i < 60) continue;
+        const mag = step < 0 ? -step : step;
+        if (mag > late) late = mag;
+        // Sign flips are counted down to `SETTLE_NOISE`, which is ten microns
+        // and is deliberately far below anything a player could see. **The
+        // amplitude is not the failure; the alternation is.** The limit cycle
+        // this case exists for oscillates over 1.4 mm -- well inside the
+        // centimetre bound above, and it does it four ticks out of four for the
+        // rest of the session. Filtering the sign at a visible distance is how a
+        // check of this shape passes on the code that produced the report.
+        if (mag < SETTLE_NOISE) continue;
+        const s = step > 0 ? 1 : -1;
+        if (sign !== 0 && s !== sign) flips++;
+        sign = s;
+      }
+      return { late, flips };
+    };
+
+    /** What the three cases below all want said about them. */
+    const judge = (name: string, r: { late: number; flips: number }): void => {
+      if (r.late >= 0.01) {
+        failures.push(
+          `${name}: after a second of contact the body still moves ${(r.late * 100).toFixed(2)} cm a tick. ` +
+            'A contact that has settled moves under a centimetre a tick -- see rigid.ts section 7.',
+        );
+      }
+      if (r.flips > 2) {
+        failures.push(
+          `${name}: the displacement along the contact normal changed sign ${r.flips} times after it should ` +
+            'have settled. That is the buzz the owner reported as vibrating between two spots.',
+        );
+      }
+    };
+
+    // (a) A driven car nosed into a kerb car and holding the throttle. The
+    //     press is `driving.DRIVE_ACCELERATION`, restated rather than imported
+    //     because the dependency runs the other way.
+    {
+      const a = sedan(0, 0, Math.PI, 0);       // facing +Z
+      const b = sedan(0, 4.5, 0, 0);           // parked nose to nose, just clear
+      b.kinematic = true;
+      judge('a car held against a parked one', settle(a, b, 6, 300));
+    }
+    // (b) The owner's own picture: a car driven into a bay between two others,
+    //     where a full positional correction bounces it off one and into the
+    //     next. This is the case with *two* spots in it.
+    {
+      // A 9.8 m bay for a 4.6 m car, so there is 30 cm of slack either side --
+      // enough for a rebound to *reach* the other car, which is the whole of
+      // what makes this two spots rather than one.
+      const a = sedan(0, 0, Math.PI, 0);
+      const front = sedan(0, 4.9, 0, 0);
+      const back = sedan(0, -4.9, 0, 0);
+      front.kinematic = true;
+      back.kinematic = true;
+      const dt = 1 / 60;
+      let late = 0;
+      let flips = 0;
+      let sign = 0;
+      for (let i = 0; i < 300; i++) {
+        const wasZ = a.z;
+        a.vz += 6 * dt;
+        for (const other of [front, back]) {
+          if (!rigidOverlap(a, other, contact)) continue;
+          rigidSeparate(a, other, contact, push);
+          a.x += push[0];
+          a.z += push[1];
+          rigidResolve(a, other, contact);
+        }
+        rigidIntegrate(a, dt, 0, 0);
+        const step = a.z - wasZ;
+        if (i < 60) continue;
+        const mag = step < 0 ? -step : step;
+        if (mag > late) late = mag;
+        if (mag < SETTLE_NOISE) continue;
+        const s = step > 0 ? 1 : -1;
+        if (sign !== 0 && s !== sign) flips++;
+        sign = s;
+      }
+      judge('a car parked in a bay between two cars', { late, flips });
+    }
+    // (c) And two dynamic bodies pushed together by a wall, which is the case
+    //     with no kinematic body in the contact at all -- so the mass ratio,
+    //     both separations and both impulses are live.
+    {
+      // `a` drives into `b`, and `b` has a wall 30 cm behind it: the squeeze is
+      // three bodies deep, so the separation `a` gets is one `b` has to pass on.
+      const a = sedan(0, 0, Math.PI, 6);
+      const b = sedan(0, 5.2, Math.PI, 0);
+      const wall = sedan(0, 10.1, Math.PI, 0);
+      wall.kinematic = true;
+      const dt = 1 / 60;
+      let late = 0;
+      let flips = 0;
+      let sign = 0;
+      for (let i = 0; i < 300; i++) {
+        const wasZ = a.z;
+        a.vz += 6 * dt;
+        for (const pair of [[a, b], [b, wall]] as Array<[RigidBody, RigidBody]>) {
+          if (!rigidOverlap(pair[0], pair[1], contact)) continue;
+          rigidSeparate(pair[0], pair[1], contact, push);
+          pair[0].x += push[0];
+          pair[0].z += push[1];
+          pair[1].x += push[2];
+          pair[1].z += push[3];
+          rigidResolve(pair[0], pair[1], contact);
+        }
+        rigidIntegrate(a, dt, 0, 0);
+        rigidIntegrate(b, dt, 0, 0);
+        const step = a.z - wasZ;
+        if (i < 60) continue;
+        const mag = step < 0 ? -step : step;
+        if (mag > late) late = mag;
+        if (mag < SETTLE_NOISE) continue;
+        const s = step > 0 ? 1 : -1;
+        if (sign !== 0 && s !== sign) flips++;
+        sign = s;
+      }
+      judge('two cars pushed together by a wall', { late, flips });
+    }
+    // (d) A loose body rolling into a parked one comes to rest against it,
+    //     which is the wreck half of the same rule -- and the one where the
+    //     caller's own decay is running, so a residual buzz would look like
+    //     the decay failing rather than like the contact failing.
+    {
+      const a = sedan(0, 0, Math.PI, 4);
+      const b = sedan(0, 5.0, 0, 0);
+      const dt = 1 / 60;
+      for (let i = 0; i < 600; i++) {
+        if (rigidOverlap(a, b, contact)) {
+          rigidSeparate(a, b, contact, push);
+          a.x += push[0];
+          a.z += push[1];
+          b.x += push[2];
+          b.z += push[3];
+          rigidResolve(a, b, contact);
+        }
+        rigidIntegrate(a, dt);
+        rigidIntegrate(b, dt);
+      }
+      if (a.vx !== 0 || a.vz !== 0 || a.yawRate !== 0) {
+        failures.push(
+          `A loose body that rolled into a parked one is still doing (${a.vx}, ${a.vz}) m/s and ` +
+            `${a.yawRate} rad/s ten seconds later. A wreck that never settles is a wreck that is never recycled.`,
+        );
+      }
+      if (b.vx !== 0 || b.vz !== 0) {
+        failures.push('And the car it hit is still rolling too, so the pair are trading a shove forever.');
+      }
+    }
+  }
+
+  // --- 10. The restitution threshold, in both directions. Section 7's third
+  //         rule, and the half of it that has no picture is the *upper* half:
+  //         a build that damped everything would have deleted the crash.
+  {
+    // A crawl. Perfectly inelastic, so the pair does not come apart on its own.
+    const a = sedan(0, 0, Math.PI, 0.4);
+    const b = sedan(0, 4.4, 0, 0);
+    b.kinematic = true;
+    rigidOverlap(a, b, contact);
+    rigidResolve(a, b, contact);
+    if (a.vz < -1e-9) {
+      failures.push(
+        `A car that touched a parked one at 0.4 m/s rebounded at ${(-a.vz).toFixed(4)} m/s. Under ` +
+          `${RESTITUTION_SPEED} m/s a contact is inelastic -- a bounce at a crawl is the engine of the ` +
+          'limit cycle rigid.ts section 7 is about.',
+      );
+    }
+    if (a.vz > 1e-6) {
+      failures.push(`...and it is still closing at ${a.vz.toFixed(4)} m/s, so the impulse did not stop it either.`);
+    }
+    // And a crash, which must be exactly as bouncy as it ever was.
+    const c = sedan(0, 0, Math.PI, 20);
+    const wall = sedan(0, 4.4, 0, 0);
+    wall.kinematic = true;
+    rigidOverlap(c, wall, contact);
+    rigidResolve(c, wall, contact);
+    const wanted = -20 * DEFAULT_RESTITUTION;
+    if (Math.abs(c.vz - wanted) > 0.5) {
+      failures.push(
+        `A car hitting a wall at 20 m/s came away at ${c.vz.toFixed(2)} m/s rather than the ` +
+          `${wanted.toFixed(2)} its restitution promises. The settling rules must not reach a crash.`,
+      );
+    }
+  }
+
+  // --- 11. And the contact damping is *only* on a resting contact, which is
+  //         the same argument from the other side: a T-bone keeps its slew.
+  {
+    const a = sedan(-3.0, -1.5, -Math.PI / 2, 12);
+    const b = sedan(0, 0, 0, 0);
+    collide(a, b);
+    const spun = b.yawRate < 0 ? -b.yawRate : b.yawRate;
+    if (!(spun > 0.2)) {
+      failures.push(
+        `A T-bone at 12 m/s left the struck car spinning at ${spun.toFixed(3)} rad/s. Contact damping is ` +
+          'for a body at rest against another; a crash that no longer slews anybody is the fix having ' +
+          'eaten the feature.',
+      );
+    }
+    // ...and a resting one does shed it, which is the rule that stops a car
+    // rocking against the one it leans on.
+    const c = sedan(0, 0, Math.PI, 0.3);
+    c.yawRate = 1;
+    const d = sedan(0, 4.4, 0, 0);
+    d.kinematic = true;
+    rigidOverlap(c, d, contact);
+    rigidResolve(c, d, contact);
+    if (!(c.yawRate < 1 - 1e-9)) {
+      failures.push(
+        `A car resting against another is still slewing at ${c.yawRate} rad/s after the contact. ` +
+          `CONTACT_SETTLE is meant to take ${CONTACT_SETTLE} of it off every tick they touch.`,
+      );
+    }
   }
 
   return failures;

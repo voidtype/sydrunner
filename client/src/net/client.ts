@@ -2483,6 +2483,43 @@ export class NetClient {
    */
   private pendingShunt: { speed: number; slip: number; yawRate: number } | null = null;
 
+  /**
+   * Did the most recent `reconcile` adopt an authoritative shunt? **Read by
+   * `main.ts`, which stands its own contact prediction down for the tick.**
+   *
+   * ---------------------------------------------------------------------------
+   * THE SECOND OF THE OWNER'S TWO SPOTS, AND WHY DEFERRING IS THE ANSWER.
+   *
+   * `game/rigid.ts` section 7 is about a contact vibrating against *itself*.
+   * This is the other one, and it needs two processes to produce: the browser
+   * predicts a contact, separates its own capsule and writes its own three
+   * velocity numbers; the server resolves the same contact a round trip earlier,
+   * and its answer arrives here on some later tick as a `CAR_SHUNT` record.
+   *
+   * On that tick both answers are applied. The velocity is taken outright a few
+   * lines up -- correctly, the server decided how hard you were hit -- but the
+   * *position* is not: the client is still standing where its own separation put
+   * it, the server's position lands separately through the replay below, and the
+   * prediction block in `main.ts` is about to run the same contact **again** and
+   * push the same penetration out a second time. The player is then corrected
+   * back. Two spots, alternating at the round-trip period, which is exactly the
+   * beat a player describes as vibration rather than as lag.
+   *
+   * So: on a tick that carries a shunt, this end does not adjudicate a contact
+   * of its own. It is one tick of not predicting on the one tick the authority
+   * has already spoken about the very thing being predicted, which is the same
+   * rule `carPredictedAt` and `bikePredictedAt` apply to a take -- do not
+   * predict over an answer that is landing. The tick after, prediction resumes
+   * from the server's velocity and the server's position, which is a better
+   * starting point than the one it stood down from.
+   */
+  get shunted(): boolean {
+    return this.shuntThisTick;
+  }
+
+  /** See `shunted`. Set and cleared inside `reconcile`, so it is one tick wide. */
+  private shuntThisTick = false;
+
   // --- Reconciliation ---------------------------------------------------------
 
   /**
@@ -2499,6 +2536,9 @@ export class NetClient {
    * for 80 ms so the correction is not a jump cut.
    */
   reconcile(local: CombatantState, world: CombatWorld, out: Vector3): Vector3 {
+    // One tick wide, and cleared here rather than by the reader so that a caller
+    // who forgets to ask cannot leave it standing. See `shunted`.
+    this.shuntThisTick = false;
     // Ease the outstanding correction toward zero regardless of whether a
     // snapshot arrived, so the tail of a previous one keeps running.
     const k = Math.min(1, 1 - Math.exp(-FIXED_DT / CORRECTION_TAU));
@@ -2563,6 +2603,13 @@ export class NetClient {
         local.carSpeed = this.pendingShunt.speed;
         local.carSlip = this.pendingShunt.slip;
         local.carYawRate = this.pendingShunt.yawRate;
+        // ...and this end does not adjudicate a contact of its own on the tick
+        // it is told the answer to one. See `shunted`, which carries the whole
+        // argument -- the short version is that predicting over a landing
+        // correction pushes the same penetration out twice and the player is
+        // then corrected back, once per round trip, which is the owner's second
+        // spot.
+        this.shuntThisTick = true;
       }
       this.pendingShunt = null;
     }

@@ -17,9 +17,10 @@
  * retune, where a hard-coded expectation is a check somebody deletes.
  *
  *   1. **Two scripted drivers collide.** Both cars are damaged as they always
- *      were, neither is inside the other after the tick, and both finish within
- *      two metres of what `game/rigid.ts` predicts for the same contact
- *      evaluated on its own.
+ *      were, the overlap between them shrinks on every tick rather than growing
+ *      (see `game/rigid.ts` section 7: a contact is separated four tenths at a
+ *      time now, not all at once), and both finish within two metres of what
+ *      that module predicts for the same contact evaluated on its own.
  *   2. **A driver rams an ambient car under the threshold.** The driven car
  *      stops or rebounds, it takes the damage the old curve gives it, and the
  *      car it hit is *pinned* rather than driving on through the wreck.
@@ -88,7 +89,7 @@ import {
   createCarShunt,
   resolveCarContact,
 } from '../client/src/game/driving.ts';
-import { createRigidBody, createRigidContact, rigidOverlap, SEPARATION_SLOP } from '../client/src/game/rigid.ts';
+import { createRigidBody, createRigidContact, rigidOverlap } from '../client/src/game/rigid.ts';
 
 const FIXED_DT = 1 / TICK_HZ;
 
@@ -218,6 +219,8 @@ function runDrivers(): { failures: string[]; contacts: number } {
   let contacts = 0;
   let overlapAfter = 0;
   let worstDepth = 0;
+  /** The previous tick's penetration, so this section can ask whether it shrank. */
+  let lastDepth = 0;
   let predictionErrorA = 0;
   let predictionErrorB = 0;
   let closingAt = 0;
@@ -281,9 +284,28 @@ function runDrivers(): { failures: string[]; contacts: number } {
       { body: carB.body, x: b.combat.body.position.x, z: b.combat.body.position.z, yaw: b.combat.body.yaw, speed: b.combat.carSpeed, slip: b.combat.carSlip, yawRate: b.combat.carYawRate },
       bodyB,
     );
-    if (rigidOverlap(bodyA, bodyB, contact) && contact.depth > SEPARATION_SLOP * 2) {
-      overlapAfter++;
-      if (contact.depth > worstDepth) worstDepth = contact.depth;
+    // --- Are they inside each other by more than the layer allows, and is the
+    //     overlap **coming apart**?
+    //
+    // This assertion used to be "not overlapping by more than the slop after the
+    // tick they met on", and it stopped being the right question when
+    // `rigid.CONTACT_CORRECTION` landed: a contact is now separated four tenths
+    // at a time, over about six ticks, deliberately -- a full correction of a
+    // 40 cm ram is a teleport, and it is also the overshoot that made a car in a
+    // parking bay alternate between two places. See `game/rigid.ts` section 7.
+    //
+    // So what is required of the tick is **convergence**: the depth may be large
+    // on the tick they meet, and it must shrink from there. A depth that grew is
+    // the failure this was always about, and it is the one that has a picture --
+    // two cars burrowing into each other.
+    if (rigidOverlap(bodyA, bodyB, contact)) {
+      if (contact.depth > lastDepth + 1e-6 && lastDepth > 0) {
+        overlapAfter++;
+        if (contact.depth > worstDepth) worstDepth = contact.depth;
+      }
+      lastDepth = contact.depth;
+    } else {
+      lastDepth = 0;
     }
     if (contacts > 30) break;
   }
@@ -307,8 +329,8 @@ function runDrivers(): { failures: string[]; contacts: number } {
   }
   if (overlapAfter > 0) {
     failures.push(
-      `The two cars were still ${worstDepth.toFixed(3)} m inside each other after ${overlapAfter} tick(s). ` +
-        'That is two cars welded together sliding down the street.',
+      `The two cars' overlap *grew* on ${overlapAfter} tick(s), to ${worstDepth.toFixed(3)} m. ` +
+        'A separation that does not converge is two cars burrowing into each other -- see rigid.ts section 7.',
     );
   }
   if (predictionErrorA > 2 || predictionErrorB > 2) {
