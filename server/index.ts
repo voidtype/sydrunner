@@ -72,7 +72,11 @@ import { verifyFooty } from '../client/src/game/footy.ts';
 // `client/src/game/swat.ts`.
 import { verifySwat } from '../client/src/game/swat.ts';
 import { verifyPowerups } from '../client/src/game/powerups.ts';
-import { verifyDamageGrade, verifyDriving } from '../client/src/game/driving.ts';
+import { verifyCarPhysics, verifyDamageGrade, verifyDriving } from '../client/src/game/driving.ts';
+// WORKSTREAM AQ: the game's 2D rigid-body layer, under the cars and the bikes.
+// Three-free, so this process runs the exact file the browser does -- which is
+// the property the determinism case in it is about.
+import { verifyRigid } from '../client/src/game/rigid.ts';
 // WORKSTREAM Y: a wrecked car catching fire and going off. Run **here** as well
 // as in the browser because the fuse, the blast and the chain are all this
 // side's authority and every failure in that file renders: a fuse that never
@@ -554,6 +558,20 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // that does not answer is your own car driving off to Ashfield beside you,
     // running people down on the way. See `client/src/game/driving.ts`.
     ['verifyDriving', verifyDriving()],
+    // --- WORKSTREAM AQ: the body layer, and the car half of its wiring.
+    //
+    // Here as well as in the browser for `verifyDriving`'s own reason and one
+    // more that is specific to this pair: the contact is adjudicated on **this**
+    // side -- a driven car against another driven car is the one collision in
+    // the game that needs two records, and only the authority has both -- and
+    // every failure in it renders a perfectly good frame. Two cars welded
+    // together sliding down George Street, a T-bone that slews the struck car
+    // the wrong way, a ute a sedan pushes as far as the ute pushes it. The
+    // determinism case is the one that costs a session: two ends integrating
+    // the same impulse to different answers is a car that rubber-bands, and it
+    // arrives as "the netcode is bad". See `client/src/game/rigid.ts`.
+    ['verifyRigid', verifyRigid()],
+    ['verifyCarPhysics', verifyCarPhysics()],
     ['verifyCarFire', verifyCarFire()],
     // And the fleet it can now steal from. See `game/staticcars.ts`: a decoder
     // that drifted from the pipeline's 16-byte stride puts every car in Sydney at

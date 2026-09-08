@@ -196,6 +196,67 @@
  * 400 objects -- around 60 kB on a 1 GB box -- and the per-tick work is
  * unchanged, because every sweep in this class was already O(records) and 400 is
  * still counted in hundreds.
+ *
+ * ---------------------------------------------------------------------------
+ * 7. CARS ARE SOLID TO EACH OTHER NOW, AND THE BODY LAYER IS NOT IN THIS FILE.
+ *
+ * The owner's report was three sentences and the middle one is the brief:
+ * *"also i noticed no car to car collision"*, *"i want car collision and physics
+ * use a lib if it makes sense"*, and -- describing cars that felt invisible --
+ * *"maybe the car hitbox is too long"*.
+ *
+ * Section 2 above is still true and this section does not undo a word of it:
+ * the car is the driver's own capsule geared, `controller.step` is still what
+ * moves it, and the throttle is still one scalar integrated by `stepCarSpeed`.
+ * What has changed is that the scalar now has two friends -- a **slip** across
+ * the heading and a **yaw rate** about it -- and that something outside this
+ * file decides what a contact does to all three.
+ *
+ * **That something is `game/rigid.ts`, and it is a general layer rather than a
+ * car one.** Read its header for the whole argument; the short version is that
+ * a car hitting a car, a car hitting a bike and a bike hitting a car are the
+ * same event seen from three sides, and three files that agree about the
+ * contact normal today are three files. Cars are that layer's first client and
+ * bikes its second; boats are the third whenever the harbour gets its physics.
+ *
+ * **Why there is no library, since one was offered.** Four reasons, all about
+ * this codebase and none about the libraries, and `rigid.ts` section 3 carries
+ * them with the arithmetic: `net/client.reconcile` replays every un-acked input
+ * and a WASM *world* has to be rewound and re-stepped to do that, three to five
+ * times a snapshot; the city's 1.4 million collision prisms are already
+ * answered by `player/collision.ts` and a solver with its own broadphase would
+ * be a second opinion about what is solid; two runtimes stepping a WASM solver
+ * is a divergence nobody can debug from inside the game, where two calls to
+ * `Math.sqrt` cannot diverge at all; and the whole of what is needed is a
+ * separating-axis test between two rectangles, one impulse and one torque,
+ * which is two hundred readable lines against half a megabyte of dependency.
+ * Cars live on a ground plane and never leave it. If one ever does -- a stunt
+ * jump that lands on its roof -- that is the change that reopens the question.
+ *
+ * What each kind of car is, to that layer:
+ *
+ *   - a **driven** car is a dynamic body whose mass comes from `CAR_MASS`, and
+ *     the separation a contact demands of it is walked through the *driver's*
+ *     `resolve` -- so a car shoved sideways still cannot enter a wall, because
+ *     the thing being shoved is a player capsule and always was.
+ *   - an **ambient or static** car is a `kinematic` body: infinite mass,
+ *     unmoved by anything, which is the honest model of a fleet that is a
+ *     closed-form lookup with no state to write a dent into (section 3). The
+ *     driven car rebounds off it and pays; the timetable does not notice. What
+ *     the timetable *does* do is **stop**, through the hold ledger it already
+ *     has -- see `traffic.HoldLedger.stun`.
+ *   - and a **hard** hit takes the ambient car out of the timetable altogether
+ *     and into the driven set as a driverless record, which is the one new kind
+ *     of thing in this feature. See `KNOCK_LOOSE_SPEED` and `CarField.knockLoose`.
+ *
+ * **On the hitbox being "too long".** It is not, and it is deliberately
+ * unchanged: `CAR_BODY_SIZE` is the drawn body and `traffic.HIT_MARGIN` is ten
+ * centimetres. What produced the report was the *timing* rather than the size --
+ * the client drew the ambient fleet on the browser's own wall clock and the
+ * server hit-tested it on the host's, and nothing had ever reconciled the two.
+ * A machine a second fast drew every car in Sydney fourteen metres behind where
+ * the server thought it was. `traffic.setTrafficClockSkew` is the fix and
+ * `server/carcrash-check.ts` section 5 is the measurement.
  */
 
 import type { InputSnapshot } from '../player/controller.ts';
@@ -221,6 +282,31 @@ import {
 // import, so nothing about this file's dependency graph changes -- the *field*
 // lives in `game/staticcars.ts` and is constructed by whoever owns a world.
 import type { StaticCarSource } from './staticcars.ts';
+// --- The body layer. See section 7 of the header, and `game/rigid.ts`' own.
+//
+// The dependency runs **this way and only this way**: `rigid.ts` knows nothing
+// about cars and must not, because bikes and (later) boats are its other
+// clients. Everything car-shaped -- the mass table, the grip, what a contact
+// costs in health -- is on this side of the line.
+import {
+  DEFAULT_FRICTION,
+  DEFAULT_RESTITUTION,
+  ROLLING_DECAY,
+  SPIN_DECAY,
+  type RigidBody,
+  type RigidContact,
+  createRigidBody,
+  createRigidContact,
+  rigidIntegrate,
+  rigidOverlap,
+  rigidResolve,
+  rigidSeparate,
+  rigidSetHeading,
+  rigidSetVelocity,
+  rigidSlip,
+  rigidAlong,
+  rigidYaw,
+} from './rigid.ts';
 // --- WORKSTREAM W (talent effects). Every read below is the identity with no
 // `TeamLookup` installed, which is why `verifyDriving` and `verifyDamageGrade`
 // needed no change. See `game/teamfx.ts`.
@@ -799,6 +885,156 @@ export function carIsWrittenOff(health: number): boolean {
   return health <= 0;
 }
 
+// --- What a car weighs, and what it does when something hits it -------------------
+
+/**
+ * Kerb weight, kilograms, indexed by `traffic.CAR_BODY_SIZE`'s own body ids.
+ *
+ * The brief's three numbers with the two it did not name filled in from the same
+ * showroom: a sedan is 1.4 t (a Camry is 1,495 kg), a hatch 1.2 (a Corolla is
+ * 1,300), an SUV 1.9 (a RAV4 is 1,700 and an X5 is 2,200), a ute 2.1 (a Ranger
+ * is 2,300 laden) and a van 2.3 (a Transit is 2,100 empty). Every one is
+ * rounded to the hundred kilogram, because what this table decides is a
+ * *ratio* -- who gives way to whom in a shunt -- and nobody can perceive the
+ * difference between 1,495 and 1,400 in a car park.
+ *
+ * **The bus, the garbage truck, the police car and the taxi are not in it**, and
+ * that is the brief's own instruction ("map to the class they are drawn as")
+ * arriving for free: none of them is a *body*, they are paint and a model over
+ * one of these five, so a taxi weighs what the sedan it is drawn as weighs and
+ * a garbage truck what the van does. If a genuinely bigger body is ever baked,
+ * this table grows with `CAR_BODY_SIZE` and `verifyCarPhysics` asserts the two
+ * are the same length -- which is the check that stops a sixth body silently
+ * weighing whatever `?? 1400` decides.
+ *
+ * The one thing worth knowing about the ratios: a van into a hatch is 1.92:1,
+ * so the hatch takes two thirds of the separation and nearly twice the
+ * velocity change. That is the biggest asymmetry the fleet can produce and it
+ * is meant to be felt.
+ */
+export const CAR_MASS: readonly number[] = [1400, 1200, 1900, 2100, 2300];
+
+/** This car's mass in kilograms, with the fallback the rest of this file uses. */
+export function carMass(body: number): number {
+  return CAR_MASS[body] ?? CAR_MASS[0];
+}
+
+/**
+ * How hard a car's tyres resist being pushed sideways, m/s per second.
+ *
+ * The whole of what makes a shunt a *shunt* rather than a permanent change of
+ * direction: a car shoved 4 m/s sideways is straight again in half a second,
+ * having moved about a metre across the road. **8**, which is a shade under a
+ * g -- a tyre's real lateral limit is around 1 g and the arcade allowance this
+ * game takes elsewhere (`DRIVE_TURN_RATE_FAST`'s 1.5 g) is for a driver asking
+ * for it, where this is a driver being asked.
+ *
+ * Zero would be a car on ice: hit from the side once and you crab down George
+ * Street forever. Thirty would kill the slip inside two ticks and there would
+ * be no picture at all -- the impulse would land, the car would not move, and
+ * the whole feature would read as damage numbers.
+ */
+export const CAR_SLIP_GRIP = 8;
+
+/**
+ * And how hard they resist being spun, radians per second per second. **4.**
+ *
+ * Deliberately faster than `rigid.SPIN_DECAY` (2.5, which is a car with nobody
+ * in it) for a reason a driver can feel: **there is somebody holding the
+ * wheel**. A driven car that has been slewed straightens out in about three
+ * quarters of a second, where a knocked-loose one keeps turning for a second and
+ * a half. That difference is the only thing that distinguishes the two on
+ * screen and it costs one constant.
+ */
+export const CAR_SPIN_GRIP = 4;
+
+/**
+ * How fast a driven car has to hit an ambient one to knock it out of the
+ * timetable, m/s of closing speed. **The brief's ~6, taken exactly.**
+ *
+ * Six is chosen against the two things either side of it rather than in the
+ * abstract. Below it is everything the city does to itself: nosing into the car
+ * in front at a light, a kerb-side scrape, a car reversing out of a bay into
+ * you. Those are `crashDamage`-free (`CRASH_FREE_SPEED` is 12 m/s of delta-v
+ * and this is a closing speed, so a 6 m/s bump still costs nothing at all) and
+ * they must not leave a wreck in the road, because a street where every parking
+ * manoeuvre spawns a permanent obstacle is a street that fills up.
+ *
+ * Above it is a car being *driven* into another one, which is the event the
+ * owner asked to be able to see. 6 m/s is 22 km/h, which is a deliberate act at
+ * any speed limit in Sydney.
+ *
+ * It is a **closing** speed, so it composes the way every other number in this
+ * file does: two cars at 3 m/s meeting head-on clears it and one at 6 m/s
+ * running into a stopped car clears it, which is the same physics and is
+ * therefore the same rule.
+ */
+export const KNOCK_LOOSE_SPEED = 6;
+
+/**
+ * How long a knocked car has to be at rest before it may be recycled, ms.
+ *
+ * The brief's 20 s, and the clock exists so the wreck is *there* for the fight
+ * that produced it. A car punted across an intersection and gone four seconds
+ * later is a car nobody was ever able to look at; twenty seconds is long enough
+ * to drive back past it, and short enough that a busy intersection is not
+ * accumulating scenery for an hour.
+ *
+ * **And it is a floor rather than the rule**, which is the honest half. See
+ * `CarField.recycleLoose`: nothing is ever recycled while somebody is within
+ * `RECYCLE_KEEP_RADIUS`, so in a street with a player in it the wreck simply
+ * stays. That is the cheaper of the two rules the brief offered ("un-suppressed
+ * only once the player is out of sight" against "left suppressed until the room
+ * empties") and it is cheaper because **it is the rule the class already has**:
+ * one distance test per loose car against the same flat player roster
+ * `recycleFarthest` was already being handed, and not one new concept. It is
+ * also the more honest of the two: a wreck that vanishes because the room
+ * emptied is a wreck that vanishes while somebody is standing next to it in a
+ * room of one.
+ */
+export const LOOSE_REST_MS = 20000;
+
+/** Below this a knocked car counts as stopped, m/s. A centimetre a second is parked. */
+export const LOOSE_REST_SPEED = 0.25;
+
+/**
+ * How many knocked cars one room holds. **The brief's 8, and the oldest goes.**
+ *
+ * This is the cap the wire cost is stated at and it is the reason there is a
+ * cap at all -- see `LOOSE_BROADCAST_TICKS`. Eight is enough for the pile-up a
+ * single determined driver can make in one intersection and small enough that
+ * the worst case is a number this document can print. The eviction is **the
+ * lowest id**, which is the oldest because `CarField.alloc` is monotonic, and
+ * it is an integer rule rather than a float one for the reason every tie-break
+ * in this project is: two builds handed the same room must choose the same car.
+ */
+export const MAX_LOOSE_CARS = 8;
+
+/**
+ * How often a moving knocked car's pose goes on the wire, in 60 Hz ticks.
+ *
+ * **Six, which is 10 Hz, and this is the whole cost of the feature.**
+ *
+ * A driven car costs nothing per tick because its pose is derived from its
+ * driver's snapshot record (`CarField.follow`, section 4). A car with nobody in
+ * it has no driver to be derived from, so it is the one thing in this game
+ * whose position has to be *sent*. At `protocol.CAR_RECORD_BYTES` and this
+ * interval that is 32 x 10 = 320 B/s per moving car, and at `MAX_LOOSE_CARS`
+ * simultaneously in motion **2.5 kB/s, or 20 kbit/s per player** -- against
+ * PERFORMANCE.md's measured 130-200 kbit/s of local density, which is 10-16 %
+ * of it, and only for the two or three seconds each of eight cars is actually
+ * rolling. A car that has stopped costs one final record and then nothing.
+ *
+ * Ten rather than sixty because both ends integrate the same body between
+ * frames: the record carries the velocity along the heading, the slip across it
+ * and the spin (`protocol.CarRecord.slip`/`spin`), so a client runs
+ * `CarField.integrateLoose` on its mirror with the identical `rigid.ts` and the
+ * 10 Hz records are corrections rather than the animation. Sixty would be
+ * 120 kbit/s at the cap, which is most of a player's budget for a Camry rolling
+ * into a gutter.
+ */
+export const LOOSE_BROADCAST_TICKS = 6;
+
 // --- What a damaged car looks like ---------------------------------------------------
 
 /**
@@ -1122,6 +1358,45 @@ export interface DriveState {
    */
   carHealth: number;
   /**
+   * How fast the car is sliding **across** its own heading, m/s, positive to
+   * its left. Zero for every metre of every ordinary drive.
+   *
+   * The first of the two numbers section 7 added, and it lives here beside
+   * `carSpeed` for `carSpeed`'s own reason and not for tidiness: it is movement
+   * state, it has to survive into `combat.advance`'s integrator and into
+   * `net/client.reconcile`'s replay, and a second copy of "which way is this
+   * car actually going" on the record would be a second opinion about where a
+   * player is.
+   *
+   * Written **only** by a contact (`resolveCarContact`) and decayed only by
+   * `stepCarSpeed` at `CAR_SLIP_GRIP`. Nothing a client sends can set it, which
+   * is what lets `shapeDriveInput` feed it into `InputSnapshot.right` without
+   * giving up the "a car does not crab" rule -- see that function.
+   *
+   * Optional on this interface and required on the combatant, on
+   * `carCrashHeadOn`'s asymmetry and for its reason: `verifyDriving` drives
+   * three-field literals through `stepCarSpeed` and the real thing is a checked
+   * field on the state both processes reconcile.
+   */
+  carSlip?: number;
+  /**
+   * And how fast it is turning about itself, radians a second, positive to the
+   * left. Zero unless something has hit it.
+   *
+   * The second. It is **folded into the driver's look yaw** by
+   * `shapeDriveSteering` rather than applied to a heading of its own, which is
+   * exactly what `CAR_SMOKING_PULL` already does and is the same argument: the
+   * car points where the driver points (section 2), the look yaw is a
+   * client-authoritative input this wire already carries, and a spin that
+   * turned the car without turning the driver would be a car facing one way and
+   * a camera facing another.
+   *
+   * Both ends integrate the same number from the same impulse, so the *rate* is
+   * agreed and only the *yaw* is client-owned -- which is the arrangement that
+   * makes this un-diverge-able rather than merely usually right.
+   */
+  carYawRate?: number;
+  /**
    * How square the nose probe's last impact was, 0..1. **Written here, read by
    * the car sweep**, and the second half of `combat.CombatantState.carCrashDv`'s
    * one-tick outbox -- see that field, which carries the whole argument.
@@ -1276,7 +1551,30 @@ export function stepCarSpeed(
     // car and gets into another one does not inherit the speed they had when
     // they were thrown through the windscreen.
     c.carSpeed = 0;
+    // And neither the slide nor the spin, on the identical argument: a player
+    // thrown out of a car that was slewing sideways would otherwise walk away
+    // crabbing. See `DriveState.carSlip`.
+    c.carSlip = 0;
+    c.carYawRate = 0;
     return 0;
+  }
+
+  // --- The tyres, before anything else, because a contact that landed on the
+  //     previous tick is what these two are shedding.
+  //
+  // `approach` and not a multiply, on the handbrake's own rule one screen down:
+  // an exponential decay never reaches zero, so a car nudged once would carry a
+  // millimetre a second of slip and a microradian of spin for the rest of the
+  // session, and `verifyCarPhysics` would have to assert against an epsilon
+  // instead of against nought. Both rates are absolute (m/s^2, rad/s^2), which
+  // is also what makes the *time* to straighten out a constant rather than a
+  // function of how hard you were hit -- a car shoved twice as hard takes twice
+  // as long to come back, which is what a tyre does.
+  if (c.carSlip !== undefined && c.carSlip !== 0) {
+    c.carSlip = approach(c.carSlip, 0, CAR_SLIP_GRIP * dt);
+  }
+  if (c.carYawRate !== undefined && c.carYawRate !== 0) {
+    c.carYawRate = approach(c.carYawRate, 0, CAR_SPIN_GRIP * dt);
   }
 
   const throttle = clamp(input.forward, -1, 1);
@@ -1549,21 +1847,54 @@ export function shapeDriveInput(c: DriveState, movement: InputSnapshot): void {
   // `shapeRideInput`'s own argument: forcing the sprint is what makes the scale
   // multiply `SPRINT_SPEED` rather than `WALK_SPEED`.
   movement.sprint = true;
-  // No sidestep. A car does not crab, and `A`/`D` have been spent on the wheel
-  // by `shapeDriveSteering` -- but this is the line that makes it a *rule*
-  // rather than a client-side courtesy, because a hand-rolled client that kept
-  // sending `right: 1` would strafe without it. `bikes.RIDE_STRAFE`'s reason.
-  movement.right = 0;
   // The sign is the whole trick. `controller.step`'s target speed is
   // `SPRINT x speedScale x min(|forward|, 1)` along the *look* direction, so a
   // reversing car is `forward = -1` with the magnitude of the speed in the
   // scale, and a forward one is `forward = 1`.
   const v = c.carSpeed;
-  movement.forward = v < 0 ? -1 : 1;
-  // `PROBE_SPRINT` in `bikes.ts` is this same 8.2 and is a constant there for
-  // the identical reason: this file may not import the controller, because the
-  // controller imports three. `verifyDriving` asserts the two have not drifted.
-  movement.speedScale = ((v < 0 ? -v : v) / SPRINT_SPEED) * (movement.speedScale ?? 1);
+  // --- And the slide, which is the one thing section 7 added to this function.
+  //
+  // **No sidestep. A car does not crab** -- and that rule is *stronger* here
+  // than it was, not weaker, which is worth reading before touching this block.
+  // What it used to be was `movement.right = 0`, whose stated job was to make
+  // "no strafing in a car" a rule rather than a client-side courtesy: a
+  // hand-rolled client that kept sending `right: 1` would strafe without it
+  // (`bikes.RIDE_STRAFE`'s reason). The lateral input is still **overwritten
+  // and never read**, so that client still cannot strafe; what it is
+  // overwritten *with* is now this end's own `carSlip`, which no `INPUT` byte
+  // can reach and which only a contact ever writes.
+  //
+  // The arithmetic is `controller.step`'s own, run backwards. That function
+  // builds a wish vector `forward * fwd + right * rightVec`, normalises it, and
+  // takes `SPRINT x speedScale x min(|wish|, 1)` along it -- so to make the body
+  // travel at `(carSpeed along the heading, carSlip across it)` the pair handed
+  // over is that vector's *direction* in the (forward, right) basis and its
+  // *magnitude* in the scale. `rightVec` is `(cos y, -sin y)`, which is the
+  // negative of this project's "left of a heading", so a slip to the left is a
+  // negative `right`.
+  //
+  // With no slip -- every metre of every ordinary drive -- `forward` comes out
+  // as exactly +/-1 and `right` as exactly 0, which is the line this replaced,
+  // bit for bit. That is deliberate: the common path must not change because
+  // cars learned to bump into each other.
+  const slip = c.carSlip ?? 0;
+  const speed = v < 0 ? -v : v;
+  if (slip === 0) {
+    movement.right = 0;
+    movement.forward = v < 0 ? -1 : 1;
+    // `PROBE_SPRINT` in `bikes.ts` is this same 8.2 and is a constant there for
+    // the identical reason: this file may not import the controller, because the
+    // controller imports three. `verifyDriving` asserts the two have not drifted.
+    movement.speedScale = (speed / SPRINT_SPEED) * (movement.speedScale ?? 1);
+    // And no jumping a car. See below.
+    movement.jump = false;
+    return;
+  }
+  // `Math.sqrt` and never `Math.hypot`, on section 5's determinism rule.
+  const magnitude = Math.sqrt(v * v + slip * slip);
+  movement.forward = v / magnitude;
+  movement.right = -slip / magnitude;
+  movement.speedScale = (magnitude / SPRINT_SPEED) * (movement.speedScale ?? 1);
   // And no jumping a car. `jump` is the handbrake now -- see `stepCarSpeed` --
   // and a sedan that hops when you brake is not the feature.
   movement.jump = false;
@@ -1638,6 +1969,25 @@ export function shapeDriveSteering(
     const grip = magnitude < DRIVE_TURN_GRIP ? magnitude / DRIVE_TURN_GRIP : 1;
     out.yawDelta += (c.drivingCar & 1 ? 1 : -1) * CAR_SMOKING_PULL * grip * dir * dt;
   }
+  // --- And the slew from a shunt. See `DriveState.carYawRate`.
+  //
+  // Added to the wheel on exactly the smoking pull's terms one clause up, and
+  // it is the same trick for the same reason: the car points where the driver
+  // points, so a spin that turned the car without turning the driver would put
+  // the camera through the side window. The *rate* is a number both ends
+  // integrate from the same impulse and decay at `CAR_SPIN_GRIP`; the *yaw* it
+  // is folded into is client-authoritative and always was, so there is nothing
+  // here two ends can disagree about.
+  //
+  // Deliberately **not** scaled by the grip ramp the pull uses. A parked car
+  // does not creep round on its own -- that is what the ramp is protecting --
+  // but a parked car that has just been rammed absolutely does, and it is the
+  // whole picture of being rammed while stationary.
+  //
+  // And **not** multiplied by `dir`: reverse inverts the *wheel* because that
+  // is what a steering rack does, and a spin imparted by two tonnes of Hilux is
+  // not something the gearbox has an opinion about.
+  out.yawDelta += (c.carYawRate ?? 0) * dt;
   return out;
 }
 
@@ -1835,6 +2185,266 @@ export function crashIntoTraffic(
     return true;
   });
   return dv;
+}
+
+// --- Cars as bodies -----------------------------------------------------------------
+
+/**
+ * Fill a `rigid.RigidBody` from a car somebody is driving, or one nobody is.
+ *
+ * The counterpart of `traffic.drivenCarPose` one layer down, and it exists for
+ * that function's stated reason: `drivenCarPose` makes a driven car *hit-test*
+ * like an ambient one, and this makes it *collide* like every other body in the
+ * game. A car that had its own contact code would be a car that agreed with the
+ * bike code today.
+ *
+ * The box is `CAR_BODY_SIZE` **without** `traffic.HIT_MARGIN` and at a scale of
+ * exactly 1, which is `drivenCarPose`'s own pair of decisions and is deliberate
+ * here for a third reason: the margin exists to make a *knockdown* generous at
+ * the corners, and a generous box between two solid objects is two cars that
+ * stop ten centimetres apart with daylight between them. What a player learns
+ * about a car they can see the edges of has to be the edges.
+ *
+ * `rigidSetHeading`'s two transcendentals are affordable here for
+ * `drivenCarPose`'s reason and no other: this runs once per *driven* car per
+ * tick and driven cars are counted in ones.
+ */
+export function carRigidBody(
+  car: {
+    body: number;
+    x: number;
+    z: number;
+    yaw: number;
+    /** Signed, along the heading. */
+    speed: number;
+    /** Across it, positive left. Optional; absent is a car that has not been hit. */
+    slip?: number;
+    yawRate?: number;
+  },
+  out: RigidBody,
+): RigidBody {
+  const size = CAR_BODY_SIZE[car.body] ?? CAR_BODY_SIZE[0];
+  out.x = car.x;
+  out.z = car.z;
+  rigidSetHeading(out, car.yaw);
+  rigidSetVelocity(out, car.speed, car.slip ?? 0);
+  out.yawRate = car.yawRate ?? 0;
+  out.mass = carMass(car.body);
+  out.halfLength = size.length * 0.5;
+  out.halfWidth = size.width * 0.5;
+  out.restitution = DEFAULT_RESTITUTION;
+  out.friction = DEFAULT_FRICTION;
+  out.kinematic = false;
+  return out;
+}
+
+/**
+ * And from an **ambient or static** car, which is a body of infinite mass.
+ *
+ * `kinematic`, and that is the honest model rather than a convenience. Section 3
+ * of this file's header is the argument in full: a schedule car is a closed-form
+ * function of the clock with no record, no health field and no existence
+ * between two calls to `poseCar`, so there is nowhere to write a velocity back
+ * to. Giving it one would mean giving it a record, and a record per car anybody
+ * has ever nudged is the per-NPC city state the performance budget forbids.
+ *
+ * What the timetable does instead of moving is **stop** -- `traffic.HoldLedger`
+ * already knows how to hold a car where it stands, and `stun` is that mechanism
+ * asked a slightly different question. And if the hit was hard enough that
+ * stopping is not a plausible answer, the car stops being ambient at all: see
+ * `KNOCK_LOOSE_SPEED`.
+ *
+ * The pose is taken with its `halfLength`/`halfWidth` **as the pose has them**,
+ * which does include `traffic.HIT_MARGIN` and the parked fleet's 4 % scale
+ * jitter. That is the opposite of `carRigidBody`'s choice one function up and it
+ * is right for the opposite reason: this box is not a thing the player learns
+ * the edges of, it is the box the knockdown and the lane obstacles already use,
+ * and a second set of ambient dimensions would be the "two opinions about where
+ * a car is" this whole layer exists to have none of.
+ */
+export function ambientRigidBody(pose: CarPose, out: RigidBody): RigidBody {
+  out.x = pose.x;
+  out.z = pose.z;
+  out.dx = pose.dx;
+  out.dz = pose.dz;
+  out.vx = pose.dx * pose.speed;
+  out.vz = pose.dz * pose.speed;
+  out.yawRate = 0;
+  out.mass = carMass(pose.body);
+  out.halfLength = pose.halfLength;
+  out.halfWidth = pose.halfWidth;
+  out.restitution = DEFAULT_RESTITUTION;
+  out.friction = DEFAULT_FRICTION;
+  out.kinematic = true;
+  return out;
+}
+
+/**
+ * What one contact did, in the units the callers need.
+ *
+ * A record the caller owns and reuses, on `traffic.CarPose`'s contract: the
+ * sweep that fills this runs per driven car per record near it, every tick, on
+ * the server's hot path.
+ */
+export interface CarShunt {
+  /**
+   * Newton-seconds along the contact normal. Zero when the pair were not
+   * touching, or were already moving apart.
+   *
+   * The quantity the *bike* rule is written against (`BIKE_THROW_IMPULSE`) and
+   * the reason this is reported at all: an impulse composes across masses where
+   * a speed does not. Being clipped by a van at 8 m/s and by a hatch at 8 m/s
+   * are different events and only one of the two numbers says so.
+   */
+  impulse: number;
+  /**
+   * How fast the two were closing along the contact normal, m/s, at the instant
+   * of contact. Positive.
+   *
+   * **Not what the damage is computed from.** `carCrashClosing` and
+   * `ambientCrashClosing` still own that, unchanged, so a crash costs exactly
+   * what it cost before this feature existed and `server/cardamage-check.ts`
+   * needed no retune. This number is what `KNOCK_LOOSE_SPEED` is compared
+   * against, because "was that hard enough to move the other car" is a question
+   * about the contact rather than about the two timetables.
+   */
+  closing: number;
+  /**
+   * Where each body has to move to stop overlapping: `[ax, az, bx, bz]`.
+   *
+   * **The caller applies these and this file deliberately does not**, which is
+   * `rigid.ts` section 4's rule and matters most here: a driven car's
+   * separation has to be walked through the *driver's own capsule resolver*, or
+   * a car shoved sideways ends up inside a shopfront. The one thing in this
+   * project that knows where the shopfronts are is `CollisionWorld.resolve`.
+   */
+  push: number[];
+}
+
+export function createCarShunt(): CarShunt {
+  return { impulse: 0, closing: 0, push: [0, 0, 0, 0] };
+}
+
+/**
+ * Two car-shaped bodies that are in each other: separate them, bounce them, and
+ * say what it cost.
+ *
+ * Returns true when there was a contact to resolve. The velocities on `a` and
+ * `b` are **written**; the positions are not -- see `CarShunt.push`.
+ *
+ * The whole of the function is three calls into `game/rigid.ts` with the
+ * closing speed measured before the impulse changes it, and it exists as a
+ * named thing in this file rather than being inlined at its four call sites
+ * (the server's driven-against-driven sweep, its driven-against-ambient sweep,
+ * the client's prediction of the second, and the bike path) for the reason
+ * `CarField.damage` exists: "how hard did those two hit and what did it do to
+ * them" must have exactly one answer rather than four that agree today.
+ */
+export function resolveCarContact(
+  a: RigidBody,
+  b: RigidBody,
+  contact: RigidContact,
+  out: CarShunt,
+  /**
+   * Called once, with the closing speed, **after** it is measured and
+   * **before** anything is resolved. The one seam in this function and it
+   * exists for exactly one caller.
+   *
+   * A driven car meeting an ambient one has to know how hard it hit *before* it
+   * can decide what it hit: under `KNOCK_LOOSE_SPEED` the ambient car is a wall
+   * (`kinematic`, section 7) and over it the ambient car is about to become a
+   * driverless record with a velocity of its own. That is one flag on `b`, and
+   * the alternative to this hook is either resolving twice or splitting the
+   * function -- and splitting it would give "how hard did those two hit and what
+   * did it do to them" two answers, which is the thing this function exists to
+   * refuse.
+   */
+  decide?: (closing: number) => void,
+): boolean {
+  out.impulse = 0;
+  out.closing = 0;
+  out.push[0] = 0;
+  out.push[1] = 0;
+  out.push[2] = 0;
+  out.push[3] = 0;
+  if (!rigidOverlap(a, b, contact)) return false;
+  // Measured **before** the impulse, because the impulse is what makes it stop
+  // being true. The sign convention is `rigid.ts`': the normal runs from `a` to
+  // `b`, so a closing pair has a negative relative normal velocity and this is
+  // its magnitude.
+  const rel = (b.vx - a.vx) * contact.nx + (b.vz - a.vz) * contact.nz;
+  out.closing = rel < 0 ? -rel : 0;
+  if (decide !== undefined) decide(out.closing);
+  rigidSeparate(a, b, contact, out.push);
+  out.impulse = rigidResolve(a, b, contact);
+  return true;
+}
+
+/**
+ * The first ambient car a driven one is **inside**, resolved. Null for the
+ * overwhelmingly common case of not touching anything.
+ *
+ * `crashIntoTraffic`'s companion and deliberately its sibling rather than its
+ * replacement: that one decides what the crash *cost*, unchanged, so a crash is
+ * worth exactly what it was worth before the body layer existed and
+ * `server/cardamage-check.ts` needed no retune. This one decides what it *did*.
+ *
+ * The two run as two sweeps over the same broadphase rather than one, and that
+ * is a real cost stated plainly: `forEachCarNear` at `CRASH_QUERY_RADIUS` twice
+ * per **occupied** driven car per tick, which is bounded by the sixteen-player
+ * cap however many wrecks are parked around the city and is the same query the
+ * player sweep already runs per player per tick. Folding them together would
+ * mean the damage rule and the contact rule sharing an early-out -- and they do
+ * not agree about when to stop: the damage takes the first car that is
+ * *closing* and this takes the first car that is *overlapping*, which for a
+ * driver who has stopped dead against a bus are different cars.
+ *
+ * `theirs` is the iterator's scratch and the return value points into it, so the
+ * caller must read it before the next call. `forEachCarNear`'s contract.
+ *
+ * **The kinematic flag is decided inside**: under `KNOCK_LOOSE_SPEED` the
+ * ambient car is a wall and over it, it is a 1.4-tonne object about to be
+ * launched. The caller reads `out.closing` to find out which happened and
+ * `other` for the velocity a knocked car leaves with.
+ */
+export function resolveTrafficContact(
+  field: TrafficField,
+  car: DrivenCar,
+  tick: number,
+  scratch: LaneRoute[],
+  mine: CarPose,
+  theirs: CarPose,
+  suppressed: (identity: number) => boolean,
+  /** The driven car's body, already filled by `carRigidBody`. Written. */
+  body: RigidBody,
+  /** Scratch for the ambient one. Filled here, and written if the hit was hard. */
+  other: RigidBody,
+  contact: RigidContact,
+  out: CarShunt,
+): CarPose | null {
+  drivenCarPose(car, mine);
+  let hit: CarPose | null = null;
+  forEachCarNear(field, car.x, car.z, CRASH_QUERY_RADIUS, tick, scratch, theirs, (p) => {
+    // Your own ghost, skipped exactly as `carHitting` and `crashIntoTraffic`
+    // skip it and for their reason.
+    if (suppressed(p.identity)) return;
+    // The viaduct gate. `crashIntoTraffic`'s clause verbatim: a car on the
+    // Cahill Expressway is not in the car on Alfred Street underneath it.
+    const dy = p.y - car.y;
+    if (dy > TAKE_HEIGHT || dy < -TAKE_HEIGHT) return;
+    ambientRigidBody(p, other);
+    if (!resolveCarContact(body, other, contact, out, (closing) => {
+      // See the header. Under the threshold this is a wall; over it, it is a
+      // car that is about to have a record of its own and therefore somewhere
+      // to put a velocity.
+      other.kinematic = closing < KNOCK_LOOSE_SPEED;
+    })) {
+      return;
+    }
+    hit = p;
+    return true;
+  });
+  return hit;
 }
 
 /**
@@ -2111,6 +2721,43 @@ export interface DrivenCar {
   yaw: number;
   /** Signed, m/s. Copied out of the driver's `carSpeed` by `follow`. */
   speed: number;
+  /**
+   * And across the heading, positive left, m/s. Copied out of the driver's
+   * `carSlip` by `follow`, or integrated here for a car nobody is in.
+   *
+   * On the wire (`protocol.CarRecord.slip`) where `speed` already was, and for
+   * the same reason: a car with nobody in it has no driver's snapshot to be
+   * derived from, so its velocity is the one velocity in this game that has to
+   * be sent. Zero for the overwhelming majority of records.
+   */
+  slip: number;
+  /** How fast it is turning about itself, rad/s, positive left. See `slip`. */
+  yawRate: number;
+  /**
+   * **Is this a car nobody is driving that is nevertheless moving?**
+   *
+   * The one new kind of thing in the body layer, and the whole of what it means
+   * is section 7's third bullet: a driven car hit an ambient one hard enough
+   * (`KNOCK_LOOSE_SPEED`) that "the timetable carries on" stopped being a
+   * plausible answer, so the ambient car was taken *out* of the timetable and
+   * given a record with `driverId` 0.
+   *
+   * It is not the same as `driverId === 0`, and that difference is the field's
+   * whole justification: a car somebody parked and walked away from is also
+   * driverless, is also a blocker, and must **not** be integrated, broadcast at
+   * 10 Hz or recycled after twenty seconds. This flag is what tells the two
+   * apart, and it goes on the wire as `protocol.CAR_LOOSE` because a client
+   * that could not tell them apart would integrate four hundred parked cars.
+   */
+  loose: boolean;
+  /**
+   * Milliseconds a loose car has been stationary. See `LOOSE_REST_MS`.
+   *
+   * Reset by any contact that gets it moving again, so a wreck that is shunted
+   * a second time starts its twenty seconds over -- which is what stops a car
+   * being recycled out from under the player who is still pushing it.
+   */
+  restMs: number;
   /** The combatant driving it, or 0 for one left in the street. */
   driverId: number;
   /**
@@ -2255,6 +2902,12 @@ export class CarField implements DrivingLookup {
       z: source.z,
       yaw: source.yaw,
       speed: 0,
+      // A car somebody has just got into is not sliding and not spinning. See
+      // `DrivenCar.slip`.
+      slip: 0,
+      yawRate: 0,
+      loose: false,
+      restMs: 0,
       driverId,
       // WORKSTREAM W: the take *is* the last driver. See `lastDriverId`.
       lastDriverId: driverId,
@@ -2289,6 +2942,12 @@ export class CarField implements DrivingLookup {
     z: number;
     yaw: number;
     speed: number;
+    /** Across the heading, positive left. Optional; absent is "not sliding". */
+    slip?: number;
+    /** Radians a second, positive left. Optional; absent is "not spinning". */
+    yawRate?: number;
+    /** Is this a driverless car still rolling? `protocol.CAR_LOOSE`. */
+    loose?: boolean;
     driverId: number;
     /** Optional so a caller that predates the crash damage means "undamaged". */
     health?: number;
@@ -2305,6 +2964,21 @@ export class CarField implements DrivingLookup {
       existing.z = record.z;
       existing.yaw = record.yaw;
       existing.speed = record.speed;
+      // The body layer's two numbers, on the pose's own terms: they describe
+      // where a record is going, and for a loose car they are the only thing
+      // that does. Defaulted rather than trusted, on `health`'s rule -- a caller
+      // that predates the body layer means "not sliding and not spinning".
+      existing.slip = record.slip ?? 0;
+      existing.yawRate = record.yawRate ?? 0;
+      // **Taken outright, in both directions**, unlike the fuse two clauses
+      // down. A car that has come to rest stops being loose, and that is an
+      // event the authority owns and this end may not have predicted; a car
+      // that has just been knocked loose is one this end certainly has not.
+      // There is no case here that corresponds to the fuse's "a record re-sent
+      // for an unrelated reason would put out a fire", because `loose` is
+      // recomputed by the authority on every tick rather than quantised.
+      existing.loose = record.loose ?? false;
+      if (!existing.loose) existing.restMs = 0;
       existing.driverId = record.driverId;
       // WORKSTREAM W: a record adopted with somebody in it names them as the
       // last driver too; one adopted empty keeps whoever it had. See
@@ -2336,6 +3010,10 @@ export class CarField implements DrivingLookup {
     }
     const car: DrivenCar = {
       ...record,
+      slip: record.slip ?? 0,
+      yawRate: record.yawRate ?? 0,
+      loose: record.loose ?? false,
+      restMs: 0,
       lastDriverId: record.driverId,
       emptyMs: 0,
       health: record.health ?? CAR_HEALTH_MAX,
@@ -2369,6 +3047,11 @@ export class CarField implements DrivingLookup {
     if (!car) return;
     car.driverId = 0;
     car.speed = 0;
+    // And the body's two numbers, on `speed`'s own argument: a car the driver
+    // stepped out of is standing still, not sliding sideways at 3 m/s. See
+    // `DrivenCar.slip`.
+    car.slip = 0;
+    car.yawRate = 0;
     car.emptyMs = 0;
   }
 
@@ -2508,6 +3191,17 @@ export class CarField implements DrivingLookup {
         car.z = driver.z;
         car.yaw = driver.yaw;
         car.speed = driver.carSpeed;
+        // The body layer's two numbers travel the same way `speed` does and for
+        // its reason: the driver's combatant is where they are integrated (they
+        // have to survive `net/client.reconcile`'s replay) and the record is a
+        // copy for the wire. See `DriveState.carSlip`.
+        car.slip = driver.carSlip ?? 0;
+        car.yawRate = driver.carYawRate ?? 0;
+        // Somebody is in it, so it is not loose whatever it was a moment ago --
+        // getting into a car that is still rolling is a legal thing to do and
+        // the record has to stop being integrated the instant it happens.
+        car.loose = false;
+        car.restMs = 0;
         car.emptyMs = 0;
         continue;
       }
@@ -2519,6 +3213,8 @@ export class CarField implements DrivingLookup {
       // question `Park Anywhere` asks about a car with no driver.
       car.driverId = 0;
       car.speed = 0;
+      car.slip = 0;
+      car.yawRate = 0;
       car.emptyMs = 0;
       changed.push(car);
     }
@@ -2738,6 +3434,235 @@ export class CarField implements DrivingLookup {
     return bestId;
   }
 
+  /**
+   * **Knock an ambient or static car out of the timetable and into the driven
+   * set, driverless.** Returns the record, or null if it could not be done.
+   *
+   * The third bullet of section 7 and the one genuinely new object in this
+   * feature. Everything about it is `take` with the driver left out --
+   * the same allocation, the same `bySource` suppression, the same
+   * `MAX_DRIVEN_CARS` ceiling -- which is the point: a knocked car is not a new
+   * kind of entity, it is a car nobody is in, and every consumer of
+   * `suppressed` already covers it with no new code (section 3).
+   *
+   * Null covers three cases and no caller cares which: somebody already has
+   * that identity, the room is at its four-hundred-record budget, and the
+   * allocator is exhausted. In all three the honest outcome is that the
+   * timetable carries on and the driver simply pays for the crash, which is
+   * exactly what happened before this existed.
+   *
+   * **The cap is enforced here rather than by the caller**, on `take`'s own
+   * argument -- the ceiling has to be an invariant of the class and not a
+   * convention four sweeps keep -- and the eviction is the lowest loose id,
+   * which is the oldest because `alloc` is monotonic. See `MAX_LOOSE_CARS`.
+   */
+  knockLoose(source: TakeableCar, speed: number, slip: number, yawRate: number): DrivenCar | null {
+    if (this.bySource.has(source.identity)) return null;
+    if (this.scorched.has(source.identity)) return null;
+    // --- The cap, before the budget, because evicting one here is what makes
+    // room under both. Counted rather than tracked in a set: loose cars are at
+    // most eight and this walks a list that is already in cache.
+    let loose = 0;
+    let oldest = 0;
+    for (const car of this.all()) {
+      if (!car.loose) continue;
+      loose++;
+      if (oldest === 0 || car.id < oldest) oldest = car.id;
+    }
+    if (loose >= MAX_LOOSE_CARS && oldest !== 0) {
+      // A removal hands the identity back (section 3), so the car that goes is
+      // simply standing in its bay again -- 250 m away or not. That is a lie
+      // this rule tells knowingly and it is the smaller of the two available:
+      // the alternative is a ninth wreck nobody can be told about.
+      this.remove(oldest);
+    }
+    if (this.byId.size >= MAX_DRIVEN_CARS) return null;
+    const id = this.alloc();
+    if (id === 0) return null;
+    const car: DrivenCar = {
+      id,
+      carId: source.identity,
+      body: source.body,
+      colour: source.colour,
+      x: source.x,
+      y: source.y,
+      z: source.z,
+      yaw: source.yaw,
+      speed,
+      slip,
+      yawRate,
+      loose: true,
+      restMs: 0,
+      driverId: 0,
+      // Nobody has ever driven it, which is the honest answer and is what stops
+      // `Park Anywhere` protecting a wreck on behalf of the person who made it.
+      lastDriverId: 0,
+      emptyMs: 0,
+      health: CAR_HEALTH_MAX,
+      damageCooldownMs: 0,
+      burningMs: NOT_BURNING,
+      igniteLockMs: 0,
+    };
+    this.byId.set(id, car);
+    this.bySource.set(car.carId, car);
+    this.dirty = true;
+    return car;
+  }
+
+  /**
+   * Roll every loose car forward by `dt`, and say which ones moved.
+   *
+   * **Run on both ends**, which is the whole reason the wire carries a slip and
+   * a spin at all: the server broadcasts a moving loose car ten times a second
+   * (`LOOSE_BROADCAST_TICKS`) and both processes integrate the identical
+   * `rigid.ts` body in between, so what arrives is a correction rather than the
+   * animation. Sixty updates a second for eight cars is 120 kbit/s a player;
+   * ten plus a shared integrator is twenty.
+   *
+   * `resolve` is the collision world, or null. **Null is a legal world** on
+   * `DrivingWorld.collision`'s rule and means a car rolls through walls, which
+   * is the correct failure for a self-check and for the first second of a
+   * session: a wreck that cannot move until the prisms arrive is worse than one
+   * that clips a kerb once.
+   *
+   * Returns the records whose pose changed, for the caller to broadcast --
+   * `follow`'s contract, and the array is the caller's and is reused.
+   */
+  integrateLoose(
+    dt: number,
+    resolve: ((fx: number, fz: number, tx: number, tz: number, r: number, feetY: number, headY?: number) => { x: number; z: number; hit: boolean }) | null,
+    changed: DrivenCar[] = [],
+  ): DrivenCar[] {
+    changed.length = 0;
+    if (dt <= 0) return changed;
+    for (const car of this.all()) {
+      if (!car.loose) continue;
+      // A car that has come to rest costs one comparison and nothing else,
+      // which is what makes the twenty-second recycling clock affordable.
+      if (car.speed === 0 && car.slip === 0 && car.yawRate === 0) {
+        car.restMs += dt * 1000;
+        continue;
+      }
+      const body = carRigidBody(car, this.looseBody);
+      const fromX = body.x;
+      const fromZ = body.z;
+      rigidIntegrate(body, dt, ROLLING_DECAY, SPIN_DECAY);
+      if (resolve !== null) {
+        // Through the same resolver a *player* is moved through, at the nose's
+        // own radius and with the step allowance the body gets -- see
+        // `NOSE_STEP`, which is the bug this argument list is shaped by. A
+        // wreck that stopped dead at every kerb would be a wreck that never
+        // reached the gutter it is meant to end up in.
+        const r = resolve(fromX, fromZ, body.x, body.z, NOSE_RADIUS, car.y + NOSE_STEP, car.y + NOSE_HEAD);
+        if (r.hit) {
+          body.x = r.x;
+          body.z = r.z;
+          // Into a wall: the roll is over. Not a rebound, because a wreck that
+          // bounced off a shopfront would be a wreck that never settles, and
+          // the whole point of the twenty-second clock is that it does.
+          body.vx = 0;
+          body.vz = 0;
+          body.yawRate = 0;
+        }
+      }
+      car.x = body.x;
+      car.z = body.z;
+      // `rigidYaw`'s one `Math.atan2`, on that function's stated terms: the
+      // value is quantised to a `u16` by `encodeCars` before anybody else sees
+      // it, and this runs on at most eight cars a tick.
+      car.yaw = rigidYaw(body);
+      car.speed = rigidAlong(body);
+      car.slip = rigidSlip(body);
+      car.yawRate = body.yawRate;
+      const stopped = car.speed < LOOSE_REST_SPEED && car.speed > -LOOSE_REST_SPEED
+        && car.slip < LOOSE_REST_SPEED && car.slip > -LOOSE_REST_SPEED;
+      if (stopped) {
+        // Snapped to nought rather than left at a millimetre a second, so the
+        // comparison at the top of this loop is exact and a resting car really
+        // does cost one branch. `approach`'s rule, one layer up.
+        car.speed = 0;
+        car.slip = 0;
+        car.yawRate = 0;
+        car.restMs = 0;
+      } else {
+        car.restMs = 0;
+      }
+      this.dirty = true;
+      changed.push(car);
+    }
+    return changed;
+  }
+
+  /** Scratch for `integrateLoose`, so a tick with eight wrecks in it allocates nothing. */
+  private readonly looseBody: RigidBody = createRigidBody();
+
+  /**
+   * Give a knocked car back to the timetable once it has stood still long
+   * enough and nobody is near it. Returns how many went.
+   *
+   * The two clauses are `LOOSE_REST_MS` and `RECYCLE_KEEP_RADIUS`, and the
+   * second is the one the brief asked to be written down. The choice was
+   * between "un-suppress once the player is out of sight" and "leave suppressed
+   * until the room empties", and this is the first -- **because the class
+   * already had it**. `recycleFarthest` has kept a 250 m ring round every
+   * record since cars stopped despawning, on the argument that "nobody can be
+   * looking at the thing that disappears"; a wreck is a much more conspicuous
+   * thing to un-disappear than a parked car, and it gets the identical ring for
+   * the identical reason and not one new concept.
+   *
+   * What it costs when it does not fire is honest and worth stating: a wreck in
+   * a street somebody is standing in stays there for as long as they stay. That
+   * is not a leak -- the record is one of the four hundred the budget already
+   * allows and `recycleFarthest` can still take it -- and it is the behaviour
+   * anybody would want: the wreck you made is still there when you drive back
+   * past it.
+   */
+  recycleLooseIds(playersXZ: readonly number[], out: number[] = []): number[] {
+    out.length = 0;
+    for (const car of this.all()) {
+      if (!car.loose) continue;
+      if (car.driverId !== 0) continue;
+      // --- **Only a car that was knocked out of the timetable**, and this
+      // clause is not a detail.
+      //
+      // `loose` means "driverless and moving", and a car a player parked and
+      // then shunted with another one is both of those -- it has to be, or it
+      // would not be integrated or broadcast while it rolls. What it must never
+      // be is *recycled*: handing it back to the timetable would delete a car
+      // somebody deliberately left somewhere, twenty seconds after they nudged
+      // it, which is exactly the vanishing-car failure section 6 of this file's
+      // header spent a whole feature removing.
+      //
+      // `lastDriverId === 0` is "nobody has ever driven this", which only
+      // `knockLoose` ever produces -- `take` sets it on the take and `follow`
+      // never clears it. A record that has had a driver belongs to
+      // `recycleFarthest` and its four-hundred-car budget, as it always did.
+      if (car.lastDriverId !== 0) continue;
+      if (car.restMs < LOOSE_REST_MS) continue;
+      let nearest2 = Infinity;
+      for (let i = 0; i + 1 < playersXZ.length; i += 2) {
+        const dx = playersXZ[i] - car.x;
+        const dz = playersXZ[i + 1] - car.z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 < nearest2) nearest2 = d2;
+      }
+      if (nearest2 < RECYCLE_KEEP_RADIUS * RECYCLE_KEEP_RADIUS) continue;
+      out.push(car.id);
+    }
+    // Removed in a second pass, because the first one is walking `all()` --
+    // which `remove` invalidates by marking the flat list dirty. `follow` makes
+    // the same split for the same reason.
+    for (const id of out) this.remove(id);
+    return out;
+  }
+
+  /** How many cars are rolling with nobody in them. The dev overlay and the checks. */
+  get looseCount(): number {
+    let n = 0;
+    for (const car of this.byId.values()) if (car.loose) n++;
+    return n;
+  }
+
   /** Empty the field. A respawn of the whole room, and the self-checks. */
   clear(): void {
     this.byId.clear();
@@ -2765,6 +3690,18 @@ export interface DriverView {
   readonly id: number;
   readonly drivingCar: number;
   readonly carSpeed: number;
+  /**
+   * The body layer's two numbers, carried to the record by `follow`.
+   *
+   * **Optional**, and that is not laziness: every existing caller of `follow`
+   * builds this view by hand (`sim.stepCars`, `main.ts`'s offline sweep,
+   * `verifyDriving`), and a required field would be a compile error in four
+   * files for a quantity that is zero on every tick of an ordinary drive.
+   * Absent means "not sliding, not spinning", which is what those callers meant
+   * before this layer existed.
+   */
+  readonly carSlip?: number;
+  readonly carYawRate?: number;
   readonly x: number;
   readonly feetY: number;
   readonly z: number;
@@ -4176,6 +5113,276 @@ export function verifyDriving(): string[] {
       failures.push('Somebody face down on the footpath was counted as a witness.');
     }
     if (bystanderSeen(0, 0, 0, () => {}, null)) failures.push('An empty street witnessed a theft.');
+  }
+
+  // --- WORKSTREAM AQ: and the body layer, as it applies to cars. Folded in
+  //     here as well as being on both boot lists in its own right, so a build
+  //     that forgot to wire the new name still runs it. See `verifyCarPhysics`.
+  for (const f of verifyCarPhysics()) failures.push(f);
+
+  return failures;
+}
+
+/**
+ * The car half of the body layer: the mass table, the contact, and the two new
+ * numbers on a `DriveState`.
+ *
+ * **`game/rigid.ts`' `verifyRigid` owns the physics** -- the separating axis,
+ * the mass ratio, the sign of a spin, the determinism over 200 ticks -- and
+ * this owns everything that is a fact about *cars*, which is the split the two
+ * files have everywhere else. A check that repeated `verifyRigid`'s cases with
+ * car-shaped numbers in them would be a second copy of the thing it is
+ * checking; what this asserts is the wiring, and the wiring is where the
+ * silent failures are:
+ *
+ *   - **A mass table shorter than the body table.** A sixth body would weigh
+ *     `?? 1400` and a van would push a bus around. Nothing renders.
+ *   - **A slip that does not reach the body.** `shapeDriveInput` is the one
+ *     place the lateral velocity becomes movement, and if it did not, every
+ *     shunt in the game would be a damage number and a sound with no picture --
+ *     which is precisely the bug the owner reported the *absence* of.
+ *   - **A slip that changes an ordinary drive.** The other direction, and the
+ *     worse one: a car with no slip must hand the controller exactly the pair
+ *     it handed before this feature existed, or every car in Sydney gets a new
+ *     top speed nobody asked for.
+ *   - **Grip that never reaches zero.** An exponential decay leaves a
+ *     millimetre a second of crab forever; a car that is straight again is the
+ *     property, and it has to be exactly straight.
+ *   - **A loose car that never stops, or one that never starts.**
+ */
+export function verifyCarPhysics(): string[] {
+  const failures: string[] = [];
+
+  // --- The tables agree, which is the one that would silently reweigh the fleet.
+  if (CAR_MASS.length !== CAR_BODY_SIZE.length) {
+    failures.push(
+      `There are ${CAR_BODY_SIZE.length} car bodies and ${CAR_MASS.length} masses. A body with no mass ` +
+        'falls back to the sedan, so a new sixth body would weigh 1.4 t whatever it is drawn as.',
+    );
+  }
+  for (let b = 0; b < CAR_BODY_SIZE.length; b++) {
+    if (!(carMass(b) > 0)) failures.push(`Body ${b} weighs ${carMass(b)} kg.`);
+  }
+  // The brief's three, named, so a retune that broke the ordering is caught by
+  // the sentence it broke rather than by a number.
+  if (!(carMass(3) > carMass(0))) failures.push('A ute does not outweigh a sedan.');
+  if (!(carMass(4) > carMass(3))) failures.push('A van does not outweigh a ute.');
+  if (!(carMass(0) > carMass(1))) failures.push('A sedan does not outweigh a hatch.');
+
+  // --- `shapeDriveInput` with no slip is exactly what it always was.
+  {
+    const c: DriveState = { drivingCar: 1, carSpeed: 20, carHealth: CAR_HEALTH_MAX };
+    const m = { forward: 0, right: 0, jump: true, sprint: false, yaw: 0, pitch: 0, speedScale: 1, jumpScale: 1 };
+    shapeDriveInput(c, m);
+    if (m.forward !== 1 || m.right !== 0) {
+      failures.push(`An ordinary drive handed the controller (${m.forward}, ${m.right}) rather than (1, 0).`);
+    }
+    if (Math.abs((m.speedScale ?? 0) * SPRINT_SPEED - 20) > 1e-9) {
+      failures.push('An ordinary drive at 20 m/s no longer asks the controller for 20 m/s.');
+    }
+    if (m.jump) failures.push('A car jumped.');
+    c.carSpeed = -6;
+    shapeDriveInput(c, m);
+    if (m.forward !== -1 || m.right !== 0) failures.push('Reverse is no longer (-1, 0).');
+  }
+
+  // --- ...and with slip it asks for the vector the slip describes.
+  {
+    const c: DriveState = { drivingCar: 1, carSpeed: 8, carHealth: CAR_HEALTH_MAX, carSlip: 6 };
+    const m = { forward: 0, right: 0, jump: false, sprint: false, yaw: 0, pitch: 0, speedScale: 1, jumpScale: 1 };
+    shapeDriveInput(c, m);
+    // The controller normalises the wish vector and takes `speedScale x SPRINT`
+    // along it, so what is asserted is the *pair*: a unit direction and the
+    // magnitude of `(8, 6)`, which is 10.
+    const len = Math.sqrt(m.forward * m.forward + m.right * m.right);
+    if (Math.abs(len - 1) > 1e-9) {
+      failures.push(`A sliding car handed the controller a wish vector ${len} long rather than 1.`);
+    }
+    if (Math.abs((m.speedScale ?? 0) * SPRINT_SPEED - 10) > 1e-9) {
+      failures.push(
+        `A car doing 8 m/s forward and 6 m/s sideways asked for ` +
+          `${((m.speedScale ?? 0) * SPRINT_SPEED).toFixed(3)} m/s rather than 10.`,
+      );
+    }
+    // Positive slip is to the car's **left**, and `InputSnapshot.right` is to
+    // its right, so the sign has to invert. Getting this backwards is a car
+    // that slides the wrong way out of every shunt, which reads as physics.
+    if (!(m.right < 0)) failures.push(`A slip to the left produced right = ${m.right}; it must be negative.`);
+    if (!(m.forward > 0)) failures.push('A forward-moving car that is sliding stopped moving forward.');
+  }
+
+  // --- The grip reaches exactly zero, in the time the constants promise.
+  {
+    const c: DriveState = {
+      drivingCar: 1, carSpeed: 0, carHealth: CAR_HEALTH_MAX, carSlip: 4, carYawRate: 3,
+    };
+    const still = { forward: 0, jump: false };
+    // 4 m/s at 8 m/s^2 is half a second; 3 rad/s at 4 rad/s^2 is 0.75 s. Both
+    // derived from the constants, so a retune moves the check with the feature.
+    const ticks = Math.ceil(Math.max(4 / CAR_SLIP_GRIP, 3 / CAR_SPIN_GRIP) * 60) + 1;
+    for (let i = 0; i < ticks; i++) stepCarSpeed(c, still, 1 / 60, 0, 0, 0, 0, null);
+    if (c.carSlip !== 0) failures.push(`A shunted car is still crabbing at ${c.carSlip} m/s after ${ticks} ticks.`);
+    if (c.carYawRate !== 0) failures.push(`And still slewing at ${c.carYawRate} rad/s.`);
+  }
+  {
+    // And the half-way point, so "reaches zero" is not passing because the
+    // decay is instantaneous -- which would be a shunt with no picture.
+    const c: DriveState = { drivingCar: 1, carSpeed: 0, carHealth: CAR_HEALTH_MAX, carSlip: 4 };
+    stepCarSpeed(c, { forward: 0, jump: false }, 1 / 60, 0, 0, 0, 0, null);
+    const wanted = 4 - CAR_SLIP_GRIP / 60;
+    if (Math.abs((c.carSlip ?? 0) - wanted) > 1e-9) {
+      failures.push(`One tick took the slip from 4 to ${c.carSlip} rather than ${wanted}.`);
+    }
+  }
+
+  // --- The spin reaches the wheel, which is the whole of how a slew is drawn.
+  {
+    const c: DriveState = { drivingCar: 1, carSpeed: 10, carHealth: CAR_HEALTH_MAX, carYawRate: 2 };
+    const out: DriveSteering = { right: 0, yawDelta: 0 };
+    shapeDriveSteering(c, 0, 10, 1 / 60, out);
+    if (Math.abs(out.yawDelta - 2 / 60) > 1e-9) {
+      failures.push(`A car slewing at 2 rad/s turned the look by ${out.yawDelta} rather than ${2 / 60}.`);
+    }
+    // And reverse does not invert it -- see the clause in `shapeDriveSteering`.
+    shapeDriveSteering(c, 0, -10, 1 / 60, out);
+    if (Math.abs(out.yawDelta - 2 / 60) > 1e-9) {
+      failures.push('Reversing inverted a spin imparted by another car.');
+    }
+  }
+
+  // --- A car against an ambient one: the ambient one does not move, the driven
+  //     one is pushed out, and the closing speed is the number the knock-loose
+  //     rule is compared against.
+  {
+    const contact = createRigidContact();
+    const shunt = createCarShunt();
+    const mine = createRigidBody();
+    const theirs = createRigidBody();
+    carRigidBody({ body: 0, x: 0, z: 2.0, yaw: 0, speed: 10 }, mine);
+    const pose = createCarPose();
+    pose.x = 0;
+    pose.z = -2.3;
+    pose.dx = 0;
+    pose.dz = -1;
+    pose.body = 0;
+    pose.halfLength = 2.3;
+    pose.halfWidth = 0.9;
+    pose.speed = 0;
+    ambientRigidBody(pose, theirs);
+    if (!resolveCarContact(mine, theirs, contact, shunt)) {
+      failures.push('A car driven into a stopped ambient car found no contact at all.');
+    } else {
+      if (Math.abs(shunt.closing - 10) > 1e-6) {
+        failures.push(`The closing speed came out at ${shunt.closing.toFixed(3)} rather than 10.`);
+      }
+      if (theirs.vx !== 0 || theirs.vz !== 0 || theirs.yawRate !== 0) {
+        failures.push('An ambient car was moved by being hit. It is kinematic and has nowhere to store that.');
+      }
+      if (shunt.push[2] !== 0 || shunt.push[3] !== 0) {
+        failures.push('The separation asked the ambient car to move.');
+      }
+      if (!(shunt.push[1] > 0)) {
+        failures.push(`The driven car was pushed ${shunt.push[1]} back out of the ambient one; it must be positive.`);
+      }
+      if (!(rigidAlong(mine) < 0)) {
+        failures.push(`The driven car left the ambient one at ${rigidAlong(mine)} m/s along its heading; it must rebound.`);
+      }
+      if (!(shunt.closing >= KNOCK_LOOSE_SPEED)) {
+        failures.push(`A 10 m/s hit does not clear the ${KNOCK_LOOSE_SPEED} m/s knock-loose threshold.`);
+      }
+    }
+  }
+
+  // --- A loose car rolls, stops, and is then given back -- but only when
+  //     nobody is standing next to it.
+  {
+    const field = new CarField();
+    const car = field.knockLoose(
+      { identity: 0xabcdef, body: 0, colour: 0, x: 0, y: 0, z: 0, yaw: 0, parked: false },
+      9, 0, 1.5,
+    );
+    if (car === null) {
+      failures.push('A car could not be knocked loose into an empty field.');
+    } else {
+      if (!field.suppressed(0xabcdef)) {
+        failures.push('A knocked car did not suppress the ambient identity it came from, so the timetable is still running it.');
+      }
+      if (field.looseCount !== 1) failures.push(`The field counts ${field.looseCount} loose cars rather than 1.`);
+      let ticks = 0;
+      // 9 m/s at `rigid.ROLLING_DECAY` is three seconds. Ten is the bound.
+      for (; ticks < 600; ticks++) {
+        field.integrateLoose(1 / 60, null);
+        if (car.speed === 0 && car.slip === 0) break;
+      }
+      if (car.speed !== 0) failures.push(`A car knocked loose at 9 m/s is still doing ${car.speed} m/s after ${ticks} ticks.`);
+      if (!(Math.abs(car.z) > 5)) failures.push(`It only travelled ${Math.abs(car.z).toFixed(2)} m before stopping.`);
+      // The twenty seconds, and the ring. A player standing on it holds it.
+      for (let i = 0; i < 60 * 21; i++) field.integrateLoose(1 / 60, null);
+      if (field.recycleLooseIds([car.x, car.z]).length !== 0) {
+        failures.push('A wreck was recycled with somebody standing next to it.');
+      }
+      if (field.recycleLooseIds([car.x + RECYCLE_KEEP_RADIUS + 10, car.z]).length !== 1) {
+        failures.push('A wreck that has stood still for twenty seconds with nobody near it was not given back.');
+      }
+      if (field.suppressed(0xabcdef)) {
+        failures.push('A recycled wreck still suppresses its ambient identity, so that car is gone forever.');
+      }
+    }
+  }
+
+  // --- A car a player parked and then shunted is **not** given back to the
+  //     timetable, however long it stands still.
+  //
+  //     The failure this guards has no picture until it happens: a car you
+  //     deliberately left outside your flat, nudged once by another car,
+  //     vanishing twenty seconds later. That is the exact vanishing-car report
+  //     section 6 of this file's header spent a whole feature removing, and the
+  //     body layer would have reintroduced it through a side door.
+  {
+    const field = new CarField();
+    const mine = field.take(
+      { identity: 0xbeef01, body: 0, colour: 0, x: 0, y: 0, z: 0, yaw: 0, parked: true },
+      7,
+    );
+    if (mine === null) {
+      failures.push('A car could not be taken into an empty field.');
+    } else {
+      // Parked: the driver got out, and then somebody shunted it.
+      field.leave(mine.id);
+      mine.loose = true;
+      mine.speed = 3;
+      for (let i = 0; i < 60 * 30; i++) field.integrateLoose(1 / 60, null);
+      if (field.recycleLooseIds([1e6, 1e6]).length !== 0) {
+        failures.push(
+          'A car a player parked was handed back to the timetable because something had shunted it. ' +
+            'Only a car knocked out of the timetable may be given back to it -- see CarField.recycleLooseIds.',
+        );
+      }
+      if (field.get(mine.id) === undefined) failures.push('...and the record is gone.');
+    }
+  }
+
+  // --- And the cap, with the oldest going. See `MAX_LOOSE_CARS`.
+  {
+    const field = new CarField();
+    const ids: number[] = [];
+    for (let i = 0; i < MAX_LOOSE_CARS + 3; i++) {
+      const c = field.knockLoose(
+        { identity: 0x1000 + i, body: 0, colour: 0, x: i * 20, y: 0, z: 0, yaw: 0, parked: false },
+        5, 0, 0,
+      );
+      if (c !== null) ids.push(c.id);
+    }
+    if (field.looseCount !== MAX_LOOSE_CARS) {
+      failures.push(`${MAX_LOOSE_CARS + 3} cars were knocked loose and ${field.looseCount} are live; the cap is ${MAX_LOOSE_CARS}.`);
+    }
+    // The three that went are the three oldest, which is the three lowest ids.
+    for (let i = 0; i < 3; i++) {
+      if (field.get(ids[i]) !== undefined) failures.push(`Loose car ${ids[i]} survived the cap; the oldest goes first.`);
+    }
+    if (field.get(ids[ids.length - 1]) === undefined) {
+      failures.push('The newest knocked car was evicted rather than the oldest.');
+    }
   }
 
   return failures;

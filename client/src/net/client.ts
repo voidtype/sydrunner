@@ -1874,7 +1874,34 @@ export class NetClient {
             // from there off `CarField.age`. See `game/carfire.ts` section 2,
             // and `CarField.adopt` for why a zero here does not put a fire out.
             fuse: r.fuse,
+            // --- WORKSTREAM AQ: the body layer's two, and the flag that says
+            // this record is a wreck rolling. Both go straight onto the mirror,
+            // which then integrates it with the identical `game/rigid.ts` the
+            // server does -- see `driving.CarField.integrateLoose`.
+            slip: r.slip,
+            yawRate: r.yawRate,
+            loose: r.loose,
           });
+          // --- And the one thing on this message that is about *this* client
+          // rather than about a car: an impact the server adjudicated on the
+          // car this player is driving.
+          //
+          // `protocol.CarRecord.shunt` carries the whole argument; the short
+          // version is that a driver's own client predicts the throttle, the
+          // wall, the ambient fleet and the health, and cannot predict being
+          // rammed by another player -- because an occupied car's pose is
+          // carried on the server and never broadcast, so this end's mirror of
+          // the car that hit us is the kerb its driver took it from. The three
+          // velocity numbers live on the *combatant* and are never sent, so
+          // without this they would diverge permanently the first time two
+          // players touched.
+          //
+          // Stashed rather than applied, because the combatant is
+          // `reconcile`'s to write and this is a socket callback. One frame at
+          // most, and it is the same frame the position correction lands on.
+          if (r.shunt && r.driver === this.id) {
+            this.pendingShunt = { speed: r.speed, slip: r.slip ?? 0, yawRate: r.yawRate ?? 0 };
+          }
         }
         // Which car the server thinks *this* client is in. Derived rather than
         // sent separately, on `MSG.BIKES`' argument: the driver id is already on
@@ -2445,6 +2472,16 @@ export class NetClient {
   private pendingAck = -1;
   private pendingSelf: SnapshotPlayer | null = null;
   private pendingSelfTick = -1;
+  /**
+   * WORKSTREAM AQ: the velocity the server says this client's car came out of
+   * an impact with, or null.
+   *
+   * Written by the `CARS` handler on a record flagged `CAR_SHUNT`, drained by
+   * `reconcile` on the next fixed step. See `protocol.CarRecord.shunt` for why
+   * the flag exists and why "adopt whenever a record for my car arrives" is not
+   * the rule.
+   */
+  private pendingShunt: { speed: number; slip: number; yawRate: number } | null = null;
 
   // --- Reconciliation ---------------------------------------------------------
 
@@ -2511,6 +2548,25 @@ export class NetClient {
     // have, so the two agree by construction, and there is nothing on the wire
     // to take it from anyway. See `shapeDriveInput`'s header on the bounded
     // error that leaves in the replay.
+    // --- WORKSTREAM AQ: and the shunt, before the identity is adopted below,
+    //     because a player who has just been knocked *out* of the car should
+    //     not have the car's exit velocity written onto them.
+    //
+    // Taken outright, exactly as the health byte is and for its reason: the
+    // server decided how hard you were hit, and a client that kept its own
+    // answer would be a client that stood still through a ram. The position
+    // that goes with it arrives through the ordinary replay a few dozen lines
+    // down, where an error this large is `CORRECTION_SNAP`'s business -- which
+    // is the branch that exists for exactly this shape of event.
+    if (this.pendingShunt !== null) {
+      if (local.drivingCar !== 0) {
+        local.carSpeed = this.pendingShunt.speed;
+        local.carSlip = this.pendingShunt.slip;
+        local.carYawRate = this.pendingShunt.yawRate;
+      }
+      this.pendingShunt = null;
+    }
+
     const carAcked = this.pendingAck >= 0 && seqLE(this.carPredictedAt, this.pendingAck);
     if (this.serverCarKnown && (this.carPredictedAt < 0 || carAcked)) {
       this.carPredictedAt = -1;

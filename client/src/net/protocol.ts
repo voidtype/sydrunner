@@ -1029,7 +1029,23 @@ export const MSG = {
  * the walls this server does. Two ends on different versions of a shared
  * computation is the failure the version exists to refuse.
  */
-export const PROTOCOL_VERSION = 33;
+/*
+ * v34: cars are solid to each other.
+ *
+ * `CAR_RECORD_BYTES` 28 -> 32 (`CarRecord.slip` and `yawRate`, two `i16`s) and
+ * two new record flags in the byte `CAR_REMOVED` had to itself (`CAR_LOOSE`,
+ * `CAR_SHUNT`). A v33 client reading a v34 `CARS` frame would read every field
+ * of every record after the first out of the middle of the previous one -- a
+ * fleet of cars at plausible wrong coordinates with nothing thrown on either
+ * end, which is exactly the failure `PROTOCOL_VERSION`'s own note is about.
+ *
+ * And a **generator change**, which is the other reason to move the number and
+ * the more important one here: `game/rigid.ts` is a shared computation both
+ * ends run over the same records, so two ends on different versions of it would
+ * separate the same pair of cars in different directions. See that file's
+ * header, and `game/driving.ts` section 7.
+ */
+export const PROTOCOL_VERSION = 34;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;
@@ -3565,6 +3581,86 @@ export interface CarRecord {
    * the server re-sends sixty times a second.
    */
   fuse?: number;
+  /**
+   * How fast it is sliding **across** its own heading, m/s, positive to its
+   * left, and how fast it is turning, radians a second, positive to its left.
+   *
+   * ---------------------------------------------------------------------------
+   * **THE TWO FIELDS THE BODY LAYER ADDED, AND WHY THEY ARE ON EVERY RECORD
+   * WHEN ONLY SOME RECORDS NEED THEM.**
+   *
+   * `game/rigid.ts` gave every vehicle in this game a plan velocity and a spin
+   * instead of one scalar along a heading, and for a car somebody is *driving*
+   * neither of the two new numbers has to be here at all: an occupied car's
+   * pose is derived from its driver's snapshot record twenty times a second
+   * (`driving.CarField.follow`), and a slide is already baked into the position
+   * that arrives.
+   *
+   * What needs them is the **loose** car -- one knocked out of the ambient
+   * fleet by a hard hit, with nobody in it and nothing to be derived from. It
+   * is the one object in this game whose velocity has to be *sent*, and it is
+   * sent so that both ends can run the identical `rigid.ts` integrator between
+   * updates: the server broadcasts a moving wreck at 10 Hz
+   * (`driving.LOOSE_BROADCAST_TICKS`) and the client rolls it forward itself,
+   * which is 20 kbit/s a player at the eight-car cap against the 120 it would
+   * cost to send every tick.
+   *
+   * They are on every record rather than on a variant because this is a
+   * fixed-stride encoding and always has been -- a second record shape would be
+   * a second decoder and a length field per row for four bytes on records that
+   * are almost all zero anyway. The cost is honest and small: `CAR_RECORD_BYTES`
+   * went 28 to 32, so a joiner's full four-hundred-record burst is 12.8 kB
+   * against 11.2, on a connection that has just pulled down a megabyte of
+   * collision prisms.
+   *
+   * **Optional on the way in and always present on the way out**, on `health`'s
+   * rule and for its reason: every caller written before the body layer --
+   * `sim.carDelta`'s removal rows, half the self-checks -- means "not sliding
+   * and not spinning", and `encodeCars` supplies the zero so that decision is
+   * made in one place.
+   */
+  slip?: number;
+  yawRate?: number;
+  /**
+   * Is this a driverless car that is nevertheless moving? `CAR_LOOSE`.
+   *
+   * Not the same question as `driver === 0`, and the difference is what the
+   * flag is for: four hundred cars parked around the city are all driverless
+   * and must not be integrated, corrected at 10 Hz or recycled after twenty
+   * seconds. See `driving.DrivenCar.loose`.
+   */
+  loose?: boolean;
+  /**
+   * Is this record the **result of an impact**? `CAR_SHUNT`.
+   *
+   * ---------------------------------------------------------------------------
+   * The one field on this wire that exists to say *why* a record was sent, and
+   * it is here because of an asymmetry the crash damage does not have.
+   *
+   * A driver's own client predicts everything about the car it is in: the
+   * throttle, the wall, the ambient car, the health. What it cannot predict is
+   * being hit by **another player's** car, because an occupied car's pose is
+   * carried on the server without ever being broadcast (`CarField.follow`), so
+   * this client's mirror of that car is the kerb its driver took it from
+   * however many kilometres ago. The contact is therefore the server's alone --
+   * and its result is three numbers that live on the *combatant* and not on the
+   * record: `carSpeed`, `carSlip` and `carYawRate`, which both ends integrate
+   * and neither sends.
+   *
+   * Left alone, those three would diverge permanently the first time two
+   * players touched. So a record sent because of an impact carries this flag,
+   * and a driver whose own car arrives flagged adopts the three velocities off
+   * it -- exactly as the health byte is adopted, and for the identical reason:
+   * the server decided how hard you were hit.
+   *
+   * It has to be a flag rather than "adopt whenever a record for my car
+   * arrives", because records are sent for unrelated reasons all the time -- a
+   * driver getting out, a fire, a chain explosion -- and each of those carries
+   * a speed that was quantised whenever it happened to be encoded. Adopting
+   * those would stamp a stale speed onto a live prediction twice a minute. The
+   * fuse's own adopt clause makes the same argument in the same words.
+   */
+  shunt?: boolean;
   /** True for "this record is gone", and then every field but `id` is meaningless. */
   removed?: boolean;
 }
@@ -3582,10 +3678,24 @@ export const CAR_HEALTH_FULL = 100;
 export const CARS_FULL = 1 << 0;
 /** Record flag: forget this id. */
 export const CAR_REMOVED = 1 << 0;
+/** Record flag: nobody is in it and it is still rolling. See `CarRecord.loose`. */
+export const CAR_LOOSE = 1 << 1;
+/** Record flag: this record is the result of an impact. See `CarRecord.shunt`. */
+export const CAR_SHUNT = 1 << 2;
 
 export const CARS_HEADER_BYTES = 4;
-/** 2 + 4 + 2 + 1 + 1 + 4 + 4 + 4 + 2 + 2 + 1 + 1. Asserted in `verifyNet`, which is how it got right. */
-export const CAR_RECORD_BYTES = 28;
+/**
+ * 2 + 4 + 2 + 1 + 1 + 4 + 4 + 4 + 2 + 2 + 1 + 1 + 2 + 2. Asserted in
+ * `verifyNet`, which is how it got right.
+ *
+ * **28 until protocol 34**, which added the body layer's slip and spin as two
+ * `i16`s. See `CarRecord.slip` for why they are on every record and what the
+ * four bytes cost: a joiner's full set at `driving.MAX_DRIVEN_CARS` goes from
+ * 11.2 kB to 12.8, once, on a socket that has just carried the collision
+ * stream. The three record *flags* cost nothing at all -- they went into the
+ * byte `CAR_REMOVED` was already sitting alone in.
+ */
+export const CAR_RECORD_BYTES = 32;
 
 /**
  * The longest fuse this byte can carry, deciseconds. 25.5 s.
@@ -3620,6 +3730,25 @@ export function carsBytes(count: number): number {
 function quantiseCarSpeed(v: number): number {
   const cm = Math.round(v * 100);
   return cm < -32768 ? -32768 : cm > 32767 ? 32767 : cm;
+}
+
+/**
+ * A spin as milliradians per second in an `i16`.
+ *
+ * Range +/- 32.7 rad/s against the ~3 rad/s a hard T-bone imparts and the 4
+ * rad/s^2 a driver's hands take it off at (`driving.CAR_SPIN_GRIP`) -- ten
+ * times the headroom, so the clamp is unreachable in play and is here for
+ * `quantiseCarSpeed`'s reason and no other.
+ *
+ * A milliradian is 0.057 degrees, and a car at the resolution floor turns a
+ * degree every seventeen seconds. That is under the `u16` the yaw itself is
+ * quantised to on this same record, which is the right place for the floor to
+ * be: a spin finer than the yaw it integrates into is a precision nothing
+ * downstream can express.
+ */
+function quantiseCarSpin(v: number): number {
+  const milli = Math.round(v * 1000);
+  return milli < -32768 ? -32768 : milli > 32767 ? 32767 : milli;
 }
 
 /** A health as a `u8`. `undefined` is a car nobody has crashed. See `CarRecord.health`. */
@@ -3661,7 +3790,10 @@ export function encodeCars(cars: readonly CarRecord[], full = false): ArrayBuffe
     // share a byte rather than costing two. Masked rather than trusted: a body
     // index that overflowed into the colour nibble would repaint the fleet.
     v.setUint8(p + 8, ((c.body & 0x0f) << 4) | (c.colour & 0x0f));
-    v.setUint8(p + 9, c.removed ? CAR_REMOVED : 0);
+    v.setUint8(
+      p + 9,
+      (c.removed ? CAR_REMOVED : 0) | (c.loose ? CAR_LOOSE : 0) | (c.shunt ? CAR_SHUNT : 0),
+    );
     v.setInt32(p + 10, quantisePos(c.x), true);
     v.setInt32(p + 14, quantisePos(c.y), true);
     v.setInt32(p + 18, quantisePos(c.z), true);
@@ -3675,6 +3807,17 @@ export function encodeCars(cars: readonly CarRecord[], full = false): ArrayBuffe
     // The fire. See `clampFuse` for why a nearly-spent fuse encodes as 1 rather
     // than rounding into the "not burning" sentinel.
     v.setUint8(p + 27, clampFuse(c.fuse));
+    // --- The body layer. Centimetres a second and milliradians a second, both
+    // in an `i16`, both clamped on `quantiseCarSpeed`'s own argument: a
+    // `setInt16` handed 40,000 wraps silently and the car slides the other way.
+    //
+    // The slip shares `quantiseCarSpeed` outright rather than getting a
+    // function of its own, because it is the same quantity in the same units on
+    // the same axis pair -- and a lateral velocity that could be finer than a
+    // longitudinal one would be a car whose diagonal had a different resolution
+    // from its forward.
+    v.setInt16(p + 28, quantiseCarSpeed(c.slip ?? 0), true);
+    v.setInt16(p + 30, quantiseCarSpin(c.yawRate ?? 0), true);
     p += CAR_RECORD_BYTES;
   }
   return buffer;
@@ -3694,13 +3837,16 @@ export function decodeCars(buffer: ArrayBuffer): { cars: CarRecord[]; full: bool
   // message pump with it.
   for (let i = 0; i < count && p + CAR_RECORD_BYTES <= buffer.byteLength; i++) {
     const model = v.getUint8(p + 8);
+    const flags = v.getUint8(p + 9);
     cars.push({
       id: v.getUint16(p, true),
       carId: v.getUint32(p + 2, true),
       driver: v.getUint16(p + 6, true),
       body: (model >> 4) & 0x0f,
       colour: model & 0x0f,
-      removed: (v.getUint8(p + 9) & CAR_REMOVED) !== 0,
+      removed: (flags & CAR_REMOVED) !== 0,
+      loose: (flags & CAR_LOOSE) !== 0,
+      shunt: (flags & CAR_SHUNT) !== 0,
       x: dequantisePos(v.getInt32(p + 10, true)),
       y: dequantisePos(v.getInt32(p + 14, true)),
       z: dequantisePos(v.getInt32(p + 18, true)),
@@ -3708,6 +3854,8 @@ export function decodeCars(buffer: ArrayBuffer): { cars: CarRecord[]; full: bool
       speed: v.getInt16(p + 24, true) / 100,
       health: v.getUint8(p + 26),
       fuse: v.getUint8(p + 27),
+      slip: v.getInt16(p + 28, true) / 100,
+      yawRate: v.getInt16(p + 30, true) / 1000,
     });
     p += CAR_RECORD_BYTES;
   }
@@ -6050,17 +6198,24 @@ export function verifyNet(): string[] {
       // `quantiseVelocity` and the *football*, not to a car.
       { id: 65535, carId: 1, driver: 65535, body: 0, colour: 0, x: 3999.99, y: -70.125, z: -3999.99, yaw: 6.28, speed: 44, health: 37 },
       { id: 74, carId: 0x80000000, driver: 12, body: 2, colour: 3, x: 0, y: 0, z: 0, yaw: 0, speed: 0, removed: true },
+      // v34: a car knocked out of the timetable -- driverless, sliding
+      // *backwards and sideways* and spinning to its right, which is the one
+      // row in this set where all three of the body layer's numbers are
+      // non-zero and none of them shares a sign. A slip that came back with the
+      // wrong sign is a wreck that slides the wrong way across the
+      // intersection, and it renders perfectly. See `CarRecord.slip`.
+      { id: 9, carId: 0x0badf00d, driver: 0, body: 3, colour: 2, x: 12.5, y: 0, z: -33.25, yaw: 1.5, speed: -4.25, slip: 2.75, yawRate: -1.875, loose: true, shunt: true, health: 88 },
     ];
     const frame = encodeCars(cars, true);
-    if (frame.byteLength !== carsBytes(3)) {
-      failures.push(`A 3-car message is ${frame.byteLength} bytes; the layout says ${carsBytes(3)}.`);
+    if (frame.byteLength !== carsBytes(cars.length)) {
+      failures.push(`A ${cars.length}-car message is ${frame.byteLength} bytes; the layout says ${carsBytes(cars.length)}.`);
     }
     const got = decodeCars(frame);
-    if (!got || got.cars.length !== 3) {
-      failures.push(`A 3-car message decoded to ${got?.cars.length ?? 'null'} records.`);
+    if (!got || got.cars.length !== cars.length) {
+      failures.push(`A ${cars.length}-car message decoded to ${got?.cars.length ?? 'null'} records.`);
     } else {
       if (!got.full) failures.push('The CARS_FULL header flag did not survive the wire.');
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < cars.length; i++) {
         const a = cars[i];
         const b = got.cars[i];
         if (b.id !== a.id) failures.push(`Car ${a.id}: id came back as ${b.id}.`);
@@ -6103,6 +6258,28 @@ export function verifyNet(): string[] {
             failures.push(`Car ${a.id}: ${axis} ${want} came back as ${back}; the tolerance is 1 cm.`);
           }
         }
+        // --- v34: the body layer. The slip shares the speed's quantiser and
+        // therefore its 2 cm/s tolerance; the spin is milliradians, so a
+        // milliradian is the floor and half of one is the tolerance.
+        const wantSlip = a.slip ?? 0;
+        if (Math.abs((b.slip ?? 0) - wantSlip) > 0.02) {
+          failures.push(`Car ${a.id}: slip ${wantSlip} came back as ${b.slip}; the tolerance is 2 cm/s.`);
+        }
+        const wantSpin = a.yawRate ?? 0;
+        if (Math.abs((b.yawRate ?? 0) - wantSpin) > 0.0006) {
+          failures.push(`Car ${a.id}: spin ${wantSpin} came back as ${b.yawRate}; the tolerance is half a milliradian.`);
+        }
+        // And the two flags that share the removal's byte. A `loose` that did
+        // not survive is a client integrating four hundred parked cars, or one
+        // drawing a wreck frozen in the middle of an intersection; a `shunt`
+        // that did not is a driver whose car's velocity diverges from the
+        // server's the first time anybody hits them. See `CarRecord.shunt`.
+        if ((b.loose ?? false) !== (a.loose ?? false)) {
+          failures.push(`Car ${a.id}: loose=${a.loose ?? false} came back as ${b.loose}.`);
+        }
+        if ((b.shunt ?? false) !== (a.shunt ?? false)) {
+          failures.push(`Car ${a.id}: shunt=${a.shunt ?? false} came back as ${b.shunt}.`);
+        }
       }
     }
     // An empty delta is legal and is what a tick with no change would send if
@@ -6140,6 +6317,19 @@ export function verifyNet(): string[] {
         `A record encoded with no fuse came back at ${bare?.cars[0]?.fuse}; an omitted fuse is a car ` +
           `that is not burning, not one about to explode.`,
       );
+    }
+    // And the body layer's three, on the identical rule: a caller that predates
+    // v34 means "not sliding, not spinning, not loose". `sim.carDelta`'s
+    // removal rows are that caller, and a removal that decoded as a *loose* car
+    // would be a client integrating a record that no longer exists.
+    if (bare === null || bare.cars[0]?.slip !== 0 || bare.cars[0]?.yawRate !== 0 || bare.cars[0]?.loose !== false) {
+      failures.push(
+        `A record encoded with no body fields came back sliding at ${bare?.cars[0]?.slip}, spinning at ` +
+          `${bare?.cars[0]?.yawRate}, loose=${bare?.cars[0]?.loose}.`,
+      );
+    }
+    if (bare !== null && bare.cars[0]?.shunt !== false) {
+      failures.push('A record encoded with no shunt flag came back as an impact, so a driver would adopt its speed.');
     }
     // A fuse below a decisecond survives as 1 rather than rounding into the
     // "not burning" sentinel. See `clampFuse`: this is the two frames before

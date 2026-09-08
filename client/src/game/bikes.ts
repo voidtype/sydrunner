@@ -84,6 +84,16 @@
 
 import type { InputSnapshot } from '../player/controller.ts';
 import { FLAT_WHITE_SPEED } from './powerups.ts';
+// --- WORKSTREAM AQ: the body layer, of which a bike is the second client. See
+// `game/rigid.ts`' header for why there is one layer rather than one per
+// vehicle, and the section below for what a bike is to it.
+import {
+  DEFAULT_FRICTION,
+  type RigidBody,
+  createRigidBody,
+  rigidSetHeading,
+  rigidSetVelocity,
+} from './rigid.ts';
 
 // --- The ride -----------------------------------------------------------------
 
@@ -262,6 +272,150 @@ export function shapeRideInput(c: RideState, movement: InputSnapshot): void {
   if (movement.forward < 0) movement.forward *= RIDE_REVERSE;
   movement.speedScale = (movement.speedScale ?? 1) * bikeSpeedScale(c.bikeTuned);
   movement.jumpScale = (movement.jumpScale ?? 1) * RIDE_JUMP;
+}
+
+// --- A bike as a body ------------------------------------------------------------
+
+/**
+ * ---------------------------------------------------------------------------
+ * WHY A BIKE HAS A BODY NOW, AND WHY IT IS NOT A SECOND INTEGRATOR.
+ *
+ * `shapeRideSteering`'s header refuses a fork -- *"a heading, a lean, a
+ * wheelbase, and a `stepBike` beside `controller.step`"* -- and nothing below
+ * takes any of that back. A rider is still a player capsule with a multiplier
+ * on it, still moved by `controller.step`, still predicted exactly because the
+ * server runs the same two functions over the same buttons.
+ *
+ * What is new is that a bike can now be **hit by a car and hit a car**, through
+ * the one contact function every vehicle in this game goes through. Before the
+ * body layer, a cyclist and a car met as a *capsule inside a box*: the
+ * knockdown test found the rider, `traffic.applyCarHit` threw them, and the car
+ * felt precisely nothing -- you could ride a Lime into the side of a bus at
+ * 26 m/s and the bus would not notice. That is the same "cars pass through each
+ * other" the owner reported one vehicle over, and it has the same fix.
+ *
+ * So a bike gets a `rigid.RigidBody` and the car sweep resolves against it. Two
+ * things fall out and both are the point:
+ *
+ *   - **the car is slowed and slewed by the bike it hits**, by the mass ratio,
+ *     which at 180 kg against 1,400 is a nudge -- a tenth of the car's speed
+ *     off a square hit. That is the correct amount. A bike should be felt and
+ *     should not stop a Camry.
+ *   - **the rider is thrown by the impulse rather than by the car's speed**,
+ *     which is what makes a hatch and a van different events at the same speed.
+ *     The throw itself is unchanged: it is still `traffic.applyCarHit`, still
+ *     `carThrowSpeed`, still the same flight over the same bonnet. See
+ *     `BIKE_THROW_IMPULSE`.
+ *
+ * The rider's *capsule* is untouched, deliberately and by instruction: the
+ * on-foot controller is the floor every shipped mechanic stands on, and a body
+ * only ever pushes it through `resolve`.
+ */
+
+/**
+ * What a bike and the person on it weigh together, kilograms. **180.**
+ *
+ * The brief's *"~100 kg plus rider"* taken at its word, with the rider at 80.
+ * A real Lime e-bike is about 30 kg, and the difference is not an error: what
+ * this number decides is how hard the pair is to *shove*, and a bike being
+ * ridden is a bike whose rider is braced, steering and braking. 30 kg would
+ * make a cyclist a traffic cone -- flicked twenty metres by a wing mirror --
+ * which is funny once and reads as broken twice.
+ *
+ * At 180 against a 1,400 kg sedan the mass ratio is 7.8:1, so a square hit
+ * takes about an eighth of the car's speed off it and gives the bike seven
+ * eighths of the closing speed. The rider does not actually leave at that speed
+ * -- `traffic.carThrowSpeed` owns the flight and always has -- but the
+ * *impulse* is what decides whether they leave at all.
+ */
+export const BIKE_MASS = 180;
+
+/** How long and wide a bike is in plan, metres. A bicycle, not a motorbike. */
+export const BIKE_HALF_LENGTH = 0.9;
+export const BIKE_HALF_WIDTH = 0.32;
+
+/**
+ * How little a bike gives back when something hits it. **0.05.**
+ *
+ * Nearly nothing, against a car's 0.2, and the reason is what a bicycle is: a
+ * thin steel frame with a person on it is not a crumple zone that springs, it
+ * is a thing that folds. A bike that bounced off a bonnet would read as a prop.
+ * `rigid.rigidResolve` takes the **softer** of the two bodies, so this is the
+ * number that applies to every car-against-bike contact in the game whatever
+ * the car is.
+ */
+export const BIKE_RESTITUTION = 0.05;
+
+/**
+ * The impulse, in newton-seconds, above which the rider comes off. **600.**
+ *
+ * ---------------------------------------------------------------------------
+ * **AN IMPULSE RATHER THAN A SPEED, AND THAT IS THE WHOLE REASON THIS CONSTANT
+ * EXISTS RATHER THAN A SECOND COPY OF `driving.RUN_DOWN_SPEED`.**
+ *
+ * Being clipped by a hatch at 8 m/s and by a van at 8 m/s are different events,
+ * and only one of the two available numbers says so. An impulse carries the
+ * mass of the thing that hit you; a speed does not.
+ *
+ * 600 is chosen to land where the knockdown already sits, so that nothing a
+ * player has learnt about being run over changes. Against a sedan the contact's
+ * effective mass is `1/(1/1400 + 1/180)` = 160 kg and the impulse is
+ * `(1 + e) x closing x 160` at a restitution of 0.05, so:
+ *
+ *     closing   impulse   thrown?
+ *     1 m/s       168      no    -- rolling into a parked car at the lights
+ *     3 m/s       504      no    -- a car easing out of a bay into your line
+ *     4 m/s       672      yes   -- `driving.RUN_DOWN_SPEED`, near enough
+ *     8 m/s     1,344      yes   -- a car actually driving
+ *
+ * So the threshold is the same 4 m/s of *deliberately driving at somebody* that
+ * `RUN_DOWN_SPEED` names, arrived at through the mass rather than around it --
+ * and a van at the same speed clears it a good margin earlier, which is the
+ * feature. `verifyBikes` asserts the sedan row rather than the constant, so a
+ * retune of either mass moves the check with it.
+ */
+export const BIKE_THROW_IMPULSE = 600;
+
+/**
+ * Fill a `rigid.RigidBody` from somebody on a bike.
+ *
+ * `driving.carRigidBody`'s counterpart, and the two are deliberately the same
+ * shape: a position, a heading from a look yaw, a velocity, a mass and a box.
+ * That sameness is the layer working -- `resolveCarContact` takes two bodies
+ * and has no idea one of them is a bicycle.
+ *
+ * The velocity is the rider's **plan velocity**, handed in rather than derived,
+ * because the one thing a rider has that a car does not is a controller that
+ * already integrated it: a cyclist's `body.velocity` is the truth about where
+ * they are going, where a car's is reconstructed from a scalar and a heading.
+ *
+ * `yawRate` is always zero. A rider does not spin about their own axis in a
+ * contact -- they come off -- so a spin would be a quantity with nothing to
+ * apply it to. `rigidResolve` still gives the bike one; it is simply not read
+ * back, which is the same thing `applyCarHit` does with everything about a
+ * victim's own momentum ("the impulse is set, not added").
+ */
+export function riderRigidBody(
+  rider: { x: number; z: number; yaw: number; vx: number; vz: number },
+  out: RigidBody,
+): RigidBody {
+  out.x = rider.x;
+  out.z = rider.z;
+  rigidSetHeading(out, rider.yaw);
+  // Set from world axes rather than from an (along, slip) pair, because that is
+  // what the controller produced. `rigidSetVelocity` is the car's way in and
+  // this is the bike's; the body cannot tell them apart afterwards.
+  rigidSetVelocity(out, 0, 0);
+  out.vx = rider.vx;
+  out.vz = rider.vz;
+  out.yawRate = 0;
+  out.mass = BIKE_MASS;
+  out.halfLength = BIKE_HALF_LENGTH;
+  out.halfWidth = BIKE_HALF_WIDTH;
+  out.restitution = BIKE_RESTITUTION;
+  out.friction = DEFAULT_FRICTION;
+  out.kinematic = false;
+  return out;
 }
 
 // --- Steering -----------------------------------------------------------------
@@ -1595,6 +1749,60 @@ export function verifyBikes(): string[] {
     // half-finished coordinate makes.
     if (Math.hypot(TUNING_X, TUNING_Z) < 100) {
       failures.push('The tuning stall is at the ENU origin; it is meant to be in Redfern.');
+    }
+  }
+
+  // --- WORKSTREAM AQ: a bike as a body. See the section above `BIKE_MASS`.
+  //
+  // Two failures with no picture between them. **A bike a car cannot feel** is
+  // the reported bug one vehicle over -- ride a Lime into a bus and the bus
+  // carries on -- and it renders as a perfectly good frame in which nothing
+  // happened. **A threshold that has drifted off the knockdown** is worse: a
+  // rider who is thrown by a car reversing out of a bay, or who is not thrown
+  // by one doing 30, both of which look like the hit test being broken.
+  {
+    const bike = createRigidBody();
+    riderRigidBody({ x: 0, z: 0, yaw: 0, vx: 0, vz: 0 }, bike);
+    if (bike.mass !== BIKE_MASS) failures.push(`A bike weighs ${bike.mass} kg rather than ${BIKE_MASS}.`);
+    if (bike.kinematic) failures.push('A bike is kinematic, so a car would bounce off it as if off a wall.');
+    if (bike.halfLength <= 0 || bike.halfWidth <= 0) failures.push('A bike has no footprint.');
+    // The rider's own velocity survives, which is what makes riding *into* a
+    // car the same event as being hit by one.
+    riderRigidBody({ x: 0, z: 0, yaw: 0, vx: 3, vz: -20 }, bike);
+    if (bike.vx !== 3 || bike.vz !== -20) {
+      failures.push(`A rider doing (3, -20) became a body doing (${bike.vx}, ${bike.vz}).`);
+    }
+    if (bike.yawRate !== 0) failures.push('A bike body was born spinning.');
+
+    // --- And the threshold, asserted against the worked case in
+    //     `BIKE_THROW_IMPULSE`'s essay rather than against the constant, so a
+    //     retune of either mass moves the check with the feature.
+    //
+    // `1 / (1/carMass + 1/bikeMass)` is the contact's effective mass and
+    // `(1 + e) x closing` is the change in relative normal velocity, which is
+    // `rigid.rigidResolve`'s expression with both arms at the centre.
+    const SEDAN_KG = 1400;
+    const effective = 1 / (1 / SEDAN_KG + 1 / BIKE_MASS);
+    const impulseAt = (closing: number): number => (1 + BIKE_RESTITUTION) * closing * effective;
+    // 3 m/s is a car easing out of a bay into your line. You stay on.
+    if (impulseAt(3) >= BIKE_THROW_IMPULSE) {
+      failures.push(
+        `A sedan closing at 3 m/s puts ${impulseAt(3).toFixed(0)} Ns into a bike, over the ` +
+          `${BIKE_THROW_IMPULSE} Ns throw. A car pulling out of a kerb bay is knocking cyclists off.`,
+      );
+    }
+    // And 4 m/s is `driving.RUN_DOWN_SPEED` -- somebody driving at you. You do not.
+    if (impulseAt(4) < BIKE_THROW_IMPULSE) {
+      failures.push(
+        `A sedan closing at 4 m/s puts only ${impulseAt(4).toFixed(0)} Ns into a bike, under the ` +
+          `${BIKE_THROW_IMPULSE} Ns throw. That is the speed the knockdown has always been at.`,
+      );
+    }
+    // The whole point of an impulse rather than a speed: a heavier car clears
+    // the threshold at a lower speed than a lighter one does.
+    const vanEffective = 1 / (1 / 2300 + 1 / BIKE_MASS);
+    if (!(vanEffective > effective)) {
+      failures.push('A van and a sedan hit a bike with the same effective mass, so the mass ratio is not reaching the contact.');
     }
   }
 

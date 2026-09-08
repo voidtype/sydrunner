@@ -159,6 +159,7 @@ import { TICK_HZ, type NetTransport } from '../client/src/net/protocol.ts';
 import { FLAG } from '../client/src/net/protocol.ts';
 import type { Participant } from './sim.ts';
 import {
+  CAR_RECORD_BYTES,
   PROTOCOL_VERSION,
   SNAPSHOT_INTERVAL,
   bikesBytes,
@@ -3078,7 +3079,17 @@ async function checkBikes(): Promise<void> {
   // the bump is one line the lead changes here and in `protocol.ts` together.
   // See `PROTOCOL_VERSION`'s v15 note. If this line is still reading 14 after
   // the batch has landed, that is the bug this check exists to catch.
-  check(PROTOCOL_VERSION === 33, `the protocol is at version ${PROTOCOL_VERSION}`);
+  check(PROTOCOL_VERSION === 34, `the protocol is at version ${PROTOCOL_VERSION}`);
+  // WORKSTREAM AQ: and the car record, which is what v34 widened. Beside the
+  // WELCOME assertion below rather than in `verifyNet` because this is the
+  // *deploy* question -- a browser tab open across this deploy is a v33 client
+  // reading 32-byte records four bytes at a time out of step, which is a fleet
+  // of cars at plausible wrong coordinates with nothing thrown on either end.
+  check(
+    CAR_RECORD_BYTES === 32,
+    `  and a car record is ${CAR_RECORD_BYTES} bytes: 28 through v33, plus v34's slip and spin as two ` +
+      `i16s. See protocol.CarRecord.slip for why they are on every record and what the four bytes cost`,
+  );
   check(
     WELCOME_BYTES === 36,
     `  and a WELCOME is ${WELCOME_BYTES} bytes: 27 through v10, plus v11's f64 clock, plus v15's ` +
