@@ -106,18 +106,18 @@
     "source_url": "https://sketchfab.com/3d-models/2023-nissan-x-trail-4x4-i-f9f2cbdacac74ee7acfe1c731195ccaa"
   },
   {
-    "file": "police_kenney.glb",
-    "label": "NSW Police Cruiser",
+    "file": "nsw_police.glb",
+    "label": "NSW Police Highway Patrol",
     "body": "police",
-    "tris": 2304,
-    "lengthM": 4.7,
+    "tris": 4240,
+    "lengthM": 4.9,
     "tint": "none",
     "weight": 1,
-    "atlas": false,
+    "atlas": true,
     "license": "CC0 1.0",
-    "attribution": "none required (CC0). Courtesy credit: Kenney - www.kenney.nl",
-    "source_url": "https://kenney.nl/assets/car-kit",
-    "note": "No real-make alternative on disk for this role. The passenger classes (0-4) carry real makes only; the four special bodies keep a stylised stand-in because removing it would leave the role with no mesh at all."
+    "attribution": "none required. Authored from nothing for SYDNEY by scripts/build-police-car.mjs; no third-party asset is used and none is owed a credit.",
+    "source_url": "scripts/build-police-car.mjs",
+    "note": "Built rather than sourced. There is no free model of a current NSW Police Force highway-patrol car this project may ship, so the sedan, the Battenburg, the lettering and the light bar are authored by a committed, re-runnable script. It replaced police_kenney.glb, which is still on disk and is no longer in this list."
   },
   {
     "file": "taxi_generic.glb",

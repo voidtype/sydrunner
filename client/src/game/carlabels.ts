@@ -58,13 +58,23 @@
  * rather than weighted to zero, because a weight of zero is a file that still
  * ships, still downloads and still has to be explained.
  *
- * The four **special** bodies keep theirs -- the bus, the garbage truck, the
- * taxi and the police car -- for a reason that is about the disk and not about
- * taste: there is no real-make alternative on it for any of the four roles, and
- * a role whose only mesh is deleted is a role that can never be drawn. The
- * manifest says the same thing in each of those five rows' `note`. Three of the
- * four are not even loaded (`carlod.mappedBody`): there is no taxi, bus or
- * garbage-truck entity in the traffic, so those labels wait for one.
+ * Three of the four **special** bodies keep theirs -- the bus, the garbage truck
+ * and the taxi -- for a reason that is about the disk and not about taste: there
+ * is no real-make alternative on it for those roles, and a role whose only mesh
+ * is deleted is a role that can never be drawn. The manifest says the same thing
+ * in each of those rows' `note`. None of the three is even loaded
+ * (`carlod.mappedBody`): there is no taxi, bus or garbage-truck entity in the
+ * traffic, so those labels wait for one.
+ *
+ * **The fourth stopped being a stand-in.** The owner, later the same round:
+ * *"the cars are fucked renmake aussie cop cars nsw from scratch"*. There is no
+ * free model of a current NSW Police Force highway-patrol car that this project
+ * may ship and there was never going to be, so `nsw_police.glb` is *authored* --
+ * `scripts/build-police-car.mjs` builds the sedan, paints the Battenburg and the
+ * lettering into one atlas, and puts a light bar on the roof, in a script that is
+ * committed and re-runnable. `police_kenney.glb` is still on the disk and is in
+ * neither this table nor the manifest; `REMOVED_STANDINS` refuses it if it comes
+ * back. It is the one row here whose file has no source and owes no credit.
  *
  * The consequence worth stating rather than discovering: **body 4 now has one
  * model**. Every van in Sydney -- 70,086 of the 1.4 M parked cars, 5 % -- is a
@@ -114,7 +124,7 @@ export const CAR_FLEET: readonly CarFleetEntry[] = [
   { file: 'mitsubishi_l200_dh.glb', body: 3, weight: 4, label: 'Mitsubishi Triton' },
   { file: 'mitsubishi_l200.glb', body: 3, weight: 1, label: 'Mitsubishi Triton' },
   { file: 'nissan_xtrail_2023.glb', body: 2, weight: 4, label: 'Nissan X-Trail 2023' },
-  { file: 'police_kenney.glb', body: 'police', weight: 1, label: 'NSW Police Cruiser' },
+  { file: 'nsw_police.glb', body: 'police', weight: 1, label: 'NSW Police Highway Patrol' },
   { file: 'taxi_generic.glb', body: 'taxi', weight: 1, label: 'Sydney Taxi' },
   { file: 'taxi_kenney.glb', body: 'taxi', weight: 1, label: 'Sydney Taxi' },
   { file: 'tesla_model_3.glb', body: 0, weight: 4, label: 'Tesla Model 3' },
@@ -128,15 +138,24 @@ export const CAR_FLEET: readonly CarFleetEntry[] = [
 ];
 
 /**
- * The stand-ins that were deleted this round, by file.
+ * The stand-ins that stopped shipping, by file.
  *
  * Kept as a list rather than as a memory, because "somebody put a generic back"
  * is exactly the change that looks harmless in a diff -- one row in a JSON file
  * -- and re-models a whole body class the moment it lands. `verifyCarLabels`
  * refuses any of these names in the table.
+ *
+ * Nineteen of the twenty were *deleted* from `client/public/cars/` as well.
+ * `police_kenney.glb` is the twentieth and is still on the disk, because
+ * removing a file is a separate decision from removing a row and the round that
+ * replaced it had enough of the second kind in it. It is refused here for the
+ * identical reason the other nineteen are: the police role has a real car now
+ * (`nsw_police.glb`, built by `scripts/build-police-car.mjs`), and a second
+ * entry in that pool would put a Kenney toy back on one marked car in two.
  */
 export const REMOVED_STANDINS: readonly string[] = [
   'hatch_filler.glb', 'hatch_generic_a.glb', 'hatch_kenney.glb', 'hatch_micro.glb',
+  'police_kenney.glb',
   'sedan_filler.glb', 'sedan_generic_a.glb', 'sedan_generic_b.glb', 'sedan_generic_c.glb',
   'sedan_kenney.glb', 'sedan_sports_kenney.glb',
   'suv_generic_a.glb', 'suv_generic_b.glb', 'suv_kenney.glb', 'suv_luxury_kenney.glb',
@@ -262,8 +281,8 @@ export function verifyCarLabels(): string[] {
     }
     if (removed.has(entry.file)) {
       failures.push(
-        `\`${entry.file}\` is one of the stand-ins removed this round and it is back in CAR_FLEET. ` +
-          'The passenger classes carry real makes only; see `carlabels.ts` section 3.',
+        `\`${entry.file}\` is one of the stand-ins that stopped shipping and it is back in CAR_FLEET. ` +
+          'Every role in this table has a real car or a built one; see `carlabels.ts` section 3.',
       );
     }
     if (typeof entry.body === 'number') {

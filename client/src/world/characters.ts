@@ -267,6 +267,23 @@ const HEAD_CROWN = 0.44;
 
 const CAP_NAVY: readonly [number, number, number] = [0.035, 0.055, 0.13];
 const CAP_PEAK: readonly [number, number, number] = [0.028, 0.045, 0.11];
+/**
+ * The police cap's four colours, linear.
+ *
+ * The crown is a shade darker than `POLICE_KIT.singlet` so a cap reads as a
+ * separate object on a navy figure rather than as the top of the head, and the
+ * peak is very nearly black because it is patent leather. The band's pair is
+ * `world/cars.LIVERY_CHEQUER_WHITE` and `LIVERY_CHEQUER_BLUE` and
+ * `world/police.CHEQUER_LIGHT` and `CHEQUER_BLUE` -- the same two numbers, four
+ * times over now, because **one force wears one livery**: the chequer on an
+ * officer's chest, the chequer round their cap, the band the box fleet draws
+ * around a marked car and the chequer painted into `nsw_police.glb`'s flanks are
+ * one blue and one white or they are a fancy dress hire.
+ */
+const POLICE_CROWN: readonly [number, number, number] = [0.015, 0.02, 0.055];
+const POLICE_PEAK: readonly [number, number, number] = [0.02, 0.02, 0.024];
+const POLICE_CHEQUER_LIGHT: readonly [number, number, number] = [0.82, 0.85, 0.88];
+const POLICE_CHEQUER_BLUE: readonly [number, number, number] = [0.05, 0.14, 0.44];
 const BAG_BLACK: readonly [number, number, number] = [0.035, 0.035, 0.04];
 const BAG_TRIM: readonly [number, number, number] = [0.5, 0.09, 0.09];
 const SHADE_LENS: readonly [number, number, number] = [0.02, 0.022, 0.028];
@@ -281,6 +298,96 @@ const PHONE_BODY: readonly [number, number, number] = [0.03, 0.03, 0.035];
 const PHONE_SCREEN: readonly [number, number, number] = [0.55, 0.6, 0.72];
 const BOARD_WHITE: readonly [number, number, number] = [0.74, 0.73, 0.7];
 const BOARD_CLIP: readonly [number, number, number] = [0.3, 0.3, 0.32];
+
+/**
+ * Facets round the police cap's crown and its chequer band.
+ *
+ * Twelve, and **even**, which is the whole of what the checks assert about it:
+ * an odd count puts two cells of one colour together at the seam, which is the
+ * one place a chequer stops being a chequer. `world/police.ts` makes the
+ * identical assertion about the band on an officer's chest and
+ * `world/cars.chequerBand` about the ring round a marked car.
+ */
+export const POLICE_CAP_SIDES = 12;
+
+/**
+ * The NSW peaked cap: a dark blue crown, one chequered band, a black peak.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY IT IS AUTHORED HERE AND WORN IN `world/police.ts`.
+ *
+ * The owner, 2026-09: *"and have propper hats"*. What an officer wore before
+ * this was a plain navy peaked cap built inside `world/police.ts`, which at any
+ * distance is a dark shape on top of a dark figure -- the file's own criterion is
+ * *what does this prop do at 40 m*, and the honest answer for navy-on-navy is
+ * nothing. A real NSW cap has a chequered band round it and that band is the
+ * entire read: it is the only high-frequency pattern on a person in this build,
+ * and it is what makes a police officer identifiable against a dark shopfront,
+ * which is exactly where a player first meets one.
+ *
+ * The shape lives in this file because **this file is where a head prop is
+ * checked**. `HEAD_BROW`/`HEAD_CROWN` above and `verifyCharacterKit` below own
+ * the one rule that costs a screenshot to find -- the head bone's origin is at
+ * the base of the skull, so a hat at a plausible 0.2 is dead centre inside it and
+ * invisible from every angle -- and a second file with its own hat is a second
+ * place for that to be got wrong. `CharacterKitAssets.policeCap` holds one for
+ * the prop table's checks and `world/police.PoliceAssets` builds its own from
+ * this same function, because the two are drawn on different materials and a
+ * geometry is cheaper than a shared owner.
+ *
+ * ---------------------------------------------------------------------------
+ * THE NUMBERS ARE THE ESHAY CAP'S, DELIBERATELY.
+ *
+ * Same radius, same crown height, same peak reach, same seat on the skull. Not
+ * a shortcut: a cap is a cap, the head under both of them is the same 1.70 m
+ * figure's, and two head props with two sets of numbers are two things to keep
+ * off the skull the next time somebody moves a bone. What is different is what a
+ * cap is *for* here -- the band, and the peak in patent black rather than in the
+ * crown's own colour.
+ */
+export function buildPoliceCap(): BufferGeometry {
+  const cap = new Parts();
+  const R = 0.175;
+  const BASE = 0.3;
+  const HEIGHT = 0.105;
+  const BAND_TOP = BASE + 0.038;
+  const PEAK_REACH = 0.15;
+
+  // The band first, at the bottom of the crown and a shade proud of it, so it
+  // reads as something round the cap rather than as a stripe painted on it.
+  for (let i = 0; i < POLICE_CAP_SIDES; i++) {
+    const a0 = (i / POLICE_CAP_SIDES) * Math.PI * 2;
+    const a1 = ((i + 1) / POLICE_CAP_SIDES) * Math.PI * 2;
+    const r = R * 1.03;
+    // Bottom-near, bottom-far, top-far, top-near: the winding that puts the face
+    // normal outward on a ring that runs anticlockwise in (x, z). The reverse is
+    // a band only visible from inside the officer, and `verifyCharacterKit`'s
+    // signed-volume test is what convicts it.
+    cap.quad(
+      [Math.sin(a0) * r, BASE, Math.cos(a0) * r],
+      [Math.sin(a1) * r, BASE, Math.cos(a1) * r],
+      [Math.sin(a1) * r, BAND_TOP, Math.cos(a1) * r],
+      [Math.sin(a0) * r, BAND_TOP, Math.cos(a0) * r],
+      i & 1 ? POLICE_CHEQUER_BLUE : POLICE_CHEQUER_LIGHT,
+    );
+  }
+  // The crown above it, tapered, and its flat top.
+  cap.band(BAND_TOP, R, BASE + HEIGHT, R * 0.86, POLICE_CAP_SIDES, POLICE_CROWN);
+  cap.lid(BASE + HEIGHT, R * 0.86, POLICE_CAP_SIDES, true, POLICE_CROWN);
+  // The peak, over -Z, which is the direction the figure faces. Drawn on both
+  // sides because it is a single sheet and is seen from underneath by anybody
+  // the officer is standing over.
+  {
+    const y = BASE + 0.004;
+    const hw = R * 0.8;
+    const tw = R * 0.52;
+    const near = -R * 0.55;
+    const far = near - PEAK_REACH;
+    cap.quad([-hw, y, near], [hw, y, near], [tw, y, far], [-tw, y, far], POLICE_PEAK);
+    cap.quad([-tw, y - 0.008, far], [tw, y - 0.008, far], [hw, y - 0.008, near], [-hw, y - 0.008, near], POLICE_PEAK);
+  }
+  return cap.build('police-cap');
+}
 
 /** The torso's own radius at a height in the chest bone's frame. `buildFigure`'s profile. */
 function torsoRadius(yLocal: number): number {
@@ -303,6 +410,12 @@ function torsoRadius(yLocal: number): number {
 export class CharacterKitAssets {
   readonly kits: ReadonlyMap<number, readonly BufferGeometry[]>;
   readonly cap: BufferGeometry;
+  /**
+   * The officer's, worn in `world/police.ts` rather than by anybody this file
+   * draws. It is in this table because this is where a head prop is checked; see
+   * `buildPoliceCap`.
+   */
+  readonly policeCap: BufferGeometry;
   readonly bumbag: BufferGeometry;
   readonly shades: BufferGeometry;
   readonly cup: BufferGeometry;
@@ -338,6 +451,11 @@ export class CharacterKitAssets {
       cap.quad([-tw, y - 0.008, far], [tw, y - 0.008, far], [hw, y - 0.008, near], [-hw, y - 0.008, near], CAP_PEAK);
     }
     this.cap = cap.build('eshay-cap');
+
+    // --- And the officer's, which is a different hat for a different job. See
+    // `buildPoliceCap`: authored here so there is one place a head prop's seat on
+    // the skull is decided and one check that says so.
+    this.policeCap = buildPoliceCap();
 
     // --- The bumbag, in the **chest** bone's frame rather than the hips'.
     //
@@ -423,7 +541,12 @@ export class CharacterKitAssets {
 
     this.triangles =
       cap.triangles + bag.triangles + shades.triangles + cup.triangles + hat.triangles +
-      phone.triangles + board.triangles;
+      phone.triangles + board.triangles +
+      // Off the built geometry rather than off a `Parts`, because
+      // `buildPoliceCap` is a function `world/police.ts` calls too and handing
+      // back an accumulator would be handing back the ability to keep adding to
+      // it. One divide against a shared shape.
+      (this.policeCap.getIndex()?.count ?? 0) / 3;
 
     // Lit, like the police kit and unlike a tracer. The fluoro is bright albedo
     // and nothing else -- `world/streetlife.ts` makes the argument: a hi-vis
@@ -442,7 +565,7 @@ export class CharacterKitAssets {
   /** Release what this object owns. Never the buffers it shares with the figure. */
   dispose(): void {
     for (const list of this.kits.values()) for (const g of list) g.dispose();
-    for (const g of [this.cap, this.bumbag, this.shades, this.cup, this.hardhat, ...this.vests, this.phone, this.clipboard]) {
+    for (const g of [this.cap, this.policeCap, this.bumbag, this.shades, this.cup, this.hardhat, ...this.vests, this.phone, this.clipboard]) {
       g.dispose();
     }
     this.material.dispose();
@@ -1087,9 +1210,9 @@ export function verifyCharacterKit(assets: CharacterKitAssets): string[] {
   // vertical radius, and the head bone is at 1.25, so in the bone's frame the
   // skull's top is at 0.445 and its widest point at 0.195. Anything meant to be
   // *on* a head has to have geometry above the widest point.
-  for (const [name, g] of [['cap', assets.cap], ['hard hat', assets.hardhat], ['shades', assets.shades]] as Array<
-    [string, BufferGeometry]
-  >) {
+  for (const [name, g] of [
+    ['cap', assets.cap], ['police cap', assets.policeCap], ['hard hat', assets.hardhat], ['shades', assets.shades],
+  ] as Array<[string, BufferGeometry]>) {
     const pos = g.getAttribute('position');
     let maxY = -Infinity;
     let minY = Infinity;
@@ -1129,8 +1252,8 @@ export function verifyCharacterKit(assets: CharacterKitAssets): string[] {
   // because they are slabs and a slab's signed volume about a point inside it is
   // meaningless.
   for (const [name, g] of [
-    ['cap', assets.cap], ['hard hat', assets.hardhat], ['cup', assets.cup], ['bumbag', assets.bumbag],
-    ['vest', assets.vests[0]],
+    ['cap', assets.cap], ['police cap', assets.policeCap], ['hard hat', assets.hardhat],
+    ['cup', assets.cup], ['bumbag', assets.bumbag], ['vest', assets.vests[0]],
   ] as Array<[string, BufferGeometry]>) {
     const pos = g.getAttribute('position');
     const idx = g.getIndex();
@@ -1179,6 +1302,102 @@ export function verifyCharacterKit(assets: CharacterKitAssets): string[] {
     let minY = Infinity;
     for (let i = 0; i < pos.count; i++) minY = Math.min(minY, pos.getY(i));
     if (minY > 0) failures.push(`The cup's base is at ${minY.toFixed(3)} in the wrist frame; it is floating above the hand.`);
+  }
+
+  /* --- The officer's cap: on the head, peak forward, and the size of a cap.
+   *
+   * The head-clearance and winding loops above already cover it as one more head
+   * prop. These three are the ones only this hat can fail, and every one of them
+   * renders a frame nobody would call broken:
+   *
+   *   - a **peak behind the face** is a cap on backwards, which from in front is
+   *     a cap with no peak at all and reads as a beanie;
+   *   - a cap that is **not the size of the eshay's** is a cap that no longer
+   *     agrees with the one head profile this file keeps -- the numbers are
+   *     deliberately the same and the check is what keeps them so;
+   *   - **an odd band** puts two cells of one colour together at the seam, and a
+   *     chequer with a seam in it is a stripe.
+   */
+  {
+    const pos = assets.policeCap.getAttribute('position');
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    // The half-width **across** the head, which is the crown's radius: the peak
+    // is narrower than the crown by construction, so `|x|` measures the band and
+    // a radius in the plane would measure the peak's own far corners and call
+    // the cap 0.26 m across.
+    let maxX = 0;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      const z = pos.getZ(i);
+      minZ = Math.min(minZ, z);
+      maxZ = Math.max(maxZ, z);
+      maxX = Math.max(maxX, Math.abs(x));
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+    }
+    // The figure faces -Z, so a peak is geometry that reaches **past the crown**
+    // in that direction. Stated against the crown's own radius rather than
+    // against a number, because the number would be the thing that goes stale
+    // the day somebody resizes the cap.
+    if (minZ > -maxX * 1.2) {
+      failures.push(
+        `The police cap reaches ${minZ.toFixed(3)} forward against a crown ${maxX.toFixed(3)} across. ` +
+          'The figure faces -Z and a peak has to stand out in front of the face; this is a beanie.',
+      );
+    }
+    if (maxZ > maxX * 1.02) {
+      failures.push(
+        `The police cap reaches ${maxZ.toFixed(3)} behind the head against a crown ${maxX.toFixed(3)} ` +
+          'across, so the peak is on backwards.',
+      );
+    }
+    // ...and it is a cap rather than a hat, measured against the one this file
+    // already keeps off the skull.
+    const eshay = assets.cap.getAttribute('position');
+    let eshayX = 0;
+    let eshayLow = Infinity;
+    let eshayHigh = -Infinity;
+    for (let i = 0; i < eshay.count; i++) {
+      eshayX = Math.max(eshayX, Math.abs(eshay.getX(i)));
+      eshayLow = Math.min(eshayLow, eshay.getY(i));
+      eshayHigh = Math.max(eshayHigh, eshay.getY(i));
+    }
+    if (maxX < eshayX * 0.9 || maxX > eshayX * 1.15) {
+      failures.push(
+        `The police cap is ${(maxX * 2).toFixed(3)} m across against the eshay cap's ` +
+          `${(eshayX * 2).toFixed(3)}. Both sit on the same 1.70 m figure and there is one head ` +
+          'profile in this file.',
+      );
+    }
+    if (minY < eshayLow - 0.03 || maxY > eshayHigh + 0.03) {
+      failures.push(
+        `The police cap runs ${minY.toFixed(3)} to ${maxY.toFixed(3)} against the eshay cap's ` +
+          `${eshayLow.toFixed(3)} to ${eshayHigh.toFixed(3)}. Same head, same seat on it.`,
+      );
+    }
+    if (POLICE_CAP_SIDES % 2 !== 0) {
+      failures.push(
+        `The cap's chequer band has ${POLICE_CAP_SIDES} facets. An odd count puts two of one colour ` +
+          'together at the seam, which is the one place a chequer stops being a chequer.',
+      );
+    }
+    // And the band is actually two colours. A cap whose ring came out one colour
+    // is a plain navy cap again, which is the thing this replaced.
+    const col = assets.policeCap.getAttribute('color');
+    const seen = new Set<string>();
+    for (let i = 0; i < col.count; i++) {
+      seen.add(`${col.getX(i).toFixed(3)},${col.getY(i).toFixed(3)},${col.getZ(i).toFixed(3)}`);
+    }
+    if (seen.size < 4) {
+      failures.push(
+        `The police cap carries ${seen.size} distinct colours and needs four -- crown, peak and the ` +
+          "band's two. Navy on navy is invisible in shade, which is the whole reason the band is there.",
+      );
+    }
   }
 
   if (assets.triangles > 900) {

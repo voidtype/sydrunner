@@ -159,6 +159,28 @@ const Y_TOLERANCE = 0.02; // 2 cm, per the verification brief
  * the same nineteen strings for the three-free side and states why there are
  * two copies; `carlod.loadCarModels` compares them at load.
  */
+/**
+ * `.glb` files in `client/public/cars/` that this script does not build, does
+ * not curate, and must not delete.
+ *
+ * There is one, and the mechanism exists because of it: `nsw_police.glb` is
+ * authored from nothing by `scripts/build-police-car.mjs` and has no row in
+ * `data/vehicles/models/manifest.json` to be processed from. Without this table
+ * the clean slate below -- which deletes every `.glb` in the output directory so
+ * that a model which stops shipping cannot linger -- would delete it on the next
+ * full run, and the manifest this script writes would not name it. Both halves
+ * are silent failures a person only finds in the game: the file is a 404 and the
+ * pool keeps its slot as a hole, so every marked car in Sydney draws as a box.
+ *
+ * The manifest row is carried through **from the manifest already on disk**
+ * rather than restated here, because that row is `build-police-car.mjs`'s to
+ * write and a second copy of it in this file is a second thing to keep true.
+ * A missing row is fatal for the reason above.
+ */
+const EXTERNAL_MODELS = [
+  { file: 'nsw_police.glb', builtBy: 'scripts/build-police-car.mjs' },
+];
+
 /** What the four special bodies' manifest rows say about their stand-in. */
 const SPECIAL_NOTE =
   'No real-make alternative on disk for this role. The passenger classes (0-4) carry real makes ' +
@@ -270,11 +292,16 @@ const CATALOG = [
 
   // --- specials: no quota, kept if they pass the same per-model limits ---
   // `length` is each one's own real-world target, not borrowed from a
-  // numbered class: the surviving police model is SUV-shaped (see its own
+  // numbered class: the Kenney police model is SUV-shaped (see its own
   // target_vehicle in the source manifest, "NSW Police general-duties
-  // SUV/wagon"), so it is sized like this game's SUV class, not its sedan
+  // SUV/wagon"), so it was sized like this game's SUV class, not its sedan
   // class, even though "police" is not itself a numbered body.
-  { file: 'police_kenney.glb', body: 'police', priority: 1, length: CAR_BODY_SIZE[2].length, label: 'NSW Police Cruiser' },
+  //
+  // It does not ship any more. `scripts/build-police-car.mjs` authors
+  // `nsw_police.glb` -- a real NSW highway-patrol sedan with the Battenburg and
+  // the lettering painted on it -- and the role has one car, which is that one.
+  // See `EXTERNAL_MODELS` and the `superseded` handling in `main`.
+  { file: 'police_kenney.glb', body: 'police', priority: 1, length: CAR_BODY_SIZE[2].length, label: 'NSW Police Cruiser', superseded: 'nsw_police.glb' },
   // 9648 tris -- over the limit; the only other police candidate, and the
   // one that *would* have wanted the sedan length.
   { file: 'police_sedan_charger.glb', body: 'police', priority: 2, length: CAR_BODY_SIZE[0].length, label: 'NSW Police Charger' },
@@ -1680,9 +1707,28 @@ async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
   // Clean slate: remove any .glb left over from a previous run so a file
   // that stops shipping (curation or a tightened limit) doesn't linger.
+  // `EXTERNAL_MODELS` is exempt -- see that table: those files are somebody
+  // else's output and this script has no way to make them again.
+  const external = new Set(EXTERNAL_MODELS.map((e) => e.file));
   if (!process.env.PREP_ONLY) {
     for (const f of fs.readdirSync(OUT_DIR)) {
-      if (f.endsWith('.glb')) fs.unlinkSync(path.join(OUT_DIR, f));
+      if (f.endsWith('.glb') && !external.has(f)) fs.unlinkSync(path.join(OUT_DIR, f));
+    }
+  }
+  // ...and their manifest rows are read now, before this run overwrites the
+  // file they are in.
+  const carried = [];
+  {
+    const previous = fs.existsSync(OUT_MANIFEST_PATH) ? JSON.parse(fs.readFileSync(OUT_MANIFEST_PATH, 'utf8')) : [];
+    for (const e of EXTERNAL_MODELS) {
+      const row = previous.find((r) => r.file === e.file);
+      if (!row) {
+        console.error(`ERROR: ${e.file} is built by ${e.builtBy} and has no row in the manifest on disk.`);
+        console.error('Run that script first: a file with no row is a hole in its pool and every car that hashes to it draws as a box.');
+        process.exitCode = 1;
+        return;
+      }
+      carried.push(row);
     }
   }
 
@@ -1702,6 +1748,19 @@ async function main() {
         body: entry.body,
         status: 'rejected',
         reason: 'stylised or generic stand-in; the passenger classes carry real makes only',
+      });
+      continue;
+    }
+    // Refused for `standIn`'s reason turned the other way up: the role this
+    // file used to be the only mesh for now has a car of its own, built rather
+    // than sourced. Listed and refused rather than deleted, so that the next
+    // person to wonder where the Kenney police car went reads the answer here.
+    if (entry.superseded) {
+      results.push({
+        file: entry.file,
+        body: entry.body,
+        status: 'rejected',
+        reason: `superseded by ${entry.superseded}, which is built from scratch`,
       });
       continue;
     }
@@ -1777,6 +1836,8 @@ async function main() {
       // place a stand-in still ships. See the CATALOG header on `standIn`.
       ...(typeof r.body === 'number' ? {} : { note: SPECIAL_NOTE }),
     }))
+    // ...and the rows this script did not write, exactly as they were.
+    .concat(carried)
     .sort((a, b) => a.file.localeCompare(b.file));
   fs.writeFileSync(OUT_MANIFEST_PATH, JSON.stringify(manifest, null, 2) + '\n');
 

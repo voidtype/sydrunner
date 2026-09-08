@@ -11,9 +11,14 @@
  * ---------------------------------------------------------------------------
  * 1. WHY THE CAR IS BUILT HERE RATHER THAN LOADED FROM `public/cars`.
  *
- * There are twenty-nine `.glb` car models on disk and one of them is literally
- * `police_kenney.glb`, so the obvious build is to load it. This does not, and
- * the reason is ownership rather than taste.
+ * There are twenty `.glb` car models on disk and one of them is literally
+ * `nsw_police.glb` -- a real NSW highway-patrol sedan with the Battenburg
+ * painted on it, built from nothing by `scripts/build-police-car.mjs` -- so the
+ * obvious build is to load it. This does not, and the reason is ownership rather
+ * than taste. (It was `police_kenney.glb` when this paragraph was written, and
+ * the argument got *stronger* rather than weaker when a good model arrived: the
+ * better that file gets, the more tempting it is to reach into the fleet that
+ * owns it.)
  *
  * `world/carlod.ts` owns every one of those files. It fetches the manifest,
  * merges each scene into **one** geometry with the node transforms baked and
@@ -45,6 +50,18 @@
  *
  * The bar alternates: red one side, blue the other, swapping about twice a
  * second. Three ways to do that and only one of them is free.
+ *
+ * (Two things about it moved in the round that built `nsw_police.glb`. The
+ * swap is no longer counted off this class's own `dt` clock -- it is
+ * `nightlights.beaconPhase(actorId, tick)`, a pure function of the car and the
+ * shared tick, so two players watching the same pursuit see the same bar flash
+ * at the same instant with nothing on the wire and a self-check can sweep an
+ * hour of it. And the plastic is no longer the whole lamp: the same phase feeds
+ * `nightlights.PoliceBeacons`, which draws the glow around it and -- when the
+ * player is wanted and the car is inside 40 m -- borrows two of the seven real
+ * lights so the bar actually lights the road. The owner's note was *"with the
+ * lights actually being lights"*; the lens below is what those lights come out
+ * of.)
  *
  * A **shader** on an emissive material would mean a node graph with a time
  * uniform, which is a pipeline of its own and something `PipelineWatch` would
@@ -191,6 +208,13 @@ import {
   polairShotFired,
   polairShotTick,
 } from '../game/polair.ts';
+import {
+  BEACON_HALF_CYCLE_TICKS,
+  PURSUIT_RECORD_STRIDE,
+  beaconPhase,
+  type PoliceBeaconSink,
+  type PursuitSource,
+} from './nightlights.ts';
 
 // --- Colours, linear ---------------------------------------------------------------
 
@@ -283,6 +307,18 @@ const WHEEL_INSET = 0.06;
 const BAR_WIDTH = 1.15;
 const BAR_DEPTH = 0.24;
 const BAR_HEIGHT = 0.13;
+/**
+ * Where the bar's centre is in the car's own frame, for the glow and the two
+ * real lights `world/nightlights.ts` hangs on it.
+ *
+ * Derived from the same two expressions `buildBarHousing` and `buildLens` are
+ * built out of rather than measured off them, because a bar whose plastic and
+ * whose light are in different places is the exact failure the street lamps'
+ * `LAMP_OUTREACH` check exists to catch -- and it looks like a bug in the car
+ * rather than in the lighting.
+ */
+const BAR_ROOF_Z = -CAR_LENGTH / 2 + CAR_LENGTH * ((CABIN_FRONT + CABIN_BACK) / 2);
+const BAR_LENS_Y = CAR_HEIGHT + 0.045 + BAR_HEIGHT / 2;
 
 /** A witches' hat: 0.45 m of orange over a 0.36 m base, which is the real thing. */
 const CONE_HEIGHT = 0.45;
@@ -868,8 +904,16 @@ export const RBT_CAPACITY = 2;
 /** How far these are drawn, metres. `police.POLICE_DRAW_RADIUS`, and for its reason. */
 export const PATROL_DRAW_RADIUS = 260;
 
-/** The strobe, in seconds per half-cycle. Twice a second, which is what a bar does. */
-export const STROBE_PERIOD = 0.25;
+/**
+ * The strobe, in seconds per half-cycle. Twice a second, which is what a bar does.
+ *
+ * Kept, and kept *derived*, now that the alternation itself is
+ * `nightlights.beaconPhase` over the shared tick: this is the same quarter of a
+ * second expressed in the unit a person reading this file thinks in, and
+ * deriving it means the two cannot drift into a bar whose plastic and whose glow
+ * flash at different rates.
+ */
+export const STROBE_PERIOD = BEACON_HALF_CYCLE_TICKS / 60;
 
 /** One pooled car: a body, a bar, and the four lenses two of which are on. */
 interface CarSlot {
@@ -887,7 +931,7 @@ interface CarSlot {
  * argument: a patrol car crosses a tile boundary every few seconds and the fleet
  * is drawn as one set for the whole visible world.
  */
-export class HighwayPatrolFleet {
+export class HighwayPatrolFleet implements PursuitSource {
   /** Add these to the scene. */
   readonly group = new Object3D();
 
@@ -897,7 +941,21 @@ export class HighwayPatrolFleet {
 
   private readonly carSlots: CarSlot[] = [];
   private readonly rbtSlots: Object3D[] = [];
-  private clock = 0;
+  /**
+   * The bar of every patrol car drawn last update, as world x, y, z and the
+   * phase that was lit -- `PURSUIT_RECORD_STRIDE` apart, and in the order the
+   * fleet drew them, which is the order the field walked.
+   *
+   * Written where the cars are placed rather than recomputed on demand, because
+   * the caller is `nightlights.NightLights.update`, which runs **earlier in the
+   * frame than this class does** and would otherwise have to be handed the actor
+   * field and the patrol car's own roof geometry. So the answer it gets is last
+   * frame's, exactly as `CarSmoke`'s is for the fire lights and for the same
+   * reason: a frame of lag on a light flashing at 4 Hz is not a thing that
+   * exists, and a second copy of "where is the bar" is a thing that drifts.
+   */
+  private readonly bars = new Float32Array(PATROL_CAPACITY * PURSUIT_RECORD_STRIDE);
+  private barCount = 0;
 
   constructor(assets: HighwayPatrolAssets) {
     this.group.name = 'highway-patrol';
@@ -957,14 +1015,26 @@ export class HighwayPatrolFleet {
    * offline. `dt` drives the strobe and nothing else; the *positions* come from
    * the authority, which is `main.ts`' rule about every actor in this project.
    */
-  update(field: { actors: Iterable<NpcActor> }, dt: number, x: number, z: number): void {
-    this.clock += dt;
-    // A hard alternation rather than a wave. See section 2.
-    const phase = Math.floor(this.clock / STROBE_PERIOD) & 1;
+  update(
+    field: { actors: Iterable<NpcActor> },
+    dt: number,
+    x: number,
+    z: number,
+    tick = 0,
+    beacons: PoliceBeaconSink | null = null,
+  ): void {
+    // `dt` no longer drives anything: the strobe is `beaconPhase` over the shared
+    // tick now, and the *positions* always came from the authority. It stays in
+    // the signature because `perf-harness.ts` calls this with four arguments and
+    // because a fleet that is handed the frame time is a fleet the next
+    // time-varying thing can use without a signature change.
+    void dt;
     const r2 = PATROL_DRAW_RADIUS * PATROL_DRAW_RADIUS;
+    beacons?.begin();
 
     let cars = 0;
     let rbts = 0;
+    this.barCount = 0;
     for (const a of field.actors) {
       const isCar = a.kind === NPC_KIND.HIGHWAY_PATROL;
       const isRbt = a.kind === NPC_KIND.RBT;
@@ -977,10 +1047,43 @@ export class HighwayPatrolFleet {
         const slot = this.carSlots[cars++];
         slot.group.visible = true;
         placeByHeading(slot.group, a);
+        // Per car, off the shared tick. See section 2: this is the one number
+        // the plastic, the glow and the two borrowed real lights all read, so
+        // they cannot disagree about which half of the bar is lit.
+        const phase = beaconPhase(a.id, tick);
         slot.lensLeftRed.visible = phase === 0;
         slot.lensRightBlue.visible = phase === 0;
         slot.lensLeftBlue.visible = phase === 1;
         slot.lensRightRed.visible = phase === 1;
+        /*
+         * The glow, at the **centre** of the bar rather than over one lens.
+         *
+         * The plastic above is a wig-wag: both halves are lit at once and the
+         * colours swap sides, which is four little boxes and two `visible`
+         * toggles. The glow is one blob in the middle of it, alternating red and
+         * blue -- and the reason it is not two blobs over the two lenses is that
+         * a bar 40 m away is four pixels wide, so what a player actually reads is
+         * *one flare on a roof changing colour*, and hanging the glow off which
+         * half is currently which colour would couple this file's flash to that
+         * file's plastic arrangement for a distinction nobody can see.
+         *
+         * Local (0, y, roofZ) into world metres, by the actor's own unit heading
+         * and no trigonometry: the body is built nose-along -Z and placed at
+         * `atan2(-dx, -dz)`, so local -Z lands on (dx, dz) and a point `roofZ`
+         * along local Z lands `-roofZ` along the heading.
+         */
+        const wx = a.x - BAR_ROOF_Z * a.dx;
+        const wz = a.z - BAR_ROOF_Z * a.dz;
+        const wy = a.y + BAR_LENS_Y;
+        beacons?.add(wx, wy, wz, phase);
+        if (this.barCount < PATROL_CAPACITY) {
+          const o = this.barCount * PURSUIT_RECORD_STRIDE;
+          this.bars[o] = wx;
+          this.bars[o + 1] = wy;
+          this.bars[o + 2] = wz;
+          this.bars[o + 3] = phase;
+          this.barCount++;
+        }
       } else {
         if (rbts >= RBT_CAPACITY) continue;
         const group = this.rbtSlots[rbts++];
@@ -992,6 +1095,38 @@ export class HighwayPatrolFleet {
     for (let i = rbts; i < this.rbtSlots.length; i++) this.rbtSlots[i].visible = false;
     this.cars = cars;
     this.rbts = rbts;
+    beacons?.end();
+  }
+
+  /**
+   * `nightlights.PursuitSource`: the nearest bars to the camera, for the two
+   * real lights one of them borrows.
+   *
+   * Sorted by nothing -- it is an insertion sort over at most four records and
+   * `max` is one, so this walks the list and keeps the closest. The RBT's car is
+   * deliberately not in it: its bar is on and its siren is off, it is parked
+   * across a lane rather than chasing anybody, and lighting the street from a
+   * breath-test site would spend the loan on the one police vehicle that is not
+   * a pursuit.
+   */
+  nearestPursuit(x: number, y: number, z: number, radius: number, out: Float32Array, max: number): number {
+    void y;
+    if (max < 1) return 0;
+    let best = -1;
+    let bestD = radius * radius;
+    for (let i = 0; i < this.barCount; i++) {
+      const o = i * PURSUIT_RECORD_STRIDE;
+      const dx = this.bars[o] - x;
+      const dz = this.bars[o + 2] - z;
+      const d = dx * dx + dz * dz;
+      if (d < bestD) {
+        bestD = d;
+        best = o;
+      }
+    }
+    if (best < 0) return 0;
+    for (let k = 0; k < PURSUIT_RECORD_STRIDE; k++) out[k] = this.bars[best + k];
+    return 1;
   }
 }
 

@@ -35,9 +35,15 @@
  *
  * The two props are chosen for what they do at distance rather than for detail:
  *
- *   - the **cap** is the silhouette. At 40 m a navy figure is a dark figure and
+ *   - the **cap** is the silhouette *and*, since the owner's *"and have propper
+ *     hats"*, half the colour. At 40 m a navy figure is a dark figure and
  *     nothing else; a peaked cap is the one shape that reads as *police* from
- *     further away than a face does, and it is 60 triangles.
+ *     further away than a face does, and a chequered band round it is the one
+ *     thing that says which force from further away than the shape does. The
+ *     geometry is `world/characters.buildPoliceCap` -- authored over there
+ *     because that file owns the rule about where a head *is* in a head bone's
+ *     frame and the check that enforces it, and because two files with two hats
+ *     are two places to get that wrong. This one wears it.
  *   - the **chequer band** is the colour. Navy on navy is invisible in shade, so
  *     the band is a ring of alternating white and mid-blue quads at chest height
  *     -- the Sillitoe tartan every police force in the Commonwealth uses, and
@@ -85,6 +91,7 @@ import {
   type NpcActor,
 } from '../game/factions.ts';
 import { createPedPose, type PedBand, type PedPose, type PedestrianField } from '../game/pedestrians.ts';
+import { POLICE_CAP_SIDES, buildPoliceCap } from './characters.ts';
 
 // --- The uniform ------------------------------------------------------------------
 
@@ -113,9 +120,6 @@ export const POLICE_KIT: Colourway = {
 /** The chequer's two colours, linear. White and a mid police blue. */
 const CHEQUER_LIGHT: readonly [number, number, number] = [0.82, 0.85, 0.88];
 const CHEQUER_BLUE: readonly [number, number, number] = [0.05, 0.14, 0.44];
-/** The cap's peak and crown. Both a touch darker than the singlet, so it reads as a separate object. */
-const CAP_CLOTH: readonly [number, number, number] = [0.015, 0.02, 0.055];
-const CAP_PEAK: readonly [number, number, number] = [0.02, 0.02, 0.024];
 
 /**
  * A little accumulator for a prop's triangles.
@@ -194,30 +198,23 @@ const BAND_HEIGHT = 0.055;
 const BAND_Y = 0.02;
 
 /**
- * The cap, in the **head bone's** frame -- which is not where a head is, and
- * that is the whole of what this block has to get right.
+ * The cap is **not built here any more**, and this note is what is left of the
+ * block that used to be.
  *
- * `animation.RIG` puts the head joint 1.25 m up (hips 0.86 + spine 0.13 + chest
- * 0.14 + neck 0.07 + head 0.05) and `character.HEAD_CENTRE` puts the skull's
- * *centre* at 1.445 with a vertical radius of 0.25. So in the bone's own frame
- * the head runs from y = -0.055 to y = +0.445, and its centre -- the widest part
- * -- is at +0.195.
+ * `world/characters.buildPoliceCap` builds it, in that file, for the reason its
+ * own header gives: the head bone's origin is at the *base* of the skull, not at
+ * its centre -- the head runs from y = -0.055 to +0.445 in that frame with its
+ * widest point at +0.195 -- and the first cut of this file put the cap at a
+ * plausible-sounding 0.2, which is dead centre inside the skull, invisible from
+ * every angle, and looked exactly like a prop that had never been parented. It
+ * took a screenshot to find. One file now owns where a head is, one check
+ * asserts it for every hat in the build, and this file wears the result.
  *
- * The first cut of this file put the cap at 0.2, which is exactly the middle of
- * the skull: geometrically perfect, entirely inside the head, and invisible from
- * every angle. It took a screenshot to notice, which is precisely why
- * `verifyPoliceKit` now asserts the cap sits above the head's equator rather
- * than merely above the joint.
- *
- * 0.30 is where a cap band sits on a real skull -- above the ears, below the
- * crown -- and the radius is a shade proud of the head's own half-width at that
- * height (0.185 x sqrt(1 - (0.105/0.25)^2) = 0.168), which is what makes it read
- * as something *worn* rather than as a painted stripe.
+ * `verifyPoliceKit` still measures the cap it is handed against the skull's
+ * equator, because the assertion is about *this* object being on *this* figure
+ * and a check that trusted another file's check would be a check that stops
+ * running the day somebody edits that one.
  */
-const CAP_RADIUS = 0.175;
-const CAP_HEIGHT = 0.105;
-const CAP_Y = 0.3;
-const PEAK_REACH = 0.15;
 
 /**
  * The uniform's geometry, built once and shared by every officer in the city.
@@ -261,51 +258,17 @@ export class PoliceAssets {
     }
     this.band = band.build('police-band');
 
-    // --- The cap. A crown, a flat top, and a peak over the eyes.
-    const cap = new Parts();
-    for (let i = 0; i < RING_SIDES; i++) {
-      const a0 = (i / RING_SIDES) * Math.PI * 2;
-      const a1 = ((i + 1) / RING_SIDES) * Math.PI * 2;
-      const s0 = Math.sin(a0);
-      const c0 = Math.cos(a0);
-      const s1 = Math.sin(a1);
-      const c1 = Math.cos(a1);
-      // The crown, slightly tapered: a cylinder reads as a bucket and a taper
-      // reads as a cap. 0.86 is measured off nothing -- it is the smallest taper
-      // that survives the flat shading at 20 m.
-      const rb = CAP_RADIUS;
-      const rt = CAP_RADIUS * 0.86;
-      cap.quad(
-        [s0 * rb, CAP_Y, c0 * rb],
-        [s1 * rb, CAP_Y, c1 * rb],
-        [s1 * rt, CAP_Y + CAP_HEIGHT, c1 * rt],
-        [s0 * rt, CAP_Y + CAP_HEIGHT, c0 * rt],
-        CAP_CLOTH,
-      );
-      // The top, as a fan of quads collapsed to triangles at the centre. Wound
-      // anticlockwise seen from above, which is +Y out.
-      cap.quad(
-        [0, CAP_Y + CAP_HEIGHT, 0],
-        [s0 * rt, CAP_Y + CAP_HEIGHT, c0 * rt],
-        [s1 * rt, CAP_Y + CAP_HEIGHT, c1 * rt],
-        [0, CAP_Y + CAP_HEIGHT, 0],
-        CAP_CLOTH,
-      );
-    }
-    // The peak, over -Z, which is the direction the figure faces. A trapezium,
-    // drawn on both sides because it is a single sheet and is seen from below by
-    // anybody the officer is standing over.
-    {
-      const y = CAP_Y + 0.004;
-      const hw = CAP_RADIUS * 0.8;
-      const tw = CAP_RADIUS * 0.52;
-      const near = -CAP_RADIUS * 0.55;
-      const far = near - PEAK_REACH;
-      cap.quad([-hw, y, near], [hw, y, near], [tw, y, far], [-tw, y, far], CAP_PEAK);
-      cap.quad([-tw, y - 0.008, far], [tw, y - 0.008, far], [hw, y - 0.008, near], [-hw, y - 0.008, near], CAP_PEAK);
-    }
-    this.cap = cap.build('police-cap');
-    this.triangles = band.triangles + cap.triangles;
+    // --- The cap, from `world/characters.ts`. A dark blue crown, one chequered
+    // band and a black peak; see `buildPoliceCap` for why the shape lives there
+    // and is drawn here, and why its numbers are the eshay cap's.
+    //
+    // Its own geometry rather than a reference to `CharacterKitAssets.policeCap`,
+    // because the two are drawn on different materials with different owners and
+    // a shared buffer would be a shared lifetime: a crowd disposing its props
+    // would take the hat off every officer in the city. Seventy-six triangles is
+    // a cheaper answer than that ownership question.
+    this.cap = buildPoliceCap();
+    this.triangles = band.triangles + (this.cap.getIndex()?.count ?? 0) / 3;
 
     // Lit, like the bat and the football and unlike a beam: a uniform has no
     // output of its own, so what has to be true of it is that it goes dark when
@@ -901,6 +864,44 @@ export function verifyPoliceKit(assets: PoliceAssets): string[] {
     }
     if (highest > 0.5) {
       failures.push(`The cap reaches ${highest.toFixed(3)} m, well over the crown at 0.445. It would float.`);
+    }
+    // --- And it is the *NSW* cap rather than a plain navy one.
+    //
+    // The owner's *"and have propper hats"* is a request about a band, and a
+    // band that has silently gone back to one colour is a cap that still passes
+    // every test above: it is on the head, it is the right size, its peak faces
+    // the right way, and at 40 m it is a dark smudge on a dark figure again --
+    // which is the exact failure the prop is there to fix. `POLICE_CAP_SIDES` is
+    // asserted even for `RING_SIDES`' reason, one seam over.
+    if (POLICE_CAP_SIDES % 2 !== 0) {
+      failures.push(
+        `The cap's band has ${POLICE_CAP_SIDES} facets. An odd count puts two of one colour together ` +
+          'at the seam, which is the one place a chequer stops being a chequer.',
+      );
+    }
+    const colour = assets.cap.getAttribute('color');
+    if (!colour) {
+      failures.push('The police cap has no colour attribute, so the crown, the peak and the band would be one white hat.');
+    } else {
+      const shades = new Set<string>();
+      for (let i = 0; i < colour.count; i++) {
+        shades.add(`${colour.getX(i).toFixed(3)},${colour.getY(i).toFixed(3)},${colour.getZ(i).toFixed(3)}`);
+      }
+      if (shades.size < 4) {
+        failures.push(
+          `The police cap carries ${shades.size} colours and needs four: the crown, the peak and the ` +
+            "band's light and blue. Navy on navy is invisible in shade.",
+        );
+      }
+      // ...and the band's blue is the chest band's blue, which is the claim that
+      // one force wears one livery rather than two shades of nearly the same.
+      const chest = `${CHEQUER_BLUE[0].toFixed(3)},${CHEQUER_BLUE[1].toFixed(3)},${CHEQUER_BLUE[2].toFixed(3)}`;
+      if (!shades.has(chest)) {
+        failures.push(
+          `The cap's band does not use the chest band's blue (${chest}). One force wears one livery; ` +
+            'two nearly-equal blues on one officer is the thing nobody sees and everybody feels.',
+        );
+      }
     }
   }
 

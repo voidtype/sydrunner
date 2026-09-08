@@ -144,12 +144,23 @@
  * `client/public/cars/manifest.json` names 19 normalised `.glb` files, of which
  * 15 are loaded. It named 38 until the 2026-09 real-cars round deleted the
  * nineteen stylised and generic stand-ins from it and from the directory, so
- * the five passenger classes carry real makes only and the four special bodies
- * keep the one mesh each that exists for them; `game/carlabels.ts` section 3
- * argues it and holds the table. They are
- * pre-normalised for length and ground plane -- the X extent is the body class's
- * own length out of `CAR_BODY_SIZE` and the lowest vertex is at y = 0 -- so
- * nothing here scales or lifts them. Two things it does do:
+ * the five passenger classes carry real makes only and the three special bodies
+ * that still have no real mesh keep the one each that exists for them;
+ * `game/carlabels.ts` section 3 argues it and holds the table. Eighteen of them
+ * are pre-normalised for length and ground plane -- the X extent is the body
+ * class's own length out of `CAR_BODY_SIZE` and the lowest vertex is at y = 0 --
+ * so nothing here scales or lifts them.
+ *
+ * The nineteenth is `nsw_police.glb`, which is not sourced at all: it is
+ * *authored*, by `scripts/build-police-car.mjs`, and it is **4.90 m** rather
+ * than the 4.70 of the body class it is measured against. That is deliberate and
+ * it is why the proportion test below is on width and height and never on
+ * length: a marked car is drawn on whichever of the five bodies the timetable
+ * rolled, so no single length could agree with all of them, and a full-size
+ * highway-patrol sedan is the right answer for all five. Its ground plane and
+ * its centring are exact, which is what actually matters here.
+ *
+ * Two things this file does do:
  *
  *   - **`YAW_CORRECTION`.** Five of the mapped files are authored nose-down-`-X`
  *     and render backwards. The correction is a table here rather than a
@@ -204,7 +215,10 @@
  *     white headlight setting the exposure for the whole car.
  *
  * A `tint: "none"` model keeps its authored colours and is drawn white, which
- * today is exactly one file: the police car, whose livery is not a paint choice.
+ * today is exactly one file: `nsw_police.glb`, whose livery is not a paint
+ * choice -- the Battenburg, the lettering and the light bar's two lenses are
+ * texels in its own atlas, and a car whose blue chequer took the entity's paint
+ * would be a police car in whatever colour the hash rolled.
  */
 
 import { Fn, instancedBufferAttribute, max, mix, texture, uv, vec4, vertexColor } from 'three/tsl';

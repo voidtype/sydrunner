@@ -191,6 +191,7 @@ import {
   torchHandMount,
   verifyNightLights,
   verifyTrainLightKit,
+  type PursuitSource,
 } from './world/nightlights.ts';
 import { CollisionWorld, type Prism } from './player/collision.ts';
 import {
@@ -4478,6 +4479,17 @@ async function main(): Promise<void> {
   );
   /** What the star row last read, so `hud.notice` fires on the edge and not the level. */
   let heatShown = 0;
+  /**
+   * The pursuit the night rig may borrow two real lights for, or null.
+   *
+   * WORKSTREAM police-car: `nightlights.PursuitSource` gates on distance and on
+   * the night; the **heat** gate is this file's, because `world/nightlights.ts`
+   * must not import `game/heat.ts` -- the same division `LampSource` and
+   * `FireSource` are drawn on. Carried across the frame boundary because the
+   * night rig updates a few hundred lines above where the star count is read,
+   * exactly as `carSmoke`'s answer to the fire lights is last frame's.
+   */
+  let pursuitLights: PursuitSource | null = null;
 
   // --- And the street factions, on exactly the same two tiers.
   //
@@ -13868,6 +13880,11 @@ async function main(): Promise<void> {
         // See `nightlights.FireSource`; a frame of lag on a light being flickered
         // at 9 Hz is not a thing that exists.
         carSmoke,
+        // WORKSTREAM police-car: and which pursuing patrol car, if any, may have
+        // the two street-lamp lights turned into its light bar. Null unless the
+        // player is wanted; see `pursuitLights` and the borrow argument above
+        // `nightlights.PursuitSource`.
+        pursuitLights,
       );
       // And the sprites, which are hidden all day for the fill they would
       // otherwise cost. One comparison on every frame but the two a day where the
@@ -14454,7 +14471,23 @@ async function main(): Promise<void> {
       // draws officers from -- which is not a police-only accessor despite the
       // name: it is "wherever the promoted actors are", and each renderer
       // filters the kinds it draws itself.
-      patrolFleet.update(policeField(), frameDt, player.position.x, player.position.z);
+      patrolFleet.update(
+        policeField(),
+        frameDt,
+        player.position.x,
+        player.position.z,
+        // WORKSTREAM police-car: the strobe is a pure function of the car and the
+        // shared tick now rather than of this process's own clock, so two players
+        // watching one pursuit see the bar flash together with nothing sent. The
+        // sink is the additive glow around the plastic; see
+        // `nightlights.PoliceBeacons`.
+        trafficTick(Date.now()),
+        nightLights.policeBeacons,
+      );
+      // ...and whether the night rig may borrow two real lights off one of those
+      // bars next frame. Heat above zero is the whole of the gate this file owns;
+      // see `pursuitLights`.
+      pursuitLights = stars > 0 ? patrolFleet : null;
       // And Polair, which still needs no actor and nothing on the wire: the orbit,
       // the beam schedule and the shot schedule are pure functions of the player's
       // id and the shared tick, so this browser draws the identical machine the
