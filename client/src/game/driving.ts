@@ -274,7 +274,7 @@
  */
 
 import type { InputSnapshot } from '../player/controller.ts';
-import { CAR_HEALTH_FULL } from '../net/protocol.ts';
+import { CAR_HEALTH_FULL, CAR_NPC_DRIVER } from '../net/protocol.ts';
 import {
   // WORKSTREAM T: `verifyDriving` derives `CRASH_QUERY_RADIUS` from the body
   // table rather than trusting the literal, so a sixth body cannot outgrow it.
@@ -550,6 +550,40 @@ export const WITNESS_RADIUS = 15;
 /** Eye height for the witness ray, and chest height at the crime. `factions.ts`' pair. */
 export const WITNESS_EYE = 1.5;
 export const CRIME_HEIGHT = 1.0;
+
+/**
+ * --- THE DRIVER THAT IS NOT A PERSON. `DrivenCar.driverId` when the authority
+ * itself is at the wheel.
+ *
+ * 65,535, and it is reserved out of the player id space rather than picked out
+ * of it: `sim.allocateId` counts to 65,534 and wraps, so no participant can ever
+ * be handed this number and `carOf(NPC_DRIVER_ID)` cannot name somebody's car by
+ * accident. `verifyDriving` asserts the reservation, because the failure if it
+ * ever stopped being true is a player two days into a busy server inheriting a
+ * highway patrol car.
+ *
+ * **A sentinel rather than a second field**, which is the decision worth
+ * writing down. A patrol car (`game/pursuit.ts`) has to be a `DrivenCar` for the
+ * only reason anything in this game is one: `follow` carries it, `damage`
+ * charges it, `publishBlockers` makes the timetable queue behind it,
+ * `resolveCarContacts` gives it mass and every one of those gates on
+ * `driverId !== 0`. Adding an `npc: boolean` beside `driverId` would have meant
+ * teaching all four the difference between "nobody is in it" and "nobody you can
+ * name is in it", when the four already ask the only question they care about.
+ *
+ * What *does* have to know is anything that looks the driver up. There are
+ * three, and all three already fail closed: `sim.fillCarBody` and
+ * `sim.applyCarBody` take the record branch when `participants.get` misses --
+ * which is corrected in this batch to reach the pursuit state instead --
+ * `world/drivencars.ts` refuses to draw it (the actor is the picture), and
+ * `recycleFarthest` skips it because it skips every car with a driver.
+ *
+ * On the wire it is the `driver` field's own value, plus `protocol.CAR_NPC` so a
+ * record is self-describing without a reader having to know the constant. See
+ * `protocol.CAR_NPC_DRIVER`, which is this number restated in the file that may
+ * not import this one.
+ */
+export const NPC_DRIVER_ID = 65535;
 
 // --- Leaving one, and never getting it back ----------------------------------------
 
@@ -5143,6 +5177,29 @@ export function verifyDriving(): string[] {
     failures.push(
       `CAR_HEALTH_MAX is ${CAR_HEALTH_MAX} and traffic.CAR_HEALTH_FULL_POSE is ${CAR_HEALTH_FULL_POSE}. ` +
         `Every dent in the city would be drawn at the wrong depth.`,
+    );
+  }
+  // --- And the third: the sentinel the wire calls a driver.
+  //
+  // `protocol.ts` may not import this file (the dependency runs the other way)
+  // and its encoder needs the number, so there are two copies of it and this is
+  // what stops them drifting. The failure if they ever did is the whole of what
+  // the flag is for: a record encoded with one value and decoded against the
+  // other is a patrol car every client draws a Camry inside, offers to the take
+  // arbitration, and integrates as a wreck.
+  if (NPC_DRIVER_ID !== CAR_NPC_DRIVER) {
+    failures.push(
+      `NPC_DRIVER_ID is ${NPC_DRIVER_ID} and protocol.CAR_NPC_DRIVER is ${CAR_NPC_DRIVER}. The wire and ` +
+        'the fleet disagree about who is driving a patrol car.',
+    );
+  }
+  // ...and that it is outside the id space the authority hands out. 65,535 is
+  // the top of the `u16` the `driver` field is, and `sim.allocateId` wraps at
+  // 65,534 precisely so it can never be issued. A change to either end of that
+  // pair is a player who inherits every police car in the room.
+  if (NPC_DRIVER_ID !== 65535) {
+    failures.push(
+      `NPC_DRIVER_ID is ${NPC_DRIVER_ID}, which is not the top of the u16 sim.allocateId reserves.`,
     );
   }
   if (TAKE_HEIGHT !== 2.5) {

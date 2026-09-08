@@ -126,7 +126,9 @@
  *   3 stars  **Highway Patrol.** `NPC_KIND.HIGHWAY_PATROL`, a promoted actor
  *            that is a *car*: it drives the road graph at you, knocks you down
  *            on contact the way traffic does, and puts two officers out when it
- *            stops near you.
+ *            stops near you. Since the pursuit rework it is also a **body** --
+ *            a `driving.DrivenCar` with `driving.NPC_DRIVER_ID` at the wheel --
+ *            so you can hit it and it can hit you. See section 8.
  *   4 stars  **An RBT.** A breath-testing station across the road ahead of you,
  *            deterministically placed from where you were and which way you
  *            were facing on the tick the rung was reached. Driving through it
@@ -191,6 +193,69 @@
  * gives -- `FactionField.promote` refuses and this file treats a refusal as
  * "not this tick", which is the state `factions.ts`' contract tells every
  * caller to design for.
+ *
+ * ---------------------------------------------------------------------------
+ * 8. THE PURSUIT: THE PATROL CAR IS A CAR NOW, AND THAT IS TWO SENTENCES OF THE
+ *    OWNER'S ANSWERED WITH ONE OBJECT.
+ *
+ * The two reports were *"and actually chase u when u bad"* and *"also i couldnt
+ * head on collision"*, and until this round they were the same hole seen from
+ * two sides. A promoted actor is an id, a position, six pips and a feed line. It
+ * is **not a body** -- nothing in `server/sim.stepCars`' four contact sweeps had
+ * ever heard of one, so a Camry driven at 15 m/s into a highway patrol car went
+ * through it without a sound -- and it is **not a vehicle** -- so what stood in
+ * for driving was a `steerToward` at a fixed 25 m/s toward whichever lane vertex
+ * inside 70 m happened to be nearest the suspect, through the ambient fleet, the
+ * parked fleet and anybody's car standing in the road.
+ *
+ * Both are answered by making it what it looks like: a `driving.DrivenCar`
+ * record with a **sentinel driver**, `driving.NPC_DRIVER_ID`. Everything the
+ * driven fleet already does then applies with no new code anywhere --
+ * `sim.resolveCarContacts` gates on `driverId !== 0` and so gives it mass and a
+ * shunt, `CarField.damage` dents it, `sim.publishBlockers` publishes every
+ * record and so makes the timetable queue behind it, `MSG.CARS` carries its
+ * pose. What this file kept is what it always owned: **the rungs**. When a car
+ * is spawned, where, how many, when it stands down, and the two officers it puts
+ * out. What it handed over is the **steering**, to `game/pursuit.ts`, which is
+ * three-free on this file's own terms and holds the whole of the lane-follower:
+ * the node pick that has no adjacency list (a node is a lane vertex, the
+ * outgoing lanes are every direction leaving it, the score is the dot of that
+ * direction with the bearing to the suspect and there is no `atan2` in it), the
+ * speed that is the road's own plus 30 % capped by the corner radius, and the
+ * one `sqrt(2 a s)` that does the queue behind a held car and the stop eight
+ * metres off a stationary suspect with the same line.
+ *
+ * **The three objects, and which of them is the truth.** The `PursuitCar` in
+ * `game/pursuit.ts` is the driver -- it is `combat.CombatantState` for a car
+ * nobody is in, and `sim.fillCarBody`/`applyCarBody` read and write it exactly
+ * as they read a human's combatant. The `DrivenCar` record is the wire and the
+ * box. The `NpcActor` is still the hit box, the health, the kill feed and the
+ * picture, and `driveCars` **slaves its pose to the `PursuitCar` at the end of
+ * every tick** -- which is why the siren (`main.ts`' `nearestSiren`), the light
+ * bar's borrowed lamps (`world/highway-patrol.nearestPursuit`) and the bat all
+ * followed the new motion without one of them being told it had changed. The
+ * actor is the only one of the three the renderer reads, and that is deliberate:
+ * `world/drivencars.ts` refuses to draw a `CAR_NPC` record, or every patrol car
+ * in Sydney would have a Camry parked inside it.
+ *
+ * **What the ladder costs on the wire**, because rule 8 of DESIGN.md says a
+ * proposal states its cost. The actor was always there and is unchanged. The
+ * record is new and rides `driving.LOOSE_BROADCAST_TICKS` -- 10 Hz, the wreck
+ * cadence, for the wreck's reason: a patrol car's pose cannot be derived from a
+ * driver's snapshot because there is no driver. At `protocol.CAR_RECORD_BYTES`
+ * that is 320 B/s a car, and four cars in pursuit at once -- the four-suspect
+ * case, since `PATROL_CARS_PER_SUSPECT` is one -- is **1,280 B/s, 10.2 kbit/s a
+ * player**, against the eight-car wreck cap's 20 and PERFORMANCE.md's per-player
+ * budget. Measured rather than estimated: `server/pursuit-check.ts` section 5
+ * counts the bytes off the real `carDelta`.
+ *
+ * **What is deliberately not done here.** A patrol car is not in the run-down
+ * sweep -- `sim.stepCars` skips a `NPC_DRIVER_ID` record there on purpose,
+ * because that sweep credits a knockout to a driver and reports a crime against
+ * an id, and neither is a thing the authority can be. Knocking a player over
+ * with a patrol car stays this file's `PATROL_HIT_M` rule, which is tuned and
+ * which `server/police-check.ts` measures. Running an officer over on foot with
+ * a *patrol* car is a hole this round leaves open and says so.
  */
 
 import { type CombatantState } from './combat.ts';
@@ -241,7 +306,29 @@ import {
   polairShotFired,
   type PolairPose,
 } from './polair.ts';
-import { carHash, type LaneRoute, type TrafficField } from './traffic.ts';
+import { canBeRunDown, carHash, type LaneRoute, type TrafficField } from './traffic.ts';
+// The body layer, for the half of a patrol car that is a car. `game/driving.ts`
+// is three-free and is already imported by the Bun server, so this costs the
+// authority nothing new; what it buys is section 8 in one line -- a record with
+// `NPC_DRIVER_ID` at the wheel is in every contact sweep, every blocker roster
+// and every damage funnel the driven fleet already has.
+import { NPC_DRIVER_ID, headingYaw, type TakeableCar } from './driving.ts';
+// And the steering, which is `game/pursuit.ts`' whole job. See section 8 for
+// what stayed here and what went there.
+import {
+  PURSUIT_BODY,
+  PURSUIT_COLOUR,
+  PURSUIT_REST_SPEED,
+  createPursuitCar,
+  createPursuitScratch,
+  createPursuitView,
+  pursuitView,
+  stepPursuitCar,
+  type PursuitCar,
+  type PursuitScratch,
+  type PursuitView,
+  type PursuitWorld,
+} from './pursuit.ts';
 // WORKSTREAM W: one read, in `report`. See `game/teamfx.ts`.
 import {
   fxHeatFrozen,
@@ -637,7 +724,7 @@ export function shedPerTick(stars: number): number {
 // --- The pursuit car's private state ---------------------------------------------
 
 /**
- * Where one patrol car is steering, and how fast.
+ * Where one patrol car is steering, and how fast: `pursuit.PursuitCar`.
  *
  * Held here rather than on `NpcActor` for the reason `factions.NpcActor` states
  * about `seen`: that record is the **wire's** shape, eighteen bytes of it are
@@ -645,18 +732,16 @@ export function shedPerTick(stars: number): number {
  * reader has to be told to ignore. The car's *pose* -- position and unit heading
  * -- is on the actor and is what the renderer draws; the steering is the
  * authority's business alone.
+ *
+ * It **used to be four numbers declared here** -- a waypoint, a pick tick and a
+ * speed -- and it is now a `PursuitCar` in `game/pursuit.ts`, because the thing
+ * it describes stopped being "where is this actor walking" and started being
+ * "what is this car doing": a heading as a unit vector, a slip and a spin a
+ * shunt can write into, where on the lane graph it thinks it is, and the two
+ * ledgers that decide when it gives up. See section 8 of the header, and
+ * `sim.fillCarBody`, which reads this the way it reads a human driver's
+ * combatant.
  */
-interface CarDrive {
-  /** The lane point being steered at, world metres. */
-  wx: number;
-  wz: number;
-  /** The tick the waypoint was last chosen. See `PATROL_REPICK_TICKS`. */
-  pickedAt: number;
-  /** Metres a second, ramped rather than stepped. */
-  speed: number;
-  /** Whether it has stopped and put its officers out. Once only. */
-  disgorged: boolean;
-}
 
 // --- The field ----------------------------------------------------------------------
 
@@ -670,7 +755,7 @@ interface CarDrive {
  */
 export class HeatField {
   private readonly heat = new Map<number, HeatState>();
-  private readonly drives = new Map<number, CarDrive>();
+  private readonly drives = new Map<number, PursuitCar>();
 
   /**
    * Bumped whenever any player's star count changes.
@@ -716,6 +801,26 @@ export class HeatField {
    * and must not become one by accident.
    */
   private readonly polair: PolairPose = createPolairPose();
+  /**
+   * The pursuit's scratch: one world view, one query buffer, one pose, one
+   * choice, and a pool of `DriverView`s.
+   *
+   * **One of each for the whole field**, on the Polair pose's own argument two
+   * fields down: `driveCars` fills the world view, reads it and is done with it
+   * inside one call, so four patrol cars share one and the step allocates
+   * nothing. The view pool is the exception and grows to the number of cars,
+   * which is one per suspect.
+   */
+  private readonly pursuitWorld: PursuitWorld = {
+    lanes: null,
+    trafficTick: 0,
+    tick: 0,
+    groundHeight: () => 0,
+    collision: null,
+  };
+  private readonly pursuitScratch: PursuitScratch = createPursuitScratch();
+  private readonly viewPool: PursuitView[] = [];
+  private readonly viewScratch: PursuitView[] = [];
   private readonly marksman: NpcActor = {
     id: 0,
     kind: NPC_KIND.POLICE,
@@ -1012,7 +1117,7 @@ export class HeatField {
     // --- 6. And the things already in it.
     this.driveCars(ctx, world);
     this.stepRbts(ctx);
-    this.sweep(ctx);
+    this.sweep(ctx, world);
   }
 
   /**
@@ -1362,7 +1467,22 @@ export class HeatField {
     if (actor === null) return;
     actor.state = NPC_STATE.CHASE;
     h.cars.push(actor.id);
-    this.drives.set(actor.id, { wx: sx, wz: sz, pickedAt: 0, speed: 0, disgorged: false });
+    // --- And the **body**, which is section 8 and is the whole of the owner's
+    // *"i couldnt head on collision"*.
+    //
+    // The record is made here rather than in `driveCars` because a car that
+    // exists for a tick without one is a car a player can drive through for a
+    // tick, and because a refused take (`MAX_DRIVEN_CARS`, an exhausted
+    // allocator) is a thing this method already knows how to treat: it is
+    // `FactionField.promote` returning null, one line up, and the answer is the
+    // same -- not this tick. The actor is *not* rolled back on a refusal; a
+    // patrol car with no record is precisely the pre-workstream car, which
+    // drives and cannot be hit, and that is a better three-star response than
+    // none at all.
+    const drive = createPursuitCar(actor.id, h.playerId, actor.x, actor.y, actor.z, actor.dx, actor.dz);
+    const record = world.cars === null ? null : world.cars.take(patrolSource(actor.id, actor), NPC_DRIVER_ID);
+    drive.carId = record === null ? 0 : record.id;
+    this.drives.set(actor.id, drive);
     this.patrolCarsSpawned++;
   }
 
@@ -1457,6 +1577,35 @@ export class HeatField {
     h.rbtOfficers.length = 0;
     h.rbtPosts.length = 0;
     this.rbtsPlaced++;
+    // --- And the RBT's own car, as a **wall**. See `pursuit.PursuitCar.anchored`.
+    //
+    // The site is drawn as a marked car parked across a lane
+    // (`world/highway-patrol.ts`) and until this round that car was scenery in
+    // the strictest sense -- no box, no mass, in no sweep -- so a player drove
+    // through the one police vehicle in the game that is deliberately standing
+    // in the road. A record with the same sentinel driver a pursuit car carries,
+    // flagged anchored, is the whole fix: `sim.fillCarBody` makes the body
+    // `kinematic`, so it shunts what hits it and is not moved by it.
+    //
+    // It rides `this.drives` beside the pursuit cars because everything that
+    // owns one of those already covers it -- `sweep` releases the record when
+    // the actor goes, `pursuitViews` carries the pose, `pursuitCarOf` finds it
+    // for a contact -- and `driveCars` cannot touch it, because that loop filters
+    // on `NPC_KIND.HIGHWAY_PATROL` and an RBT is not one. Nothing ever calls
+    // `stepPursuitCar` on it, which is what "anchored" means in one sentence.
+    //
+    // The **cones are still not solid**, and that is the point: `RBT_LINE_HALF_M`
+    // is seven metres either side against a 4.6 m car, so evading a breath test
+    // by driving round the car is exactly as possible as it was, and ramming the
+    // car itself is now a crash rather than a nothing.
+    if (world.cars !== null) {
+      const wall = createPursuitCar(site.id, h.playerId, site.x, site.y, site.z, site.dx, site.dz, true);
+      const record = world.cars.take(patrolSource(site.id, site), NPC_DRIVER_ID);
+      if (record !== null) {
+        wall.carId = record.id;
+        this.drives.set(site.id, wall);
+      }
+    }
 
     // The two officers, one either side of the road, as real promoted actors.
     // See the `RBT` registration for why they are not part of the site actor.
@@ -1517,17 +1666,37 @@ export class HeatField {
   /**
    * Every patrol car, one tick.
    *
-   * The pursuit is a **lane-graph steer, not a path-find**, and the distinction
-   * is the same one `factions.walkToward` makes about officers on foot: what a
-   * steering car does when it loses you is end up on the wrong road, which is
-   * exactly what the decay timer is for. It picks the lane vertex that most
-   * reduces its distance to the suspect out of the ones near it, four times a
-   * second, and turns toward it at a bounded rate. With no lanes resident it
-   * drives straight at the suspect and slides off buildings, which is the
-   * honest degraded mode rather than a car that stops existing.
+   * **The rungs stayed here and the steering left.** See section 8 of the
+   * header: what this method still owns is every question about whether there
+   * should be a car -- the three-star gate, `PATROL_PURSUIT_M`'s leash, the
+   * knockdown, the two officers -- and what it hands to `game/pursuit.ts` is the
+   * one question it was bad at, which is where the car goes. That file's node
+   * pick is the lane graph read as a graph without one existing, its speed is
+   * the road's own plus thirty per cent capped by the corner radius, and its
+   * `sqrt(2 a s)` does the queue behind a held car and the stop eight metres off
+   * a stationary suspect with one line.
+   *
+   * The three poses are reconciled at the end of every car: the `PursuitCar` is
+   * the truth, the `NpcActor` is slaved to it (so the siren, the light bar and
+   * the bat follow with no code), and the `DrivenCar` record is carried by
+   * `CarField.follow` off the view this builds. A car that has been shunted
+   * arrives here with the contact already written into its `PursuitCar` by
+   * `sim.applyCarBody` -- exactly as a human driver arrives at `combat.advance`
+   * with theirs written onto their combatant.
    */
   private driveCars(ctx: FactionCtx, world: HeatWorld): void {
     if (this.drives.size === 0) return;
+    // The pursuit's view of the process, rebuilt in place rather than allocated:
+    // this runs per car per tick and an object literal a tick is the only thing
+    // in the method that could allocate. `ctx.tick` is the shared wall-clock
+    // tick for both clocks, which is what `PATROL_REPICK_TICKS` always read.
+    const pw = this.pursuitWorld;
+    pw.lanes = world.lanes;
+    pw.tick = ctx.tick;
+    pw.trafficTick = ctx.tick;
+    pw.groundHeight = ctx.groundHeight;
+    pw.collision = ctx.collision;
+
     for (const actor of ctx.field.actors) {
       if (actor.kind !== NPC_KIND.HIGHWAY_PATROL) continue;
       const drive = this.drives.get(actor.id);
@@ -1543,16 +1712,15 @@ export class HeatField {
       // train -- is a car chasing somebody who is no longer wanted, and it
       // would chase them for the rest of the session because nothing else in
       // this file despawns it. `health = -2` is `FactionField.step`'s despawn
-      // flag, the same one an officer walking home sets.
+      // flag, the same one an officer walking home sets. The record goes with
+      // it in `sweep`, which is where every other piece of this car's
+      // bookkeeping is already released.
       if (suspect === undefined || this.starsOf(actor.target) < 3) {
         actor.health = -2;
         continue;
       }
       const tx = suspect.body.position.x;
       const tz = suspect.body.position.z;
-      const dx = tx - actor.x;
-      const dz = tz - actor.z;
-      const d2 = dx * dx + dz * dz;
 
       // --- WORKSTREAM W: `Ghost Plates`' "highway patrol pursuit range
       // 300 -> 200 m against you".
@@ -1566,99 +1734,91 @@ export class HeatField {
       // forever is the bug the rung test was half of) and is the only place the
       // key has a home. Stated here because it is a behaviour change to the
       // untalented game and the lead should know that.
+      //
+      // Measured off the *car* rather than off the actor, which is now the same
+      // point by construction: `drive` is the truth and the actor is slaved to
+      // it at the bottom of this loop.
+      const rdx = tx - drive.x;
+      const rdz = tz - drive.z;
+      const d2 = rdx * rdx + rdz * rdz;
       const pursuit = fxPatrolRangeM(actor.target, PATROL_PURSUIT_M);
       if (d2 > pursuit * pursuit) {
         actor.health = -2;
         continue;
       }
 
-      // --- Arrived. Stop, and put two officers out. Once, and only for a
-      //     suspect somebody is still investigating -- `escalate`'s `pursued`
-      //     gate, applied to the third and last door heat puts a constable
-      //     through. Two officers disgorged onto a lapsed countdown are two
-      //     officers `POLICE.think` stands down and buries on the next tick,
-      //     and the `disgorged` latch would then hold the car's doors shut for
-      //     the rest of the stop. The car keeps its own vigil either way; it is
-      //     the ladder's actor and does not need an investigation to drive.
-      if (d2 <= PATROL_STOP_M * PATROL_STOP_M) {
-        drive.speed = 0;
+      // --- Drive. One call, and everything about how a car moves is inside it.
+      //
+      // The suspect's plan speed goes in because the arrival rule is about them
+      // and not about the car: a suspect who is *running* is chased, and one who
+      // is standing still is stopped eight metres short of. `game/pursuit.ts`
+      // takes it as a number rather than reading a combatant, because that file
+      // must not know what a combatant is.
+      const sv = suspect.body.velocity;
+      const suspectSpeed = Math.sqrt(sv.x * sv.x + sv.z * sv.z);
+      const range = stepPursuitCar(
+        drive, tx, tz, suspectSpeed, pw, ctx.dt, this.pursuitScratch, world.lanes,
+      );
+
+      // --- The actor follows the car. **This is the line that made the siren,
+      //     the beacons and the bat work without being told anything.**
+      //
+      // `main.ts`' `nearestSiren`, `world/highway-patrol.HighwayPatrolFleet` and
+      // `sim.npcHitTest` all read the actor and only the actor; slaving it here,
+      // after the drive and before anything else in the tick reads it, is what
+      // makes "the car moved" and "the police car on screen moved" one event.
+      actor.x = drive.x;
+      actor.y = drive.y;
+      actor.z = drive.z;
+      actor.dx = drive.dx;
+      actor.dz = drive.dz;
+
+      // --- Arrived, or given up. Both put the two officers out, and they are
+      //     genuinely the same event: a car that has stopped beside you and a
+      //     car that has stopped because it cannot reach you both mean two
+      //     constables on the footpath. The brief asks for the second in those
+      //     words -- *"the car parks and the officers pursue on foot"*.
+      //
+      // The `investigationOf` gate is `escalate`'s `pursued` clause, applied to
+      // the third and last door heat puts a constable through: two officers
+      // disgorged onto a lapsed countdown are two officers `POLICE.think` stands
+      // down and buries on the next tick, and the `disgorged` latch would then
+      // hold the car's doors shut for the rest of the stop.
+      const halted = drive.stopped || drive.parked
+        || (drive.speed < PURSUIT_REST_SPEED && d2 <= PATROL_STOP_M * PATROL_STOP_M);
+      if (halted) {
         actor.state = NPC_STATE.IDLE;
         if (!drive.disgorged && ctx.investigationOf(actor.target) !== undefined) {
           drive.disgorged = true;
           for (let side = 0; side < 2; side++) {
             const off = side === 0 ? 1.6 : -1.6;
-            const ox = actor.x + actor.dz * off;
-            const oz = actor.z - actor.dx * off;
+            const ox = drive.x + drive.dz * off;
+            const oz = drive.z - drive.dx * off;
             const officer = ctx.field.promote(
               NPC_KIND.POLICE,
-              ox, ctx.groundHeight(ox, oz, actor.y), oz,
-              actor.dx, actor.dz,
+              ox, ctx.groundHeight(ox, oz, drive.y), oz,
+              drive.dx, drive.dz,
               actor.target,
             );
             if (officer === null) break;
             ctx.field.bark(officer, ctx);
           }
         }
-        continue;
+      } else {
+        // Somebody they had stopped for has run: back on the road.
+        drive.disgorged = false;
+        actor.state = NPC_STATE.CHASE;
       }
-      // Somebody they had stopped for has run: back on the road.
-      drive.disgorged = false;
-      actor.state = NPC_STATE.CHASE;
-
-      // --- The waypoint, re-picked four times a second.
-      if (ctx.tick - drive.pickedAt >= PATROL_REPICK_TICKS || drive.pickedAt === 0) {
-        drive.pickedAt = ctx.tick;
-        drive.wx = tx;
-        drive.wz = tz;
-        const lanes = world.lanes;
-        if (lanes !== null) {
-          lanes.near(actor.x, actor.z, PATROL_LANE_REACH, this.routes);
-          let bestScore = Infinity;
-          for (const r of this.routes) {
-            for (let i = 0; i < r.count; i += 5) {
-              const vx = r.x[i] - actor.x;
-              const vz = r.z[i] - actor.z;
-              const vd2 = vx * vx + vz * vz;
-              // Only points genuinely ahead of the car and not on top of it:
-              // a waypoint behind the bumper is a three-point turn at 90 km/h.
-              if (vd2 < 36 || vd2 > PATROL_LANE_REACH * PATROL_LANE_REACH) continue;
-              if (vx * actor.dx + vz * actor.dz <= 0) continue;
-              const px = r.x[i] - tx;
-              const pz = r.z[i] - tz;
-              // Distance from the *suspect*, so the car follows the road that
-              // gets it there rather than the road it is already on.
-              const score = px * px + pz * pz;
-              if (score >= bestScore) continue;
-              bestScore = score;
-              drive.wx = r.x[i];
-              drive.wz = r.z[i];
-            }
-          }
-        }
-      }
-
-      // --- Steer. A bounded turn toward the waypoint, then integrate.
-      steerToward(actor, drive.wx, drive.wz, ctx.dt);
-      const wantSpeed = PATROL_SPEED;
-      drive.speed += Math.min(8 * ctx.dt, Math.max(-14 * ctx.dt, wantSpeed - drive.speed));
-      const step = drive.speed * ctx.dt;
-      let nx = actor.x + actor.dx * step;
-      let nz = actor.z + actor.dz * step;
-      if (ctx.collision) {
-        // The player's own resolver, so a car takes the corner a player would
-        // and cannot drive through a terrace. A car that is wedged simply stops,
-        // which is what `walkToward` already accepts for an officer on foot.
-        const moved = ctx.collision.resolve(actor.x, actor.z, nx, nz, PATROL_RADIUS, actor.y + 0.5);
-        if (Math.abs(moved.x - nx) > 0.01 || Math.abs(moved.z - nz) > 0.01) drive.speed *= 0.4;
-        nx = moved.x;
-        nz = moved.z;
-      }
-      actor.x = nx;
-      actor.z = nz;
-      actor.y = ctx.groundHeight(nx, nz, actor.y);
 
       // --- Contact. The same knockdown a Camry gives, through the authority's
       // own damage door so the KO, the feed and the respawn are one machine.
+      //
+      // **Still here rather than in the contact sweeps**, and the reason is
+      // stated in section 8: `sim.stepCars`' run-down sweep credits a knockout
+      // to a driver and reports a crime against an id, and the authority is
+      // neither. So a patrol car is skipped there and this rule -- which is
+      // tuned, and which `server/police-check.ts` measures -- is what running
+      // somebody over in one still costs.
       //
       // `policeMayHarm` here for the marksman's reason one method up: patrol
       // cars arrive at three stars and the loop above already retires one whose
@@ -1666,9 +1826,30 @@ export class HeatField {
       // asked anyway because the bumper is police damage and every piece of
       // police damage in this build asks the same question in the same words.
       if (
-        d2 <= PATROL_HIT_M * PATROL_HIT_M &&
+        range <= PATROL_HIT_M &&
         suspect.phase !== 'ko' &&
         suspect.health > 0 &&
+        // --- **...and not somebody who is in a car**, which is workstream T's
+        //     `canBeRunDown` applied to the one bumper in the game that had
+        //     never been asked.
+        //
+        // This bumper is a *capsule* test against the suspect's body, and a
+        // suspect sitting in a car has their body in the middle of it -- so a
+        // patrol car nosing into the front of a player's Camry found the driver
+        // 2.6 m away and threw them over their own bonnet, and the car-on-car
+        // contact that should have been the whole event never happened because
+        // there was nobody left driving. That is the owner's older report --
+        // *"I still get knocked out of cars when crashing into another car, the
+        // actual action should be damage to both cars"* -- arriving again
+        // through the one door workstream T did not close, and
+        // `server/pursuit-check.ts` section 4 is what found it: a head-on that
+        // charged fourteen metres a second of damage to a car with nobody in it.
+        //
+        // The contact is not lost, it is *relocated*: a patrol car is a
+        // `DrivenCar` now (section 8), so hitting a player's car is
+        // `sim.resolveCarContacts` -- both cars dented, both shunted, the driver
+        // still driving.
+        canBeRunDown(suspect) &&
         policeMayHarm(suspect.id)
       ) {
         // --- WORKSTREAM W: `Right of Way` / `Sirens Are Music`: highway patrol
@@ -1688,6 +1869,51 @@ export class HeatField {
     }
   }
 
+  /**
+   * Every patrol car's `driving.DriverView`, for `CarField.follow`.
+   *
+   * The authority calls this once a tick and pushes what it yields onto the
+   * views it already builds for its human drivers (`sim.stepCars`). That is the
+   * whole of "a patrol car is carried by the same sweep a stolen Camry is": one
+   * more row in one array, and `follow` does not know or care that the id in it
+   * is not a person's.
+   *
+   * The array and the rows in it are this field's and are reused, on
+   * `sim.publishBlockers`' rule: this runs every tick and a fresh view per car
+   * per tick is the only thing in the path that would allocate.
+   */
+  pursuitViews(): readonly PursuitView[] {
+    const out = this.viewPool;
+    out.length = 0;
+    for (const drive of this.drives.values()) {
+      if (drive.carId === 0) continue;
+      while (this.viewScratch.length <= out.length) this.viewScratch.push(createPursuitView());
+      out.push(pursuitView(drive, this.viewScratch[out.length]));
+    }
+    return out;
+  }
+
+  /**
+   * The pursuit state behind a car record, or undefined.
+   *
+   * `sim.fillCarBody` and `sim.applyCarBody` ask this the way they ask
+   * `participants.get` about a human driver, and the symmetry is the point: a
+   * shunt that lands on a patrol car has to be written where the *driver* keeps
+   * its velocity, or `CarField.follow` overwrites it with the pre-contact number
+   * on the same tick. Linear in patrol cars, which is one per suspect.
+   */
+  pursuitCarOf(recordId: number): PursuitCar | undefined {
+    if (recordId === 0) return undefined;
+    for (const drive of this.drives.values()) if (drive.carId === recordId) return drive;
+    return undefined;
+  }
+
+  /** Every live patrol car's record id. The authority's broadcast reads it. */
+  pursuitRecordIds(out: number[] = []): number[] {
+    out.length = 0;
+    for (const drive of this.drives.values()) if (drive.carId !== 0) out.push(drive.carId);
+    return out;
+  }
   /**
    * Every RBT, one tick: is anybody standing at it, or driving through it?
    *
@@ -1792,10 +2018,26 @@ export class HeatField {
    * Last in the step, after everything has read the lists -- `FactionField.step`
    * puts its despawn sweep in the same place for the same reason.
    */
-  private sweep(ctx: FactionCtx): void {
+  private sweep(ctx: FactionCtx, world: HeatWorld): void {
     const live = new Set<number>();
     for (const a of ctx.field.actors) live.add(a.id);
-    for (const id of [...this.drives.keys()]) if (!live.has(id)) this.drives.delete(id);
+    for (const id of [...this.drives.keys()]) {
+      if (live.has(id)) continue;
+      // --- **And the record goes with the actor.** The one line that keeps the
+      // driven fleet honest about a patrol car.
+      //
+      // A `DrivenCar` nobody removes is a car standing in the road for the rest
+      // of the session: `recycleFarthest` skips it (it has a driver),
+      // `recycleLooseIds` skips it (it is not loose and has a last driver), and
+      // `publishBlockers` would go on holding the whole street up behind a
+      // police car that despawned twenty minutes ago. Removal is the same
+      // `CarField.remove` a recycled car takes, and it reaches every client as
+      // a `CAR_REMOVED` on the next `MSG.CARS` -- which is exactly what the
+      // actor's own despawn does one tier up.
+      const drive = this.drives.get(id);
+      if (drive !== undefined && drive.carId !== 0 && world.cars !== null) world.cars.remove(drive.carId);
+      this.drives.delete(id);
+    }
     for (const [id, h] of [...this.heat]) {
       for (let i = h.cars.length - 1; i >= 0; i--) {
         if (!live.has(h.cars[i])) h.cars.splice(i, 1);
@@ -1812,6 +2054,42 @@ export class HeatField {
   }
 }
 
+/**
+ * The `driving.TakeableCar` a patrol car's record is made out of.
+ *
+ * A patrol car is **not stolen from anything**, which is what makes this
+ * function three lines rather than a query. Every other `DrivenCar` in the game
+ * comes out of the timetable or off a kerb, so its `identity` names an ambient
+ * car that then has to be suppressed; this one is minted, has no ambient copy,
+ * and suppresses nothing.
+ *
+ * The identity is therefore only required to be **unique and stable for the
+ * life of the car**, and it is hashed off the actor id with a constant of its
+ * own so it lands in a third space rather than colliding with
+ * `traffic.identityOf`'s or `traffic.staticCarIdentity`'s. A collision would not
+ * be catastrophic -- `CarField.take` refuses a duplicate identity and the car
+ * simply has no body that tick, which is the pre-workstream behaviour -- but a
+ * pursuit that silently failed one time in four billion is worth one `carHash`.
+ *
+ * `parked` is false: this is a car arriving, not a car at a kerb, and the flag's
+ * only reader is the bay snap.
+ */
+function patrolSource(actorId: number, at: { x: number; y: number; z: number; dx: number; dz: number }): TakeableCar {
+  return {
+    identity: carHash(actorId | 0, 0x50_11_ce),
+    body: PURSUIT_BODY,
+    colour: PURSUIT_COLOUR,
+    x: at.x,
+    y: at.y,
+    z: at.z,
+    // `headingYaw`'s one `atan2` is `driving.ts`' own sanctioned exception and
+    // the value is quantised to a `u16` by `encodeCars` before anybody else sees
+    // it. Once per spawn, which is once per suspect per rung.
+    yaw: headingYaw(at.dx, at.dz),
+    parked: false,
+  };
+}
+
 /** The nearest thing to a lookup this file needs. Ascending id; the tick order. */
 function findCombatant(list: readonly CombatantState[], id: number): CombatantState | undefined {
   if (id < 0) return undefined;
@@ -1819,43 +2097,14 @@ function findCombatant(list: readonly CombatantState[], id: number): CombatantSt
   return undefined;
 }
 
-/**
- * Turn an actor's unit heading toward a point, at most `PATROL_TURN_RATE` a
- * second, without ever touching an angle.
- *
- * No `atan2` and no `sin`: the turn is done as a **rotation of the heading
- * vector toward the target vector**, clamped by the cross product, which is
- * `factions.ts`'s rule 5 taken literally. The small-angle rotation is a first
- * order step normalised back to unit length -- exact enough at 60 Hz for a
- * quantity that is re-normalised every tick, and identical in both engines
- * because it is four multiplies and a square root.
+/*
+ * `steerToward` used to live here: an actor's unit heading turned toward a
+ * point by a clamped cross product, with no angle formed anywhere. It moved to
+ * `pursuit.turnToward` with the rest of the driving, because the only caller
+ * was the patrol car and a rotation that lived in this file while the thing it
+ * rotated lived in that one is the split section 8 exists to have none of. The
+ * arithmetic is unchanged and so is the argument for it -- see that function.
  */
-function steerToward(actor: NpcActor, tx: number, tz: number, dt: number): void {
-  const dx = tx - actor.x;
-  const dz = tz - actor.z;
-  const d2 = dx * dx + dz * dz;
-  if (d2 < 1e-6) return;
-  const inv = 1 / Math.sqrt(d2);
-  const wx = dx * inv;
-  const wz = dz * inv;
-  // Cross product in the plane: positive when the target is to one side.
-  const cross = actor.dx * wz - actor.dz * wx;
-  const dot = actor.dx * wx + actor.dz * wz;
-  const maxTurn = PATROL_TURN_RATE * dt;
-  // Already pointing there, within the step this tick could take.
-  if (dot > 0 && Math.abs(cross) <= maxTurn) {
-    actor.dx = wx;
-    actor.dz = wz;
-    return;
-  }
-  const s = cross >= 0 ? maxTurn : -maxTurn;
-  const nx = actor.dx - actor.dz * s;
-  const nz = actor.dz + actor.dx * s;
-  const len = Math.sqrt(nx * nx + nz * nz);
-  if (len < 1e-6) return;
-  actor.dx = nx / len;
-  actor.dz = nz / len;
-}
 
 // --- The world this needs beyond the faction context -------------------------------
 
@@ -1872,6 +2121,27 @@ function steerToward(actor: NpcActor, tx: number, tz: number, dt: number): void 
 export interface HeatWorld {
   /** The lane graph, for the pursuit and the RBT. Null before any tile is resident. */
   lanes: TrafficField | null;
+  /**
+   * The driven fleet, so a patrol car can **be** one. See section 8.
+   *
+   * Structurally typed rather than `driving.CarField` named, on
+   * `FactionCtx.roads`' own rule: this file needs two methods and naming the
+   * class would tie the ladder to a constructor it never calls. `null` is the
+   * honest answer for a process with no fleet -- `verifyHeat` builds one, and a
+   * patrol car in that world is an actor without a body, which is exactly what
+   * shipped before this round and is a degradation rather than a crash.
+   *
+   * The take is `take(source, driverId)` verbatim: the source is a
+   * `driving.TakeableCar` this file synthesises (`patrolSource`), because a
+   * patrol car is not stolen from the timetable and has no ambient copy to
+   * suppress. Its identity is hashed out of the actor id into a space neither
+   * `traffic.identityOf` nor `traffic.staticCarIdentity` can reach by
+   * construction -- see `patrolSource`.
+   */
+  cars: {
+    take(source: TakeableCar, driverId: number): { id: number } | null;
+    remove(id: number): boolean;
+  } | null;
   /**
    * What this player's train is doing: **-2 on foot**, **-1 aboard and moving**,
    * or the index of the stop it is standing at.
@@ -2232,7 +2502,7 @@ function verifyLadder(): string[] {
     const combatant = stubCombatant(7);
     const field = stubField();
     const ctx = stubCtx(field, [combatant]);
-    const world: HeatWorld = { lanes: null, rideStop: () => -2 };
+    const world: HeatWorld = { lanes: null, cars: null, rideStop: () => -2 };
 
     // One bystander assault: one star, and the star has to appear on the very
     // next step rather than a tick later.
@@ -2290,7 +2560,7 @@ function verifyLadder(): string[] {
 
     // The train. Boarding halves, and pulling out of a station sheds a star.
     let stop = -2;
-    const riding: HeatWorld = { lanes: null, rideStop: () => stop };
+    const riding: HeatWorld = { lanes: null, cars: null, rideStop: () => stop };
     heat.report(7, REASON.MURDER_POLICE, WITNESS_KIND.POLICE);
     ctx.tick++;
     heat.step(ctx, riding);
@@ -2377,7 +2647,7 @@ function verifyMarksman(): string[] {
       }
     };
 
-    const world: HeatWorld = { lanes: null, rideStop: () => -2 };
+    const world: HeatWorld = { lanes: null, cars: null, rideStop: () => -2 };
     drive(world, 5, 20);
     if (heat.polairShots === 0) {
       failures.push(
@@ -2413,7 +2683,7 @@ function verifyMarksman(): string[] {
     // --- And a bot: nothing either, even at five.
     heat.reset(11);
     const beforeBot = heat.polairShots;
-    drive({ lanes: null, rideStop: () => -2, isBot: () => true }, 5, 3);
+    drive({ lanes: null, cars: null, rideStop: () => -2, isBot: () => true }, 5, 3);
     if (heat.polairShots !== beforeBot) {
       failures.push(
         `${heat.polairShots - beforeBot} rounds were fired at a bot. HeatWorld.isBot is not being consulted, ` +
@@ -2483,7 +2753,7 @@ function verifyStandDown(): string[] {
   try {
     const field = new FactionField();
     const combatant = stubCombatant(7);
-    const world: HeatWorld = { lanes: null, rideStop: () => -2 };
+    const world: HeatWorld = { lanes: null, cars: null, rideStop: () => -2 };
     const ctx: FactionCtx = {
       tick: 1000,
       dt: 1 / 60,

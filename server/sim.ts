@@ -118,6 +118,10 @@ import {
   // the layer and `game/driving.ts` section 7 for what a car is to it.
   KNOCK_LOOSE_SPEED,
   LOOSE_BROADCAST_TICKS,
+  // The sentinel a patrol car's record carries in place of a driver, and the
+  // one `atan2` its pose crosses into the body layer through. See
+  // `driving.NPC_DRIVER_ID` and `game/heat.ts` section 8.
+  NPC_DRIVER_ID,
   NOSE_HEAD,
   NOSE_RADIUS,
   NOSE_STEP,
@@ -249,6 +253,10 @@ import {
   type HeatWorld,
   type HeatRecord,
 } from '../client/src/game/heat.ts';
+// And the pursuit's one number this file needs: what a marked highway patrol car
+// weighs, which is not what the sedan box it collides as weighs. See
+// `pursuit.PURSUIT_MASS`.
+import { PURSUIT_MASS } from '../client/src/game/pursuit.ts';
 // --- Workstream E: the five characters and the ambient events.
 //
 // Same terms again: both modules import no three and both register only bytes
@@ -1171,6 +1179,8 @@ export class Simulation {
   private readonly looseSweep: DrivenCar[] = [];
   /** And the player roster the twenty-second recycler reads. See `playersXZ`. */
   private readonly loosePlayersXZ: number[] = [];
+  /** The patrol car record ids, for the 10 Hz pursuit broadcast. Reused. */
+  private readonly pursuitIds: number[] = [];
   /**
    * The collision world as `CarField.integrateLoose` wants it, bound once.
    *
@@ -1622,6 +1632,32 @@ export class Simulation {
     // `game/heat.ts` imported the rail bake to work it out again.
     this.heatWorld = {
       lanes: world.traffic,
+      // And the driven fleet, which is where a patrol car's **body** comes
+      // from. `game/heat.ts` section 8: the ladder mints a `DrivenCar` with
+      // `driving.NPC_DRIVER_ID` at the wheel and everything the driven fleet
+      // already does -- the contact sweeps, the damage funnel, the blocker
+      // roster, `MSG.CARS` -- applies to it with no new code in this file
+      // beyond the three lines `fillCarBody`, `applyCarBody` and the run-down
+      // sweep each grew.
+      cars: {
+        take: (source, driverId) => this.cars.take(source, driverId),
+        // --- **The removal has to reach the wire**, and this wrapper is the
+        //     only reason this is not just `this.cars`.
+        //
+        // `CarField.remove` deletes the record and tells nobody: every other
+        // caller in this file follows it with a push onto `carRemovals`, which
+        // is what becomes a `CAR_REMOVED` row in the next `MSG.CARS`
+        // (`carDelta`). `heat.HeatField.sweep` calls this when a patrol car's
+        // actor despawns, and without the push every client in the room would
+        // keep a ghost police car standing in the road for the rest of the
+        // session -- solid to their contact prediction, and drawn by nothing,
+        // because `world/drivencars.ts` refuses to draw a `CAR_NPC` record.
+        remove: (id) => {
+          const gone = this.cars.remove(id);
+          if (gone) this.carRemovals.push(id);
+          return gone;
+        },
+      },
       rideStop: (id) => this.rideStop(id),
       // And who is a bot, which only Polair's marksman asks: a helicopter firing
       // rounds at a bot is a pip nobody sees taken off somebody nobody is
@@ -2244,7 +2280,7 @@ export class Simulation {
   /**
    * The next player id, per `protocol.AOI_ID_LIFECYCLE`.
    *
-   * Ascending from 1, **wrapping at 65535 and skipping anybody currently live**,
+   * Ascending from 1, **wrapping at 65534 and skipping anybody currently live**,
    * which is protocol v8's requirement and was a latent bug before it: `nextId`
    * was an unbounded JavaScript number written to the wire as a `u8`, so a long
    * session with churn eventually handed out an id that aliased onto somebody
@@ -2265,7 +2301,12 @@ export class Simulation {
   private allocateId(): number {
     for (let attempt = 0; attempt <= 65535; attempt++) {
       const id = this.nextId;
-      this.nextId = this.nextId >= 65535 ? 1 : this.nextId + 1;
+      // Wraps at 65,534, not 65,535: the top of the `u16` is reserved as
+      // `driving.NPC_DRIVER_ID`, the sentinel a patrol car's `DrivenCar` record
+      // carries in place of a driver. A participant handed that id two days into
+      // a busy server would inherit every highway patrol car in the room, which
+      // is exactly the class of aliasing this allocator's own note is about.
+      this.nextId = this.nextId >= 65534 ? 1 : this.nextId + 1;
       if (!this.participants.has(id)) return id;
     }
     // Unreachable: 65,535 ids against a room cap in the hundreds. Throwing
@@ -4755,6 +4796,17 @@ export class Simulation {
       });
     }
 
+    // --- And the cars the **authority** is driving.
+    //
+    // One more row per patrol car in the array `follow` is about to read, and
+    // that is the whole of "a patrol car is carried by the same sweep a stolen
+    // Camry is". `heat.HeatField.pursuitViews` builds them off the
+    // `pursuit.PursuitCar`s it owns; `follow` neither knows nor cares that the
+    // id in them is `driving.NPC_DRIVER_ID` rather than a person's, which is the
+    // argument for the sentinel in the first place. `main.ts`' offline sweep
+    // pushes the identical rows onto the identical array.
+    for (const view of this.heat.pursuitViews()) this.driverViews.push(view);
+
     // --- What everybody drove into. Drained before `follow`, because a crash
     // that killed the driver has already cleared `drivingCar` and the sweep is
     // about to leave the car in the road -- and the wall still happened.
@@ -4937,6 +4989,17 @@ export class Simulation {
     // the same timetable.
     for (const car of this.cars.all()) {
       if (car.driverId === 0) continue;
+      // --- **Not the patrol cars.** `game/heat.ts` section 8 carries the
+      // argument and it is worth the two lines here as well: every branch below
+      // has a driver's *name* in it -- `creditKo(car.driverId, ...)` puts a
+      // knockout on a scoreboard, `reportCrime(car.driverId, ...)` accuses
+      // somebody of dangerous driving, and `participants.get` is asked for a
+      // body to attribute a strike to. The authority is none of those, and a
+      // knockout credited to player 65,535 is a row on a ladder nobody can
+      // click. What running somebody down in a patrol car costs is
+      // `heat.PATROL_HIT_M`, which is tuned and which `server/police-check.ts`
+      // measures.
+      if (car.driverId === NPC_DRIVER_ID) continue;
       const speed = car.speed < 0 ? -car.speed : car.speed;
       if (speed < RUN_DOWN_SPEED) continue;
       const pose = drivenCarPose(car, this.drivenPose);
@@ -5112,6 +5175,34 @@ export class Simulation {
       // makes is about a car nobody is near. `CarField.recycleLoose` is
       // O(loose cars x players) and both are counted in ones, but a sweep that
       // does nothing sixty times a second is still a sweep.
+      // --- And the patrol cars, on the identical cadence and for the identical
+      //     reason. `game/heat.ts` section 8, and `protocol.CarRecord.npc`.
+      //
+      // A patrol car is the second object in this game whose pose cannot be
+      // derived from a driver's snapshot record, so it is the second one that
+      // has to be *sent* -- and `CarField.follow` will not send it, because
+      // `follow` only reports records whose driver **changed**, which for a car
+      // the authority is driving is never. Ten hertz rather than sixty on the
+      // wreck's arithmetic: 32 bytes at 10 Hz is 320 B/s a car, and four cars in
+      // pursuit is 10.2 kbit/s a player against the 61 sixty hertz would cost.
+      // The client dead-reckons in between (`pursuit.advancePursuitMirror`) and
+      // draws the *actor*, which arrives at the snapshot rate -- so what these
+      // bytes actually buy is the body the local driver's head-on prediction is
+      // run against, which is the owner's *"i couldnt head on collision"*.
+      if (this.tick % LOOSE_BROADCAST_TICKS === 0) {
+        // Once a second is enough for a car that is standing still, and the RBT's
+        // is standing still for the whole of its life (`pursuit.PursuitCar.anchored`).
+        // It still has to be sent *sometimes*, because `follow` never will and a
+        // record no client holds is a wall nobody can predict hitting -- so a
+        // stationary patrol car costs 32 B/s and a moving one 320.
+        const slow = this.tick % TICK_HZ === 0;
+        for (const id of this.heat.pursuitRecordIds(this.pursuitIds)) {
+          const car = this.cars.get(id);
+          if (car === undefined) continue;
+          const moving = car.speed !== 0 || car.slip !== 0 || car.yawRate !== 0;
+          if (moving || slow) this.carChanges.push(car);
+        }
+      }
       if (this.tick % TICK_HZ === 0 && this.cars.looseCount > 0) {
         this.loosePlayersXZ.length = 0;
         for (const p of this.ordered) {
@@ -5674,6 +5765,40 @@ export class Simulation {
    * decimal by `server/cardamage-check.ts`.
    */
   private fillCarBody(car: DrivenCar, out: RigidBody): RigidBody {
+    // --- The authority's own car. `game/heat.ts` section 8.
+    //
+    // A patrol car's driver is not a participant, it is a `pursuit.PursuitCar`
+    // on the heat field -- and it is *exactly* a driver in the sense this method
+    // cares about: the record is a copy carried by `CarField.follow` at the end
+    // of the tick and the live pose is the driver's. Reading the record here
+    // would separate a pair of cars from where they were a tick ago, which is
+    // the bug the human branch below exists to avoid and which
+    // `server/carcrash-check.ts` section 1 convicts.
+    //
+    // The **mass is overridden** and nothing else is: `pursuit.PURSUIT_MASS`,
+    // because a marked highway patrol car is a bull bar, a cage and two officers
+    // on top of the sedan box it collides as. See that constant.
+    const npc = car.driverId === NPC_DRIVER_ID ? this.heat.pursuitCarOf(car.id) : undefined;
+    if (npc !== undefined) {
+      carRigidBody(
+        {
+          body: car.body,
+          x: npc.x,
+          z: npc.z,
+          yaw: headingYaw(npc.dx, npc.dz),
+          speed: npc.speed,
+          slip: npc.slip,
+          yawRate: npc.yawRate,
+        },
+        out,
+      );
+      out.mass = PURSUIT_MASS;
+      // The RBT's car, which is a wall: `kinematic` is an inverse mass of zero
+      // (`rigid.rigidInvMass`), so it shunts whatever hits it and is not moved.
+      // See `pursuit.PursuitCar.anchored`.
+      out.kinematic = npc.anchored;
+      return out;
+    }
     const driver = car.driverId === 0 ? undefined : this.participants.get(car.driverId);
     if (driver !== undefined && driver.combat.drivingCar === car.id) {
       const c = driver.combat;
@@ -5707,6 +5832,36 @@ export class Simulation {
    * untouched.
    */
   private applyCarBody(car: DrivenCar, body: RigidBody, pushX: number, pushZ: number): void {
+    // --- The authority's own car, on `fillCarBody`'s argument read backwards.
+    //
+    // The shunt has to land on the **`PursuitCar`** and not on the record,
+    // because `CarField.follow` runs later in this same tick and would copy the
+    // pre-contact velocity straight back over it -- which is the whole reason a
+    // human driver's shunt is written to their combatant rather than to their
+    // car. The separation goes through the collision world for that branch's
+    // stated reason: a police car shoved sideways must not end up in a
+    // shopfront.
+    const npc = car.driverId === NPC_DRIVER_ID ? this.heat.pursuitCarOf(car.id) : undefined;
+    if (npc !== undefined) {
+      // A wall takes nothing away from the contact. `rigidSeparate` and
+      // `rigidResolve` already give a kinematic body zero of both, so this is a
+      // statement rather than an arithmetic difference -- and a statement is
+      // what stops the next reader wondering whether an RBT can be pushed.
+      if (npc.anchored) return;
+      npc.speed = rigidAlong(body);
+      npc.slip = rigidSlip(body);
+      npc.yawRate = body.yawRate;
+      if (pushX !== 0 || pushZ !== 0) {
+        const moved = this.pushBody(npc.x, npc.z, npc.x + pushX, npc.z + pushZ, npc.y);
+        npc.x = moved.x;
+        npc.z = moved.z;
+      }
+      // Deliberately **not** `loose`: a patrol car that has been hit is still
+      // being driven, and flagging it would hand it to `integrateLoose` on both
+      // ends and have two processes rolling a police car the authority is
+      // steering. See `protocol.CarRecord.npc`.
+      return;
+    }
     const driver = car.driverId === 0 ? undefined : this.participants.get(car.driverId);
     if (driver !== undefined && driver.combat.drivingCar === car.id) {
       const c = driver.combat;

@@ -1045,7 +1045,26 @@ export const MSG = {
  * separate the same pair of cars in different directions. See that file's
  * header, and `game/driving.ts` section 7.
  */
-export const PROTOCOL_VERSION = 34;
+/*
+ * v35: the patrol car drives, and is a car.
+ *
+ * One new record flag, `CAR_NPC`, in the byte `CAR_REMOVED`/`CAR_LOOSE`/
+ * `CAR_SHUNT` already share -- so `CAR_RECORD_BYTES` did not move and a v34
+ * client would not mis-stride a v35 frame. The number moves anyway, and for the
+ * reason the v34 note gives about `rigid.ts` rather than the one it gives about
+ * the stride: a v34 client reading a v35 `CARS` frame sees a record with a
+ * `driver` of 65,535 and no flag it understands, so it draws a civilian Camry on
+ * top of the police car `world/highway-patrol.ts` is already drawing at the same
+ * spot, predicts contacts against a body it thinks is parked, and offers it to
+ * the take arbitration. A silent double car in the middle of a pursuit is
+ * exactly the class of failure this number exists to refuse.
+ *
+ * And a **generator change** beside it: `game/pursuit.ts` is a shared
+ * computation in the same sense `rigid.ts` is -- the offline browser runs it as
+ * the authority -- and two ends on different versions of the lane-follower would
+ * put the same patrol car down two different streets.
+ */
+export const PROTOCOL_VERSION = 35;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;
@@ -3661,6 +3680,32 @@ export interface CarRecord {
    * fuse's own adopt clause makes the same argument in the same words.
    */
   shunt?: boolean;
+  /**
+   * Is the **authority** driving this one? `CAR_NPC`, and `driver` is
+   * `CAR_NPC_DRIVER`.
+   *
+   * A highway patrol car in pursuit (`game/pursuit.ts`). It is a `DrivenCar` in
+   * every sense that matters to this wire -- it has a pose, a health byte, a
+   * body index and a velocity, and it is broadcast at the loose cadence because
+   * it is the second object in this game whose motion cannot be derived from a
+   * driver's snapshot record. What it is *not* is anybody's: no combatant on
+   * either end has `drivingCar` pointing at it.
+   *
+   * The flag is redundant with the `driver` value and is here anyway, on
+   * `CAR_LOOSE`'s own argument one field up: a reader that had to compare
+   * `driver` against a constant to know whether to draw a Camry over the top of
+   * a police car is a reader that will one day be written without the constant.
+   * It costs nothing -- the byte `CAR_REMOVED` sat alone in has four spare bits
+   * -- and it is what makes the record say what it is.
+   *
+   * What a client does with it is refuse three things: do not draw it
+   * (`world/drivencars.ts` -- `world/highway-patrol.ts` draws the actor, which
+   * is the same car with a light bar on it), do not integrate it as a wreck
+   * (`CAR_LOOSE` is never set on one), and do not let anybody take it. What it
+   * does *do* is enter the contact prediction, which is the whole of the owner's
+   * *"also i couldnt head on collision"*.
+   */
+  npc?: boolean;
   /** True for "this record is gone", and then every field but `id` is meaningless. */
   removed?: boolean;
 }
@@ -3682,6 +3727,19 @@ export const CAR_REMOVED = 1 << 0;
 export const CAR_LOOSE = 1 << 1;
 /** Record flag: this record is the result of an impact. See `CarRecord.shunt`. */
 export const CAR_SHUNT = 1 << 2;
+/** Record flag: the authority is driving it. See `CarRecord.npc`. */
+export const CAR_NPC = 1 << 3;
+
+/**
+ * The `driver` a `CAR_NPC` record carries. `driving.NPC_DRIVER_ID`.
+ *
+ * Repeated here rather than imported for the reason `CAR_HEALTH_FULL` is: the
+ * *encoder* needs it and this file may not import `game/driving.ts` -- the
+ * dependency runs the other way. `verifyDriving` asserts the two agree, and
+ * `verifyNet` asserts that this value is outside the id space
+ * `sim.allocateId` hands out.
+ */
+export const CAR_NPC_DRIVER = 65535;
 
 export const CARS_HEADER_BYTES = 4;
 /**
@@ -3792,7 +3850,11 @@ export function encodeCars(cars: readonly CarRecord[], full = false): ArrayBuffe
     v.setUint8(p + 8, ((c.body & 0x0f) << 4) | (c.colour & 0x0f));
     v.setUint8(
       p + 9,
-      (c.removed ? CAR_REMOVED : 0) | (c.loose ? CAR_LOOSE : 0) | (c.shunt ? CAR_SHUNT : 0),
+      (c.removed ? CAR_REMOVED : 0) | (c.loose ? CAR_LOOSE : 0) | (c.shunt ? CAR_SHUNT : 0)
+        // Derived from the driver rather than trusted from the caller, so the
+        // flag and the id cannot disagree: there is one fact here and the flag
+        // is a restatement of it. See `CarRecord.npc`.
+        | (c.npc || (c.driver & 0xffff) === CAR_NPC_DRIVER ? CAR_NPC : 0),
     );
     v.setInt32(p + 10, quantisePos(c.x), true);
     v.setInt32(p + 14, quantisePos(c.y), true);
@@ -3847,6 +3909,7 @@ export function decodeCars(buffer: ArrayBuffer): { cars: CarRecord[]; full: bool
       removed: (flags & CAR_REMOVED) !== 0,
       loose: (flags & CAR_LOOSE) !== 0,
       shunt: (flags & CAR_SHUNT) !== 0,
+      npc: (flags & CAR_NPC) !== 0,
       x: dequantisePos(v.getInt32(p + 10, true)),
       y: dequantisePos(v.getInt32(p + 14, true)),
       z: dequantisePos(v.getInt32(p + 18, true)),
@@ -6196,6 +6259,16 @@ export function verifyNet(): string[] {
       // spare: the field is `i16` centimetres, so it saturates at 327 m/s, and
       // the +/- 63.5 m/s clamp anybody grepping for will find belongs to
       // `quantiseVelocity` and the *football*, not to a car.
+      //
+      // v35: this row is **also the patrol car**, and that is not a coincidence
+      // being tidied up -- `driver: 65535` was already here as the top of the
+      // `u16`, and 65,535 is exactly the value `driving.NPC_DRIVER_ID` reserves
+      // out of the id space for the authority's own driver. So the boundary row
+      // and the pursuit row are one row, and it asserts both: the field still
+      // carries the largest id it can hold, and `CAR_NPC` is derived from that
+      // id by `encodeCars` rather than trusted from the caller. `npc` is
+      // deliberately **not** set on the way in, which is what makes the
+      // derivation the thing under test.
       { id: 65535, carId: 1, driver: 65535, body: 0, colour: 0, x: 3999.99, y: -70.125, z: -3999.99, yaw: 6.28, speed: 44, health: 37 },
       { id: 74, carId: 0x80000000, driver: 12, body: 2, colour: 3, x: 0, y: 0, z: 0, yaw: 0, speed: 0, removed: true },
       // v34: a car knocked out of the timetable -- driverless, sliding
@@ -6279,6 +6352,18 @@ export function verifyNet(): string[] {
         }
         if ((b.shunt ?? false) !== (a.shunt ?? false)) {
           failures.push(`Car ${a.id}: shunt=${a.shunt ?? false} came back as ${b.shunt}.`);
+        }
+        // --- v35: and the third flag in that byte, which is **derived** rather
+        // than carried. `encodeCars` sets `CAR_NPC` from the driver id, so the
+        // expectation here is computed the same way rather than read off the
+        // input: the property under test is that the flag and the id cannot
+        // disagree, and a check that took the caller's word for both would not
+        // be testing anything. A patrol car that arrived without the flag is a
+        // client drawing a civilian Camry inside a police car and offering it to
+        // the take arbitration -- see `CarRecord.npc`.
+        const wantNpc = (a.npc ?? false) || a.driver === CAR_NPC_DRIVER;
+        if ((b.npc ?? false) !== wantNpc) {
+          failures.push(`Car ${a.id}: npc=${wantNpc} came back as ${b.npc}; driver was ${a.driver}.`);
         }
       }
     }
