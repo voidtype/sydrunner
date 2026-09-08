@@ -574,7 +574,7 @@ import {
   verifyBikeGlow,
   verifyBikeMesh,
 } from './world/bike.ts';
-import { CombatAudio, RAVE_AUDIBLE_RANGE } from './game/audio.ts';
+import { CombatAudio, RAVE_AUDIBLE_RANGE, verifyAudioSiren } from './game/audio.ts';
 // --- WORKSTREAM AL: what the traffic sounds like, decided three-free and made of
 // oscillators in `game/audio.ts`. The split is `game/rail-audio.ts`'; see the
 // header of `game/carsound.ts` for the argument and for the pool.
@@ -627,6 +627,7 @@ import {
   POLICE_CLIPS,
   POLICE_STATIONS,
   createBeatPose,
+  createBeatScratch,
   createWitness,
   feedLine,
   forEachPoliceNear,
@@ -635,6 +636,7 @@ import {
   npcKind,
   policeWitness,
   reasonText,
+  strikeAmbientPolice,
   strikeNpc,
   verifyPolice,
   type FactionCtx,
@@ -1414,7 +1416,18 @@ async function main(): Promise<void> {
   // The kit's own half runs later, where the assets exist -- see the
   // `verifyPoliceKit` call beside `PoliceAssets`. This is everything that needs
   // nothing but arithmetic, which is most of it.
-  const policeFailures = timed('police', () => verifyPolice(undefined, SNAPSHOT_INTERVAL));
+  const policeFailures = timed('police', () => verifyPolice(undefined, SNAPSHOT_INTERVAL))
+    // And the police's **sound**, which is the same feature and a different
+    // file. `verifyAudioSiren` is the ownership rule for the siren -- it plays
+    // while you are wanted and a pursuing car is in range, and it stops when
+    // either of those stops being true -- plus the three decibels the whole
+    // force went up by. It is folded in here rather than given a boot entry of
+    // its own because a player does not experience "the police" and "the police
+    // sounding right" as two features, and one fatal list is easier to read than
+    // two. Client-side only: `game/audio.ts` is the browser's mixer and the
+    // server never builds an audio graph, which is `verifyPoliceKit`'s
+    // arrangement exactly.
+    .concat(timed('police audio', verifyAudioSiren));
   // And the graded response on top of them, in the same two halves.
   //
   // The **rules** half is where this feature's silent failures live and they all
@@ -2511,7 +2524,11 @@ async function main(): Promise<void> {
   // The kit self-checks come with them, because a fatal check belongs beside the
   // thing it checks rather than beside the thing that happens to use it.
   const policeAssets = new PoliceAssets(characters);
-  const policeKitFailures = verifyPoliceKit(policeAssets);
+  // `characters` is handed in so the check can build and pose a real rig: the
+  // muzzle assertion is about where a *posed* skeleton's hand is, and a check
+  // that recomputed the bone chain by hand would be asserting its own copy of
+  // it. See `verifyMuzzle`.
+  const policeKitFailures = verifyPoliceKit(policeAssets, characters);
   if (policeKitFailures.length) {
     hud.fatal('Police kit self-checks failed:\n' + policeKitFailures.map((f) => '  - ' + f).join('\n'));
     return;
@@ -4420,6 +4437,15 @@ async function main(): Promise<void> {
   // warm-up that compiles them. Only the squad is built here.
   const squad = new PoliceSquad(policeAssets, characters);
   for (const rig of squad.rigs) scene.add(rig.mesh);
+  /**
+   * Scratch for the swing's ambient-officer test, so a swing allocates nothing.
+   *
+   * `pedBands`/`pedPose` above, one tier up: a beat has to be *posed* before it
+   * can be hit, and posing it needs a band list and a pedestrian pose of its own
+   * -- the crowd's pair are mid-query when the officer test runs. See
+   * `factions.BeatScratch`.
+   */
+  const beatScratch = createBeatScratch();
 
   // --- The heat ladder (workstream D). One contiguous block; see `game/heat.ts`.
   //
@@ -4627,6 +4653,12 @@ async function main(): Promise<void> {
   const firing = new Set<number>();
   /** Scratch for `roundEnd`, so a volley allocates nothing. */
   const shotEnd = { x: 0, y: 0, z: 0 };
+  /**
+   * And for the muzzle it starts at, which is the officer's hand on the rig when
+   * they are drawn and the simulation's estimate when they are not. See
+   * `world/police.PoliceSquad.muzzle`, and the shot block that fills this.
+   */
+  const shotMuzzle = { x: 0, y: 0, z: 0 };
   /**
    * What state every live bird was in last frame, so a call is heard once.
    *
@@ -11519,14 +11551,24 @@ async function main(): Promise<void> {
         const ax = f.combat.body.position.x;
         const ay = f.combat.body.position.y;
         const az = f.combat.body.position.z;
-        const hit = npcHitTest(
-          policeField(),
-          ax, ay, az,
-          ax - Math.sin(f.combat.body.yaw) * cp * REACH,
-          ay + Math.sin(f.combat.body.pitch) * REACH,
-          az - Math.cos(f.combat.body.yaw) * cp * REACH,
-          CAST_RADIUS,
-        );
+        const bx = ax - Math.sin(f.combat.body.yaw) * cp * REACH;
+        const by = ay + Math.sin(f.combat.body.pitch) * REACH;
+        const bz = az - Math.cos(f.combat.body.yaw) * cp * REACH;
+        let hit = npcHitTest(policeField(), ax, ay, az, bx, by, bz, CAST_RADIUS);
+        // And the **ambient** tier, which is where every officer a player has
+        // not already annoyed is standing. `server/sim.strikeBodyAt` carries the
+        // whole argument; the half that belongs here is why this is offline
+        // only. `strikeAmbientPolice` *promotes*, and online the actor list is
+        // `net/client.ts`' mirror -- rebuilt from each snapshot, owned by the
+        // server, and no place for this process to invent a body. Online the
+        // authority runs the identical test against its own bands at the same
+        // tick and the officer arrives in the next snapshot, which is the same
+        // 50 ms the banner above already accepts.
+        if (hit === null && !online) {
+          hit = strikeAmbientPolice(
+            factions, pedestrians, tick, ax, ay, az, bx, by, bz, CAST_RADIUS, playerCombat.id, beatScratch,
+          );
+        }
         if (hit !== null) {
           // Read before the strike, never after: `strikeNpc` may put them on the
           // ground, and whether this was a crime is a question about the person
@@ -14239,10 +14281,33 @@ async function main(): Promise<void> {
             if (actor.kind === NPC_KIND.POLICE) {
               policeStats.shots++;
               audio.gunshot(range);
+              // --- **Where the round leaves.** The owner: *"the bullets need
+              // tro actually have the tracers come from the police's gun"*.
+              //
+              // `PoliceSquad.muzzle` is the officer's hand on the skinned rig,
+              // and it answers false for an officer who has no rig this frame --
+              // the pool is `SQUAD_CAPACITY` and the draw radius is 180 m, so
+              // somebody firing from behind you in a busy block may not be
+              // skinned at all. The fallback is the simulation's own estimate,
+              // which is the muzzle `factions.POLICE.think` already puts in the
+              // `shot` event: right for a shot you cannot see the shooter of,
+              // and wrong only where the rig exists to do better. See
+              // `world/police.MUZZLE_FORWARD_M`.
+              //
+              // The **same point feeds both** the round's path and the tracer,
+              // deliberately: `roundEnd` walks from the muzzle to find the wall
+              // or road a miss ends on, and a round that started somewhere the
+              // tracer is not drawn from would end somewhere the tracer does not
+              // reach.
+              if (!squad.muzzle(actor.id, shotMuzzle)) {
+                shotMuzzle.x = actor.x + actor.dx * 0.3;
+                shotMuzzle.y = actor.y + 1.35;
+                shotMuzzle.z = actor.z + actor.dz * 0.3;
+              }
               // A hit stops at the chest; a miss whips past and hits the road
               // or a wall behind you. See `factions.roundEnd` and `NPC_STATE.FIRE_MISS`.
               roundEnd(
-                actor.x + actor.dx * 0.3, actor.y + 1.35, actor.z + actor.dz * 0.3,
+                shotMuzzle.x, shotMuzzle.y, shotMuzzle.z,
                 player.position.x, player.position.y, player.position.z,
                 actor.state === NPC_STATE.FIRE_MISS,
                 (actor.id * 131 + ((trafficTick(Date.now()) / 6) | 0)) | 0,
@@ -14250,7 +14315,7 @@ async function main(): Promise<void> {
                 groundHeightAt,
                 shotEnd,
               );
-              tracers.fire(actor, shotEnd, Math.hypot(shotEnd.x - actor.x, shotEnd.y - actor.y - 1.35, shotEnd.z - actor.z));
+              tracers.fire(actor, shotEnd, shotMuzzle);
             } else if (isStreetKind(actor.kind) && range < 6) {
               // Close only. A swipe is a sound you hear because it happened to
               // you, and one audible from 40 m would be a city of invisible
@@ -14481,9 +14546,25 @@ async function main(): Promise<void> {
       // the nearest patrol car that is actually chasing somebody -- a car parked
       // at an RBT has its bar on and its siren off, which is what one of those
       // looks like on a real arterial.
+      //
+      // **And only one that is still in the pursuit.** The owner: *"make it so
+      // their siren stops when they despawn or u on 0 stars"*. Two states are
+      // excluded and each is a way the sound outlived what it was about:
+      // `NPC_STATE.DOWN` is a wrecked car, and `NPC_STATE.RETURN` is a car whose
+      // investigation has ended and which is now simply driving home -- which
+      // takes as long as the drive does, and ran the siren the whole way after
+      // the banner had cleared and the star row had emptied. The despawn needs
+      // no clause at all: an actor that has resolved is not in this list, so the
+      // distance goes back to `Infinity` on the frame it goes.
+      //
+      // The **star gate is the other half and is not here** -- it is
+      // `audio.sirenWanted`, because "is this pursuit mine" is a question about
+      // the listener rather than about the sources, and there is one place that
+      // decides whether a sound plays.
       let nearestSiren = Infinity;
       for (const a of policeField().actors) {
-        if (a.kind !== NPC_KIND.HIGHWAY_PATROL || a.state === NPC_STATE.DOWN) continue;
+        if (a.kind !== NPC_KIND.HIGHWAY_PATROL) continue;
+        if (a.state === NPC_STATE.DOWN || a.state === NPC_STATE.RETURN) continue;
         const dx = a.x - player.position.x;
         const dz = a.z - player.position.z;
         const d = Math.sqrt(dx * dx + dz * dz);
@@ -14498,6 +14579,12 @@ async function main(): Promise<void> {
           ? null
           : {
               sirenDistance: nearestSiren,
+              // Whose pursuit this is. See `audio.sirenWanted`: a patrol car
+              // promoted for somebody else's three stars is decoded out of the
+              // same NPC section by every client in the room, and without this
+              // a player standing in Balmain with nothing on their star row
+              // heard it.
+              stars,
               rotor: polair.intensity,
               rotorDistance: polair.slant,
               rotorClosing: polair.closing,

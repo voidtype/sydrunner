@@ -3544,7 +3544,7 @@ export class NetClient {
           state: n.state,
           health: 0, downTicks: 0, stateTicks: 0, target: -1,
           homeX: n.x, homeZ: n.z,
-          fireCooldown: 0, shotsFired: 0, barkedAt: 0, struckAt: 0, seen: 0,
+          fireCooldown: 0, shotsFired: 0, bestRange: Infinity, barkedAt: 0, struckAt: 0, seen: 0,
         };
         this.actors.set(n.id, actor);
       }

@@ -64,10 +64,11 @@ import {
   Color,
   Mesh,
   MeshStandardNodeMaterial,
+  Vector3,
 } from 'three/webgpu';
 import type { WarmupPart } from './warmup.ts';
 
-import { BONE } from '../player/animation.ts';
+import { BONE, FIGURE_HEIGHT } from '../player/animation.ts';
 import {
   CharacterActor,
   SELF_SHADOW_LAYER,
@@ -395,6 +396,132 @@ export const SQUAD_CAPACITY = 16;
 /** How far officers are drawn, metres. Inside the crowd's own impostor radius. */
 export const POLICE_DRAW_RADIUS = 180;
 
+// --- Where the round leaves ---------------------------------------------------------
+
+/**
+ * The aiming arm, and the muzzle at the end of it.
+ *
+ * ===========================================================================
+ * THE REPORT: *"and also the bullets need tro actually have the tracers come
+ * from the police's gun"*.
+ *
+ * `Tracers.fire` used to take its origin from `actor.x + actor.dx * 0.3`,
+ * `actor.y + 1.35` -- a point thirty centimetres in front of the officer's feet
+ * position at a fixed chest height, which is the same estimate
+ * `factions.POLICE.think` puts in the `shot` event. It is a perfectly good
+ * *simulation* muzzle: it is deterministic, it costs nothing, and the round's
+ * arithmetic does not care. What it is not is a place on the officer. It does
+ * not lean with the walk cycle, it does not move when the figure turns its
+ * shoulders, and it is thirty centimetres in front of a body whose arms are by
+ * its sides -- so at any range a player can actually see an officer at, the
+ * tracer starts in mid-air beside them.
+ *
+ * ---------------------------------------------------------------------------
+ * **THE ARM HAD TO COME UP FIRST, AND THAT IS THE HALF THAT IS NOT OBVIOUS.**
+ *
+ * The rig's arm hangs straight down: `animation.RIG` runs the shoulder 0.33 m
+ * to the elbow and 0.31 m to the wrist, both along -Y, and its own header says
+ * so in as many words -- *"the arm runs 0.185 m out and then 0.64 m straight
+ * down to the wrist, which hangs the mitt level with the knee"*. There is no aim
+ * clip in `player/animation.ts` and there should not be one: that file is the
+ * player's locomotion and a police pose is not locomotion.
+ *
+ * So taking the wrist as the muzzle *without* raising the arm would have moved
+ * the tracer from a plausible-looking point in mid-air to the officer's **knee**,
+ * which is unambiguously worse and would have passed any check that only asked
+ * "is the origin on the rig". The arm is raised here, as a two-bone override
+ * written straight onto the skeleton after `CharacterActor.update` has posed it
+ * -- the standard place for anything that has to happen after a clip and before
+ * the skinning -- and the muzzle is the wrist plus a fist's worth of pistol.
+ *
+ * The two angles are radians about the bone's own X, which is the axis the whole
+ * rig's limb clips use. 1.35 at the shoulder brings the upper arm within 13
+ * degrees of level and 0.35 at the elbow puts a slight bend in it, which lands
+ * the wrist at about 1.12 m -- an inch under the shoulder joint, which is where
+ * a hand holding a pistol at arm's length actually is -- and 0.63 m in front of
+ * the chest.
+ *
+ * **What only eyes can judge**: whether an officer at *one* star, who by
+ * `factions.POLICE_ARMED_STARS` is holding `NPC_STATE.AIM` with no weapon at
+ * all, reads as pointing a pistol or as putting a hand up to say stop. The
+ * state byte carries no distinction and the client cannot infer one for a
+ * pursuit that is not the local player's, so the arm goes up for both. It is a
+ * one-line change to gate it on the shot if the owner looks and disagrees.
+ */
+const AIM_SHOULDER_X = 1.35;
+const AIM_ELBOW_X = 0.35;
+
+/**
+ * How far in front of the wrist the muzzle is, metres.
+ *
+ * A pistol held in a fist puts the barrel's end about a hand's length past the
+ * wrist joint, and the round leaves the end of the barrel. It is along the
+ * **figure's facing** rather than along the forearm because that is the
+ * direction the shot was aimed in -- `POLICE.think` squares the actor's heading
+ * onto the suspect before it fires, and the arm is posed to that heading -- and
+ * because a bend at the elbow should not be able to point the tracer somewhere
+ * the round did not go.
+ *
+ * Twelve centimetres, which is inside `MUZZLE_MAX_FROM_HAND_M`: the check below
+ * asserts that the origin this produces is a point *on the officer's hand*
+ * rather than a point in front of them that happens to be near it.
+ */
+export const MUZZLE_FORWARD_M = 0.12;
+
+/**
+ * How far the muzzle may be from the hand node before it has stopped being the
+ * officer's gun, metres. `verifyPoliceKit` asserts it.
+ *
+ * Fifteen centimetres is a pistol. The number exists so that the failure this
+ * whole section is about -- an origin that drifts back to a fixed offset from
+ * the body, or to a bone that is not the hand -- is convicted by arithmetic
+ * rather than by somebody looking at a tracer and thinking it seems fine.
+ */
+export const MUZZLE_MAX_FROM_HAND_M = 0.15;
+
+/** Scratch for the muzzle query. One per module: `muzzle` is called once a shot. */
+const MUZZLE_HAND = new Vector3();
+
+/**
+ * Put the aiming arm on a posed rig. **After `CharacterActor.update`, always.**
+ *
+ * Two bone rotations and nothing else, which is what keeps this compatible with
+ * every clip: `applyToBones` writes all seventeen bones from the blended pose on
+ * every frame, so this is overwritten and rewritten each time and there is no
+ * state to get out of step. The officer still walks, still bobs, still turns --
+ * they simply do it with one arm up.
+ */
+function poseAimArm(actor: CharacterActor): void {
+  actor.bones[BONE.SHOULDER_R].rotation.set(AIM_SHOULDER_X, 0, 0);
+  actor.bones[BONE.ELBOW_R].rotation.set(AIM_ELBOW_X, 0, 0);
+}
+
+/**
+ * The world position of the gun at the end of a posed rig's aiming arm.
+ *
+ * `updateMatrixWorld` is forced rather than assumed, and that is the one line
+ * here that is load-bearing: three composes a skeleton during render, and this
+ * is asked from the frame loop *before* the render on the frame a shot arrives.
+ * Without it the muzzle is one frame stale, which at `CHASE_SPEED` is ten
+ * centimetres and at a snapshot boundary is more -- and the symptom is a tracer
+ * that starts just behind the hand it came out of, which is the original report
+ * in a smaller size.
+ *
+ * One rig, once per shot fired: `FIRE_INTERVAL_TICKS` is 54 ticks and the actor
+ * cap is 24, so the worst case is a few dozen matrix composes a second against a
+ * skeleton three composes for the skinning anyway.
+ */
+export function muzzleOf(actor: CharacterActor, out: { x: number; y: number; z: number }): void {
+  actor.mesh.updateMatrixWorld(true);
+  actor.bones[BONE.WRIST_R].getWorldPosition(MUZZLE_HAND);
+  // The figure's own forward. Yaw 0 faces -Z -- `CharacterActor.update` sets
+  // `mesh.rotation.y` and nothing else, so this is exact and needs no matrix.
+  const yaw = actor.mesh.rotation.y;
+  out.x = MUZZLE_HAND.x - Math.sin(yaw) * MUZZLE_FORWARD_M;
+  out.y = MUZZLE_HAND.y;
+  out.z = MUZZLE_HAND.z - Math.cos(yaw) * MUZZLE_FORWARD_M;
+}
+
 /** One pooled rig, and the officer it currently stands in for. */
 interface Slot {
   actor: CharacterActor;
@@ -654,7 +781,42 @@ export class PoliceSquad {
         speed: down ? 0 : this.vSpeed[i],
         onGround: true,
       });
+      // --- And the weapon up, for an officer who has squared up or just fired.
+      //
+      // **After `update`, which writes all seventeen bones**, so this is an
+      // override rather than a blend and there is nothing to keep in step. See
+      // `poseAimArm` and `AIM_SHOULDER_X`, which carry the argument -- including
+      // the half that is really about the tracer: the round leaves the hand, and
+      // the hand had to be somewhere a round could leave from.
+      if (state === NPC_STATE.AIM || state === NPC_STATE.FIRE || state === NPC_STATE.FIRE_MISS) {
+        poseAimArm(slot.actor);
+      }
     }
+  }
+
+  /**
+   * Where a promoted officer's gun is, in world metres. False if they are not
+   * on a rig this frame.
+   *
+   * **False is a real answer and the caller has to have one**: `SQUAD_CAPACITY`
+   * is sixteen and `POLICE_DRAW_RADIUS` is 180 m, so an officer firing from
+   * behind you in a busy CBD block may have no skeleton at all in this process.
+   * `main.ts` falls back to the simulation's own muzzle estimate, which is the
+   * point the `shot` event already carries -- a tracer from an approximate place
+   * is right for somebody you cannot see, and wrong for somebody you can.
+   *
+   * Keyed on `-actorId`, which is `gather`'s encoding: a promoted actor's key is
+   * the negative of its id and an ambient officer's is a positive `pedKey`, so
+   * the two tiers cannot collide in the slot table.
+   */
+  muzzle(actorId: number, out: { x: number; y: number; z: number }): boolean {
+    for (const slot of this.slots) {
+      if (slot.key !== -actorId) continue;
+      if (!slot.actor.mesh.visible) return false;
+      muzzleOf(slot.actor, out);
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -771,18 +933,49 @@ export class Tracers {
    * which is past the actor cap in any case, and overwriting the oldest is both
    * cheaper and the correct behaviour if it ever happened.
    */
-  fire(actor: NpcActor, target: { x: number; y: number; z: number }, range: number): void {
+  fire(
+    actor: NpcActor,
+    target: { x: number; y: number; z: number },
+    /**
+     * The gun, if the officer is on a rig this frame. See `PoliceSquad.muzzle`.
+     *
+     * **An argument rather than a lookup**, because this class does not own a
+     * squad and should not: `Tracers` is twelve boxes and a pool, it is built in
+     * `main.ts` four hundred lines before the squad is, and a renderer that
+     * reached across to another renderer to find out where to draw would be the
+     * one edge in this feature that has to be kept in step by hand.
+     *
+     * Optional, and absent falls back to the estimate this used to compute
+     * unconditionally: `actor.dx * 0.3` in front of the feet at 1.35 m, which is
+     * the same muzzle `factions.POLICE.think` puts in the `shot` event. That is
+     * the right answer for an officer with no skeleton in this process -- see
+     * `PoliceSquad.muzzle`, which returns false for exactly that case.
+     */
+    muzzle?: { x: number; y: number; z: number },
+  ): void {
     const t = this.pool[this.cursor];
     this.cursor = (this.cursor + 1) % this.pool.length;
-    const mx = actor.x + actor.dx * 0.3;
-    const my = actor.y + 1.35;
-    const mz = actor.z + actor.dz * 0.3;
+    const mx = muzzle ? muzzle.x : actor.x + actor.dx * 0.3;
+    const my = muzzle ? muzzle.y : actor.y + 1.35;
+    const mz = muzzle ? muzzle.z : actor.z + actor.dz * 0.3;
     t.mesh.position.set(mx, my, mz);
     t.mesh.lookAt(target.x, target.y, target.z);
     // The box runs one metre along -Z, which is what `lookAt` points; scaling z
     // to the range stretches it exactly onto the line. The other two axes stay
     // at 1 so a tracer is the same width at 5 m and at 35.
-    t.mesh.scale.set(1, 1, Math.max(0.5, range));
+    //
+    // **Measured from the origin this tracer is actually drawn from**, which it
+    // used to be handed as an argument. That was correct exactly while there was
+    // one possible origin: the moment the muzzle can be the rig's hand *or* the
+    // estimate, a length computed by the caller against one of them and a
+    // position set here from the other is a tracer that stops short of, or
+    // reaches past, where the round went -- and the error is a few tenths of a
+    // metre, which is precisely the size that reads as sloppy rather than as
+    // wrong. There is one origin and it is three lines up.
+    const dx = target.x - mx;
+    const dy = target.y - my;
+    const dz = target.z - mz;
+    t.mesh.scale.set(1, 1, Math.max(0.5, Math.sqrt(dx * dx + dy * dy + dz * dz)));
     t.mesh.visible = true;
     t.life = TRACER_SECONDS;
   }
@@ -824,7 +1017,7 @@ export class Tracers {
  * And one that is not about geometry at all: **a cap parented so low that it
  * intersects the shoulders**, which at 40 m is an officer with no head.
  */
-export function verifyPoliceKit(assets: PoliceAssets): string[] {
+export function verifyPoliceKit(assets: PoliceAssets, characters?: CharacterAssets): string[] {
   const failures: string[] = [];
 
   if (RING_SIDES % 2 !== 0) {
@@ -920,6 +1113,86 @@ export function verifyPoliceKit(assets: PoliceAssets): string[] {
     failures.push('The police beat slots overlap the pedestrian range; an officer and a bystander share an identity.');
   }
 
+  // --- The muzzle, on a rig that is actually posed. See below.
+  if (characters !== undefined) failures.push(...verifyMuzzle(characters, assets));
+
+  return failures;
+}
+
+/**
+ * **The tracer comes out of the gun**, asserted against a posed skeleton.
+ *
+ * The owner: *"and also the bullets need tro actually have the tracers come from
+ * the police's gun"*. The three ways that can be false all render a frame
+ * nobody would file a bug about:
+ *
+ *   - **The origin drifts back to a body offset.** A fixed point in front of the
+ *     feet at a fixed height is what this replaced, and it is the one that looks
+ *     nearly right: at 40 m a tracer starting 30 cm beside an officer is a
+ *     tracer starting at an officer. This measures the distance from the *hand*,
+ *     so an origin that stops following the arm is convicted by a number.
+ *   - **The wrong bone.** `BONE.WRIST_L` type-checks perfectly and puts every
+ *     round through the officer's other hand, which nobody sees because the
+ *     tracer is 55 ms long.
+ *   - **The arm never came up.** Without `poseAimArm` the wrist hangs level with
+ *     the knee -- `animation.RIG` says so -- so an origin that is genuinely on
+ *     the hand is genuinely at knee height and shooting up at you. That is the
+ *     one this whole section exists for, and it is why the second assertion is
+ *     *forward of the chest* rather than merely *near the hand*.
+ *
+ * A real `CharacterActor` is built and posed rather than the arithmetic being
+ * repeated: what is being tested is the composition of the rig, the two bone
+ * overrides and the forward offset, and a check that recomputed the chain by
+ * hand would be asserting its own copy of it. Three geometry, no context, no
+ * scene -- `PoliceSquad`'s constructor already builds sixteen of these at boot.
+ */
+function verifyMuzzle(characters: CharacterAssets, assets: PoliceAssets): string[] {
+  const failures: string[] = [];
+  const actor = new CharacterActor(characters, 0, assets.kit);
+  // Standing still at the origin, facing yaw 0 -- which is -Z. Anything else
+  // would make the "forward of the chest" test a statement about a rotation.
+  actor.update(1 / 60, { position: { x: 0, y: 0, z: 0 }, yaw: 0, speed: 0, onGround: true });
+  poseAimArm(actor);
+
+  const muzzle = { x: 0, y: 0, z: 0 };
+  muzzleOf(actor, muzzle);
+
+  const hand = new Vector3();
+  const chest = new Vector3();
+  actor.mesh.updateMatrixWorld(true);
+  actor.bones[BONE.WRIST_R].getWorldPosition(hand);
+  actor.bones[BONE.CHEST].getWorldPosition(chest);
+
+  const fromHand = Math.sqrt(
+    (muzzle.x - hand.x) ** 2 + (muzzle.y - hand.y) ** 2 + (muzzle.z - hand.z) ** 2,
+  );
+  if (fromHand > MUZZLE_MAX_FROM_HAND_M) {
+    failures.push(
+      `The tracer's origin is ${fromHand.toFixed(3)} m from the officer's hand, past the ` +
+        `${MUZZLE_MAX_FROM_HAND_M} m a pistol is. It is a point near the officer rather than a point on them.`,
+    );
+  }
+  // Forward is -Z at yaw 0, so "in front of the chest" is a smaller z than the
+  // chest's. Half a metre of margin would be a claim about the arm's length;
+  // this asks only that the round leaves in front of the body rather than out
+  // of its back or its side.
+  if (!(muzzle.z < chest.z - 0.2)) {
+    failures.push(
+      `The muzzle is at z=${muzzle.z.toFixed(3)} against a chest at ${chest.z.toFixed(3)}: it is not in front ` +
+        'of the officer. The aiming arm has not been applied, so the round is leaving from a hand hanging at ' +
+        'the knee -- see AIM_SHOULDER_X.',
+    );
+  }
+  // And it is at something like weapon height rather than at knee height, which
+  // is the same failure measured the other way and is the one a reader of a
+  // single frame would put down to perspective.
+  if (!(muzzle.y > 0.9 && muzzle.y < 1.5)) {
+    failures.push(
+      `The muzzle is ${muzzle.y.toFixed(3)} m off the ground on a ${FIGURE_HEIGHT} m figure. A pistol held ` +
+        'out is between 0.9 and 1.5; the knee this rig rests its wrist at is 0.46.',
+    );
+  }
+  actor.mesh.removeFromParent();
   return failures;
 }
 

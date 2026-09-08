@@ -728,6 +728,7 @@ export class HeatField {
     homeX: 0, homeZ: 0,
     fireCooldown: 0,
     shotsFired: 0,
+    bestRange: Infinity,
     barkedAt: 0,
     struckAt: 0,
     seen: 0,

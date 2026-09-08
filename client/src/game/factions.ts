@@ -782,6 +782,26 @@ export interface NpcActor {
    * real time would produce an officer who either cannot miss or cannot hit.
    */
   shotsFired: number;
+  /**
+   * The closest this actor has ever got to its current target, metres, or
+   * `Infinity` for an actor that has not measured one yet.
+   *
+   * **The leash's datum.** See `PURSUIT_LEASH_M` for the argument; what belongs
+   * here is why it is a field rather than a derivation. "Has this officer been
+   * outrun" is a question about the *history* of a chase and there is nothing
+   * else on this record that remembers one: position is now, `stateTicks` resets
+   * on every transition, and `homeX/homeZ` is where the actor was promoted,
+   * which for a station reinforcement is 600 m from anything the pursuit is
+   * about.
+   *
+   * Reset when the target changes -- `FactionField.focusPolice` re-points an
+   * officer and `POLICE.think` drops one -- because a closest approach to
+   * somebody else is not a fact about this chase.
+   *
+   * **Not on the wire**, on `NpcActor.target`'s own terms: a client draws an
+   * officer, it does not decide whether one gives up.
+   */
+  bestRange: number;
   /** The tick of the last aggro bark, for the audio cooldown. */
   barkedAt: number;
   /** The last tick `strikeNpc` landed on this actor. The re-hit guard. */
@@ -1404,6 +1424,54 @@ export const POLICE_WALK_SPEED = 1.5;
 export const ENGAGE_RANGE = 35;
 const ENGAGE_RANGE_2 = ENGAGE_RANGE * ENGAGE_RANGE;
 
+/**
+ * How much further than `ENGAGE_RANGE` an officer who has **already stopped**
+ * lets a suspect get before running again, metres.
+ *
+ * ---------------------------------------------------------------------------
+ * **A hysteresis band, and it is the difference between the police being a
+ * hazard and being an escort.** This was not a tuning gap; it was a state
+ * machine oscillating, and it was invisible from every angle except a counter.
+ *
+ * The measurement, from `server/police-check.ts`'s chase table before this
+ * constant existed: a suspect at **two stars walking away in a straight line**
+ * -- the single most ordinary thing a wanted player does -- was pursued by four
+ * officers who held station at exactly 35 m for thirty seconds and fired
+ * **zero rounds**. Standing still, the same four fired 128. Nothing looked
+ * wrong: the officers were there, they were close, they were facing the right
+ * way, and the shot model was untouched.
+ *
+ * The mechanism is arithmetic. `AIM_TICKS` is 36 -- six tenths of a second of
+ * squaring up before the first round -- and `stateTicks` is reset by *every*
+ * transition into `AIM`. A suspect walking at 4.4 m/s adds 7 cm to the range
+ * each tick, so an officer who stopped at 34.99 m is outside 35 on the next one
+ * and goes back to `CHASE`; closing at `CHASE_SPEED` against a walk is 2 m/s of
+ * net approach, so they are back inside two ticks later and enter `AIM` again
+ * with the clock **back at zero**. Three ticks a cycle, forever, and the aim
+ * window is never once completed. The officer is not stuck and is not confused
+ * -- they are doing exactly what the code says, ten times a second.
+ *
+ * ---------------------------------------------------------------------------
+ * **Five metres, and the ceiling is `WITNESS_RANGE`.** The band has to be wide
+ * enough to buy a round, which is `AIM_TICKS` of walking -- 2.6 m -- and the
+ * more of `FIRE_INTERVAL_TICKS` it covers on top of that, the less the cadence
+ * of a running fight differs from a standing one. It may not push the range a
+ * round can be fired at past the range a crime can be *seen* at, or an officer
+ * would be shooting at somebody they could not have witnessed, which is the
+ * relation `verifyPolice` has always asserted about `ENGAGE_RANGE` and now
+ * asserts about the sum. 35 + 5 = 40, exactly `WITNESS_RANGE`.
+ *
+ * What a player feels: an officer runs you down to 35 m, stops, shouts, and
+ * fires; you keep walking, they let you get to 40, then run you back down to 35
+ * and fire again. About a round every three and a half seconds while you walk
+ * away from them, against none at all before. Sprint and the band is crossed in
+ * six tenths of a second, so a sprinting suspect still takes almost nothing --
+ * which is the pacing `hitChance` already argues for and the reason running is
+ * the answer to being shot at.
+ */
+export const ENGAGE_HOLD_M = 5;
+const ENGAGE_HOLD_RANGE_2 = (ENGAGE_RANGE + ENGAGE_HOLD_M) * (ENGAGE_RANGE + ENGAGE_HOLD_M);
+
 /** How long the weapon is up before the first shot, ticks. 0.6 s. */
 export const AIM_TICKS = 36;
 /** And between shots after that. 0.9 s -- a considered shot, not automatic fire. */
@@ -1673,6 +1741,82 @@ export const POLICE_MAX_HEALTH = 3;
 export const PROMOTE_RADIUS = 120;
 /** How many pursuers one investigation tries to keep on a suspect. */
 export const PURSUIT_TARGET = 4;
+/**
+ * And how many once the ladder is at `PURSUIT_SURGE_STARS`. The owner: *"and
+ * actually chase u when u bad"*.
+ *
+ * Four is the whole-city constant and it was the same number at one star and at
+ * five, which is a response that does not answer the question the star row is
+ * asking. `game/heat.ts`'s ladder already escalates the *kinds* of answer -- a
+ * highway patrol car at three, a roadblock at four, Polair at five -- and left
+ * the number of people on foot flat, so the rung a player feels least is exactly
+ * the one where the foot police should start being a crowd.
+ *
+ * Eight rather than more, and the ceiling is not taste: `MAX_ACTORS` is 24
+ * across **every** faction, and `reinforcementDebt` can add eight more on top of
+ * this for a suspect who has been decking officers. Eight plus eight is
+ * sixteen, which leaves the meth heads, the drunks and the birds two thirds of
+ * what they had -- and `FactionField.promote`'s eviction is what settles the
+ * rest rather than a refusal nobody can see.
+ *
+ * The rung is **three** because that is where `heat.ts` says the response stops
+ * being local: two stars is the pair who saw you, three is the city answering.
+ */
+export const PURSUIT_TARGET_HIGH = 8;
+export const PURSUIT_SURGE_STARS = 3;
+
+/**
+ * How many pursuers this suspect's investigation wants, before the debt.
+ *
+ * A function rather than a comparison at the one call site, on
+ * `policeMayHarm`'s argument exactly: the next thing to ask this question will
+ * be a check, and two places that both know the inequality is two places that
+ * can disagree about it. `verifyPolice` asserts the shape from the other end.
+ */
+export function pursuitTargetFor(stars: number): number {
+  return stars >= PURSUIT_SURGE_STARS ? PURSUIT_TARGET_HIGH : PURSUIT_TARGET;
+}
+
+/**
+ * The leash: how much ground a suspect has to open on an officer, past the
+ * closest that officer has ever got to them, before the officer gives up.
+ *
+ * ---------------------------------------------------------------------------
+ * **A gap that has grown, not an absolute distance**, and the difference is the
+ * whole design. An absolute leash -- "stand down past 180 m" -- reads correctly
+ * for the pair who watched you run off and is wrong for every officer
+ * `FactionField.recruit` dispatches from a station, who is promoted at the
+ * station door and is routinely 600 m out before they have taken a step. Under
+ * an absolute rule that officer stands down on the tick they are created, the
+ * trickle re-promotes another one two seconds later, and the station spends the
+ * whole investigation manufacturing officers who walk straight home.
+ *
+ * So the officer's own **closest approach** is the datum (`NpcActor.bestRange`),
+ * and this is how far the suspect has to pull *back out* from it. An officer who
+ * is still closing never reaches it however far away they started; one who has
+ * been left behind reaches it in the time it takes to lose this much ground.
+ *
+ * ---------------------------------------------------------------------------
+ * **A hundred and fifty metres, and it is the handoff's number rather than a
+ * feeling.** The point of giving up is not that the officer is tired -- it is
+ * that they are holding one of `MAX_ACTORS`' slots and one of
+ * `PURSUIT_TARGET`'s four, so nobody *ahead* of the suspect can be promoted
+ * while they trail. `PROMOTE_RADIUS` is 120, which is where a fresh officer
+ * comes from, so a leash below it would stand people down inside the ring the
+ * replacements come out of and a leash far above it would leave the pursuit
+ * staffed entirely by people who cannot catch up. A hundred and fifty is one
+ * ring and a quarter: an officer who has been dropped a block and a half behind
+ * is replaced by one on the next corner, and the suspect meets new police rather
+ * than watching the old ones recede.
+ *
+ * At the sprint the ladder actually produces -- a player at 8.2 m/s against
+ * `CHASE_SPEED`'s 6.4 -- the gap grows at 1.8 m/s, so this is about eighty
+ * seconds of flat-out running before a pursuer is handed off. That is
+ * deliberately generous: the countdown is forty-five seconds and the cap is two
+ * minutes, so an officer who gives up has been comprehensively outrun rather
+ * than merely inconvenienced.
+ */
+export const PURSUIT_LEASH_M = 150;
 /** The most extra pursuers a suspect can owe for cops they put down. See `NpcKindDef.reinforceOnDown`. */
 export const REINFORCE_DEBT_MAX = 8;
 /** Ticks between reinforcements trickling out of the nearest station. 2 s. */
@@ -2788,6 +2932,19 @@ export class FactionField {
   clear(): void {
     this.actors.length = 0;
     this.investigations.clear();
+    // **And the debt**, which this method quietly did not clear.
+    //
+    // `clearInvestigation` has always taken the two together -- an
+    // investigation and what the suspect owes it are one record in two maps --
+    // and this, which is the *whole field* being emptied, dropped only one of
+    // them. Nothing in play reaches it: `clear` is a fixture's call and a
+    // respawn goes through `clearInvestigation`. What it cost was a measurement,
+    // which is exactly the class of bug that ships. `server/police-check.ts`
+    // knocked an officer down in its bat section, cleared the field between
+    // scenarios, and then measured a nine-row chase table in which every
+    // pursuit was four officers larger than the rung it was labelled with --
+    // and every row was self-consistent, so nothing in the table said so.
+    this.reinforcementDebt.clear();
     this.events.length = 0;
     clearPendingCrimes();
   }
@@ -2875,6 +3032,7 @@ export class FactionField {
       homeZ: z,
       fireCooldown: 0,
       shotsFired: 0,
+      bestRange: Infinity,
       barkedAt: 0,
       struckAt: 0,
       seen: 0,
@@ -2970,8 +3128,13 @@ export class FactionField {
       for (const a of this.actors) {
         if (a.target === inv.playerId && a.state !== NPC_STATE.RETURN) onIt++;
       }
-      // Four, plus two for every officer this suspect has already put down.
-      const pursuitTarget = PURSUIT_TARGET + (this.reinforcementDebt.get(inv.playerId) ?? 0);
+      // Four -- eight once the ladder is at `PURSUIT_SURGE_STARS` -- plus two
+      // for every officer this suspect has already put down. The stars are read
+      // through `heatOf`, which is the injected reader and answers 0 in a
+      // process with no ladder installed, so a bare field gets exactly the
+      // pursuit it got before this line existed.
+      const pursuitTarget =
+        pursuitTargetFor(heatOf(inv.playerId)) + (this.reinforcementDebt.get(inv.playerId) ?? 0);
       if (onIt >= pursuitTarget) continue;
 
       // --- From the beat. Everybody inside `PROMOTE_RADIUS` comes, up to the
@@ -3076,6 +3239,12 @@ export class FactionField {
         const dz = c.body.position.z - a.z;
         if (dx * dx + dz * dz > POLICE_FOCUS_M * POLICE_FOCUS_M) continue;
         a.target = c.id;
+        // The leash's datum goes with the target. A closest approach to the
+        // teammate this officer has just been taken off is not a fact about the
+        // chase they are now on, and carrying it over would stand them down on
+        // the tick the mega handed them to somebody further away. See
+        // `NpcActor.bestRange`.
+        a.bestRange = Infinity;
         // Straight into the chase rather than leaving whatever state they were
         // in: an officer switched mid-`AIM` would otherwise spend the rest of
         // that aim window pointed at the person they are no longer shooting, and
@@ -3265,6 +3434,146 @@ export function npcHitTest(
     best = actor;
   }
   return best;
+}
+
+/**
+ * Scratch for a query that has to pose the beat. One object, held by the
+ * caller for the life of the process, never allocated per swing.
+ *
+ * The same bundle `policeWitness` takes and for the same reason -- see
+ * `Simulation.witnessCtx`: a hit test runs on every swing, every football that
+ * reaches the street and every driven car in the room, and a fresh record on
+ * each of those would be the one thing in this feature that allocates per event.
+ */
+export interface BeatScratch {
+  bands: PedBand[];
+  ped: PedPose;
+  beat: BeatPose;
+}
+
+export function createBeatScratch(): BeatScratch {
+  return { bands: [], ped: createPedPose(), beat: createBeatPose() };
+}
+
+/**
+ * How close an ambient pose has to be to a promoted actor before it is taken
+ * for the same officer, metres.
+ *
+ * **A duplicate is a real state, not a paranoia.** An officer promoted off a
+ * beat keeps their reserved slot on the band -- `forEachPoliceNear` is a pure
+ * function of `(band, slot, tick)` and has never heard of `FactionField` -- so
+ * for as long as the promoted body is still near where it came from, the same
+ * person is posed twice: once as an integrated actor and once as a schedule.
+ * That is a drawing problem the squad has always had and is not this function's
+ * to fix. What *is* this function's is that a bat must not find the ambient copy
+ * of somebody it has already knocked down, promote a second officer out of it,
+ * and go on doing that until the actor cap refuses -- so the pose is dropped
+ * when a live actor is standing in it.
+ *
+ * Half a metre is a shade under `PAIR_OFFSET`, which is the distance between the
+ * two officers of a pair: anything wider would let a promoted leader mask their
+ * own partner, who is a different person and is hittable.
+ */
+export const BEAT_DUPLICATE_M = 0.5;
+
+/**
+ * The nearest **ambient** officer the segment A-B passes within `pad` of,
+ * promoted into the pursuit and handed back. Null if the swing found nobody.
+ *
+ * ---------------------------------------------------------------------------
+ * THE REPORT THIS EXISTS FOR, in the owner's words: *"but right now i cant get
+ * the cops"*, and *"make it so polICE are hitable like normal players"*.
+ *
+ * `npcHitTest` walks `field.actors` and nothing else, which means the only
+ * officers in this city a player could touch were the ones already chasing
+ * them. Every officer on a beat -- which is every officer a player meets before
+ * they have done anything, and is the overwhelming majority of the police in the
+ * world -- was scenery you swung through. The lifecycle at the top of this file
+ * has said the opposite since the day it was written: *"Ambient actors can still
+ * be seen (`policeWitness` walks them) and still be hit (`strikeNpc`), and being
+ * hit is one of the things that promotes them."* `server/sim.resolveStrike` says
+ * it too, in a comment about why the swing is not rewound: *"a police officer on
+ * a beat is the same function."* Only the code disagreed.
+ *
+ * ---------------------------------------------------------------------------
+ * **PROMOTE, THEN STRIKE. Never the other way round, and never both.**
+ *
+ * This function promotes and does not damage, which looks like half a job and is
+ * the whole of the contract in section 4: `strikeNpc` is the one door, it owns
+ * the re-hit guard, the down clock, the feed line and the despawn flag, and a
+ * second function that took a pip off an actor would be a second answer to what
+ * a hit is. So the caller does what it already does for a promoted officer --
+ * `Simulation.hitNpc`, which reads the crime, strikes, and reports -- and the
+ * only difference between the two tiers is which line found the body.
+ *
+ * The actor is promoted **onto the attacker**, which is the lifecycle's own
+ * statement rather than an extra: an officer you have just hit is an officer who
+ * is now after you. The investigation that makes that stick is opened by the
+ * caller a few lines later (`REASON.ASSAULT_POLICE`, no witness test -- the
+ * officer you hit is the witness), and `POLICE.think` looks it up on the next
+ * step. A caller with no investigation behind it -- a bot, whose crimes are
+ * never adjudicated -- promotes an officer who stands down and walks home on
+ * their next tick, which is the correct behaviour and needs no special case.
+ *
+ * Returns null when the cap refuses the promotion, and a caller that gets null
+ * does nothing: an officer who could not be promoted stays ambient, which is
+ * `FactionField.promote`'s own stated rule for every faction.
+ *
+ * ---------------------------------------------------------------------------
+ * COST. One `forEachPoliceNear` over the swing's own span -- the same query
+ * `policeWitness` runs on every swing already, at a radius of about two metres
+ * rather than forty -- and a capsule test per pose. Allocation-free given a
+ * `BeatScratch`.
+ */
+export function strikeAmbientPolice(
+  field: FactionField,
+  peds: PedestrianField | null,
+  tick: number,
+  ax: number, ay: number, az: number,
+  bx: number, by: number, bz: number,
+  pad: number,
+  target: number,
+  scratch: BeatScratch,
+): NpcActor | null {
+  if (peds === null) return null;
+  const reach = POLICE_RADIUS + pad;
+  // Centred on the segment and widened by half its own length, so a cast that
+  // is metres long (a bat's reach, a car's box) is covered by one query rather
+  // than by a radius that only knows about its start.
+  const cx = (ax + bx) * 0.5;
+  const cz = (az + bz) * 0.5;
+  const half = Math.sqrt((bx - ax) * (bx - ax) + (bz - az) * (bz - az)) * 0.5;
+
+  let bestD = Infinity;
+  let bx2 = 0;
+  let by2 = 0;
+  let bz2 = 0;
+  let bdx = 0;
+  let bdz = 1;
+  forEachPoliceNear(peds, cx, cz, half + reach, tick, scratch.bands, scratch.ped, scratch.beat, (p) => {
+    const d = segmentToCapsule(
+      ax, ay, az, bx, by, bz,
+      p.x, p.y + POLICE_RADIUS, p.z,
+      p.x, p.y + POLICE_HEIGHT - POLICE_RADIUS, p.z,
+    );
+    if (d > reach || d >= bestD) return;
+    // Somebody already standing here as a promoted actor is this same officer
+    // drawn twice. See `BEAT_DUPLICATE_M`.
+    for (const a of field.actors) {
+      if (a.kind !== NPC_KIND.POLICE) continue;
+      const ddx = a.x - p.x;
+      const ddz = a.z - p.z;
+      if (ddx * ddx + ddz * ddz <= BEAT_DUPLICATE_M * BEAT_DUPLICATE_M) return;
+    }
+    bestD = d;
+    bx2 = p.x;
+    by2 = p.y;
+    bz2 = p.z;
+    bdx = p.dx;
+    bdz = p.dz;
+  });
+  if (bestD === Infinity) return null;
+  return field.promote(NPC_KIND.POLICE, bx2, by2, bz2, bdx, bdz, target);
 }
 
 /**
@@ -3467,7 +3776,36 @@ export const POLICE = registerNpcKind({
     }
 
     const inv = actor.target >= 0 ? ctx.investigationOf(actor.target) : undefined;
-    const suspect = inv ? ctx.combatants.find((c) => c.id === inv.playerId) : undefined;
+    let suspect = inv ? ctx.combatants.find((c) => c.id === inv.playerId) : undefined;
+
+    // --- **The leash.** Has this officer been outrun? See `PURSUIT_LEASH_M`.
+    //
+    // Measured here rather than in the chase branch below, and it is the one
+    // ordering decision in this clause: an officer standing in `AIM` at 34 m
+    // whose suspect walks to 190 is just as outrun as one who never closed, and
+    // a leash tested only on the tick an officer happens to be running would
+    // miss them. So the question is asked once, before the state machine, and
+    // its answer is expressed the only way this function has of saying "I have
+    // nobody" -- by dropping the suspect and falling into the stand-down branch
+    // immediately below, which already knows how to walk an officer home.
+    //
+    // `bestRange` is updated on the way past, so an officer who is still closing
+    // moves their own datum and can never trip this. `Infinity` on a fresh
+    // actor is what makes the first tick of a pursuit set the datum rather than
+    // test against one.
+    if (suspect !== undefined) {
+      const lx = suspect.body.position.x - actor.x;
+      const lz = suspect.body.position.z - actor.z;
+      const gap = Math.sqrt(lx * lx + lz * lz);
+      if (gap < actor.bestRange) actor.bestRange = gap;
+      else if (gap > actor.bestRange + PURSUIT_LEASH_M) {
+        // Given up. The slot goes back to the cap and the four-deep pursuit
+        // count goes back to `recruit`, which is the whole point: the officer a
+        // suspect has left a block and a half behind is replaced by one on the
+        // corner ahead of them rather than trailing forever inside the number.
+        suspect = undefined;
+      }
+    }
 
     // --- Stood down: the countdown ran out, or the suspect left the world.
     //
@@ -3477,6 +3815,9 @@ export const POLICE = registerNpcKind({
     // possible statement that they were never really there.
     if (!inv || !suspect) {
       actor.target = -1;
+      // And the leash's datum with it, on `focusPolice`'s reason: a closest
+      // approach belongs to a chase, and this officer is no longer on one.
+      actor.bestRange = Infinity;
       // --- Before walking home: is there anything here this force has been told
       // to engage on sight?
       //
@@ -3558,7 +3899,22 @@ export const POLICE = registerNpcKind({
       ctx.collision === null ||
       !ctx.collision.blocked(actor.x, actor.y + WITNESS_EYE, actor.z, tx, ty, tz);
 
-    if (range2 > ENGAGE_RANGE_2 || !clear || !shootable) {
+    // --- The radius this officer is judged against, and it is **two radii**.
+    //
+    // `ENGAGE_RANGE` while they are still closing, and `ENGAGE_RANGE +
+    // ENGAGE_HOLD_M` once they have stopped: an officer with the weapon up gets
+    // to keep it up while the suspect walks a few metres further off, rather
+    // than dropping back into a run the instant the range ticks over. See
+    // `ENGAGE_HOLD_M`, which has the measurement -- without this band a walking
+    // suspect at two stars is followed for thirty seconds and never shot at
+    // once, because the aim clock is reset by the transition and the transition
+    // happens three times a second.
+    //
+    // The fire state counts as holding for the same reason it is held at all: a
+    // round is in the air for `FIRE_STATE_TICKS` and an officer who broke into a
+    // run mid-shot would be drawn firing over their shoulder.
+    const holding = actor.state === NPC_STATE.AIM || firedRound(actor.state);
+    if (range2 > (holding ? ENGAGE_HOLD_RANGE_2 : ENGAGE_RANGE_2) || !clear || !shootable) {
       if (actor.state !== NPC_STATE.CHASE) {
         actor.state = NPC_STATE.CHASE;
         actor.stateTicks = 0;
@@ -4073,6 +4429,70 @@ export function verifyPolice(kitTriangles?: number, snapshotInterval?: number): 
         'shoot at somebody they never saw commit anything.',
     );
   }
+  // --- The hysteresis band, and the two things that can be wrong with it.
+  //
+  // **Too narrow** and it does nothing: an officer needs `AIM_TICKS` of the
+  // suspect's own walking speed inside the band to complete a single aim, and a
+  // band shorter than that leaves the oscillation exactly where it was -- four
+  // officers following a walking suspect for thirty seconds and never firing,
+  // which is the measurement `ENGAGE_HOLD_M` was written from and which nothing
+  // about the picture gives away.
+  //
+  // **Too wide** and a round can be fired from further than a crime can be
+  // seen, which is the relation the clause above asserts about `ENGAGE_RANGE`
+  // and has to hold for the range an officer *actually* shoots from.
+  {
+    // A player's walk, restated rather than imported: `player/controller.ts`'s
+    // `WALK_SPEED` is not exported and this file may not reach into the
+    // controller for a number it only needs an order of magnitude of. 4.4 m/s.
+    const WALK = 4.4;
+    const needed = (AIM_TICKS / 60) * WALK;
+    if (ENGAGE_HOLD_M < needed) {
+      failures.push(
+        `The engage band is ${ENGAGE_HOLD_M} m and a walking suspect crosses it in ` +
+          `${((ENGAGE_HOLD_M / WALK) * 60).toFixed(0)} ticks, short of the ${AIM_TICKS} an officer needs to ` +
+          `finish aiming (${needed.toFixed(1)} m). Officers would follow a walker at arm's length and never fire.`,
+      );
+    }
+    if (ENGAGE_RANGE + ENGAGE_HOLD_M > WITNESS_RANGE) {
+      failures.push(
+        `An officer holding their aim fires out to ${ENGAGE_RANGE + ENGAGE_HOLD_M} m and can only witness at ` +
+          `${WITNESS_RANGE} m. The band has pushed the shot past the sight.`,
+      );
+    }
+  }
+  // --- The pursuit's own two numbers.
+  {
+    if (pursuitTargetFor(PURSUIT_SURGE_STARS) <= pursuitTargetFor(PURSUIT_SURGE_STARS - 1)) {
+      failures.push(
+        `The pursuit is ${pursuitTargetFor(PURSUIT_SURGE_STARS - 1)} officers below ${PURSUIT_SURGE_STARS} stars ` +
+          `and ${pursuitTargetFor(PURSUIT_SURGE_STARS)} at it. The rung the ladder escalates at does not ` +
+          'escalate, which is the star row promising something the street does not deliver.',
+      );
+    }
+    if (pursuitTargetFor(0) !== PURSUIT_TARGET) {
+      failures.push('A suspect with no stars at all is answered by something other than the base pursuit.');
+    }
+    // The surge and the debt together have to leave room for the other
+    // factions, because `MAX_ACTORS` is the whole city's budget and not the
+    // police's. Half of it is the line: past that a pursuit evicts the street.
+    if (PURSUIT_TARGET_HIGH + REINFORCE_DEBT_MAX > MAX_ACTORS) {
+      failures.push(
+        `A maximal pursuit is ${PURSUIT_TARGET_HIGH} + ${REINFORCE_DEBT_MAX} = ` +
+          `${PURSUIT_TARGET_HIGH + REINFORCE_DEBT_MAX} officers against a ${MAX_ACTORS}-actor cap shared with ` +
+          'every other faction. One suspect would evict the whole street.',
+      );
+    }
+    // The leash has to be **outside** the ring replacements come from, or an
+    // officer is stood down inside the radius `recruit` would promote a fresh
+    // one out of -- which is churn rather than a handoff.
+    if (!(PURSUIT_LEASH_M > PROMOTE_RADIUS)) {
+      failures.push(
+        `The leash is ${PURSUIT_LEASH_M} m and fresh officers are promoted from ${PROMOTE_RADIUS} m. An ` +
+          'officer would give up inside the ring their replacement comes out of.',
+      );
+    }
+  }
 
   // --- The kit, if the renderer built one.
   if (kitTriangles !== undefined && kitTriangles <= 0) {
@@ -4116,6 +4536,9 @@ export function verifyPolice(kitTriangles?: number, snapshotInterval?: number): 
   }
   // --- The two-star gate, over the real `POLICE.think`.
   failures.push(...verifyArmedAtTwoStars());
+
+  // --- And the pursuit's own state machine, over the same `think`.
+  failures.push(...verifyPursuit());
 
   // --- Where a round ends: a hit at the chest, a miss past you and into the road.
   {
@@ -4405,6 +4828,154 @@ function verifyArmedAtTwoStars(): string[] {
   return failures;
 }
 
+
+/**
+ * **The pursuit's state machine**, driven through the real `POLICE.think` on a
+ * flat world with nothing in it.
+ *
+ * Two behaviours, both added in the round that answered *"and actually chase u
+ * when u bad"*, and both of which fail by rendering a perfectly plausible
+ * pursuit:
+ *
+ *   - **The hold band.** An officer who has stopped keeps the weapon up while
+ *     the suspect walks a few metres further off. Without it the aim clock is
+ *     reset three times a second and a walking suspect is never fired at --
+ *     four officers at 35 m for thirty seconds and not one round, which
+ *     `server/police-check.ts` measured and which nothing about the picture
+ *     gives away. This is that measurement in miniature: one officer, one
+ *     suspect stepping backwards at a walk, and a count of rounds.
+ *   - **The leash.** An officer who has been comprehensively outrun gives up so
+ *     that `recruit` can put somebody fresh in front of the suspect instead.
+ *     The two ways to get it wrong are opposite and both are silent: too eager
+ *     and the officer dispatched from a station 600 m away stands down before
+ *     they have taken a step (the trickle then manufactures another one every
+ *     two seconds forever), too shy and the pursuit is permanently staffed by
+ *     four people who cannot catch up.
+ *
+ * The harness is `verifyArmedAtTwoStars`' -- a stub heat reader through
+ * `setHeatReader`, an `investigationOf` made by hand so no self-check can make
+ * anybody wanted, and `think` called directly with `stateTicks` advanced exactly
+ * as `FactionField.step` advances it.
+ */
+function verifyPursuit(): string[] {
+  const failures: string[] = [];
+  const def = npcKind(NPC_KIND.POLICE);
+  if (def === undefined) return ['verifyPolice could not find the police kind; the pursuit is unproven.'];
+
+  const wasReader = setHeatReader((id) => (id === SUSPECT_ID ? POLICE_ARMED_STARS : 0));
+  try {
+    const field = new FactionField();
+    const suspect = {
+      id: SUSPECT_ID,
+      body: { position: { x: 0, y: 0, z: 0 }, velocity: { x: 0, y: 0, z: 0 }, yaw: 0, pitch: 0, onGround: true },
+      health: MAX_HEALTH,
+      phase: 'idle',
+    } as unknown as CombatantState;
+    let shots = 0;
+    const ctx: FactionCtx = {
+      tick: 5000,
+      dt: 1 / 60,
+      collision: null,
+      groundHeight: () => 0,
+      roads: null,
+      peds: null,
+      combatants: [suspect],
+      field,
+      investigationOf: (id) =>
+        id === SUSPECT_ID ? { playerId: SUSPECT_ID, reason: REASON.ASSAULT, ticks: COUNTDOWN_TICKS, since: 0 } : undefined,
+      damagePlayer: () => {},
+      emit: (e) => {
+        if (e.kind === 'shot') shots++;
+      },
+    };
+
+    // --- 1. The hold band: a suspect **walking** away is fired at.
+    //
+    // The officer starts on the boundary and the suspect steps back 4.4 m/s --
+    // a player's walk, which is what made this fail. Ten seconds is room for
+    // eleven cooldowns; without the band it is room for none.
+    {
+      const officer = field.promote(NPC_KIND.POLICE, ENGAGE_RANGE, 0, 0, -1, 0, SUSPECT_ID);
+      if (officer === null) return ['verifyPolice could not promote an officer; the hold band is unproven.'];
+      suspect.body.position.x = 0;
+      for (let i = 0; i < 10 * 60; i++) {
+        ctx.tick++;
+        officer.stateTicks++;
+        def.think(officer, ctx);
+        // Backwards, away from the officer, at a walk.
+        suspect.body.position.x -= 4.4 / 60;
+      }
+      if (shots === 0) {
+        failures.push(
+          'An officer held station on a suspect walking away in a straight line for ten seconds and fired ' +
+            'nothing at all. The aim window is being reset by the engage transition on every tick the range ' +
+            `ticks over ${ENGAGE_RANGE} m -- see ENGAGE_HOLD_M, which is the band that stops it.`,
+        );
+      }
+      field.clear();
+    }
+
+    // --- 2. The leash lets go of somebody who has been outrun.
+    {
+      suspect.body.position.x = 0;
+      const officer = field.promote(NPC_KIND.POLICE, 20, 0, 0, -1, 0, SUSPECT_ID);
+      if (officer === null) return ['verifyPolice could not promote an officer; the leash is unproven.'];
+      // One tick to record the closest approach, then the suspect is a leash
+      // and a bit further away -- a teleport rather than a run, because what is
+      // being tested is the comparison and not how long a sprint takes.
+      ctx.tick++;
+      officer.stateTicks++;
+      def.think(officer, ctx);
+      const datum = officer.bestRange;
+      suspect.body.position.x = officer.x + datum + PURSUIT_LEASH_M + 5;
+      ctx.tick++;
+      officer.stateTicks++;
+      def.think(officer, ctx);
+      if (officer.target !== -1 || officer.state !== NPC_STATE.RETURN) {
+        failures.push(
+          `An officer whose suspect opened ${PURSUIT_LEASH_M + 5} m on them is still in state ` +
+            `${officer.state} chasing ${officer.target}. The leash never lets go, so a suspect who outran the ` +
+            'pair that saw them keeps all four pursuit slots on people who cannot catch up and meets nobody new.',
+        );
+      }
+      field.clear();
+    }
+
+    // --- 3. And does **not** let go of somebody who is still closing.
+    //
+    // The station reinforcement's case, and the reason the leash is measured
+    // against the officer's own closest approach rather than against a fixed
+    // distance: `recruit`'s trickle promotes at the station door, which is
+    // routinely hundreds of metres out. An absolute leash stands that officer
+    // down on the tick they are created, and the station then manufactures
+    // another one every `REINFORCE_INTERVAL_TICKS` for the rest of the
+    // investigation. Nothing errors and nobody ever arrives.
+    {
+      suspect.body.position.x = 0;
+      const officer = field.promote(NPC_KIND.POLICE, 600, 0, 0, -1, 0, SUSPECT_ID);
+      if (officer === null) return ['verifyPolice could not promote an officer; the long dispatch is unproven.'];
+      for (let i = 0; i < 60 * 10; i++) {
+        ctx.tick++;
+        officer.stateTicks++;
+        def.think(officer, ctx);
+      }
+      if (officer.target !== SUSPECT_ID) {
+        failures.push(
+          `An officer dispatched from 600 m gave up while still closing (they reached ${officer.x.toFixed(0)} m). ` +
+            'The leash is an absolute distance rather than ground lost against their own closest approach, so ' +
+            'every station reinforcement stands down on the tick it is promoted.',
+        );
+      }
+      if (!(officer.x < 600)) {
+        failures.push('An officer dispatched from 600 m did not close at all.');
+      }
+      field.clear();
+    }
+  } finally {
+    setHeatReader(wasReader);
+  }
+  return failures;
+}
 
 /**
  * The LOS ray, against a hand-built prism. Split out so `checkPolice` can run it

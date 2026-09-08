@@ -426,6 +426,7 @@ function actor(id: number, kind: number, x: number, z: number, state: number): N
     homeZ: z,
     fireCooldown: 0,
     shotsFired: 0,
+    bestRange: Infinity,
     barkedAt: 0,
     struckAt: 0,
     seen: 0,

@@ -455,7 +455,7 @@ export function verifyTalentLive(): string[] {
       id, kind, x, y: 0, z, dx: 0, dz: 1,
       state: 0, health: 1, downTicks: 0, stateTicks: 0,
       target: -1, homeX: x, homeZ: z,
-      fireCooldown: 0, shotsFired: 0, barkedAt: 0, struckAt: 0, seen: 0,
+      fireCooldown: 0, shotsFired: 0, bestRange: Infinity, barkedAt: 0, struckAt: 0, seen: 0,
     });
     // No lookup installed, so `fxMethheadAlly` is false and nobody is recruited.
     // That is the property every other self-check in this repo depends on.

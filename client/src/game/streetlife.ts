@@ -3379,7 +3379,7 @@ export function verifyStreetlife(): string[] {
     const fake = (kind: number, target: number, state: number): NpcActor => ({
       id: 1, kind, x: 0, y: 0, z: 0, dx: 0, dz: 1, state,
       health: 2, downTicks: 0, stateTicks: 0, target, homeX: 0, homeZ: 0,
-      fireCooldown: 0, shotsFired: 0, barkedAt: 0, struckAt: 0, seen: 0,
+      fireCooldown: 0, shotsFired: 0, bestRange: Infinity, barkedAt: 0, struckAt: 0, seen: 0,
     });
     if (strikeCrime(fake(NPC_KIND.METHHEAD, 3, NPC_STATE.CHASE)) !== REASON.NONE) {
       failures.push('Hitting a meth head is being reported as a crime. They are the aggressor.');
