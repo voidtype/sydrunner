@@ -31,7 +31,7 @@ keys=set(l.strip() for l in open('$R/publish-keys.txt') if l.strip())
 ok=set()
 for l in open('$R/r2-results.jsonl'):
     p=l.split()
-    if len(p)>=3 and p[0]=='OK' and p[2] in ('200','201'): ok.add(p[1])
+    if len(p)>=2 and p[0]=='OK': ok.add(p[1])  # columns: OK <key> <bytes sent>
 missing=keys-ok
 print(f"R2: {len(ok)} ok, {len(missing)} missing of {len(keys)}")
 if missing:
