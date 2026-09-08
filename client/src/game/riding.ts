@@ -181,7 +181,7 @@ import { type RailStation, CONCOURSE_OVER_RAIL_M,
 // terms section 2 sets out. It is imported rather than restated because the
 // deck's outer edge and the rim of the terrain carve have to be *the same
 // number*: see `PLATFORM_OUTER_M`, where their difference was the bug.
-import { pointInPolygon, type Prism } from '../player/collision.ts';
+import { pointInPolygon, UNDER_BUILDING_M, type Prism } from '../player/collision.ts';
 // WORKSTREAM AG: how much of the corridor this platform's track may have. See
 // `PlatformSite.outer` -- both ends of the wire read this one answer.
 import { atlasFor } from '../world/track-atlas.ts';
@@ -1909,6 +1909,55 @@ export const ACCESS_OVERLAP_M = 2.5;
 export const ACCESS_HEAD_M = 1.9;
 
 /**
+ * How far a building standing on `base` cuts into the head over an access
+ * floor at `floorY`, metres. Zero when a body walks under it clear.
+ *
+ * ---------------------------------------------------------------------------
+ * **This is `CollisionWorld.solidFor`'s building clause, restated on the
+ * plan's own arguments, and the restatement is the whole point of the
+ * function.** The plan asks *may a mouth stand here*; `resolve` asks *is this
+ * body inside a wall*; and until this was written the two asked it with
+ * different margins. `solidFor` is `headY > base - UNDER_BUILDING_M`, because
+ * a building is drawn from its pad *down* to the terrain -- `base` is a pad
+ * and not a soffit, and the only bodies genuinely under one are the ones two
+ * metres below its low corner, in a tunnel, a cutting or a shaft. This test
+ * was `fl + ACCESS_HEAD_M > base`: the same `base`, read as a soffit, with no
+ * margin at all. The two differ by exactly `UNDER_BUILDING_M`, and the gap
+ * between them is a mouth the planner calls clear and the mover calls a wall.
+ *
+ * **Edgecliff is what fell down it, on the 2026-09-08 retile.** The Edgecliff
+ * Centre is one 8,291 m2 OSM footprint (`o387786916`, 27 vertices, twelve
+ * metres, pad -27.62 m) covering the station's site, its OSM entrance at
+ * (2486.8 E, -1108.4 N) and every metre for 28 m north of it. The terrain four
+ * metres west of that entrance is -29.56, so a head at -27.66 cleared the pad
+ * by **0.03 m**, the ring search stopped on the first candidate it scored at
+ * zero, and the mouth was written inside the centre's walls. The street there
+ * answers -15.62 m -- the *roof* -- 13.9 m over the mouth the plan had just
+ * chosen; a body walking in met the wall at feet -15.6 and never reached the
+ * concourse at -40.6.
+ *
+ * It had been getting away with it, and by an accident. The shipped world
+ * carried a second, smaller OSM footprint over the same block (2,660 m2, five
+ * vertices, pad -28.80), and `AccessWorld.baseAt` reports the **lowest** pad
+ * over a point, so the entrance measured 1.37 m of intrusion and the search
+ * had to leave the block entirely -- 28 m north, onto open ground, which is
+ * where the shipped mouth is. `merge._dedupe_osm` landed this round, correctly
+ * recognised the two as one building drawn twice and kept the one that says
+ * more; the accidental margin went out with the duplicate, and a knife-edge
+ * that had always been there became a failure. Nothing new was built at
+ * Edgecliff, and the terrain under it did not move.
+ *
+ * At `ACCESS_MAX_SLOPE` the two metres cost 2.7 m of run before the incline is
+ * back under the pad -- which is exactly the strip the header above already
+ * says has to be clear: the pad, the mouth, and the first few metres.
+ */
+export function accessIntrusionAt(floorY: number, base: number): number {
+  if (!Number.isFinite(base)) return 0;
+  const cut = floorY + ACCESS_HEAD_M - (base - UNDER_BUILDING_M);
+  return cut > 0 ? cut : 0;
+}
+
+/**
  * The way into an underground station, as one set of numbers both ends and the
  * drawing read.
  *
@@ -2055,12 +2104,12 @@ export function stationAccessPlan(st: RailStation, world: AccessWorld = {}): Acc
     return [ux * sgn, uz * sgn];
   };
   // `clear`: no building stands on the pad, the mouth, or any part of the
-  // incline a head would reach -- a body whose head is under a building's
-  // base passes beneath it (`collision.resolve` and `roofHeight` both honour
-  // the soffit); any higher, it is inside the walls. Checked against the
-  // building's own base rather than the terrain, because a base is the low
-  // corner of a footprint on a slope and can sit metres under the street.
-  // `intrusion`: metres by which a building's base cuts into the head over
+  // incline a head would reach -- a body two metres below a building's low
+  // corner is in a tunnel and not in the walls, which is the one exception
+  // `collision.solidFor` makes and `accessIntrusionAt` restates. Checked
+  // against the building's own base rather than the terrain, because a base is
+  // the low corner of a footprint on a slope and can sit metres under the
+  // street. `intrusion`: metres by which a building cuts into the head over
   // the incline, worst sample; 0 is clear. Sampled every metre, so a narrow
   // wing is not stepped over.
   const intrusion = (mx: number, mz: number): number => {
@@ -2075,8 +2124,8 @@ export function stationAccessPlan(st: RailStation, world: AccessWorld = {}): Acc
       const sx = mx + dx * d;
       const sz = mz + dz * d;
       const fl = top - Math.max(d, 0) * ACCESS_MAX_SLOPE;
-      const base = world.baseAt(sx, sz);
-      if (Number.isFinite(base) && fl + ACCESS_HEAD_M - base > worst) worst = fl + ACCESS_HEAD_M - base;
+      const cut = accessIntrusionAt(fl, world.baseAt(sx, sz));
+      if (cut > worst) worst = cut;
     }
     return worst;
   };
@@ -4578,6 +4627,64 @@ function riderArc(consist: Consist, a: AboardSlot, head: number): number {
  */
 export function verifyStationAccess(): string[] {
   const failures: string[] = [];
+  // --- The way in is planned against the margin the *mover* uses -------------
+  //
+  // Edgecliff, from the field, as a fixture. Every number in this block was
+  // measured off the 2026-09-08 world with `stationAccessPlan` and
+  // `CollisionWorld` in hand, and the block is here because the failure it
+  // pins is one no station-shaped test would ever reach: it is three
+  // centimetres wide. See `accessIntrusionAt`.
+  //
+  //   * the Edgecliff Centre, `o387786916`: one OSM footprint, 8,291 m2,
+  //     spanning (2468..2609 E, -1084..-1201 N), pad -27.624 m;
+  //   * the candidate the ring search stopped on, four metres west of the OSM
+  //     entrance: terrain -29.5567, so a head at -27.657 -- 0.033 m *under*
+  //     that pad, which the old zero-margin reading scored as clear;
+  //   * the mouth that survives, 28 m north at (2486.8, -1080.4): off the
+  //     footprint entirely, terrain -28.690, which is where the shipped world
+  //     put it and where this build puts it again.
+  {
+    const rect = (x0: number, z0: number, x1: number, z1: number, base: number, structural = false): Prism => ({
+      points: new Float32Array([x0, z0, x1, z0, x1, z1, x0, z1]),
+      height: 12, base, top: base + 12,
+      minX: x0, minZ: z0, maxX: x1, maxZ: z1,
+      structural, seen: 0, carveStamp: 0,
+    });
+    const centre = rect(2468, 1084, 2609, 1201, -27.624);
+    const field = (prisms: Prism[]) => ({
+      prismsWithin(_x: number, _z: number, _r: number, out: Prism[]): void { for (const q of prisms) out.push(q); },
+    });
+    const w = accessWorldFrom(field([centre]), () => -29.5567);
+    // A footprint the way in crosses answers with its pad; one beside it does
+    // not answer at all, and `NaN` is what makes the mouth stay where it is.
+    const over = w.baseAt!(2482.8, 1108.39);
+    if (!(Math.abs(over - -27.624) < 0.001)) failures.push(`a footprint the way in crosses should hand back its pad, not ${over}`);
+    const beside = w.baseAt!(2486.8, 1080.39);
+    if (Number.isFinite(beside)) failures.push(`a footprint 4 m beside the mouth should leave it clear, not hand back ${beside}`);
+    if (accessIntrusionAt(-29.5567, beside) !== 0) failures.push('open ground over the mouth is not an intrusion');
+    // The 0.033 m the old reading cleared by, and the 1.967 m it is short by
+    // once the mover's own margin is in. If the first of these ever goes
+    // positive the fixture has drifted off the measurement it is named for.
+    if (!(-29.5567 + ACCESS_HEAD_M - -27.624 < 0)) failures.push('the Edgecliff fixture no longer clears the pad without the margin; the numbers have drifted');
+    const cut = accessIntrusionAt(-29.5567, over);
+    if (!(Math.abs(cut - 1.9673) < 0.01)) failures.push(`the Edgecliff Centre cuts ${cut.toFixed(3)} m into the head over its mouth, not 1.967`);
+    // The duplicate the dedupe took out, at the OSM entrance: it convicted on
+    // the old reading too, which is why the shipped world walked.
+    if (!(accessIntrusionAt(-29.3288, -28.8002) > 0)) failures.push('the 2,660 m2 duplicate over Edgecliff should have blocked the entrance on either reading');
+    // And the promise the header makes: six metres down a 1:1.33 incline the
+    // same pad is walked under, so a mouth is only ever pushed off the pad and
+    // the first few metres -- not out from under the block.
+    if (accessIntrusionAt(-29.5567 - 6 * ACCESS_MAX_SLOPE, -27.624) !== 0) failures.push('six metres down the incline a building is meant to be walked under');
+    // The seam itself, at the width of a centimetre: a head exactly
+    // `UNDER_BUILDING_M` below the pad is under the building, and one above it
+    // is inside it. This is `collision.solidFor` clause 2, said here.
+    if (accessIntrusionAt(-27.624 - UNDER_BUILDING_M - ACCESS_HEAD_M, -27.624) !== 0) failures.push('a head exactly two metres under the pad is under the building');
+    if (!(accessIntrusionAt(-27.624 - UNDER_BUILDING_M - ACCESS_HEAD_M + 0.01, -27.624) > 0)) failures.push('a head a centimetre over that is inside it');
+    // A deck is not a building and never was: `baseAt` skips it, because
+    // `solidFor` honours a structure's soffit with no margin at all.
+    const deck = accessWorldFrom(field([rect(2468, 1084, 2609, 1201, -27.624, true)]), () => -29.5567);
+    if (Number.isFinite(deck.baseAt!(2482.8, 1108.39))) failures.push('a structure over the way in is a soffit, not a pad');
+  }
   // --- The carve. A plan running along +z from a mouth at the origin, 10 m
   // deep over 13.3 m, flat ground at 0: the lid (4.2 m over the floor) is
   // under the street past d = (4.2 + cover) / 0.75.

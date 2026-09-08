@@ -1873,6 +1873,27 @@ walked **1 of 28** before the following and **28 of 28** after.
   the mouth, or the head of the incline (`riding.stationAccessPlan`, rings of
   eight compass points, the least-intruded candidate if none is clear). Its
   height is the terrain, not the bake's entrance DEM.
+- **"Clear" means clear to the mover** (`riding.accessIntrusionAt`, 2026-09-09).
+  A building's `base` is a **pad, not a soffit** -- `mesh.py` runs its walls
+  down to the terrain -- so `collision.solidFor` only lets a body under one
+  whose head is `UNDER_BUILDING_M` (2 m) below the low corner. The mouth search
+  read the same `base` with no margin at all, and those two metres are a mouth
+  the planner calls clear and the mover calls a wall. **Edgecliff fell down it
+  on the 2026-09-08 retile.** `merge._dedupe_osm` landed that round and
+  correctly took out a 2,660 m2 OSM duplicate over the Edgecliff Centre; the
+  surviving 8,291 m2 footprint (`o387786916`) has its pad 1.93 m over the
+  street four metres west of the OSM entrance, the search scored that as clear
+  by **0.03 m**, and the mouth was written inside the building -- where the
+  street answers the roof, 13.9 m up, and the walk in met a wall at feet
+  -15.6 m with the concourse at -40.6. Nothing was built at Edgecliff and no
+  terrain tile there moved: the duplicate had been supplying the margin by
+  accident, because `AccessWorld.baseAt` reports the *lowest* pad over a point.
+  With the mover's own margin in, the mouth goes back to the open ground 28 m
+  north that the shipped world used -- the same plan to the last decimal --
+  and four other mouths move between 2 and 8 m. No retile: the rule is a
+  runtime one, evaluated identically on both ends at every station-box rebuild
+  (`world.boxesOf`, `main.refreshStationBoxes`), and it costs nothing over the
+  sampling loop it replaces.
 - **The incline** is 1:1.33 -- an escalator's pitch -- because a 1:2 ramp to a
   railhead thirty metres down is a sixty-metre strip no CBD block leaves free.
   Its box overlaps the street as a *flat* pad (`StationBox.riseMax`).
