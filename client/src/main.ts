@@ -516,6 +516,10 @@ import {
   createCarShunt,
   resolveCarContact,
   resolveTrafficContact,
+  // --- WORKSTREAM AS: and the same layer asked of the *parked* fleet, which is
+  // most of the cars in a street. `sim.resolveStaticContacts` is the authority
+  // and this is its prediction, on the line above's own terms.
+  resolveStaticContact,
   verifyCarPhysics,
   type DrivenCar,
   snapToBay,
@@ -532,7 +536,14 @@ import {
 // --- WORKSTREAM S: the parked fleet, as something a player can steal. The field
 // is fed by the streamer (`setStaticCarSink`) and asked by `resolveTake`; see
 // `game/staticcars.ts` and `game/driving.ts` section 1, which this retires.
-import { StaticCarField, verifyParkedBins, verifyStaticCars } from './game/staticcars.ts';
+// WORKSTREAM AS adds `createStaticCarPose`: the same field is now also what
+// makes a kerb car solid, and a contact has to keep hold of which one it hit.
+import {
+  StaticCarField,
+  createStaticCarPose,
+  verifyParkedBins,
+  verifyStaticCars,
+} from './game/staticcars.ts';
 // The name of the car you just got into, said once as hero text. Three-free and
 // pure, so the modulus that picks the model can be taken here without the fleet
 // -- see `game/carlabels.ts`, which is the whole argument.
@@ -4377,6 +4388,12 @@ async function main(): Promise<void> {
   const carBodyB = createRigidBody();
   const carContact = createRigidContact();
   const carShunt = createCarShunt();
+  /**
+   * --- WORKSTREAM AS: and whichever parked car won a static contact.
+   * `sim.staticStruck` on the other end. A copy rather than a borrow of
+   * `StaticCarField`'s reused pose, on that class's own contract.
+   */
+  const carStaticStruck = createStaticCarPose();
   /** Loose cars that moved this frame. Owned and reused; see `CarField.integrateLoose`. */
   const carLooseSweep: DrivenCar[] = [];
   /**
@@ -11845,6 +11862,73 @@ async function main(): Promise<void> {
               c.body.position.z = moved.z;
             }
             if (carShunt.closing < KNOCK_LOOSE_SPEED) traffic.held.stun(struck.identity, tick);
+          }
+          // --- WORKSTREAM AS: and the **parked fleet**, predicted on exactly
+          // the terms the block above it is.
+          //
+          // `sim.resolveStaticContacts` runs the identical call with the
+          // identical arguments off the identical bytes, so this is a prediction
+          // and not a second opinion. It is the population the owner's *"not all
+          // cars collide"* was about: the timetable is forty cars inside a draw
+          // radius and `.cars.bin` is twenty-three thousand, so this is what
+          // makes a terrace street solid on the frame you drive into it rather
+          // than a round trip later.
+          //
+          // **The residency needs nothing said about it here**, which is the
+          // point of asking `staticCars` -- this end's own field, fed tile by
+          // tile by `world/streamer.ts` -- rather than reaching for anything
+          // wider. `driving.resolveTake`'s paragraph is the whole argument and
+          // it holds verbatim: the server wants `.cars.bin` out to 2,000 m of
+          // any participant and this end holds a ring of a few hundred metres,
+          // so **the server's set is a strict superset of ours around any
+          // player**. We cannot predict a contact it will not confirm; the
+          // reverse -- it resolving a car whose tile has not been built here --
+          // arrives as a correction, which is what `CarField.adopt` does with
+          // every other misprediction on this path.
+          //
+          // The knock-loose branch is not predicted, for the reason the block
+          // above gives: a record's id is the server's to allocate. What *is*
+          // predicted is the flag, because it changes our own car's rebound --
+          // over the threshold the parked car is dynamic and takes some of the
+          // impulse away, and a client that made it a wall would stop harder
+          // than the server did and snap forward when `MSG.CARS` arrived. For
+          // the one round trip between the hit and that record landing, this end
+          // keeps meeting a car the server has already lifted out of the kerb;
+          // the correction is the same one every take takes.
+          if (staticCars.carCount > 0) {
+            carRigidBody(mine, carBodyA);
+            const feet = c.body.position.y - EYE_HEIGHT;
+            if (
+              resolveStaticContact(
+                staticCars, c.body.position.x, feet, c.body.position.z,
+                carBodyA, carBodyB, carContact, carShunt, drivenCars.suppress, carStaticStruck, true,
+              ) && (carShunt.impulse !== 0 || carShunt.push[0] !== 0 || carShunt.push[1] !== 0)
+            ) {
+              c.carSpeed = rigidAlong(carBodyA);
+              c.carSlip = rigidSlip(carBodyA);
+              c.carYawRate = carBodyA.yawRate;
+              const push = carShunt.push;
+              if (push[0] !== 0 || push[1] !== 0) {
+                const moved = collision.resolve(
+                  c.body.position.x, c.body.position.z,
+                  c.body.position.x + push[0], c.body.position.z + push[1],
+                  NOSE_RADIUS, feet + NOSE_STEP, feet + NOSE_HEAD,
+                );
+                c.body.position.x = moved.x;
+                c.body.position.z = moved.z;
+              }
+              // The damage, off the contact's own closing speed and through the
+              // same `CarField.damage` funnel and the same cooldown the server
+              // charges it with -- `sim.resolveStaticContacts` decision 2 is
+              // where the argument for that number lives. Online the server's
+              // answer wins on the next `MSG.CARS`; offline this is it.
+              const cost = crashDamage(carShunt.closing);
+              if (cost > 0 && cars.damage(mine.id, cost) !== null) {
+                audio.carCrunch(Math.min(1, carShunt.closing / DRIVE_TOP_SPEED));
+              } else {
+                audio.carScrape();
+              }
+            }
           }
           // --- And the **records with nobody in them**, which is the other
           // half of "cars should never pass thru each other" and the half a

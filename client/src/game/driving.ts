@@ -249,6 +249,20 @@
  *     and into the driven set as a driverless record, which is the one new kind
  *     of thing in this feature. See `KNOCK_LOOSE_SPEED` and `CarField.knockLoose`.
  *
+ * **WORKSTREAM AS: and the second half of that middle bullet is now true.** It
+ * said "ambient or static" from the day it was written and only the ambient half
+ * was ever asked: `resolveTrafficContact` walks a `TrafficField` and there was
+ * no function in this file that walked a `StaticCarField`, so the 733,898
+ * resident cars at the kerbs -- most of what a player can see -- had a box
+ * nothing tested. The owner's report was one line, *"not all cars collide"*.
+ * `resolveStaticContact` is the missing sweep, `staticRigidBody` is the missing
+ * fill, and both ends ask them beside the timetable's pair at the same instant,
+ * which is what `resolveTake` has done with these two fleets since workstream S.
+ * A parked car knocked out of its bay is `knockLoose` with the identity it
+ * always had, so the record, the suppression, the wire and the recycling are all
+ * the ones that already existed -- and `world/carlod.syncSuppressedStatics` was
+ * already folding its instance flat, because a theft needed exactly that.
+ *
  * **On the hitbox being "too long".** It is not, and it is deliberately
  * unchanged: `CAR_BODY_SIZE` is the drawn body and `traffic.HIT_MARGIN` is ten
  * centimetres. What produced the report was the *timing* rather than the size --
@@ -281,7 +295,10 @@ import {
 // WORKSTREAM S: the parked fleet, as a source `resolveTake` can ask. A type-only
 // import, so nothing about this file's dependency graph changes -- the *field*
 // lives in `game/staticcars.ts` and is constructed by whoever owns a world.
-import type { StaticCarSource } from './staticcars.ts';
+// WORKSTREAM AS adds `StaticCarPose` for the same reason and on the same terms:
+// `staticRigidBody` and `resolveStaticContact` need the shape of a parked car
+// and nothing about the field that holds them.
+import type { StaticCarPose, StaticCarSource } from './staticcars.ts';
 // --- The body layer. See section 7 of the header, and `game/rigid.ts`' own.
 //
 // The dependency runs **this way and only this way**: `rigid.ts` knows nothing
@@ -2280,6 +2297,75 @@ export function ambientRigidBody(pose: CarPose, out: RigidBody): RigidBody {
 }
 
 /**
+ * And from a car parked at the kerb out of `<tile>.cars.bin`. WORKSTREAM AS.
+ *
+ * The third of the three fills, and the owner's whole report -- *"not all cars
+ * collide"* -- was this one missing. `resolveTrafficContacts` walks the
+ * timetable and only the timetable, so the 733,898 resident cars out of the
+ * parked fleet, which is most of what anybody standing in a street can see,
+ * were the one population in the game with a box nothing ever asked about. You
+ * could drive through a whole row of them at forty and feel nothing.
+ *
+ * **`kinematic`, like the ambient fill above it, and for one of that function's
+ * two reasons rather than both.** A parked car has no timetable to carry on
+ * down -- it has no clock at all, it is six numbers in a `Float32Array` -- but
+ * it equally has nowhere to *put* a velocity, which is the half that decides
+ * this flag: a `StaticCarField` is a decode of bytes on disk and writing a
+ * speed into it would be a mutation neither end could agree about and neither
+ * could persist. What happens instead is the same two-way rule the timetable
+ * has and it is `resolveStaticContact`'s to apply: under `KNOCK_LOOSE_SPEED`
+ * the car is a wall, and over it, it stops being parked at all and becomes a
+ * driverless record through `CarField.knockLoose` -- which suppresses the
+ * identity, which is what `world/carlod.syncSuppressedStatics` already folds the
+ * instance flat for.
+ *
+ * ---------------------------------------------------------------------------
+ * THE BOX IS `CAR_BODY_SIZE` WITHOUT `traffic.HIT_MARGIN`, WHICH IS
+ * `carRigidBody`'S CHOICE AND NOT `ambientRigidBody`'S.
+ *
+ * That is the one place the three fills disagree and it is worth the paragraph,
+ * because the obvious reading is that a car nobody is driving should be shaped
+ * like the other cars nobody is driving. The deciding fact is what happens next:
+ * a parked car that is hit hard becomes a `DrivenCar`, and a `DrivenCar` is
+ * boxed by `carRigidBody` -- so a static car boxed with the margin would
+ * **change size at the instant it was knocked loose**, growing 10 cm on every
+ * side and shoving the car that hit it. A pop like that has no picture and would
+ * be blamed on the impulse. The margin exists to make a *knockdown* generous at
+ * the corners (`traffic.HIT_MARGIN`) and a parked car is furniture a player
+ * walks up to and can see the edges of, which is `carRigidBody`'s own sentence.
+ *
+ * The heading costs `rigidSetHeading`'s two transcendentals, which is the one
+ * thing this fill pays that `ambientRigidBody` does not: a `CarPose` carries a
+ * unit heading already and a `StaticCarPose` carries a look yaw, because the
+ * sidecar stores a rotation and there is no way from that to `(dx, dz)` that is
+ * not a `sin` and a `cos`. It is affordable on `rigidSetHeading`'s own terms one
+ * step widened -- this runs per *candidate* rather than per driven car, and a
+ * `CRASH_QUERY_RADIUS` query against a kerb row returns a handful. Both ends
+ * compute `staticLookYaw` as one subtraction and therefore hand the same double
+ * to the same two functions; a last-bit disagreement between two engines' `sin`
+ * moves a corner by 1e-16 m and could only change an answer in an exact tie,
+ * which `resolveStaticContact` breaks on an integer anyway.
+ */
+export function staticRigidBody(pose: StaticCarPose, out: RigidBody): RigidBody {
+  const size = CAR_BODY_SIZE[pose.body] ?? CAR_BODY_SIZE[0];
+  out.x = pose.x;
+  out.z = pose.z;
+  rigidSetHeading(out, pose.yaw);
+  // Furniture: it is not going anywhere until somebody knocks it out of the
+  // kerb, and then it is going somewhere as a record rather than as a row.
+  out.vx = 0;
+  out.vz = 0;
+  out.yawRate = 0;
+  out.mass = carMass(pose.body);
+  out.halfLength = size.length * 0.5;
+  out.halfWidth = size.width * 0.5;
+  out.restitution = DEFAULT_RESTITUTION;
+  out.friction = DEFAULT_FRICTION;
+  out.kinematic = true;
+  return out;
+}
+
+/**
  * What one contact did, in the units the callers need.
  *
  * A record the caller owns and reuses, on `traffic.CarPose`'s contract: the
@@ -2445,6 +2531,205 @@ export function resolveTrafficContact(
     return true;
   });
   return hit;
+}
+
+/**
+ * The parked car a body is **inside**, resolved. False for the overwhelmingly
+ * common case of not touching anything. WORKSTREAM AS.
+ *
+ * `resolveTrafficContact`'s sibling over the *other* fleet, and the answer to
+ * the owner's *"not all cars collide"*. Everything above this line asks the
+ * timetable; this asks the kerb, which is where 733,898 of the resident cars in
+ * Sydney actually are. `resolveTake` has asked both sources at one instant since
+ * workstream S -- *"the winner is decided by one rule over the union of them"* --
+ * and this is that shape applied to the contact.
+ *
+ * The body is `a` and may be **anything with a box**: a driven car
+ * (`carRigidBody`), a wreck rolling down a hill, a cyclist
+ * (`bikes.riderRigidBody`). Nothing below knows which, which is `rigid.ts`
+ * section 1's whole argument one level up -- a car hitting a parked car and a
+ * bike hitting a parked car are the same event seen from two sides.
+ *
+ * ---------------------------------------------------------------------------
+ * 1. WHY THE WINNER IS THE LOWEST IDENTITY AND NOT THE FIRST ONE FOUND.
+ *
+ * `crashIntoTraffic` and `resolveTrafficContact` both take the **first** car the
+ * iterator offers, and both state the reason: `forEachCarNear` has one fixed
+ * iteration order in every process, so "the first" is a thing two processes can
+ * agree on. **That argument does not survive the move to the parked fleet**, and
+ * getting this wrong would have been invisible.
+ *
+ * `StaticCarField.forEachStaticNear` walks a `Map` of tiles in *adoption* order,
+ * and the two ends adopt in different orders by construction: the server's
+ * arrive as `HexResidency`'s third layer drains a hexagon manifest, the
+ * browser's as `world/streamer.ts` commits tiles around a moving player. Two
+ * processes holding the same two cars can therefore offer them in opposite
+ * orders, and "the first" would name a different car on each end -- a shunt off
+ * the car in front on one screen and the car behind on the other.
+ *
+ * So the rule is the **lowest identity among the candidates that actually
+ * overlap**, which is `offerTake`'s own tie-break (*"an integer comparison is a
+ * rule both can state where a float comparison is one two builds can disagree
+ * about"*) applied to the same fleet one layer down. It costs a second
+ * `rigidOverlap` on the winner, which is four dot products on a pair already
+ * known to be touching, and it buys an answer that does not depend on which
+ * process is asking.
+ *
+ * ---------------------------------------------------------------------------
+ * 2. `knockLoose` IS A PARAMETER BECAUSE A BIKE IS NOT A CAR.
+ *
+ * When it is set, this behaves exactly as `resolveTrafficContact` does: under
+ * `KNOCK_LOOSE_SPEED` the parked car is a wall and over it, it is dynamic and
+ * the caller reads `b` for the velocity to hand `CarField.knockLoose`. When it
+ * is clear the parked car is a wall at any speed.
+ *
+ * The bike sweep clears it, and the reason is that `KNOCK_LOOSE_SPEED` is a
+ * rule about *cars*: six metres a second was chosen against a 1.4-tonne body,
+ * which is 8,400 kg m/s of momentum, and a 180 kg bike would have to be doing
+ * 47 m/s to bring the same. Handing a cyclist the same threshold would let a
+ * Lime punt a parked Hilux out of its bay at jogging pace, which is not a
+ * picture anybody has asked for. What a bike contact decides is whether the
+ * *rider* comes off, and that is `bikes.BIKE_THROW_IMPULSE`'s question against
+ * `out.impulse`, unchanged and already written.
+ *
+ * ---------------------------------------------------------------------------
+ * 3. THE RESIDENCY, AND WHY NEITHER END HAS TO DO ANYTHING ABOUT IT.
+ *
+ * `statics` is whatever field the caller holds and nothing here reaches past it:
+ * on the server `ServerWorld.staticCars`, wanted out to
+ * `world.STATIC_CARS_NEED_MARGIN_M` (2,000 m) of any participant; in the browser
+ * the `StaticCarField` `world/streamer.ts` feeds, which is a ring of a few
+ * hundred metres. `resolveTake`'s paragraph on this is the whole answer and it
+ * holds verbatim for contacts: **the server's set is a strict superset of the
+ * client's around any player**, so the client cannot predict a contact the
+ * server has not got, and the reverse -- the server resolving a car whose tile
+ * the browser has not built -- arrives as a correction, which is what every
+ * other misprediction on this path already does. A caller with no field at all
+ * passes `null` and gets what shipped before this workstream.
+ *
+ * `found` is the caller's own copy of the winning car, filled here. It is a copy
+ * rather than the field's reused pose because `forEachStaticNear` hands out one
+ * scratch it overwrites per car -- `StaticCarPose`'s stated contract -- and this
+ * function has to still know who won after the walk is over.
+ */
+export function resolveStaticContact(
+  statics: StaticCarSource,
+  /** Where to look: the body's own centre, and the feet the ground is asked about. */
+  x: number,
+  feetY: number,
+  z: number,
+  /** The striking body, already filled. Written. */
+  a: RigidBody,
+  /** Scratch for the parked car. Filled here, and made dynamic if the hit was hard. */
+  b: RigidBody,
+  contact: RigidContact,
+  out: CarShunt,
+  /** `CarField.suppressed`. A car somebody has already taken is not at the kerb. */
+  suppressed: (identity: number) => boolean,
+  /** The caller's copy of whichever car won. See section 1. */
+  found: StaticCarPose,
+  /** May this contact take the car out of the kerb at all? See section 2. */
+  knockLoose: boolean,
+  radius = CRASH_QUERY_RADIUS,
+): boolean {
+  out.impulse = 0;
+  out.closing = 0;
+  out.push[0] = 0;
+  out.push[1] = 0;
+  out.push[2] = 0;
+  out.push[3] = 0;
+
+  let has = false;
+  statics.forEachStaticNear(x, feetY, z, radius, (c) => {
+    // Somebody is driving it, or it burnt: either way it is not furniture any
+    // more, and its record is the driven sweep's business. `resolveTake` asks
+    // the identical predicate of the identical fleet.
+    if (suppressed(c.identity)) return;
+    // The viaduct gate, `crashIntoTraffic`' clause and `offerTake`'s: a car on
+    // the Cahill Expressway is not in the car on Alfred Street underneath it.
+    // `TAKE_HEIGHT` is this project's one answer to "the same piece of road".
+    const dy = c.y - feetY;
+    if (dy > TAKE_HEIGHT || dy < -TAKE_HEIGHT) return;
+    // Cheaper than the identity comparison it would otherwise gate, and it is
+    // false for all but a handful of the cars a kerb row offers.
+    staticRigidBody(c, b);
+    if (!rigidOverlap(a, b, contact)) return;
+    // --- **A car whose centre is inside your own footprint is not a car you
+    //     have hit. It is a car you are parked in.**
+    //
+    // The one clause here that `resolveTrafficContact` has no need of, and it is
+    // the difference between a feature and a regression. The pipeline puts a
+    // schedule car inside a parked one at the ends where it could not fill a bay
+    // -- `traffic.KERBLESS_INSET_M` states the residual as 5.7 % of 212 ends and
+    // says outright that the real fix is a `bays.py` pass and a retile -- and
+    // `traffic.synthesiseLaneBay` parks a car at the left edge of its own lane,
+    // which is precisely where `.cars.bin` puts the kerb fleet. That was
+    // harmless while nothing tested a parked car's box. The moment something did
+    // it became **"taken but not drivable"**: you press `E` at one of those
+    // ends, you are born inside a Camry, and every tick spends itself pushing
+    // you back into the one behind. `server/take-check.ts` caught it on the
+    // first run and measured it -- a second of full throttle moved the car
+    // 1.59 m -- which is the bug the take was fixed for wearing a different hat.
+    //
+    // The gate is that the two centres are closer than the two cars are **wide**
+    // (1.8 m for two sedans), which is a picture rather than a tolerance: cars
+    // that meet are 4.6 m apart nose to tail and 3.2 m apart nose to flank, and
+    // no legitimate approach can ever get inside 1.8 m -- the separation runs
+    // every tick and one tick at `DRIVE_TOP_SPEED` is 0.73 m, so the closest a
+    // real T-bone reaches is 2.47 m. What is left inside the gate is only the
+    // co-located pair, which is the pipeline's own and predates all of this: the
+    // two cars are drawn exactly as they always were, and neither shoves the
+    // other out of a bay they are both standing in.
+    const cx = c.x - a.x;
+    const cz = c.z - a.z;
+    const stacked = a.halfWidth + b.halfWidth;
+    if (cx * cx + cz * cz < stacked * stacked) return;
+    if (has && c.identity >= found.identity) return;
+    has = true;
+    found.identity = c.identity;
+    found.body = c.body;
+    found.colour = c.colour;
+    found.x = c.x;
+    found.y = c.y;
+    found.z = c.z;
+    found.yaw = c.yaw;
+  });
+  if (!has) return false;
+
+  // The winner again, because the walk above left `b` and `contact` describing
+  // whichever car happened to come last. See section 1.
+  staticRigidBody(found, b);
+  if (!resolveCarContact(a, b, contact, out, (closing) => {
+    // `resolveTrafficContact`'s hook, with section 2's gate in front of it.
+    b.kinematic = !knockLoose || closing < KNOCK_LOOSE_SPEED;
+  })) {
+    return false;
+  }
+  // --- 4. **A body that is not moving into a parked car is not in contact with
+  //     it**, however deep the overlap is. This is the one rule here that
+  //     `resolveTrafficContact` does not have, and it exists because of a
+  //     failure `server/take-check.ts` found the day this shipped.
+  //
+  // The pipeline puts a schedule car inside a parked one about five times in a
+  // hundred at the ends it could not fill a bay at -- `traffic.KERBLESS_INSET_M`
+  // states the residual as 5.7 % of 212 ends and says the real fix is a `bays.py`
+  // pass and a retile. Which was harmless while nothing tested a parked car's
+  // box, and became "taken but not drivable" the moment something did: you press
+  // `E`, you are born inside a Camry, and every tick spends itself separating
+  // you from it -- a second of full throttle moved the car 1.59 m, which is
+  // exactly the bug the take was fixed for wearing a different hat.
+  //
+  // Gating on the closing speed answers it without a grace period, a flag or a
+  // tick counter, and it is the honest rule rather than a workaround: **the
+  // separation exists to stop you entering a car, not to eject you from one you
+  // were placed in.** Driving *into* a parked car closes and is refused; driving
+  // *out* of one closes on nothing and is free; sitting inside one is not an
+  // event at all, which is also what keeps a car resting against a kerb car off
+  // the wire every tick. What it costs is that two overlapping cars nobody is
+  // pushing together stay overlapping -- which is the pipeline's own 5.7 % and
+  // was true before any of this, drawn exactly as it always was.
+  if (!(out.closing > 0)) return false;
+  return true;
 }
 
 /**
@@ -5382,6 +5667,167 @@ export function verifyCarPhysics(): string[] {
     }
     if (field.get(ids[ids.length - 1]) === undefined) {
       failures.push('The newest knocked car was evicted rather than the oldest.');
+    }
+  }
+
+  // --- WORKSTREAM AS: the parked fleet is solid, and the three ways that fails
+  //     silently.
+  //
+  //     `server/carcoverage-check.ts` is the acceptance and it drives the real
+  //     `Simulation` over the shipped bake. What can be asserted *here* is
+  //     everything that does not need a world, and `game/staticcars.ts`' own
+  //     header says a `StaticCarSource` can be answered from an array -- which
+  //     is what makes the whole rule checkable at boot on both ends:
+  //
+  //       - **a box that changes size when the car is knocked loose.** A static
+  //         car boxed with `traffic.HIT_MARGIN` would grow 10 cm on every side
+  //         the instant it became a record, and shove the car that hit it. No
+  //         picture; it would be blamed on the impulse.
+  //       - **a winner that depends on which process asked.** The two ends walk
+  //         their tiles in different orders (see `resolveStaticContact` section
+  //         1), so "the first one found" would name a different car on each end.
+  //       - **a bike that punts a Hilux out of its bay.** `KNOCK_LOOSE_SPEED` is
+  //         a rule about cars; the `knockLoose` flag is what keeps it there.
+  {
+    const contact = createRigidContact();
+    const shunt = createCarShunt();
+    const mine = createRigidBody();
+    const theirs = createRigidBody();
+    const found = { identity: 0, body: 0, colour: 0, x: 0, y: 0, z: 0, yaw: 0 };
+
+    /** A `StaticCarSource` made of literals. `staticcars.ts` section 2's own seam. */
+    const rowOf = (cars: StaticCarPose[]): StaticCarSource => ({
+      // `feetY` is the ground hint a real field resolves a height with; these
+      // cars carry theirs, so it is ignored here exactly as the class's default
+      // `groundAt` ignores everything but the asker.
+      forEachStaticNear: (x, _feetY, z, radius, visit) => {
+        const r2 = radius * radius;
+        for (const c of cars) {
+          const dx = c.x - x;
+          const dz = c.z - z;
+          if (dx * dx + dz * dz > r2) continue;
+          visit(c);
+        }
+      },
+    });
+    const none = (): boolean => false;
+
+    // The box, against the record the same car becomes. A sedan is 4.6 x 1.8.
+    {
+      staticRigidBody({ identity: 1, body: 0, colour: 0, x: 0, y: 0, z: 0, yaw: 0 }, theirs);
+      carRigidBody({ body: 0, x: 0, z: 0, yaw: 0, speed: 0 }, mine);
+      if (theirs.halfLength !== mine.halfLength || theirs.halfWidth !== mine.halfWidth) {
+        failures.push(
+          `A parked sedan boxes at ${theirs.halfLength} x ${theirs.halfWidth} and the record it becomes ` +
+            `at ${mine.halfLength} x ${mine.halfWidth}. A car that changes size on the tick it is knocked ` +
+            'loose shoves whatever hit it, and nobody would attribute that to a box.',
+        );
+      }
+      if (!theirs.kinematic) failures.push('A parked car is not kinematic; there is nowhere to put a velocity.');
+      if (theirs.vx !== 0 || theirs.vz !== 0) failures.push('A parked car was filled with a velocity.');
+      // Yaw 0 is `(0, -1)`, `rigid.ts` section 5's convention, through
+      // `staticLookYaw`'s subtraction rather than through an `atan2`.
+      if (Math.abs(theirs.dx) > 1e-12 || Math.abs(theirs.dz + 1) > 1e-12) {
+        failures.push(`A parked car at yaw 0 points (${theirs.dx}, ${theirs.dz}) rather than (0, -1).`);
+      }
+    }
+
+    // Two overlapping candidates offered in both orders: the same one must win.
+    {
+      const high: StaticCarPose = { identity: 900, body: 0, colour: 0, x: 0, y: 0, z: -2.2, yaw: 0 };
+      const low: StaticCarPose = { identity: 12, body: 0, colour: 0, x: 0.6, y: 0, z: -2.4, yaw: 0 };
+      const winners: number[] = [];
+      for (const order of [[high, low], [low, high]]) {
+        carRigidBody({ body: 0, x: 0, z: 2.0, yaw: 0, speed: 10 }, mine);
+        if (!resolveStaticContact(rowOf(order), 0, 0, 2.0, mine, theirs, contact, shunt, none, found, true)) {
+          failures.push('A car driven into two parked cars found neither of them.');
+          break;
+        }
+        winners.push(found.identity);
+      }
+      if (winners.length === 2 && winners[0] !== winners[1]) {
+        failures.push(
+          `Two parked cars offered in two orders produced two winners (${winners[0]} and ${winners[1]}). ` +
+            'The ends adopt tiles in different orders, so an order-dependent winner is a shunt off the car ' +
+            'in front on one screen and the car behind on the other. See resolveStaticContact section 1.',
+        );
+      }
+      if (winners.length === 2 && winners[0] !== 12) {
+        failures.push(`The winner was identity ${winners[0]} and not the lowest, 12.`);
+      }
+    }
+
+    // The contact itself: a wall under the threshold, a launch over it.
+    {
+      const row = rowOf([{ identity: 5, body: 0, colour: 0, x: 0, y: 0, z: -2.3, yaw: 0 }]);
+      // Under. `KNOCK_LOOSE_SPEED` is 6, so half of it is comfortably a wall.
+      carRigidBody({ body: 0, x: 0, z: 2.0, yaw: 0, speed: KNOCK_LOOSE_SPEED * 0.5 }, mine);
+      if (!resolveStaticContact(row, 0, 0, 2.0, mine, theirs, contact, shunt, none, found, true)) {
+        failures.push('A car driven into a parked car at half the knock-loose speed found no contact.');
+      } else {
+        if (theirs.vx !== 0 || theirs.vz !== 0 || theirs.yawRate !== 0) {
+          failures.push('A parked car was moved by a hit under the threshold. Under it, it is a wall.');
+        }
+        if (shunt.push[2] !== 0 || shunt.push[3] !== 0) {
+          failures.push('The separation asked a parked car to move out of the way.');
+        }
+        if (!(shunt.push[1] > 0)) {
+          failures.push(`The driver was pushed ${shunt.push[1]} back out of a parked car; it must be positive.`);
+        }
+        if (!(rigidAlong(mine) < 0)) {
+          failures.push(`A car that hit a parked car left at ${rigidAlong(mine)} m/s; it must rebound.`);
+        }
+      }
+      // Over, and the parked car now has somewhere to put a velocity.
+      carRigidBody({ body: 0, x: 0, z: 2.0, yaw: 0, speed: KNOCK_LOOSE_SPEED * 2 }, mine);
+      if (!resolveStaticContact(row, 0, 0, 2.0, mine, theirs, contact, shunt, none, found, true)) {
+        failures.push('A car driven into a parked car at twice the knock-loose speed found no contact.');
+      } else if (!(theirs.vz < 0)) {
+        failures.push(
+          `A parked car hit at ${(KNOCK_LOOSE_SPEED * 2).toFixed(1)} m/s left at ${theirs.vz} m/s along the ` +
+            'hit. Over the threshold it stops being furniture and is launched -- see CarField.knockLoose.',
+        );
+      }
+      // ...and with `knockLoose` clear it is a wall at any speed, which is what
+      // stops a Lime punting a Hilux out of its bay.
+      carRigidBody({ body: 0, x: 0, z: 2.0, yaw: 0, speed: KNOCK_LOOSE_SPEED * 4 }, mine);
+      if (!resolveStaticContact(row, 0, 0, 2.0, mine, theirs, contact, shunt, none, found, false)) {
+        failures.push('A body driven into a parked car with knockLoose clear found no contact at all.');
+      } else if (theirs.vx !== 0 || theirs.vz !== 0 || theirs.yawRate !== 0) {
+        failures.push(
+          'A caller that asked for a wall got a launch. `knockLoose` is what keeps KNOCK_LOOSE_SPEED a ' +
+            'rule about cars rather than about bikes -- see resolveStaticContact section 2.',
+        );
+      }
+    }
+
+    // Suppression and the viaduct gate, which are the two ways a car that is
+    // there is correctly not there.
+    {
+      const row = rowOf([{ identity: 5, body: 0, colour: 0, x: 0, y: 0, z: -2.3, yaw: 0 }]);
+      carRigidBody({ body: 0, x: 0, z: 2.0, yaw: 0, speed: 10 }, mine);
+      if (resolveStaticContact(row, 0, 0, 2.0, mine, theirs, contact, shunt, (i) => i === 5, found, true)) {
+        failures.push('A car somebody had already taken was still standing at the kerb to be hit.');
+      }
+      const upstairs = rowOf([
+        { identity: 5, body: 0, colour: 0, x: 0, y: TAKE_HEIGHT + 1, z: -2.3, yaw: 0 },
+      ]);
+      carRigidBody({ body: 0, x: 0, z: 2.0, yaw: 0, speed: 10 }, mine);
+      if (resolveStaticContact(upstairs, 0, 0, 2.0, mine, theirs, contact, shunt, none, found, true)) {
+        failures.push(
+          'A car on the deck above was hit by one on the street below. The whole viaduct is a hazard to ' +
+            'Alfred Street without this gate.',
+        );
+      }
+      // And nothing at all in reach is not a contact, which is the case every
+      // tick of every session takes.
+      carRigidBody({ body: 0, x: 0, z: 40, yaw: 0, speed: 10 }, mine);
+      if (resolveStaticContact(row, 0, 0, 40, mine, theirs, contact, shunt, none, found, true)) {
+        failures.push('A car forty metres up the street was reported as touching a parked one.');
+      }
+      if (shunt.impulse !== 0 || shunt.closing !== 0) {
+        failures.push('A contact that did not happen left an impulse behind for the caller to read.');
+      }
     }
   }
 

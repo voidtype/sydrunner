@@ -577,7 +577,16 @@ the shipped bake — it presses `E` beside real parked cars through the real
 it is the only thing that covers stealing a car at all — **since workstream S its
 sections 6 and 7 press `E` at a car out of `tiles/*.cars.bin`, so it is also the
 gate that catches a box the `.cars.bin` rsync did not reach**: `the server's
-residency: N cars` in its own output, and it fails outright at zero); and
+residency: N cars` in its own output, and it fails outright at zero);
+`bun run server/carcoverage-check.ts` (a minute over the shipped bake — it rams
+**every population of car a player can see**, one row each, and every row must
+read `contact = yes`: a kerb car out of `.cars.bin`, a schedule car in each of
+its five stages, another player's car stationary and closing, a car somebody
+parked, and a wreck. It exists because the owner's *"not all cars collide"*
+was green on every other gate in this list, and it is the one that catches a
+population being added without a box. It also prints how many parked cars
+within 90 m of its test point the residency cannot see, so the cap biting is a
+number rather than a caveat); and
 `RIDE_GANGWAY=only bun run server/ride-acceptance.ts` when trains changed.
 These are the repeatable, cheap tests that replaced browser-driven checking;
 add to them rather than around them. If the protocol shape changed, bump `PROTOCOL_VERSION` **once**
