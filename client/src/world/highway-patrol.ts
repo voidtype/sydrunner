@@ -9,41 +9,70 @@
  * against `game/factions.ts`, restated, and for the same reason.
  *
  * ---------------------------------------------------------------------------
- * 1. WHY THE CAR IS BUILT HERE RATHER THAN LOADED FROM `public/cars`.
+ * 1. THE CAR IS `nsw_police.glb` NOW, AND THIS SECTION IS THE ARGUMENT THAT
+ *    CHANGED.
  *
- * There are twenty `.glb` car models on disk and one of them is literally
- * `nsw_police.glb` -- a real NSW highway-patrol sedan with the Battenburg
- * painted on it, built from nothing by `scripts/build-police-car.mjs` -- so the
- * obvious build is to load it. This does not, and the reason is ownership rather
- * than taste. (It was `police_kenney.glb` when this paragraph was written, and
- * the argument got *stronger* rather than weaker when a good model arrived: the
- * better that file gets, the more tempting it is to reach into the fleet that
- * owns it.)
+ * This section used to say: there are twenty `.glb` car models on disk and one
+ * of them is a police car, and this file loads none of them, **because
+ * `world/carlod.ts` owns them**. That file fetches the manifest, merges each
+ * scene into one geometry, holds them in per-body pools whose *order is a
+ * contract* and draws them out of a claim ledger; none of it is exported and
+ * none of it is shaped for a single hero object, so asking for "one car at this
+ * position, please" would mean either reaching into those pools -- a second
+ * owner for that file's invariants -- or copying two hundred lines of glTF
+ * flattening into a file about police. So the patrol car was **procedural**: a
+ * white Commodore-shaped box out of the same little `Parts` accumulator
+ * `world/police.ts` builds its cap with.
  *
- * `world/carlod.ts` owns every one of those files. It fetches the manifest,
- * merges each scene into **one** geometry with the node transforms baked and
- * every material collapsed to a vertex colour, holds them in per-body pools
- * whose *order is a contract*, and draws them as `InstancedMesh`es out of a
- * claim ledger. None of that machinery is exported and none of it is shaped for
- * a single hero object: `CarModelFleet` is a lookup-driven near-field fleet, and
- * asking it for "one car at this position, please" would mean either reaching
- * into its pools or copying its merge. The first is a second owner for that
- * file's invariants; the second is two hundred lines of glTF flattening in a
- * file about police.
+ * The owner's verdict on that, once a real model existed beside it, was three
+ * words long. It was right, and the argument above was answered rather than
+ * overturned -- because **it was never an argument about the merge**. Splitting
+ * the two halves of "carlod owns it" apart is the whole of this section:
  *
- * So the patrol car is **procedural**, out of the same little `Parts`
- * accumulator `world/police.ts` builds its cap and band with -- a white
- * Commodore-shaped body, a dark glasshouse, four wheels, and the blue-and-white
- * Sillitoe flank stripe that makes it a *marked* car from further away than the
- * shape does. Two hundred and forty triangles, no fetch, no manifest, no
- * failure mode where the pursuit arrives as an invisible car because a CDN
- * 404'd. It reads as a box car at 10 m and reads as a police car at 60, which
- * is the distance that matters: a patrol car you can see from a block away is
- * the whole point of a 3-star response.
+ *   - *The fleet* is genuinely owned. Pools, weights, holes, the claim ledger,
+ *     the modulus that decides which model every car in Sydney is: all of that
+ *     is a near-field traffic system with invariants nothing else may touch,
+ *     and this file still does not touch one of them. It does not read
+ *     `CarModelFleet`, it is not in the manifest's pool order, and a patrol car
+ *     is not a claim.
+ *   - *The merge* is a **pure function**. `mergeModel(root, tint, yaw, accept)`
+ *     takes a glTF scene and returns a geometry, a map and a seat. It reads no
+ *     fleet state and writes none. So it is exported and called here, and the
+ *     duplication the old paragraph was afraid of does not exist: there is one
+ *     flattener in this client and both callers use it. The `accept` predicate
+ *     is the one thing that had to be added, and it is why the light bar can be
+ *     three geometries out of one file rather than one geometry taken apart
+ *     afterwards -- see section 2.
  *
- * The **light bar** was always going to be built here whatever the body was --
- * see section 2 -- and once the light bar is procedural the body being
- * procedural too is what makes them one object with one material and one draw.
+ * What is drawn is therefore `client/public/cars/nsw_police.glb`: a real NSW
+ * highway-patrol sedan, 4.9 x 1.85 m and 1.54 m over the bar, with the
+ * Battenburg, the flank lettering and the roof number on one atlas, built from
+ * nothing by `scripts/build-police-car.mjs`. It is loaded **once**, at boot,
+ * behind `main.ts`' `withDeadline`, and merged into three geometries -- body,
+ * red lens, blue lens -- which every patrol actor in view is drawn from as
+ * three `InstancedMesh`es with `frustumCulled = false`, on `CarModelFleet`'s own
+ * terms: the set is bounded by `PATROL_DRAW_RADIUS` and a per-object frustum
+ * test on four instances costs more than it saves.
+ *
+ * **The procedural car did not leave, and that is the point.** The old body,
+ * bar and four lenses are still built, still checked, and are what is drawn
+ * whenever `model === null`: before the fetch lands, when the deadline beats it,
+ * when the file 404s off a CDN, and when the merge produces something
+ * `verifyPatrolModel` refuses. The failure the old section named -- *a pursuit
+ * that arrives as an invisible car* -- is the one failure a 3-star response
+ * cannot have, so it is not traded for a better model; it is covered by keeping
+ * the worse one. Two hundred and forty triangles that always work are a cheap
+ * insurance policy, and `adopt` is the only line that switches between them.
+ *
+ * The file is fetched a second time, strictly speaking: `carlod` has an ambient
+ * row for it as well, so a marked car parked outside a station is one of that
+ * fleet's instances. That is a browser cache hit for 363 kB and a second 1024 x
+ * 512 atlas in VRAM, and it is the price of the two systems not sharing a
+ * geometry -- which is exactly the ownership line above, paid for in the only
+ * currency that keeps it honest.
+ *
+ * The **light bar** is still built here whatever the body is -- see section 2 --
+ * and the glb's two lens primitives are what it is now built *out of*.
  *
  * ---------------------------------------------------------------------------
  * 2. THE LIGHT BAR, AND WHY IT IS TWO MESHES RATHER THAN A SHADER.
@@ -77,6 +106,36 @@
  * The lenses are `MeshBasicNodeMaterial`: unlit, so they are the same red at
  * midnight as at noon, which is what a lamp is and is the treatment
  * `world/nightlights.ts` gives every other emissive sprite in this build.
+ *
+ * **On the glb the same rule survives, one level up.** The file carries the two
+ * lenses on their own primitives with their own `nsw_police_lightbar_red` and
+ * `nsw_police_lightbar_blue` materials, whose `emissiveFactor` is the honest
+ * description of a lamp for anything that opens it -- and `mergeModel` throws
+ * materials away, which is exactly why that factor is *read out* here and
+ * written into the merged lens geometry's vertex colour. The lens is then drawn
+ * by the same unlit `assets.lamp` the procedural plastic uses, with no new
+ * material and no new pipeline, and the emissive the artist stated is the colour
+ * on screen.
+ *
+ * The toggle moves from `visible` to an **instance count**, which is the same
+ * trick and not a compromise: the red lens and the blue lens are one
+ * `InstancedMesh` each, and a car whose `beaconPhase` is 0 has its matrix
+ * written into the red one and a car whose phase is 1 into the blue one. A set
+ * with a count of zero is one skipped draw call. `nightlights.PoliceBeacons`
+ * draws the glow over those same lenses out of two instanced sets partitioned by
+ * the identical phase, for the identical reason, and now the plastic and the
+ * glow are literally the same arrangement rather than two arrangements that
+ * agree.
+ *
+ * One thing genuinely changed, and it is a change in the *car* rather than in
+ * the mechanism. The procedural bar is a **wig-wag**: both halves lit at once,
+ * the colours swapping sides, because four little boxes cost nothing. The glb's
+ * lenses are painted -- red is the near-side lens and blue is the off-side one,
+ * for good -- so the bar can only **alternate**: red half lit, then blue half
+ * lit, the unlit half falling back to the dark housing under it. That is what a
+ * real bar on a real Commodore does, so it is not a loss; it is stated here
+ * because a reader comparing the two cars at a set of lights should know the
+ * flash is not the same flash.
  *
  * ---------------------------------------------------------------------------
  * 3. THE RBT IS ONE MESH FOR ONE ACTOR.
@@ -171,16 +230,25 @@ import {
   BufferGeometry,
   Color,
   DoubleSide,
+  Group,
+  InstancedMesh,
+  Matrix4,
   Mesh,
   MeshBasicNodeMaterial,
   MeshStandardNodeMaterial,
   Object3D,
   SpotLight,
+  type Texture,
 } from 'three/webgpu';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { WarmupPart } from './warmup.ts';
 
 import { NPC_KIND, type NpcActor } from '../game/factions.ts';
 import { HEAT_MAX } from '../game/heat.ts';
+// The flattener, and **only** the flattener. See section 1: `mergeModel` is a
+// pure function of a glTF scene and nothing about `CarModelFleet` -- no pool, no
+// claim, no manifest row -- is reachable through it.
+import { mergeModel } from './carlod.ts';
 // The orbit, the beam schedule and the shot schedule. Three-free, shared with
 // the authority, and the reason nothing about the helicopter is on the wire: this
 // file recomputes the identical pose the server rolled the marksman's shot
@@ -887,6 +955,255 @@ function additive(name: string, r: number, g: number, b: number): MeshBasicNodeM
   return m;
 }
 
+// --- The model ------------------------------------------------------------------------
+
+/** Where the file lives, and what it is called. `carlod`'s `MODEL_DIR`, restated. */
+export const PATROL_MODEL_DIR = '/cars/';
+export const PATROL_MODEL_FILE = 'nsw_police.glb';
+
+/**
+ * The three material names the merge splits the file on.
+ *
+ * Names rather than primitive indices, because an index is a property of the
+ * order `scripts/build-police-car.mjs` happened to add its primitives in and a
+ * name is a property of the *car*. If that script is ever re-run with the bar
+ * built before the shell, an index-based split silently draws the body as a
+ * lamp; a name-based one keeps working, and `verifyPatrolModel` convicts a
+ * rename rather than a reorder.
+ */
+const BODY_MATERIAL = 'nsw_police_body';
+const LENS_RED_MATERIAL = 'nsw_police_lightbar_red';
+const LENS_BLUE_MATERIAL = 'nsw_police_lightbar_blue';
+
+/**
+ * The yaw baked into the merge, radians.
+ *
+ * The file is authored **nose along +X**, which is the convention every car in
+ * `client/public/cars/` follows and `carlod` reads them in. Every *body* in this
+ * project is built nose along **-Z** -- `buildBody`, `buildHeliBody`,
+ * `world/people.ts`, `player/controller.ts` -- which is what makes
+ * `placeByHeading`'s single `atan2(-dx, -dz)` work on all of them.
+ *
+ * So the model is rotated a quarter turn **once, into the geometry, at load**,
+ * which is where `carlod`'s own `YAW_CORRECTION` is baked and for its reason: it
+ * is a property of the file, it never changes, and the alternative is a
+ * correction term on every matrix in every frame that somebody eventually
+ * forgets. `makeRotationY(+PI/2)` sends +X to -Z and +Z to +X, so after it the
+ * car's length runs along Z and its width along X exactly as the procedural
+ * body's does -- which is the whole reason the two paths can share one matrix.
+ */
+const PATROL_MODEL_YAW = Math.PI / 2;
+
+/**
+ * `nsw_police.glb`, flattened into the three geometries this file draws.
+ *
+ * Three rather than one because the two lenses are switched independently of
+ * the body and of each other -- see section 2 -- and `InstancedMesh` is one
+ * geometry and one material. Splitting at the merge is free; splitting a merged
+ * geometry afterwards is a second index rewrite and a second set of bounds.
+ */
+export interface PatrolModel {
+  /** Shell, glass, wheels, livery and the bar's dark housing. Carries the atlas UVs. */
+  readonly body: BufferGeometry;
+  /** The near-side lens, its vertex colour set to the material's own emissive. */
+  readonly lensRed: BufferGeometry;
+  /** And the off-side one. */
+  readonly lensBlue: BufferGeometry;
+  /** The one atlas the file packs, or null for a build that lost it. */
+  readonly atlas: Texture | null;
+  /**
+   * The centre of the light bar in the car's own frame -- **measured off the two
+   * lens geometries**, never typed in.
+   *
+   * `world/nightlights.PoliceBeacons` hangs its glow here and the two borrowed
+   * real lights come out of here, so a number that disagreed with the plastic
+   * would be the exact failure `LAMP_OUTREACH` exists to catch on the street
+   * lamps, and it would read as a bug in the car rather than in the lighting.
+   * The procedural car derives the same three numbers from the same two
+   * expressions its lenses are built out of (`BAR_ROOF_Z`, `BAR_LENS_Y`); this
+   * derives them from the geometry, which is the same discipline one step
+   * further along.
+   */
+  readonly barX: number;
+  readonly barY: number;
+  readonly barZ: number;
+  /**
+   * How far the file's own lowest vertex was from its origin before the merge
+   * put the tyres on the road. `carlod.MergedModel.seat`, and it is here because
+   * it is what puts `barY` and the constant `BAR_LENS_Y` in the same frame when
+   * a check compares them.
+   */
+  readonly seat: number;
+  /** Length along Z, width along X, height. Measured after the yaw, not before. */
+  readonly box: { readonly length: number; readonly width: number; readonly height: number };
+  readonly triangles: number;
+}
+
+/** The material name on a mesh the loader produced, or the empty string. */
+function materialName(mesh: Mesh): string {
+  const m = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+  return (m as { name?: string } | undefined)?.name ?? '';
+}
+
+/** The `emissiveFactor` glTF stated for a named material, linear, or null. */
+function emissiveOf(root: Object3D, name: string): [number, number, number] | null {
+  let found: [number, number, number] | null = null;
+  root.traverse((node) => {
+    const mesh = node as Mesh;
+    if (found !== null || !mesh.isMesh || materialName(mesh) !== name) return;
+    const m = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+    const e = (m as { emissive?: Color } | undefined)?.emissive;
+    if (e) found = [e.r, e.g, e.b];
+  });
+  return found;
+}
+
+/**
+ * Paint one lens geometry the colour its material said it emits, and drop
+ * everything the unlit material will not read.
+ *
+ * A **three-wide** colour attribute, deliberately: `mergeModel` writes four
+ * (rgb plus the prep's `_PAINT` mask in w) because `carlod`'s own node graph
+ * reads that fourth component, and `assets.lamp` is an ordinary
+ * `MeshBasicNodeMaterial` with `vertexColors` on, which multiplies the *vec4* --
+ * so a mask of 0 in w would multiply the alpha to nothing. Replacing the
+ * attribute rather than reinterpreting it is one allocation at load and removes
+ * the question entirely. The UVs go with it: the lens is not textured, and an
+ * attribute nothing samples is bytes on the bus and a wider vertex layout in a
+ * pipeline cache key.
+ */
+function paintLens(geometry: BufferGeometry, rgb: readonly [number, number, number]): void {
+  const count = geometry.getAttribute('position').count;
+  const colours = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    colours[i * 3] = rgb[0];
+    colours[i * 3 + 1] = rgb[1];
+    colours[i * 3 + 2] = rgb[2];
+  }
+  geometry.deleteAttribute('color');
+  geometry.deleteAttribute('uv');
+  geometry.setAttribute('color', new BufferAttribute(colours, 3));
+}
+
+/**
+ * Flatten a loaded scene into a `PatrolModel`.
+ *
+ * Split out from `loadPatrolModel` and given a `yaw` argument so that
+ * `verifyHighwayPatrol` can drive **this exact function** at boot over a scene
+ * it assembles out of the procedural geometry -- for which the right answers are
+ * the constants at the top of this file. That is what makes the bar-centre
+ * derivation a tested piece of arithmetic rather than one that is only ever
+ * exercised against a file the check cannot fetch.
+ */
+export function buildPatrolModel(root: Object3D, yaw = PATROL_MODEL_YAW): PatrolModel {
+  const body = mergeModel(root, 'none', yaw, (m) => materialName(m) === BODY_MATERIAL);
+  const red = mergeModel(root, 'none', yaw, (m) => materialName(m) === LENS_RED_MATERIAL);
+  const blue = mergeModel(root, 'none', yaw, (m) => materialName(m) === LENS_BLUE_MATERIAL);
+
+  // Back into the body's frame. `mergeModel` seats **each** merge on its own
+  // lowest vertex -- which for the body is the contact patch and is right, and
+  // for a lens 1.5 m up is a lens sitting on the road. See its note on `seat`.
+  for (const part of [red, blue]) {
+    part.geometry.translate(0, part.seat - body.seat, 0);
+    part.geometry.computeBoundingBox();
+    part.geometry.computeBoundingSphere();
+  }
+
+  // The emissive the artist stated, or this file's own lens colour if the
+  // material carried none. Falling back rather than failing, because a bar drawn
+  // in `LENS_RED` is the car this file drew for months and a bar drawn in the
+  // body's white is a fault light.
+  paintLens(red.geometry, emissiveOf(root, LENS_RED_MATERIAL) ?? LENS_RED);
+  paintLens(blue.geometry, emissiveOf(root, LENS_BLUE_MATERIAL) ?? LENS_BLUE);
+
+  // The body is drawn from the atlas and nothing else, so its vertex colour --
+  // white for every vertex of a `tint: "none"` model -- is 16 bytes a vertex
+  // that no shader reads.
+  body.geometry.deleteAttribute('color');
+
+  // --- The bar's centre, off the two lens geometries and off nothing else.
+  const rb = red.geometry.boundingBox!;
+  const bb = blue.geometry.boundingBox!;
+  const barX = (Math.min(rb.min.x, bb.min.x) + Math.max(rb.max.x, bb.max.x)) / 2;
+  const barY = (Math.min(rb.min.y, bb.min.y) + Math.max(rb.max.y, bb.max.y)) / 2;
+  const barZ = (Math.min(rb.min.z, bb.min.z) + Math.max(rb.max.z, bb.max.z)) / 2;
+
+  // And the car's own extent, over all three parts, in the frame the yaw left
+  // behind -- which is why `mergeModel`'s `box` is not used: its three labels
+  // are measured before any rotation this file asked for.
+  const b = body.geometry.boundingBox!;
+  const minX = Math.min(b.min.x, rb.min.x, bb.min.x);
+  const maxX = Math.max(b.max.x, rb.max.x, bb.max.x);
+  const minY = Math.min(b.min.y, rb.min.y, bb.min.y);
+  const maxY = Math.max(b.max.y, rb.max.y, bb.max.y);
+  const minZ = Math.min(b.min.z, rb.min.z, bb.min.z);
+  const maxZ = Math.max(b.max.z, rb.max.z, bb.max.z);
+
+  body.geometry.name = 'nsw_police_body';
+  red.geometry.name = 'nsw_police_lens_red';
+  blue.geometry.name = 'nsw_police_lens_blue';
+
+  return {
+    body: body.geometry,
+    lensRed: red.geometry,
+    lensBlue: blue.geometry,
+    atlas: body.map,
+    barX,
+    barY,
+    barZ,
+    seat: body.seat,
+    box: { length: maxZ - minZ, width: maxX - minX, height: maxY - minY },
+    triangles: body.triangles + red.triangles + blue.triangles,
+  };
+}
+
+/**
+ * Fetch and flatten `nsw_police.glb`, or answer null and let the procedural car
+ * stand.
+ *
+ * **Null is a supported answer at every step** and is never an exception: a 404
+ * off a CDN, a deadline the caller lost, a file that will not parse, a merge
+ * that lands somewhere `verifyPatrolModel` refuses. Section 1's rule -- a
+ * pursuit is never invisible -- is enforced right here, by there being no path
+ * out of this function that returns a half-built model.
+ *
+ * Bytes first and then `parseAsync`, on `loadLandmarks`' and `loadCarModels`'
+ * shared note: the release CDN serves this gzipped and `loadAsync` would fetch
+ * it a second time.
+ */
+export async function loadPatrolModel(baseUrl = PATROL_MODEL_DIR): Promise<PatrolModel | null> {
+  try {
+    const response = await fetch(`${baseUrl}${PATROL_MODEL_FILE}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const gltf = await new GLTFLoader().parseAsync(await response.arrayBuffer(), '');
+    const model = buildPatrolModel(gltf.scene);
+    const failures = verifyPatrolModel(model);
+    if (failures.length > 0) {
+      console.warn(
+        `[patrol] ${PATROL_MODEL_FILE} merged into something that is not a patrol car; the procedural ` +
+          `car stands. ${failures.join(' ')}`,
+      );
+      model.body.dispose();
+      model.lensRed.dispose();
+      model.lensBlue.dispose();
+      return null;
+    }
+    // Warned about rather than refused, and the asymmetry is deliberate: the
+    // atlas is the Battenburg, the flank lettering and the roof number, and
+    // without it the car draws in flat white -- which is still a white sedan
+    // with a flashing bar on the roof and still reads as police at 60 m. Losing
+    // the livery is worse than the box car and much better than no car, so it is
+    // a line in the console rather than a fall back to the fallback.
+    if (model.atlas === null) {
+      console.warn(`[patrol] ${PATROL_MODEL_FILE} merged with no atlas; the car will be drawn in flat white.`);
+    }
+    return model;
+  } catch (err) {
+    console.warn(`[patrol] ${PATROL_MODEL_FILE} did not load; the procedural car stands.`, err);
+    return null;
+  }
+}
+
 // --- The fleet --------------------------------------------------------------------------
 
 /**
@@ -915,14 +1232,45 @@ export const PATROL_DRAW_RADIUS = 260;
  */
 export const STROBE_PERIOD = BEACON_HALF_CYCLE_TICKS / 60;
 
-/** One pooled car: a body, a bar, and the four lenses two of which are on. */
+/**
+ * One pooled procedural car: a body, a bar, and the four lenses two of which
+ * are on.
+ *
+ * The `group` outlives the procedural body it was built for. Once a
+ * `PatrolModel` is adopted every mesh under it is hidden, but the group is
+ * still positioned and rotated every frame, and **its matrix is the matrix the
+ * instanced model is drawn with**. One placement with two consumers, rather than
+ * two placements that have to be proved equal -- see `update`.
+ */
 interface CarSlot {
   group: Object3D;
+  /** The procedural meshes, for the one `visible` write that switches paths. */
+  procedural: Mesh[];
   lensLeftRed: Mesh;
   lensRightBlue: Mesh;
   lensLeftBlue: Mesh;
   lensRightRed: Mesh;
 }
+
+/**
+ * One pooled RBT: the witches' hats, and a marked car parked skewed at the end
+ * of them.
+ *
+ * The hats are always the procedural geometry -- there is no glb of a traffic
+ * cone and there should not be -- and the **car** is swapped with the pursuit
+ * cars, because an RBT and a pursuit are visible from each other and a modelled
+ * Commodore parked beside a white box reads as one of them being broken.
+ */
+interface RbtSlot {
+  group: Object3D;
+  /** The car, its bar and its two lenses. Hidden when a model is adopted. */
+  procedural: Mesh[];
+  /** Where the car sits inside the site, as a matrix, composed once. */
+  carLocal: Matrix4;
+}
+
+/** Scratch for the two matrix compositions `update` does. Never escapes. */
+const _patrolMatrix = /*#__PURE__*/ new Matrix4();
 
 /**
  * Every patrol car and RBT in view, as pooled meshes.
@@ -940,7 +1288,45 @@ export class HighwayPatrolFleet implements PursuitSource {
   rbts = 0;
 
   private readonly carSlots: CarSlot[] = [];
-  private readonly rbtSlots: Object3D[] = [];
+  private readonly rbtSlots: RbtSlot[] = [];
+
+  /**
+   * The three instanced sets `nsw_police.glb` is drawn as, or null for a
+   * session that is drawing the procedural car. See section 1.
+   *
+   * All three or none: `adopt` builds them together and nothing else writes
+   * them, so `modelBody === null` is the single condition the whole switch is
+   * expressed as and there is no state where a body is drawn without its bar.
+   */
+  private readonly modelGroup = new Group();
+  private model: PatrolModel | null = null;
+  private modelBody: InstancedMesh | null = null;
+  private modelRed: InstancedMesh | null = null;
+  private modelBlue: InstancedMesh | null = null;
+  /**
+   * The unlit lamp material the procedural lenses are drawn with, kept so
+   * `adopt` can draw the glb's lenses with **the same one**.
+   *
+   * That sharing is the point rather than an economy: section 2's rule is that a
+   * lamp is unlit and is the same red at midnight as at noon, and one material
+   * for both cars is how the rule cannot be applied to one of them and forgotten
+   * on the other.
+   */
+  private readonly lamp: MeshBasicNodeMaterial;
+
+  /**
+   * Where the light bar's centre is in the car's own frame.
+   *
+   * The procedural constants until a model is adopted, and the model's own
+   * measured centre after -- because the glb's bar is 3 cm lower and 2 cm
+   * further back than the box car's, and the glow and the two borrowed real
+   * lights have to be on whichever bar is actually on screen. See
+   * `PatrolModel.barX`.
+   */
+  private barX = 0;
+  private barY = BAR_LENS_Y;
+  private barZ = BAR_ROOF_Z;
+
   /**
    * The bar of every patrol car drawn last update, as world x, y, z and the
    * phase that was lit -- `PURSUIT_RECORD_STRIDE` apart, and in the order the
@@ -958,7 +1344,10 @@ export class HighwayPatrolFleet implements PursuitSource {
   private barCount = 0;
 
   constructor(assets: HighwayPatrolAssets) {
+    this.lamp = assets.lamp;
     this.group.name = 'highway-patrol';
+    this.modelGroup.name = 'highway-patrol-model';
+    this.group.add(this.modelGroup);
     for (let i = 0; i < PATROL_CAPACITY; i++) {
       const group = new Object3D();
       group.name = `patrol:${i}`;
@@ -970,12 +1359,14 @@ export class HighwayPatrolFleet implements PursuitSource {
       bar.castShadow = true;
       const slot: CarSlot = {
         group,
+        procedural: [],
         lensLeftRed: new Mesh(assets.lensLeftRed, assets.lamp),
         lensRightBlue: new Mesh(assets.lensRightBlue, assets.lamp),
         lensLeftBlue: new Mesh(assets.lensLeftBlue, assets.lamp),
         lensRightRed: new Mesh(assets.lensRightRed, assets.lamp),
       };
-      group.add(body, bar, slot.lensLeftRed, slot.lensRightBlue, slot.lensLeftBlue, slot.lensRightRed);
+      slot.procedural.push(body, bar, slot.lensLeftRed, slot.lensRightBlue, slot.lensLeftBlue, slot.lensRightRed);
+      group.add(...slot.procedural);
       this.carSlots.push(slot);
       this.group.add(group);
     }
@@ -1003,8 +1394,137 @@ export class HighwayPatrolFleet implements PursuitSource {
       lens2.position.copy(car.position);
       lens2.rotation.y = car.rotation.y;
       group.add(props, car, bar, lens, lens2);
-      this.rbtSlots.push(group);
+      // The car's own local transform, composed **off the mesh that already
+      // has it** rather than typed out a second time: the instanced model is
+      // drawn at `site x carLocal`, and two copies of "1.6 m past the last hat,
+      // skewed 0.35 rad" would be a modelled car parked somewhere the box car
+      // was not.
+      car.updateMatrix();
+      this.rbtSlots.push({ group, procedural: [car, bar, lens, lens2], carLocal: car.matrix.clone() });
       this.group.add(group);
+    }
+  }
+
+  /**
+   * Draw `nsw_police.glb` from now on.
+   *
+   * Called once, from `main.ts`, when and if the fetch lands. Everything before
+   * that frame -- and every frame of a session where it never lands -- is the
+   * procedural car, which is section 1's whole insurance policy and is why this
+   * is a method rather than a constructor argument: the fleet is in the scene
+   * and drawing from the first frame, and a boot that waited for a 363 kB file
+   * before it could draw a pursuit would have traded the failure the other way
+   * round.
+   *
+   * Idempotent-by-refusal rather than by re-entry: a second call is a bug in the
+   * caller and is ignored, because tearing down three `InstancedMesh`es that a
+   * frame may be halfway through is a worse answer than the model the fleet
+   * already has.
+   */
+  adopt(model: PatrolModel): void {
+    if (this.modelBody !== null) return;
+    this.model = model;
+    this.barX = model.barX;
+    this.barY = model.barY;
+    this.barZ = model.barZ;
+
+    /*
+     * One lit, mapped material for the body, and `assets.lamp` for both lenses.
+     *
+     * The body's is new because the atlas is: `assets.material` is
+     * vertex-coloured and flat-shaded, which is right for a box car and wrong
+     * for a model that carries its Battenburg, its lettering and its roof number
+     * as texels. `vertexColors` is off because `buildPatrolModel` deletes the
+     * attribute, and `flatShading` is off on `carlod`'s own note -- these
+     * vertices carry authored normals and faceting them is a melted car.
+     *
+     * Single-sided, unlike `carlod`'s fleet material, and the difference is the
+     * asset rather than a difference of opinion: that fleet is two-sided because
+     * half the panels of a Sketchfab body are wound inside-out, and this file was
+     * generated by `scripts/build-police-car.mjs` with every quad wound outward
+     * on purpose. Two-siding it would double the fragment work on the one car
+     * that is always in the middle of the screen during a pursuit.
+     */
+    const material = new MeshStandardNodeMaterial();
+    material.name = 'nsw_police';
+    material.color = new Color(1, 1, 1);
+    material.vertexColors = false;
+    if (model.atlas !== null) material.map = model.atlas;
+    material.roughness = 0.4;
+    material.metalness = 0.1;
+    material.flatShading = false;
+
+    // The RBT's parked car shares the sets, so the capacity is both.
+    const capacity = PATROL_CAPACITY + RBT_CAPACITY;
+    const body = new InstancedMesh(model.body, material, capacity);
+    body.name = 'nsw_police_body';
+    body.castShadow = true;
+    body.receiveShadow = false;
+    const red = new InstancedMesh(model.lensRed, this.lamp, capacity);
+    red.name = 'nsw_police_lens_red';
+    const blue = new InstancedMesh(model.lensBlue, this.lamp, capacity);
+    blue.name = 'nsw_police_lens_blue';
+    for (const mesh of [body, red, blue]) {
+      mesh.count = 0;
+      // Culled by `PATROL_DRAW_RADIUS` and by nothing else, on `CarModelFleet`'s
+      // own argument: the bounding sphere of a set whose instances move every
+      // frame would have to be recomputed every frame, and the radius test the
+      // loop below is already doing is free.
+      mesh.frustumCulled = false;
+    }
+    for (const lens of [red, blue]) {
+      lens.castShadow = false;
+      lens.receiveShadow = false;
+    }
+    this.modelBody = body;
+    this.modelRed = red;
+    this.modelBlue = blue;
+    this.modelGroup.add(body, red, blue);
+
+    // And the box car goes dark, once, here. Hidden rather than removed from the
+    // graph: the slot groups are still placed every frame -- their matrices are
+    // what the instances above are drawn with -- and a `visible` write is free
+    // where a `remove` would be a graph edit and a lost placement. `update` stops
+    // touching these the moment `modelBody` is non-null, so nothing brings them
+    // back.
+    for (const slot of this.carSlots) for (const mesh of slot.procedural) mesh.visible = false;
+    for (const slot of this.rbtSlots) for (const mesh of slot.procedural) mesh.visible = false;
+  }
+
+  /** The model in use, or null. Read by the dev handle and by the checks. */
+  get patrolModel(): PatrolModel | null {
+    return this.model;
+  }
+
+  /**
+   * Compile the three model pipelines before a pursuit needs them.
+   *
+   * `world/trains.ts`' `warm`, for its reason and with its shape: the boot
+   * warm-up in `main.ts` runs long before this file has arrived, so
+   * `highwayPatrolWarmupParts` cannot list geometry that does not exist yet, and
+   * the scene pass cannot reach a set whose count is zero. Without this the
+   * first patrol car of a session costs three synchronous pipeline compiles in
+   * the one frame a player is certain to be looking -- which is the exact hitch
+   * `world/warmup.ts` exists to remove.
+   *
+   * One instance of each at the origin, and the counts put back afterwards even
+   * if the compile threw: a fleet left showing a patrol car parked at (0, 0, 0)
+   * in the middle of the harbour is a worse bug than an uncompiled shader.
+   */
+  async warm(precompile: (group: Group) => Promise<void>): Promise<void> {
+    const meshes = [this.modelBody, this.modelRed, this.modelBlue];
+    if (meshes.some((m) => m === null)) return;
+    const counts = meshes.map((m) => m!.count);
+    _patrolMatrix.identity();
+    for (const mesh of meshes) {
+      mesh!.setMatrixAt(0, _patrolMatrix);
+      mesh!.instanceMatrix.needsUpdate = true;
+      mesh!.count = 1;
+    }
+    try {
+      await precompile(this.modelGroup);
+    } finally {
+      for (let i = 0; i < meshes.length; i++) meshes[i]!.count = counts[i];
     }
   }
 
@@ -1014,6 +1534,13 @@ export class HighwayPatrolFleet implements PursuitSource {
    * `field` is whatever the caller has -- `net.actors` online, `FactionField`
    * offline. `dt` drives the strobe and nothing else; the *positions* come from
    * the authority, which is `main.ts`' rule about every actor in this project.
+   *
+   * **One placement, two consumers.** Whichever car is being drawn, every actor
+   * is put on its `CarSlot.group` by `placeByHeading` and that group's own
+   * matrix is what the instanced model is drawn with. The two paths therefore
+   * cannot produce different matrices -- not because a check says so, but
+   * because there is only one composition of a matrix in this method.
+   * `verifyPatrolPaths` proves the property stayed structural.
    */
   update(
     field: { actors: Iterable<NpcActor> },
@@ -1031,6 +1558,15 @@ export class HighwayPatrolFleet implements PursuitSource {
     void dt;
     const r2 = PATROL_DRAW_RADIUS * PATROL_DRAW_RADIUS;
     beacons?.begin();
+    const modelBody = this.modelBody;
+    const modelRed = this.modelRed;
+    const modelBlue = this.modelBlue;
+    // How many instances of each set have been written this frame. Bodies
+    // include the RBT's parked car; each lens counts only the cars whose bar is
+    // showing that colour, which is section 2's strobe expressed as a count.
+    let bodies = 0;
+    let reds = 0;
+    let blues = 0;
 
     let cars = 0;
     let rbts = 0;
@@ -1051,30 +1587,43 @@ export class HighwayPatrolFleet implements PursuitSource {
         // the plastic, the glow and the two borrowed real lights all read, so
         // they cannot disagree about which half of the bar is lit.
         const phase = beaconPhase(a.id, tick);
-        slot.lensLeftRed.visible = phase === 0;
-        slot.lensRightBlue.visible = phase === 0;
-        slot.lensLeftBlue.visible = phase === 1;
-        slot.lensRightRed.visible = phase === 1;
+        if (modelBody === null) {
+          slot.lensLeftRed.visible = phase === 0;
+          slot.lensRightBlue.visible = phase === 0;
+          slot.lensLeftBlue.visible = phase === 1;
+          slot.lensRightRed.visible = phase === 1;
+        } else {
+          // The group's own matrix, composed from the position and rotation
+          // `placeByHeading` just wrote. The renderer would compose it anyway
+          // for the procedural path; here it is composed once and read.
+          slot.group.updateMatrix();
+          modelBody.setMatrixAt(bodies++, slot.group.matrix);
+          // The strobe. One lens lit, the other left as the dark housing under
+          // it -- which is what a painted bar can do and what a real one does.
+          if (phase === 0) modelRed!.setMatrixAt(reds++, slot.group.matrix);
+          else modelBlue!.setMatrixAt(blues++, slot.group.matrix);
+        }
         /*
          * The glow, at the **centre** of the bar rather than over one lens.
          *
-         * The plastic above is a wig-wag: both halves are lit at once and the
-         * colours swap sides, which is four little boxes and two `visible`
-         * toggles. The glow is one blob in the middle of it, alternating red and
-         * blue -- and the reason it is not two blobs over the two lenses is that
-         * a bar 40 m away is four pixels wide, so what a player actually reads is
-         * *one flare on a roof changing colour*, and hanging the glow off which
-         * half is currently which colour would couple this file's flash to that
-         * file's plastic arrangement for a distinction nobody can see.
+         * The plastic above alternates; the glow is one blob in the middle of
+         * the bar, changing colour with it -- and the reason it is not two blobs
+         * over the two lenses is that a bar 40 m away is four pixels wide, so
+         * what a player actually reads is *one flare on a roof changing colour*,
+         * and hanging the glow off which half is currently lit would couple this
+         * file's flash to that file's plastic arrangement for a distinction
+         * nobody can see.
          *
-         * Local (0, y, roofZ) into world metres, by the actor's own unit heading
-         * and no trigonometry: the body is built nose-along -Z and placed at
-         * `atan2(-dx, -dz)`, so local -Z lands on (dx, dz) and a point `roofZ`
-         * along local Z lands `-roofZ` along the heading.
+         * Local (barX, barY, barZ) into world metres, by the actor's own unit
+         * heading and no trigonometry: the body is built nose-along -Z and
+         * placed at `atan2(-dx, -dz)`, so `sin` of that yaw is `-dx` and `cos`
+         * is `-dz`, and the standard rotation of a local point falls out as the
+         * two lines below. With `barX` at zero -- which is where both cars' bars
+         * are -- it reduces to exactly the single term this used to carry.
          */
-        const wx = a.x - BAR_ROOF_Z * a.dx;
-        const wz = a.z - BAR_ROOF_Z * a.dz;
-        const wy = a.y + BAR_LENS_Y;
+        const wx = a.x - this.barX * a.dz - this.barZ * a.dx;
+        const wz = a.z + this.barX * a.dx - this.barZ * a.dz;
+        const wy = a.y + this.barY;
         beacons?.add(wx, wy, wz, phase);
         if (this.barCount < PATROL_CAPACITY) {
           const o = this.barCount * PURSUIT_RECORD_STRIDE;
@@ -1086,13 +1635,35 @@ export class HighwayPatrolFleet implements PursuitSource {
         }
       } else {
         if (rbts >= RBT_CAPACITY) continue;
-        const group = this.rbtSlots[rbts++];
-        group.visible = true;
-        placeByHeading(group, a);
+        const slot = this.rbtSlots[rbts++];
+        slot.group.visible = true;
+        placeByHeading(slot.group, a);
+        if (modelBody !== null) {
+          slot.group.updateMatrix();
+          _patrolMatrix.multiplyMatrices(slot.group.matrix, slot.carLocal);
+          modelBody.setMatrixAt(bodies++, _patrolMatrix);
+          // **Both** lenses, and no strobe. A breath-test car is parked with its
+          // bar on rather than pursuing anybody -- which is the same reason
+          // `nearestPursuit` refuses to spend the two real lights on it -- and
+          // its procedural twin has always drawn its red and blue halves
+          // together.
+          modelRed!.setMatrixAt(reds++, _patrolMatrix);
+          modelBlue!.setMatrixAt(blues++, _patrolMatrix);
+        }
       }
     }
     for (let i = cars; i < this.carSlots.length; i++) this.carSlots[i].group.visible = false;
-    for (let i = rbts; i < this.rbtSlots.length; i++) this.rbtSlots[i].visible = false;
+    for (let i = rbts; i < this.rbtSlots.length; i++) this.rbtSlots[i].group.visible = false;
+    if (modelBody !== null) {
+      modelBody.count = bodies;
+      modelRed!.count = reds;
+      modelBlue!.count = blues;
+      // Uploaded once a frame per set, and only when the set has anything in
+      // it: a room with nobody wanted is three counts of zero and no traffic.
+      if (bodies > 0) modelBody.instanceMatrix.needsUpdate = true;
+      if (reds > 0) modelRed!.instanceMatrix.needsUpdate = true;
+      if (blues > 0) modelBlue!.instanceMatrix.needsUpdate = true;
+    }
     this.cars = cars;
     this.rbts = rbts;
     beacons?.end();
@@ -1975,12 +2546,389 @@ export function verifyHighwayPatrol(assets?: HighwayPatrolAssets): string[] {
   // and the unit circle built out of it. There is no arithmetic left in this file
   // that two processes both evaluate, which is the point of the split.
 
+  // --- The model path, driven against a synthetic file, and the two paths
+  //     compared. Both need geometry; see the two functions.
+  if (assets) {
+    failures.push(...verifyPatrolMerge(assets));
+    failures.push(...verifyPatrolPaths(assets));
+  }
+
   // --- And the rig, driven. Three minutes of frames with a real `Polair` in a
   //     real (if empty) scene graph. Only when the assets exist, because it needs
   //     geometry to build the meshes out of.
   if (assets) failures.push(...verifyPolairRig(assets));
 
   return failures;
+}
+
+/**
+ * Is this thing a patrol car?
+ *
+ * Run on **every** merge before it is adopted -- `loadPatrolModel` refuses a
+ * model that fails here and lets the procedural car stand -- and again at boot
+ * against a synthetic one, so the rules themselves are exercised in a session
+ * where no file was fetched. Pure: it reads bounds off three geometries and
+ * nothing else.
+ *
+ * Each rule is a way the model can be wrong while rendering perfectly, which is
+ * this project's criterion for a check being worth writing:
+ *
+ *   - a file **rotated the wrong way** by the yaw bake is a patrol car that
+ *     drives sideways down every street in Sydney, at the correct speed, with
+ *     its bar flashing;
+ *   - a **bar found somewhere other than the roof** puts the glow and the two
+ *     borrowed real lights under the sills or ten metres up, which reads as a
+ *     bug in `world/nightlights.ts` rather than in the car;
+ *   - a **bar off to one side** is a light bar mounted on the passenger door,
+ *     and the offset is small enough that it looks like the glow lagging the car
+ *     rather than sitting in the wrong place;
+ *   - **two lenses the same colour** is a bar that flashes white, which reads as
+ *     a fault light;
+ *   - and a **lens merged empty** is a bar with half of it missing every other
+ *     quarter of a second, which reads as the strobe being broken.
+ */
+export function verifyPatrolModel(model: PatrolModel): string[] {
+  const failures: string[] = [];
+  const body = model.body.boundingBox;
+  if (!body) return ['The merged patrol body has no bounding box; nothing about it can be checked.'];
+
+  if ((model.body.getIndex()?.count ?? 0) <= 0) {
+    failures.push('The merged patrol body has no triangles; a pursuit would arrive as an invisible car.');
+  }
+  for (const [name, g] of [['red', model.lensRed], ['blue', model.lensBlue]] as const) {
+    if ((g.getIndex()?.count ?? 0) <= 0) {
+      failures.push(`The ${name} lens merged to nothing; that half of the strobe would be a hole in the bar.`);
+    }
+  }
+
+  // Nose along -Z, which is what the yaw bake is for and what `placeByHeading`
+  // assumes about every body in this project.
+  if (!(model.box.length > model.box.width)) {
+    failures.push(
+      `The merged patrol car is ${model.box.length.toFixed(2)} m along Z and ${model.box.width.toFixed(2)} m ` +
+        'along X, so the yaw bake left it facing sideways. Every patrol car in the city would drive crabwise.',
+    );
+  }
+  if (Math.abs(model.box.length - CAR_LENGTH) > 0.35) {
+    failures.push(
+      `The merged patrol car is ${model.box.length.toFixed(2)} m long and this file's constants -- which is ` +
+        `what \`heat.PATROL_HIT_M\` is set against -- say ${CAR_LENGTH}.`,
+    );
+  }
+  // The tyres are on the road, which `mergeModel` guarantees for the body it
+  // seated and is therefore a check on the seating rather than on the file.
+  if (Math.abs(body.min.y) > 1e-4) {
+    failures.push(
+      `The merged patrol body's lowest vertex is at y=${body.min.y.toFixed(3)} rather than 0, so it is drawn ` +
+        'with its tyres in the carriageway or hovering over it.',
+    );
+  }
+
+  // --- The bar. Where it is, against the car it is bolted to.
+  const top = body.max.y;
+  if (!(model.barY >= top - 0.5 && model.barY <= top + 0.5)) {
+    failures.push(
+      `The light bar's centre is at y=${model.barY.toFixed(2)} and the body's roof is at ` +
+        `${top.toFixed(2)}. A bar more than half a metre off the roof is a glow floating over the car or ` +
+        'buried in it, and the two real lights a pursuit borrows come out of that point.',
+    );
+  }
+  const midX = (body.min.x + body.max.x) / 2;
+  const midZ = (body.min.z + body.max.z) / 2;
+  if (Math.abs(model.barX - midX) > 0.1) {
+    failures.push(
+      `The light bar's centre is ${(model.barX - midX).toFixed(2)} m off the car's centre line. A bar is ` +
+        'mounted across the roof, and an offset one reads as the glow lagging the car rather than as geometry.',
+    );
+  }
+  // Fore and aft, a **quarter of the car's length** rather than the 10 cm the
+  // lateral rule gets, and the asymmetry is the geometry rather than laziness: a
+  // bar is always centred across a roof and is never centred along one. It sits
+  // over the cabin, and where the cabin is differs by car -- `nsw_police.glb`
+  // puts its bar 2 cm behind the car's centre and this file's own procedural
+  // body puts it 64 cm forward of it, over a cabin drawn well up the bonnet.
+  // Both are patrol cars. A bar on the boot lid or out over the bonnet is not,
+  // and a quarter of a sedan's length either side of centre is the roof.
+  if (Math.abs(model.barZ - midZ) > model.box.length * 0.25) {
+    failures.push(
+      `The light bar's centre is ${(model.barZ - midZ).toFixed(2)} m fore or aft of the car's centre, which ` +
+        'is off the roof entirely. See the note above; the same failure along the other axis reads as the ' +
+        'glow trailing the car rather than as geometry.',
+    );
+  }
+
+  // --- And the two colours, off the vertex colours `paintLens` wrote out of the
+  //     glTF's own `emissiveFactor`.
+  const red = firstColour(model.lensRed);
+  const blue = firstColour(model.lensBlue);
+  if (red === null || blue === null) {
+    failures.push('A merged lens has no vertex colour, so it would draw in the lamp material\'s flat white.');
+  } else if (!(red[0] > red[2] && blue[2] > blue[0])) {
+    failures.push(
+      `The two lenses merged as rgb(${red.map((v) => v.toFixed(2)).join(', ')}) and ` +
+        `rgb(${blue.map((v) => v.toFixed(2)).join(', ')}). One has to be red and the other blue, or the bar ` +
+        'flashes one colour and reads as a fault light rather than as a police car.',
+    );
+  }
+
+  return failures;
+}
+
+/**
+ * The synthetic file, for the two checks below: the procedural car, dressed as
+ * `nsw_police.glb`.
+ *
+ * Three meshes carrying the three material names the merge splits on, over the
+ * geometry this file has always built, with the two lens materials given this
+ * file's own lens colours as their emissive. Merged at **yaw zero**, because the
+ * procedural body is already nose-along -Z and the quarter turn is a correction
+ * for a file authored the other way.
+ *
+ * The point of it is that the right answers are knowable: this scene's bar
+ * centre is `(0, BAR_LENS_Y, BAR_ROOF_Z)` by construction, so a derivation that
+ * reads it off the geometry can be held to a number rather than to a range. That
+ * is the only way the bar-centre arithmetic gets tested at all -- the real file
+ * needs a fetch, and a check that needs a fetch is a check that gets deleted.
+ */
+function syntheticPatrolFile(assets: HighwayPatrolAssets): Object3D {
+  const root = new Object3D();
+  const bodyMaterial = new MeshStandardNodeMaterial();
+  bodyMaterial.name = BODY_MATERIAL;
+  const redMaterial = new MeshStandardNodeMaterial();
+  redMaterial.name = LENS_RED_MATERIAL;
+  redMaterial.emissive = new Color(LENS_RED[0], LENS_RED[1], LENS_RED[2]);
+  const blueMaterial = new MeshStandardNodeMaterial();
+  blueMaterial.name = LENS_BLUE_MATERIAL;
+  blueMaterial.emissive = new Color(LENS_BLUE[0], LENS_BLUE[1], LENS_BLUE[2]);
+  // The housing rides on the body's material, exactly as it does in the real
+  // file: it is dark plastic, not a lamp.
+  root.add(
+    new Mesh(assets.body, bodyMaterial),
+    new Mesh(assets.barHousing, bodyMaterial),
+    // The two *phase-0* lenses, which is the pair that is lit together and is
+    // therefore the pair whose union is the bar.
+    new Mesh(assets.lensLeftRed, redMaterial),
+    new Mesh(assets.lensRightBlue, blueMaterial),
+  );
+  return root;
+}
+
+/**
+ * `buildPatrolModel` and `verifyPatrolModel`, driven over the synthetic file.
+ *
+ * The assertion that matters is the **bar centre**, held to the constants at the
+ * top of this file rather than to a tolerance -- and held with the seat added
+ * back, because `mergeModel` drops the body onto y = 0 and the procedural car's
+ * lowest vertex is 2 cm off its own origin. That single line is what proves the
+ * measured answer and the typed answer are the same answer, which is the whole
+ * reason the model's bar is measured instead of typed.
+ */
+function verifyPatrolMerge(assets: HighwayPatrolAssets): string[] {
+  const failures: string[] = [];
+  let model: PatrolModel;
+  try {
+    model = buildPatrolModel(syntheticPatrolFile(assets), 0);
+  } catch (err) {
+    return [`The patrol merge threw on a well-formed file: ${String(err)}`];
+  }
+
+  if (Math.abs(model.barX - 0) > 1e-4) {
+    failures.push(`The measured bar centre is ${model.barX.toFixed(4)} m off the car's centre line and the lenses are built symmetric about it.`);
+  }
+  if (Math.abs(model.barZ - BAR_ROOF_Z) > 1e-4) {
+    failures.push(
+      `The measured bar centre sits at z=${model.barZ.toFixed(4)} and \`BAR_ROOF_Z\` -- the constant the ` +
+        `procedural car's glow has always used -- is ${BAR_ROOF_Z.toFixed(4)}. The measurement and the ` +
+        'constant have to be the same number or one of the two cars has its glow in the wrong place.',
+    );
+  }
+  if (Math.abs(model.barY + model.seat - BAR_LENS_Y) > 1e-4) {
+    failures.push(
+      `The measured bar centre sits at y=${model.barY.toFixed(4)} over a seat of ${model.seat.toFixed(4)}, ` +
+        `which is ${(model.barY + model.seat).toFixed(4)} in the file's own frame against \`BAR_LENS_Y\` of ` +
+        `${BAR_LENS_Y.toFixed(4)}.`,
+    );
+  }
+  // And the lens colours survived the round trip through `emissiveFactor`.
+  const red = firstColour(model.lensRed);
+  if (red !== null && Math.abs(red[0] - LENS_RED[0]) > 1e-4) {
+    failures.push(
+      `The red lens merged at ${red[0].toFixed(3)} rather than the ${LENS_RED[0]} its material emits, so the ` +
+        'glb\'s stated emissive is not what reaches the screen.',
+    );
+  }
+  failures.push(...verifyPatrolModel(model));
+  for (const g of [model.body, model.lensRed, model.lensBlue]) g.dispose();
+  return failures;
+}
+
+/**
+ * The two draw paths, over one synthetic pursuit, compared instance by instance.
+ *
+ * `update` composes exactly one matrix per actor and both paths read it, so this
+ * cannot fail today -- which is the point. What it defends is the *next* edit:
+ * the obvious way to add something to the instanced path is a second
+ * `position.set` and a second `rotation.y`, and a patrol car whose model is
+ * drawn a few centimetres from where its shadow, its glow and its hit radius
+ * think it is would be a bug nobody could name.
+ *
+ * It also drives the RBT, which is the case with a composed local transform in
+ * it and therefore the one where a hand-copied "1.6 m past the last hat" could
+ * drift, and it checks that `nearestPursuit` still hands the night rig a bar in
+ * the same place -- to 5 cm, which is the honest tolerance, because the glb's
+ * bar genuinely is a couple of centimetres lower than the box car's.
+ */
+function verifyPatrolPaths(assets: HighwayPatrolAssets): string[] {
+  const failures: string[] = [];
+  let model: PatrolModel;
+  try {
+    model = buildPatrolModel(syntheticPatrolFile(assets), 0);
+  } catch (err) {
+    return [`The patrol merge threw on a well-formed file: ${String(err)}`];
+  }
+
+  // Only the seven fields `update` reads. Cast rather than filled out, because
+  // an `NpcActor` has twenty fields and a check that had to invent a plausible
+  // `fireCooldown` would be asserting things about `game/factions.ts`.
+  const actor = (id: number, kind: number, x: number, z: number, dx: number, dz: number): NpcActor =>
+    ({ id, kind, x, y: 0.5, z, dx, dz } as NpcActor);
+  const field = {
+    actors: [
+      actor(11, NPC_KIND.HIGHWAY_PATROL, 40, -60, 0.6, -0.8),
+      actor(12, NPC_KIND.HIGHWAY_PATROL, -18, 33, -1, 0),
+      actor(13, NPC_KIND.HIGHWAY_PATROL, 5, 5, 0, 1),
+      actor(14, NPC_KIND.RBT, 70, 12, 0.28, 0.96),
+      // Past `PATROL_DRAW_RADIUS`, so both paths have to drop it.
+      actor(15, NPC_KIND.HIGHWAY_PATROL, 900, 900, 1, 0),
+    ],
+  };
+
+  const boxCar = new HighwayPatrolFleet(assets);
+  const modelCar = new HighwayPatrolFleet(assets);
+  modelCar.adopt(model);
+
+  const bodies = modelCar.group.getObjectByName('nsw_police_body') as InstancedMesh | undefined;
+  const reds = modelCar.group.getObjectByName('nsw_police_lens_red') as InstancedMesh | undefined;
+  const blues = modelCar.group.getObjectByName('nsw_police_lens_blue') as InstancedMesh | undefined;
+  if (!bodies || !reds || !blues) {
+    return ['`adopt` did not put the three instanced sets in the fleet group under the names the check expects.'];
+  }
+
+  const mine = new Matrix4();
+  const theirs = new Matrix4();
+  const barA = new Float32Array(PURSUIT_RECORD_STRIDE);
+  const barB = new Float32Array(PURSUIT_RECORD_STRIDE);
+  let worst = 0;
+  let worstBar = 0;
+  let litLenses = 0;
+  let redFrames = 0;
+  let blueFrames = 0;
+
+  for (let frame = 0; frame < 240; frame++) {
+    const tick = 2_000_000 + frame;
+    boxCar.update(field, 1 / 60, 0, 0, tick, null);
+    modelCar.update(field, 1 / 60, 0, 0, tick, null);
+    if (boxCar.cars !== modelCar.cars || boxCar.rbts !== modelCar.rbts) {
+      failures.push(
+        `The box car drew ${boxCar.cars} cars and ${boxCar.rbts} RBTs and the model drew ` +
+          `${modelCar.cars} and ${modelCar.rbts}. The two paths disagree about who is in view.`,
+      );
+      break;
+    }
+    if (bodies.count !== modelCar.cars + modelCar.rbts) {
+      failures.push(
+        `The model drew ${bodies.count} bodies for ${modelCar.cars} patrol cars and ${modelCar.rbts} RBTs. ` +
+          'Every one of those is a car and each is drawn exactly once.',
+      );
+      break;
+    }
+    // Every lit lens on every drawn car, and no more: a patrol car shows one
+    // half of its bar and an RBT's parked car shows both.
+    if (reds.count + blues.count !== modelCar.cars + modelCar.rbts * 2) {
+      failures.push(
+        `The model lit ${reds.count + blues.count} lenses over ${modelCar.cars} patrol cars and ` +
+          `${modelCar.rbts} RBTs. A pursuing bar shows one half at a time and a parked one shows both.`,
+      );
+      break;
+    }
+    litLenses += reds.count + blues.count;
+    if (reds.count > modelCar.rbts) redFrames++;
+    if (blues.count > modelCar.rbts) blueFrames++;
+
+    for (let i = 0; i < modelCar.cars; i++) {
+      const group = boxCar.group.getObjectByName(`patrol:${i}`);
+      if (!group) {
+        failures.push(`The box car has no slot named patrol:${i}.`);
+        break;
+      }
+      group.updateMatrix();
+      bodies.getMatrixAt(i, theirs);
+      worst = Math.max(worst, maxElementDelta(group.matrix, theirs));
+    }
+    // The RBT's parked car, at the site's matrix times its own local one.
+    for (let i = 0; i < modelCar.rbts; i++) {
+      const group = boxCar.group.getObjectByName(`rbt:${i}`);
+      const car = group?.children.find((c) => (c as Mesh).isMesh && (c as Mesh).geometry === assets.body);
+      if (!group || !car) {
+        failures.push(`The box car has no parked car under its slot rbt:${i}.`);
+        break;
+      }
+      group.updateMatrix();
+      car.updateMatrix();
+      mine.multiplyMatrices(group.matrix, car.matrix);
+      bodies.getMatrixAt(modelCar.cars + i, theirs);
+      worst = Math.max(worst, maxElementDelta(mine, theirs));
+    }
+    // And the bar the night rig is handed.
+    const a = boxCar.nearestPursuit(0, 0, 0, PATROL_DRAW_RADIUS, barA, 1);
+    const b = modelCar.nearestPursuit(0, 0, 0, PATROL_DRAW_RADIUS, barB, 1);
+    if (a !== b) {
+      failures.push(`\`nearestPursuit\` answered ${a} for the box car and ${b} for the model.`);
+      break;
+    }
+    if (a === 1) {
+      if (barA[3] !== barB[3]) failures.push('The two paths lit different halves of the same bar on the same tick.');
+      worstBar = Math.max(
+        worstBar,
+        Math.abs(barA[0] - barB[0]),
+        Math.abs(barA[1] - barB[1]),
+        Math.abs(barA[2] - barB[2]),
+      );
+    }
+  }
+
+  if (worst > 1e-5) {
+    failures.push(
+      `A patrol car's model matrix and its procedural matrix differ by ${worst.toExponential(2)}. The two ` +
+        'paths have stopped being one placement, so the model is drawn away from its own shadow, glow and ' +
+        'hit radius by an amount nobody would be able to name.',
+    );
+  }
+  if (worstBar > 0.05) {
+    failures.push(
+      `The bar the night rig is handed moved ${worstBar.toFixed(3)} m when the model was adopted. The glow ` +
+        'and the two borrowed real lights would sit off the light bar they are meant to be coming out of.',
+    );
+  }
+  if (litLenses === 0) {
+    failures.push('The model never lit a lens over four seconds of pursuit; the light bar is dark.');
+  }
+  if (redFrames === 0 || blueFrames === 0) {
+    failures.push(
+      `The model's bar showed red on ${redFrames} frames and blue on ${blueFrames} of 240. Both halves have ` +
+        'to come up or the strobe is one colour, which reads as a fault light.',
+    );
+  }
+
+  for (const g of [model.body, model.lensRed, model.lensBlue]) g.dispose();
+  return failures;
+}
+
+/** The largest per-element difference between two matrices. */
+function maxElementDelta(a: Matrix4, b: Matrix4): number {
+  let worst = 0;
+  for (let i = 0; i < 16; i++) worst = Math.max(worst, Math.abs(a.elements[i] - b.elements[i]));
+  return worst;
 }
 
 /**
@@ -2237,6 +3185,14 @@ function firstColour(geometry: BufferGeometry): [number, number, number] | null 
  * everything off-screen so the first patrol car does not cost a shader compile
  * in the middle of a pursuit -- which is the one moment in the session where a
  * 200 ms hitch is unambiguously the game's fault.
+ *
+ * **`nsw_police.glb`'s three pipelines are not in this list and cannot be.**
+ * This is called at boot, from a synchronous block, and the model has not been
+ * fetched yet -- so a `WarmupPart` naming its geometry would be naming
+ * `undefined`. `HighwayPatrolFleet.warm` is where those three are compiled
+ * instead, on `world/trains.ts`' arrangement and for the same reason; the list
+ * below stays the procedural car's, which is the car a session draws until the
+ * fetch lands and the car it draws forever if the fetch does not.
  */
 export function highwayPatrolWarmupParts(assets: HighwayPatrolAssets): WarmupPart[] {
   return [

@@ -2790,8 +2790,11 @@ const BEACON_CYCLE_TICKS = BEACON_HALF_CYCLE_TICKS * 2;
  *
  * Pure and framework-free on `torchSway`'s and `fireFlicker`'s terms, and with
  * one extra constraint those two do not have: **it is evaluated on both ends**
- * -- the renderer draws the sprite from it and `world/highway-patrol.ts` toggles
- * the lens plastic from it -- so it obeys the determinism rule in `CLAUDE.md`
+ * -- the renderer draws the sprite from it and `world/highway-patrol.ts` picks
+ * which lens of `nsw_police.glb` is drawn from it (a `visible` toggle when that
+ * file is the procedural car's; an instance count when it is the model's, which
+ * is this class's own arrangement one file over) -- so it obeys the determinism
+ * rule in `CLAUDE.md`
  * and contains no `Math.sin`, no `Math.pow` and nothing that rounds differently
  * on two machines. Integer division and a parity, and that is the whole of it.
  *
