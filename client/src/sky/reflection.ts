@@ -319,6 +319,26 @@ export function clearcoatOver(lit: Readonly<Rgb>, env: Readonly<Rgb>, nDotV: num
  * If you change a constant in this file, run the sheet. It will tell you.
  * ------------------------------------------------------------------------- */
 
+/**
+ * The environment at the reference instant, written out.
+ *
+ * The sheet has no sun and no clock -- it draws one car against one fixed light
+ * so that a wrong nose or a missing panel is the only thing that can differ
+ * between two runs. So it takes the 3 pm dome as a constant, and these are the
+ * three triples it hard-codes. `verifyReflection` checks them against
+ * `skyEnvAt(57.11)`, so the sheet cannot drift from the game by more than the
+ * distance between this table and the code above it.
+ */
+export const SHEET_ENV: {
+  readonly zenith: Rgb;
+  readonly horizon: Rgb;
+  readonly ground: Rgb;
+} = {
+  zenith: [0.680544, 0.99246, 1.4178],
+  horizon: [2.236382, 2.520226, 2.907285],
+  ground: [0.28356, 0.233937, 0.163047],
+};
+
 /** `[nDotV, dirY]` probes and the reflectance and radiance luminance they must give at the reference instant. */
 export const SHEET_REFERENCE: ReadonlyArray<{
   nDotV: number;
@@ -532,6 +552,20 @@ export function verifyReflection(): string[] {
   }
 
   /* --- 6. The sheet's copy of the arithmetic. See `SHEET_REFERENCE`. */
+  for (const key of ['zenith', 'horizon', 'ground'] as const) {
+    const want = SHEET_ENV[key];
+    const got = env[key];
+    for (let i = 0; i < 3; i++) {
+      if (Math.abs(got[i] - want[i]) > 1e-5) {
+        failures.push(
+          `SHEET_ENV.${key} is (${want.map((c) => c.toFixed(6)).join(', ')}) and the rig gives ` +
+            `(${got.map((c) => c.toFixed(6)).join(', ')}). The offline car sheet hard-codes the first of those, ` +
+            'so the sheet is now drawing cars under a different sky from the game. Update both.',
+        );
+        break;
+      }
+    }
+  }
   for (const row of SHEET_REFERENCE) {
     const f = coatFresnel(row.nDotV);
     const r = luminance(envRadiance(env, row.dirY));
