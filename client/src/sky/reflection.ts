@@ -112,9 +112,9 @@
  * ## WHAT ELSE IS IN THIS FILE
  *
  * The environment above was built for cars and it turned out to be the term
- * another surface was missing too, so this file now has two arms hanging off one
- * dome. They share `skyEnvFor` and nothing else, and each has its own switch in
- * `calibration.ts` and its own check at the bottom:
+ * three other surfaces were missing, so this file now has three arms hanging off
+ * one dome. They share `skyEnvFor` and nothing else, and each has its own
+ * switch in `calibration.ts` and its own check at the bottom:
  *
  *   - **the coat** -- `CAR_SKY_REFLECT`, `verifyReflection`. The paragraphs
  *     above.
@@ -123,14 +123,18 @@
  *     `curtain_wall`, the window rectangles inside every other wall slot, and
  *     the landmark glazing band. Its own section below opens with what the audit
  *     got wrong about it, which is worth reading before touching `world/facade.ts`.
+ *   - **the aerial arm** -- `FAR_AERIAL`, `verifyAerial`. `GRAPHICS.md` item 4.
+ *     The far city, hazed toward the same horizon band by distance, because
+ *     three's `Fog` colour is a `Color` and a `Color` cannot hold the 2.49 of
+ *     linear radiance the low sky actually sits at.
  *
- * One dome under both is the point rather than an accident: a car and a tower's
- * glass now agree about what the sky is doing, at every hour, because there is
- * one function that says so.
+ * Three arms and one dome is the point rather than an accident: a car, a tower's
+ * glass and a suburb four kilometres off now agree about what the sky is doing,
+ * at every hour, because there is one function that says so.
  *
  * ---------------------------------------------------------------------------
  * Pure and three-free, like `calibration.ts` and for the same reason: the server
- * runs both checks and may not import three, and the two offline sheets
+ * runs all three checks and may not import three, and the two offline sheets
  * (`scripts/render-car-sheet.mjs --pbr`, `scripts/render-landmark-sheet.mjs
  * --pbr`) evaluate the same arithmetic on the CPU. `world/skyreflect.ts` holds
  * the twelve lines of TSL that say this again in a shader, and the copies are
@@ -570,6 +574,150 @@ export const GLAZING_COAT = {
  * here has a nonzero row above it.
  */
 export const GLAZING_WHOLE_SURFACE: readonly string[] = ['curtain_wall', 'landmark_glass'];
+
+/* ---------------------------------------------------------------------------
+ * THE AERIAL ARM. `GRAPHICS.md` item 4.
+ *
+ * ## THE FOG CANNOT REACH THE SKY, AND THAT IS A TYPE ERROR IN THREE
+ *
+ * `world/far.ts` draws 12,778 unlit prisms with one global `SLAB_LIGHT`
+ * multiply, so the far suburbs sit at a uniform pastel from 1.8 km to the 4.5 km
+ * edge and `scene.fog` does every bit of the depth work. `main.ts` set that fog
+ * up carefully and then wrote down the reason it could not finish the job:
+ *
+ *   > *"A `Fog` colour is capped at 1.0 linear so it cannot reach the horizon
+ *   > band's brightness; this gets as close as the cap allows while keeping a
+ *   > blue bias."*
+ *
+ * That is exact and it is the whole item. `Fog.color` is a `THREE.Color`, and a
+ * `Color` is three channels in [0, 1]. The low sky at 3 pm is **2.49 of
+ * luminance**. So the fog fades the far city toward `0.686, 0.807, 0.956` --
+ * a value two and a half times *darker* than the sky it is standing in for --
+ * and the more distance a building has, the further below its own background it
+ * is dragged. Distance that darkens is not aerial perspective, it is murk, and
+ * it is why the far suburbs read as cut-outs pasted on a bright sky.
+ *
+ * `skyEnvFor` publishes the number the fog is not allowed to hold. This term is
+ * a second, uncapped haze that mixes toward it.
+ *
+ * ## THE WEIGHT
+ *
+ * Beer-Lambert, and the extinction is the one number worth arguing about.
+ * Meteorological visibility `V` and extinction `beta` are related by the Koschmieder
+ * contrast threshold, `beta = 3.912 / V`. Sydney's clear-air visibility on the day
+ * this dome is calibrated to is on the order of 40 km, so `beta` is 0.098 per
+ * kilometre, and over the 4.5 km from the eye to the world's edge that is
+ * `1 - exp(-0.44)`, or **0.36**. `AERIAL_MAX` is that, rounded to two figures,
+ * and it is a derivation rather than a taste: the far city at the horizon is
+ * about a third sky and two thirds building, which is what a photograph of
+ * Sydney from the Anzac Bridge shows.
+ *
+ * Zero at the near edge is not a taper, it is a requirement. `far.ts` slabs and
+ * streamed tiles overlap for as long as it takes a GLB to arrive, and a slab
+ * that was hazier than the real building standing in the same place would make
+ * that swap a visible flash. `AERIAL_NEAR` is the streaming radius exactly.
+ *
+ * The height term is the second half of real aerial perspective and it is the
+ * half that is usually left out: haze is a ground-hugging scale-height thing, so
+ * a tower's top is *less* hazed than its base at the same range. Without it the
+ * far city fades as a flat card and the effect reads as a wash over the whole
+ * image rather than as air standing between you and it.
+ *
+ * ## AND IT MUST BE ZERO AT NIGHT
+ *
+ * `skyEnvFor`'s night floor is a **lighting** floor, not a radiance: the rig
+ * holds `HEMISPHERE_NIGHT` up so that a player can see, and the environment
+ * inherits it, which is right for a car (a rim of ambient on a dark flank) and
+ * wrong for the sky behind a silhouette. At midnight the environment's horizon
+ * is 0.51 of luminance and the far city under `NIGHT_SLAB` is 0.058 -- so a haze
+ * that ran at night would put the far suburbs *nine times brighter* than they
+ * are now and turn a silhouette skyline into a grey one.
+ *
+ * In-scattering is what aerial perspective is, and at night there is none: that
+ * is why `sky/dusk.ts` takes the fog to `FOG_NIGHT` at 0.016. So the weight
+ * carries a daylight factor, `far.ts` supplies it from the same
+ * `characters.slabLight` curve the slabs are already lit by, and the term is
+ * **exactly zero** whenever that curve is at its night floor. Not small: zero,
+ * asserted by identity, so the night skyline that ships is the night skyline
+ * that shipped.
+ * ------------------------------------------------------------------------- */
+
+/** Where the haze starts: the streaming radius, so a slab and its tile agree. */
+export const AERIAL_NEAR = 1800;
+
+/** And where it reaches `AERIAL_MAX`: the far edge of the drawn world. */
+export const AERIAL_FAR = 4500;
+
+/** See the header: Koschmieder at 40 km of visibility over 4.5 km of air. */
+export const AERIAL_MAX = 0.36;
+
+/**
+ * The scale height of the haze, in metres of world y.
+ *
+ * 220 m, which is a shade over Sydney Tower's shaft and a good deal more than
+ * anything else in the city, so the term reaches about `1/e` of full strength at
+ * the top of the tallest thing it draws and is essentially flat across the
+ * suburbs. Chosen against the *skyline* rather than against a real atmosphere,
+ * whose scale height is 8 km and would be indistinguishable from a constant over
+ * a 300 m city -- what this is buying is the read that the tops of the towers
+ * are standing out of the haze, which needs a height constant on the order of
+ * the towers.
+ */
+export const AERIAL_SCALE_HEIGHT = 220;
+
+/**
+ * The haze weight at a distance, a height and a daylight fraction.
+ *
+ * `distance` is metres from the eye, `height` is metres of world y above sea
+ * level (which is what `far.ts` slabs carry -- they are built in world space and
+ * their y is an AHD elevation), `day` is 0 at the night floor and 1 in full
+ * daylight.
+ *
+ * Smoothstepped rather than ramped in distance because the near end has to leave
+ * *exactly* zero and a linear ramp leaves a first derivative instead, which is a
+ * visible crease at 1.8 km along a line that is already the seam between two
+ * levels of detail.
+ */
+export function aerialWeight(distance: number, height: number, day: number): number {
+  const d = smoothstep01((distance - AERIAL_NEAR) / (AERIAL_FAR - AERIAL_NEAR));
+  const h = Math.exp(-Math.max(0, height) / AERIAL_SCALE_HEIGHT);
+  const k = day < 0 ? 0 : day > 1 ? 1 : day;
+  return AERIAL_MAX * d * h * k;
+}
+
+/**
+ * The daylight fraction, from the far city's own light curve.
+ *
+ * `game/characters.slabLight` returns `NIGHT_SLAB + (1 - NIGHT_SLAB) * day`, so
+ * the day fraction is that, inverted. Written here rather than read off the
+ * curve directly because the number this term needs is **zero at the night
+ * floor**, and `slabLight` is 0.14 there -- multiplying by 0.14 would leave a
+ * fourteen per cent haze on a silhouette skyline, which is the one thing the
+ * header says must not happen. Inverting is the difference between "nearly
+ * nothing" and "nothing", and only the second of those is assertable.
+ *
+ * `far.ts` passes its own `NIGHT_SLAB` rather than this file importing it: that
+ * constant lives in `game/characters.ts` with the rest of the day curve, and a
+ * second copy of it here is a second place for it to be wrong.
+ */
+export function aerialDayFraction(slabLight: number, nightFloor: number): number {
+  if (!(nightFloor < 1)) return 0;
+  const d = (slabLight - nightFloor) / (1 - nightFloor);
+  return d < 0 ? 0 : d > 1 ? 1 : d;
+}
+
+/**
+ * The composite. A convex mix toward the horizon band, on the same terms and
+ * with the same guarantee as the coats above.
+ */
+export function aerialOver(slab: Readonly<Rgb>, env: SkyEnv, weight: number): Rgb {
+  const w = weight < 0 ? 0 : weight > 1 ? 1 : weight;
+  return [
+    slab[0] * (1 - w) + env.horizon[0] * w,
+    slab[1] * (1 - w) + env.horizon[1] * w,
+    slab[2] * (1 - w) + env.horizon[2] * w,
+  ];
+}
 
 /* ---------------------------------------------------------------------------
  * THE SEAM WITH THE OFFLINE SHEET.
@@ -1167,6 +1315,213 @@ export function verifyGlazing(): string[] {
         );
         break;
       }
+    }
+  }
+
+  return failures;
+}
+
+/* ---------------------------------------------------------------------------
+ * THE AERIAL CHECK.
+ *
+ * Its own function for the same reason `verifyGlazing` is: `FAR_AERIAL` is a
+ * third switch, and a failure should say which of the three to reach for.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * `game/characters.NIGHT_SLAB`, restated.
+ *
+ * Not imported: `game/characters.ts` is a very large module with a station
+ * table and a street-life model in it, and this file is the one the *server*
+ * pulls in to check a look. One number, and `world/far.ts` passes the real one
+ * to `aerialDayFraction` at runtime, so the copy here can only ever make this
+ * check assert the wrong midnight -- never make the game draw one.
+ */
+const NIGHT_SLAB_ANCHOR = 0.14;
+
+export function verifyAerial(): string[] {
+  const failures: string[] = [];
+  const env = skyEnvAt(REFERENCE_ALTITUDE);
+
+  /* --- 1. Zero at the near edge, and zero inside it, exactly.
+   *
+   * Not "small". A `far.ts` slab and the streamed tile that replaces it stand in
+   * the same place for as long as it takes a GLB to arrive, and a slab that was
+   * hazier than the real building would make that swap a visible flash. The
+   * smoothstep is what buys this -- a linear ramp would leave a first derivative
+   * at 1,800 m instead, which is a crease along the seam between two levels of
+   * detail. */
+  {
+    for (const d of [0, 100, 900, AERIAL_NEAR - 1, AERIAL_NEAR]) {
+      const w = aerialWeight(d, 0, 1);
+      if (w !== 0) {
+        failures.push(
+          `The far city is hazed by ${w} at ${d} m, inside AERIAL_NEAR (${AERIAL_NEAR} m). A slab and the ` +
+            'tile that replaces it overlap for as long as a GLB takes to arrive, and a slab that is hazier ' +
+            'than the building standing in the same place makes that swap a flash.',
+        );
+      }
+    }
+    // And the derivative is zero there too, which is the whole reason it is a
+    // smoothstep. One metre in should still be under a ten-thousandth.
+    if (!(aerialWeight(AERIAL_NEAR + 1, 0, 1) < 1e-4)) {
+      failures.push(
+        `One metre past the near edge the haze is already ${aerialWeight(AERIAL_NEAR + 1, 0, 1)}. That is a ` +
+          'ramp, not a smoothstep, and it is a visible crease along the streaming radius.',
+      );
+    }
+  }
+
+  /* --- 2. Monotone in distance, and bounded by AERIAL_MAX. */
+  {
+    let last = -Infinity;
+    for (let d = 0; d <= 12000; d += 25) {
+      const w = aerialWeight(d, 0, 1);
+      if (w < last - 1e-12) {
+        failures.push(`The haze thinned with distance, at ${d} m: ${w} after ${last}.`);
+        break;
+      }
+      if (!(w >= 0 && w <= AERIAL_MAX + 1e-12) || !Number.isFinite(w)) {
+        failures.push(`The haze at ${d} m is ${w}, outside [0, AERIAL_MAX (${AERIAL_MAX})].`);
+        break;
+      }
+      last = w;
+    }
+    if (Math.abs(aerialWeight(AERIAL_FAR, 0, 1) - AERIAL_MAX) > 1e-9) {
+      failures.push(
+        `At the far edge (${AERIAL_FAR} m) the haze is ${aerialWeight(AERIAL_FAR, 0, 1)} rather than ` +
+          `AERIAL_MAX (${AERIAL_MAX}). The far edge is where the Koschmieder derivation in the header lands ` +
+          'and the two have to be the same number.',
+      );
+    }
+    if (!(AERIAL_NEAR < AERIAL_FAR)) {
+      failures.push(`AERIAL_NEAR (${AERIAL_NEAR}) is not inside AERIAL_FAR (${AERIAL_FAR}).`);
+    }
+    if (!(AERIAL_MAX > 0 && AERIAL_MAX < 0.75)) {
+      failures.push(
+        `AERIAL_MAX is ${AERIAL_MAX}. Zero is no aerial perspective; past about three quarters the far ` +
+          'suburbs stop being a city and become weather.',
+      );
+    }
+  }
+
+  /* --- 3. The height term: full at sea level, thinning upward, never negative. */
+  {
+    if (Math.abs(aerialWeight(AERIAL_FAR, 0, 1) - aerialWeight(AERIAL_FAR, -50, 1)) > 1e-12) {
+      failures.push('A slab below sea level is hazed differently from one at it; the height is clamped at zero.');
+    }
+    let last = Infinity;
+    for (let h = 0; h <= 400; h += 5) {
+      const w = aerialWeight(AERIAL_FAR, h, 1);
+      if (w > last + 1e-12) {
+        failures.push(`The haze thickened with height, at ${h} m.`);
+        break;
+      }
+      last = w;
+    }
+    const top = aerialWeight(AERIAL_FAR, AERIAL_SCALE_HEIGHT, 1) / AERIAL_MAX;
+    if (Math.abs(top - Math.exp(-1)) > 1e-9) {
+      failures.push(
+        `At AERIAL_SCALE_HEIGHT the haze is ${top.toFixed(4)} of full rather than 1/e. That constant is a ` +
+          'scale height and the term is meant to be an exponential in it.',
+      );
+    }
+  }
+
+  /* --- 4. The night floor, preserved by identity.
+   *
+   * The load-bearing assertion of the whole arm. `skyEnvFor`'s night value is a
+   * *lighting* floor rather than a radiance -- the rig holds `HEMISPHERE_NIGHT`
+   * up so a player can see -- so at midnight the environment's horizon is nine
+   * times brighter than the far city under `NIGHT_SLAB`, and a haze that ran at
+   * night would turn a silhouette skyline into a grey one. In-scattering is what
+   * aerial perspective *is*, and at night there is none.
+   *
+   * So this is asserted as exact equality on the output, not as a bound on the
+   * weight: the night skyline that ships has to be the night skyline that
+   * shipped, bit for bit. */
+  {
+    const dayFrac = aerialDayFraction(NIGHT_SLAB_ANCHOR, NIGHT_SLAB_ANCHOR);
+    if (dayFrac !== 0) {
+      failures.push(
+        `At the far city's night floor the daylight fraction is ${dayFrac}, not 0. ` +
+          '`game/characters.slabLight` sits at NIGHT_SLAB all night and this term has to go out with it.',
+      );
+    }
+    if (aerialDayFraction(1, NIGHT_SLAB_ANCHOR) !== 1) {
+      failures.push(`At noon the daylight fraction is ${aerialDayFraction(1, NIGHT_SLAB_ANCHOR)}, not 1.`);
+    }
+    const nightEnv = skyEnvAt(-30);
+    const slabs: Rgb[] = [
+      [0.0729, 0.0715, 0.0695], // concrete at NIGHT_SLAB x BASE_SHADE
+      [0.0167, 0.0278, 0.0298], // curtain wall, the darkest tint in the table
+      [0.1424, 0.1402, 0.1315], // painted render, the brightest
+    ];
+    for (const slab of slabs) {
+      for (const d of [AERIAL_NEAR, 3000, AERIAL_FAR, 9000]) {
+        const w = aerialWeight(d, 0, dayFrac);
+        const out = aerialOver(slab, nightEnv, w);
+        for (let i = 0; i < 3; i++) {
+          if (out[i] !== slab[i]) {
+            failures.push(
+              `At night a far slab moved from ${slab[i]} to ${out[i]} at ${d} m. The weight carries a ` +
+                'daylight factor precisely so this is zero rather than small -- the environment at midnight ' +
+                'is a lighting floor nine times brighter than the far city, and a haze toward it is a grey ' +
+                'skyline where a silhouette belongs.',
+            );
+            return failures;
+          }
+        }
+      }
+    }
+    // And a monotone daylight fraction in between, so dusk is a fade and not a switch.
+    let last = -Infinity;
+    for (let k = NIGHT_SLAB_ANCHOR; k <= 1.0001; k += 0.01) {
+      const v = aerialDayFraction(Math.min(k, 1), NIGHT_SLAB_ANCHOR);
+      if (v < last - 1e-12) {
+        failures.push(`The daylight fraction fell as the day came up, at slabLight ${k.toFixed(2)}.`);
+        break;
+      }
+      last = v;
+    }
+  }
+
+  /* --- 5. And by day it is a convex mix, like everything else in this file. */
+  {
+    const slabs: Rgb[] = [
+      [0, 0, 0], [0.1193, 0.1985, 0.2132], [0.521, 0.5109, 0.4965], [1.0176, 1.0013, 0.9396], [6, 6, 6],
+    ];
+    for (const slab of slabs) {
+      for (const d of [1800, 2400, 3600, 4500, 9000]) {
+        for (const h of [0, 60, 260]) {
+          const w = aerialWeight(d, h, 1);
+          const out = aerialOver(slab, env, w);
+          for (let i = 0; i < 3; i++) {
+            const hi = Math.max(slab[i], env.horizon[i]) + 1e-9;
+            const lo = Math.min(slab[i], env.horizon[i]) - 1e-9;
+            if (out[i] > hi || out[i] < lo) {
+              failures.push(
+                `The haze put ${out[i].toFixed(4)} outside [${lo.toFixed(4)}, ${hi.toFixed(4)}] at ${d} m, ` +
+                  `${h} m up. It is meant to be a mix, not an add.`,
+              );
+              return failures;
+            }
+          }
+        }
+      }
+    }
+    // The direction that matters: the far city is darker than the low sky, so
+    // distance has to *brighten* it. It used to darken, because `scene.fog`'s
+    // colour is a `THREE.Color` and cannot hold the 2.49 the low sky sits at --
+    // which is the entire item.
+    const near = toDisplay([0.521, 0.5109, 0.4965]);
+    const far = toDisplay(aerialOver([0.521, 0.5109, 0.4965], env, aerialWeight(AERIAL_FAR, 0, 1)));
+    if (!(luminance(far as unknown as Rgb) > luminance(near as unknown as Rgb))) {
+      failures.push(
+        `A concrete slab at the far edge went from rgb(${near.join(',')}) to rgb(${far.join(',')}) -- distance ` +
+          'made it darker or left it alone. The low sky at 3 pm is 2.49 of luminance and the far city is ' +
+          'about a fifth of that, so haze brightens it. Distance that darkens is murk, not aerial perspective.',
+      );
     }
   }
 

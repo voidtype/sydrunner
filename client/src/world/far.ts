@@ -91,6 +91,9 @@ import { fetchWorldAsset } from './cdn.ts';
 import { expandCover } from './cover.ts';
 import { MATERIALS } from './facade.ts';
 import { createGroundMaterial } from './ground.ts';
+// WORKSTREAM AQ, `GRAPHICS.md` item 4. See `createSlabMaterial`.
+import { NIGHT_SLAB } from '../game/characters.ts';
+import { createFarCityMaterial, setAerialDaylight } from './skyreflect.ts';
 
 /**
  * `far.bin`'s magic and the format this file can read. Both from
@@ -482,10 +485,54 @@ const SLAB_LIGHT = uniform(1.0);
 
 export function setSlabDaylight(k: number): void {
   SLAB_LIGHT.value = Math.max(0, Math.min(1, k));
+  // And the haze, off the same curve and in the same call, so there is no frame
+  // on which the far city is lit for one hour and hazed for another.
+  //
+  // `NIGHT_SLAB` goes across rather than being read over there, because the
+  // number the haze needs is **zero** at the night floor and `k` is 0.14 --
+  // `sky/reflection.aerialDayFraction` is the inversion and its header says why
+  // "nearly nothing" would not have done. See `GRAPHICS.md` item 4.
+  setAerialDaylight(k, NIGHT_SLAB);
 }
 
+/**
+ * ---------------------------------------------------------------------------
+ * AERIAL PERSPECTIVE, `GRAPHICS.md` item 4, and why it is not `scene.fog`.
+ *
+ * Everything above is a flat multiply, so the far suburbs sit at one pastel from
+ * 1.8 km to the 4.5 km edge and `scene.fog` does all of the depth work. The
+ * trouble is that the fog **cannot reach the sky**: `Fog.color` is a
+ * `THREE.Color`, a `Color` holds three channels in [0, 1], and the low sky at
+ * 3 pm is 2.49 of linear luminance. `main.ts` wrote that down when it chose the
+ * value -- *"a `Fog` colour is capped at 1.0 linear so it cannot reach the
+ * horizon band's brightness; this gets as close as the cap allows"* -- and the
+ * consequence is that distance has been *darkening* the far city toward a value
+ * two and a half times under its own background. Distance that darkens is murk,
+ * not air, and it is why the horizon has read as cut-outs pasted on a bright
+ * sky.
+ *
+ * So the slab material gets a second, uncapped haze toward the horizon radiance
+ * `sky/reflection.ts` publishes for the coats -- shared uniforms, one new
+ * scalar, no second sky. Zero on a slab inside the streaming radius (so the swap
+ * to a real tile is not a flash), exponential in height (so a tower top stands
+ * out of the haze instead of the skyline fading as one card), and exactly zero
+ * at night, because in-scattering is what aerial perspective is and at night
+ * there is none.
+ *
+ * Predicted at 3 pm on 15 February, for a concrete slab at `BASE_SHADE`, before
+ * the fog gets it:
+ *
+ *   1,800 m, at sea level      rgb(129, 127, 125) -- unchanged, by construction
+ *   3,000 m, at sea level      rgb(167, 172, 177)
+ *   4,500 m, at sea level      rgb(207, 216, 227)
+ *   4,500 m, 260 m up          rgb(158, 161, 165)
+ *
+ * That last pair is the read: at the same range the top of a tower is fifty code
+ * values darker than its own base, which is what a photograph of the CBD from
+ * Rozelle looks like and what a single fog factor can never produce.
+ * ------------------------------------------------------------------------- */
 function createSlabMaterial(): MeshBasicNodeMaterial {
-  const material = new MeshBasicNodeMaterial();
+  const material = createFarCityMaterial();
   material.name = 'far-city';
 
   // `colorNode` is the base and the `color` attribute multiplies *into* it --

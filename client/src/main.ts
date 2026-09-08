@@ -35,7 +35,7 @@ import { EXPOSURE, NIGHT_FULL_ALTITUDE } from './sky/calibration.ts';
 // See GRAPHICS.md.
 import { verifyGrade } from './sky/grade.ts';
 import { installGrade, updateGrade } from './sky/gradenode.ts';
-import { verifyGlazing, verifyReflection } from './sky/reflection.ts';
+import { verifyAerial, verifyGlazing, verifyReflection } from './sky/reflection.ts';
 import { updateSkyReflect } from './world/skyreflect.ts';
 import { SydneySky } from './sky/sky.ts';
 import { CYCLE_MS, verifyCycle } from './sky/cycle.ts';
@@ -6088,6 +6088,12 @@ async function main(): Promise<void> {
     // slot in the city now wears a coated material, and what keeps a brick
     // terrace bit-for-bit what it was is that the mask is zero on brick.
     ...verifyGlazing(),
+    // And the haze on the far city -- `GRAPHICS.md` item 4. Its load-bearing
+    // assertion is also a zero: the weight carries a daylight factor so that at
+    // midnight a far slab is bit-for-bit what it was, because the environment's
+    // night value is a *lighting* floor nine times brighter than the far city
+    // and a haze toward it is a grey skyline where a silhouette belongs.
+    ...verifyAerial(),
     ...verifyInterpDelay(),
     ...verifyQuests(),
     ...verifyDialog(),

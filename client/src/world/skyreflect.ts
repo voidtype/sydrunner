@@ -86,9 +86,21 @@
  * `glassArea` is `inWindow * (1 - frameMask)` minus whatever an aircon box is
  * covering, and every one of those is a hundred lines of window grammar that
  * only that file knows. This file takes the node and asks no questions.
+ *
+ * ---------------------------------------------------------------------------
+ * ## AND THE FAR CITY. `GRAPHICS.md` item 4.
+ *
+ * At the bottom of this file, and it is here rather than in `world/far.ts` for
+ * one reason: it wants `E.horizon`, and there is one sky. A second copy of the
+ * environment written from the same `solarRig` on the same frame would be the
+ * same numbers in a second buffer, until the day somebody edited one of them.
+ *
+ * Same hook, third material class, one new scalar uniform. See the block above
+ * `AerialBasicNodeMaterial`.
  */
 
 import {
+  MeshBasicNodeMaterial,
   MeshStandardNodeMaterial,
   Vector3,
   type Node,
@@ -97,7 +109,9 @@ import {
 import {
   Fn,
   cameraPosition,
+  exp,
   float,
+  max,
   mix,
   normalWorld,
   positionWorld,
@@ -107,8 +121,12 @@ import {
   vec4,
 } from 'three/tsl';
 
-import { CAR_SKY_REFLECT, GLAZING_SKY_REFLECT } from '../sky/calibration.ts';
+import { CAR_SKY_REFLECT, FAR_AERIAL, GLAZING_SKY_REFLECT } from '../sky/calibration.ts';
 import {
+  AERIAL_FAR,
+  AERIAL_MAX,
+  AERIAL_NEAR,
+  AERIAL_SCALE_HEIGHT,
   COAT_F0,
   COAT_MAX,
   COAT_POWER,
@@ -117,6 +135,7 @@ import {
   GLAZING_POWER,
   HORIZON_HIGH,
   HORIZON_LOW,
+  aerialDayFraction,
   skyEnvAt,
 } from '../sky/reflection.ts';
 
@@ -302,4 +321,96 @@ export function createGlazingMaterial(): MeshStandardNodeMaterial {
   material.coatMax = GLAZING_MAX;
   material.coatPower = GLAZING_POWER;
   return material;
+}
+
+/* ---------------------------------------------------------------------------
+ * THE HAZE. `GRAPHICS.md` item 4.
+ *
+ * The far city, mixed toward the same horizon band the coats above reflect. The
+ * argument is in `sky/reflection.ts`' aerial section and the short version is a
+ * type: `scene.fog.color` is a `THREE.Color`, a `Color` is three channels in
+ * [0, 1], and the low sky at 3 pm is 2.49 of luminance. So the fog fades the far
+ * suburbs toward a value two and a half times *darker* than the sky behind them
+ * and distance has been subtracting light instead of adding it.
+ *
+ * `main.ts` wrote that limitation down when it set the fog up -- *"a `Fog`
+ * colour is capped at 1.0 linear so it cannot reach the horizon band's
+ * brightness; this gets as close as the cap allows"* -- and this is the term
+ * that is not capped.
+ *
+ * **Nothing new is uploaded for it.** `E.horizon` is already on the GPU for the
+ * coats; the only addition is one scalar, and it is a scalar rather than a
+ * second colour because the *shape* of the day is `far.ts`' own `SLAB_LIGHT`
+ * curve and there must not be two of those.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * The daylight fraction, 0 at the far city's night floor and 1 at noon.
+ *
+ * See `reflection.aerialDayFraction` for why this is inverted out of
+ * `SLAB_LIGHT` rather than being `SLAB_LIGHT` itself: the number this term needs
+ * has to be **zero** at night, not 0.14, or a silhouette skyline carries a
+ * fourteen per cent wash of a lighting floor. `verifyAerial` asserts the
+ * resulting slab value by identity.
+ */
+const AERIAL = /*#__PURE__*/ uniform(0);
+
+/**
+ * Written once a frame from `world/far.setSlabDaylight`, which is already being
+ * called from the sky's own phase. One buffer write, shared by all 192 slab
+ * meshes because they share one material.
+ */
+export function setAerialDaylight(slabLight: number, nightFloor: number): void {
+  AERIAL.value = aerialDayFraction(slabLight, nightFloor);
+}
+
+/**
+ * A `MeshBasicNodeMaterial` that fades toward the sky with distance.
+ *
+ * `setupOutput` again, and for a third reason on top of the two the coat gives:
+ * the far city's colour arrives as `colorNode` **times a per-vertex tint**
+ * (`vertexColors`, one `FAR_TINT` row per material slot), so the haze cannot go
+ * in `colorNode` -- it would be multiplied by the tint afterwards and every
+ * slab would be hazed toward its own colour. It has to land after the multiply
+ * and before the fog, which is exactly what this hook is.
+ *
+ * The cost, counted honestly rather than estimated: a subtract and a length for
+ * the distance, a `smoothstep`, a `max` and an `exp` for the height, two
+ * multiplies for the scalars and a three-channel `mix`. Call it eighteen ALU,
+ * not the six `GRAPHICS.md` guessed -- the guess did not price the height term,
+ * which is the half of aerial perspective that makes a tower top stand out of
+ * the haze instead of the whole skyline fading as one card. Still nothing
+ * against 187,981 unlit triangles that do no lighting at all.
+ *
+ * Zero new pipelines: one material for the whole far city before this, one
+ * after.
+ */
+export class AerialBasicNodeMaterial extends MeshBasicNodeMaterial {
+  setupOutput(builder: NodeBuilder, outputNode: Node): Node {
+    const lit = outputNode as any;
+    // World-space distance rather than view z. A range fog uses view z and it
+    // is wrong at the edges of a 90-degree field: a slab at the corner of the
+    // screen is further away than one straight ahead at the same z, and at four
+    // kilometres that is hundreds of metres of air the fog is not counting.
+    const distance = positionWorld.sub(cameraPosition).length();
+    // `positionWorld.y` is an AHD elevation, because these prisms are built in
+    // world space -- so this reads the *terrain* as well as the building, which
+    // is correct and is the one thing about it worth saying twice: a suburb on a
+    // ridge at 100 m genuinely has less air in front of it than one at sea
+    // level, and both are in this number already.
+    const height = max(positionWorld.y, float(0));
+    const weight = smoothstep(float(AERIAL_NEAR), float(AERIAL_FAR), distance)
+      .mul(exp(height.mul(float(-1 / AERIAL_SCALE_HEIGHT))))
+      .mul(AERIAL)
+      .mul(float(AERIAL_MAX));
+    return super.setupOutput(builder, vec4(mix(lit.rgb, E.horizon, weight as any), lit.a));
+  }
+}
+
+/**
+ * The material the far city should be built with: hazed if the switch is on,
+ * plain if it is not. Same factory rule, same reason, as the two above.
+ */
+export function createFarCityMaterial(): MeshBasicNodeMaterial {
+  return FAR_AERIAL ? new AerialBasicNodeMaterial() : new MeshBasicNodeMaterial();
 }

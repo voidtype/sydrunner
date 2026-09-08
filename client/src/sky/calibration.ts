@@ -93,6 +93,18 @@ export const CAR_SKY_REFLECT = true;
 export const GLAZING_SKY_REFLECT = true;
 
 /**
+ * Aerial perspective on the far city. See `sky/reflection.ts`' aerial section
+ * and `world/far.ts`.
+ *
+ * Off restores the flat `SLAB_LIGHT` multiply the far suburbs shipped with --
+ * one pastel from 1.8 km to 4.5 km, with `scene.fog` doing all the depth work
+ * against a colour that is structurally capped below the sky it stands in for.
+ * The term is zero at the near edge and zero at night by construction, so the
+ * only image it can move is the one it was added for.
+ */
+export const FAR_AERIAL = true;
+
+/**
  * Direct-beam intensity with the sun at the zenith and no atmosphere in the way.
  *
  * The old value was 3.45 at the zenith, and it was not weak in isolation -- it
