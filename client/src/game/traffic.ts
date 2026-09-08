@@ -396,6 +396,73 @@ export function trafficTick(nowMs: number): number {
 }
 
 /**
+ * The same clock, **unfloored**: the tick the picture is drawn on.
+ *
+ * ---------------------------------------------------------------------------
+ * ## What this replaces, and the measurement that convicted it
+ *
+ * The hit test runs on whole ticks so that this client and the server ask the
+ * identical question, and the picture runs *between* them so a 144 Hz display
+ * does not watch 60 Hz cars. That split is right. What `main.ts` used to write
+ * for the second half was not:
+ *
+ *     trafficTick(Date.now()) + accumulator / FIXED_DT
+ *
+ * -- a whole tick of the **wall** clock plus the residue of the **simulation's**
+ * fixed-step accumulator. Two 60 Hz sawteeth with nothing tying their phases
+ * together, added as though one were the fractional part of the other. Their
+ * sum is not monotonic, and on any display that is not exactly 60 Hz it goes
+ * *backwards*, hard, over and over:
+ *
+ *   | display | frames stepping the clock backwards | worst step back |
+ *   |---------|-------------------------------------|-----------------|
+ *   | 60 Hz   | none                                | --              |
+ *   | 120 Hz  | **one frame in two**                | 8.3 ms          |
+ *   | 144 Hz  | one frame in nine                   | 9.7 ms          |
+ *   | 165 Hz  | one frame in eleven                 | 10.6 ms         |
+ *
+ * Everything ambient in this game is a pure function of that number, so a clock
+ * that jitters is a *world* that jitters. Driven over the real bands and the
+ * real route field for thirty seconds at 120 Hz -- which is what a MacBook's
+ * ProMotion panel runs at -- the old expression produced:
+ *
+ *   - **117,372 direction reversals in 117,530 lived pedestrian-frames.** Every
+ *     walker in Sydney stepping back and forth by up to 3.9 cm, every frame.
+ *     That is the shimmer.
+ *   - **19,200 reversals in 43,248 car-frames**, up to 29.7 cm. That is the
+ *     bigger one, and it is what a shadow cast by a car does with it.
+ *   - **twenty pedestrians and sixteen cars blinking out for a single frame**,
+ *     over thirty-two bands and eight routes -- a walker whose `u >= trip` gate
+ *     the clock walked across twice, or a schedule car whose stage it did. On a
+ *     real street with hundreds of both, that is a steady sprinkle of pops.
+ *
+ * The same timeline on this function: **zero of all four, at every cadence.**
+ * See `game/drawclock-check.ts`, which is that driver.
+ *
+ * ## Why this is the whole fix
+ *
+ * There was never a second quantity to add. The fraction of a tick that has
+ * elapsed is a property of the clock, not of the simulation's bookkeeping, and
+ * it is already in the multiply `trafficTick` throws away. So the picture's tick
+ * is the floor's own argument, and the two agree by construction:
+ *
+ *     Math.floor(drawTick(t)) === trafficTick(t)   for every t
+ *
+ * -- asserted in `verifyDrawClock`, because that identity is what keeps the car
+ * you are drawn being hit by the car that hit you.
+ *
+ * `Date.now()` has millisecond resolution, so this advances in steps of 0.06 of
+ * a tick: 1.4 cm at 50 km/h, a seventh of a shadow-map texel, and always
+ * forwards. Read it **once a frame** and hand the same number to every consumer
+ * -- eight separate `Date.now()` calls in one frame can straddle a tick
+ * boundary, and then `carlod.sweep` claims a car out of a world that
+ * `TrafficMovers.update` is not drawing.
+ */
+export function drawTick(nowMs: number): number {
+  return (nowMs + trafficClockSkewMs - TRAFFIC_EPOCH_MS) * (TRAFFIC_HZ / 1000);
+}
+
+/**
  * How far this process's wall clock is from the host's, milliseconds.
  *
  * ---------------------------------------------------------------------------

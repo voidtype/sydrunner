@@ -80,6 +80,10 @@ import { trafficSeconds,
   forEachCarNear,
   nearestBay,
   trafficTick,
+  // The same clock unfloored: the tick the *picture* is drawn on, read once a
+  // frame into `drawnAt`. See `traffic.drawTick` for what it replaced and the
+  // measurement that convicted it.
+  drawTick,
   // WORKSTREAM AQ: the host's wall clock, adopted for the timetable. See
   // `traffic.setTrafficClockSkew` -- this is the fix for the owner's "maybe the
   // car hitbox is too long", which was never the hitbox.
@@ -344,6 +348,10 @@ import { DialogPanel, cursorsFrom, verifyDialogPanel } from './dialog.ts';
 // structurally unable to report time we did not spend, so a stall it blames on
 // `render` may have been a garbage collection that landed there.
 import { MAX_CATCHUP_STEPS, planSteps, verifyFrameStep } from './game/framestep.ts';
+// The clock the picture is drawn on, and the driver that holds it monotone at
+// every display cadence. Beside `framestep` deliberately: the bug was adding
+// that file's accumulator to this one's tick. See `game/drawclock-check.ts`.
+import { verifyDrawClock } from './game/drawclock-check.ts';
 import { StallRing, verifyStallRing } from './game/stallring.ts';
 import { BoundaryLog, verifyBoundaryLog } from './world/boundarylog.ts';
 import { QuestTracker, verifyQuestTracker } from './questtracker.ts';
@@ -6063,6 +6071,17 @@ async function main(): Promise<void> {
     ...verifyFrameStep(),
     ...verifyStallRing(),
     ...verifyBoundaryLog(),
+    /*
+     * And the clock those steps are *not* the fraction of. `game/framestep.ts`
+     * owns the accumulator; this owns what the picture is drawn on, and the two
+     * are next to each other because adding one to the other is precisely the
+     * bug it exists to have removed. Section 3 drives real walkers and a real
+     * route field over thirty seconds of frames at four display cadences and
+     * asserts nothing blinks and nothing walks backwards; section 2 runs the
+     * superseded expression and requires it to still fail, so the zero above it
+     * is one somebody earned. See `game/drawclock-check.ts`.
+     */
+    ...verifyDrawClock(),
   ];
   if (dialogFailures.length > 0) {
     hud.fatal('Client self-checks failed:\n' + dialogFailures.map((f) => '  - ' + f).join('\n'));
@@ -13038,6 +13057,30 @@ async function main(): Promise<void> {
     const steps = plan.steps;
     for (let i = 0; i < steps; i++) simulate(FIXED_DT);
 
+    /*
+     * --- The tick everything ambient is *drawn* on. Read once, here, and handed
+     *     to all nine sinks below.
+     *
+     * This line used to be eight copies of `trafficTick(Date.now()) +
+     * accumulator / FIXED_DT`, and `traffic.drawTick`'s header is the whole
+     * autopsy: that is a whole tick of the wall clock plus the residue of *this*
+     * accumulator, which is a different 60 Hz sawtooth with an unrelated phase.
+     * The sum runs backwards on one frame in two at 120 Hz, and every ambient
+     * thing in Sydney is a pure function of it -- so every walker jittered back
+     * and forth every frame, every car by up to 30 cm, and anything sitting on
+     * an existence boundary blinked out for a frame as the clock walked across
+     * it twice. That is the owner's *"shadows can flicker... as can ppl and
+     * other objects"*, and it is display-refresh dependent, which is why nothing
+     * in the quality governor explained it.
+     *
+     * **Once** rather than per sink, and that is the second half of the fix: two
+     * `Date.now()` calls a millisecond apart straddle a tick boundary about six
+     * times in a hundred, and when they do, `carModels.sweep` claims a car out
+     * of a world one tick ahead of the one `trafficMovers.update` then draws --
+     * a claimed car whose box is suppressed and whose model nobody poses.
+     */
+    const drawnAt = drawTick(Date.now());
+
     // WORKSTREAM AT: which distance boundary this frame crossed, and how fast the
     // player is going. Read after the simulation, so the position is the one the
     // streamer will be pumped with, and stashed for the *next* frame's stall
@@ -14093,7 +14136,7 @@ async function main(): Promise<void> {
         lastCarSweep = now;
         carModels.sweep(
           traffic,
-          trafficTick(Date.now()) + accumulator / FIXED_DT,
+          drawnAt,
           player.position.x,
           player.position.z,
         );
@@ -14124,7 +14167,7 @@ async function main(): Promise<void> {
 
       trafficMovers.update(
         traffic,
-        trafficTick(Date.now()) + accumulator / FIXED_DT,
+        drawnAt,
         player.position.x,
         player.position.z,
         // --- Workstream Q: where the camera is and which way it points, which is
@@ -14157,7 +14200,10 @@ async function main(): Promise<void> {
     // second, so skipping frames is exact and the ferry is where it would
     // have been when you come back out.
     { // runs indoors too: the windows look out on it (UI.md, INTERIORS.md)
-      boats.update(trafficSeconds(trafficTick(Date.now())), camera.position.x, camera.position.z, streamer.terrain.sea_level_y);
+      // The frame's own clock, floored, so a boat is on the same second as the
+      // street it is drawn beside rather than on a `Date.now()` of its own that
+      // can land a tick either side of it. See `drawnAt`.
+      boats.update(trafficSeconds(Math.floor(drawnAt)), camera.position.x, camera.position.z, streamer.terrain.sea_level_y);
     }
     frameProfile.at(FSEC.crowd);
     { // runs indoors too: the windows look out on it (UI.md, INTERIORS.md)
@@ -14176,7 +14222,7 @@ async function main(): Promise<void> {
       if (crowd.ground === null) crowd.ground = groundHeightAt;
       crowd.update(
         pedestrians,
-        trafficTick(Date.now()) + accumulator / FIXED_DT,
+        drawnAt,
         frameDt,
         player.position.x,
         player.position.z,
@@ -14287,7 +14333,7 @@ async function main(): Promise<void> {
       squad.update(
         pedestrians,
         policeField(),
-        trafficTick(Date.now()) + accumulator / FIXED_DT,
+        drawnAt,
         frameDt,
         player.position.x,
         player.position.z,
@@ -14300,7 +14346,7 @@ async function main(): Promise<void> {
       streetCrowd.update(
         pedestrians,
         policeField(),
-        trafficTick(Date.now()) + accumulator / FIXED_DT,
+        drawnAt,
         frameDt,
         player.position.x,
         player.position.z,
@@ -14314,7 +14360,7 @@ async function main(): Promise<void> {
       flock.update(
         pedestrians,
         policeField(),
-        trafficTick(Date.now()) + accumulator / FIXED_DT,
+        drawnAt,
         player.position.x,
         player.position.z,
         wildGround,
@@ -14325,7 +14371,7 @@ async function main(): Promise<void> {
       characterCrowd.update(
         pedestrians,
         policeField(),
-        trafficTick(Date.now()) + accumulator / FIXED_DT,
+        drawnAt,
         frameDt,
         player.position.x,
         player.position.z,
@@ -14343,7 +14389,7 @@ async function main(): Promise<void> {
       // whenever the player was on a station platform. The wildlife's ground query
       // already makes exactly this distinction and its header argues it.
       eventScene.update(
-        trafficTick(Date.now()) + accumulator / FIXED_DT,
+        drawnAt,
         player.position.x,
         player.position.z,
         wildGround,

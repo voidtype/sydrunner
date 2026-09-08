@@ -326,6 +326,11 @@ import { verifyQuestLog } from '../client/src/game/questlog.ts';
 // as theft, and a boundary counter that mistakes pacing a circle for crossing a
 // ring are all arithmetic, and none of them has a screenshot that says so.
 import { verifyFrameStep } from '../client/src/game/framestep.ts';
+// And the clock the *client's* picture is drawn on. Three-free, and here for
+// the reason every other renderer-adjacent arithmetic check is: nothing in this
+// process draws a walker, so nothing in this process can mask a driver that
+// stopped measuring. See `client/src/game/drawclock-check.ts`.
+import { verifyDrawClock } from '../client/src/game/drawclock-check.ts';
 import { verifyStallRing } from '../client/src/game/stallring.ts';
 import { verifyTilePriority } from '../client/src/world/tilepriority.ts';
 import { verifySuspension } from '../client/src/game/suspension.ts';
@@ -958,6 +963,7 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     ['verifyControlsHint', verifyControlsHint()],
     ['verifyQuestLog', verifyQuestLog()],
     ['verifyFrameStep', verifyFrameStep()],
+    ['verifyDrawClock', verifyDrawClock()],
     ['verifyStallRing', verifyStallRing()],
     ['verifyTilePriority', verifyTilePriority()],
     ['verifySuspension', verifySuspension()],
