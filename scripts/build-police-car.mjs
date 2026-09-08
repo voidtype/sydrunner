@@ -87,8 +87,8 @@
  * sides of a car are mirror images and text is not. So the atlas carries the
  * strip twice -- once laid out nose-right for the +Z flank, once nose-left for
  * the -Z flank -- with the *artwork* mirrored between them and the *lettering*
- * drawn upright in both. 350 kB of atlas is 25 kB of PNG; a mirrored word is
- * forever.
+ * drawn upright in both. The second strip is half the atlas and it is 60 kB of
+ * flat-colour PNG either way; a mirrored word is forever.
  *
  * ---------------------------------------------------------------------------
  * THE LIGHT BAR IS ITS OWN GEOMETRY AND THE LIGHT IS NOT IN THIS FILE.
@@ -192,24 +192,26 @@ const ROOF_X = [-0.88, 0.62];
 
 /**
  * How finely the shell is tessellated, and why it is not as coarse as it could
- * be.
+ * be -- which is no longer the reason this file first gave.
  *
- * A twelve-sided section and the eleven stations above draw a perfectly good car
- * -- 800 triangles, the silhouette right, the wheels right. It was also
- * **illegible on the contact sheet**, and that is a fact about the sheet worth
- * writing down rather than working around: `scripts/render-car-sheet.mjs` shades
- * one colour per triangle, averaged from its three corners' texels, because it
- * is a scanline rasteriser with no texture sampler in it. A flank quad 0.85 m
- * long and 0.28 m tall therefore averages a whole Battenburg cell and its
- * neighbours into one grey, and the livery this file exists to paint disappeared
- * from the only picture anybody looks at before a deploy.
+ * A twelve-sided section and the eleven stations above draw a perfectly good
+ * car: 800 triangles, the silhouette right, the wheels right. The first cut of
+ * this file subdivided it to 32 facets and `MAX_STATION_GAP` **to make the
+ * livery legible on the contact sheet**, because `scripts/render-car-sheet.mjs`
+ * shaded one colour per triangle from its three corners' texels and a flank
+ * quad averaged a whole Battenburg cell into one grey.
  *
- * So the shell is subdivided until a triangle is smaller than a chequer cell:
- * 32 facets round the section and no station gap longer than `MAX_STATION_GAP`.
- * That is 2,700 triangles rather than 800, which against the fleet it joins --
- * a 10,283-triangle Prado, a 20,387-triangle X-Trail -- is still the cheapest
- * real car in the manifest, and it buys a second thing for free: the shading is
- * smooth where a coarse loft was faceted.
+ * That was chasing a fault in the picture with geometry on the car, and it
+ * could never have worked: the letters of "POLICE" have a 4 cm stroke, and no
+ * tessellation a 5 m car can afford resolves 4 cm. The sheet now samples the
+ * atlas per fragment, exactly as `carlod.materialFor`'s shader does, and the
+ * livery is crisp there at 800 triangles or 2,700.
+ *
+ * The subdivision stays anyway, and on its own merits: `carlod` is the one
+ * material in this build that is not flat-shaded, so the shell is drawn with
+ * smooth normals, and a twelve-sided superellipse smooth-shaded is a melted
+ * Kenney car. 2,700 triangles against a 10,283-triangle Prado and a
+ * 20,387-triangle X-Trail is still the cheapest real car in the manifest.
  */
 const BODY_SIDES = 32;
 const ARCH_POINTS = 16;
@@ -246,20 +248,45 @@ const LIGHT_BAR = {
 
 // --- The atlas -----------------------------------------------------------------------
 
-const ATLAS_W = 1024;
-const ATLAS_H = 512;
+/**
+ * 2048 x 1024, and the doubling is paid for on the flanks.
+ *
+ * The first cut was 1024 x 512, which gave the flank strip 209 x 191 px/m and
+ * a 4 cm letter stroke seven pixels wide. That is legible in the atlas and it
+ * was **not** legible on the car: a texel that is 5 mm of real door is a texel
+ * the mip chain throws away by the time a player is ten metres off, and the
+ * only place a marked car is ever read at ten metres is the only place it
+ * matters -- the far side of an intersection, which is where you decide whether
+ * to run. At 2048 x 1024 the flank is 418 x 417 px/m, square to within a
+ * pixel per metre, and "POLICE" is 400 px of atlas rather than 200.
+ *
+ * The cost is 6.5 kB, and that number is the argument. Four times the texels of
+ * a flat-colour PNG is not four times the bytes -- 3.7 kB became 10.2 kB, and
+ * the `.glb` went from 363.1 kB to 369.8 kB, which is 1.8% on the one car in
+ * the fleet whose whole purpose is to be recognised before it is close. Nearly
+ * all of this file is its 4,240 triangles; the livery is a rounding error.
+ */
+const ATLAS_W = 2048;
+const ATLAS_H = 1024;
 
 /**
  * Where each painted surface lives in the atlas, in pixels.
  *
- * The two flank strips are the same 4.90 x 0.92 m window on the car at 209 x 191
- * pixels per metre, which is as near square as a strip that has to be a power of
- * two on one side gets.
+ * The two flank strips get the atlas's full width and three quarters of its
+ * height between them -- 384 rows each -- because the flank is what a player
+ * sees. They cover the same 4.90 x 0.92 m window on the car at 418 x 417
+ * px/m, which is square texels to within a pixel per metre: a Battenburg cell
+ * is as crisp along the car as it is up it, and the letter strokes do not come
+ * out fatter one way than the other.
+ *
+ * The bonnet, the boot and the twelve flat-colour cells share the 256 rows
+ * left at the bottom, which is far more than any of them needs: a boot lid is
+ * eight rectangles and a solid cell is one colour.
  */
-const FLANK_R = { x: 0, y: 0, w: ATLAS_W, h: 176 };
-const FLANK_L = { x: 0, y: 176, w: ATLAS_W, h: 176 };
-const BONNET = { x: 0, y: 352, w: 352, h: 112 };
-const BOOT = { x: 352, y: 352, w: 352, h: 112 };
+const FLANK_R = { x: 0, y: 0, w: ATLAS_W, h: 384 };
+const FLANK_L = { x: 0, y: 384, w: ATLAS_W, h: 384 };
+const BONNET = { x: 0, y: 768, w: 704, h: 224 };
+const BOOT = { x: 704, y: 768, w: 704, h: 224 };
 
 /** The world window each flank strip covers. */
 const FLANK_Y0 = 0.2;
@@ -268,20 +295,30 @@ const FLANK_Y1 = 1.12;
 /**
  * The Battenburg's grid, in world metres on the flank.
  *
+ * Twelve columns of 0.39 m over two rows of 0.165, so a cell is about what a
+ * real one is and the band runs 0.375 to 0.705 -- between the sill and the door
+ * handles, inside the stretch where the section is genuinely flat (0.37 to 0.97,
+ * see `SECTION_POWER`), so the grid sits on a surface instead of wrapping round
+ * one.
+ *
+ * The band was 0.26 m tall in the first cut and it read as one row of blocks
+ * rather than as a chequer. A Battenburg's whole legibility is that the eye
+ * gets *two* rows to see the half-offset in; one row of alternating blocks is a
+ * Sillitoe band, which is a thing that goes on a cap.
+ *
  * Here rather than inside the painter because the *loft* reads it too: the body
- * has a section cut in at every column boundary so that no triangle spans two
- * cells. See `resample`.
+ * has section cuts either side of every column boundary. See `resample`.
  */
-const CHEQUER = { x0: -2.34, cols: 12, cellW: 4.68 / 12, y0: 0.4, rowH: 0.13 };
+const CHEQUER = { x0: -2.34, cols: 12, cellW: 4.68 / 12, y0: 0.375, rowH: 0.165 };
 /** ...and the bonnet's and the boot's, in X and in Z. */
 const BONNET_X = [1.15, 2.2];
 const BONNET_Z = 0.8;
 const BOOT_X = [-2.3, -1.55];
 const BOOT_Z = 0.75;
 
-/** The flat-colour cells, 40 px square, two rows down the right of the atlas. */
-const SOLID_ORIGIN = [712, 352];
-const SOLID_CELL = 40;
+/** The flat-colour cells, 80 px square, two rows down the right of the atlas. */
+const SOLID_ORIGIN = [1424, 768];
+const SOLID_CELL = 80;
 const SOLID_PER_ROW = 7;
 
 /**
@@ -431,15 +468,11 @@ function flankArt(rect, mirror) {
   /*
    * The Battenburg: twelve columns of two rows over 4.68 m of flank.
    *
-   * It sits between 0.40 and 0.67, and both of those numbers are chosen twice
-   * over. They are inside the band where the section is genuinely flat (0.37 to
-   * 0.97 -- see `SECTION_POWER`), because a chequer that ran up onto the
-   * shoulder is a chequer wrapping round a curve and the whole point of the
-   * pattern is that it is a grid. And the row boundary at 0.53 is where the
-   * section's own facet row falls: the contact sheet averages a triangle's three
-   * corners into one colour, so a cell boundary that sits *inside* a triangle
-   * comes out as a smear and one that sits on a triangle edge comes out as a
-   * chequer. The cell is 0.39 x 0.135, which is also about what a real one is.
+   * It sits between 0.375 and 0.705, inside the band where the section is
+   * genuinely flat (0.37 to 0.97 -- see `SECTION_POWER`), because a chequer that
+   * ran up onto the shoulder is a chequer wrapping round a curve and the whole
+   * point of the pattern is that it is a grid. The cell is 0.39 x 0.165, which
+   * is about what a real one is; see `CHEQUER` on why the band got taller.
    */
   {
     for (let c = 0; c < CHEQUER.cols; c++) {
@@ -458,12 +491,20 @@ function flankArt(rect, mirror) {
     }
   }
 
-  // "POLICE" on the doors, above the chequer and under the glass: 0.19 m of
-  // letter across the two front doors, which is where it is on the real car.
+  /*
+   * "POLICE" on the doors, above the chequer and under the glass.
+   *
+   * 0.22 m of cap height over 1.17 m of door, which is about what is on the
+   * real car and is the number the atlas was doubled for: at 417 px/m that is a
+   * 92 px letter with an 18 px stroke, drawn into the atlas at full size rather
+   * than drawn small and resampled up. A stencil stroke this heavy survives the
+   * mip chain, which a hairline does not -- and the thing being bought is not
+   * the word on the contact sheet, it is the word at ten metres in the game.
+   */
   {
-    const h = 0.2 * sy;
+    const h = 0.22 * sy;
     const w = wordWidth('POLICE') * h * 1.15;
-    out.push(...word('POLICE', px(0) - w / 2, py(0.93), h, PALETTE.chequerBlue, 1.15));
+    out.push(...word('POLICE', px(0) - w / 2, py(0.98), h, PALETTE.chequerBlue, 1.15));
   }
   return out;
 }
@@ -766,23 +807,21 @@ function buildShell(parts) {
   // --- The lower body: a closed loft, capped at both ends.
   {
     /*
-     * Cut extra rings in **either side of** every Battenburg column boundary.
+     * Cut extra rings either side of every Battenburg column boundary.
      *
-     * `scripts/render-car-sheet.mjs` samples the atlas at a triangle's three
-     * corners and paints the whole triangle in their average, so on the sheet a
-     * cell boundary that falls inside a triangle is a smear. The obvious answer
-     * -- cut a ring exactly *on* each boundary -- makes it worse, and finding out
-     * why is worth the paragraph: a vertex sitting on the boundary samples one
-     * side or the other by a rounding, so both of the quads meeting there come
-     * out mixed and only the middle third of each cell is clean.
+     * This was written to fight the contact sheet's old per-triangle shading,
+     * and the honest note is that it never won: it aligned the *columns* to
+     * triangle edges, but the chequer's two *rows* fall wherever the
+     * superellipse's own facet ring happens to land -- a ring is at y = 0.530
+     * and the row boundary was placed at 0.53 to match it, and then the band's
+     * top edge at 0.66 sat inside a quad that ran to 0.6725 and smeared anyway.
+     * A pattern is only as crisp as its worst edge.
      *
-     * A pair of cuts an eighth of a cell either side instead gives a narrow quad
-     * straddling the boundary -- which reads as the edge, and reads *well*,
-     * because a soft edge is what a texture filter would have drawn anyway -- and
-     * leaves three quarters of every cell in quads whose corners are all its own
-     * colour. Nothing about this changes the car in the game, where the texture
-     * is sampled per fragment and the chequer is crisp whatever the geometry
-     * does. It changes what a person can see before shipping it.
+     * The sheet samples per fragment now and the whole argument is moot. The
+     * cuts stay because they cost 24 rings and even out the flank's shading
+     * where the section changes width fastest, which is at the doors -- and
+     * because removing them would change the triangle count in
+     * `client/public/cars/manifest.json` for no gain a person can see.
      */
     const cuts = [];
     for (let c = 0; c <= CHEQUER.cols; c++) {

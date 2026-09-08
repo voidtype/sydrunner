@@ -15,7 +15,36 @@
  * scanline rasteriser over the glb's own triangles, so it runs in CI and in a
  * handoff. Writes `data/vehicles/car-sheet.png`; the cell order is printed.
  *
- *   node scripts/render-car-sheet.mjs [--out path] [--only a.glb,b.glb]
+ * ---------------------------------------------------------------------------
+ * THE SAMPLER, AND THE LIE THIS SHEET USED TO TELL.
+ *
+ * Until 2026-09 this file had no texture sampler in it. It read the atlas
+ * **once per vertex**, averaged a triangle's three corners into one colour and
+ * flat-filled the triangle with it -- and every essay written against that
+ * behaviour was an essay about the sheet rather than about a car. Two of them
+ * were expensive:
+ *
+ *   - `scripts/build-police-car.mjs` subdivided its shell from 800 triangles to
+ *     2,700 and cut extra rings either side of every Battenburg column boundary,
+ *     purely so a chequer cell would be bigger than a triangle. It still could
+ *     not work. A cell is 0.39 x 0.13 m and the letters of "POLICE" have a
+ *     4 cm stroke; no tessellation a 5 m car can afford resolves a 4 cm stroke,
+ *     so the livery this project authored a whole script to paint came out as
+ *     pale blue smears and the word came out as nothing.
+ *   - `toyota_hiace_2020.glb` is a photo-textured van -- headlamps, grille,
+ *     wheel arches, glass, all in its map -- drawn here as a featureless block,
+ *     because a vertex sits on a UV island's *edge* and a van has 1,132 of
+ *     them. The model was blamed for years of being "a slab". It is not.
+ *
+ * So the rasteriser now interpolates UV (and the `_PAINT` mask) across the
+ * triangle with the barycentric weights it was already computing for the depth
+ * test, and samples the atlas per fragment -- which is what the shader in
+ * `carlod.materialFor` does, one texture fetch inside `Fn`. The projection here
+ * is orthographic, so affine interpolation of UV is exact and no perspective
+ * divide is owed. It costs one texel fetch per covered pixel and it is the
+ * difference between a picture of the cars and a picture of their triangles.
+ *
+ *   node scripts/render-car-sheet.mjs [--out path] [--only a.glb,b.glb] [--px N]
  */
 import { NodeIO } from '@gltf-transform/core';
 import { KHRONOS_EXTENSIONS } from '@gltf-transform/extensions';
@@ -33,8 +62,22 @@ const onlyArg = args.indexOf('--only');
 const ONLY = onlyArg >= 0 ? new Set(args[onlyArg + 1].split(',')) : null;
 /** `--mask`: draw the paint mask instead -- white where the paint lands, red where the authored colour stays. */
 const MASK = args.includes('--mask');
+/**
+ * `--px N`: how wide one view is, in pixels. 320 is the whole-fleet sheet, where
+ * what is being judged is the silhouette, the nose direction and the paint; a
+ * livery is judged at 1200, on one car, with `--only`.
+ *
+ * It scales the cell rather than the sheet, so the geometry the rasteriser walks
+ * is unchanged and only the sampling gets finer -- which is the point: reading
+ * "POLICE" off a door needs pixels on the door, not a bigger PNG of the same
+ * twelve.
+ */
+const pxArg = args.indexOf('--px');
+const CELL_W = pxArg >= 0 ? Math.max(64, Math.round(Number(args[pxArg + 1]))) : 320;
 
-const W = 320, H = 190, COLS = 4;
+const W = CELL_W, H = Math.round(CELL_W * 190 / 320);
+/** Four cars a row on the fleet sheet; fewer when `--only` asked for fewer, so a one-car sheet is one car wide and not a quarter of a picture. */
+let COLS = 4;
 /** The paint every painted surface takes on the sheet: a mid blue, so a painted headlight is obvious. */
 const PAINT = [0.18, 0.36, 0.78];
 const VIEWS = [{ cam: [1, 0.55, 0.75] }, { cam: [-1, 0.55, 0.75] }];
@@ -80,15 +123,36 @@ const io = new NodeIO().registerExtensions(KHRONOS_EXTENSIONS);
 }
 
 const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.glb') && (ONLY === null || ONLY.has(f))).sort();
+COLS = Math.min(COLS, Math.max(1, files.length));
 const rows = Math.ceil(files.length / COLS);
 const sheetW = COLS * W * 2, sheetH = rows * H;
 const sheet = Buffer.alloc(sheetW * sheetH * 3, 40);
+
+/**
+ * sRGB byte to linear, as a 256-entry table.
+ *
+ * A glTF base colour texture is sRGB-encoded and three decodes it on the way
+ * into the shader; every other input here (the base colour factor, `COLOR_0`)
+ * is already linear, and the write-out at the bottom of this file encodes back
+ * with a `sqrt`. Reading the byte as if it were linear -- which is what this did
+ * until 2026-09 -- therefore brightened every texel by its own square root, and
+ * the effect is worst on the saturated mid-tones: `nsw_police.glb`'s navy
+ * chequer came out a pale cornflower and nobody could tell whether the fault was
+ * in the palette, in `world/cars.LIVERY_CHEQUER_BLUE` or in the picture.
+ */
+const SRGB_TO_LINEAR = new Float32Array(256);
+for (let i = 0; i < 256; i++) {
+  const c = i / 255;
+  SRGB_TO_LINEAR[i] = c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
 
 async function texelsOf(mat) {
   const tex = mat?.getBaseColorTexture();
   if (!tex || !tex.getImage()) return null;
   const { data, info } = await sharp(Buffer.from(tex.getImage())).raw().removeAlpha().toBuffer({ resolveWithObject: true });
-  return { data, w: info.width, h: info.height };
+  const linear = new Float32Array(data.length);
+  for (let i = 0; i < data.length; i++) linear[i] = SRGB_TO_LINEAR[data[i]];
+  return { data: linear, w: info.width, h: info.height };
 }
 
 let cell = 0;
@@ -111,7 +175,11 @@ for (const f of files) {
       const pos = p.getAttribute('POSITION'), uv = p.getAttribute('TEXCOORD_0'), idx = p.getIndices();
       const col0 = p.getAttribute('COLOR_0'), paint = p.getAttribute('_PAINT');
       const n = pos.getCount();
-      const w = new Array(n), col = new Array(n);
+      // Per vertex: world position, the *untextured* colour (base factor times
+      // any `COLOR_0`), the atlas coordinate and the paint mask. The texel is
+      // deliberately not folded in here -- it is fetched per fragment below,
+      // which is the whole of what this rasteriser learned in 2026-09.
+      const w = new Array(n), col = new Array(n), tc = new Array(n), pm = new Float32Array(n);
       const v = [0, 0, 0], t = [0, 0], c = [1, 1, 1];
       for (let i = 0; i < n; i++) {
         pos.getElement(i, v);
@@ -120,24 +188,21 @@ for (const f of files) {
         bb = [Math.min(bb[0], x), Math.min(bb[1], y), Math.min(bb[2], z), Math.max(bb[3], x), Math.max(bb[4], y), Math.max(bb[5], z)];
         let r = base[0], g = base[1], b = base[2];
         if (col0) { col0.getElement(i, c); r *= c[0]; g *= c[1]; b *= c[2]; }
-        if (tx && uv) {
-          uv.getElement(i, t);
-          const px = ((Math.floor(t[0] * tx.w) % tx.w) + tx.w) % tx.w, py = ((Math.floor(t[1] * tx.h) % tx.h) + tx.h) % tx.h;
-          const o = (py * tx.w + px) * 3;
-          r *= tx.data[o] / 255; g *= tx.data[o + 1] / 255; b *= tx.data[o + 2] / 255;
-        }
-        const mask = paint ? paint.getScalar(i) : 1;
-        // `carlod`'s rule: value under the paint's hue where the mask is on.
-        const value = Math.max(r, g, b);
-        col[i] = MASK
-          ? (mask > 0.5 ? [0.9, 0.9, 0.9] : [0.85, 0.15, 0.1])
-          : [r + (PAINT[0] * value - r) * mask, g + (PAINT[1] * value - g) * mask, b + (PAINT[2] * value - b) * mask];
+        col[i] = [r, g, b];
+        if (tx && uv) { uv.getElement(i, t); tc[i] = [t[0], t[1]]; } else tc[i] = null;
+        pm[i] = paint ? paint.getScalar(i) : 1;
       }
       const cnt = idx ? idx.getCount() : n;
       for (let k = 0; k < cnt; k += 3) {
         let ia = idx ? idx.getScalar(k) : k, ib = idx ? idx.getScalar(k + 1) : k + 1, ic = idx ? idx.getScalar(k + 2) : k + 2;
         if (det < 0) { const s = ib; ib = ic; ic = s; }
-        tris.push({ a: w[ia], b: w[ib], c: w[ic], col: [(col[ia][0] + col[ib][0] + col[ic][0]) / 3, (col[ia][1] + col[ib][1] + col[ic][1]) / 3, (col[ia][2] + col[ib][2] + col[ic][2]) / 3] });
+        tris.push({
+          a: w[ia], b: w[ib], c: w[ic],
+          ca: col[ia], cb: col[ib], cc: col[ic],
+          ta: tc[ia], tb: tc[ib], tc: tc[ic],
+          pa: pm[ia], pb: pm[ib], pc: pm[ic],
+          tex: tx,
+        });
       }
     }
   }
@@ -182,9 +247,34 @@ for (const f of files) {
           const o = y * W + x;
           if (z >= zb[o]) continue;
           zb[o] = z;
-          img[o * 3] = tr.col[0] * lam;
-          img[o * 3 + 1] = tr.col[1] * lam;
-          img[o * 3 + 2] = tr.col[2] * lam;
+          // --- The fragment. `w0/w1/w2` weight A/B/C; the projection is
+          // orthographic, so these are the true surface barycentrics and no
+          // perspective divide is owed.
+          let r = w0 * tr.ca[0] + w1 * tr.cb[0] + w2 * tr.cc[0];
+          let g = w0 * tr.ca[1] + w1 * tr.cb[1] + w2 * tr.cc[1];
+          let b = w0 * tr.ca[2] + w1 * tr.cb[2] + w2 * tr.cc[2];
+          if (tr.tex && tr.ta && tr.tb && tr.tc) {
+            const tu = w0 * tr.ta[0] + w1 * tr.tb[0] + w2 * tr.tc[0];
+            const tv = w0 * tr.ta[1] + w1 * tr.tb[1] + w2 * tr.tc[1];
+            const tex = tr.tex;
+            const sx = ((Math.floor(tu * tex.w) % tex.w) + tex.w) % tex.w;
+            const sy = ((Math.floor(tv * tex.h) % tex.h) + tex.h) % tex.h;
+            const to = (sy * tex.w + sx) * 3;
+            r *= tex.data[to]; g *= tex.data[to + 1]; b *= tex.data[to + 2];
+          }
+          const mask = w0 * tr.pa + w1 * tr.pb + w2 * tr.pc;
+          if (MASK) {
+            const on = mask > 0.5;
+            img[o * 3] = (on ? 0.9 : 0.85) * lam;
+            img[o * 3 + 1] = (on ? 0.9 : 0.15) * lam;
+            img[o * 3 + 2] = (on ? 0.9 : 0.1) * lam;
+            continue;
+          }
+          // `carlod`'s rule: value under the paint's hue where the mask is on.
+          const value = Math.max(r, g, b);
+          img[o * 3] = (r + (PAINT[0] * value - r) * mask) * lam;
+          img[o * 3 + 1] = (g + (PAINT[1] * value - g) * mask) * lam;
+          img[o * 3 + 2] = (b + (PAINT[2] * value - b) * mask) * lam;
         }
       }
     }

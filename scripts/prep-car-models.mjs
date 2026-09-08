@@ -215,7 +215,16 @@ const CATALOG = [
   // (a light bar, a tyre) and the panels stay. See the decimation stage.
   { file: 'toyota_prado_2013.glb', body: 2, priority: 0, decimate: true, weight: 5, pruneError: 0.02, positionsOnly: true, label: 'Toyota LandCruiser Prado 2013' },
   { file: 'toyota_corolla_2020.glb', body: 1, priority: 0, decimate: true, weight: 5, label: 'Toyota Corolla 2020' },
-  { file: 'tesla_model_3.glb', body: 0, priority: 0, decimate: true, weight: 4, label: 'Tesla Model 3' },
+  // `paintUv`: this car is **one** material called "Vehicle" over a 128 px
+  // palette -- the top fifteen rows are eight swatches (black, two greys, white,
+  // yellow, orange, dark red, white) and everything below them is the
+  // teal-to-green ramp that is the body. A `paint:` pin names materials and
+  // there is only one to name, so the pin here is the *region of the map* that
+  // is paint: v >= 0.125, which is row 16 of 128 and down. Without it every
+  // triangle in the file was painted -- windows, tyres, indicators, plate -- and
+  // the body took its brightness from a ramp that peaks at 0.67, which is the
+  // owner's "the Tesla is black". See `soleMaterialRefinement`.
+  { file: 'tesla_model_3.glb', body: 0, priority: 0, decimate: true, weight: 4, paintUv: [0, 0.125, 1, 1], label: 'Tesla Model 3' },
   { file: 'toyota_camry_2020.glb', body: 0, priority: 0, decimate: true, weight: 6, label: 'Toyota Camry 2020' },
   { file: 'toyota_hiace_2020.glb', body: 4, priority: 0, decimate: true, weight: 8, label: 'Toyota HiAce 2020' },
   // --- sedan (0) --- CC0 first, then CC-BY, roughly by cleanliness/size.
@@ -765,6 +774,129 @@ async function paintedMaterials(doc, pinned = null) {
   return { painted: new Set(eligible.filter((m) => info.get(m).area >= largest * 0.2)), info };
 }
 
+// --- When the material names say nothing: the mask, per triangle -------------------
+//
+// `paintedMaterials` decides what the paint lands on from *material names*, and
+// on a car with a dozen of them that is exactly right. It has nothing at all to
+// say about a car with **one**:
+//
+//   - `tesla_model_3.glb` is a single material called "Vehicle". `PAINT_RE`
+//     matches "vehicle", so every triangle in the file was painted -- the glass,
+//     the tyres, the indicators, the number plate. It is a palette-mapped model:
+//     a 128 px map whose top fifteen rows are eight swatches (black, two greys,
+//     white, yellow, orange, dark red, white) and whose remaining rows are a
+//     teal-to-green ramp that is the body. Painting the swatches meant a car
+//     whose headlights, tail lights and windows were all the colour of the car,
+//     and whose body took its brightness from a ramp that never rises past 0.67,
+//     which is the whole of the owner's "the Tesla is black".
+//   - `toyota_hiace_2020.glb` is a single material called "Material.001" over a
+//     photographic 512 px map -- real headlamps, a real grille, real glass, real
+//     tyres. Same disease, same symptom: 1,132 triangles of van, every one of
+//     them painted, drawn as one flat block of whatever colour the hash rolled.
+//
+// So when the painted materials collapse to one that covers essentially the
+// whole car, the mask is decided **per triangle from its own texel** instead,
+// sampled at the triangle's centroid -- never at a vertex, which sits on a UV
+// island's edge and reads the seam. Only ever narrower than the material's
+// answer: a triangle can lose the paint here, never gain it.
+/** Above this share of the model's area, a single painted material has told us nothing. */
+const SOLE_MATERIAL_SHARE = 0.9;
+/** Darker than this is glass, tyre, rubber, shadow or underbody; never a panel. */
+const TEXEL_BODY_FLOOR = 0.35;
+/**
+ * More saturated than this is a lamp, an indicator or a badge.
+ *
+ * Which assumes the body of such a car is *neutral* -- white, silver, grey --
+ * and that is true of every sole-material model on disk except the Tesla, whose
+ * body is a teal ramp and which therefore carries a `paintUv` pin instead. A
+ * model that breaks the assumption without a pin trips `MIN_REFINED_SHARE`
+ * below and is reported rather than shipped wrong.
+ */
+const TEXEL_BODY_SAT = 0.3;
+/** Under this share of the model's triangles the refinement has clearly misfired, and the run says so rather than shipping a car with no paint on it. */
+const MIN_REFINED_SHARE = 0.12;
+/** How many rows of barycentric samples a triangle's texels are read at: 4 gives 15 points, which is plenty for a decision with two outcomes. */
+const BODY_SAMPLE_STEPS = 4;
+/** A triangle with at least this much body under it is painted. See the asymmetry argument where it is used. */
+const MIXED_BODY_SHARE = 0.15;
+
+/**
+ * Is this texel body, at this point of the map?
+ *
+ * `pin` is a catalog row's `paintUv` -- `[u0, v0, u1, v1]` in the *source* map's
+ * coordinates -- and where one is given it is the whole answer: it names the
+ * region of a palette that is the car's paint, which is a fact about the map
+ * that no threshold can be asked to rediscover. Without one, the rule is the
+ * value floor and the saturation ceiling above.
+ */
+function bodyTexel(r, g, b, u, v, pin) {
+  if (pin) {
+    const uu = u - Math.floor(u), vv = v - Math.floor(v);
+    return uu >= pin[0] && uu <= pin[2] && vv >= pin[1] && vv <= pin[3];
+  }
+  const hi = Math.max(r, g, b);
+  if (hi < TEXEL_BODY_FLOOR) return false;
+  const lo = Math.min(r, g, b);
+  return (hi - lo) / hi <= TEXEL_BODY_SAT;
+}
+
+/**
+ * The gain for a per-triangle mask: the 95th percentile of value over the map's
+ * *body* texels alone.
+ *
+ * `paintGain` takes it over the whole material, which for these two files means
+ * the white swatch and the chrome set the exposure for a body that never gets
+ * near them -- the Tesla's came out 1.14 against the 1.49 its ramp actually
+ * wants. Here the same question is asked of the same texels the mask will end up
+ * on, and it is asked of the *map* rather than of the geometry because a gain is
+ * a property of the picture.
+ */
+function texelGain(data, w, h, channels, factor, pin) {
+  const vals = [];
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const o = (y * w + x) * channels;
+      const r = (data[o] / 255) * factor[0], g = (data[o + 1] / 255) * factor[1], b = (data[o + 2] / 255) * factor[2];
+      if (bodyTexel(r, g, b, (x + 0.5) / w, (y + 0.5) / h, pin)) vals.push(Math.max(r, g, b));
+    }
+  }
+  if (vals.length === 0) return 1;
+  vals.sort((a, b) => a - b);
+  const best = vals[Math.floor(vals.length * 0.95)];
+  return best > 1e-3 ? Math.min(6, 1 / best) : 1;
+}
+
+/**
+ * The refinement for this model, or null if its materials did the job.
+ *
+ * Engaged only when the painted set is **one** mapped material covering at
+ * least `SOLE_MATERIAL_SHARE` of the model -- which on the disk this reads is
+ * exactly `tesla_model_3.glb` and `toyota_hiace_2020.glb` among the cars that
+ * ship, and would be any future one-material car automatically. Every other
+ * file goes through `paintedMaterials` untouched, and a Camry whose
+ * `Paint_Color` names itself is not second-guessed by a threshold.
+ */
+async function soleMaterialRefinement(painted, info, pin) {
+  if (painted.size !== 1) return null;
+  const mat = [...painted][0];
+  const tex = mat.getBaseColorTexture();
+  if (!tex || !tex.getImage()) return null;
+  let total = 0;
+  for (const i of info.values()) total += i.area;
+  if (total <= 0 || info.get(mat).area < total * SOLE_MATERIAL_SHARE) return null;
+  const { data, info: meta } = await sharp(Buffer.from(tex.getImage())).raw().toBuffer({ resolveWithObject: true });
+  const factor = mat.getBaseColorFactor();
+  return {
+    mat,
+    pin,
+    factor,
+    src: { data, w: meta.width, h: meta.height, channels: meta.channels },
+    gain: texelGain(data, meta.width, meta.height, meta.channels, factor, pin),
+    body: 0,
+    tris: 0,
+  };
+}
+
 /**
  * The value the body reads at, so the paint lands at full strength: the 95th
  * percentile of the painted surfaces' value, area-weighted by material. Baked
@@ -955,7 +1087,13 @@ const SOLID_STRIP_PX = 64;
 const SOLID_CELL_PX = 8;
 const CELL_PAD_PX = 2;
 
-async function bakeAtlas(doc, painted, info, gain) {
+/**
+ * `refine`, when it is not null: `{ mat, pin, src, gain }` from
+ * `soleMaterialRefinement` -- the one material whose mask is decided per
+ * triangle rather than per material, the source map already decoded, and the
+ * gain taken over its body texels alone. See `bodyTexel`.
+ */
+async function bakeAtlas(doc, painted, info, gain, refine = null) {
   const root = doc.getRoot();
   const textured = [];
   const solid = [];
@@ -978,6 +1116,10 @@ async function bakeAtlas(doc, painted, info, gain) {
     // and a Ranger authored in navy would otherwise take its paint at a
     // fifteenth of the brightness of the Camry beside it. A painted map keeps
     // its texels (the panel gaps, the badge) exposed by the gain.
+    // A refined material's gain is applied per *texel* further down -- only the
+    // body texels want lifting, and its glass and its indicators are in the same
+    // map -- so its factor comes back here with no gain in it at all.
+    if (refine && refine.mat === mat) return [f[0], f[1], f[2]];
     if (painted.has(mat)) return mat.getBaseColorTexture() ? [f[0] * gain, f[1] * gain, f[2] * gain] : [1, 1, 1];
     // Glass darkens by its own alpha: what a tinted window looks like from
     // outside, drawn opaque.
@@ -994,11 +1136,22 @@ async function bakeAtlas(doc, painted, info, gain) {
       .removeAlpha()
       .raw()
       .toBuffer({ resolveWithObject: true });
+    const perTexel = refine && refine.mat === mat;
     for (let p = 0; p < meta.width * meta.height; p++) {
       const o = p * 3;
-      data[o] = Math.min(255, data[o] * f[0]);
-      data[o + 1] = Math.min(255, data[o + 1] * f[1]);
-      data[o + 2] = Math.min(255, data[o + 2] * f[2]);
+      let r = data[o] * f[0], g = data[o + 1] * f[1], b = data[o + 2] * f[2];
+      if (perTexel) {
+        // The cell is the whole source map resized to fill, so a cell pixel's
+        // source coordinate is simply where it sits in the cell.
+        const u = ((p % meta.width) + 0.5) / meta.width;
+        const v = (Math.floor(p / meta.width) + 0.5) / meta.height;
+        if (bodyTexel(r / 255, g / 255, b / 255, u, v, refine.pin)) {
+          r *= refine.gain; g *= refine.gain; b *= refine.gain;
+        }
+      }
+      data[o] = Math.min(255, r);
+      data[o + 1] = Math.min(255, g);
+      data[o + 2] = Math.min(255, b);
     }
     const padded = await sharp(data, { raw: { width: inner, height: inner, channels: 3 } })
       .extend({ top: CELL_PAD_PX, bottom: CELL_PAD_PX, left: CELL_PAD_PX, right: CELL_PAD_PX, extendWith: 'copy' })
@@ -1056,6 +1209,7 @@ async function bakeAtlas(doc, painted, info, gain) {
       if (!box) throw new Error(`material ${mat.getName()} has no atlas cell`);
       const [bx, by, bw, bh] = box;
       const isTex = textured.includes(mat);
+      const perTri = refine !== null && refine.mat === mat && isTex && uv !== null;
       const cnt = idx ? idx.getCount() : n;
       for (let k = 0; k < cnt; k += 3) {
         const ids = [idx ? idx.getScalar(k) : k, idx ? idx.getScalar(k + 1) : k + 1, idx ? idx.getScalar(k + 2) : k + 2];
@@ -1072,6 +1226,51 @@ async function bakeAtlas(doc, painted, info, gain) {
           const vv = Math.min(1, Math.max(0, t[1] - offV));
           out[i * 2] = (bx + u * bw) / ATLAS_PX;
           out[i * 2 + 1] = (by + vv * bh) / ATLAS_PX;
+        }
+        if (perTri) {
+          /*
+           * The mask, from the texels the triangle actually **covers**: a
+           * barycentric grid over its UV, never a vertex and never the centroid
+           * alone.
+           *
+           * A vertex is the worst possible sample -- it sits on its UV island's
+           * edge, where the map holds the seam between two parts and neither
+           * one's colour. The centroid is a good sample and it was the first
+           * cut, and on the Tesla it is enough: 99.5% of that car's triangles
+           * are wholly inside one swatch. It is not enough on a 1,132-triangle
+           * van, where a quarter of the triangles straddle a window and its
+           * pillar, and a coin-flip per triangle drew white wedges across the
+           * glass -- visible on the sheet's `--mask` view as a zigzag.
+           *
+           * So a triangle is painted unless it is *clearly* not body. The
+           * asymmetry is the point: the error that leaves is a window drawn in a
+           * darker shade of the car's own colour, which is what a tinted window
+           * looks like, and the error it avoids is an unpainted wedge of white
+           * in the middle of a coloured panel, which is a hole.
+           */
+          let on = 0, seen = 0;
+          for (let sa = 0; sa <= BODY_SAMPLE_STEPS; sa++) {
+            for (let sb = 0; sa + sb <= BODY_SAMPLE_STEPS; sb++) {
+              const wa = sa / BODY_SAMPLE_STEPS, wb = sb / BODY_SAMPLE_STEPS, wc = 1 - wa - wb;
+              let su = 0, sv = 0;
+              const ws = [wa, wb, wc];
+              for (let c = 0; c < 3; c++) { uv.getElement(ids[c], t); su += ws[c] * (t[0] - offU); sv += ws[c] * (t[1] - offV); }
+              const sx = Math.min(refine.src.w - 1, Math.max(0, Math.floor(su * refine.src.w)));
+              const sy = Math.min(refine.src.h - 1, Math.max(0, Math.floor(sv * refine.src.h)));
+              const so = (sy * refine.src.w + sx) * refine.src.channels;
+              if (bodyTexel(
+                (refine.src.data[so] / 255) * refine.factor[0],
+                (refine.src.data[so + 1] / 255) * refine.factor[1],
+                (refine.src.data[so + 2] / 255) * refine.factor[2],
+                su, sv, refine.pin,
+              )) on++;
+              seen++;
+            }
+          }
+          const paintIt = on / seen >= MIXED_BODY_SHARE ? 1 : 0;
+          for (const i of ids) mask[i] = paintIt;
+          refine.body += paintIt;
+          refine.tris += 1;
         }
       }
       const buf = pos.getBuffer();
@@ -1433,13 +1632,26 @@ async function processFile(entry, srcMeta) {
   } else {
     const { painted, info } = await paintedMaterials(doc, entry.paint ?? null);
     const gain = paintGain(painted, info);
+    // One material over the whole car names nothing: the mask comes off the
+    // texels instead. See `soleMaterialRefinement`.
+    const refine = await soleMaterialRefinement(painted, info, entry.paintUv ?? null);
     result.painted = [...painted].map((m) => m.getName() || '?');
     let totalArea = 0;
     for (const i of info.values()) totalArea += i.area;
     result.materials = [...info.entries()].sort((a, b) => b[1].area - a[1].area).slice(0, 8).map(([, i]) => `${i.name || '?'}:${Math.round((100 * i.area) / totalArea)}%`);
-    result.gain = Math.round(gain * 100) / 100;
-    if (await bakeAtlas(doc, painted, info, gain)) {
+    result.gain = Math.round((refine ? refine.gain : gain) * 100) / 100;
+    if (await bakeAtlas(doc, painted, info, gain, refine)) {
       result.atlas = true;
+      if (refine && refine.tris > 0) {
+        const share = refine.body / refine.tris;
+        result.refined = `${Math.round(100 * share)}% of ${refine.tris} tris${refine.pin ? ' (pinned)' : ''}`;
+        if (share < MIN_REFINED_SHARE) {
+          console.warn(
+            `WARNING: ${entry.file}: the per-texel paint mask found body on only ${Math.round(100 * share)}% of its triangles. ` +
+              'Its one material is probably a coloured body the neutral rule cannot see; give the catalog row a `paintUv` naming the part of its map that is paint.',
+          );
+        }
+      }
     } else {
       writePaintMask(doc, painted);
       completeAttributes(doc);
@@ -1637,7 +1849,11 @@ function printReport(results) {
         r.minY,
         `${r.axis}${r.sign > 0 ? '+' : '-'}`,
         r.directionConfidence,
-        `${r.steeringZ === null || r.steeringZ === undefined ? '-' : r.steeringZ.toFixed(2)} / ${r.mirrored ? 'yes' : 'no'} / ${r.trisBefore ?? '-'}` + (r.atlas ? ' / atlas' : '') + (r.painted ? ` / paint: ${r.painted.join(',')} x${r.gain} of ${(r.materials ?? []).join(' ')}` : r.roles ? ` / ${r.roles} roles` : ''),
+        `${r.steeringZ === null || r.steeringZ === undefined ? '-' : r.steeringZ.toFixed(2)} / ${r.mirrored ? 'yes' : 'no'} / ${r.trisBefore ?? '-'}` + (r.atlas ? ' / atlas' : '') + (r.painted ? ` / paint: ${r.painted.join(',')} x${r.gain} of ${(r.materials ?? []).join(' ')}` : r.roles ? ` / ${r.roles} roles` : '') +
+          // The per-texel mask, when one ran: without this line the only way to
+          // know a car's paint was decided by threshold rather than by name is
+          // to open the .glb. See `soleMaterialRefinement`.
+          (r.refined ? ` / per-texel mask: ${r.refined}` : ''),
       ].join(' | '),
     );
   }
