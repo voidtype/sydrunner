@@ -2542,6 +2542,29 @@ export function resolveCarContact(
  * ambient car is a wall and over it, it is a 1.4-tonne object about to be
  * launched. The caller reads `out.closing` to find out which happened and
  * `other` for the velocity a knocked car leaves with.
+ *
+ * ---------------------------------------------------------------------------
+ * WORKSTREAM AV: `knockLoose` IS A PARAMETER BECAUSE A WRECK IS NOT A DRIVER.
+ *
+ * `resolveStaticContact`'s section 2 made the identical parameter for the
+ * identical shape of reason and this is that argument over the other fleet.
+ * When it is clear, the ambient car is a **wall at any speed**: kinematic, so
+ * the striking body takes the whole of the rebound and the timetable keeps its
+ * row.
+ *
+ * The caller that clears it is a **knocked-loose wreck**. Until this parameter
+ * existed a wreck met no schedule car at all -- `sim.resolveTrafficContacts`
+ * walked occupied cars only -- so a Camry punted across George Street at 8 m/s
+ * rolled straight through a bus, which is the one thing in this game two solid
+ * objects are never allowed to do. The obvious fix, letting the wreck knock the
+ * next car loose, is the one `sim.resolveTrafficContacts`' header refuses in
+ * writing: eight loose records is the cap, a wreck rolling down a queue would
+ * spend all eight on physics in a second and a half, and nothing a player did
+ * would be able to knock anything loose for the next twenty seconds. So the
+ * wreck stops and the car it hit is *stunned* (`traffic.HoldLedger.stun`) for
+ * the same three seconds a driver's under-threshold hit buys -- one wreck, one
+ * car standing still, no new records, and a picture that is the same on both
+ * ends because both ends make this call with the flag clear.
  */
 export function resolveTrafficContact(
   field: TrafficField,
@@ -2557,6 +2580,8 @@ export function resolveTrafficContact(
   other: RigidBody,
   contact: RigidContact,
   out: CarShunt,
+  /** May this contact take the car out of the timetable at all? See WORKSTREAM AV. */
+  knockLoose = true,
 ): CarPose | null {
   drivenCarPose(car, mine);
   let hit: CarPose | null = null;
@@ -2572,8 +2597,9 @@ export function resolveTrafficContact(
     if (!resolveCarContact(body, other, contact, out, (closing) => {
       // See the header. Under the threshold this is a wall; over it, it is a
       // car that is about to have a record of its own and therefore somewhere
-      // to put a velocity.
-      other.kinematic = closing < KNOCK_LOOSE_SPEED;
+      // to put a velocity -- unless the striker may not knock anything loose,
+      // in which case it is a wall at every speed there is. WORKSTREAM AV.
+      other.kinematic = !knockLoose || closing < KNOCK_LOOSE_SPEED;
     })) {
       return;
     }

@@ -12278,6 +12278,66 @@ async function main(): Promise<void> {
       // Online as well as offline, unlike the `follow` sweep above: a loose car
       // is the one record whose position is *not* derived from a driver, so
       // there is nothing else for either end to derive it from.
+      //
+      // --- WORKSTREAM AV: and **before it rolls, what it is rolling into**.
+      //
+      // `sim.resolveTrafficContacts` runs the identical call with the identical
+      // flag at the identical point in its tick -- before `integrateLoose`, off
+      // the record rather than off any live body -- so this is a prediction and
+      // not a second opinion, which is the relationship every other sweep in
+      // this block has with the authority.
+      //
+      // It has to be here rather than only on the server, and the reason is the
+      // broadcast rate: a loose car's pose is sent at `LOOSE_BROADCAST_TICKS`,
+      // ten times a second, and this end integrates the six ticks in between.
+      // A wreck that stopped against a bus on the authority and kept rolling
+      // here would be drawn *inside* that bus for up to 100 ms and then snapped
+      // back -- which is the one artefact the shared integrator exists to avoid.
+      //
+      // The wreck is `a` and the schedule car is a **wall**: `knockLoose` is
+      // clear, so nothing here mints a record (an id is the server's to
+      // allocate -- `driving.CarField` section 4, and the two sweeps above stand
+      // down from the same branch for the same reason) and the timetable car is
+      // stunned, which both ends already compute from the same ledger.
+      //
+      // Every rolling wreck rather than only the local player's, unlike the
+      // three sweeps above: a loose record's pose is the same on every end by
+      // construction, so there is no "somebody else's car whose kerb we cannot
+      // see" here to be wrong about.
+      {
+        const looseTick = trafficTick(Date.now());
+        for (const wreck of cars.all()) {
+          if (wreck.driverId !== 0 || !wreck.loose) continue;
+          if (wreck.speed === 0 && wreck.slip === 0 && wreck.yawRate === 0) continue;
+          const body = carRigidBody(wreck, carBodyA);
+          const struck = resolveTrafficContact(
+            traffic, wreck, looseTick, carRoutes, carCrashPose, carPose, drivenCars.suppress,
+            body, carBodyB, carContact, carShunt, false,
+          );
+          if (struck === null) continue;
+          wreck.speed = rigidAlong(body);
+          wreck.slip = rigidSlip(body);
+          wreck.yawRate = body.yawRate;
+          wreck.restMs = 0;
+          const push = carShunt.push;
+          if (push[0] !== 0 || push[1] !== 0) {
+            // Through the resolver a wreck is rolled with, at the nose's own
+            // radius and step allowance -- `sim.applyCarBody` walks the identical
+            // separation through the identical call. A car pushed out of a bus
+            // must not be pushed into a shopfront.
+            const moved = collision.resolveCity(
+              wreck.x, wreck.z, wreck.x + push[0], wreck.z + push[1],
+              NOSE_RADIUS, wreck.y + NOSE_STEP, wreck.y + NOSE_HEAD,
+            );
+            wreck.x = moved.x;
+            wreck.z = moved.z;
+            // And back onto the ground it was shoved over: the third of
+            // `driving.CarField.groundAt`'s four floating paths.
+            cars.reground(wreck);
+          }
+          traffic.held.stun(struck.identity, looseTick);
+        }
+      }
       cars.integrateLoose(FIXED_DT, carLooseResolve, carLooseSweep);
       // --- And the patrol cars, dead-reckoned between the authority's 10 Hz
       // corrections. Online only: offline the pose comes from `follow` off a

@@ -12,7 +12,7 @@
  *
  *     bun run server/carcrash-check.ts
  *
- * Six sections, and every one of them prints a **ratcheted count** rather than
+ * Seven sections, and every one of them prints a **ratcheted count** rather than
  * a pass: a number that must not go down is a check that survives the next
  * retune, where a hard-coded expectation is a check somebody deletes.
  *
@@ -32,6 +32,11 @@
  *      and was never the hitbox. Reported in milliseconds and in metres at
  *      50 km/h.
  *   6. **The wire**, in bytes a second per player at the eight-car cap.
+ *   7. **A wreck rolls into the timetable.** WORKSTREAM AV, and the one section
+ *      here with no driver in it: a knocked-loose record used to meet no
+ *      schedule car at all and slid through the side of a bus at 8 m/s. It has
+ *      to be stopped by one, pin it, come to rest inside two metres, and knock
+ *      nothing loose doing it.
  *
  * ---------------------------------------------------------------------------
  * ONE VIRTUAL CLOCK, AND WHY IT IS `Date.now` ITSELF.
@@ -80,16 +85,25 @@ import {
 } from '../client/src/game/traffic.ts';
 import {
   CAR_HEALTH_MAX,
+  CRASH_QUERY_RADIUS,
   KNOCK_LOOSE_SPEED,
   LOOSE_BROADCAST_TICKS,
   LOOSE_REST_MS,
   MAX_LOOSE_CARS,
   RECYCLE_KEEP_RADIUS,
+  ambientRigidBody,
   carRigidBody,
   createCarShunt,
+  headingYaw,
   resolveCarContact,
 } from '../client/src/game/driving.ts';
-import { createRigidBody, createRigidContact, rigidOverlap } from '../client/src/game/rigid.ts';
+import {
+  ROLLING_DECAY,
+  SEPARATION_SLOP,
+  createRigidBody,
+  createRigidContact,
+  rigidOverlap,
+} from '../client/src/game/rigid.ts';
 
 const FIXED_DT = 1 / TICK_HZ;
 
@@ -786,6 +800,266 @@ function runWire(): { failures: string[]; bytesPerSecond: number } {
   return { failures, bytesPerSecond: bytes };
 }
 
+// --- 7. A wreck against the timetable ---------------------------------------------
+
+/**
+ * How fast the wreck is rolling when it reaches the schedule car, m/s. **8.**
+ *
+ * Over `KNOCK_LOOSE_SPEED`, deliberately and by a third: the whole point of the
+ * section is that a *driver* closing this fast would take the car it hit out of
+ * the timetable and a *wreck* closing this fast must not, so a speed under the
+ * threshold would pass the loose-count assertion for the wrong reason and prove
+ * nothing at all.
+ *
+ * It is also the speed `rigid.ROLLING_DECAY`'s own essay is written against --
+ * *"a Camry punted at 8 m/s rolls 10.7 m and stops in 2.7 seconds"* -- which is
+ * what makes `WRECK_STOP_M` a real bound rather than a restatement of the
+ * decay: free of any obstacle this wreck travels `v^2 / 2a`, and the section
+ * prints that number beside the one it measured.
+ */
+const WRECK_ROLL = 8;
+
+/**
+ * How far a wreck may travel *after* it touches a schedule car, metres. **2.**
+ *
+ * A car length is 4.4 m, so two metres is "it stopped against the thing it hit"
+ * with room for the rebound and for the tick of staleness
+ * `resolveTrafficContacts` takes in the separation. Ten and a half metres is
+ * what passing straight through looks like.
+ */
+const WRECK_STOP_M = 2;
+
+interface WreckResult {
+  failures: string[];
+  /** Did the wreck meet the timetable at all? The whole defect, in one boolean. */
+  touched: boolean;
+  /** How fast it was rolling on the tick it did. */
+  closing: number;
+  /** How far it went from there before it stopped, metres. */
+  travelled: number;
+  /** And how far it would have gone with nothing in the way. `v^2 / 2a`. */
+  freeRoll: number;
+  /** Was the car it hit pinned where it stood? */
+  stunned: boolean;
+  /** Loose records before the roll and after it. These must be the same number. */
+  looseBefore: number;
+  looseAfter: number;
+  /** The deepest the wreck was left inside any ambient car once it had settled. */
+  overlap: number;
+}
+
+/**
+ * **A knocked-loose wreck rolling into a stopped schedule car.** WORKSTREAM AV.
+ *
+ * ---------------------------------------------------------------------------
+ * WHAT THIS CATCHES, AND WHY THE SIX SECTIONS ABOVE COULD NOT.
+ *
+ * Sections 2 and 3 ram the timetable with a *driver* in the car, which is the
+ * only body `sim.resolveTrafficContacts` used to walk: its gate was
+ * `if (car.driverId === 0) continue`, so a record with nobody in it met no
+ * schedule car ever. A wreck punted across George Street therefore slid through
+ * the side of a bus at 8 m/s and carried on to the far gutter -- two solid
+ * objects occupying one place, which is the single thing the body layer exists
+ * to refuse, and every check in this project was green while it happened
+ * because every one of them had a driver in the car.
+ *
+ * The fix is *not* to let the wreck knock the bus loose, and that refusal is the
+ * reason the sweep was written the way it was: eight loose records is the whole
+ * budget (`MAX_LOOSE_CARS`), and a wreck rolling down a queue would spend it on
+ * physics in a second and a half, evicting the wreck the player actually made.
+ * So the wreck meets a **kinematic** body -- it bounces and stops -- and the car
+ * it hit is stunned for three seconds like any other under-threshold contact.
+ *
+ * Four things are asserted and each one fails a different way round:
+ *
+ *   1. **It touched.** Without the sweep there is no contact at all, and this is
+ *      the assertion that was failing before the change.
+ *   2. **It stopped within `WRECK_STOP_M`** of where it touched, against a free
+ *      roll of `v^2 / 2a` printed beside it. A wreck that merely *slowed*
+ *      passing through would clear the first assertion and fail this one.
+ *   3. **Nothing new is loose.** One record went in and one record comes out; a
+ *      version that handed the wreck `knockLoose` would pass 1 and 2 and fail
+ *      here, which is exactly the tempting wrong fix.
+ *   4. **Nothing is left inside anything.** Measured after the wreck has
+ *      settled, against every ambient car within `CRASH_QUERY_RADIUS` of it, at
+ *      `rigid.SEPARATION_SLOP` -- the depth that layer leaves standing on
+ *      purpose -- plus a centimetre of quantisation.
+ *
+ * The approach is `runRam`'s and for `runRam`'s reason: straight down the lane
+ * into a car that is already standing still, so the closing speed is the
+ * wreck's own and there is no timing in the fixture at all. The wreck is minted
+ * through `CarField.knockLoose` rather than made by a second car ramming one,
+ * because a real hard ram would leave the *rammer* in the street as a second
+ * body and the loose count this section is about would then have two honest
+ * answers.
+ */
+function runWreckIntoTraffic(): WreckResult {
+  const failures: string[] = [];
+  const world = streetWorld();
+  const sim = new Simulation(world);
+  const out: TickOutput = { tick: 0, events: [], snapshot: null };
+  const scratch: LaneRoute[] = [];
+  const probe = createCarPose();
+  const freeRoll = (WRECK_ROLL * WRECK_ROLL) / (2 * ROLLING_DECAY);
+
+  const stopped = findStopped(sim, scratch, probe);
+  if (stopped === null) {
+    console.log('  7. a wreck into the timetable: SKIPPED -- no stationary ambient car at this instant.');
+    return {
+      failures: ['7: no stationary ambient car on the synthetic street; the section could not run.'],
+      touched: false, closing: 0, travelled: 0, freeRoll, stunned: false,
+      looseBefore: 0, looseAfter: 0, overlap: 0,
+    };
+  }
+  const t = stopped;
+
+  // Eight metres behind it along its own heading, which puts about three and a
+  // half metres of clear road between the two boxes -- half a second at
+  // `WRECK_ROLL`, and far too little for `ROLLING_DECAY` to take anything
+  // meaningful off the closing speed before they meet.
+  const BACK_M = 8;
+  const wreck = sim.cars.knockLoose(
+    {
+      identity: 0xfeed07,
+      body: 0,
+      colour: 0,
+      x: t.x - t.dx * BACK_M,
+      y: t.y,
+      z: t.z - t.dz * BACK_M,
+      yaw: headingYaw(t.dx, t.dz),
+      parked: false,
+    },
+    WRECK_ROLL, 0, 0,
+  );
+  if (wreck === null) {
+    return {
+      failures: ['7: CarField.knockLoose refused to mint the wreck, so the section could not run.'],
+      touched: false, closing: 0, travelled: 0, freeRoll, stunned: false,
+      looseBefore: 0, looseAfter: 0, overlap: 0,
+    };
+  }
+  const looseCount = (): number => {
+    let n = 0;
+    for (const rec of sim.cars.all()) if (rec.loose) n++;
+    return n;
+  };
+  const looseBefore = looseCount();
+
+  let touched = false;
+  let closing = 0;
+  let stunned = false;
+  let contactX = 0;
+  let contactZ = 0;
+  let travelled = 0;
+  let settled = false;
+
+  for (let tick = 0; tick < 60 * 12; tick++) {
+    // The wreck's own speed and place **before** the tick, because the tick is
+    // what changes both and the contact is measured at the instant of it.
+    const wasSpeed = Math.hypot(wreck.speed, wreck.slip);
+    const wasX = wreck.x;
+    const wasZ = wreck.z;
+    sim.step(out);
+
+    if (!touched) {
+      // A free roll sheds `ROLLING_DECAY / TICK_HZ` -- five centimetres a second
+      // per tick -- so anything an order of magnitude over that is a contact and
+      // nothing else. Derived rather than written down, for the reason
+      // `SOFT_RAM` is.
+      const shed = wasSpeed - Math.hypot(wreck.speed, wreck.slip);
+      if (shed > (ROLLING_DECAY / TICK_HZ) * 10) {
+        touched = true;
+        closing = wasSpeed;
+        contactX = wasX;
+        contactZ = wasZ;
+        stunned = world.traffic.held.stunned(t.identity, trafficTick(Date.now()));
+      }
+      if (wasSpeed === 0) break;
+      continue;
+    }
+
+    travelled = Math.hypot(wreck.x - contactX, wreck.z - contactZ);
+    // `integrateLoose` snaps a stopped wreck's three numbers to exactly nought,
+    // which is what makes this an equality rather than a threshold. See
+    // `driving.LOOSE_REST_SPEED`.
+    if (wreck.speed === 0 && wreck.slip === 0 && wreck.yawRate === 0) { settled = true; break; }
+  }
+
+  const looseAfter = looseCount();
+
+  // --- And is it inside anything? Asked of **every** ambient car within the
+  //     broadphase radius rather than of the one identity `findStopped` named,
+  //     because the failure this is about does not care which car was passed
+  //     through.
+  let overlap = 0;
+  {
+    const bodyA = createRigidBody();
+    const bodyB = createRigidBody();
+    const contact = createRigidContact();
+    carRigidBody(wreck, bodyA);
+    forEachCarNear(
+      world.traffic, wreck.x, wreck.z, CRASH_QUERY_RADIUS, trafficTick(Date.now()), scratch, probe, (q) => {
+        if (sim.cars.suppressed(q.identity)) return;
+        ambientRigidBody(q, bodyB);
+        if (rigidOverlap(bodyA, bodyB, contact) && contact.depth > overlap) overlap = contact.depth;
+      },
+    );
+  }
+
+  console.log(
+    `  7. a wreck into the timetable: rolled at ${WRECK_ROLL} m/s, ` +
+      (touched
+        ? `touched 0x${(t.identity >>> 0).toString(16)} at ${closing.toFixed(2)} m/s ` +
+          `${stunned ? 'and PINNED it' : 'and did not pin it'}, then travelled ` +
+          `${travelled.toFixed(2)} m against a ${freeRoll.toFixed(1)} m free roll ` +
+          `(${settled ? 'settled' : 'still moving'}), left ${overlap.toFixed(3)} m inside anything`
+        : 'NEVER TOUCHED IT -- the wreck passed through the timetable') +
+      `; loose records ${looseBefore} -> ${looseAfter}`,
+  );
+
+  if (!touched) {
+    failures.push(
+      `7: a wreck rolling at ${WRECK_ROLL} m/s passed straight through a stopped schedule car. ` +
+        'sim.resolveTrafficContacts walks occupied cars only unless a loose record is in the sweep too; ' +
+        'see WORKSTREAM AV in its header.',
+    );
+  } else {
+    if (travelled > WRECK_STOP_M) {
+      failures.push(
+        `7: the wreck carried on ${travelled.toFixed(2)} m after touching the car it hit, against a bound of ` +
+          `${WRECK_STOP_M} m and a ${freeRoll.toFixed(1)} m free roll. It is meant to stop against it, not to be ` +
+          'slowed by it.',
+      );
+    }
+    if (!settled) {
+      failures.push('7: the wreck never came to rest, so it is a record CarField.recycleLooseIds can never give back.');
+    }
+    if (!stunned) {
+      failures.push(
+        '7: the schedule car a wreck stopped against was not pinned, so it drives on through the wreck ' +
+          'three ticks later. See traffic.HoldLedger.stun.',
+      );
+    }
+  }
+  if (looseAfter !== looseBefore) {
+    failures.push(
+      `7: the loose count went ${looseBefore} -> ${looseAfter}. A wreck must not knock the timetable loose: ` +
+        `${MAX_LOOSE_CARS} is the whole budget and a wreck rolling down a queue would spend it on physics ` +
+        'rather than on anything a player did.',
+    );
+  }
+  // A centimetre over the slop the layer leaves standing on purpose. See
+  // `rigid.SEPARATION_SLOP`, and section 1's own convergence argument.
+  if (overlap > SEPARATION_SLOP + 0.01) {
+    failures.push(
+      `7: the settled wreck is ${overlap.toFixed(3)} m inside an ambient car, against a separation slop of ` +
+        `${SEPARATION_SLOP} m. Two solid objects are in one place.`,
+    );
+  }
+
+  return { failures, touched, closing, travelled, freeRoll, stunned, looseBefore, looseAfter, overlap };
+}
+
 // --- The run ---------------------------------------------------------------------
 
 function main(): void {
@@ -838,6 +1112,8 @@ function main(): void {
   failures.push(...clock.failures);
   const wire = runWire();
   failures.push(...wire.failures);
+  const wreck = runWreckIntoTraffic();
+  failures.push(...wreck.failures);
 
   // --- The ratchet. Numbers that must not go *down*, printed so a future run
   //     can be read against this one without anybody having to remember what
@@ -851,6 +1127,9 @@ function main(): void {
   console.log(`    residual clock skew, ms (lower is better)        ${clock.skewMs.toFixed(1)}`);
   console.log(`    metres of car per 50 ms of skew at 50 km/h       ${clock.metres.toFixed(2)}`);
   console.log(`    bytes a second at the cap (lower is better)      ${wire.bytesPerSecond}`);
+  console.log(`    schedule cars a rolling wreck is stopped by      ${wreck.touched ? 1 : 0}`);
+  console.log(`    metres it carried on afterwards (lower is better) ${wreck.travelled.toFixed(2)}`);
+  console.log(`    records a wreck knocked loose (must stay 0)      ${wreck.looseAfter - wreck.looseBefore}`);
 
   if (failures.length > 0) {
     console.log('');

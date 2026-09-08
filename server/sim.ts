@@ -5045,6 +5045,13 @@ export class Simulation {
     //   - and **either way** the driven car's own three numbers -- speed, slip
     //     and spin -- are written back onto its driver's combatant, which is
     //     where the integrator and the replay both read them.
+    //
+    // WORKSTREAM AV: and a **rolling wreck** is in this sweep too, with only the
+    // first of those three outcomes available to it -- the ambient car is a wall
+    // at any speed and is stunned, and nothing is knocked loose. The method's own
+    // header carries the argument, which is that the eight-car cap belongs to
+    // players and that a wreck passing through a bus is not the alternative
+    // anybody wanted.
     this.resolveTrafficContacts(tick);
 
     // --- And the **parked fleet**, which is workstream AS and is the last of
@@ -5442,17 +5449,53 @@ export class Simulation {
    * And every driven car that is inside an **ambient** one. See the block in
    * `stepCars` that calls this for the three outcomes.
    *
-   * Occupied cars only, on the damage sweep's own argument: a `forEachCarNear`
-   * per driven car per tick is bounded by the player cap, and a car standing
-   * empty in a lane is already something the timetable queues behind rather
-   * than drives into (`publishBlockers`). A knocked-loose car is left out for
-   * the same reason and one more -- a wreck rolling through the ambient fleet
-   * would knock the whole street loose one car at a time, which is the
-   * eight-car cap being spent by physics rather than by a player.
+   * Occupied cars **and wrecks that are rolling**, on the damage sweep's own
+   * argument: a `forEachCarNear` per body per tick is bounded by the player cap
+   * plus `driving.MAX_LOOSE_CARS`, and a car standing *still* with nobody in it
+   * is left out because the timetable already queues six metres behind it
+   * rather than driving into it (`publishBlockers`).
+   *
+   * ---------------------------------------------------------------------------
+   * WORKSTREAM AV: A WRECK USED TO ROLL THROUGH A BUS, AND THE HEADER THAT SAID
+   * SO WAS HALF RIGHT.
+   *
+   * What stood here was "occupied cars only", and the second half of the reason
+   * still holds word for word: *a wreck rolling through the ambient fleet would
+   * knock the whole street loose one car at a time, which is the eight-car cap
+   * being spent by physics rather than by a player*. Eight is the whole budget
+   * (`MAX_LOOSE_CARS`), a punted Camry crossing a queue would eat it in a second
+   * and a half, and every one of those records evicts the wreck the player
+   * actually made -- so "the wreck knocks the next car loose" is refused, and is
+   * still refused.
+   *
+   * The conclusion drawn from it was the wrong one. Leaving the wreck out of the
+   * sweep entirely did not stop it interacting with the fleet; it made it
+   * **pass through** -- a two-tonne object at 8 m/s sliding through the side of a
+   * bus, which is the one thing this project's whole body layer exists to
+   * refuse, and which no queueing argument covers because the bus is a schedule
+   * row and not a blocker the wreck can be behind.
+   *
+   * So the wreck is in the sweep and it meets a schedule car as a **kinematic**
+   * body -- `driving.resolveTrafficContact`'s `knockLoose` flag, cleared, which
+   * is `resolveStaticContact`'s section 2 one fleet over. The wreck bounces and
+   * stops; the timetable car is *stunned* through the hold ledger for the same
+   * three seconds a driver's under-threshold hit buys, so it stands there rather
+   * than driving on through the thing that hit it; and no record is minted, so
+   * the eight-car cap belongs to players as before. Both ends make the identical
+   * call with the flag clear (`main.ts`' wreck sweep, beside its
+   * `CarField.integrateLoose`), so the wreck stops in the same place on every
+   * screen between one 10 Hz broadcast and the next.
    */
   private resolveTrafficContacts(tick: number): void {
     for (const car of this.cars.all()) {
-      if (car.driverId === 0) continue;
+      const driven = car.driverId !== 0;
+      // A wreck that has come to rest is furniture the timetable queues behind,
+      // and asking about it every tick for the rest of the session would be a
+      // broadphase query per settled wreck per tick that can only ever answer
+      // "still touching". `integrateLoose` snaps a stopped car's three numbers
+      // to exactly nought for this comparison; see `DrivenCar.restMs`.
+      const rolling = car.loose && (car.speed !== 0 || car.slip !== 0 || car.yawRate !== 0);
+      if (!driven && !rolling) continue;
       // --- **From the record, and not from the live driver**, which is the
       // opposite of what the driven-against-driven sweep does one method up.
       //
@@ -5477,16 +5520,25 @@ export class Simulation {
       const struck = resolveTrafficContact(
         this.world.traffic, car, tick, this.carRoutes, this.drivenPose, this.carPose,
         this.suppressCar, this.bodyA, this.bodyB, this.carContact, this.carShunt,
+        // Only somebody driving can take a car out of the timetable. See
+        // WORKSTREAM AV in this method's header, and the identical parameter on
+        // `resolveStaticContact` one sweep along.
+        driven,
       );
       if (struck === null) continue;
       this.applyCarBody(car, this.bodyA, this.carShunt.push[0], this.carShunt.push[1]);
       this.shunted.add(car.id);
       this.carChanges.push(car);
-      if (this.carShunt.closing < KNOCK_LOOSE_SPEED) {
+      if (!driven || this.carShunt.closing < KNOCK_LOOSE_SPEED) {
         // A wall, and a car that stands where it was hit for three seconds
         // rather than driving on through the thing that hit it. See
         // `traffic.HoldLedger.stun` -- including whose stun it is, and what a
         // remote player's crash therefore looks like on somebody else's screen.
+        //
+        // `!driven` is the wreck, at **any** speed: the body it just met was
+        // kinematic, so there is no dynamic velocity on `bodyB` to hand
+        // `knockLoose` and nothing below this line would have anything to mint a
+        // record from. WORKSTREAM AV.
         this.world.traffic.held.stun(struck.identity, tick);
         continue;
       }
