@@ -45,6 +45,7 @@
  * difference between a picture of the cars and a picture of their triangles.
  *
  *   node scripts/render-car-sheet.mjs [--out path] [--only a.glb,b.glb] [--px N] [--pbr]
+ *                                     [--palette [--intent]]
  */
 import { NodeIO } from '@gltf-transform/core';
 import { KHRONOS_EXTENSIONS } from '@gltf-transform/extensions';
@@ -95,6 +96,57 @@ const W = CELL_W, H = Math.round(CELL_W * 190 / 320);
 let COLS = 4;
 /** The paint every painted surface takes on the sheet: a mid blue, so a painted headlight is obvious. */
 const PAINT = [0.18, 0.36, 0.78];
+
+/* ---------------------------------------------------------------------------
+ * `--palette`: THE EIGHT PAINTS, WHICH IS A DIFFERENT PICTURE
+ *
+ * The default sheet paints every body the one blue above, deliberately: it is a
+ * *geometry* check, and one flat colour is what makes a wrong nose or a missing
+ * panel the only thing that can differ between two runs.
+ *
+ * `--palette` asks the other question. `client/src/sky/carpaint.ts` re-derived
+ * all eight albedos against the clearcoat in 2026-09, and the thing a number
+ * cannot judge about a palette is whether it is still a palette: whether white
+ * is still the brightest paint and black the darkest, whether a red car still
+ * reads as red rather than as pink, whether the four neutrals still occupy the
+ * whole tonal range instead of clustering. So this mode draws one model in each
+ * of the eight, in palette order, and the cells are the answer.
+ *
+ * `--intent` draws the *old* table beside it -- the eight as they were authored
+ * before the coat existed, which is the input the derivation inverts. Two runs
+ * and a diff is the before and after, with no need to check anything out.
+ *
+ * Both tables are a second copy of `sky/carpaint.ts` and are fenced the way
+ * everything else in this script is: `SHEET_PAINT` there is `CAR_PAINT_ALBEDO`
+ * and `PAINT_INTENT` is the other, `verifyCarPaint` asserts both on each boot
+ * list, and this script prints them so a mismatch is visible in the log beside
+ * the picture it produced.
+ * ------------------------------------------------------------------------- */
+const PALETTE_NAMES = ['white', 'silver', 'grey', 'black', 'blue', 'red', 'green', 'beige'];
+/** `sky/carpaint.CAR_PAINT_ALBEDO`. Derived, six decimals, the palette that ships. */
+const PALETTE_DERIVED = [
+  [0.825550, 0.829009, 0.824876],
+  [0.408024, 0.416638, 0.433124],
+  [0.153385, 0.156844, 0.169206],
+  [0.109055, 0.109422, 0.119722],
+  [0.032766, 0.078494, 0.239309],
+  [0.271942, 0.020762, 0.014567],
+  [0.036890, 0.088803, 0.051681],
+  [0.325550, 0.290865, 0.229000],
+];
+/** `sky/carpaint.PAINT_INTENT`. What the palette was before the coat existed. */
+const PALETTE_INTENT = [
+  [0.805, 0.81, 0.808],
+  [0.4, 0.41, 0.428],
+  [0.153, 0.158, 0.172],
+  [0.11, 0.112, 0.124],
+  [0.036, 0.082, 0.24],
+  [0.268, 0.026, 0.022],
+  [0.04, 0.092, 0.058],
+  [0.32, 0.288, 0.23],
+];
+const PALETTE = args.includes('--palette');
+const INTENT = args.includes('--intent');
 const VIEWS = [{ cam: [1, 0.55, 0.75] }, { cam: [-1, 0.55, 0.75] }];
 
 const io = new NodeIO().registerExtensions(KHRONOS_EXTENSIONS);
@@ -208,8 +260,27 @@ const SHEET_SKY = 1 / luma(ENV.horizon);
 }
 
 const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.glb') && (ONLY === null || ONLY.has(f))).sort();
-COLS = Math.min(COLS, Math.max(1, files.length));
-const rows = Math.ceil(files.length / COLS);
+/*
+ * A cell is a (model, paint) pair. In the default mode that is every model in
+ * one blue; under `--palette` it is one model in all eight, which is the same
+ * loop with the two lists swapped over and is why the loop below reads a job
+ * rather than a file.
+ */
+const jobs = PALETTE
+  ? (INTENT ? PALETTE_INTENT : PALETTE_DERIVED).map((paint, i) => ({
+      file: files[0], paint, label: PALETTE_NAMES[i],
+    }))
+  : files.map((file) => ({ file, paint: PAINT, label: file }));
+if (PALETTE) {
+  console.log(
+    `palette: ${INTENT ? 'PAINT_INTENT (before the coat)' : 'CAR_PAINT_ALBEDO (derived, shipped)'} on ${files[0]}`,
+  );
+  for (let i = 0; i < 8; i++) {
+    console.log(`  ${PALETTE_NAMES[i].padEnd(7)} ${jobs[i].paint.map((c) => c.toFixed(6)).join(', ')}`);
+  }
+}
+COLS = Math.min(COLS, Math.max(1, jobs.length));
+const rows = Math.ceil(jobs.length / COLS);
 const sheetW = COLS * W * 2, sheetH = rows * H;
 const sheet = Buffer.alloc(sheetW * sheetH * 3, 40);
 
@@ -241,7 +312,7 @@ async function texelsOf(mat) {
 }
 
 let cell = 0;
-for (const f of files) {
+for (const { file: f, paint: CELL_PAINT, label } of jobs) {
   const doc = await io.read(path.join(DIR, f));
   const root = doc.getRoot();
   const tris = [];
@@ -378,9 +449,9 @@ for (const f of files) {
           }
           // `carlod`'s rule: value under the paint's hue where the mask is on.
           const value = Math.max(r, g, b);
-          img[o * 3] = (r + (PAINT[0] * value - r) * mask) * lam;
-          img[o * 3 + 1] = (g + (PAINT[1] * value - g) * mask) * lam;
-          img[o * 3 + 2] = (b + (PAINT[2] * value - b) * mask) * lam;
+          img[o * 3] = (r + (CELL_PAINT[0] * value - r) * mask) * lam;
+          img[o * 3 + 1] = (g + (CELL_PAINT[1] * value - g) * mask) * lam;
+          img[o * 3 + 2] = (b + (CELL_PAINT[2] * value - b) * mask) * lam;
           if (PBR && coatF !== null) {
             const f = coatF, e = coatE;
             img[o * 3] = img[o * 3] * (1 - f) + e[0] * SHEET_SKY * f;
@@ -400,7 +471,7 @@ for (const f of files) {
       }
     }
   }
-  console.log(`${String(cell).padStart(2)}  ${f}`);
+  console.log(`${String(cell).padStart(2)}  ${label}`);
   cell++;
 }
 fs.mkdirSync(path.dirname(OUT), { recursive: true });

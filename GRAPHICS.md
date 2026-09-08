@@ -8,7 +8,12 @@ pipeline exactly as it stands, surface by surface, with the budgets that bind an
 the things three r0.185's WebGPU path can and cannot do here. Part two is the
 ordered plan, each item with what it changes, what it costs in draw calls,
 pipelines, memory and frame milliseconds, what its offline proof is, and what
-only eyes can judge. Part three is what shipped on the night this was written.
+only eyes can judge. Part three is what shipped on the night this was written and
+part four is what shipped the night after -- items 2 and 4, and the follow-up
+part three created. **Two of part four's three findings contradict the audit
+above them**, and both are left standing with the correction beside them rather
+than quietly edited, because how a wrong reading of this renderer looks is worth
+as much to the next reader as the right one.
 
 Two rules run through the whole thing, and they are why the ranking looks the way
 it does rather than like a feature list:
@@ -206,10 +211,10 @@ through in the table but described in full in part three.
 | # | item | payoff | cost | risk |
 |---|---|---|---|---|
 | 1 | ~~Colour grade (day/dusk/night split-tone)~~ **shipped** | high | ~0 | none — luminance-preserving by construction |
-| 2 | **Sky reflection on building glazing** | **highest remaining** | ~15 ALU on facade pixels, 0 pipelines | low |
+| 2 | ~~Sky reflection on building glazing~~ **shipped** | high | ~14 ALU on glazed pixels, 0 pipelines | low |
 | 3 | ~~Clearcoat sky reflection on cars~~ **shipped** | high | ~20 ALU on car pixels, 0 pipelines | low |
-| 4 | **Aerial perspective on the far city** | high | 1 uniform, ~6 ALU | low |
-| 5 | **Baked contact/ambient occlusion in the prism bake** | high | pipeline work, 0 runtime | medium (world rebuild) |
+| 4 | ~~Aerial perspective on the far city~~ **shipped** | high | 1 uniform, ~18 ALU (not the 6 guessed) | low |
+| 5 | **Baked contact/ambient occlusion in the prism bake** — **the highest-payoff item left** | high | pipeline work, 0 runtime | medium (world rebuild) |
 | 6 | **Bloom on emissives** | medium-high | a real post chain: 2–3 passes, ~1.5 ms, MSAA rework | medium |
 | 7 | **A tight near shadow cascade** | medium-high | +1 depth pass over ~60 m, +0.8–1.5 ms | medium |
 | 8 | **Road decals: lane markings, stop bars** | medium-high | pipeline + geometry work | medium |
@@ -220,52 +225,50 @@ through in the table but described in full in part three.
 | 13 | **Tree LOD / impostors** | (perf, not looks) | pipeline work; *saves* 483 k triangles | medium |
 | 14 | **Motion blur / DoF** | low | a post chain plus velocity buffers | high — and off by default anyway |
 
-### 2 — Sky reflection on building glazing
+### 2 — Sky reflection on building glazing — **shipped 2026-09-09**
 
-**The highest-payoff item left, and it is the same twelve lines that shipped for
-cars tonight.** `curtain_wall` carries `roughness 0.10, metalness 0.28` and the
-facade shader gives every window a glazing-keyed reflectivity — against an
-environment that does not exist. A metallic workflow with no environment is a
-black object, so **every window in the CBD is a hole**. A tower is the one thing
-in this city that is *made of* reflected sky.
+Shipped, and the paragraph that used to stand here was **half wrong**, which is
+worth keeping on the record because it is the kind of wrong an audit written off
+a material table will be. It said:
 
-- **What changes.** `world/facade.ts` grows a coat term inside its existing TSL
-  graph, weighted by the `inWindow` mask it already computes and by the same
-  Schlick used in `sky/reflection.ts`. Glass gets a much higher `F0` than paint
-  (0.04 flat, and the roughness is already 0.10 so the lobe is tight enough that
-  the horizon band reads as a band).
-- **Cost.** Zero new materials, zero new pipelines, zero draws, zero memory.
-  About 15 ALU on facade fragments, gated to nonzero only where the window mask
-  is on. Call it under 0.1 ms; the facade shader is already far heavier than
-  this.
-- **Offline proof.** `verifyReflection` extended with a glazing case: the
-  composite is still convex, so no calibrated brick value can move (the mask is
-  zero on brick); and the published `curtain_wall` display values move only
-  inside the window rectangle, which the mask makes assertable.
-- **Only eyes can judge.** Whether a CBD tower now reads as glass or as a
-  disco ball. Spec 7.3 says **never shiny**, and this is the item that argues
-  with it — which is why the switch for it should be separate from the cars'.
+> *"`curtain_wall` carries `roughness 0.10, metalness 0.28` and the facade shader
+> gives every window a glazing-keyed reflectivity — against an environment that
+> does not exist. A metallic workflow with no environment is a black object, so
+> every window in the CBD is a hole."*
 
-### 4 — Aerial perspective on the far city
+`world/facade.ts` has carried a hand-authored window reflection for a long time —
+`GLASS_SKY`, a two-anchor dome with a fitted falloff, a sun-half gradient, an
+aureole and a full Schlick, put through `emissiveNode` so that reflected radiance
+does not scale with the irradiance landing on the wall. **By day a Sydney window
+was never a hole.** What was actually wrong with it was three things, and they
+were one thing:
 
-`far.ts` draws 12,778 unlit prisms with one global `SLAB_LIGHT` multiply. They
-therefore sit at a uniform pastel from 1.8 km to 4.5 km, with the fog
-(`smoothstep(500, 9000, viewZ)`) doing all the depth work. Real distance
-haze is not a grey wash, it is *the sky colour, mixed in by distance, with the
-low end warmer than the high end*. The single most recognisable "open world"
-cue after the grade.
+1. it is frozen at 3 pm — `GLASS_SKY` is a pair of literals off the dome at the
+   reference instant, so at golden hour the CBD reflects a blue afternoon over a
+   burning sky, which is the fault `sky/dusk.ts` fixed for `scene.fog`;
+2. it is switched off after dark by `nightFactor`, and `facade.ts`'s own night
+   table says what is left: *unlit glass rgb(0, 0, 0)*. That is the hole, and it
+   is a hole for half of every day;
+3. `curtain_wall`'s metalness 0.28 hands 28% of its diffuse to an indirect
+   specular `EnvironmentNode` feeds and this build never set — and the emissive
+   is masked to the *glass*, so the mullion and spandrel grid, which is most of
+   a tower's area at any distance where the panes have gone sub-pixel, got none
+   of it back.
 
-- **What changes.** One extra term in `createSlabMaterial`'s existing TSL: mix
-  the slab colour toward the horizon radiance that `sky/reflection.ts` already
-  publishes as a uniform, by a smoothstep on view distance and a second one on
-  height.
-- **Cost.** Reuses the reflection's three uniforms. ~6 ALU on 187 k triangles'
-  worth of fragments. Under 0.2 ms. Zero pipelines.
-- **Offline proof.** Pure: the mix weight is a function of distance and height,
-  so `verifyFar`-style monotonicity and clamps, plus the assertion that at zero
-  distance the slab colour is unchanged (so `far.ts`'s published palette still
-  means what it says).
-- **Only eyes can judge.** Whether the horizon reads as depth or as murk.
+All three are the term `sky/reflection.skyEnvFor` computes off the rig. See part
+four.
+
+### 4 — Aerial perspective on the far city — **shipped 2026-09-09**
+
+Shipped, and the reason it was needed turned out to be sharper than "the fog does
+all the depth work". **The fog cannot reach the sky, and it is a type that stops
+it.** `Fog.color` is a `THREE.Color`, a `Color` holds three channels in [0, 1],
+and the low sky at 3 pm is 2.49 of linear luminance. `main.ts` wrote the
+limitation down when it chose the value — *"a `Fog` colour is capped at 1.0
+linear so it cannot reach the horizon band's brightness; this gets as close as the
+cap allows"* — so distance has been fading the far city toward a value two and a
+half times **darker** than the sky behind it. Distance that darkens is murk. See
+part four.
 
 ### 5 — Baked ambient occlusion per prism
 
@@ -508,7 +511,7 @@ Four things, and the owner should look at them:
    `cars.ts` actually cares about is against *shaded asphalt* two metres away,
    and that is a frame, not a number.
 
-### The follow-up this pass created
+### The follow-up this pass created — **closed 2026-09-09, see part four**
 
 `cars.ts`'s eight paint albedos are still lifted above measured reflectance to
 fake a reflection that now exists. The coat is a convex mix, so nothing is
@@ -518,3 +521,238 @@ Re-deriving all eight against a renderer that finally has the environment is a
 real piece of work and is now *possible offline for the first time*, because
 `grade.neutralToneMap` puts the whole chain in the repository. It should be done
 before item 2 makes glass do the same thing.
+
+---
+
+## Part four: what shipped, 2026-09-09
+
+Items 2 and 4, and the follow-up part three created — three commits on
+`graphics-2026-09-glazing`. Every existing check stays green, `npm run typecheck`
+is clean, and the server boots with **three more** checks in the passing list:
+`verifyGlazing`, `verifyAerial`, `verifyCarPaint`.
+
+**Zero new pipelines, and here is how that is known rather than hoped.**
+`warmup.ts`' own key is `` `${part.material.uuid}|${geometryLayout}|${casts}|${receive}` `` —
+the material *object*, not its class. Nothing in this pass constructs a material
+that was not constructed before it: one per facade slot, one for the landmark
+glazing band, one for the whole far city, and the car fleet's untouched. All
+three terms are `setupOutput` subclasses folded into a graph that already
+existed, so every cache key in the build is the same string it was yesterday.
+
+### The glazing coat — `sky/reflection.ts`, `world/facade.ts`, `world/landmarks.ts`
+
+The same convex mix as the car coat at glass's own two constants:
+
+    out = lit * (1 - F * mask) + env(reflect(V, N)) * F * mask
+
+`GLAZING_F0` is **0.04**, which is float glass and carries none of `COAT_F0`'s
+apology for a lifted palette underneath. `GLAZING_MAX` is **0.85** rather than
+the 1.0 real glass reaches at grazing, and the reason is the one `facade.ts`
+already gives for its own dome: *"the glass sees an unobstructed dome, so inside
+a narrow canyon it reflects haze band where a real window would reflect the
+building across the street."* At `F = 1` every tower's silhouette becomes a
+perfect mirror of a sky with no city in it, which is a brighter and flatter error
+than the one being fixed, and spec 7.3's **never shiny** is aimed at that frame.
+
+**Which slots, which is the question the item asked to have answered.** One
+material slot in this city is glazing — `curtain_wall` — and it takes the coat
+over its whole surface, mullions and spandrels included. **A window in a brick
+terrace is not a slot**: it is a rectangle inside `brick_red` computed per pixel
+by the window grammar, and there never will be a slot for it. So the eight other
+wall slots (`brick_red`, `brick_cream`, `brick_brown`, `sandstone`,
+`concrete_precast`, `corrugated_steel`, `render_painted`, `fibro`) take the coat
+through the glass mask and are bit-identical everywhere else. `landmark_glass` is
+not a facade slot at all — `world/landmarks.ts`, roughness 0.14, metalness 0.28,
+the Sydney Tower turret's observation band and the glazed mouths under the Opera
+House shells — and has precisely the same defect, so it is in the same table. The
+two roof slots, the awning fascia, the three fences and the seven ground surfaces
+carry a zero row, checked by name.
+
+`GLAZING_COAT` lives in `sky/reflection.ts` (three-free, so the server checks it)
+and `facade.ts` assigns it to a `Record<MaterialName, number>` — so **a new
+material slot with no row is a compile error**, the same guarantee
+`MATERIAL_LOOK` gives.
+
+**The one thing to be honest about.** On a window pane the facade's own `glazing`
+emissive has already taken its Fresnel share of the outgoing radiance, so the two
+coats compose in series and the total reflective share is `f + F − f·F` where the
+correct answer is `f`. Head-on that is an over-reflection of `F0·(1 − f)` — about
+four points — of an environment that is *dimmer* than the one the emissive uses,
+because this one is a twenty-degree cone average and that one is the raw
+ten-degree haze peak. At grazing `f` runs to 1 and it vanishes, which is the end
+where a mistake would have shown. Feeding the live environment *into* `GLASS_SKY`
+instead was the first design and it is wrong: it would darken every window in the
+city threefold and move sixteen published display values. The two lobes are both
+real and they belong to different roughnesses.
+
+At 3 pm on 15 February, for a shaded curtain wall (first column is what shipped):
+
+    spandrel, near head-on      rgb( 21,  44,  44) -> rgb( 48,  68,  76)
+    the same at 60 deg off      rgb( 21,  44,  44) -> rgb(105, 124, 139)
+    the same at grazing         rgb( 21,  44,  44) -> rgb(162, 183, 207)
+    unlit pane, at night        rgb(  0,   0,   0) -> rgb(  1,   7,  17)
+    unlit pane, night, grazing  rgb(  0,   0,   0) -> rgb( 51,  63,  80)
+
+Switch: **`GLAZING_SKY_REFLECT`** in `sky/calibration.ts`, separate from the
+car's because spec 7.3's *never shiny* is the standing instruction this term
+argues with and two mistakes want two knobs.
+
+### The offline proof — `scripts/render-landmark-sheet.mjs --pbr --mat`
+
+**The landmark sheet does rasterise a glazing material**, and it is the better
+subject of the two: `landmark_glass` is real triangles in `landmarks.glb`, and
+the turret is a *ring*, so one cell carries the Fresnel from head-on round to
+grazing in a single band of pixels.
+
+It needed a second flag to be worth anything. Almost every one of those 8,285
+triangles is *behind* something — the mouths are under the shells, the
+observation band inside a ring of gold cladding — and a plain sheet of the whole
+landmark moves 510 subpixels out of two million with the coat on and off, which
+is a picture of nothing. `--mat landmark_glass` drops the other materials from
+the *drawing* while keeping the whole landmark's bounding box, fit and scale bar,
+so a glass-only cell registers with a full one. With it, 1.21% of the sheet moves
+— which is all of the glass — by a mean of 7.6 code values.
+
+The arithmetic is the third copy of `sky/reflection.ts` and is fenced from both
+ends like the car sheet's: `SHEET_ENV` and the new `SHEET_GLAZING` are asserted
+by `verifyGlazing` on both boot lists, the sheet asserts the same probes at
+startup, and it refuses to draw if they have drifted.
+
+### The haze — `sky/reflection.ts`, `world/skyreflect.ts`, `world/far.ts`
+
+    weight = smoothstep(1800, 4500, distance) * exp(-y / 220) * day * 0.36
+
+`AERIAL_MAX` 0.36 is Koschmieder rather than taste: `β = 3.912 / V` at 40 km of
+clear-air visibility is 0.098 per km, and `1 − exp(−0.44)` over 4.5 km of air is
+0.36. Zero at the near edge is a requirement and not a taper — a slab and the
+tile that replaces it stand in the same place until the GLB lands, and a hazier
+slab makes that swap a flash — which is why it is a `smoothstep` and not a ramp:
+a ramp leaves a first derivative at the streaming radius, and that is a crease
+along a seam that is already a seam.
+
+The height term is the half of aerial perspective usually left out and it is
+what stops the skyline fading as one card. At 4.5 km a concrete slab at sea level
+goes rgb(129,127,125) → rgb(207,216,227) and the same slab 260 m up goes to
+rgb(158,161,165) — fifty code values of separation between a tower's base and its
+top at identical range, which no single fog factor can produce.
+
+**And it is exactly zero at night, asserted by identity.** `skyEnvFor`'s night
+value is a *lighting* floor — the rig holds `HEMISPHERE_NIGHT` up so a player can
+see — so at midnight the environment's horizon is nine times brighter than the
+far city under `NIGHT_SLAB`, and a haze toward it would turn a silhouette skyline
+into a grey one. In-scattering is what aerial perspective is and at night there
+is none, which is why `sky/dusk.ts` already takes the fog to 0.016.
+`aerialDayFraction` inverts `slabLight` rather than using it, because the number
+needed is zero and `slabLight` is 0.14 all night.
+
+Cost, counted rather than guessed: a subtract and a length, a `smoothstep`, a
+`max` and an `exp`, two multiplies and a three-channel `mix` — **eighteen ALU,
+not the six this document estimated**, because the estimate did not price the
+height term. One new scalar uniform; the horizon colour is the coats'.
+
+Switch: **`FAR_AERIAL`** in `sky/calibration.ts`.
+
+### The follow-up, closed — `sky/carpaint.ts`
+
+Part three's follow-up asked for the eight car albedos to be re-derived now that
+the environment exists, on the ground that *"the dark end of the palette is now a
+compensation for a term that is no longer missing"*. It is done, and **the
+premise is half wrong**, which changes what the answer means.
+
+The lift is worth **2.2x** on black — 0.11 against the ~0.05 a real black paint
+reflects. The coat is worth **three per cent**: `COAT_F0` is 0.03, and the
+cosine-weighted mean of `coatFresnel` over a whole convex body is 0.052. The coat
+is a *rim* — half the sky at the silhouette, three points across the panel you
+are looking at — and it cannot be what a 2.2x lift was standing in for. Unwinding
+the lift on the strength of it would have taken every dark car straight back to
+the hole `cars.ts` describes.
+
+So the residual lift stays and is now attributable to what it actually is: **the
+analytic dome has no city in it.** No sunlit wall opposite, no footpath, no
+awning, no roof of the car in front — which is most of a car's ambient specular
+in a street canyon, and which needs the reflection probes listed at the bottom of
+part two.
+
+What *was* re-derived is exactly the three per cent, and the reason to bother is
+not the level but the **hue**. The coat adds blue-white sky, so it lifts the
+channel a paint has least of, which desaturates — `cars.ts`' own warning that
+*"the temptation to lift the other two channels for realism is what turns a red
+car pink under this tone curve"* describes what the coat had quietly been doing
+to the red row since the night it shipped. Red rendered rgb(225, 68, 68) where
+the palette intends rgb(227, 58, 52).
+
+    a' = ( a  -  pi * env * F / E ) / ( 1 - F )
+
+A closed form, per channel, no iteration and no fitting. **Done in linear
+radiance, which is what makes it exact**: it restores the radiance each paint was
+tuned to produce, whatever tone curve, exposure or grade runs afterwards. So
+every rgb triple published in `world/cars.ts` is *more* true after this change
+than before it, and not one of them needed editing. The reference view is the one
+`verifyReflection` already walks — a roof in sun, square to the eye, reflecting
+the zenith — because that is the anchor the whole palette is spaced against and
+its irradiance has no free parameters.
+
+    white   +2.6%   goes up: white is brighter than the zenith, so the coat was
+                    taking light off the anchor
+    silver  +2.0%
+    grey     0.0%   sits within a tenth of a per cent of the zenith's own level
+    black   -0.9%   and twice as far in blue as in red — a black car had been
+                    going faintly navy
+    blue    -9.0% R
+    red     -20% G, -34% B — the largest move, and the one that matters
+    green   -7.8%
+    beige   +1.7%
+
+The palette moved out of `world/cars.ts` and into `sky/carpaint.ts` with the
+derivation above it and `verifyCarPaint` beside it. `cars.ts` keeps the essay;
+`LIVERY_WHITE` is now `PAINT[0]` by reference rather than by transcription, which
+is what stops the fleet acquiring a second white the moment the palette moves
+again.
+
+### The offline proof — `scripts/render-car-sheet.mjs --palette`
+
+The default sheet paints every body one blue on purpose: it is a *geometry*
+check. `--palette` draws one model in all eight paints in palette order, and
+`--intent` draws the pre-coat table beside it, so two runs and a diff are the
+before and after with nothing checked out. Both tables are fenced by
+`verifyCarPaint`.
+
+Measured, a Camry in both views: **6.15% of the sheet moves — all of the painted
+body — by a mean of 1.62 code values**, white and silver up, grey, black, blue
+and red down, and the ordering intact: white is still the brightest paint and
+black still the darkest of the four neutrals.
+
+### What only eyes can judge
+
+Four more, on top of part three's four:
+
+1. **Whether a CBD tower now reads as glass or as a disco ball.** This is the
+   item that argues with spec 7.3's *never shiny* and `GLAZING_MAX` (0.85) is
+   the knob. The numbers say a shaded spandrel goes from rgb(21,44,44) to
+   rgb(162,183,207) at grazing; whether that is a glass building or a mirrored
+   one is a frame.
+2. **Whether the rim the coat leaves on a night skyline is right.** It comes off
+   the rig's *lighting* floor rather than the night sky's own radiance — the same
+   floor the car coat uses — so it is physically several times too bright. A
+   grazing pane at night sits at rgb(51,63,80) against a sky that is nearly
+   black. If it reads as rimmed rather than as silhouetted, the fix is a night
+   scale on the environment shared by both arms.
+3. **Whether the horizon now reads as depth or as murk**, and whether 0.36 is the
+   right amount of air over a city that still has `scene.fog` on it as well. The
+   two compose and only a frame can say what they compose to.
+4. **Whether a street of forty parked cars still reads as a palette.** The
+   `--palette` sheet answers it for one model on a turntable under one light; it
+   cannot answer it for a kerb in low sun, which is the case that matters.
+
+### The follow-up this pass creates
+
+`GLASS_SKY` in `world/facade.ts` is still frozen at 3 pm. The coat now supplies a
+live sky *alongside* it rather than *instead of* it, and the reason is stated
+above — the two are different lobes of the same dome and substituting one for the
+other would move sixteen calibrated values. The right end state is a second
+analytic environment at glass's own roughness, `skyEnvFor` with a
+`HORIZON_GAIN` near the raw dome's eight rather than the cone-averaged 2.6,
+driven off the rig; then `GLASS_SKY` retires, its display table is re-derived
+once, and the CBD's windows turn orange at sunset instead of only getting a warm
+rim. Three more uniforms and a page of re-derivation, and it should be done
+before anything else touches that shader.

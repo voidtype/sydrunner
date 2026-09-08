@@ -783,6 +783,22 @@ export const SHEET_GLAZING: ReadonlyArray<{ nDotV: number; fresnel: number }> = 
   { nDotV: 0.1, fresnel: 0.518297 },
 ];
 
+/**
+ * The two paints the checks below hang their anchors on.
+ *
+ * `verifyReflection` evaluates a white roof in sun and a black car in shade
+ * through the real chain, and both of those have to be paints the game actually
+ * uses or the assertion is about a car nobody sees. The palette lives in
+ * `sky/carpaint.ts` -- which imports *this* file, because the palette is derived
+ * from `COAT_F0` -- so it cannot be imported back the other way without a cycle.
+ *
+ * These two rows are therefore the copy, and `verifyCarPaint` is the assertion
+ * that they are `CAR_PAINT_ALBEDO[0]` and `[3]`. One direction, one check, no
+ * cycle, and neither end can be edited alone.
+ */
+export const PALETTE_ANCHOR_WHITE: Rgb = [0.82555, 0.829009, 0.824876];
+export const PALETTE_ANCHOR_BLACK: Rgb = [0.109055, 0.109422, 0.119722];
+
 /* ---------------------------------------------------------------------------
  * THE CHECK.
  * ------------------------------------------------------------------------- */
@@ -937,11 +953,14 @@ export function verifyReflection(): string[] {
     const rig = solarRig(REFERENCE_ALTITUDE);
     const E = rig.sunIntensity * Math.sin((REFERENCE_ALTITUDE * Math.PI) / 180);
     // A roof: horizontal, so the beam lands square-ish and the reflection is the
-    // zenith. Albedo 0.805 (`PAINT[0]`, white), metalness 0.4 already priced in.
+    // zenith. `PALETTE_ANCHOR_WHITE`, metalness 0.4 already priced in -- and it
+    // is that constant rather than a literal now, because `sky/carpaint.ts`
+    // re-derived the palette against this very coat and a stale 0.805 here
+    // would be checking a car the game stopped painting.
     const roofLit: Rgb = [
-      (0.805 * (E * rig.sunColour[0] + rig.hemisphereIntensity * rig.skyColour[0])) / Math.PI,
-      (0.805 * (E * rig.sunColour[1] + rig.hemisphereIntensity * rig.skyColour[1])) / Math.PI,
-      (0.805 * (E * rig.sunColour[2] + rig.hemisphereIntensity * rig.skyColour[2])) / Math.PI,
+      (PALETTE_ANCHOR_WHITE[0] * (E * rig.sunColour[0] + rig.hemisphereIntensity * rig.skyColour[0])) / Math.PI,
+      (PALETTE_ANCHOR_WHITE[1] * (E * rig.sunColour[1] + rig.hemisphereIntensity * rig.skyColour[1])) / Math.PI,
+      (PALETTE_ANCHOR_WHITE[2] * (E * rig.sunColour[2] + rig.hemisphereIntensity * rig.skyColour[2])) / Math.PI,
     ];
     const roofPlain = toDisplay(roofLit);
     const roofCoat = toDisplay(clearcoatOver(roofLit, envRadiance(env, 1), 1));
@@ -963,7 +982,9 @@ export function verifyReflection(): string[] {
       rig.hemisphereIntensity * rig.skyColour[2],
     ];
     const blackLit: Rgb = [
-      (0.11 * shadeE[0]) / Math.PI, (0.112 * shadeE[1]) / Math.PI, (0.124 * shadeE[2]) / Math.PI,
+      (PALETTE_ANCHOR_BLACK[0] * shadeE[0]) / Math.PI,
+      (PALETTE_ANCHOR_BLACK[1] * shadeE[1]) / Math.PI,
+      (PALETTE_ANCHOR_BLACK[2] * shadeE[2]) / Math.PI,
     ];
     const blackPlain = toDisplay(blackLit);
     const blackCoat = toDisplay(clearcoatOver(blackLit, envRadiance(env, 0.2), 0.6));
@@ -1211,9 +1232,9 @@ export function verifyGlazing(): string[] {
     const rig = solarRig(REFERENCE_ALTITUDE);
     const beam = rig.sunIntensity * Math.sin((REFERENCE_ALTITUDE * Math.PI) / 180);
     const roofLit: Rgb = [
-      (0.805 * (beam * rig.sunColour[0] + rig.hemisphereIntensity * rig.skyColour[0])) / Math.PI,
-      (0.805 * (beam * rig.sunColour[1] + rig.hemisphereIntensity * rig.skyColour[1])) / Math.PI,
-      (0.805 * (beam * rig.sunColour[2] + rig.hemisphereIntensity * rig.skyColour[2])) / Math.PI,
+      (PALETTE_ANCHOR_WHITE[0] * (beam * rig.sunColour[0] + rig.hemisphereIntensity * rig.skyColour[0])) / Math.PI,
+      (PALETTE_ANCHOR_WHITE[1] * (beam * rig.sunColour[1] + rig.hemisphereIntensity * rig.skyColour[1])) / Math.PI,
+      (PALETTE_ANCHOR_WHITE[2] * (beam * rig.sunColour[2] + rig.hemisphereIntensity * rig.skyColour[2])) / Math.PI,
     ];
     const plain = toDisplay(roofLit);
     const coated = toDisplay(glazingCoatOver(roofLit, envRadiance(env, 1), 1, 1));

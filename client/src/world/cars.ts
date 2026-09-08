@@ -102,6 +102,10 @@ import {
   type TrafficField,
 } from '../game/traffic.ts';
 import { policeLiveried } from '../game/factions.ts';
+// WORKSTREAM AQ, the 2026-09 graphics pass' follow-up. The eight albedos are
+// derived rather than authored now -- see the header on `PAINT` and the essay in
+// `sky/carpaint.ts`, which is three-free so the server checks them too.
+import { CAR_PAINT_ALBEDO } from '../sky/carpaint.ts';
 import type { ViewLatch } from '../game/viewlatch.ts';
 // What the traffic sounds like. A sink for `CarLightSink`'s reason, stated on
 // the `engines` property below. Three-free, so this is a type import into a
@@ -151,58 +155,89 @@ type Rgb = [number, number, number];
 /**
  * Paint albedo per `colourIndex`, linear. Must match `parking.WHITE` .. `BEIGE`.
  *
+ * **The eight numbers moved out of this file and into `sky/carpaint.ts`, and
+ * that is the whole of the 2026-09 follow-up.** They are no longer authored:
+ * they are the closed-form solution of one equation, written out there with the
+ * derivation above them and a check beside them on both boot lists. This file
+ * keeps the essay, because what the palette is *for* is a rendering decision and
+ * belongs next to the fleet that draws it; what the palette *is* is arithmetic
+ * over `sky/reflection.ts` and belongs next to the coat it inverts.
+ *
+ * WHAT MOVED, AND WHAT THIS PARAGRAPH USED TO SAY. It used to say this:
+ *
+ *   > *"Every albedo is above the true reflectance of the paint it names. A
+ *   > car's clearcoat reflects the sky across the whole body, and this renderer
+ *   > has no environment map and no ambient specular ... the lift is the missing
+ *   > sky reflection, put where the renderer can actually deliver it."*
+ *
+ * The renderer now has one. `sky/reflection.ts` shipped it and `carpaint.ts`
+ * asks the obvious next question -- how much of the lift was it standing in for
+ * -- and the answer is **three per cent**: `COAT_F0` is 0.03 and the coat is a
+ * rim rather than a wash. The lift is worth 2.2x on black. So the lift stays,
+ * and it is now attributable to what it is actually standing in for, which is
+ * that the analytic dome has **no city in it**: no sunlit wall opposite, no
+ * footpath, no awning, no roof of the car in front. That is most of a car's
+ * ambient specular in a street canyon and it needs a probe or a screen-space
+ * trace, both of which are on `GRAPHICS.md`'s list under their own costs.
+ *
+ * What *was* re-derived is exactly the three per cent, and the reason to bother
+ * is not the level -- it is the **hue**. The coat adds blue-white sky, so it
+ * lifts the channel a paint has least of, which desaturates; the warning three
+ * paragraphs down about a red car turning pink is what the coat had quietly been
+ * doing to it since the night it shipped. Red rendered rgb(225, 68, 68) where
+ * this table intends rgb(227, 58, 52), and it now renders the second of those.
+ *
+ * **Every display value written beside a row below is still exactly true**, and
+ * more true than it was yesterday: the inversion is done in *linear radiance*,
+ * so it restores the radiance each paint was tuned to produce whatever tone
+ * curve, exposure or grade runs afterwards. Not one of them needed editing.
+ *
  * The mix behind these is the pipeline's problem and it is worth naming here
  * anyway, because it is what the palette has to survive: white 30%, silver 15%,
  * grey 10%, black 15%, blue 10%, red 8%, beige 7%, green 5%. Seventy per cent of
  * an Australian kerb is achromatic. A palette that spends its variety budget on
  * hue rather than on *value* is the fastest way to make a street of parked cars
- * look like a car park in a racing game, and the four neutrals below are
- * deliberately spread across the whole tonal range instead of clustering.
+ * look like a car park in a racing game, and the four neutrals are deliberately
+ * spread across the whole tonal range instead of clustering -- which is what
+ * `verifyCarPaint` asserts, over the four neutrals only, because a saturated red
+ * is genuinely darker in luminance than black paint and an order over all eight
+ * would be asserting the wrong thing.
  *
  * Each row states the display value for a roof in sun, a flank in sun, and a
  * flank in shade -- the three a parked car actually presents. The flank in sun
  * is the one to judge the colour by; the roof is the brightest facet and the
  * shade figure is where the palette can fail without anyone noticing.
+ *
+ *   white   roof rgb(240,244,249)  flank rgb(232,236,240)  shade rgb(146,141,138)
+ *           The anchor: a roof in sun *is* the sunlit footpath to within a code
+ *           value, which is where a white car belongs.
+ *   silver  roof rgb(217,223,233)  flank rgb(175,179,187)  shade rgb( 98, 95, 95)
+ *           Half a stop under white and very slightly blue -- a metallic silver
+ *           is grey paint with an aluminium flake reading the sky.
+ *   grey    roof rgb(136,141,151)  flank rgb(104,108,116)  shade rgb( 44, 41, 44)
+ *           Gunmetal, and it sits just above sunlit asphalt at rgb(131,137,148)
+ *           on purpose: a grey car on a grey road has to stay separable and the
+ *           margin it has is five code values plus the sun on its roof.
+ *   black   roof rgb(113,116,127)  flank rgb( 84, 87, 95)  shade rgb( 31, 27, 31)
+ *           Still the darkest car on the street by thirty code values, and it
+ *           survives shade. See above on why it is far above the ~0.05 a black
+ *           paint reflects and why the coat did not retire that.
+ *   blue    roof rgb( 47, 97,179)  flank rgb( 27, 74,142)  shade rgb(  4, 36, 77)
+ *           Mid, slightly toward navy. Fully saturated blue paint is rare on a
+ *           real kerb and reads as a toy immediately.
+ *   red     roof rgb(182, 36, 29)  flank rgb(147, 23, 15)  shade rgb( 90,  7,  1)
+ *           Kept hot -- 182 red against 36 green is a proper Australian red, and
+ *           the temptation to lift the other two channels for "realism" is what
+ *           turns a red car pink under this tone curve. It is also the row the
+ *           re-derivation moved furthest, for exactly that reason.
+ *   green   roof rgb( 52,104, 79)  flank rgb( 31, 79, 56)  shade rgb(  5, 39, 19)
+ *           Bottle green, not grass: a green car in Australia is a Territory or
+ *           an old Falcon. Stands in for every colour outside the six above.
+ *   beige   roof rgb(197,190,175)  flank rgb(156,150,137)  shade rgb( 85, 74, 59)
+ *           The other half of "other", and the one that carries the
+ *           fifteen-year-old cars on the kerb.
  */
-const PAINT: Rgb[] = [
-  // White. The anchor: a roof in sun at rgb(240,244,249) is the sunlit footpath
-  // to within a code value, which is where a white car belongs.
-  //          roof sun rgb(240,244,249)  flank sun rgb(232,236,240)  shade rgb(146,141,138)
-  [0.805, 0.81, 0.808],
-  // Silver. Half a stop under white and very slightly blue -- a metallic silver
-  // is grey paint with an aluminium flake reading the sky.
-  //          roof sun rgb(217,223,233)  flank sun rgb(175,179,187)  shade rgb( 98, 95, 95)
-  [0.4, 0.41, 0.428],
-  // Mid grey / gunmetal. Sits just above sunlit asphalt (131,137,148), which is
-  // deliberate: a grey car on a grey road has to stay separable and the margin
-  // it has is five code values plus the sun on its roof.
-  //          roof sun rgb(136,141,151)  flank sun rgb(104,108,116)  shade rgb( 44, 41, 44)
-  [0.153, 0.158, 0.172],
-  // Black. See the note at the top: this is far above the ~0.05 a black paint
-  // actually reflects, and the difference is the clearcoat's sky reflection that
-  // this renderer cannot produce any other way. It still reads as the darkest
-  // car on the street by 30 code values, and it survives shade.
-  //          roof sun rgb(113,116,127)  flank sun rgb( 84, 87, 95)  shade rgb( 31, 27, 31)
-  [0.11, 0.112, 0.124],
-  // Blue. Mid, slightly toward navy. Fully saturated blue paint is rare on a
-  // real kerb and reads as a toy immediately.
-  //          roof sun rgb( 47, 97,179)  flank sun rgb( 27, 74,142)  shade rgb(  4, 36, 77)
-  [0.036, 0.082, 0.24],
-  // Red. Kept hot -- 182 red against 36 green is a proper Australian red, and
-  // the temptation to lift the other two channels for "realism" is what turns a
-  // red car pink under this tone curve.
-  //          roof sun rgb(182, 36, 29)  flank sun rgb(147, 23, 15)  shade rgb( 90,  7,  1)
-  [0.268, 0.026, 0.022],
-  // Dark green, standing in for every colour outside the six above. Bottle
-  // green, not grass: a green car in Australia is a Territory or an old Falcon.
-  //          roof sun rgb( 52,104, 79)  flank sun rgb( 31, 79, 56)  shade rgb(  5, 39, 19)
-  [0.04, 0.092, 0.058],
-  // Beige / champagne. The other half of "other", and the one that carries the
-  // fifteen-year-old cars on the kerb.
-  //          roof sun rgb(197,190,175)  flank sun rgb(156,150,137)  shade rgb( 85, 74, 59)
-  [0.32, 0.288, 0.23],
-];
-
+const PAINT: Rgb[] = CAR_PAINT_ALBEDO.map((c) => [...c] as Rgb);
 /**
  * The palette, for the near-field model fleet.
  *
@@ -934,8 +969,14 @@ export const TRAFFIC_DRAW_RADIUS = 420;
  * value is not re-derived here for the reason `PAINT` states about the whole
  * palette: white is the anchor the rest of the fleet is judged against, and two
  * whites in one street is two whites.
+ *
+ * **It is `PAINT[0]` by reference now rather than by transcription**, and the
+ * 2026-09 re-derivation is why: white moved from 0.805 to 0.825550 when the
+ * palette was solved against the clearcoat (`sky/carpaint.ts`), and a literal
+ * here would have quietly become the second white this comment says cannot
+ * exist. A copy that is only correct while somebody remembers it is not a copy.
  */
-const LIVERY_WHITE: Rgb = [0.805, 0.81, 0.808];
+const LIVERY_WHITE: Rgb = [...PAINT[0]] as Rgb;
 
 /** Fleet white, for the model fleet. See `CAR_PAINT` on why it is shared. */
 export const CAR_LIVERY_WHITE: Readonly<Rgb> = LIVERY_WHITE;

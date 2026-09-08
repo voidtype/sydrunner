@@ -36,6 +36,7 @@ import { EXPOSURE, NIGHT_FULL_ALTITUDE } from './sky/calibration.ts';
 import { verifyGrade } from './sky/grade.ts';
 import { installGrade, updateGrade } from './sky/gradenode.ts';
 import { verifyAerial, verifyGlazing, verifyReflection } from './sky/reflection.ts';
+import { verifyCarPaint } from './sky/carpaint.ts';
 import { updateSkyReflect } from './world/skyreflect.ts';
 import { SydneySky } from './sky/sky.ts';
 import { CYCLE_MS, verifyCycle } from './sky/cycle.ts';
@@ -6094,6 +6095,11 @@ async function main(): Promise<void> {
     // night value is a *lighting* floor nine times brighter than the far city
     // and a haze toward it is a grey skyline where a silhouette belongs.
     ...verifyAerial(),
+    // And the follow-up the coat created: the eight car albedos are a closed
+    // form over `COAT_F0` now rather than eight authored numbers, so the check
+    // is that the published table *is* the derivation and that the coated
+    // render of it is the uncoated render the palette was tuned to produce.
+    ...verifyCarPaint(),
     ...verifyInterpDelay(),
     ...verifyQuests(),
     ...verifyDialog(),

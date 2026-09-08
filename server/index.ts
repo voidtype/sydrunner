@@ -310,6 +310,7 @@ import { verifyBuildBudget } from '../client/src/world/buildbudget.ts';
 // draws nothing, on `verifySpawn`'s argument. See GRAPHICS.md.
 import { verifyGrade } from '../client/src/sky/grade.ts';
 import { verifyAerial, verifyGlazing, verifyReflection } from '../client/src/sky/reflection.ts';
+import { verifyCarPaint } from '../client/src/sky/carpaint.ts';
 import { verifyInterpDelay } from '../client/src/net/interpdelay.ts';
 import { verifyDialog, verifyQuests } from '../client/src/game/questmodel.ts';
 // WORKSTREAM AO: who the givers in that content *are* -- kit, heading, stance
@@ -942,6 +943,10 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // the day curve is checked on both boot lists already and the term hung off
     // it should be too.
     ['verifyAerial', verifyAerial()],
+    // The car palette, which is arithmetic over the coat now rather than eight
+    // authored numbers. Three-free precisely so this process can say whether
+    // the table and its derivation still agree.
+    ['verifyCarPaint', verifyCarPaint()],
     ['verifyInterpDelay', verifyInterpDelay()],
     ['verifyQuests', verifyQuests()],
     ['verifyDialog', verifyDialog()],
