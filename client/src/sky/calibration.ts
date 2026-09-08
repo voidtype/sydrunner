@@ -37,6 +37,44 @@ import { directionFrom, solarPosition, sydneyTime } from './solar.ts';
 const LATITUDE = -33.87;
 const LONGITUDE = 151.21;
 
+/* ---------------------------------------------------------------------------
+ * THE SWITCHES.
+ *
+ * Everything else in this file is a measured number. These are not: they are
+ * **on/off for a look**, and they are here rather than in the files they govern
+ * for one reason -- somebody looking at a frame that reads wrong at three in the
+ * morning should have one place to look, not several.
+ *
+ * Each governs a term added by the 2026-09 graphics pass (`GRAPHICS.md`), each
+ * defaults to on, and each is a code deploy away from off with nothing else
+ * touched. Turning one off restores exactly the image that shipped before it: no
+ * term below leaves residue in a constant somewhere else.
+ *
+ * They are deliberately **not** a URL parameter, a settings toggle or an
+ * environment read. A look the player can turn off is a look two players are
+ * arguing about, and every check in this codebase that asserts a display value
+ * would then be asserting one of two images.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * The day/dusk/night colour grade. See `sky/grade.ts`.
+ *
+ * Off restores the bare Khronos PBR Neutral output. Safe to flip at any time:
+ * the grade preserves the luminance of every neutral surface exactly, so nothing
+ * downstream is quoted against it.
+ */
+export const GRADE_ENABLED = true;
+
+/**
+ * The clearcoat sky reflection on car paint. See `sky/reflection.ts`.
+ *
+ * Off restores the flat, environment-less car the palette in `world/cars.ts` was
+ * lifted to compensate for -- which is the image that shipped, and is why this
+ * one is genuinely revertible rather than nominally so.
+ */
+export const CAR_SKY_REFLECT = true;
+
+
 /**
  * Direct-beam intensity with the sun at the zenith and no atmosphere in the way.
  *
