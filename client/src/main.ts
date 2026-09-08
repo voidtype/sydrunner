@@ -29,6 +29,14 @@ import { BOARD_HINT_M, DoorMarker, verifyDoorMarker } from './world/doormarker.t
 import { sunScreaming, sunScreamMix, verifySunButton } from './game/sunbutton.ts';
 import { SunFeature, verifySunButtonRenderer } from './world/sunbutton.ts';
 import { EXPOSURE, NIGHT_FULL_ALTITUDE } from './sky/calibration.ts';
+// WORKSTREAM AQ (the 2026-09 graphics pass). The grade and the sky reflection:
+// pure curves in `sky/grade.ts` and `sky/reflection.ts`, shader in
+// `sky/gradenode.ts` and `world/skyreflect.ts`, switches in `sky/calibration.ts`.
+// See GRAPHICS.md.
+import { verifyGrade } from './sky/grade.ts';
+import { installGrade, updateGrade } from './sky/gradenode.ts';
+import { verifyReflection } from './sky/reflection.ts';
+import { updateSkyReflect } from './world/skyreflect.ts';
 import { SydneySky } from './sky/sky.ts';
 import { CYCLE_MS, verifyCycle } from './sky/cycle.ts';
 /*
@@ -2085,6 +2093,23 @@ async function main(): Promise<void> {
   // 0.6 inside ACES and does not inside Neutral. Pinned by the sky: see the
   // reasoning where it is defined.
   renderer.toneMappingExposure = EXPOSURE;
+  /*
+   * And then the grade on top of it, which replaces the curve selected two lines
+   * above with the same curve followed by a split-tone. `sky/grade.ts` has the
+   * argument and the invariant -- it preserves the luminance of every neutral
+   * surface exactly, so every display value published in `calibration.ts`,
+   * `cars.ts` and `street.ts` still means what it says.
+   *
+   * Before `init()` deliberately: `renderer.library` is built in the
+   * `WebGPURenderer` constructor, and registering here means `warmUpPipelines`
+   * compiles the pipelines the game will actually draw with rather than
+   * compiling a set and then invalidating it. Never throws; a library that has
+   * moved under a three upgrade leaves the plain Neutral curve in place, which
+   * is the image that shipped before this pass.
+   */
+  if (!installGrade(renderer)) {
+    console.warn('[render] the colour grade did not install; the frame is ungraded Neutral.');
+  }
   await renderer.init();
   /*
    * **The frame is allowed to say "not now", and this must come after `init()`.**
@@ -5999,6 +6024,14 @@ async function main(): Promise<void> {
     ...verifyQuestAim(),
     ...verifyQuestAreas(),
     ...verifyBuildBudget(),
+    // WORKSTREAM AQ. Both pure, so both run on the server too -- see
+    // `server/index.ts`. The grade's invariant (a neutral surface keeps its
+    // luminance exactly, at every altitude) and the coat's (the composite is a
+    // convex mix, so no calibrated anchor can be brightened by it) are the two
+    // claims that let this pass default to on over a hand-measured palette, and
+    // neither has a screenshot that says so.
+    ...verifyGrade(),
+    ...verifyReflection(),
     ...verifyInterpDelay(),
     ...verifyQuests(),
     ...verifyDialog(),
@@ -13763,6 +13796,16 @@ async function main(): Promise<void> {
     globals.nightFactor.value = 1 - Math.min(Math.max((alt + 5) / 11, 0), 1);
     const d = sky.solar.direction;
     globals.sunDirection.value.set(d.x, d.y, d.z);
+    /*
+     * The grade and the sky reflection, on the same altitude and in the same
+     * block, because both are functions of the sun and this is where the sun is
+     * read. Six uniform writes between them and two `solarRig` calls; `sky.ts`
+     * measures its own whole `applySolar` at 5.4 microseconds, so this is
+     * comfortably inside the noise of a section that is already 0.03% of the
+     * frame. Neither allocates.
+     */
+    updateGrade(alt);
+    updateSkyReflect(alt);
 
     // AB: `sky` closes and `stream` opens on the same line the camera matrix is
     // composed, because that compose exists for the streamer's frustum cull.
