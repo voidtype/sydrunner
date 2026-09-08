@@ -529,6 +529,7 @@ import {
   NOSE_HEAD,
   NOSE_RADIUS,
   NOSE_STEP,
+  NPC_DRIVER_ID,
   carRigidBody,
   createCarShunt,
   resolveCarContact,
@@ -701,6 +702,10 @@ import {
 // three-free and shared with the authority, which is why nothing about Polair is
 // on the wire -- see `game/polair.ts` section 3.
 import { verifyPolair } from './game/polair.ts';
+// The pursuit itself: the lane-follower behind a patrol car, shared with the
+// authority for `game/heat.ts`' own reason. `advancePursuitMirror` is the client
+// half of the 10 Hz broadcast and `verifyPursuitDriving` the boot check.
+import { advancePursuitMirror, verifyPursuitDriving } from './game/pursuit.ts';
 // The illegal raves, on the same two-file split as everything ambient in this
 // build: `game/rave.ts` is the arithmetic every client agrees about -- which
 // warehouse, viaduct or park is live tonight, what is on the decks, where forty
@@ -1481,6 +1486,17 @@ async function main(): Promise<void> {
   // by `HighwayPatrolAssets` -- and is the one that would otherwise ship a
   // patrol car with a hole in one flank.
   const heatFailures = timed('heat', verifyHeat);
+  // --- And the pursuit's own arithmetic, which is the half of the ladder that
+  // renders a plausible city hardest.
+  //
+  // A patrol car that takes a corner at a speed no tyre would is a car nobody
+  // can lose, which reads as difficulty rather than as a bug; a node pick that
+  // scores the wrong direction is a car that drives away from you down a
+  // perfectly real street; and a stop rule that overshoots puts two constables
+  // out the far side of the person they came for. None of the three throws and
+  // every one of them is a number. See `game/pursuit.ts`, whose section 2 is the
+  // design statement `verifyPursuitDriving`'s second block asserts.
+  const pursuitFailures = timed('pursuit', verifyPursuitDriving);
   // Talents into numbers, and the four ability buttons. Run **here** as well as
   // on the server (`server/index.ts`) because every number in them is evaluated
   // on both ends and has to agree: the swing damage this process predicts and
@@ -1847,6 +1863,7 @@ async function main(): Promise<void> {
     pedModelFailures.length ||
     policeFailures.length ||
     heatFailures.length ||
+    pursuitFailures.length ||
     teamFxFailures.length ||
     polairFailures.length ||
     streetFailures.length ||
@@ -1950,6 +1967,7 @@ async function main(): Promise<void> {
           ...pedModelFailures,
           ...policeFailures,
           ...heatFailures,
+          ...pursuitFailures,
           ...polairFailures,
           ...streetFailures,
           ...wildlifeFailures,
@@ -4536,6 +4554,13 @@ async function main(): Promise<void> {
    */
   const heatWorld: HeatWorld = {
     lanes: traffic,
+    // Filled in beside `localCars` below, which is declared two thousand lines
+    // further down: this literal is evaluated before it exists. Null until then,
+    // which is the honest value and is also what an online client keeps -- the
+    // offline authority is the only thing in this process that ever spawns a
+    // patrol car, and `net.cars` is a mirror rather than a field to take one
+    // out of. See `heat.HeatWorld.cars`.
+    cars: null,
     rideStop: (id) => {
       if (id !== playerCombat.id) return -2;
       const a = playerCombat.aboard;
@@ -7088,6 +7113,10 @@ async function main(): Promise<void> {
   //     line can reach is only the offline one.
   localCars.groundAt = groundHeightAt;
   const carWorld = (): CarField => (net ? net.cars : localCars);
+  // --- And the ladder's half of it: the field an offline pursuit takes its
+  // patrol cars out of. See `heatWorld.cars`, which this is the deferred half
+  // of, and `heat.ts` section 8 for what a patrol car being a `DrivenCar` buys.
+  heatWorld.cars = localCars;
   /** Where `driving.shapeDriveSteering` writes. One object, reused every frame. */
   const driveSteering: DriveSteering = { right: 0, yawDelta: 0 };
   /** Scratch for `resolveTake`, so a prompt asked sixty times a second allocates nothing. */
@@ -11907,6 +11936,15 @@ async function main(): Promise<void> {
           yaw: c.body.yaw,
         });
       }
+      // --- And the patrol cars, which offline this process is the authority for.
+      //
+      // `heat.HeatField.pursuitViews` yields one row per car with
+      // `driving.NPC_DRIVER_ID` in it, and `follow` neither knows nor cares that
+      // the id is not a person's -- which is the whole argument for the sentinel
+      // (see `driving.NPC_DRIVER_ID`). `sim.stepCars` pushes the identical rows
+      // onto the identical array; this is the same code path and not a second
+      // one, which is what makes `?offline` a real test of the pursuit.
+      for (const view of heat.pursuitViews()) driverViews.push(view);
       for (const car of localCars.follow(driverViews)) {
         // A car left within reach of a kerb bay is snapped into it, so it reads
         // as parked rather than as abandoned at an angle. `sim.parkOnLeave` runs
@@ -12153,7 +12191,21 @@ async function main(): Promise<void> {
           // ...and this one stands down on a shunt tick too. See `deferToShunt`.
           if (!deferToShunt) for (const other of cars.all()) {
             if (other.id === mine.id) continue;
-            if (other.driverId !== 0) continue;
+            // --- **...and the patrol cars**, which is the owner's *"also i
+            //     couldnt head on collision"* on this end of the wire.
+            //
+            // The gate used to be `driverId !== 0` alone, on the paragraph
+            // above: a car somebody is *in* has a record that is the kerb they
+            // took it from, so this end cannot honestly predict a contact
+            // against it. A patrol car is the third case and it is the opposite
+            // one -- nobody is in it, its record *is* where it is (the
+            // authority broadcasts the pose at `LOOSE_BROADCAST_TICKS`, and
+            // `advancePursuitMirror` dead-reckons between), and it is a two-tonne
+            // object driving at you. Without this clause a player who drove
+            // head-on into one felt nothing until the server's `CAR_SHUNT`
+            // arrived up to 100 ms later, which at a 30 m/s closing speed is
+            // three metres of car passed through before anything happened.
+            if (other.driverId !== 0 && other.driverId !== NPC_DRIVER_ID) continue;
             const dy = other.y - mine.y;
             if (dy > TAKE_HEIGHT || dy < -TAKE_HEIGHT) continue;
             carRigidBody(
@@ -12192,7 +12244,13 @@ async function main(): Promise<void> {
             other.slip = rigidSlip(carBodyB);
             other.yawRate = carBodyB.yawRate;
             other.restMs = 0;
-            if (other.speed !== 0 || other.slip !== 0 || other.yawRate !== 0) other.loose = true;
+            // A shunted **parked** car is a car that rolls, which is what
+            // `loose` means. A shunted **patrol** car is not: it is being driven
+            // and the authority is the only thing that decides where it goes
+            // next, so flagging it would hand it to `integrateLoose` and have
+            // this end rolling a police car down the street against the server's
+            // own answer. See `protocol.CarRecord.npc`.
+            if (other.driverId === 0 && (other.speed !== 0 || other.slip !== 0 || other.yawRate !== 0)) other.loose = true;
             if (push[2] !== 0 || push[3] !== 0) {
               const moved = collision.resolveCity(
                 other.x, other.z, other.x + push[2], other.z + push[3],
@@ -12221,6 +12279,11 @@ async function main(): Promise<void> {
       // is the one record whose position is *not* derived from a driver, so
       // there is nothing else for either end to derive it from.
       cars.integrateLoose(FIXED_DT, carLooseResolve, carLooseSweep);
+      // --- And the patrol cars, dead-reckoned between the authority's 10 Hz
+      // corrections. Online only: offline the pose comes from `follow` off a
+      // real `PursuitCar` a few blocks up, and doing both would advance the car
+      // twice a tick. See `pursuit.advancePursuitMirror`.
+      if (online) advancePursuitMirror(cars.all(), FIXED_DT);
       // The clocks. `CarField.age` removes nothing -- see `game/driving.ts`
       // section 6 -- and online the cooldown it advances is the *prediction's*,
       // which is why it runs on the mirror as well as on the authority.

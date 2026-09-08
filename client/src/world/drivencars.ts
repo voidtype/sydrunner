@@ -70,7 +70,7 @@ import {
   type LaneRoute,
   type TrafficField,
 } from '../game/traffic.ts';
-import { CAR_HEALTH_MAX, CarField, DRIVE_TOP_SPEED, carIsSmoking } from '../game/driving.ts';
+import { CAR_HEALTH_MAX, CarField, DRIVE_TOP_SPEED, NPC_DRIVER_ID, carIsSmoking } from '../game/driving.ts';
 // --- WORKSTREAM Y: the fire. Three-free rules, on `game/driving.ts`' terms; what
 // this file does with them is two lines of pose and one argument to the plume.
 // See `game/carfire.ts`.
@@ -291,6 +291,25 @@ export class DrivenCarView {
   private forEach(visit: (pose: CarPose, burn: number) => void): void {
     let n = 0;
     for (const car of this.field().all()) {
+      // --- **The patrol car is not drawn here.**
+      //
+      // A highway patrol car in pursuit is a `DrivenCar` with
+      // `driving.NPC_DRIVER_ID` at the wheel (`game/pursuit.ts`, and
+      // `game/heat.ts` section 8), so it is in this field for every reason the
+      // body layer wants it to be: it has mass, it dents, it blocks the
+      // timetable, and its pose is on `MSG.CARS`. What it is *not* is one of
+      // this class's pictures. `world/highway-patrol.HighwayPatrolFleet` already
+      // draws it -- off the `NpcActor` whose pose the authority slaves to the
+      // record -- as the real `nsw_police.glb` with a light bar on it, and
+      // drawing it here as well would put a beige Camry inside every police car
+      // in Sydney, claim a model slot off the near-field fleet for it, and give
+      // it a second shadow.
+      //
+      // The gate is the `driverId` rather than the wire's `CAR_NPC` flag because
+      // this class reads records and not frames, and offline there is no frame
+      // at all -- the two say the same thing and only one of them is always
+      // there. See `protocol.CarRecord.npc`.
+      if (car.driverId === NPC_DRIVER_ID) continue;
       // **Where this car is going to be drawn, before anything is decided about
       // it.** For an empty record that is the record; for a car somebody is in
       // it is the driver, and the record is the kerb they took it from however

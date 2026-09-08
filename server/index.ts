@@ -164,6 +164,7 @@ import { verifyUnstuck } from '../client/src/game/unstuck.ts';
 // the top of the ladder -- lands on players in a session and never in a
 // browser's console. See `client/src/game/heat.ts`'s check for the list.
 import { verifyHeat } from '../client/src/game/heat.ts';
+import { verifyPursuitDriving } from '../client/src/game/pursuit.ts';
 // --- WORKSTREAM W: the talent hooks and the ability table. One entry in this
 // list and one in `main.ts`, both running the same two functions, because every
 // number in them is evaluated on **both** ends -- the swing damage the browser
@@ -483,6 +484,16 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // looking. See `client/src/game/sunbutton.ts`.
     ['verifySunButton', verifySunButton()],
     ['verifyHeat', verifyHeat()],
+    // --- And the pursuit under it, which is a shared computation and therefore
+    // has to be checked on this end as well as in the browser.
+    //
+    // `game/pursuit.ts` runs on the authority here and *as* the authority in an
+    // offline browser, so the two have to agree about the node pick, the corner
+    // cap and the stop -- and every one of them is a number that renders a
+    // plausible city when it is wrong. A car that takes a corner faster than a
+    // tyre would is a pursuit nobody can lose, which reads as difficulty and not
+    // as a bug. See that file's section 2.
+    ['verifyPursuitDriving', verifyPursuitDriving()],
     // Talents into numbers, and the four ability buttons. Every failure in these
     // two is silent in this repo's sense: a swing multiplier that composed wrong
     // is a fight that feels slightly off, a take radius that did not move is a
