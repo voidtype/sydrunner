@@ -387,6 +387,21 @@ export interface StaticCarSink {
 
 // --- The field ---------------------------------------------------------------
 
+/**
+ * The coarse cell a *tile* is filed under, metres. See `StaticCarField.cells`.
+ *
+ * 1,024, which is `player/collision.TILE_CELL_M`'s own number and chosen the
+ * same way: a tile is 500 m on this build, so one cell holds four of them and
+ * the query disc a body on foot makes (3.5 m) is inside one cell of the four
+ * essentially always.
+ */
+const STATIC_TILE_CELL_M = 1024;
+
+/** Two signed cell coordinates as one integer key. `collision.tileCellKey`'s. */
+function staticCellKey(cx: number, cz: number): number {
+  return (cx & 0xfffff) * 0x100000 + (cz & 0xfffff);
+}
+
 /** One tile's parked cars, in world space. See section 2 on the layout. */
 interface StaticTile {
   count: number;
@@ -421,6 +436,27 @@ interface StaticTile {
  */
 export class StaticCarField implements StaticCarSource {
   private readonly tiles = new Map<string, StaticTile>();
+  /**
+   * The resident tiles by coarse cell, so a query tests a handful rather than
+   * all of them. WORKSTREAM footcar.
+   *
+   * **This does not contradict section 2 and is worth the paragraph, because
+   * that section is emphatic that there is no spatial index.** What it argues
+   * against is a grid over the *cars* -- at a 32 m cell, 1.4 M cars populate
+   * ~140,000 buckets and the `Map` of them measured larger than the SoA it
+   * indexes. This is a grid over the **tiles**: 6,399 of them resident on the
+   * shipped bake, one string reference each, which is tens of kilobytes.
+   *
+   * It was not needed while the only caller was `E`. `player/collision.ts` now
+   * asks this class once per body per tick, so that a player walks *round* a
+   * parked car rather than through it, and the four-comparison rejection
+   * section 2 costs out as "not measurable" is 25,600 comparisons a query once
+   * the residency is the whole extent. Measured on the shipped bake at 20.5 us
+   * a body, which is 0.33 ms a tick at sixteen bodies -- most of a `Room`'s
+   * whole budget spent rejecting tiles in Penrith. `server/footcar-check.ts`
+   * prints the figure before and after.
+   */
+  private readonly cells = new Map<number, string[]>();
   /** Cars and estimated bytes held, maintained incrementally for the cap. */
   private cars = 0;
   private estimated = 0;
@@ -501,6 +537,7 @@ export class StaticCarField implements StaticCarSource {
     });
     this.cars += count;
     this.estimated += estimateStaticCarBytes(count, 1);
+    this.file(tileKey, minX, minZ, maxX, maxZ);
   }
 
   /** One tile's parked cars, out again. Idempotent. */
@@ -510,6 +547,45 @@ export class StaticCarField implements StaticCarSource {
     this.tiles.delete(tileKey);
     this.cars -= held.count;
     this.estimated -= estimateStaticCarBytes(held.count, 1);
+    this.unfile(tileKey, held.minX, held.minZ, held.maxX, held.maxZ);
+  }
+
+  /**
+   * Put a tile's key in every cell its extent covers, and take it out again.
+   * See `cells`.
+   *
+   * A tile with no cars has an infinite extent (the `Infinity` seeds in `adopt`
+   * survive an empty loop) and is filed nowhere, which is right: it has nothing
+   * to offer a query. `decodeCars` refuses an empty sidecar, so this is the
+   * belt on a case that cannot arrive.
+   */
+  private file(key: string, minX: number, minZ: number, maxX: number, maxZ: number): void {
+    if (!Number.isFinite(minX)) return;
+    for (let cx = Math.floor(minX / STATIC_TILE_CELL_M); cx <= Math.floor(maxX / STATIC_TILE_CELL_M); cx++) {
+      for (let cz = Math.floor(minZ / STATIC_TILE_CELL_M); cz <= Math.floor(maxZ / STATIC_TILE_CELL_M); cz++) {
+        const k = staticCellKey(cx, cz);
+        const list = this.cells.get(k);
+        if (list) list.push(key);
+        else this.cells.set(k, [key]);
+      }
+    }
+  }
+
+  private unfile(key: string, minX: number, minZ: number, maxX: number, maxZ: number): void {
+    if (!Number.isFinite(minX)) return;
+    for (let cx = Math.floor(minX / STATIC_TILE_CELL_M); cx <= Math.floor(maxX / STATIC_TILE_CELL_M); cx++) {
+      for (let cz = Math.floor(minZ / STATIC_TILE_CELL_M); cz <= Math.floor(maxZ / STATIC_TILE_CELL_M); cz++) {
+        const k = staticCellKey(cx, cz);
+        const list = this.cells.get(k);
+        if (list === undefined) continue;
+        const at = list.indexOf(key);
+        if (at >= 0) list.splice(at, 1);
+        // A cell emptied is deleted, so a session that streams the whole city
+        // past a player leaves a `Map` the size of what is resident and not the
+        // size of everywhere they have been.
+        if (list.length === 0) this.cells.delete(k);
+      }
+    }
   }
 
   /** Is this tile's sidecar already held? `HexLayer.spec.has`. */
@@ -533,6 +609,7 @@ export class StaticCarField implements StaticCarSource {
   /** Empty it. A room torn down, and the self-checks. */
   clear(): void {
     this.tiles.clear();
+    this.cells.clear();
     this.cars = 0;
     this.estimated = 0;
   }
@@ -555,26 +632,40 @@ export class StaticCarField implements StaticCarSource {
     if (this.tiles.size === 0) return;
     const r2 = radius * radius;
     const pose = this.pose;
-    for (const tile of this.tiles.values()) {
-      // Four comparisons against the tile's own extent. At `TAKE_RADIUS` this
-      // rejects every tile but the one the player is standing in and, on a seam,
-      // its neighbour.
-      if (
-        tile.maxX < x - radius || tile.minX > x + radius ||
-        tile.maxZ < z - radius || tile.minZ > z + radius
-      ) continue;
-      for (let i = 0; i < tile.count; i++) {
-        const dx = tile.x[i] - x;
-        const dz = tile.z[i] - z;
-        if (dx * dx + dz * dz > r2) continue;
-        pose.identity = tile.identity[i];
-        pose.body = tile.body[i];
-        pose.colour = tile.colour[i];
-        pose.x = tile.x[i];
-        pose.z = tile.z[i];
-        pose.y = this.groundAt(pose.x, pose.z, feetY) + STATIC_CAR_CLEARANCE_Y;
-        pose.yaw = staticLookYaw(tile.heading[i]);
-        visit(pose);
+    // The cells the query disc covers, and then the tiles filed in them. A tile
+    // wider than a cell is filed in several, so a query spanning a cell seam can
+    // meet the same tile twice -- the four comparisons and then the distance
+    // test below reject the repeat's cars anyway, and at `TAKE_RADIUS` or the
+    // capsule's own 3.5 m the disc almost never crosses a 1,024 m seam at all.
+    // A visit set would cost more than the case it removes. See `cells`.
+    for (let cx = Math.floor((x - radius) / STATIC_TILE_CELL_M); cx <= Math.floor((x + radius) / STATIC_TILE_CELL_M); cx++) {
+      for (let cz = Math.floor((z - radius) / STATIC_TILE_CELL_M); cz <= Math.floor((z + radius) / STATIC_TILE_CELL_M); cz++) {
+        const keys = this.cells.get(staticCellKey(cx, cz));
+        if (keys === undefined) continue;
+        for (const key of keys) {
+          const tile = this.tiles.get(key);
+          if (tile === undefined) continue;
+          // Four comparisons against the tile's own extent. At `TAKE_RADIUS` this
+          // rejects every tile but the one the player is standing in and, on a seam,
+          // its neighbour.
+          if (
+            tile.maxX < x - radius || tile.minX > x + radius ||
+            tile.maxZ < z - radius || tile.minZ > z + radius
+          ) continue;
+          for (let i = 0; i < tile.count; i++) {
+            const dx = tile.x[i] - x;
+            const dz = tile.z[i] - z;
+            if (dx * dx + dz * dz > r2) continue;
+            pose.identity = tile.identity[i];
+            pose.body = tile.body[i];
+            pose.colour = tile.colour[i];
+            pose.x = tile.x[i];
+            pose.z = tile.z[i];
+            pose.y = this.groundAt(pose.x, pose.z, feetY) + STATIC_CAR_CLEARANCE_Y;
+            pose.yaw = staticLookYaw(tile.heading[i]);
+            visit(pose);
+          }
+        }
       }
     }
   }

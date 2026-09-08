@@ -1434,8 +1434,16 @@ export interface DrivingWorld {
    * first second of a session before anything has streamed -- and means the nose
    * probe passes everything, which is the correct failure: a car that cannot
    * move until the collision arrives is worse than one that clips a wall once.
+   *
+   * **`resolveCity` and not `resolve`, named on the interface so the choice
+   * cannot be made by accident.** WORKSTREAM footcar put the parked, schedule
+   * and driven fleets into `CollisionWorld.resolve` so that a body on foot walks
+   * round a car; a car's bonnet must not meet them there, because car-on-car is
+   * `game/rigid.ts` with two masses and this probe would find the driver's own
+   * box in the way on the first tick. `CollisionWorld` satisfies both members
+   * and every literal below deliberately satisfies only this one.
    */
-  collision: { resolve(fx: number, fz: number, tx: number, tz: number, r: number, feetY: number, headY?: number): { x: number; z: number; hit: boolean } } | null;
+  collision: { resolveCity(fx: number, fz: number, tx: number, tz: number, r: number, feetY: number, headY?: number): { x: number; z: number; hit: boolean } } | null;
   /**
    * Is this point on a carriageway? Optional; absent counts as road. See
    * `DRIVE_TOP_SPEED_ROUGH`.
@@ -1679,7 +1687,15 @@ export function stepCarSpeed(
     // noticing. Lifted feet and an unlifted head is `controller.step`'s own pair,
     // argument for argument, so the bonnet and the body now agree about what is
     // solid.
-    const hit = world.collision.resolve(
+    // **`resolveCity` and not `resolve`**: the city, without the cars in it.
+    // A car's bonnet meeting another car is a *crash* and is adjudicated by
+    // `game/rigid.ts` with two masses and an impulse -- `resolveTrafficContacts`,
+    // `resolveStaticContacts` and `resolveCarContacts` between them cover every
+    // population `server/carcoverage-check.ts` enumerates. A second opinion from
+    // the capsule resolver would charge for the same contact twice, and this
+    // probe would find the driver's *own* car box in the way on the first tick.
+    // See `player/collision.CollisionWorld.resolveCity`.
+    const hit = world.collision.resolveCity(
       x, z,
       x + fx * NOSE_REACH, z + fz * NOSE_REACH,
       NOSE_RADIUS, feetY + NOSE_STEP, feetY + NOSE_HEAD,
@@ -4456,8 +4472,8 @@ export function verifyDriving(): string[] {
 
   // --- The nose probe stops the car at a wall and leaves it alone in the open.
   {
-    const open: DrivingWorld = { collision: { resolve: (fx, fz) => ({ x: fx, z: fz, hit: false }) } };
-    const wall: DrivingWorld = { collision: { resolve: (fx, fz) => ({ x: fx, z: fz, hit: true }) } };
+    const open: DrivingWorld = { collision: { resolveCity: (fx, fz) => ({ x: fx, z: fz, hit: false }) } };
+    const wall: DrivingWorld = { collision: { resolveCity: (fx, fz) => ({ x: fx, z: fz, hit: true }) } };
     const clear: DriveState = { drivingCar: 1, carSpeed: 20, carHealth: CAR_HEALTH_MAX };
     if (stepCarSpeed(clear, { forward: 1, jump: false }, 1 / 60, 0, 0, 0, 0, open) !== 0) {
       failures.push('The nose probe reported a bump in an empty world.');
@@ -4495,7 +4511,7 @@ export function verifyDriving(): string[] {
     // scrape down the side of a building.
     {
       const alongside: DrivingWorld = {
-        collision: { resolve: (_fx, _fz, tx, tz) => ({ x: tx + 0.4, z: tz, hit: true }) },
+        collision: { resolveCity: (_fx, _fz, tx, tz) => ({ x: tx + 0.4, z: tz, hit: true }) },
       };
       const scrape: DriveState = { drivingCar: 1, carSpeed: 20, carHealth: CAR_HEALTH_MAX };
       stepCarSpeed(scrape, { forward: 1, jump: false }, 1 / 60, 0, 0, 0, 0, alongside);
@@ -4991,7 +5007,7 @@ export function verifyDriving(): string[] {
     /** Every query is answered exactly as `CollisionWorld` would answer it. */
     const kerb = (): DrivingWorld => ({
       collision: {
-        resolve: (fx, fz, tx, tz, _r, feetY) =>
+        resolveCity: (fx, fz, tx, tz, _r, feetY) =>
           feetY >= KERB_TOP - 0.05
             ? { x: tx, z: tz, hit: false }
             : { x: fx, z: fz, hit: true },
@@ -5014,7 +5030,7 @@ export function verifyDriving(): string[] {
     // probe that got the height right rather than a probe that stopped asking.
     const tall = (): DrivingWorld => ({
       collision: {
-        resolve: (fx, fz, tx, tz, _r, feetY) =>
+        resolveCity: (fx, fz, tx, tz, _r, feetY) =>
           feetY >= 2 - 0.05 ? { x: tx, z: tz, hit: false } : { x: fx, z: fz, hit: true },
       },
     });
@@ -5028,7 +5044,7 @@ export function verifyDriving(): string[] {
     // underside is at 2.6 m, which is `decks.WALK_UNDER_M`.
     const soffit = (): DrivingWorld => ({
       collision: {
-        resolve: (fx, fz, tx, tz, _r, feetY, headY) =>
+        resolveCity: (fx, fz, tx, tz, _r, feetY, headY) =>
           (headY ?? feetY + NOSE_HEAD) <= 2.6 ? { x: tx, z: tz, hit: false } : { x: fx, z: fz, hit: true },
       },
     });

@@ -290,6 +290,9 @@ import { PositionHistory, createBounds, rewindInto, resolveLiveById, type Rewoun
 import { SpatialHash } from '../client/src/game/spatialhash.ts';
 import { eyeAt, groundFor, layOutBikes, type ServerWorld } from './world.ts';
 import { CollisionWorld, type Prism } from '../client/src/player/collision.ts';
+// WORKSTREAM footcar: the three fleets as boxes a body on foot walks around.
+// Three-free, like everything else this file imports out of `client/src/game`.
+import { CarSolidField } from '../client/src/game/carsolids.ts';
 // --- Interiors. Three pure modules and a wire constant; see INTERIORS.md.
 //
 // `doorway` answers which building a body is standing at, from the same prisms
@@ -1128,6 +1131,29 @@ export class Simulation {
    * passes reach `Simulation.cars` for the `DrivingLookup` on it.
    */
   readonly cars = new CarField();
+  /**
+   * **The three fleets, as boxes a body on foot walks around.** WORKSTREAM
+   * footcar.
+   *
+   * `server/carcoverage-check.ts` rams every population of car in the game and
+   * its report ended with the hole: *"On foot, everything. The static fleet is
+   * not in the collision prisms and no pedestrian capsule is tested against
+   * it."* Cars were solid to other cars and to nobody's legs -- so a player, a
+   * bot, an officer, a pedestrian and a knocked-out body all walked through the
+   * kerb row, the bays and the wrecks.
+   *
+   * Held here rather than on `ServerWorld` and that is deliberate: the world is
+   * loaded once per host and shared by every room (`loadWorld`), while
+   * `this.cars` and the suppression it publishes are **per room**. A field on
+   * the world would let one room's theft un-park a car in another. The
+   * `CollisionWorld` those rooms share is the awkward half of that and is
+   * accounted for below in the constructor.
+   *
+   * Sources are set in the constructor and the tick at the top of `step`; see
+   * `game/carsolids.ts` for the whole argument and `player/collision.resolveCity`
+   * for the four callers that deliberately do *not* see this.
+   */
+  readonly carSolids = new CarSolidField();
   /** Records that changed this tick, for `room.sendCars`. Reused; see `bikeChanges`. */
   private readonly carChanges: DrivenCar[] = [];
   /**
@@ -1189,7 +1215,11 @@ export class Simulation {
   ): { x: number; z: number; hit: boolean } => {
     const world = this.world.collision;
     if (world === null) return { x: tx, z: tz, hit: false };
-    return world.resolve(fx, fz, tx, tz, r, feetY, headY);
+    // `resolveCity`: a wreck rolling down a hill is a *car*, and a car meeting a
+    // car is `resolveStaticContacts`/`resolveCarContacts` with two masses. See
+    // `player/collision.CollisionWorld.resolveCity` for the four callers that
+    // are here and why none of them has legs.
+    return world.resolveCity(fx, fz, tx, tz, r, feetY, headY);
   };
   /**
    * Scratch for `resolveTake` and for the driven fleet's own hit tests, on
@@ -1591,6 +1621,39 @@ export class Simulation {
     // nothing (`SYDNEY_FAKE_DRIVING=1` passes the sprint hatch instead).
     this.driving = options.driving ?? this.cars;
     this.fareCtx.peds = world.peds;
+
+    // --- WORKSTREAM footcar: **on foot, cars are solid.** See `carSolids`.
+    //
+    // The three fleets this process holds, and they are the three
+    // `server/carcoverage-check.ts` enumerates:
+    //
+    //   - `world.staticCars` is the residency's third `HexLayer` -- the
+    //     `.cars.bin` rows out to the whole extent a participant reaches, which
+    //     is a strict superset of the browser's streamed ring. Null on a world
+    //     baked before the parked fleet existed, and null means "no kerb cars",
+    //     which is what every check that builds a synthetic street already gets.
+    //   - `world.traffic` is the timetable, shared with every room on the host
+    //     and read-only from here: a pose is a closed-form function of the tick.
+    //   - `this.cars` is this room's records: cars with drivers, cars somebody
+    //     parked, and wrecks knocked loose out of the kerb.
+    //
+    // `suppressed` is `this.suppressCar`, the same predicate `stepCars`,
+    // `resolveTake` and the traffic's own obstacle ledger go through, so a car
+    // somebody has driven away in stops being a wall in its bay on the tick it
+    // stops being on the timetable. It is deliberately **not** applied to the
+    // records: a record *is* the car, and filtering it would make every stolen
+    // car in the room walk-through.
+    //
+    // Installed on the shared `CollisionWorld` here as well as at the top of
+    // every `step`, because a room resolves before its first tick -- `join`
+    // places a body, `pickRespawn` probes for a spot -- and a world with no
+    // fleet would put a spawn point inside a parked car.
+    this.carSolids.statics = world.staticCars ?? null;
+    this.carSolids.traffic = world.traffic;
+    this.carSolids.driven = this.cars;
+    this.carSolids.suppressed = this.suppressCar;
+    world.collision.setCarSolids(this.carSolids);
+
     this.ballWorld = groundFor(world);
     this.factionWorld = groundFor(world);
     // --- **Where the ground is under a car nobody is in.** See
@@ -3205,6 +3268,27 @@ export class Simulation {
     // reads a talent. See `teamfx.fxSetNow` for why exactly one talent needs a
     // module-level clock and why threading it was the worse option.
     fxSetNow(Date.now());
+    // --- WORKSTREAM footcar: the tick the car boxes stand at, installed beside
+    // the wall clock and before anything moves a body.
+    //
+    // A schedule car's pose is a pure function of `(route, slot, tick)`, so
+    // fixing it once here is what makes the box every capsule in this room is
+    // resolved against the *same* box -- and the same one the browser's
+    // prediction meets, since `main.ts` writes the identical field from the
+    // identical `trafficTick(Date.now())` at the top of its own fixed step. A
+    // field that read the clock per query would give two participants stepped
+    // half a millisecond apart two different streets. See `game/carsolids.ts`.
+    this.carSolids.tick = trafficTick(Date.now());
+    // **And the field itself, re-installed every tick.** See `carSolids`.
+    //
+    // One `CollisionWorld` is shared by every room on the host (`loadWorld` runs
+    // once and `Room` is handed the same `ServerWorld`), and the fleet is *per
+    // room* -- one room's theft must not un-park a car in another. Rooms step
+    // sequentially on the one thread, so claiming the world at the top of this
+    // tick and holding it for the length of it is exactly right and costs a
+    // field write. The alternative, a `CollisionWorld` per room, is 193 MB of
+    // prisms per room on a 1 GB box and is not a trade this project can make.
+    this.world.collision.setCarSolids(this.carSolids);
     this.events.length = 0;
     this.bikeChanges.length = 0;
     // **After** the clear, never before. See `bikeLoans`.
@@ -5804,7 +5888,10 @@ export class Simulation {
   private pushBody(fx: number, fz: number, tx: number, tz: number, feetY: number): { x: number; z: number } {
     const world = this.world.collision;
     if (world === null) return { x: tx, z: tz };
-    return world.resolve(fx, fz, tx, tz, NOSE_RADIUS, feetY + NOSE_STEP, feetY + NOSE_HEAD);
+    // `resolveCity`, on `looseResolve`'s argument: this separation is the
+    // displacement `game/rigid.ts` just computed *from* a car contact, and
+    // running it through the car boxes would resolve the same contact twice.
+    return world.resolveCity(fx, fz, tx, tz, NOSE_RADIUS, feetY + NOSE_STEP, feetY + NOSE_HEAD);
   }
 
   /**
