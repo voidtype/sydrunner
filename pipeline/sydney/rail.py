@@ -63,7 +63,7 @@ from typing import Any
 
 import numpy as np
 
-from . import config, geo
+from . import config, geo, merge
 from .sources.osm import PBF_PATH, _as_layer, _project, _read_layer, _within_radius
 
 # --- The physics, all of it -----------------------------------------------------
@@ -572,6 +572,10 @@ class RailStation:
     entrance_north: float = 0.0
     entrance_y: float = 0.0
     entrance_source: str = "none"  # 'osm' | 'generated'
+    # How far the mouth was walked to get out of the buildings standing over it.
+    # Zero at a mouth that was already clear, and at every station where the
+    # bake had no footprints to test against. See `clear_mouth`.
+    entrance_cleared_m: float = 0.0
     # Is the platform surface under the ground over it? The one fact the
     # geometry round cannot get wrong without the station being unenterable.
     below_grade: bool = False
@@ -5422,12 +5426,297 @@ STATION_BELOW_GRADE_M = 2.0
 STATION_BOX_MARGIN_M = 20.0
 STATION_BOX_HALF_WIDTH_M = 16.0
 
+# --- The head a body needs to walk in, and the mouth that is written clear -------
+#
+# WHAT THIS IS. `game/riding.stationAccessPlan` takes the entrance this module
+# writes and, if a building stands over it, walks it out of the way with a ring
+# search. That search runs on both ends at boot, over a collision field neither
+# end had when the bake was made, and until this section existed the bake was
+# free to write a mouth inside a wall and leave the runtime to notice. It
+# stopped noticing once, at Edgecliff, and the whole of `accessIntrusionAt`'s
+# header is the post-mortem. So the same test and the same search run **here**,
+# against the same footprints and the same DEM the tiles are cut from, and the
+# entrance that ships is already the one the runtime would have searched for.
+# The runtime keeps its search: a bake is a claim about buildings that a partial
+# tile refresh can date, and a plan that re-derives is a plan that cannot be
+# stale. What this removes is the case where the two *disagree*.
+#
+# THE MARGIN, STATED ONCE. A body may walk **under** a building -- that is the
+# one exception `player/collision.solidFor` makes -- and how far under is the
+# only number in this argument:
+#
+#     ACCESS_HEAD_M      1.9   a head over the access floor (`riding.ACCESS_HEAD_M`)
+#     UNDER_BUILDING_M   2.0   how far below a footprint's pad a body is under
+#                              the building rather than inside it
+#                              (`player/collision.UNDER_BUILDING_M`)
+#
+# `ACCESS_CLEAR_M` is their sum, and it belongs to the family this pipeline
+# already keeps for the same question asked of other structures:
+# `cli.WALKABLE_UNDER_M` (2.2, the clearance an audit is willing to call
+# walkable) and `decks.WALK_UNDER_M` (2.6, the clearance a deck is *built* to).
+# This one is the largest of the three because it is the only one measured
+# against a **pad** rather than a soffit -- a pad is the low corner of a
+# footprint on a slope and a soffit is where the floor actually is, and the
+# 0.03 m of daylight between the two at Edgecliff is precisely what a mouth fell
+# through. The three numbers are deliberately not unified: they answer
+# "may a body pass" for three different kinds of thing.
+ACCESS_HEAD_M = 1.9
+UNDER_BUILDING_M = 2.0
+ACCESS_CLEAR_M = ACCESS_HEAD_M + UNDER_BUILDING_M
+
+# `game/riding.ACCESS_MAX_SLOPE`, `ACCESS_OVERLAP_M` and `BOX_MIN_HEIGHT_M`,
+# restated by value so the search below is the same search. They are duplicated
+# rather than shared for `RAIL_EPOCH_MS`'s reason -- the two processes cannot
+# import each other -- and `cmd_rail_bake` prints the mouths it moved, which is
+# how a drift in any of them shows up as a station that moves for no reason.
+ACCESS_MAX_SLOPE = 0.75
+ACCESS_OVERLAP_M = 2.5
+ACCESS_BOX_MIN_HEIGHT_M = 4.0
+# How far the mouth may be from the site before `stationAccessPlan` stops
+# believing the OSM node at all. `riding.stationAccessPlan`'s `osm` test.
+ACCESS_OSM_REACH_M = 260.0
+# The ring search: rings of eight compass points, nearest first, out to here.
+ACCESS_RING_STEP_M = 4.0
+ACCESS_RING_MAX_M = 90.0
+
+
+def access_intrusion(floor_y: float, base: float) -> float:
+    """`game/riding.accessIntrusionAt`, in Python. See that function's header."""
+    if base is None or not math.isfinite(base):
+        return 0.0
+    cut = floor_y + ACCESS_HEAD_M - (base - UNDER_BUILDING_M)
+    return cut if cut > 0.0 else 0.0
+
+
+class AccessFootprints:
+    """`game/riding.AccessWorld.baseAt`, over the merged building list.
+
+    The runtime asks its collision field for *the lowest pad of any
+    non-structural prism standing on this point*. The collision field is written
+    from this same list with `tiles._pad_and_skirt`, so this is that query
+    against the input rather than against the output -- one indirection shorter
+    and, at Edgecliff, identical to the centimetre the shipped payload carries.
+
+    **The list is the one the ledger holds**, which is the merged-and-deduped
+    set the last build stored. `railenv.py`'s header states the cycle this sits
+    in and its resolution: the build reads a bake and the bake reads the build,
+    so the order is *build with the bake you have, then re-bake*. A footprint
+    that arrived after the last build is invisible here for exactly one round,
+    and the runtime's own search is what covers that round.
+    """
+
+    def __init__(self, buildings, terrain) -> None:
+        from shapely.geometry import Polygon
+        from shapely.strtree import STRtree
+
+        from . import tiles
+
+        self._polys: list = []
+        self._bases: list[float] = []
+        for b in buildings:
+            ring = np.asarray(b.ring, dtype=np.float64)
+            if len(ring) < 3:
+                continue
+            pad, _ = tiles._pad_and_skirt(terrain, b)
+            # `build_tile` adds `base_height` to the pad for anything that does
+            # not start at the ground, and `write_collision` ships that sum.
+            if b.base_height > 0.0:
+                pad += b.base_height
+            poly = Polygon(ring, b.holes)
+            if not poly.is_valid:
+                poly = poly.buffer(0)
+            if poly.is_empty:
+                continue
+            self._polys.append(poly)
+            self._bases.append(float(pad))
+        self._tree = STRtree(self._polys) if self._polys else None
+        self.count = len(self._polys)
+
+    def base_at(self, x: float, z: float) -> float:
+        """The lowest pad standing on a **world** (x, z), or NaN over open ground."""
+        if self._tree is None:
+            return float("nan")
+        from shapely.geometry import Point
+
+        p = Point(x, -z)
+        base = float("nan")
+        for i in self._tree.query(p):
+            i = int(i)
+            if not self._polys[i].contains(p):
+                continue
+            b = self._bases[i]
+            # `!(base <= b)` -- the runtime's own comparison, so NaN falls
+            # through on the first hit and the lowest wins after that.
+            if not base <= b:
+                base = b
+        return base
+
+
+# How far from a station a footprint has to be before it cannot possibly be over
+# any mouth. `ENTRANCE_MATCH_M` (220) is how far an OSM entrance node may be from
+# the site, `ACCESS_RING_MAX_M` (90) is how far the search may walk from there,
+# and the incline reaches about `(ceil - floor) / ACCESS_MAX_SLOPE` past that --
+# under 60 m at the deepest station in this city. 400 m covers all three with
+# room, and it is the difference between padding 1.3 million footprints and
+# padding two thousand.
+ACCESS_FOOTPRINT_REACH_M = 400.0
+
+
+def load_access_footprints(
+    terrain, stations: Sequence[RailStation], log=print
+) -> "AccessFootprints | None":
+    """The merged building list out of the ledger, near the bore stations, padded.
+
+    `cli._read_buildings_table` is the same read and the same re-orientation;
+    this is a copy rather than an import because `cli` imports half the pipeline
+    and a bake that pulled `pygltflib` in to look up a pad would be paying for
+    the geometry round to answer a question about the ground.
+
+    Narrowed to `ACCESS_FOOTPRINT_REACH_M` of a station the plan can be about,
+    in SQL, before a single ring is parsed. `None` when there is no ledger, no
+    `buildings` table or nothing near a station -- all three are legitimate on a
+    fresh checkout, and the caller says so rather than failing.
+    """
+    import json as _json
+    import sqlite3
+
+    from . import ledger
+
+    sites = [
+        (float(s.site_east), float(s.site_north))
+        for s in stations
+        if s.vertical == "underground"
+    ]
+    if not sites:
+        return None
+    try:
+        con = ledger.connect()
+        con.row_factory = sqlite3.Row
+        rows: dict[str, sqlite3.Row] = {}
+        for e, n in sites:
+            r = ACCESS_FOOTPRINT_REACH_M
+            for row in con.execute(
+                "SELECT * FROM buildings WHERE east BETWEEN ? AND ? AND north BETWEEN ? AND ?",
+                (e - r, e + r, n - r, n + r),
+            ):
+                rows[row["id"]] = row
+    except sqlite3.Error:
+        return None
+    if not rows:
+        log("  access: the ledger holds no buildings near a bore station;"
+            " every mouth is written where OSM put it")
+        return None
+    out = []
+    for r in rows.values():
+        g = _json.loads(r["geometry"])
+        ring, holes = merge.orient_footprint(
+            np.asarray(g["ring"], dtype=np.float64),
+            [np.asarray(h, dtype=np.float64) for h in g.get("holes", [])],
+        )
+        out.append(
+            merge.Building(
+                id=r["id"], source=g.get("source", "ms"), ring=ring, holes=holes,
+                area=r["area"], centroid=(r["east"], r["north"]),
+                min_height=g.get("min_height"), min_level=g.get("min_level"),
+                bridge=bool(g.get("bridge")), man_made=g.get("man_made"),
+                layer=int(g.get("layer") or 0), levels=r["levels"],
+                height=r["height"] or 0.0, height_source=r["height_source"] or "",
+            )
+        )
+    t0 = time.time()
+    field = AccessFootprints(out, terrain)
+    log(f"  access: {field.count:,} footprints within {ACCESS_FOOTPRINT_REACH_M:.0f} m"
+        f" of a bore station, padded in {time.time() - t0:.1f}s")
+    return field
+
+
+def _incline_dir(
+    site_x: float, site_z: float, ux: float, uz: float, mx: float, mz: float
+) -> tuple[float, float]:
+    """Which way the incline runs from a mouth: back toward the room's centre."""
+    a = (mx - site_x) * ux + (mz - site_z) * uz
+    sgn = -1.0 if a > 0 else 1.0
+    return ux * sgn, uz * sgn
+
+
+def _mouth_intrusion(
+    mx: float,
+    mz: float,
+    *,
+    site_x: float,
+    site_z: float,
+    ux: float,
+    uz: float,
+    floor_y: float,
+    fallback_top: float,
+    ground_at,
+    base_at,
+) -> float:
+    """Metres by which a building cuts into the head over the incline. 0 is clear.
+
+    `stationAccessPlan`'s `intrusion`, sample for sample: the pad behind the
+    mouth at the mouth's height, then a metre at a time down the incline to its
+    foot, worst sample wins. The loop accumulates `d` by ones from -2.5 exactly
+    as the original does, because both are exact in binary and a `range` here
+    would quietly sample a different set of points.
+    """
+    dx, dz = _incline_dir(site_x, site_z, ux, uz, mx, mz)
+    g0 = ground_at(mx, mz)
+    top = g0 if math.isfinite(g0) else fallback_top
+    length = max((top - floor_y) / ACCESS_MAX_SLOPE, 12.0)
+    worst = 0.0
+    d = -ACCESS_OVERLAP_M
+    while d <= length:
+        cut = access_intrusion(
+            top - (d if d > 0.0 else 0.0) * ACCESS_MAX_SLOPE,
+            base_at(mx + dx * d, mz + dz * d),
+        )
+        if cut > worst:
+            worst = cut
+        d += 1.0
+    return worst
+
+
+def clear_mouth(
+    mx: float, mz: float, **kw
+) -> tuple[float, float, float]:
+    """The mouth `stationAccessPlan` would choose, and what it still costs.
+
+    Rings of eight compass points about the *original* mouth, nearest first, the
+    first clear candidate wins and the least intruded upon wins if none is; the
+    diagonal is 0.7071 and not `sqrt(2)/2`, because the runtime's is. Returns
+    `(x, z, intrusion)` in world metres.
+    """
+    best = _mouth_intrusion(mx, mz, **kw)
+    if best <= 0.0:
+        return mx, mz, 0.0
+    r2 = 0.7071
+    dirs = (
+        (1.0, 0.0), (-1.0, 0.0), (0.0, 1.0), (0.0, -1.0),
+        (r2, r2), (-r2, r2), (r2, -r2), (-r2, -r2),
+    )
+    bx, bz = mx, mz
+    r = ACCESS_RING_STEP_M
+    while r <= ACCESS_RING_MAX_M:
+        for dx, dz in dirs:
+            cx = mx + dx * r
+            cz = mz + dz * r
+            here = _mouth_intrusion(cx, cz, **kw)
+            if here < best:
+                best = here
+                bx, bz = cx, cz
+                if here == 0.0:
+                    return bx, bz, 0.0
+        r += ACCESS_RING_STEP_M
+    return bx, bz, best
+
 
 def generate_access(
     stations: Sequence[RailStation],
     entrances: Sequence[tuple[float, float, str]],
     terrain=None,
-) -> None:
+    footprints: "AccessFootprints | None" = None,
+) -> dict:
     """Give every station a doorway and say how far it is from there to the platform.
 
     `shaft_depth` is the signed drop -- **positive down**, so it is the number of
@@ -5436,7 +5725,13 @@ def generate_access(
     between the ground at the entrance and the platform surface, which is the
     only pair of heights a stair actually connects; `clearance` is a claim about
     the *track* and is a metre and a bit lower.
+
+    With `footprints`, a mouth that lands inside a building is walked clear
+    before it is written -- see `AccessFootprints` and `clear_mouth`. Without
+    one, this is exactly what it was, and the runtime does the walking alone.
+    Returns a stats block for the caller to print.
     """
+    stats = {"planned": 0, "moved": 0, "moved_max_m": 0.0, "unresolved": 0, "worst": []}
     for st in stations:
         # The site is where the trains stand, so it is where the platform is and
         # therefore what an entrance has to reach.
@@ -5474,13 +5769,74 @@ def generate_access(
             if terrain is not None else st.ground_y
         )
         platform_surface = (st.site_y if st.site_faces else st.track_y) + PLATFORM_TOP_M
-        st.shaft_depth = st.entrance_y - platform_surface
         # **Below grade is measured at the station, not at the doorway.** The
         # entrance can be 200 m away up a hill, and a shaft depth taken from
         # there is a fact about the walk rather than about the railway. The
         # ground *over the platform* is the number RAIL-VERTICAL.md's whole
         # argument is about, and it is the one geometry has to carve against.
         st.below_grade = (st.site_ground - platform_surface) > STATION_BELOW_GRADE_M
+        # ...and now the doorway is walked out of whatever building it landed
+        # in, on `clear_mouth`'s terms and before anything downstream reads it.
+        # After `below_grade`, because that is half the gate; after `entrance_y`,
+        # because the DEM at the *original* point is what `stationAccessPlan`
+        # falls back to when the ground declines to answer.
+        _clear_station_mouth(st, terrain, footprints, stats)
+        st.shaft_depth = st.entrance_y - platform_surface
+    stats["worst"].sort(key=lambda w: -w[1])
+    del stats["worst"][6:]
+    return stats
+
+
+def _clear_station_mouth(st: RailStation, terrain, footprints, stats: dict) -> None:
+    """Move one station's entrance clear of the buildings over it, in place.
+
+    The gate is `stationAccessPlan`'s own, restated: a bore station a service
+    calls at, with a box tall enough to stand up in. Everything else -- a
+    surface station, a cutting, a station nothing calls at -- gets no plan at
+    runtime and therefore has no mouth for this to be about.
+    """
+    if footprints is None or terrain is None:
+        return
+    if st.vertical != "underground" or not st.below_grade:
+        return
+    if not st.served_dirs:
+        return
+    floor_y = float(st.site_y) + PLATFORM_TOP_M
+    ceil_y = float(st.site_ground)
+    if not (math.isfinite(floor_y) and math.isfinite(ceil_y)):
+        return
+    if not (ceil_y - floor_y >= ACCESS_BOX_MIN_HEIGHT_M):
+        return
+    # World metres from here down, because that is the frame the runtime plans
+    # in and the two searches have to sample the same points. `site_dx/site_dz`
+    # are already world; east and north are not.
+    site_x, site_z = float(st.site_east), -float(st.site_north)
+    mx, mz = float(st.entrance_east), -float(st.entrance_north)
+    osm = st.entrance_source == "osm" and math.hypot(mx - site_x, mz - site_z) < ACCESS_OSM_REACH_M
+    stats["planned"] += 1
+    x, z, worst = clear_mouth(
+        mx,
+        mz,
+        site_x=site_x,
+        site_z=site_z,
+        ux=float(st.site_dx),
+        uz=float(st.site_dz),
+        floor_y=floor_y,
+        fallback_top=float(st.entrance_y) if osm else ceil_y,
+        ground_at=lambda gx, gz: float(terrain.sample(gx, -gz)),
+        base_at=footprints.base_at,
+    )
+    if worst > 0.0:
+        stats["unresolved"] += 1
+    moved = math.hypot(x - mx, z - mz)
+    if moved <= 0.0:
+        return
+    st.entrance_east, st.entrance_north = x, -z
+    st.entrance_y = float(terrain.sample(x, -z))
+    st.entrance_cleared_m = moved
+    stats["moved"] += 1
+    stats["moved_max_m"] = max(stats["moved_max_m"], moved)
+    stats["worst"].append((st.name, moved, worst))
 
 
 # --- Overhead power, staged for the geometry round ---------------------------------
@@ -5969,6 +6325,12 @@ def write_bake(
             "entranceZ": round(ent_z, 2),
             "entranceY": round(float(s.entrance_y), 3),
             "entranceSource": s.entrance_source,
+            # How far the bake walked this mouth to get it out from under a
+            # building. Reported rather than used: `game/riding.stationAccessPlan`
+            # re-derives the same walk from the collision field it holds, and
+            # this is the number that says whether the two agreed. See
+            # `clear_mouth`.
+            "entranceClearedM": round(float(s.entrance_cleared_m), 2),
             "shaftDepth": round(float(s.shaft_depth), 3),
             # The one bit geometry cannot get wrong: is the platform under the
             # ground the player is standing on? Derived from the same measured
@@ -6299,7 +6661,22 @@ def build_all(radius_m: float, log=print, terrain=True) -> dict:
         f"{max((s.site_spread for s in stations), default=0.0):.0f} m, "
         f"{len(split)} over a platform length"
         + (f" ({', '.join(s.name for s in split[:4])})" if split else ""))
-    generate_access(stations, entrances, field)
+    # The footprints a mouth has to get out of. Read from the ledger's merged
+    # set -- the one the last build stored -- and skipped without complaint when
+    # there is none, because a first bake on a fresh checkout has no world to
+    # read and the runtime's own search still covers it. See `AccessFootprints`.
+    footprints = None
+    if field is not None:
+        footprints = load_access_footprints(field, stations, log=log)
+    access = generate_access(stations, entrances, field, footprints)
+    if access["planned"]:
+        log(f"  access: {access['planned']} bore mouths planned against "
+            f"{footprints.count if footprints else 0:,} footprints, "
+            f"{access['moved']} walked clear (worst {access['moved_max_m']:.1f} m), "
+            f"{access['unresolved']} still under a building")
+        for name, moved, worst in access["worst"]:
+            log(f"    {name:<22} moved {moved:5.1f} m"
+                + (f", {worst:.2f} m of head still cut" if worst > 0 else ""))
     blocks = cut_blocks(g, lines)
     for ln in lines:
         for d in ln.dirs:
