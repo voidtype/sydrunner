@@ -35,7 +35,7 @@
  * geometry over it in the file that is supposed to draw it.**
  *
  * ---------------------------------------------------------------------------
- * ## The three sources, and why all three are read rather than derived
+ * ## The four sources, and why all four are read rather than derived
  *
  *   - **The lanes.** `tiles.write_lanes`' ways block: centreline, solved height
  *     and kerb-to-kerb half width, per tile, clipped to the tile. The
@@ -52,6 +52,17 @@
  *     is drawn in walls, roofs, the contact skirt and the awning fascia; a deck
  *     is drawn in `road_asphalt`/`footpath_concrete`, which is what
  *     `decks.SLOT_DECK` and `decks.SLOT_STRUCTURE` alias to.
+ *   - **The landmark file.** `landmarks.glb`, opened once with the loader
+ *     `scripts/render-landmark-sheet.mjs` already reads it with, each node's
+ *     own transform applied. The four hero landmarks are the one place in this
+ *     world where the two halves live in different files: `landmarks.py` files
+ *     their collision under the tile holding each prism's centre, like a
+ *     building's, and their geometry is in no tile at all. A check that read
+ *     only the tiles therefore reported the Harbour Bridge's parapets, the
+ *     Opera House podium and the whole of Luna Park as invisible walls -- 34 of
+ *     them, carried in the budget below as an admitted lie for two rounds. See
+ *     `readLandmarkPlan`, and item 5 of `runControl`, which is what proves the
+ *     vertices came out where the landmark stands.
  *
  * ---------------------------------------------------------------------------
  * ## What "drawn" means here, and why it is a vertex test rather than a cover
@@ -127,6 +138,10 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+// The landmark file's reader. See `readLandmarkPlan`: this is the loader
+// `scripts/render-landmark-sheet.mjs` already opens `landmarks.glb` with, and a
+// check that hand-rolled a second one would be a check of a copy.
+import { NodeIO } from '@gltf-transform/core';
 import { CollisionWorld, type Prism } from '../client/src/player/collision.ts';
 import { parseTileGlb } from '../client/src/world/tile-decode.ts';
 import { decodeStreetNames, translateStreetNames } from '../client/src/world/tile-decode.ts';
@@ -171,31 +186,44 @@ export const UNDRAWN_AREA_BUDGET_M2 = 0;
  * `_mitred_ring` is the one frame both now use.
  *
  * **The retile of 2026-08-23 ran, and the fourteen are gone.** 1,646 tiles
- * re-emitted; this check now measures **3**, and they are the same three the
+ * re-emitted; this check then measured **3**, and they were the same three the
  * prediction named, to the metre: Millers Point, (-301.1, -1097.0), (-298.4,
  * -1102.4) and (-257.9, -1075.3) -- `landmarks.BRIDGE_PARAPET_HEIGHT` hero
- * parapets whose geometry lives in `landmarks.glb`, which this check does not
- * open, so they read as undrawn here and a landmark-aware check is what would
- * name them. Their base is 1.1 m over the ground and their top 2.4 m over it --
- * a shin-to-shoulder bar across Millers Point that nothing draws. The budget is
- * 3 rather than 0 for exactly those three and for nothing else.
+ * parapets whose geometry lives in `landmarks.glb`, which this check did not
+ * open, so they read as undrawn and a landmark-aware check was named as what
+ * would clear them. The budget was 3 for exactly those three.
  *
- * **The round of 2026-09-08 measured 34, and every one of the 31 new ones is
- * the same blind spot.** 24 are the Opera House podium and its monumental
+ * **The round of 2026-09-08 measured 34, and every one of the 31 new ones was
+ * the same blind spot.** 24 were the Opera House podium and its monumental
  * steps in tile `1_2` (base at sea level, tops climbing -62 to -55 m, 62 to
- * 1,484 m2 each), and 7 are Luna Park in `0_4` -- the two entrance towers,
- * the big top and four posts -- whose collision this retile now emits from
+ * 1,484 m2 each), and 7 were Luna Park in `0_4` -- the two entrance towers, the
+ * big top and four posts -- whose collision that retile emits from
  * `landmarks.py` while their meshes live in `landmarks.glb`. Nothing a player
- * can see is missing; the check cannot see the landmark file. The budget
- * moves to 34 for exactly those, and the honest fix is the landmark-aware
- * read named above, which would put this back to 0.
+ * could see was missing; the check could not see the landmark file. The budget
+ * went to 34 with the fix named in the same breath.
+ *
+ * ---------------------------------------------------------------------------
+ * **THAT FIX IS IN, AND THE NUMBER IS BACK TO ZERO.** `readLandmarkPlan` opens
+ * `landmarks.glb` beside the tiles, puts every node's 42,752 vertices into
+ * world metres through the node's own transform, and hands them to the *same*
+ * predicate the tile geometry goes through -- the same inflated ring, the same
+ * vertex count, the same `DRAWN_VERTEX_MIN`. On the 2026-09-08 world all 34
+ * are drawn by the landmark file and by no tile -- the nearest of them to the
+ * line an Opera House step, at 11 vertices inside its own ring against a
+ * threshold of 4 -- and the anywhere count over 1,371,905 prisms is **0**, for
+ * 15 s more than the same scan cost while blind. So this is a
+ * ratchet at zero again rather than a fence around a known lie, and the number
+ * the run prints beside it -- `drawn by landmarks.glb and by no tile` -- is the
+ * size of what used to be carried here. A build where that line reads 0 while
+ * the landmarks are still in the index has lost the landmark read, and item 5
+ * of `runControl` fails before this budget can.
  *
  * So the scan is over every prism now and the lane test is kept only as a
  * *severity* split -- a wall in a trunk carriageway is worse than a wall in a
  * back garden, and the table sorts by it. Both counts are ratcheted, because
  * they can regress independently.
  */
-export const UNDRAWN_ANYWHERE_BUDGET = 34;
+export const UNDRAWN_ANYWHERE_BUDGET = 0;
 
 /**
  * How far a prism's underside must clear the ground before it stops being a
@@ -400,10 +428,17 @@ function inflate(pts: ArrayLike<number>, by: number): number[] {
 // --- The world ---------------------------------------------------------------------
 
 interface TileEntry { key: string; b: number; bounds: [number, number, number, number]; }
+/** What `landmarks.LandmarkContract` puts in the index. Only the two fields read here. */
+interface LandmarkContract {
+  file: string;
+  items: Array<{ name: string; anchor_world: [number, number, number] }>;
+}
 interface WorldIndex {
   tile_size: number;
   terrain: { grid: number };
   tiles: TileEntry[];
+  /** Absent on a world built before the hero landmarks. See `readLandmarkPlan`. */
+  landmarks?: LandmarkContract;
 }
 
 const index = JSON.parse(readFileSync(join(ROOT, 'index.json'), 'utf8')) as WorldIndex;
@@ -500,6 +535,136 @@ function planPoints(t: TileEntry, slots: Set<string>): Float64Array {
   return Float64Array.from(xs);
 }
 
+// --- The landmark file -------------------------------------------------------------
+
+/**
+ * Which tile a world point falls in, by the index's own arithmetic.
+ *
+ * `index.json` writes a tile's bounds as `[tx*S, -(tz+1)*S, (tx+1)*S, -tz*S]` --
+ * x runs east with the key's first field and z runs *south*, against the second,
+ * because the world frame is `(east, up, -north)`. This is that relation read
+ * backwards, and `runControl` asserts it against every tile in the build rather
+ * than leaving it as a comment: a key derived one tile out would file the Opera
+ * House's vertices under the tile next door, and the only symptom would be an
+ * offender count that stayed exactly where it was.
+ */
+function tileKeyAt(x: number, z: number): string {
+  return `${Math.floor(x / SIZE)}_${Math.floor(-z / SIZE)}`;
+}
+
+/**
+ * The hero landmarks' own vertices, in world metres, filed under the tile that
+ * holds each one.
+ *
+ * ---------------------------------------------------------------------------
+ * **This file is the fourth source and the reason the anywhere count was a lie
+ * for two rounds.** `landmarks.py` emits a collision prism for every volume of
+ * the bridge, the Opera House, the tower and Luna Park, and files each one under
+ * the tile holding its centre -- so the prisms arrive in `collision/<tile>.bin`
+ * like any building's. Their *geometry* does not: it is in one `landmarks.glb`
+ * loaded once beside `far.bin` (`world/landmarks.ts`), and never in a tile's
+ * `.glb` at all. A check that opened only the tile files therefore found 34
+ * solids with nothing drawn over them in a city where a player can see all 34,
+ * and the budget carried them as an admitted blind spot.
+ *
+ * The vertices come out in **world** metres, which is where the two frames meet:
+ * the GLB puts each landmark's positions in metres about its own anchor so a
+ * 1.7 km bridge keeps millimetre resolution in float32, and the anchor rides on
+ * the node above the mesh as `(east, 0, -north)`. So the node transform is the
+ * whole registration and it is applied here exactly as `loadLandmarks` bakes it
+ * into the geometry on the client and as `render-landmark-sheet.mjs` applies it
+ * to draw the sheet -- `getWorldMatrix`, per node, per vertex. Drop it and every
+ * landmark lands on the Town Hall with the same triangle count, which is the
+ * failure the control's positive half is aimed at.
+ *
+ * Bucketed by tile because the scan is by tile and the alternative is 42,752
+ * vertices tested against all 1.37 million prisms. A prism is filed by its own
+ * centre and can overhang its tile -- by half a deck segment at the worst, which
+ * is 12.5 m -- so the scan gathers the eight neighbours too, the same 3 x 3 the
+ * lanes are gathered over.
+ */
+interface LandmarkPlan {
+  /** `[x, z, ...]` per tile key, world metres. */
+  buckets: Map<string, Float64Array>;
+  /** Each node's plan extent, `[minX, minZ, maxX, maxZ]`. For the control. */
+  extent: Map<string, [number, number, number, number]>;
+  /** The node names built, in file order. */
+  names: string[];
+  vertices: number;
+}
+
+const NO_POINTS = new Float64Array(0);
+
+/**
+ * Read `landmarks.glb` once, through the loader the landmark sheet already uses.
+ *
+ * Loud on every failure that is not "this world has no landmark set at all",
+ * because the quiet version of this function is a check that reports zero
+ * undrawn solids by reading no geometry. A build whose index carries a
+ * `landmarks` block and whose file will not open is a build whose 34 landmark
+ * prisms would be excused by an empty vertex list -- the exact defect the
+ * blind spot was. `runControl` is the other half: it proves the vertices that
+ * did come out are standing where the landmark is.
+ */
+async function readLandmarkPlan(): Promise<LandmarkPlan> {
+  const plan: LandmarkPlan = { buckets: new Map(), extent: new Map(), names: [], vertices: 0 };
+  const contract = index.landmarks;
+  if (contract === undefined) return plan;
+
+  const path = join(ROOT, contract.file);
+  if (!existsSync(path)) {
+    throw new Error(
+      `index.json names a landmark set at ${contract.file} and ${path} does not exist. ` +
+        `Every hero landmark's collision is in the tiles and none of its geometry is, so this ` +
+        `run would report all of it as invisible walls.`,
+    );
+  }
+  // Plain `NodeIO`, no extensions registered: the shipped file uses none, and a
+  // build that started quantising positions should stop this check dead rather
+  // than have it read a mesh it half understands. `render-landmark-sheet.mjs`
+  // registers the Khronos set and is the place to copy from when that day comes.
+  const doc = await new NodeIO().read(path);
+
+  const loose = new Map<string, number[]>();
+  const v = [0, 0, 0];
+  for (const node of doc.getRoot().listNodes()) {
+    const mesh = node.getMesh();
+    if (mesh === null) continue;
+    const name = node.getName();
+    plan.names.push(name);
+    const m = node.getWorldMatrix();
+    let box = plan.extent.get(name);
+    if (box === undefined) {
+      box = [Infinity, Infinity, -Infinity, -Infinity];
+      plan.extent.set(name, box);
+    }
+    for (const prim of mesh.listPrimitives()) {
+      const pos = prim.getAttribute('POSITION');
+      if (pos === null) continue;
+      for (let i = 0; i < pos.getCount(); i++) {
+        pos.getElement(i, v);
+        // Column-major, as glTF stores it: translation in 12/13/14. Only x and z
+        // are kept -- the drawn test is a plan test, here as for a building.
+        const x = m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12];
+        const z = m[2] * v[0] + m[6] * v[1] + m[10] * v[2] + m[14];
+        const key = tileKeyAt(x, z);
+        let bucket = loose.get(key);
+        if (bucket === undefined) { bucket = []; loose.set(key, bucket); }
+        bucket.push(x, z);
+        if (x < box[0]) box[0] = x;
+        if (z < box[1]) box[1] = z;
+        if (x > box[2]) box[2] = x;
+        if (z > box[3]) box[3] = z;
+        plan.vertices++;
+      }
+    }
+  }
+  for (const [key, pts] of loose) plan.buckets.set(key, Float64Array.from(pts));
+  return plan;
+}
+
+const LANDMARKS = await readLandmarkPlan();
+
 /** This tile's lane ways, in world metres, or an empty list. */
 function waysOf(t: TileEntry): Array<{ x: Float32Array; z: Float32Array; halfWidth: number; klass: number; osmId: number }> {
   const buf = read(t.key, 'lanes.bin');
@@ -582,6 +747,39 @@ function neighbourWays(t: TileEntry): ReturnType<typeof waysOf> {
   return out;
 }
 
+const landmarkCache = new Map<string, Float64Array>();
+/**
+ * Every landmark vertex near one tile: its own bucket and its eight neighbours'.
+ *
+ * The same 3 x 3 `neighbourWays` takes, for the same reason -- a prism is filed
+ * under the tile holding its centre and its ring can hang over the edge -- and
+ * one shared empty array for the 22,900 tiles that have no landmark near them,
+ * so the tiles that are not the harbour pay a map lookup and nothing else.
+ */
+function landmarksNear(key: string): Float64Array {
+  const cached = landmarkCache.get(key);
+  if (cached !== undefined) return cached;
+  const [tx, tz] = key.split('_').map(Number);
+  const parts: Float64Array[] = [];
+  let n = 0;
+  for (let ax = -1; ax <= 1; ax++) {
+    for (let az = -1; az <= 1; az++) {
+      const b = LANDMARKS.buckets.get(`${tx + ax}_${tz + az}`);
+      if (b === undefined) continue;
+      parts.push(b);
+      n += b.length;
+    }
+  }
+  let out = NO_POINTS;
+  if (n > 0) {
+    out = new Float64Array(n);
+    let at = 0;
+    for (const p of parts) { out.set(p, at); at += p.length; }
+  }
+  landmarkCache.set(key, out);
+  return out;
+}
+
 const offenders: Offender[] = [];
 let prismsSeen = 0;
 let onRoadPrisms = 0;
@@ -596,6 +794,17 @@ let tilesWithRoad = 0;
  * become a guess -- see the header on why the test is a vertex count.
  */
 let closestCall = Number.POSITIVE_INFINITY;
+/**
+ * How many prisms nothing in a tile draws and `landmarks.glb` does.
+ *
+ * The size of the blind spot, reported every run rather than remembered in a
+ * comment: this is the population the anywhere budget used to carry. If it ever
+ * reads zero on a build that has a landmark set, the landmark read has come
+ * apart and the control below is what says so.
+ */
+let landmarkDrawn = 0;
+/** The margin on `DRAWN_VERTEX_MIN` for that population, kept apart. See `closestCall`. */
+let closestLandmark = Number.POSITIVE_INFINITY;
 const t0 = Date.now();
 
 for (const t of scope) {
@@ -649,6 +858,9 @@ for (const t of scope) {
 
   const bld = planPoints(t, BUILDING_SLOTS);
   const deck = planPoints(t, DECK_SLOTS);
+  // And what the landmark file draws over this tile, which is nothing at all for
+  // every tile that is not on the harbour or under the tower. See LandmarkPlan.
+  const lmk = landmarksNear(t.key);
   for (const { p, on, klass, osmId } of live) {
     const ring = inflate(p.points, RING_SLOP_M);
     /**
@@ -673,9 +885,25 @@ for (const t of scope) {
     };
     // Either slot family answers, because a prism does not carry which module
     // drew it and a deck is drawn in the street's materials. See DECK_SLOTS.
-    const hits = Math.max(insideCount(bld), insideCount(deck));
+    const tileHits = Math.max(insideCount(bld), insideCount(deck));
+    // And the landmark file answers last, on the identical predicate -- the same
+    // inflated ring, the same vertex count, the same threshold -- because "drawn"
+    // must not mean two different things depending on which file drew it. Asked
+    // only when the tiles have already failed to draw the thing, so the harbour
+    // pays for it and the other 22,900 tiles do not.
+    const lmkHits = tileHits >= DRAWN_VERTEX_MIN || lmk.length === 0 ? 0 : insideCount(lmk);
+    const hits = Math.max(tileHits, lmkHits);
     if (hits >= DRAWN_VERTEX_MIN) {
-      if (hits < closestCall) closestCall = hits;
+      // The two margins are kept apart on purpose: the tile population is 1.37
+      // million prisms and the landmark one is 380, and averaging a hero
+      // landmark's thousands of vertices into `closestCall` would hide the day
+      // the city's own separation stopped being total.
+      if (tileHits >= DRAWN_VERTEX_MIN) {
+        if (tileHits < closestCall) closestCall = tileHits;
+      } else {
+        landmarkDrawn++;
+        if (lmkHits < closestLandmark) closestLandmark = lmkHits;
+      }
       continue;
     }
     if (on > 0) onRoadArea += on;
@@ -691,12 +919,22 @@ const onLane = offenders.filter((o) => o.onRoad > 0).length;
 say(`  ${tilesWithRoad.toLocaleString()} tiles carry a prism; ${prismsSeen.toLocaleString()} prisms read in ${secs.toFixed(0)} s`);
 say(`  ${onRoadPrisms.toLocaleString()} of them stand on a carriageway by ${MIN_ON_ROAD_M2} m2 or more`);
 say(`  ${walkUnder.toLocaleString()} clear ${WALKABLE_UNDER_M} m over the ground and are walked under, not into`);
+say(
+  `  ${landmarkDrawn.toLocaleString()} are drawn by landmarks.glb and by no tile -- ` +
+    `${LANDMARKS.vertices.toLocaleString()} vertices over ${LANDMARKS.names.length} nodes ` +
+    `(${LANDMARKS.names.join(', ') || 'none in this build'})`,
+);
 say(`  ${offenders.length.toLocaleString()} are SOLID AND UNDRAWN anywhere at all`);
 say(`  ${onLane.toLocaleString()} of those stand on a drivable lane -- ${onRoadArea.toFixed(0)} m2 of carriageway`);
 say(
   `  margin: the drawn prism nearest the line had ` +
     `${Number.isFinite(closestCall) ? closestCall : 0} vertices inside its own ring, against a ` +
     `threshold of ${DRAWN_VERTEX_MIN}${closestCall >= MARGIN_CAP ? ' (capped)' : ''}`,
+);
+say(
+  `  margin: the landmark-drawn prism nearest the line had ` +
+    `${Number.isFinite(closestLandmark) ? closestLandmark : 0} vertices inside its own ring` +
+    `${Number.isFinite(closestLandmark) && closestLandmark >= MARGIN_CAP ? ' (capped)' : ''}`,
 );
 
 if (offenders.length > 0) {
@@ -736,6 +974,39 @@ export const CONTROL_X = -2884.1;
 export const CONTROL_Z = -7417.7;
 /** A 12 m box, which is a small building and comfortably over MIN_ON_ROAD_M2. */
 const CONTROL_HALF = 6;
+
+/**
+ * And the landmark half of the control: which node it stands under.
+ *
+ * The Opera House, because 24 of the 31 solids the last round added to the
+ * blind spot were its podium and its steps, and because its anchor is the one
+ * point about it this file can name without hard-coding a number that a retile
+ * could move -- `index.json` carries `anchor_world` per landmark and the
+ * pipeline puts it at the OSM footprint's own centroid, which is under the
+ * building by construction.
+ *
+ * The positive half is what catches the failure this whole section is exposed
+ * to: `readLandmarkPlan` applies each node's transform, and a read that dropped
+ * it would come back with the right vertex count, the right extent *shape*, and
+ * every landmark stacked on the Town Hall. Nothing in the counts above would
+ * move -- the offenders would go on reading undrawn and the budget would go on
+ * being blamed. A box under the shells with nothing in it is the one thing that
+ * says so out loud.
+ */
+export const CONTROL_LANDMARK = 'opera_house';
+/**
+ * And how far past that landmark's own easternmost vertex its negative twin
+ * stands, metres.
+ *
+ * Five, and measured from the **extent** rather than from a hand-picked empty
+ * spot, because that is the only way to say "outside it" about a shape this
+ * file does not otherwise model: past the extent there is no vertex of that
+ * landmark at any y, so a hit there is the ring test answering yes to a place
+ * the landmark cannot reach. Five metres rather than fifty because the twin has
+ * to stay in the same tile bucket as the positive: a negative that passed by
+ * being somewhere else entirely would prove nothing about the predicate.
+ */
+const CONTROL_CLEAR_M = 5;
 
 function runControl(): string[] {
   const bad: string[] = [];
@@ -842,6 +1113,89 @@ function runControl(): string[] {
     );
   }
 
+  // 5. And a box under a landmark is drawn, while the same box outside it is
+  //    not. The whole of this round is one predicate -- "landmarks.glb has
+  //    vertices inside this ring" -- and it can fail in two directions that a
+  //    count cannot tell apart. A read that lost the node transforms answers no
+  //    everywhere, which looks exactly like the blind spot it replaced; a read
+  //    that answered yes for any prism *near* a landmark would excuse a genuine
+  //    invisible wall standing beside the Opera House, which is worse than the
+  //    blind spot because it is silent. So the positive and the negative are
+  //    both asserted, on one box and its own translation.
+  const landmarkBox = (cx: number, cz: number): number => {
+    const boxRing = inflate(
+      [
+        cx - CONTROL_HALF, cz - CONTROL_HALF, cx + CONTROL_HALF, cz - CONTROL_HALF,
+        cx + CONTROL_HALF, cz + CONTROL_HALF, cx - CONTROL_HALF, cz + CONTROL_HALF,
+      ],
+      RING_SLOP_M,
+    );
+    const cloud = landmarksNear(tileKeyAt(cx, cz));
+    let n = 0;
+    for (let i = 0; i < cloud.length; i += 2) {
+      if (inRing(boxRing, cloud[i], cloud[i + 1])) n++;
+    }
+    return n;
+  };
+  let under = 0;
+  let beside = 0;
+  let lmX = 0;
+  let lmZ = 0;
+  const item = index.landmarks?.items.find((i) => i.name === CONTROL_LANDMARK);
+  const extent = LANDMARKS.extent.get(CONTROL_LANDMARK);
+  if (index.landmarks === undefined) {
+    bad.push(
+      `this build's index.json has no landmarks block, so nothing was read out of a landmark ` +
+        `file and every hero landmark's collision -- the bridge's parapets, the Opera House ` +
+        `podium and steps, Luna Park -- would be counted as an invisible wall.`,
+    );
+  } else if (item === undefined || extent === undefined) {
+    bad.push(
+      `${CONTROL_LANDMARK} is not in this build: the index names ` +
+        `${index.landmarks.items.map((i) => i.name).join(', ') || 'nothing'} and landmarks.glb ` +
+        `carries ${LANDMARKS.names.join(', ') || 'no node with a mesh'}. The control cannot ask ` +
+        `its question and the landmark half of the scan is unproven.`,
+    );
+  } else {
+    lmX = item.anchor_world[0];
+    lmZ = item.anchor_world[2];
+    under = landmarkBox(lmX, lmZ);
+    beside = landmarkBox(extent[2] + CONTROL_CLEAR_M + CONTROL_HALF, lmZ);
+    if (under < DRAWN_VERTEX_MIN) {
+      bad.push(
+        `a ${CONTROL_HALF * 2} m box under ${CONTROL_LANDMARK}'s own anchor ` +
+          `(${lmX.toFixed(1)}, ${lmZ.toFixed(1)}) holds ${under} landmark vertices, against a ` +
+          `threshold of ${DRAWN_VERTEX_MIN}. Either the node transforms were dropped -- in which ` +
+          `case every landmark is stacked on the Town Hall and reads as undrawn where it stands ` +
+          `-- or the set no longer draws its own anchor. The anywhere count is back to being blind.`,
+      );
+    }
+    if (beside >= DRAWN_VERTEX_MIN) {
+      bad.push(
+        `the same box moved ${CONTROL_CLEAR_M} m past ${CONTROL_LANDMARK}'s easternmost vertex ` +
+          `still holds ${beside} landmark vertices, so the drawn test is answering yes to a place ` +
+          `the landmark does not reach and a real invisible wall beside it would be excused.`,
+      );
+    }
+  }
+
+  // 6. And the bucketing agrees with the index, on every tile in the build. A
+  //    key derived one tile out files the Opera House under its neighbour, and
+  //    the only symptom is a count that does not move. Cheap enough to ask of
+  //    all 22,928 rather than of a sample.
+  let misfiled = '';
+  for (const e of index.tiles) {
+    const k = tileKeyAt((e.bounds[0] + e.bounds[2]) / 2, (e.bounds[1] + e.bounds[3]) / 2);
+    if (k !== e.key) { misfiled = `${e.key} -> ${k}`; break; }
+  }
+  if (misfiled !== '') {
+    bad.push(
+      `tileKeyAt disagrees with index.json about which tile a point is in (${misfiled}), so the ` +
+        `landmark vertices are bucketed under the wrong tiles and the 3 x 3 gather can miss them ` +
+        `entirely. See tileKeyAt on the bounds relation it inverts.`,
+    );
+  }
+
   say('');
   say(
     `  CONTROL  a ${CONTROL_HALF * 2} m box at Pacific Highway x Critchett Road ` +
@@ -853,6 +1207,10 @@ function runControl(): string[] {
   );
   say(
     `           twisted-cell probe ${twistProbe.toFixed(2)} m (the NW-SE split says 5.00, bilinear 6.25)`,
+  );
+  say(
+    `           the same box under ${CONTROL_LANDMARK} (${lmX.toFixed(1)}, ${lmZ.toFixed(1)}) holds ` +
+      `${under} landmark vertices, and ${CONTROL_CLEAR_M} m past its eastern edge, ${beside}`,
   );
   say(
     bad.length === 0
