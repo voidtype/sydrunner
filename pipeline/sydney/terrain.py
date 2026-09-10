@@ -249,6 +249,15 @@ class Terrain:
         # a re-reading of it through one cell of harbour. Everything else in the
         # build wants `sample`, where the pads already are.
         self.pads = []
+        # The bare-earth zones this surface had the built mass taken off, when it
+        # did: one `pads.PadRecord` each, from `bareearth.station_pads`. Kept
+        # apart from `self.pads` rather than folded into it, because that list
+        # has two named readers and one of them -- `landmarks.stated_pad` --
+        # looks a record up by *name*, and a bare-earth zone carries the same
+        # name as the rule 1 pad over it. Only `bare-earth-check.py`'s gate reads
+        # this one; everything in the build wants `sample`, where the correction
+        # already is.
+        self.bare_earth = []
 
     # --- Construction --------------------------------------------------------
 
@@ -260,6 +269,7 @@ class Terrain:
         conform_roads: bool = True,
         conform_water: bool = True,
         conform_pads: bool = True,
+        bare_earth: bool = True,
     ) -> Terrain:
         """The extent's ground, with the streets levelled into it.
 
@@ -312,6 +322,19 @@ class Terrain:
         cell feather, which is what lets `terrain-rules-check.py` assert that
         nothing outside those extents moved by a millimetre. Read `pads.py`'s
         header before changing the order of these three.
+
+        `bare_earth` is the fourth pass and it runs **first**, before the road
+        solve rather than after the water. `bareearth.py` argues the whole of it;
+        the ordering is the half that belongs here. Rule 1 levels a bridge-tagged
+        station onto the *solved streets* beside it, and at Chatswood those
+        streets stand on the same contaminated plateau the station does -- so the
+        authority rule 1 defers to has to be corrected before it is consulted,
+        which means before `roadgrade.solve` reads its first profile. That makes
+        it the one pass whose write the road solve can carry outside its own
+        zone: it moves ground a street is solved on, and a grade-clamped graph
+        propagates. `bare-earth-check.py` measures how far rather than assuming
+        it is zero. Pass `False` for the surface as it was before this rule,
+        which is the "off" column of every number that module reports.
         """
         dem, origin_px, mpp = cls._load_dem(radius_m, zoom)
 
@@ -353,6 +376,30 @@ class Terrain:
         # `terraincache`, which is what stops this solve running most rounds.
         del dem
         field = cls(_Lattice(heights, -reach, -reach, spacing), base, stats)
+        if bare_earth:
+            # First, and reading nothing this build has computed: the correction
+            # is a function of the raw terrarium pixels and the OSM footprints
+            # over them, so it is available before any solve and has to be
+            # applied before the one that would otherwise inherit the error. It
+            # is written with `pads.conform` -- same plateau, same one-cell
+            # smoothstep, same `PadRecord` -- because a rule that can name the
+            # ground it is allowed to touch should be made to, and that machinery
+            # is what makes the naming checkable. No water is passed: the water
+            # has not been read yet and does not need to be, because
+            # `water.conform` runs *after* this and wins on every post it owns.
+            from . import bareearth
+            from . import pads as pads_module
+
+            # `field.sample` and not the raster: the correction is a subtraction
+            # off what the lattice already says, so a zone with nothing to
+            # correct moves nothing at all rather than by the difference between
+            # two windowings of the same Gaussian. `_BareField` argues it.
+            zones = bareearth.station_pads(radius_m, base, zoom, field.sample)
+            stats["bare_earth"] = pads_module.conform(
+                heights, -reach, -reach, spacing, zones, None, field.bare_earth
+            )
+            stats["min"] = float(heights.min())
+            stats["max"] = float(heights.max())
         if conform_roads:
             # The solve reads the *unconformed* surface through `field.sample`
             # and the conformance then writes back into the same array, so the
@@ -646,6 +693,18 @@ def _bilinear(grid: np.ndarray, x, y):
 # rasterise the footprints, subtract a coverage-weighted height, hole-fill from
 # the unbuilt ground around each block -- is tractable and needs no new source.
 # Both are their own pass. Neither changes anything below `_load_dem`.
+#
+# UPDATE 2026-09-10: the second one is built, in `bareearth.py`, and is the
+# `bare_earth` pass above. Two corrections to the sketch, both measured there:
+# the hole-fill is not needed and does not work (at 15.87 m a pixel a suburban
+# roof never owns a pixel, so masking a blend and filling from blends recovers
+# the blend -- it moved Chatswood 0.31 m the wrong way), and the subtraction is
+# the whole method on its own, because the smoothing is linear. It is applied
+# **only inside bridge-tagged station zones** and bounded by the roof over the
+# platforms, deliberately: unbounded it wants 15.6 m off Circular Quay, which is
+# the CBD error this note is about and not a thing a station rule gets to fix.
+# Applying it city-wide is still the follow-up; what exists is the narrowest
+# version that answers RAIL-VERTICAL.md section 3a.
 #
 # UPDATE: the *worst* consequence of it has since been dealt with separately, and
 # it is worth being clear about which. The contamination made the roads unusable

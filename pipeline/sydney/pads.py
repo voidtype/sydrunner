@@ -29,6 +29,18 @@ reading are not beside the thing but **on top of it**.
        is heard from: the footprint the model stands on is levelled to the pad
        the model stands at, and `pad_spread_m` goes 9.50 -> 0.00.
 
+**A third rule runs before both of these, in `bareearth.py`.** Rule 1 says the
+ground under a bridge-tagged station is the adjacent solved street, which is
+true, and which bought +0.7 m at Chatswood before it stopped -- because the
+streets around Chatswood stand on the same contaminated plateau the station
+does, so the authority rule 1 defers to had itself never been asked the
+question. `bareearth.py` asks it: over the same zone this module computes
+(`bridge_station_zones` -- one definition, two readers), the DSM has the built
+mass of the footprints subtracted off it **before `roadgrade.solve` reads a
+profile**, so rule 1 then pulls the station onto streets solved on ground the
+shopping centre has been taken off. Read that module's header before changing
+the zones here: they are the same zones.
+
 ---------------------------------------------------------------------------
 THE SHAPE IS `roadgrade.conform`'S, DELIBERATELY.
 
@@ -264,8 +276,33 @@ def _street_target(surface: roadgrade.RoadSurface) -> Callable:
     return target
 
 
-def station_pads(radius_m: float, surface: roadgrade.RoadSurface | None) -> list[Pad]:
-    """Rule one's zones: every bridge-tagged station's platform extent.
+@dataclass(frozen=True)
+class StationZone:
+    """One bridge-tagged station's platform extent, before anybody has a height.
+
+    Split out of `station_pads` when `bareearth.py` arrived, because two rules
+    now fire on this extent -- the bare-earth pass before the road solve and
+    rule 1 after it -- and two readings of "which stations are bridge-tagged and
+    how far does the deck reach" is one reading too many. The tie-break in
+    RAIL-VERTICAL.md section 3 is what makes the split safe: this is a question
+    about OSM tags and platform polygons only, so it has the same answer before
+    and after every height in the build exists.
+    """
+
+    name: str
+    zone: BaseGeometry
+    note: dict
+    # The platform rectangles themselves, before the margin was buffered on.
+    # Rule 1 has never needed them -- its target is the street network and the
+    # margin is the whole point of the zone -- but `bareearth.roof_cap` asks a
+    # question the buffered zone cannot answer: *what stands over the deck*, as
+    # opposed to what stands within 44 m of it. Carried here rather than
+    # re-derived there so `_platform_rect` has one caller's worth of truth.
+    decks: tuple[BaseGeometry, ...] = ()
+
+
+def bridge_station_zones(radius_m: float) -> list[StationZone]:
+    """Every bridge-tagged station's platform extent plus `STATION_MARGIN_M`.
 
     `structure` here is exactly `rail.classify_vertical`'s -- the length-weighted
     tunnel/bridge share of the track within `rail.STATION_WAY_RADIUS_M` -- and it
@@ -282,8 +319,6 @@ def station_pads(radius_m: float, surface: roadgrade.RoadSurface | None) -> list
     station in it (Chatswood, Circular Quay, Milsons Point) is mapped with its
     decks.
     """
-    if surface is None:
-        return []
     from . import rail
 
     ways, stations, platforms, _entrances = rail.read_rail(radius_m)
@@ -314,8 +349,7 @@ def station_pads(radius_m: float, surface: roadgrade.RoadSurface | None) -> list
     from scipy.spatial import cKDTree
 
     tree = cKDTree(mid)
-    target = _street_target(surface)
-    pads: list[Pad] = []
+    out: list[StationZone] = []
     for st in stations:
         idx = tree.query_ball_point([st.east, st.north], rail.STATION_WAY_RADIUS_M)
         if not idx:
@@ -333,12 +367,11 @@ def station_pads(radius_m: float, surface: roadgrade.RoadSurface | None) -> list
                        for r in rects])
         if zone is None:
             continue
-        pads.append(
-            Pad(
+        out.append(
+            StationZone(
                 name=st.name,
-                kind="station",
                 zone=zone,
-                target=target,
+                decks=tuple(rects),
                 note={
                     "bridge_share": round(bri, 3),
                     "tunnel_share": round(tun, 3),
@@ -349,7 +382,25 @@ def station_pads(radius_m: float, surface: roadgrade.RoadSurface | None) -> list
                 },
             )
         )
-    return pads
+    return out
+
+
+def station_pads(radius_m: float, surface: roadgrade.RoadSurface | None) -> list[Pad]:
+    """Rule one: those zones, each targeting the solved street network.
+
+    The extent is `bridge_station_zones` and the height is `_street_target`;
+    everything either of them is for is argued where it lives. What is left here
+    is the join, and the one line worth having: no road surface, no rule, because
+    the whole claim rule 1 makes is "the street knows better than the DSM" and
+    with no solve there is no street to ask.
+    """
+    if surface is None:
+        return []
+    target = _street_target(surface)
+    return [
+        Pad(name=z.name, kind="station", zone=z.zone, target=target, note=dict(z.note))
+        for z in bridge_station_zones(radius_m)
+    ]
 
 
 # --- Rule two: the ground under a hero landmark's footprint --------------------
