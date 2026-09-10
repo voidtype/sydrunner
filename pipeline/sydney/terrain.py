@@ -258,6 +258,14 @@ class Terrain:
         # this one; everything in the build wants `sample`, where the correction
         # already is.
         self.bare_earth = []
+        # The shoreline pass's record, when it ran: one `shoreline.ShoreRecord`,
+        # carrying the mapped tidal water the band was measured from and the two
+        # constants that shaped it. Kept apart from the two lists above for the
+        # same reason they are kept apart from each other -- it is not a pad, it
+        # has no name to look up, and its one reader is `shoreline-check.py`'s
+        # gate, which has to test the geometry the pass used rather than a
+        # reconstruction of it. Everything in the build wants `sample`.
+        self.shore = []
 
     # --- Construction --------------------------------------------------------
 
@@ -270,6 +278,7 @@ class Terrain:
         conform_water: bool = True,
         conform_pads: bool = True,
         bare_earth: bool = True,
+        shoreline: bool = True,
     ) -> Terrain:
         """The extent's ground, with the streets levelled into it.
 
@@ -335,6 +344,23 @@ class Terrain:
         propagates. `bare-earth-check.py` measures how far rather than assuming
         it is zero. Pass `False` for the surface as it was before this rule,
         which is the "off" column of every number that module reports.
+
+        `shoreline` is the fifth pass and runs **second**, immediately after the
+        bare-earth one and still before the road solve. `shoreline.py` argues the
+        whole of it; the ordering is the half that belongs here, and it is the
+        pass above it making the same argument for a second reason. The largest
+        single term in the Quay's thirty-metre error is `roadgrade.solve` --
+        eleven metres of it, because a grade-clamped street network cannot fall
+        from a 40 m CBD to the harbour in the three hundred metres it has -- so a
+        shore correction applied *after* the roads would leave the lattice under
+        its own carriageways. Corrected before, the streets are solved on ground
+        that has a shore in it. It runs after `bare_earth` rather than before
+        because that pass floors its own correction at the smoothed DSM over a
+        200 m ring, and a ring measured on already-lowered ground would clamp a
+        station straight back up; in this order each reads a surface the other
+        has finished with. Its write can therefore be carried outside its own
+        band by the road solve exactly as the bare-earth pass's can, and
+        `shoreline-check.py` measures that shadow rather than asserting it away.
         """
         dem, origin_px, mpp = cls._load_dem(radius_m, zoom)
 
@@ -397,6 +423,24 @@ class Terrain:
             zones = bareearth.station_pads(radius_m, base, zoom, field.sample)
             stats["bare_earth"] = pads_module.conform(
                 heights, -reach, -reach, spacing, zones, None, field.bare_earth
+            )
+            stats["min"] = float(heights.min())
+            stats["max"] = float(heights.max())
+        if shoreline:
+            # Second, and still before the road solve. It reads `field.sample`
+            # for the same reason the pass above it does -- the correction is a
+            # subtraction off what the lattice already says, so a shore with
+            # nothing to correct moves nothing at all rather than by the
+            # difference between two windowings of the same Gaussian -- and it
+            # reads the mapped water through its own `water.load`, because the
+            # build's own water is not read until after the roads and hoisting
+            # that read would move every pond in the extent. `shoreline.py`'s
+            # `tidal_geometry` states the trade.
+            from . import shoreline as shore_module
+
+            stats["shoreline"] = shore_module.conform(
+                heights, -reach, -reach, spacing, radius_m, base, zoom,
+                field.sample, field.shore,
             )
             stats["min"] = float(heights.min())
             stats["max"] = float(heights.max())
@@ -705,6 +749,18 @@ def _bilinear(grid: np.ndarray, x, y):
 # the CBD error this note is about and not a thing a station rule gets to fix.
 # Applying it city-wide is still the follow-up; what exists is the narrowest
 # version that answers RAIL-VERTICAL.md section 3a.
+#
+# UPDATE 2026-09-10, later the same day: the *second* narrowest version is built
+# too, in `shoreline.py`, and it is the `shoreline` pass above. Same estimator,
+# a different bound: inside a 250 m band along mapped tidal water the ground is
+# pulled toward the water and floored at this deconvolution, so a foreshore the
+# DSM reads as a wharf shed comes down and a foreshore that is real rock does
+# not. It removes 5.63 m of the Quay's 29.56 m error and RAIL-VERTICAL.md
+# section 3d has every term of the rest -- including the one that is not the
+# DEM's at all: `roadgrade._lipschitz` averages a downward projection with an
+# upward one and so hands back 59% of anything taken off a shore that is tied to
+# a CBD still reading 40 to 55 m. The city-wide pass this note has always asked
+# for is still the follow-up, and section 3d's reach sweep is what it is worth.
 #
 # UPDATE: the *worst* consequence of it has since been dealt with separately, and
 # it is worth being clear about which. The contamination made the roads unusable

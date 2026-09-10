@@ -427,6 +427,205 @@ DEM, the extract and the source of every module that shapes the lattice, so a
 key, so a rail-only edit still costs one fresh solve; `terraincache`'s header
 already took that trade and this makes it slightly worse and still right.
 
+#### 3d. Amendment, 2026-09-10: the ground at Circular Quay, measured and half fixed
+
+§3c ended by naming Circular Quay's recorded conflict as real and forbidding
+anyone to edit the expectation away: *"The fix is the terrain at the Quay, or
+`raw_heights` — not the audit."* This is the terrain half. It is
+`pipeline/sydney/shoreline.py`, gated by `pipeline/sydney/shoreline-check.py`,
+and it is honest about being a **partial** fix: it removes 5.63 m of a 29.56 m
+error and the reason the other 23.9 m stays is a finding of its own, in the last
+block of this section.
+
+**The ground at the Quay, what it should be, and every term of the difference.**
+Measured on the 5.3 km ring along a transect down the middle of Sydney Cove at
+east 140, at north 820 — the promenade, 32 m behind the waterline, **~2.5 m AHD
+in life**:
+
+| term | ground (m AHD) | what it added |
+|---|---|---|
+| the raw 15.87 m terrarium pixel | **12.50** | **+10.0** |
+| the 60 m Gaussian | 17.81 | +5.3 |
+| `bareearth`, capped at `roof_cap` = 0.45 m | 17.37 | −0.45 |
+| `roadgrade.solve` + `conform` | 28.50 | **+11.1** |
+| `water.conform` | 28.50 | **0.00** |
+| `pads.station_pads` rule 1 (Circular Quay) | **32.06** | +3.6 |
+
+So, to the four candidates the brief put:
+
+- **(a) the tile itself is wrong, by about ten metres, and it is the largest
+  DSM term.** At 15.87 m a pixel there is no promenade in this raster: the raw
+  pixels over the Quay's own block read 9–15 m and the ones over the Opera
+  House side read 23–26. The Cahill's deck, the ferry terminal roofs, the wharf
+  sheds and the AMP building *are* the ground here. No kernel removes that.
+- **(b) the Gaussian adds five metres, not fifteen.** 12.50 raw against 17.81
+  smoothed is what the CBD's towers are worth at the Quay through a 60 m
+  kernel — the smaller half of the DSM's error, not the larger. `terrain.py`'s
+  note is right that the contaminated patch is 1.5 km wide; what it did not say
+  is that the patch *reaches the water*.
+- **(c) the water conform does not pull the promenade down, and cannot.** Its
+  `hold` is `np.maximum(out, hold)` with `hold` at sea level, so on a post
+  already 28 m up it is a no-op. Measured: **0.00 m** on this transect, including
+  at north 840 which is 12.8 m from the waterline and well inside
+  `water.FEATHER_OUT_M`. That is not a bug — a one-sided hold is the right shape
+  for *"no dry ground under the sea"*. It is the wrong shape for the opposite
+  failure, and nothing in the pipeline was looking at the opposite failure.
+- **(d) `roof_cap` is right to refuse.** §3b caps the Quay's deconvolution at
+  0.45 m because every polygon over those decks is `building=train_station`
+  awning, and the unbounded 15.6 m would take the wharves, the viaduct and the
+  heroes with it. Correct *for a station rule*. It is the wrong bound for a
+  shore, because what is wrong at the Quay is not the roof over the platforms.
+
+**And a fifth term the question did not list, which is the largest of all:**
+`roadgrade.solve` adds **eleven metres**. The streets are solved under a grade
+clamp from ground that reads 40–55 m across the CBD, so the profile cannot fall
+to the harbour in the three hundred metres it has, `roadgrade.conform` pulls the
+lattice onto it, and rule 1 then reads those streets and adds 3.6 m more. **The
+CBD's contamination is delivered to the foreshore by the road solve.**
+
+**The rule.** In `shoreline.py`, run **second** — after `bareearth` and still
+before `roadgrade.solve`, for the ordering reason §3b already argued and this
+term makes twice as sharp:
+
+> **A shore may not stand higher over the water than a shore stands, and it may
+> not be pulled down by more than there is building on it.** Within
+> `SHORE_REACH_M` of mapped **tidal** water the lattice is pulled toward
+> `SURFACE_AHD + PROMENADE_AHD` by a weight that is one at the waterline and
+> zero at the reach; the result is floored at the smoothed DSM with the built
+> mass deconvolved out of it. Never upward. Never past that floor.
+>
+>     d   = metres to the nearest mapped tidal waterline, zero inside it
+>     u   = clip(d / SHORE_REACH_M, 0, 1);  w = 1 - (3u^2 - 2u^3)
+>     new = min(natural, max(natural + w*((sea + PROMENADE_AHD) - natural),
+>                            natural - built_drop))
+
+`SHORE_REACH_M` is 250 m and `PROMENADE_AHD` is 3.0 m AHD — the Quay promenade
+in life, and clear of both numbers `water.py` owns (`SHORE_CLEARANCE_M` 0.4,
+`TIDAL_MARGIN_M` 2.0).
+
+**Both halves are load-bearing and each one's failure is the other's bound.**
+The pull alone flattens real rock: Mrs Macquaries Point reads 4.58 m AHD *at the
+waterline* and a pull to 3.0 takes 1.6 m of sandstone off it. The floor alone is
+§3b's estimator unbounded — right and unusable. Together the discriminator is
+not a classification and not a footprint mask but a per-post, continuous
+measurement of **how much building the DSM is looking at**, which is rule 1 of
+this document read for the ground instead of for the railway. (A footprint mask
+was the shape the brief offered and it is refused for `bareearth.py`'s reason —
+half a building corrected is a step through a wall — and because it gets the
+Quay promenade itself backwards: no footprint stands on it and it is thirty
+metres wrong, because the mass belongs to the block behind.)
+
+There is **no reach feather** and none is needed: at `d = SHORE_REACH_M` the
+weight is zero, the pull term is `natural`, and the `max` against
+`natural − built_drop` returns `natural`. The pass stops writing by
+construction. `pads.py`'s one cell would have been a 27% ramp here.
+
+**The gate, on the 5.3 km ring.** Four lattices, not two: a pass-only pair with
+every later pass off — whose diff *is* the write, and is asserted — and the
+shipped pair, whose diff is measured.
+
+| | |
+|---|---|
+| the pass's own write | **21,633 of 148,225 posts** (14.59%), p50 0.304 / p95 4.309 / max 18.730 m |
+| bounded by the built mass / by the pull | 19,084 / 2,785 |
+| **every one inside the band + one cell** (250 + 31.25 m) | **PASS**, and **not one post was raised** |
+| the shipped diff, all of it | 32,711 posts, p50 0.061 / p95 3.151 / max 12.012 m |
+| — inside the band + one cell | 18,143, p50 0.474 / p95 3.863 / max 12.012 |
+| — the road solve's shadow, outside it | 14,568, p50 0.000 / p95 0.966 / max 6.979; 718 over a metre, none of *those* past 684 m |
+| extra grade in the band | 8,557 cells steeper, p50 0.12% / p95 1.86% / max 14.94%, in a band already at p95 19.98% |
+
+**The Quay transect, before and after** (m AHD; the shipped chain both sides):
+
+| N | d(water) | off | on | in life |
+|---|---|---|---|---|
+| 900 | wet | −1.46 | −1.46 | the bed `water.conform` cut |
+| 860 | 5 m | 14.80 | **12.16** | ~2.5, the promenade |
+| 820 | 32 m | 32.06 | **26.42** | ~2.5, behind the seawall |
+| 780 | 72 m | 33.96 | **28.27** | ~4, Alfred Street |
+| 700 | 152 m | 41.32 | **35.61** | ~6 |
+| 680 | 172 m | 43.14 | **37.44** | ~6, under the Cahill deck (the deck ~20) |
+
+Every station is closer and none is close. Away from the CBD the rule lands in
+full — the pass's own write, before the roads: Kirribilli −2.40, Dawes Point
+−2.26, Balmain East −0.23, **Mrs Macquaries Point 0.00 at the waterline and 0.00
+ten metres in, Centennial Park 0.00.** The floor declines unbuilt ground
+outright, which is the whole safety argument and it is asserted every run.
+
+**The heroes.** `landmark-audit`'s blocks, built on both lattices:
+
+| hero | what moved | why |
+|---|---|---|
+| **Opera House** | **identical to the millimetre** | its podium is `sea + OPERA_PODIUM_TOP_AHD` — a stated 16.0 m AHD platform, and nothing in its audit reads the ground. What does move is outside the audit: the podium prism's buried base, `min(sample over the plan)` 0.87 → 0.15 m AHD, and the ceremonial stair riser 0.642 → 0.675 m over 22 treads. Neither is visible. |
+| **Harbour Bridge** | `ramp_south_m` 265 → 275; `ramp_north_clearance_m` **8.329 → 9.935**; `deck_s_min` −839.5 → −849.5 | the deck is stated at 49.0 m AHD and does not move. The **abutments** stand on ground that did: arch pin S 10.00 → 6.27, arch pin N 5.88 → 3.74, ramp foot S 34.29 → 33.40, ramp foot N 35.60 → 33.99 m AHD. So the southern ramp runs 10 m further before it meets grade in The Rocks, and the northern granite abutment closing the gap is 1.61 m taller — exactly the ground it stands on. The arch pins are unaffected in *height*: `build_bridge` founds them at `min(ground, sea + BRIDGE_BEARING_AHD − 6)` and their tops are stated. |
+| **Luna Park** | `base_y` −56.738 → −60.482 (**14.34 → 10.59 m AHD**) | a `ground_founded` landmark on reclaimed foreshore, entirely inside the band. Its forecourt is ~3 m AHD in life, so this is 3.74 m of the error going the right way. |
+| **Sydney Tower** | `base_y` −0.541 | **the road solve's shadow only.** Its pad is Westfield's block, ~600 m from mapped water and outside the band; no post under it was written by this pass. |
+
+**What Circular Quay's clearance becomes, from the transect.** The station node
+is E 86.6 N 818.4 and its ground goes **37.24 → 30.56 m AHD, −6.68 m**. §3c
+records the shipped 20 km bake there at `groundY` −33.84 (37.23 AHD),
+`clearance` −6.74, conflict recorded — the same ground to the centimetre, which
+is the check that this is the same surface. `rail.raw_heights` gives a bridge
+node `terrain.sample(...) + BRIDGE_RISE` and `BRIDGE_RISE` is 7.0 m, so the deck
+follows the ground down and only what the 3.3% grade projection restores from
+approaches that did not move survives; Chatswood measured that exchange rate at
+**0.38**. So 6.68 m of ground is worth between **+2.54 and +6.68 m** of
+clearance, and Circular Quay goes from −6.74 to somewhere in **−4.20 .. −0.06 m**.
+**Neither end clears the deck.** The conflict §3c forbade editing away stays
+recorded and stays right: the ground is still wrong, by less. `rail-audit` at
+20 km was not run for this round and `shoreline-check.py --radius 20000` is
+where the measured number is.
+
+**And the finding that outranks the pass.** The pass writes **11.48 m** at the
+promenade and the build keeps **5.63**. Median kept/written on dry land the pass
+wrote more than a metre to: **0.41**. It is not a rounding loss. The mechanism is
+`roadgrade._lipschitz`, whose own docstring is the argument against it —
+*"cutting a spike down (low) and filling the valleys either side of it up (high)
+are both legal answers and the truth is between them"* — so it returns the
+average of a downward projection and an upward one. That is the right operator
+for an error of unknown sign, and **this error has a sign**:
+`roadgrade.OPENING_M`'s note says so two hundred lines earlier
+(*"contamination is always upward"*), and so does `bareearth.BUILT_COEFF`'s, and
+so does `shoreline.py`'s own `np.minimum(natural, ...)`. When the shore comes
+down eleven metres and the CBD three hundred metres away stays at fifty, the
+`CROSS_GRADE` tie chain is violated, the low projection pulls the CBD down, the
+high projection pulls the shore back up, and the average splits an error that is
+entirely the CBD's evenly between the two. Measured: the solved street nearest
+east 140 north 820 goes 31.31 → 25.63 m AHD — a 5.68 m fall for an 11.5 m
+correction — and it ends up standing 20 m above its own ground.
+
+So the shore rule is **necessary and not sufficient**, and the two things that
+finish it are already named in other files' headers:
+
+- **the city-wide deconvolution**, `terrain.py`'s standing follow-up and
+  `bareearth.py`'s. `shoreline.SHORE_REACH_M`'s own table is what it is worth,
+  swept on the 5.3 km ring with every pass on: at a 600 m reach the Quay
+  promenade comes to 17.23 m AHD and Sydney Tower moves 2.7 m; at 900 m the Quay
+  reaches 14.30 and **Town Hall drops 11.3 m**, which is roughly the error
+  `terrain.py` records there — that row is not a shore rule, it is the CBD pass
+  arriving under a shore rule's name, and it deserves its own round and its own
+  gate on the CBD's landmarks. 600 m is the row to take next, once that gate
+  exists at 20 km.
+- **a Lipschitz projection that knows its error has a sign** — one-sided where
+  the observation is a surface model over a city, symmetric elsewhere. That is a
+  change to every street in Sydney, it belongs to whoever owns `roadgrade.py`,
+  and `road-grade-audit` is its gate.
+
+**Two of §3b's numbers move, and neither is a regression.** `bare-earth-check.py`
+now runs both of its columns on ground this pass has already touched, so Circular
+Quay's zone reads `ground off -40.38 / on -40.51` where §3b recorded
+`-33.68 / -33.83`. The *move* it measures is the same −0.13 m, which is the
+number that check exists to assert; the absolute is 6.7 m lower because that is
+this pass. `bare-earth-check.py` and `terrain-rules-check.py` were both re-run at
+5.3 km against this branch and both still PASS, gate and all. `rail-audit` and
+`landmark-audit` at 20 km were not run this round.
+
+**One thing fixed in passing, because §3c's lesson had a third instance
+waiting.** `cli.cmd_road_grade_audit`'s `--surface raw` called
+`Terrain.load(radius, conform_roads=…, conform_water=…, conform_pads=…)` and
+named three of what are now five flags, so its "before" column was the raw drape
+*with the bare-earth pass still in it* — the identical trap §3c found in
+`rail.build_all`. Every flag is now named there.
+
 ### 4. Access is generated, never looked up
 
 Every failure of reachability came from treating access as *content* — build it

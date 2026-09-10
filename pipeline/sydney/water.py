@@ -1039,6 +1039,18 @@ def conform(
     mapped water, against 13 without this pass. See `terrain.Terrain.load` for
     the whole of that argument and `cli._tidal_plan` for how the audit reports
     it. `water-audit` reports the polygon overlap.
+
+    **THE HOLD IS ONE-SIDED AND THAT IS ONLY HALF A SHORELINE.** `hold` is a
+    `np.maximum` at sea level: it raises a post that the DEM put under the sea
+    and it can never lower one. That is the right shape for the failure this
+    module was written against, and it means this pass has nothing at all to say
+    about the opposite one -- a foreshore the DSM stands thirty metres up on the
+    wharf sheds built along it. Measured at Circular Quay: on a post 12.8 m from
+    the waterline, well inside `FEATHER_OUT_M`, this conform moves the ground by
+    **0.00 m** while it stands at 28 m AHD over a promenade that is 2.5 m in
+    life. `shoreline.py` is the other side and runs long before this, on the
+    unsolved lattice; RAIL-VERTICAL.md section 3d is the argument. Nothing here
+    changed and nothing here should: two rules, two directions, one waterline.
     """
     if field.is_empty():
         return {"posts": int(heights.size), "wet": 0, "held": 0}
