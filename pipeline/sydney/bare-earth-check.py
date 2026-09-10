@@ -416,7 +416,8 @@ def main(argv: list[str] | None = None) -> int:
         for p in problems:
             print(f"  - {p}")
         return 1
-    print(f"{PASS}: the pass moved what it claimed, and Chatswood is on its deck.")
+    print(f"{PASS}: the pass moved what it claimed"
+          + ("." if args.skip_rail else ", and Chatswood is up off the floor."))
     return 0
 
 
